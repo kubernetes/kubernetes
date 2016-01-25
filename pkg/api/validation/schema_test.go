@@ -72,7 +72,7 @@ func TestValidateOk(t *testing.T) {
 		for _, test := range tests {
 			testObj := test.obj
 			apiObjectFuzzer.Fuzz(testObj)
-			data, err := testapi.Default.Codec().Encode(testObj)
+			data, err := runtime.Encode(testapi.Default.Codec(), testObj)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

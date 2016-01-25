@@ -42,6 +42,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -343,7 +344,7 @@ func (k *Executor) LaunchTask(driver bindings.ExecutorDriver, taskInfo *mesos.Ta
 		return
 	}
 
-	obj, err := api.Codec.Decode(taskInfo.GetData())
+	obj, err := kruntime.Decode(api.Codecs.UniversalDecoder(), taskInfo.GetData())
 	if err != nil {
 		log.Errorf("failed to extract yaml data from the taskInfo.data %v", err)
 		k.sendStatus(driver, newStatus(taskInfo.GetTaskId(), mesos.TaskState_TASK_FAILED,

@@ -61,7 +61,7 @@ func pkgPath(group, version string) string {
 		group = "api"
 	}
 	gv := group
-	if version != "" {
+	if version != "__internal" {
 		gv = path.Join(group, version)
 	}
 	switch {
@@ -104,7 +104,7 @@ func main() {
 	} else {
 		pkgname = gv.Group
 	}
-	if len(gv.Version) != 0 {
+	if len(gv.Version) != 0 && gv.Version != kruntime.APIVersionInternal {
 		pkgname = gv.Version
 	}
 

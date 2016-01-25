@@ -30,6 +30,7 @@ import (
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
@@ -391,7 +392,7 @@ func ExampleNoMergingOnExplicitPaths() {
 
 	mergedConfig, err := loadingRules.Load()
 
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -437,7 +438,7 @@ func ExampleMergingSomeWithConflict() {
 
 	mergedConfig, err := loadingRules.Load()
 
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -496,7 +497,7 @@ func ExampleMergingEverythingNoConflicts() {
 
 	mergedConfig, err := loadingRules.Load()
 
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}

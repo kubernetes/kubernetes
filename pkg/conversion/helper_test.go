@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package componentconfig
+package conversion
 
-import (
-	"io/ioutil"
+import "testing"
 
-	"k8s.io/kubernetes/pkg/runtime"
-)
-
-func DecodeFromPathInto(obj runtime.Object, c runtime.Codec, filename string) error {
-	b, err := ioutil.ReadFile(filename)
-	c = runtime.YAMLDecoder(c)
-
-	if err != nil {
-		return err
+func TestInvalidPtrValueKind(t *testing.T) {
+	var simple interface{}
+	switch obj := simple.(type) {
+	default:
+		_, err := EnforcePtr(obj)
+		if err == nil {
+			t.Errorf("Expected error on invalid kind")
+		}
 	}
-	return c.DecodeInto(b, obj)
+}
+
+func TestEnforceNilPtr(t *testing.T) {
+	var nilPtr *struct{}
+	_, err := EnforcePtr(nilPtr)
+	if err == nil {
+		t.Errorf("Expected error on nil pointer")
+	}
 }

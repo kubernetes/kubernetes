@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -209,8 +210,7 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 func setDiscoveryDefaults(config *Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
-	// Discovery client deals with unversioned objects, so we use api.Codec.
-	config.Codec = api.Codec
+	config.Codec = runtime.NoopEncoder{api.Codecs.UniversalDecoder()}
 	return nil
 }
 

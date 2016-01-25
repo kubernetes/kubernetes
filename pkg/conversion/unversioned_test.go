@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -67,8 +67,8 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	// TODO: caesarxuchao: use the testapi.Extensions.Codec() once the PR that
 	// moves experimental from v1 to v1beta1 got merged.
-	expCodec := runtime.CodecFor(api.Scheme, v1beta1.SchemeGroupVersion)
-	encoded, err := expCodec.Encode(status)
+	expCodec := api.Codecs.LegacyCodec(extensions.SchemeGroupVersion)
+	encoded, err := runtime.Encode(expCodec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.Kind != "Status" {
 		t.Errorf("Kind is not set to \"Status\". Got %s", encoded)
 	}
-	if typeMeta.APIVersion != "" {
+	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
 	decoded, err := runtime.Decode(expCodec, encoded)

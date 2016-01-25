@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/storage"
@@ -104,4 +105,42 @@ func IsAPIPrefixNotFound(err error) bool {
 
 	_, ok := err.(*errAPIPrefixNotFound)
 	return ok
+}
+
+// errNotAcceptable indicates Accept negotiation has failed
+// TODO: move to api/errors if other code needs to return this
+type errNotAcceptable struct {
+	accepted []string
+}
+
+func (e errNotAcceptable) Error() string {
+	return fmt.Sprintf("only the following media types are accepted: %v", strings.Join(e.accepted, ", "))
+}
+
+func (e errNotAcceptable) Status() unversioned.Status {
+	return unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    http.StatusNotAcceptable,
+		Reason:  unversioned.StatusReason("NotAcceptable"),
+		Message: e.Error(),
+	}
+}
+
+// errNotAcceptable indicates Content-Type is not recognized
+// TODO: move to api/errors if other code needs to return this
+type errUnsupportedMediaType struct {
+	accepted []string
+}
+
+func (e errUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("the body of the request was in an unknown format - accepted media types include: %v", strings.Join(e.accepted, ", "))
+}
+
+func (e errUnsupportedMediaType) Status() unversioned.Status {
+	return unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    http.StatusUnsupportedMediaType,
+		Reason:  unversioned.StatusReason("UnsupportedMediaType"),
+		Message: e.Error(),
+	}
 }

@@ -20,16 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-// SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed PluginBase
-func (obj *PluginBase) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	_, obj.Kind = gvk.ToAPIVersionAndKind()
-}
-
-// GroupVersionKind satisfies the ObjectKind interface for all objects that embed PluginBase
-func (obj *PluginBase) GroupVersionKind() *unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind("", obj.Kind)
-}
-
 // SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
 func (obj *TypeMeta) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
@@ -42,3 +32,33 @@ func (obj *TypeMeta) GroupVersionKind() *unversioned.GroupVersionKind {
 
 func (obj *Unknown) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
 func (obj *Unstructured) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+
+// GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
+// interface if no objects are provided, or the ObjectKind interface of the object in the
+// highest array position.
+func (obj *VersionedObjects) GetObjectKind() unversioned.ObjectKind {
+	last := obj.Last()
+	if last == nil {
+		return unversioned.EmptyObjectKind
+	}
+	return last.GetObjectKind()
+}
+
+// First returns the leftmost object in the VersionedObjects array, which is usually the
+// object as serialized on the wire.
+func (obj *VersionedObjects) First() Object {
+	if len(obj.Objects) == 0 {
+		return nil
+	}
+	return obj.Objects[0]
+}
+
+// Last is the rightmost object in the VersionedObjects array, which is the object after
+// all transformations have been applied. This is the same object that would be returned
+// by Decode in a normal invocation (without VersionedObjects in the into argument).
+func (obj *VersionedObjects) Last() Object {
+	if len(obj.Objects) == 0 {
+		return nil
+	}
+	return obj.Objects[len(obj.Objects)-1]
+}

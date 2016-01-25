@@ -18,15 +18,11 @@ package conversion
 
 import (
 	"encoding/json"
-	"fmt"
-	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 
-	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 )
@@ -109,7 +105,7 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *Scheme {
-	internalGV := unversioned.GroupVersion{}
+	internalGV := unversioned.GroupVersion{Version: "__internal"}
 	externalGV := unversioned.GroupVersion{Version: "v1"}
 
 	s := NewScheme()
@@ -122,32 +118,7 @@ func GetTestScheme() *Scheme {
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType2"), &ExternalTestType2{})
 	s.AddKnownTypeWithName(internalGV.WithKind("TestType3"), &TestType1{})
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &ExternalTestType1{})
-	s.MetaFactory = testMetaFactory{}
 	return s
-}
-
-type testMetaFactory struct{}
-
-func (testMetaFactory) Interpret(data []byte) (unversioned.GroupVersionKind, error) {
-	findKind := struct {
-		APIVersion string `json:"myVersionKey,omitempty"`
-		ObjectKind string `json:"myKindKey,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err := yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return unversioned.GroupVersionKind{}, fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	gv, err := unversioned.ParseGroupVersion(findKind.APIVersion)
-	if err != nil {
-		return unversioned.GroupVersionKind{}, err
-	}
-	return gv.WithKind(findKind.ObjectKind), nil
-}
-
-func (testMetaFactory) Update(version, kind string, obj interface{}) error {
-	return UpdateVersionAndKind(nil, "APIVersion", version, "ObjectKind", kind, obj)
 }
 
 func objDiff(a, b interface{}) string {
@@ -168,111 +139,6 @@ func objDiff(a, b interface{}) string {
 	//	fmt.Sprintf("%#v", a),
 	//	fmt.Sprintf("%#v", b),
 	//)
-}
-
-func runTest(t *testing.T, source interface{}) {
-	name := reflect.TypeOf(source).Elem().Name()
-	TestObjectFuzzer.Fuzz(source)
-
-	s := GetTestScheme()
-	data, err := s.EncodeToVersion(source, "v1")
-	if err != nil {
-		t.Errorf("%v: %v (%#v)", name, err, source)
-		return
-	}
-	obj2, err := s.Decode(data)
-	if err != nil {
-		t.Errorf("%v: %v (%v)", name, err, string(data))
-		return
-	}
-	if !reflect.DeepEqual(source, obj2) {
-		t.Errorf("1: %v: diff: %v", name, objDiff(source, obj2))
-		return
-	}
-	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface()
-	err = s.DecodeInto(data, obj3)
-	if err != nil {
-		t.Errorf("2: %v: %v", name, err)
-		return
-	}
-	if !reflect.DeepEqual(source, obj3) {
-		t.Errorf("3: %v: diff: %v", name, objDiff(source, obj3))
-		return
-	}
-}
-
-func TestTypes(t *testing.T) {
-	table := []interface{}{
-		&TestType1{},
-		&ExternalInternalSame{},
-	}
-	for _, item := range table {
-		// Try a few times, since runTest uses random values.
-		for i := 0; i < *fuzzIters; i++ {
-			runTest(t, item)
-		}
-	}
-}
-
-func TestMultipleNames(t *testing.T) {
-	s := GetTestScheme()
-
-	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	internal := obj.(*TestType1)
-	if internal.A != "value" {
-		t.Fatalf("unexpected decoded object: %#v", internal)
-	}
-
-	out, err := s.EncodeToVersion(internal, "v1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(out), `"myKindKey":"TestType1"`) {
-		t.Errorf("unexpected encoded output: %s", string(out))
-	}
-}
-
-func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
-	internalGV := unversioned.GroupVersion{}
-	externalGV := unversioned.GroupVersion{Version: "v1"}
-
-	s := NewScheme()
-	// create two names internally, with TestType1 being preferred
-	s.AddKnownTypeWithName(internalGV.WithKind("TestType1"), &TestType1{})
-	s.AddKnownTypeWithName(internalGV.WithKind("OtherType1"), &TestType1{})
-	// create two names externally, with TestType1 being preferred
-	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &ExternalTestType1{})
-	s.AddKnownTypeWithName(externalGV.WithKind("OtherType1"), &ExternalTestType1{})
-	s.MetaFactory = testMetaFactory{}
-
-	ext := &ExternalTestType1{}
-	ext.APIVersion = "v1"
-	ext.ObjectKind = "OtherType1"
-	ext.A = "test"
-	data, err := json.Marshal(ext)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expect := &TestType1{A: "test"}
-
-	obj, err := s.Decode(data)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !reflect.DeepEqual(expect, obj) {
-		t.Errorf("unexpected object: %#v", obj)
-	}
-
-	into := &TestType1{}
-	if err := s.DecodeInto(data, into); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !reflect.DeepEqual(expect, obj) {
-		t.Errorf("unexpected object: %#v", obj)
-	}
 }
 
 func TestKnownTypes(t *testing.T) {
@@ -311,77 +177,5 @@ func TestConvertToVersionErr(t *testing.T) {
 	_, err := s.ConvertToVersion(tt, "v1")
 	if err == nil {
 		t.Fatalf("unexpected non-error")
-	}
-}
-
-func TestEncode_NonPtr(t *testing.T) {
-	s := GetTestScheme()
-	tt := TestType1{A: "I'm not a pointer object"}
-	obj := interface{}(tt)
-	data, err := s.EncodeToVersion(obj, "v1")
-	obj2, err2 := s.Decode(data)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v'", err, err2)
-	}
-	if _, ok := obj2.(*TestType1); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if !reflect.DeepEqual(obj2, &tt) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &tt, obj2)
-	}
-}
-
-func TestEncode_Ptr(t *testing.T) {
-	s := GetTestScheme()
-	tt := &TestType1{A: "I am a pointer object"}
-	obj := interface{}(tt)
-	data, err := s.EncodeToVersion(obj, "v1")
-	obj2, err2 := s.Decode(data)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v'", err, err2)
-	}
-	if _, ok := obj2.(*TestType1); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if !reflect.DeepEqual(obj2, tt) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &tt, obj2)
-	}
-}
-
-func TestBadJSONRejection(t *testing.T) {
-	s := GetTestScheme()
-	badJSONs := [][]byte{
-		[]byte(`{"myVersionKey":"v1"}`),                          // Missing kind
-		[]byte(`{"myVersionKey":"v1","myKindKey":"bar"}`),        // Unknown kind
-		[]byte(`{"myVersionKey":"bar","myKindKey":"TestType1"}`), // Unknown version
-	}
-	for _, b := range badJSONs {
-		if _, err := s.Decode(b); err == nil {
-			t.Errorf("Did not reject bad json: %s", string(b))
-		}
-	}
-	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
-	if err := s.DecodeInto(badJSONKindMismatch, &TestType1{}); err == nil {
-		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
-	}
-	if err := s.DecodeInto([]byte(``), &TestType1{}); err == nil {
-		t.Errorf("Did not give error for empty data")
-	}
-}
-
-func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
-	s := GetTestScheme()
-	s.InternalVersions[""] = unversioned.GroupVersion{Version: "v1"}
-	badJSONs := [][]byte{
-		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
-	}
-	for _, b := range badJSONs {
-		if _, err := s.Decode(b); err == nil {
-			t.Errorf("Did not reject bad json: %s", string(b))
-		}
-	}
-	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
-	if err := s.DecodeInto(badJSONKindMismatch, &TestType1{}); err == nil {
-		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}
 }

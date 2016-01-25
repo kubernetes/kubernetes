@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -86,13 +87,13 @@ func TestCodec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		codec := thirdPartyResourceDataCodec{kind: "Foo"}
+		codec := &thirdPartyResourceDataCodec{kind: "Foo", delegate: testapi.Extensions.Codec()}
 		data, err := json.Marshal(test.obj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
 		}
-		obj, err := runtime.Decode(&codec, data)
+		obj, err := runtime.Decode(codec, data)
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
@@ -120,7 +121,7 @@ func TestCodec(t *testing.T) {
 			t.Errorf("[%s]\nexpected\n%v\nsaw\n%v\n", test.name, test.obj, &output)
 		}
 
-		data, err = runtime.Encode(&codec, rsrcObj)
+		data, err = runtime.Encode(codec, rsrcObj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 		}

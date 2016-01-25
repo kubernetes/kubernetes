@@ -30,7 +30,7 @@ import (
 
 // Clientset returns a clientset that will respond with the provided objects
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := core.NewObjects(api.Scheme, api.Scheme)
+	o := core.NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)

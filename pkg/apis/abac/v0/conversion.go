@@ -17,7 +17,7 @@ limitations under the License.
 package v0
 
 import (
-	"k8s.io/kubernetes/pkg/apis/abac"
+	api "k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/conversion"
 )
 

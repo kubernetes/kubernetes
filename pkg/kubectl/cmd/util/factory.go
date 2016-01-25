@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -63,13 +64,19 @@ type Factory struct {
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
+	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
+	// into their internal form (if possible). Eventually the internal form will be removed as an option,
+	// and only versioned objects will be returned.
+	Decoder func(toInternal bool) runtime.Decoder
+	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
+	JSONEncoder func() runtime.Encoder
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func() (*client.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
-	RESTClient func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
@@ -185,7 +192,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		ClientConfig: func() (*client.Config, error) {
 			return clients.ClientConfigForVersion(nil)
 		},
-		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+		ClientForMapping: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
 			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
@@ -209,6 +216,15 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
+		},
+		Decoder: func(toInternal bool) runtime.Decoder {
+			if toInternal {
+				return api.Codecs.UniversalDecoder()
+			}
+			return api.Codecs.UniversalDeserializer()
+		},
+		JSONEncoder: func() runtime.Encoder {
+			return api.Codecs.LegacyCodec(registered.EnabledVersions()...)
 		},
 		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, absoluteTimestamps, columnLabels), nil
@@ -531,7 +547,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	gvk, err := runtime.UnstructuredJSONScheme.DataKind(data)
+	gvk, err := json.DefaultMetaFactory.Interpret(data)
 	if err != nil {
 		return err
 	}
@@ -663,24 +679,9 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 	return printer, nil
 }
 
-// ClientMapperForCommand returns a ClientMapper for the factory.
-func (f *Factory) ClientMapperForCommand() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-		return f.RESTClient(mapping)
-	})
-}
-
-// NilClientMapperForCommand returns a ClientMapper which always returns nil.
-// When command is running locally and client isn't needed, this mapper can be parsed to NewBuilder.
-func (f *Factory) NilClientMapperForCommand() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-		return nil, nil
-	})
-}
-
 // One stop shopping for a Builder
 func (f *Factory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
-	return resource.NewBuilder(mapper, typer, f.ClientMapperForCommand())
+	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }

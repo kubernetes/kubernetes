@@ -18,11 +18,13 @@ package install
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	internal "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -49,7 +51,7 @@ func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := registered.GroupOrDie(internal.GroupName).Codec.Encode(&pod)
+	data, err := runtime.Encode(internal.Codecs.LegacyCodec(registered.GroupOrDie(internal.GroupName).GroupVersion), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,8 +102,8 @@ func TestRESTMapper(t *testing.T) {
 		}
 
 		interfaces, _ := registered.GroupOrDie(internal.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
+		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
+			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
 		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}
@@ -111,6 +113,17 @@ func TestRESTMapper(t *testing.T) {
 		}
 		if name != "foo" {
 			t.Errorf("unable to retrieve object meta with: %v", mapping.MetadataAccessor)
+		}
+	}
+}
+
+func TestUnversioned(t *testing.T) {
+	for _, obj := range []runtime.Object{
+		&unversioned.Status{},
+		&unversioned.ExportOptions{},
+	} {
+		if unversioned, ok := internal.Scheme.IsUnversioned(obj); !unversioned || !ok {
+			t.Errorf("%v is expected to be unversioned", reflect.TypeOf(obj))
 		}
 	}
 }

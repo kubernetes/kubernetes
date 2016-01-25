@@ -26,7 +26,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
@@ -152,6 +151,7 @@ type Column struct {
 // of data from templates specified in the `Columns` array
 type CustomColumnsPrinter struct {
 	Columns []Column
+	Decoder runtime.Decoder
 }
 
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
@@ -192,7 +192,7 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	switch u := obj.(type) {
 	case *runtime.Unknown:
 		var err error
-		if obj, err = api.Codec.Decode(u.RawJSON); err != nil {
+		if obj, _, err = s.Decoder.Decode(u.RawJSON, nil, nil); err != nil {
 			return err
 		}
 	}
