@@ -27,10 +27,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// How long to wait for a log pod to be displayed
-const podLogTimeout = 45 * time.Second
-
 var _ = Describe("Downward API volume", func() {
+	// How long to wait for a log pod to be displayed
+	const podLogTimeout = 45 * time.Second
+
 	f := NewFramework("downward-api")
 	It("should provide podname only [Conformance]", func() {
 		podName := "downwardapi-volume-" + string(util.NewUUID())
