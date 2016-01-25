@@ -142,6 +142,7 @@ type TestContextType struct {
 	CloudConfig           CloudConfig
 	KubectlPath           string
 	OutputDir             string
+	ReportDir             string
 	prefix                string
 	MinStartupPods        int
 	UpgradeTarget         string

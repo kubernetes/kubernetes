@@ -44,6 +44,10 @@ const (
 )
 
 func resizeGroup(size int) error {
+	if testContext.ReportDir != "" {
+		CoreDump(testContext.ReportDir)
+		defer CoreDump(testContext.ReportDir)
+	}
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
