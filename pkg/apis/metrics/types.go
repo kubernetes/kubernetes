@@ -16,7 +16,10 @@ limitations under the License.
 
 package metrics
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+)
 
 // Placeholder top-level node resource metrics.
 type RawNode struct {
@@ -26,4 +29,27 @@ type RawNode struct {
 // Placeholder top-level pod resource metrics.
 type RawPod struct {
 	unversioned.TypeMeta `json:",inline"`
+}
+
+// Node-level metrics.
+type Node struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+	Metrics              Metrics `json:"metrics,omitempty"`
+}
+
+// Pod-level metrics.
+type Pod struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+	Metrics              Metrics `json:"metrics,omitempty"`
+}
+
+// The latest available metrics for the appriopriate resource.
+type Metrics struct {
+	// StartTime and EndTime specifies the time window from which the response was returned.
+	StartTime unversioned.Time `json:"start"`
+	EndTime   unversioned.Time `json:"end"`
+	// List of available resources' usage.
+	Usage api.ResourceList `json:"usage",omitempty`
 }

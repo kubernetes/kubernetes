@@ -19,14 +19,134 @@ limitations under the License.
 package v1alpha1
 
 import (
+	time "time"
+
 	api "k8s.io/kubernetes/pkg/api"
+	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	inf "speter.net/go/exp/math/dec/inf"
 )
+
+func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {
+	if in.Amount != nil {
+		if newVal, err := c.DeepCopy(in.Amount); err != nil {
+			return err
+		} else {
+			out.Amount = newVal.(*inf.Dec)
+		}
+	} else {
+		out.Amount = nil
+	}
+	out.Format = in.Format
+	return nil
+}
+
+func deepCopy_unversioned_Time(in unversioned.Time, out *unversioned.Time, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.Time); err != nil {
+		return err
+	} else {
+		out.Time = newVal.(time.Time)
+	}
+	return nil
+}
 
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
+	return nil
+}
+
+func deepCopy_v1_ObjectMeta(in v1.ObjectMeta, out *v1.ObjectMeta, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.GenerateName = in.GenerateName
+	out.Namespace = in.Namespace
+	out.SelfLink = in.SelfLink
+	out.UID = in.UID
+	out.ResourceVersion = in.ResourceVersion
+	out.Generation = in.Generation
+	if err := deepCopy_unversioned_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
+		return err
+	}
+	if in.DeletionTimestamp != nil {
+		out.DeletionTimestamp = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
+			return err
+		}
+	} else {
+		out.DeletionTimestamp = nil
+	}
+	if in.DeletionGracePeriodSeconds != nil {
+		out.DeletionGracePeriodSeconds = new(int64)
+		*out.DeletionGracePeriodSeconds = *in.DeletionGracePeriodSeconds
+	} else {
+		out.DeletionGracePeriodSeconds = nil
+	}
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	if in.Annotations != nil {
+		out.Annotations = make(map[string]string)
+		for key, val := range in.Annotations {
+			out.Annotations[key] = val
+		}
+	} else {
+		out.Annotations = nil
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_Metrics(in Metrics, out *Metrics, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_Time(in.StartTime, &out.StartTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Time(in.EndTime, &out.EndTime, c); err != nil {
+		return err
+	}
+	if in.Usage != nil {
+		out.Usage = make(v1.ResourceList)
+		for key, val := range in.Usage {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.Usage[key] = *newVal
+		}
+	} else {
+		out.Usage = nil
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_Node(in Node, out *Node, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1alpha1_Metrics(in.Metrics, &out.Metrics, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_Pod(in Pod, out *Pod, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1alpha1_Metrics(in.Metrics, &out.Metrics, c); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -46,7 +166,13 @@ func deepCopy_v1alpha1_RawPod(in RawPod, out *RawPod, c *conversion.Cloner) erro
 
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		deepCopy_resource_Quantity,
+		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
+		deepCopy_v1_ObjectMeta,
+		deepCopy_v1alpha1_Metrics,
+		deepCopy_v1alpha1_Node,
+		deepCopy_v1alpha1_Pod,
 		deepCopy_v1alpha1_RawNode,
 		deepCopy_v1alpha1_RawPod,
 	)
