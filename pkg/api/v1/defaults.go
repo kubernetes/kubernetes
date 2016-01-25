@@ -243,6 +243,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				}
 			}
 		},
+		func(obj *ResourceQuotaSpec) {
+			// if not specified, the quota counts requests to preserve backward compatibility
+			if obj.ResourceAccountingPolicy == nil {
+				policy := ResourceAccountingPolicyRequests
+				obj.ResourceAccountingPolicy = &policy
+			}
+		},
 	)
 }
 

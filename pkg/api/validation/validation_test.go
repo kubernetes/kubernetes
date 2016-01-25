@@ -3634,6 +3634,45 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 }
 
+func TestValidateResourceQuotaUpdate(t *testing.T) {
+	accountingPolicyRequests := api.ResourceAccountingPolicyRequests
+	accountingPolicyLimits := api.ResourceAccountingPolicyLimits
+	testCases := map[string]struct {
+		newResourceQuota api.ResourceQuota
+		oldResourceQuota api.ResourceQuota
+		isValid          bool
+	}{
+		"valid-update": {
+			newResourceQuota: api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo", ResourceVersion: "123"},
+				Spec:       api.ResourceQuotaSpec{ResourceAccountingPolicy: &accountingPolicyRequests},
+			},
+			oldResourceQuota: api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo", ResourceVersion: "123"},
+				Spec:       api.ResourceQuotaSpec{ResourceAccountingPolicy: &accountingPolicyRequests, Hard: api.ResourceList{}},
+			},
+			isValid: true,
+		},
+		"invalid-update-change-accounting-policy": {
+			newResourceQuota: api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo", ResourceVersion: "123"},
+				Spec:       api.ResourceQuotaSpec{ResourceAccountingPolicy: &accountingPolicyRequests},
+			},
+			oldResourceQuota: api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo", ResourceVersion: "123"},
+				Spec:       api.ResourceQuotaSpec{ResourceAccountingPolicy: &accountingPolicyLimits},
+			},
+			isValid: false,
+		},
+	}
+	for testName, testCase := range testCases {
+		errList := ValidateResourceQuotaUpdate(&testCase.newResourceQuota, &testCase.oldResourceQuota)
+		if testCase.isValid && len(errList) != 0 {
+			t.Errorf("Expected no error for %v, but got %v", testName, errList)
+		}
+	}
+}
+
 func TestValidateNamespace(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}

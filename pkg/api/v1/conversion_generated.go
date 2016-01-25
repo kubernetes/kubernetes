@@ -2618,6 +2618,12 @@ func autoConvert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(in *api.ResourceQ
 	} else {
 		out.Hard = nil
 	}
+	if in.ResourceAccountingPolicy != nil {
+		out.ResourceAccountingPolicy = new(ResourceAccountingPolicy)
+		*out.ResourceAccountingPolicy = ResourceAccountingPolicy(*in.ResourceAccountingPolicy)
+	} else {
+		out.ResourceAccountingPolicy = nil
+	}
 	return nil
 }
 
@@ -5782,6 +5788,12 @@ func autoConvert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuota
 	}
 	if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
 		return err
+	}
+	if in.ResourceAccountingPolicy != nil {
+		out.ResourceAccountingPolicy = new(api.ResourceAccountingPolicy)
+		*out.ResourceAccountingPolicy = api.ResourceAccountingPolicy(*in.ResourceAccountingPolicy)
+	} else {
+		out.ResourceAccountingPolicy = nil
 	}
 	return nil
 }

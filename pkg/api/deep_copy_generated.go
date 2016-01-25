@@ -2248,6 +2248,17 @@ func deepCopy_api_ResourceQuotaSpec(in ResourceQuotaSpec, out *ResourceQuotaSpec
 	} else {
 		out.Hard = nil
 	}
+	if in.ResourceAccountingPolicy != nil {
+		in, out := in.ResourceAccountingPolicy, &out.ResourceAccountingPolicy
+		*out = new(ResourceAccountingPolicy)
+		if newVal, err := c.DeepCopy(*in); err != nil {
+			return err
+		} else {
+			**out = newVal.(ResourceAccountingPolicy)
+		}
+	} else {
+		out.ResourceAccountingPolicy = nil
+	}
 	return nil
 }
 

@@ -2021,10 +2021,23 @@ const (
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 )
 
+// ResourceAccountingPolicy defines how the quota accounts resource usage
+type ResourceAccountingPolicy string
+
+const (
+	// ResourceAccountingPolicyRequests means the quota tracks resource requests
+	ResourceAccountingPolicyRequests ResourceAccountingPolicy = "Requests"
+	// ResourceAccountingPolicyLimits means the quota tracks resource limits
+	ResourceAccountingPolicyLimits ResourceAccountingPolicy = "Limits"
+)
+
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
 	Hard ResourceList `json:"hard,omitempty"`
+	// ResourceAccountingPolicy specifies how resources are counted
+	// If empty, the default policy is Requests
+	ResourceAccountingPolicy *ResourceAccountingPolicy `json:"resourceAccountingPolicy,omitempty"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use

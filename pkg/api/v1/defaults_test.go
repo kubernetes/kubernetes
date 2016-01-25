@@ -620,6 +620,21 @@ func TestSetDefaultLimitRangeItem(t *testing.T) {
 	}
 }
 
+func TestSetDefaultResourceQuotaSpec(t *testing.T) {
+	quota := &versioned.ResourceQuota{
+		ObjectMeta: versioned.ObjectMeta{
+			Name: "test-defaults",
+		},
+		Spec: versioned.ResourceQuotaSpec{},
+	}
+
+	output := roundTrip(t, runtime.Object(quota))
+	quota2 := output.(*versioned.ResourceQuota)
+	if *quota2.Spec.ResourceAccountingPolicy != versioned.ResourceAccountingPolicyRequests {
+		t.Errorf("Expected resource accounting policy: %v, got: %v", versioned.ResourceAccountingPolicyRequests, *quota2.Spec.ResourceAccountingPolicy)
+	}
+}
+
 func TestSetDefaultProbe(t *testing.T) {
 	originalProbe := versioned.Probe{}
 	expectedProbe := versioned.Probe{

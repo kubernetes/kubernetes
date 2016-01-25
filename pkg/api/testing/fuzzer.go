@@ -129,6 +129,12 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				s.SecurityContext = new(api.PodSecurityContext)
 			}
 		},
+		func(s *api.ResourceQuotaSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(s)
+			// has a default value
+			accountingPolicy := api.ResourceAccountingPolicyRequests
+			s.ResourceAccountingPolicy = &accountingPolicy
+		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
