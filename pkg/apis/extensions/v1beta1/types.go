@@ -33,8 +33,11 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int32 `json:"replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-	Selector *LabelSelector `json:"selector,omitempty"`
+	// label query over pods that should match the replicas count. This is same
+	// as the label selector but in the string format to avoid introspection
+	// by clients. The string will be in the same format as the query-param syntax.
+	// More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	Selector string `json:"selector,omitempty"`
 }
 
 // represents a scaling request for a resource.

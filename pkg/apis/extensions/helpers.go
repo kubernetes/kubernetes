@@ -77,9 +77,7 @@ func ScaleFromDeployment(deployment *Deployment) *Scale {
 		},
 		Status: ScaleStatus{
 			Replicas: deployment.Status.Replicas,
-			// TODO(madhusudancs): Remove LabelSelector wrapping and use deployment.Spec.Selector directly
-			// when deployment is moved to LabelSelector.
-			Selector: &LabelSelector{MatchLabels: deployment.Spec.Selector},
+			Selector: labels.SelectorFromSet(deployment.Spec.Selector).String(),
 		},
 	}
 }

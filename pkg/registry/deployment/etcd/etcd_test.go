@@ -83,9 +83,7 @@ func validNewScale() *extensions.Scale {
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: validDeployment.Status.Replicas,
-			// TODO(madhusudancs): Remove LabelSelector wrapping and use deployment.Spec.Selector directly
-			// when deployment is moved to LabelSelector.
-			Selector: &extensions.LabelSelector{MatchLabels: validDeployment.Spec.Selector},
+			Selector: labels.SelectorFromSet(validDeployment.Spec.Selector).String(),
 		},
 	}
 }

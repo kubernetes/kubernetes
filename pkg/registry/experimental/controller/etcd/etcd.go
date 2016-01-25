@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 
@@ -79,7 +80,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: extensions.SetAsLabelSelector(rc.Spec.Selector),
+			Selector: labels.SelectorFromSet(rc.Spec.Selector).String(),
 		},
 	}, nil
 }
@@ -117,7 +118,7 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: extensions.SetAsLabelSelector(rc.Spec.Selector),
+			Selector: labels.SelectorFromSet(rc.Spec.Selector).String(),
 		},
 	}, false, nil
 }
