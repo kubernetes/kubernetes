@@ -558,3 +558,41 @@ func DefaultKubernetesUserAgent() string {
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
 }
+
+// LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
+// KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
+// either populated or were empty to start.
+func LoadTLSFiles(c *Config) error {
+	var err error
+	c.CAData, err = dataFromSliceOrFile(c.CAData, c.CAFile)
+	if err != nil {
+		return err
+	}
+
+	c.CertData, err = dataFromSliceOrFile(c.CertData, c.CertFile)
+	if err != nil {
+		return err
+	}
+
+	c.KeyData, err = dataFromSliceOrFile(c.KeyData, c.KeyFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
+// or an error if an error occurred reading the file
+func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
+	if len(data) > 0 {
+		return data, nil
+	}
+	if len(file) > 0 {
+		fileData, err := ioutil.ReadFile(file)
+		if err != nil {
+			return []byte{}, err
+		}
+		return fileData, nil
+	}
+	return nil, nil
+}
