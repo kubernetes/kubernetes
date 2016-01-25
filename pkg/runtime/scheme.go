@@ -25,47 +25,115 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
-// Scheme defines methods for serializing and deserializing API objects. It
-// is an adaptation of conversion's Scheme for our API objects.
+// Scheme defines methods for serializing and deserializing API objects, a type
+// registry for converting group, version, and kind information to and from Go
+// schemas, and mappings between Go schemas of different versions. A scheme is the
+// foundation for a versioned API and versioned configuration over time.
+//
+// In a Scheme, a Type is a particular Go struct, a Version is a point-in-time
+// identifier for a particular representation of that Type (typically backwards
+// compatible), a Kind is the unique name for that Type within the Version, and a
+// Group identifies a set of Versions, Kinds, and Types that evolve over time. An
+// Unversioned Type is one that is not yet formally bound to a type and is promised
+// to be backwards compatible (effectively a "v1" of a Type that does not expect
+// to break in the future).
+//
+// Schemes are not expected to change at runtime and are only threadsafe after
+// registration is complete.
 type Scheme struct {
-	raw *conversion.Scheme
+	// versionMap allows one to figure out the go type of an object with
+	// the given version and name.
+	gvkToType map[unversioned.GroupVersionKind]reflect.Type
+
+	// typeToGroupVersion allows one to find metadata for a given go object.
+	// The reflect.Type we index by should *not* be a pointer.
+	typeToGVK map[reflect.Type][]unversioned.GroupVersionKind
+
+	// unversionedTypes are transformed without conversion in ConvertToVersion.
+	unversionedTypes map[reflect.Type]unversioned.GroupVersionKind
+
+	// unversionedKinds are the names of kinds that can be created in the context of any group
+	// or version
+	// TODO: resolve the status of unversioned types.
+	unversionedKinds map[string]reflect.Type
+
 	// Map from version and resource to the corresponding func to convert
 	// resource field labels in that version to internal version.
 	fieldLabelConversionFuncs map[string]map[string]FieldLabelConversionFunc
+
+	// converter stores all registered conversion functions. It also has
+	// default coverting behavior.
+	converter *conversion.Converter
+
+	// cloner stores all registered copy functions. It also has default
+	// deep copy behavior.
+	cloner *conversion.Cloner
 }
 
 // Function to convert a field selector to internal representation.
 type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
 
-func (self *Scheme) Raw() *conversion.Scheme {
-	return self.raw
+// NewScheme creates a new Scheme. This scheme is pluggable by default.
+func NewScheme() *Scheme {
+	s := &Scheme{
+		gvkToType:        map[unversioned.GroupVersionKind]reflect.Type{},
+		typeToGVK:        map[reflect.Type][]unversioned.GroupVersionKind{},
+		unversionedTypes: map[reflect.Type]unversioned.GroupVersionKind{},
+		unversionedKinds: map[string]reflect.Type{},
+		cloner:           conversion.NewCloner(),
+		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
+	}
+	s.converter = conversion.NewConverter(s.nameFunc)
+
+	s.AddConversionFuncs(DefaultEmbeddedConversions()...)
+
+	// Enable map[string][]string conversions by default
+	if err := s.AddConversionFuncs(DefaultStringConversions...); err != nil {
+		panic(err)
+	}
+	if err := s.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+		panic(err)
+	}
+	if err := s.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// nameFunc returns the name of the type that we wish to use to determine when two types attempt
+// a conversion. Defaults to the go name of the type if the type is not registered.
+func (s *Scheme) nameFunc(t reflect.Type) string {
+	// find the preferred names for this type
+	gvks, ok := s.typeToGVK[t]
+	if !ok {
+		return t.Name()
+	}
+
+	for _, gvk := range gvks {
+		internalGV := gvk.GroupVersion()
+		internalGV.Version = "__internal" // this is hacky and maybe should be passed in
+		internalGVK := internalGV.WithKind(gvk.Kind)
+
+		if internalType, exists := s.gvkToType[internalGVK]; exists {
+			return s.typeToGVK[internalType][0].Kind
+		}
+	}
+
+	return gvks[0].Kind
 }
 
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
-func (self *Scheme) fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
-	scheme = self
-	inVersion = s.Meta().SrcVersion
-	outVersion = s.Meta().DestVersion
+func (s *Scheme) fromScope(scope conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
+	scheme = s
+	inVersion = scope.Meta().SrcVersion
+	outVersion = scope.Meta().DestVersion
 	return inVersion, outVersion, scheme
 }
 
-// NewScheme creates a new Scheme. This scheme is pluggable by default.
-func NewScheme() *Scheme {
-	s := &Scheme{conversion.NewScheme(), map[string]map[string]FieldLabelConversionFunc{}}
-	s.AddConversionFuncs(DefaultEmbeddedConversions()...)
-
-	// Enable map[string][]string conversions by default
-	if err := s.raw.AddConversionFuncs(DefaultStringConversions...); err != nil {
-		panic(err)
-	}
-	if err := s.raw.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
-		panic(err)
-	}
-	if err := s.raw.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
-		panic(err)
-	}
-	return s
+// Converter allows access to the converter for the scheme
+func (s *Scheme) Converter() *conversion.Converter {
+	return s.converter
 }
 
 // AddUnversionedTypes registers the provided types as "unversioned", which means that they follow special rules.
@@ -75,111 +143,221 @@ func NewScheme() *Scheme {
 //
 // TODO: there is discussion about removing unversioned and replacing it with objects that are manifest into
 //   every version with particular schemas. Resolve tihs method at that point.
-func (s *Scheme) AddUnversionedTypes(gv unversioned.GroupVersion, types ...Object) {
-	interfaces := make([]interface{}, len(types))
-	for i := range types {
-		interfaces[i] = types[i]
+func (s *Scheme) AddUnversionedTypes(version unversioned.GroupVersion, types ...Object) {
+	s.AddKnownTypes(version, types...)
+	for _, obj := range types {
+		t := reflect.TypeOf(obj).Elem()
+		gvk := version.WithKind(t.Name())
+		s.unversionedTypes[t] = gvk
+		if _, ok := s.unversionedKinds[gvk.Kind]; ok {
+			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
+		}
+		s.unversionedKinds[gvk.Kind] = t
 	}
-	s.raw.AddUnversionedTypes(gv, interfaces...)
 }
 
-// AddKnownTypes registers the types of the arguments to the marshaller of the package api.
+// AddKnownTypes registers all types passed in 'types' as being members of version 'version'.
+// All objects passed to types should be pointers to structs. The name that go reports for
+// the struct becomes the "kind" field when encoding. Version may not be empty - use the
+// APIVersionInternal constant if you have a type that does not have a formal version.
 func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...Object) {
-	interfaces := make([]interface{}, len(types))
-	for i := range types {
-		interfaces[i] = types[i]
+	if len(gv.Version) == 0 {
+		panic(fmt.Sprintf("version is required on all types: %s %v", gv, types[0]))
 	}
-	s.raw.AddKnownTypes(gv, interfaces...)
-}
+	for _, obj := range types {
+		t := reflect.TypeOf(obj)
+		if t.Kind() != reflect.Ptr {
+			panic("All types must be pointers to structs.")
+		}
+		t = t.Elem()
+		if t.Kind() != reflect.Struct {
+			panic("All types must be pointers to structs.")
+		}
 
-// AddIgnoredConversionType declares a particular conversion that should be ignored - during conversion
-// this method is not invoked.
-func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
-	return s.raw.AddIgnoredConversionType(from, to)
+		gvk := gv.WithKind(t.Name())
+		s.gvkToType[gvk] = t
+		s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
+	}
 }
 
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
-// your structs.
+// your structs. Version may not be empty - use the APIVersionInternal constant if you have a
+// type that does not have a formal version.
 func (s *Scheme) AddKnownTypeWithName(gvk unversioned.GroupVersionKind, obj Object) {
-	s.raw.AddKnownTypeWithName(gvk, obj)
+	t := reflect.TypeOf(obj)
+	if len(gvk.Version) == 0 {
+		panic(fmt.Sprintf("version is required on all types: %s %v", gvk, t))
+	}
+	if t.Kind() != reflect.Ptr {
+		panic("All types must be pointers to structs.")
+	}
+	t = t.Elem()
+	if t.Kind() != reflect.Struct {
+		panic("All types must be pointers to structs.")
+	}
+
+	s.gvkToType[gvk] = t
+	s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
 }
 
 // KnownTypes returns the types known for the given version.
-// Return value must be treated as read-only.
 func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type {
-	return s.raw.KnownTypes(gv)
+	types := make(map[string]reflect.Type)
+	for gvk, t := range s.gvkToType {
+		if gv != gvk.GroupVersion() {
+			continue
+		}
+
+		types[gvk.Kind] = t
+	}
+	return types
 }
 
-// ObjectKind returns the default group,version,kind of the given Object.
+// ObjectKind returns the group,version,kind of the go object,
+// or an error if it's not a pointer or is unregistered.
 func (s *Scheme) ObjectKind(obj Object) (unversioned.GroupVersionKind, error) {
-	return s.raw.ObjectKind(obj)
+	gvks, err := s.ObjectKinds(obj)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
+	}
+	return gvks[0], nil
 }
 
-// ObjectKinds returns the all possible group,version,kind of the given Object.
+// ObjectKinds returns all possible group,version,kind of the go object,
+// or an error if it's not a pointer or is unregistered.
 func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, error) {
-	return s.raw.ObjectKinds(obj)
+	v, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return nil, err
+	}
+	t := v.Type()
+
+	gvks, ok := s.typeToGVK[t]
+	if !ok {
+		return nil, &notRegisteredErr{t: t}
+	}
+
+	return gvks, nil
 }
 
 // Recognizes returns true if the scheme is able to handle the provided group,version,kind
 // of an object.
 func (s *Scheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
-	return s.raw.Recognizes(gvk)
+	_, exists := s.gvkToType[gvk]
+	return exists
 }
 
 func (s *Scheme) IsUnversioned(obj Object) (bool, bool) {
-	return s.raw.IsUnversioned(obj)
+	v, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return false, false
+	}
+	t := v.Type()
+
+	if _, ok := s.typeToGVK[t]; !ok {
+		return false, false
+	}
+	_, ok := s.unversionedTypes[t]
+	return ok, true
 }
 
-// New returns a new API object of the given version ("" for internal
-// representation) and name, or an error if it hasn't been registered.
+// New returns a new API object of the given version and name, or an error if it hasn't
+// been registered. The version and kind fields must be specified.
 func (s *Scheme) New(kind unversioned.GroupVersionKind) (Object, error) {
-	obj, err := s.raw.NewObject(kind)
-	if err != nil {
-		return nil, err
+	if t, exists := s.gvkToType[kind]; exists {
+		return reflect.New(t).Interface().(Object), nil
 	}
-	return obj.(Object), nil
+
+	if t, exists := s.unversionedKinds[kind.Kind]; exists {
+		return reflect.New(t).Interface().(Object), nil
+	}
+	return nil, &notRegisteredErr{gvk: kind}
 }
 
 // Log sets a logger on the scheme. For test purposes only
 func (s *Scheme) Log(l conversion.DebugLogger) {
-	s.raw.Log(l)
+	s.converter.Debug = l
 }
 
-// AddConversionFuncs adds a function to the list of conversion functions. The given
-// function should know how to convert between two API objects. We deduce how to call
-// it from the types of its two parameters; see the comment for
-// Converter.RegisterConversionFunction.
+// AddIgnoredConversionType identifies a pair of types that should be skipped by
+// conversion (because the data inside them is explicitly dropped during
+// conversion).
+func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
+	return s.converter.RegisterIgnoredConversion(from, to)
+}
+
+// AddConversionFuncs adds functions to the list of conversion functions. The given
+// functions should know how to convert between two of your API objects, or their
+// sub-objects. We deduce how to call these functions from the types of their two
+// parameters; see the comment for Converter.Register.
 //
-// Note that, if you need to copy sub-objects that didn't change, it's safe to call
-// Convert() inside your conversionFuncs, as long as you don't start a conversion
-// chain that's infinitely recursive.
+// Note that, if you need to copy sub-objects that didn't change, you can use the
+// conversion.Scope object that will be passed to your conversion function.
+// Additionally, all conversions started by Scheme will set the SrcVersion and
+// DestVersion fields on the Meta object. Example:
+//
+// s.AddConversionFuncs(
+//	func(in *InternalObject, out *ExternalObject, scope conversion.Scope) error {
+//		// You can depend on Meta() being non-nil, and this being set to
+//		// the source version, e.g., ""
+//		s.Meta().SrcVersion
+//		// You can depend on this being set to the destination version,
+//		// e.g., "v1".
+//		s.Meta().DestVersion
+//		// Call scope.Convert to copy sub-fields.
+//		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
+//		return nil
+//	},
+// )
+//
+// (For more detail about conversion functions, see Converter.Register's comment.)
 //
 // Also note that the default behavior, if you don't add a conversion function, is to
-// sanely copy fields that have the same names. It's OK if the destination type has
-// extra fields, but it must not remove any. So you only need to add a conversion
-// function for things with changed/removed fields.
+// sanely copy fields that have the same names and same type names. It's OK if the
+// destination type has extra fields, but it must not remove any. So you only need to
+// add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
-	return s.raw.AddConversionFuncs(conversionFuncs...)
+	for _, f := range conversionFuncs {
+		if err := s.converter.RegisterConversionFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Similar to AddConversionFuncs, but registers conversion functions that were
 // automatically generated.
 func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
-	return s.raw.AddGeneratedConversionFuncs(conversionFuncs...)
+	for _, f := range conversionFuncs {
+		if err := s.converter.RegisterGeneratedConversionFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AddDeepCopyFuncs adds a function to the list of deep-copy functions.
 // For the expected format of deep-copy function, see the comment for
 // Copier.RegisterDeepCopyFunction.
 func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	return s.raw.AddDeepCopyFuncs(deepCopyFuncs...)
+	for _, f := range deepCopyFuncs {
+		if err := s.cloner.RegisterDeepCopyFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
 // automatically generated.
 func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	return s.raw.AddGeneratedDeepCopyFuncs(deepCopyFuncs...)
+	for _, f := range deepCopyFuncs {
+		if err := s.cloner.RegisterGeneratedDeepCopyFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
@@ -198,19 +376,43 @@ func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFun
 // the comment in conversion.Converter.SetStructFieldCopy for parameter details.
 // Call as many times as needed, even on the same fields.
 func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
-	return s.raw.AddStructFieldConversion(srcFieldType, srcFieldName, destFieldType, destFieldName)
+	return s.converter.SetStructFieldCopy(srcFieldType, srcFieldName, destFieldType, destFieldName)
 }
 
-// AddDefaultingFuncs adds a function to the list of value-defaulting functions.
-// We deduce how to call it from the types of its two parameters; see the
-// comment for Converter.RegisterDefaultingFunction.
+// RegisterInputDefaults sets the provided field mapping function and field matching
+// as the defaults for the provided input type.  The fn may be nil, in which case no
+// mapping will happen by default. Use this method to register a mechanism for handling
+// a specific input type in conversion, such as a map[string]string to structs.
+func (s *Scheme) RegisterInputDefaults(in interface{}, fn conversion.FieldMappingFunc, defaultFlags conversion.FieldMatchingFlags) error {
+	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
+}
+
+// AddDefaultingFuncs adds functions to the list of default-value functions.
+// Each of the given functions is responsible for applying default values
+// when converting an instance of a versioned API object into an internal
+// API object.  These functions do not need to handle sub-objects. We deduce
+// how to call these functions from the types of their two parameters.
+//
+// s.AddDefaultingFuncs(
+//	func(obj *v1.Pod) {
+//		if obj.OptionalField == "" {
+//			obj.OptionalField = "DefaultValue"
+//		}
+//	},
+// )
 func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
-	return s.raw.AddDefaultingFuncs(defaultingFuncs...)
+	for _, f := range defaultingFuncs {
+		err := s.converter.RegisterDefaultingFunc(f)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Copy does a deep copy of an API object.
 func (s *Scheme) Copy(src Object) (Object, error) {
-	dst, err := s.raw.DeepCopy(src)
+	dst, err := s.DeepCopy(src)
 	if err != nil {
 		return nil, err
 	}
@@ -219,25 +421,33 @@ func (s *Scheme) Copy(src Object) (Object, error) {
 
 // Performs a deep copy of the given object.
 func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
-	return s.raw.DeepCopy(src)
+	return s.cloner.DeepCopy(src)
 }
 
-// WithConversions returns an ObjectConvertor that has the additional conversion functions
-// defined in fns. The current scheme is not altered.
-func (s *Scheme) WithConversions(fns *conversion.ConversionFuncs) ObjectConvertor {
-	if fns == nil {
-		return s
-	}
-	copied := *s
-	copied.raw = s.raw.WithConversions(*fns)
-	return &copied
-}
-
-// Convert will attempt to convert in into out. Both must be pointers.
-// For easy testing of conversion functions. Returns an error if the conversion isn't
-// possible.
+// Convert will attempt to convert in into out. Both must be pointers. For easy
+// testing of conversion functions. Returns an error if the conversion isn't
+// possible. You can call this with types that haven't been registered (for example,
+// a to test conversion of types that are nested within registered types), but in
+// that case, the conversion.Scope object passed to your conversion functions won't
+// have SrcVersion or DestVersion fields set correctly in Meta().
 func (s *Scheme) Convert(in, out interface{}) error {
-	return s.raw.Convert(in, out)
+	inVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
+	outVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
+	if inObj, ok := in.(Object); ok {
+		if gvk, err := s.ObjectKind(inObj); err == nil {
+			inVersion = gvk.GroupVersion()
+		}
+	}
+	if outObj, ok := out.(Object); ok {
+		if gvk, err := s.ObjectKind(outObj); err == nil {
+			outVersion = gvk.GroupVersion()
+		}
+	}
+	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
+	if flags == 0 {
+		flags = conversion.AllowDifferentFieldTypeNames
+	}
+	return s.converter.Convert(in, out, flags, meta)
 }
 
 // Converts the given field label and value for an kind field selector from
@@ -267,22 +477,60 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 	case *Unknown, *Unstructured:
 		old := in.GetObjectKind().GroupVersionKind()
 		defer in.GetObjectKind().SetGroupVersionKind(old)
-		setTargetVersion(in, s.raw, gv)
+		setTargetVersion(in, s, gv)
 		return in, nil
 	}
-	unknown, err := s.raw.ConvertToVersion(in, outVersion)
+	t := reflect.TypeOf(in)
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
+	}
+
+	t = t.Elem()
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
+	}
+
+	var kind unversioned.GroupVersionKind
+	if unversionedKind, ok := s.unversionedTypes[t]; ok {
+		kind = unversionedKind
+	} else {
+		kinds, ok := s.typeToGVK[t]
+		if !ok || len(kinds) == 0 {
+			return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
+		}
+		kind = kinds[0]
+	}
+
+	outKind := gv.WithKind(kind.Kind)
+
+	inKind, err := s.ObjectKind(in)
 	if err != nil {
 		return nil, err
 	}
-	obj, ok := unknown.(Object)
-	if !ok {
-		return nil, fmt.Errorf("the provided object cannot be converted to a runtime.Object: %#v", unknown)
+
+	out, err := s.New(outKind)
+	if err != nil {
+		return nil, err
 	}
-	setTargetVersion(obj, s.raw, gv)
-	return obj, nil
+
+	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), gv, in)
+	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+		return nil, err
+	}
+
+	setTargetVersion(out, s, gv)
+	return out, nil
 }
 
-func setTargetVersion(obj Object, raw *conversion.Scheme, gv unversioned.GroupVersion) {
+// generateConvertMeta constructs the meta value we pass to Convert.
+func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversioned.GroupVersion, in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
+	flags, meta := s.converter.DefaultMeta(reflect.TypeOf(in))
+	meta.SrcVersion = srcGroupVersion.String()
+	meta.DestVersion = destGroupVersion.String()
+	return flags, meta
+}
+
+func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
 	if gv.Version == APIVersionInternal {
 		// internal is a special case
 		obj.GetObjectKind().SetGroupVersionKind(nil)

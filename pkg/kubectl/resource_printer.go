@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -181,7 +180,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 			continue
 		}
 		converted, err := p.convertor.ConvertToVersion(obj, version.String())
-		if conversion.IsNotRegisteredError(err) {
+		if runtime.IsNotRegisteredError(err) {
 			continue
 		}
 		if err != nil {

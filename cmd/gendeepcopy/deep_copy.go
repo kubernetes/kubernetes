@@ -114,7 +114,7 @@ func main() {
 	}
 
 	versionPath := pkgPath(gv.Group, gv.Version)
-	generator := kruntime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
+	generator := kruntime.NewDeepCopyGenerator(api.Scheme, versionPath, sets.NewString("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
 	if len(*overwrites) > 0 {

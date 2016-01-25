@@ -24,8 +24,10 @@ import (
 )
 
 const (
-	APIVersionInternal    = "__internal"
-	APIVersionUnversioned = "__unversioned"
+	// APIVersionInternal may be used if you are registering a type that should not
+	// be considered stable or serialized - it is a convention only and has no
+	// special behavior in this package.
+	APIVersionInternal = "__internal"
 )
 
 // Typer retrieves information about an object's group, version, and kind.
