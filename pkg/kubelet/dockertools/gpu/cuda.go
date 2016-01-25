@@ -1,5 +1,5 @@
 package gpu
 
 import (
-	nvd "http://github.com/NVIDIA/nvidia-docker"
+	nvd "github.com/NVIDIA/nvidia-docker/tools/src/nvidia"
 )
