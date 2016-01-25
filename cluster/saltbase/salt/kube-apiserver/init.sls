@@ -4,6 +4,9 @@
 /srv/kubernetes/known_tokens.csv:
   file.managed:
     - source: salt://kube-apiserver/known_tokens.csv
+    - user: root
+    - group: root
+    - mode: 600
 #    - watch_in:
 #      - service: kube-apiserver
 {% endif %}
@@ -13,6 +16,9 @@
 /srv/kubernetes/basic_auth.csv:
   file.managed:
     - source: salt://kube-apiserver/basic_auth.csv
+    - user: root
+    - group: root
+    - mode: 600
 {% endif %}
 
 /var/log/kube-apiserver.log:
