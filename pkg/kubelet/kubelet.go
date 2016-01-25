@@ -1703,13 +1703,13 @@ func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 		}
 		return hostDNS, hostSearch, nil
 	}
+	var dns, dnsSearch []string
 
-	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
-	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
-	// in case the cluster DNS server cannot resolve the DNS query itself
-	dns := []string{kl.clusterDNS.String()}
-
-	var dnsSearch []string
+	if kl.clusterDNS != nil {
+		dns = append([]string{kl.clusterDNS.String()}, hostDNS...)
+	} else {
+		dns = hostDNS
+	}
 	if kl.clusterDomain != "" {
 		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
 		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
