@@ -155,7 +155,8 @@ func (m *EtcdTestServer) Terminate(t *testing.T) {
 	time.Sleep(250 * time.Millisecond)
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
-		hs.Close()
+		// TODO: Uncomment when fix #19254
+		// hs.Close()
 	}
 	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
 		t.Fatal(err)
