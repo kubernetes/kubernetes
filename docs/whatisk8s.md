@@ -142,7 +142,7 @@ Kubernetes is not a traditional, all-inclusive PaaS (Platform as a Service) syst
 * Kubernetes is unopinionated in the source-to-image space. It does not deploy source code and does not build your application. Continuous Integration (CI) workflow is an area where different users and projects have their own requirements and preferences, so we support layering CI workflows on Kubernetes but don't dictate how it should work.
 * Kubernetes allows users to choose the logging, monitoring, and alerting systems of their choice. (Though we do provide some integrations as proof of concept.)
 * Kubernetes does not provide nor mandate a comprehensive application configuration language/system (e.g., [jsonnet](https://github.com/google/jsonnet)).
-* Kubernetes does not provide nor adopt any comprehensive machine configuration, maintenance, and management system (e.g., [Chef](https://www.chef.io/chef/), [Puppet](https://puppetlabs.com/solutions/configuration-management), [Ansible](http://www.ansible.com/), [Salt](http://saltstack.com/)).
+* Kubernetes does not provide nor adopt any comprehensive machine configuration, maintenance, management, or self-healing systems.
 
 On the other hand, a number of PaaS systems run *on* Kubernetes, such as [Openshift](https://github.com/openshift/origin), [Deis](http://deis.io/), and [Gondor](https://gondor.io/). You could also roll your own custom PaaS, integrate with a CI system of your choice, or get along just fine with just Kubernetes: bring your container images and deploy them on Kubernetes.
 
