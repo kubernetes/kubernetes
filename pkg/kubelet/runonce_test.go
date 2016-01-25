@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestRunOnce(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRunOnce(t *testing.T) {
 	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &kubecontainer.FakeRuntime{}
-	basePath, err := ioutil.TempDir(os.TempDir(), "kubelet")
+	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir %v", err)
 	}

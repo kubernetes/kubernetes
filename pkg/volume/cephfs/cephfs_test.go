@@ -17,7 +17,6 @@ limitations under the License.
 package cephfs
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -25,11 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cephTest")
+	tmpDir, err := utiltesting.MkTmpdir("cephTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cephTest")
+	tmpDir, err := utiltesting.MkTmpdir("cephTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
