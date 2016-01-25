@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -1644,6 +1645,33 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 	return gce.waitForZoneOp(deleteOp, disk.Zone)
 }
 
+// Builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD
+// Specifically, this builds FailureDomain (zone) and Region labels.
+// The PersistentVolumeLabel admission controller calls this and adds the labels when a PV is created.
+func (gce *GCECloud) GetAutoLabelsForPD(name string) (map[string]string, error) {
+	disk, err := gce.getDiskByNameUnknownZone(name)
+	if err != nil {
+		return nil, err
+	}
+
+	zone := disk.Zone
+	region, err := GetGCERegion(zone)
+	if err != nil {
+		return nil, err
+	}
+
+	if zone == "" || region == "" {
+		// Unexpected, but sanity-check
+		return nil, fmt.Errorf("PD did not have zone/region information: %q", disk.Name)
+	}
+
+	labels := make(map[string]string)
+	labels[unversioned.LabelZoneFailureDomain] = zone
+	labels[unversioned.LabelZoneRegion] = region
+
+	return labels, nil
+}
+
 func (gce *GCECloud) AttachDisk(diskName, instanceID string, readOnly bool) error {
 	instance, err := gce.getInstanceByName(instanceID)
 	if err != nil {
@@ -1736,14 +1764,20 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 	// "us-central1-a/mydisk".  We could do this for them as part of
 	// admission control, but that might be a little weird (values changing
 	// on create)
+
+	var found *gceDisk
 	for _, zone := range gce.managedZones {
 		disk, err := gce.findDiskByName(diskName, zone)
 		if err != nil {
 			return nil, err
 		}
-		if disk != nil {
-			return disk, nil
+		if found != nil {
+			return nil, fmt.Errorf("GCE persistent disk name was found in multiple zones: %q", diskName)
 		}
+		found = disk
+	}
+	if found != nil {
+		return found, nil
 	}
 	return nil, fmt.Errorf("GCE persistent disk not found: %q", diskName)
 }
