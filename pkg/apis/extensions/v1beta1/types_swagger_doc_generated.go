@@ -74,6 +74,25 @@ func (ClusterAutoscalerSpec) SwaggerDoc() map[string]string {
 	return map_ClusterAutoscalerSpec
 }
 
+var map_CustomMetricCurrentStatus = map[string]string{
+	"name":  "Custom Metric name.",
+	"value": "Custom Metric value (average).",
+}
+
+func (CustomMetricCurrentStatus) SwaggerDoc() map[string]string {
+	return map_CustomMetricCurrentStatus
+}
+
+var map_CustomMetricTarget = map[string]string{
+	"":      "Alpha-level support for Custom Metrics in HPA (as annotations).",
+	"name":  "Custom Metric name.",
+	"value": "Custom Metric value (average).",
+}
+
+func (CustomMetricTarget) SwaggerDoc() map[string]string {
+	return map_CustomMetricTarget
+}
+
 var map_DaemonSet = map[string]string{
 	"":         "DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
