@@ -7,26 +7,26 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: heapster-v12
+  name: heapster-v13
   namespace: kube-system
   labels:
     k8s-app: heapster
-    version: v12
+    version: v13
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
     k8s-app: heapster
-    version: v12
+    version: v13
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v12
+        version: v13
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v0.18.5
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha1
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -40,10 +40,24 @@ spec:
             - /heapster
             - --source=kubernetes:''
             - --sink=gcm
-            - --sink=gcmautoscaling
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha1
+          name: eventer
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 100m
+              memory: {{ heapster_memory }}
+            requests:
+              cpu: 100m
+              memory: {{ heapster_memory }}
+          command:
+            - /eventer
+            - --source=kubernetes:''
             - --sink=gcl
-            - --stats_resolution=30s
-            - --sink_frequency=1m
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
