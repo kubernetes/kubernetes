@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -24,9 +25,70 @@ import (
 	"testing"
 
 	"github.com/google/gofuzz"
+	flag "github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/util"
 )
+
+var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
+
+// Test a weird version/kind embedding format.
+type MyWeirdCustomEmbeddedVersionKindField struct {
+	ID         string `json:"ID,omitempty"`
+	APIVersion string `json:"myVersionKey,omitempty"`
+	ObjectKind string `json:"myKindKey,omitempty"`
+	Z          string `json:"Z,omitempty"`
+	Y          uint64 `json:"Y,omitempty"`
+}
+
+type TestType1 struct {
+	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
+	A                                     string               `json:"A,omitempty"`
+	B                                     int                  `json:"B,omitempty"`
+	C                                     int8                 `json:"C,omitempty"`
+	D                                     int16                `json:"D,omitempty"`
+	E                                     int32                `json:"E,omitempty"`
+	F                                     int64                `json:"F,omitempty"`
+	G                                     uint                 `json:"G,omitempty"`
+	H                                     uint8                `json:"H,omitempty"`
+	I                                     uint16               `json:"I,omitempty"`
+	J                                     uint32               `json:"J,omitempty"`
+	K                                     uint64               `json:"K,omitempty"`
+	L                                     bool                 `json:"L,omitempty"`
+	M                                     map[string]int       `json:"M,omitempty"`
+	N                                     map[string]TestType2 `json:"N,omitempty"`
+	O                                     *TestType2           `json:"O,omitempty"`
+	P                                     []TestType2          `json:"Q,omitempty"`
+}
+
+type TestType2 struct {
+	A string `json:"A,omitempty"`
+	B int    `json:"B,omitempty"`
+}
+
+type ExternalTestType2 struct {
+	A string `json:"A,omitempty"`
+	B int    `json:"B,omitempty"`
+}
+type ExternalTestType1 struct {
+	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
+	A                                     string                       `json:"A,omitempty"`
+	B                                     int                          `json:"B,omitempty"`
+	C                                     int8                         `json:"C,omitempty"`
+	D                                     int16                        `json:"D,omitempty"`
+	E                                     int32                        `json:"E,omitempty"`
+	F                                     int64                        `json:"F,omitempty"`
+	G                                     uint                         `json:"G,omitempty"`
+	H                                     uint8                        `json:"H,omitempty"`
+	I                                     uint16                       `json:"I,omitempty"`
+	J                                     uint32                       `json:"J,omitempty"`
+	K                                     uint64                       `json:"K,omitempty"`
+	L                                     bool                         `json:"L,omitempty"`
+	M                                     map[string]int               `json:"M,omitempty"`
+	N                                     map[string]ExternalTestType2 `json:"N,omitempty"`
+	O                                     *ExternalTestType2           `json:"O,omitempty"`
+	P                                     []ExternalTestType2          `json:"Q,omitempty"`
+}
 
 func testLogger(t *testing.T) DebugLogger {
 	// We don't set logger to eliminate rubbish logs in tests.
@@ -35,7 +97,7 @@ func testLogger(t *testing.T) DebugLogger {
 }
 
 func TestConverter_byteSlice(t *testing.T) {
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	src := []byte{1, 2, 3}
 	dest := []byte{}
 	err := c.Convert(&src, &dest, 0, nil)
@@ -48,7 +110,7 @@ func TestConverter_byteSlice(t *testing.T) {
 }
 
 func TestConverter_MismatchedTypes(t *testing.T) {
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 
 	err := c.RegisterConversionFunc(
 		func(in *[]string, out *int, s Scope) error {
@@ -84,7 +146,7 @@ func TestConverter_DefaultConvert(t *testing.T) {
 		Bar string
 		Baz int
 	}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	c.nameFunc = func(t reflect.Type) string { return "MyType" }
 
@@ -123,7 +185,7 @@ func TestConverter_DeepCopy(t *testing.T) {
 		Baz interface{}
 		Qux map[string]string
 	}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 
 	foo, baz := "foo", "baz"
@@ -166,7 +228,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 		Baz int
 	}
 	type C struct{}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
@@ -228,7 +290,7 @@ func TestConverter_IgnoredConversion(t *testing.T) {
 	type B struct{}
 
 	count := 0
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		count++
 		return nil
@@ -257,7 +319,7 @@ func TestConverter_IgnoredConversionNested(t *testing.T) {
 		C C
 	}
 
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	typed := C("")
 	if err := c.RegisterIgnoredConversion(&typed, &typed); err != nil {
 		t.Fatal(err)
@@ -275,7 +337,7 @@ func TestConverter_IgnoredConversionNested(t *testing.T) {
 func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	type A struct{}
 	type B struct{}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		return nil
 	}); err != nil {
@@ -297,7 +359,7 @@ func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 func TestConverter_WithConversionOverriden(t *testing.T) {
 	type A struct{}
 	type B struct{}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		return fmt.Errorf("conversion function should be overriden")
 	}); err != nil {
@@ -331,7 +393,7 @@ func TestConverter_MapsStringArrays(t *testing.T) {
 		Baz   int
 		Other string
 	}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
 		if len(*input) == 0 {
@@ -384,7 +446,7 @@ func TestConverter_MapsStringArraysWithMappingKey(t *testing.T) {
 		Baz   int
 		Other string
 	}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
 		if len(*input) == 0 {
@@ -434,7 +496,7 @@ func TestConverter_fuzz(t *testing.T) {
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.nameFunc = func(t reflect.Type) string {
 		// Hide the fact that we don't have separate packages for these things.
 		return map[reflect.Type]string{
@@ -473,7 +535,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	type Bar struct {
 		A map[string]string
 	}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	err := c.RegisterConversionFunc(
 		func(in *int, out *string, s Scope) error {
@@ -519,7 +581,7 @@ func TestConverter_tags(t *testing.T) {
 	type Bar struct {
 		A string `test:"bar"`
 	}
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	err := c.RegisterConversionFunc(
 		func(in *string, out *string, s Scope) error {
@@ -544,7 +606,7 @@ func TestConverter_tags(t *testing.T) {
 func TestConverter_meta(t *testing.T) {
 	type Foo struct{ A string }
 	type Bar struct{ A string }
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	checks := 0
 	err := c.RegisterConversionFunc(
@@ -653,7 +715,7 @@ func TestConverter_flags(t *testing.T) {
 		},
 	}
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 
 	for i, item := range table {
@@ -691,7 +753,7 @@ func TestConverter_FieldRename(t *testing.T) {
 		NameMeta
 	}
 
-	c := NewConverter()
+	c := NewConverter(DefaultNameFunc)
 	err := c.SetStructFieldCopy(WeirdMeta{}, "WeirdMeta", TypeMeta{}, "TypeMeta")
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -764,131 +826,22 @@ func TestConverter_FieldRename(t *testing.T) {
 	}
 }
 
-func TestMetaValues(t *testing.T) {
-	type InternalSimple struct {
-		APIVersion string `json:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty"`
-		TestString string `json:"testString"`
-	}
-	type ExternalSimple struct {
-		APIVersion string `json:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty"`
-		TestString string `json:"testString"`
-	}
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: "__internal"}
-	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "externalVersion"}
-
-	s := NewScheme()
-	s.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
-	s.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
-
-	internalToExternalCalls := 0
-	externalToInternalCalls := 0
-
-	// Register functions to verify that scope.Meta() gets set correctly.
-	err := s.AddConversionFuncs(
-		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			t.Logf("internal -> external")
-			if e, a := internalGV.String(), scope.Meta().SrcVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := externalGV.String(), scope.Meta().DestVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			scope.Convert(&in.TestString, &out.TestString, 0)
-			internalToExternalCalls++
-			return nil
-		},
-		func(in *ExternalSimple, out *InternalSimple, scope Scope) error {
-			t.Logf("external -> internal")
-			if e, a := externalGV.String(), scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := internalGV.String(), scope.Meta().DestVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			scope.Convert(&in.TestString, &out.TestString, 0)
-			externalToInternalCalls++
-			return nil
-		},
-	)
+func objDiff(a, b interface{}) string {
+	ab, err := json.Marshal(a)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		panic("a")
 	}
-	simple := &InternalSimple{
-		TestString: "foo",
-	}
-
-	s.Log(t)
-
-	out, err := s.ConvertToVersion(simple, externalGV.String())
+	bb, err := json.Marshal(b)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		panic("b")
 	}
+	return util.StringDiff(string(ab), string(bb))
 
-	internal, err := s.ConvertToVersion(out, internalGV.String())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if e, a := simple, internal; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
-	}
-
-	if e, a := 1, internalToExternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := 1, externalToInternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestMetaValuesUnregisteredConvert(t *testing.T) {
-	type InternalSimple struct {
-		Version    string `json:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty"`
-		TestString string `json:"testString"`
-	}
-	type ExternalSimple struct {
-		Version    string `json:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty"`
-		TestString string `json:"testString"`
-	}
-	s := NewScheme()
-	// We deliberately don't register the types.
-
-	internalToExternalCalls := 0
-
-	// Register functions to verify that scope.Meta() gets set correctly.
-	err := s.AddConversionFuncs(
-		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			if e, a := "unknown/unknown", scope.Meta().SrcVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := "unknown/unknown", scope.Meta().DestVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			scope.Convert(&in.TestString, &out.TestString, 0)
-			internalToExternalCalls++
-			return nil
-		},
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	simple := &InternalSimple{TestString: "foo"}
-	external := &ExternalSimple{}
-	err = s.Convert(simple, external)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if e, a := simple.TestString, external.TestString; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-
-	// Verify that our conversion handler got called.
-	if e, a := 1, internalToExternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
+	// An alternate diff attempt, in case json isn't showing you
+	// the difference. (reflect.DeepEqual makes a distinction between
+	// nil and empty slices, for example.)
+	//return util.StringDiff(
+	//	fmt.Sprintf("%#v", a),
+	//	fmt.Sprintf("%#v", b),
+	//)
 }

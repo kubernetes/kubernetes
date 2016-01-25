@@ -21,7 +21,6 @@ import (
 	"io"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
@@ -52,7 +51,7 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionK
 	}
 
 	if len(unstruct.APIVersion) == 0 {
-		return nil, nil, conversion.NewMissingVersionErr(string(data))
+		return nil, nil, NewMissingVersionErr(string(data))
 	}
 	gv, err := unversioned.ParseGroupVersion(unstruct.APIVersion)
 	if err != nil {
@@ -60,7 +59,7 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionK
 	}
 	gvk := gv.WithKind(unstruct.Kind)
 	if len(unstruct.Kind) == 0 {
-		return nil, &gvk, conversion.NewMissingKindErr(string(data))
+		return nil, &gvk, NewMissingKindErr(string(data))
 	}
 	unstruct.Object = m
 	return unstruct, &gvk, nil

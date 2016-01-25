@@ -35,7 +35,7 @@ func BenchmarkPodConversion(b *testing.B) {
 		b.Fatalf("Unexpected error decoding pod: %v", err)
 	}
 
-	scheme := api.Scheme.Raw()
+	scheme := api.Scheme
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
 		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Default.GroupVersion().String())
@@ -63,7 +63,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
-	scheme := api.Scheme.Raw()
+	scheme := api.Scheme
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
 		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.GroupVersion().String())
@@ -91,7 +91,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
-	scheme := api.Scheme.Raw()
+	scheme := api.Scheme
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
 		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.GroupVersion().String())
