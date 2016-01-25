@@ -54,11 +54,15 @@ Documentation for other releases can be found at
     - [Installing configuration files](#installing-configuration-files)
     - [Running the podmaster](#running-the-podmaster)
   - [Conclusion](#conclusion)
-  - [Vagrant up!](#vagrant-up)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## Introduction
+
+PLEASE NOTE: Note that the podmaster implementation is obsoleted by https://github.com/kubernetes/kubernetes/pull/16830,
+which provides a primitive for leader election in the experimental kubernetes API.
+
+Nevertheless, the concepts and implementation in this document are still valid, as is the podmaster implementation itself.
 
 This document describes how to build a high-availability (HA) Kubernetes cluster.  This is a fairly advanced topic.
 Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up such as
@@ -274,13 +278,6 @@ restarting the kubelets on each node.
 
 If you are turning up a fresh cluster, you will need to install the kubelet and kube-proxy on each worker node, and
 set the `--apiserver` flag to your replicated endpoint.
-
-## Vagrant up!
-
-We indeed have an initial proof of concept tester for this, which is available [here](../../examples/high-availability/).
-
-It implements the major concepts (with a few minor reductions for simplicity), of the podmaster HA implementation alongside a quick smoke test using k8petstore.
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/high-availability.md?pixel)]()
