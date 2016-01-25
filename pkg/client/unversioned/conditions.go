@@ -115,9 +115,14 @@ func JobHasDesiredParallelism(c ExtensionsInterface, job *extensions.Job) wait.C
 		if job.Status.Active == *job.Spec.Parallelism {
 			return true, nil
 		}
-		// otherwise count successful
-		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
-		return progress == 0, nil
+		if job.Spec.Completions == nil {
+			// A job without specified completions needs to wait for Active to reach Parallelism.
+			return false, nil
+		} else {
+			// otherwise count successful
+			progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
+			return progress == 0, nil
+		}
 	}
 }
 

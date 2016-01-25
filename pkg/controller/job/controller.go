@@ -362,7 +362,33 @@ func (jm *JobController) syncJob(key string) error {
 			active = jm.manageJob(activePods, succeeded, &job)
 		}
 		completions := succeeded
-		if completions == *job.Spec.Completions {
+		complete := false
+		if job.Spec.Completions == nil {
+			// This type of job is complete when any pod exits with success.
+			// Each pod is capable of
+			// determining whether or not the entire Job is done.  Subsequent pods are
+			// not expected to fail, but if they do, the failure is ignored.  Once any
+			// pod succeeds, the controller waits for remaining pods to finish, and
+			// then the job is complete.
+			if succeeded > 0 && active == 0 {
+				complete = true
+			}
+		} else {
+			// Job specifies a number of completions.  This type of job signals
+			// success by having that number of successes.  Since we do not
+			// start more pods than there are remaining completions, there should
+			// not be any remaining active pods once this count is reached.
+			if completions >= *job.Spec.Completions {
+				complete = true
+				if active > 0 {
+					jm.recorder.Event(&job, api.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
+				}
+				if completions > *job.Spec.Completions {
+					jm.recorder.Event(&job, api.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+				}
+			}
+		}
+		if complete {
 			job.Status.Conditions = append(job.Status.Conditions, newCondition(extensions.JobComplete, "", ""))
 			now := unversioned.Now()
 			job.Status.CompletionTime = &now
@@ -453,15 +479,31 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ex
 		wait.Wait()
 
 	} else if active < parallelism {
-		// how many executions are left to run
-		diff := *job.Spec.Completions - succeeded
-		// limit to parallelism and count active pods as well
-		if diff > parallelism {
-			diff = parallelism
+		wantActive := 0
+		if job.Spec.Completions == nil {
+			// Job does not specify a number of completions.  Therefore, number active
+			// should be equal to parallelism, unless the job has seen at least
+			// once success, in which leave whatever is running, running.
+			if succeeded > 0 {
+				wantActive = active
+			} else {
+				wantActive = parallelism
+			}
+		} else {
+			// Job specifies a specific number of completions.  Therefore, number
+			// active should not ever exceed number of remaining completions.
+			wantActive = *job.Spec.Completions - succeeded
+			if wantActive > parallelism {
+				wantActive = parallelism
+			}
 		}
-		diff -= active
+		diff := wantActive - active
+		if diff < 0 {
+			glog.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active)
+			diff = 0
+		}
 		jm.expectations.ExpectCreations(jobKey, diff)
-		glog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, parallelism, diff)
+		glog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
 		active += diff
 		wait := sync.WaitGroup{}

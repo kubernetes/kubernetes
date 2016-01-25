@@ -43,7 +43,8 @@ Documentation for other releases can be found at
   - [Writing a Job Spec](#writing-a-job-spec)
     - [Pod Template](#pod-template)
     - [Pod Selector](#pod-selector)
-    - [Parallelism and Completions](#parallelism-and-completions)
+    - [Parallel Jobs](#parallel-jobs)
+      - [Controlling Parallelism](#controlling-parallelism)
   - [Handling Pod and Container Failures](#handling-pod-and-container-failures)
   - [Job Patterns](#job-patterns)
   - [Alternatives](#alternatives)
@@ -103,7 +104,7 @@ Run the example job by downloading the example file and then running this comman
 
 ```console
 $ kubectl create -f ./job.yaml
-jobs/pi
+job "pi" created
 ```
 
 Check on the status of the job using this command:
@@ -113,16 +114,17 @@ $ kubectl describe jobs/pi
 Name:		pi
 Namespace:	default
 Image(s):	perl
-Selector:	app=pi
-Parallelism:	2
+Selector:	app in (pi)
+Parallelism:	1
 Completions:	1
-Labels:		<none>
-Pods Statuses:	1 Running / 0 Succeeded / 0 Failed
+Start Time:	Mon, 11 Jan 2016 15:35:52 -0800
+Labels:		app=pi
+Pods Statuses:	0 Running / 1 Succeeded / 0 Failed
+No volumes.
 Events:
-  FirstSeen	LastSeen	Count	From	SubobjectPath	Reason			Message
-  ─────────	────────	─────	────	─────────────	──────			───────
-  1m		1m		1	{job }			SuccessfulCreate	Created pod: pi-z548a
-
+  FirstSeen	LastSeen	Count	From			SubobjectPath	Type		Reason			Message
+  ---------	--------	-----	----			-------------	--------	------			-------
+  1m		1m		1	{job-controller }			Normal		SuccessfulCreate	Created pod: pi-dtn4q
 ```
 
 To view completed pods of a job, use `kubectl get pods --show-all`.  The `--show-all` will show completed pods too.
@@ -141,7 +143,7 @@ that just gets the name from each pod in the returned list.
 View the standard output of one of the pods:
 
 ```console
-$ kubectl logs pi-aiw0a
+$ kubectl logs $pods
 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566430860213949463952247371907021798609437027705392171762931767523846748184676694051320005681271452635608277857713427577896091736371787214684409012249534301465495853710507922796892589235420199561121290219608640344181598136297747713099605187072113499999983729780499510597317328160963185950244594553469083026425223082533446850352619311881710100031378387528865875332083814206171776691473035982534904287554687311595628638823537875937519577818577805321712268066130019278766111959092164201989380952572010654858632788659361533818279682303019520353018529689957736225994138912497217752834791315155748572424541506959508295331168617278558890750983817546374649393192550604009277016711390098488240128583616035637076601047101819429555961989467678374494482553797747268471040475346462080466842590694912933136770289891521047521620569660240580381501935112533824300355876402474964732639141992726042699227967823547816360093417216412199245863150302861829745557067498385054945885869269956909272107975093029553211653449872027559602364806654991198818347977535663698074265425278625518184175746728909777727938000816470600161452491921732172147723501414419735685481613611573525521334757418494684385233239073941433345477624168625189835694855620992192221842725502542568876717904946016534668049886272327917860857843838279679766814541009538837863609506800642251252051173929848960841284886269456042419652850222106611863067442786220391949450471237137869609563643719172874677646575739624138908658326459958133904780275901
 ```
 
@@ -184,27 +186,66 @@ Also you should not normally create any pods whose labels match this selector, e
 via another Job, or via another controller such as ReplicationController.  Otherwise, the Job will
 think that those pods were created by it.  Kubernetes will not stop you from doing this.
 
-### Parallelism and Completions
+### Parallel Jobs
 
-By default, a Job is complete when one Pod runs to successful completion.
+There are three main types of jobs:
 
-A single Job object can also be used to control multiple pods running in
-parallel.  There are several different [patterns for running parallel
-jobs](#job-patterns).
+1. Non-parallel Jobs
+  - normally only one pod is started, unless the pod fails.
+  - job is complete as soon as Pod terminates successfully.
+1. Parallel Jobs with a *fixed completion count*:
+  - specify a non-zero positive value for `.spec.completions`
+  - the job is complete when there is one successful pod for each value in the range 1 to `.spec.completions`.
+  - **not implemented yet:** each pod passed a different index in the range 1 to `.spec.completions`.
+1. Parallel Jobs with a *work queue*:
+  - do not specify `.spec.completions`
+  - the pods must coordinate with themselves or an external service to determine what each should work on
+  - each pod is independently capable of determining whether or not all its peers are done, thus the entire Job is done.
+  - when _any_ pod terminates with success, no new pods are created.
+  - once at least one pod has terminated with success and all pods are terminated, then the job is completed with success.
+  - once any pod has exited with success, no other pod should still be doing any work or writing any output.  They should all be
+    in the process of exiting.
 
-With some of these patterns, you can suggest how many pods should run
-concurrently by setting `.spec.parallelism` to the number of pods you would
-like to have running concurrently.  This number is a suggestion. The number
-running concurrently may be lower or higher for a variety of reasons.  For
-example, it may be lower if the number of remaining completions is less, or as
-the controller is ramping up, or if it is throttling the job due to excessive
-failures.  It may be higher for example if a pod is gracefully shutdown, and
-the replacement starts early.
+For a Non-parallel job, you can leave both `.spec.completions` and `.spec.parallelism` unset.  When both are
+unset, both are defaulted to 1.
 
-If you do not specify `.spec.parallelism`, then it defaults to `.spec.completions`.
+For a Fixed Completion Count job, you should set `.spec.completions` to the number of completions needed.
+You can set `.spec.parallelism`, or leave it unset and it will default to 1.
 
-Depending on the pattern you are using, you will either set `.spec.completions`
-to 1 or to the number of units of work (see [Job Patterns] for an explanation).
+For a Work Queue Job, you must leave `.spec.completions` unset, and set `.spec.parallelism` to
+a non-negative integer.
+
+For more information about how to make use of the different types of job, see the [job patterns](#job-patterns) section.
+
+
+#### Controlling Parallelism
+
+The requested parallelism (`.spec.parallelism`) can be set to any non-negative value.
+If it is unspecified, it defaults to 1.
+If it is specified as 0, then the Job is effectively paused until it is increased.
+
+A job can be scaled up using the `kubectl scale` command.  For example, the following
+command sets `.spec.parallelism` of a job called `myjob` to 10:
+
+```console
+$ kubectl scale  --replicas=$N jobs/myjob
+job "myjob" scaled
+```
+
+You can also use the `scale` subresource of the Job resource.
+
+Actual parallelism (number of pods running at any instant) may be more or less than requested
+parallelism, for a variety or reasons:
+
+- For Fixed Completion Count jobs, the actual number of pods running in parallel will not exceed the number of
+  remaining completions.   Higher values of `.spec.parallelism` are effectively ignored.
+- For work queue jobs, no new pods are started after any pod has succeded -- remaining pods are allowed to complete, however.
+- If the controller has not had time to react.
+- If the controller failed to create pods for any reason (lack of ResourceQuota, lack of permission, etc),
+  then there may be fewer pods than requested.
+- The controller may throttle new pod creation due to excessive previous pod failures in the same Job.
+- When a pod is gracefully shutdown, it make take time to stop.
+
 
 ## Handling Pod and Container Failures
 
