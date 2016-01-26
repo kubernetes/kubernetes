@@ -157,6 +157,41 @@ func testReboot(c *client.Client, rebootCmd string) {
 	}
 }
 
+func printStatusAndLogsForNotReadyPods(c *client.Client, oldPods, newPods []*api.Pod) {
+	printFn := func(id, log string, err error, previous bool) {
+		prefix := "Retrieving log for container"
+		if previous {
+			prefix = "Retrieving log for the last terminated container"
+		}
+		if err != nil {
+			Logf("%s %s, err: %v:\n%s\n", prefix, id, log)
+		} else {
+			Logf("%s %s:\n%s\n", prefix, id, log)
+		}
+	}
+	for _, oldPod := range oldPods {
+		for _, p := range newPods {
+			if p.Namespace != oldPod.Namespace || p.Name != oldPod.Name {
+				continue
+			}
+			if ok, _ := podRunningReady(p); !ok {
+				Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
+				// Print the log of the containers if pod is not running and ready.
+				for _, container := range p.Status.ContainerStatuses {
+					cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
+					log, err := getPodLogs(c, p.Namespace, p.Name, container.Name)
+					printFn(cIdentifer, log, err, false)
+					// Get log from the previous container.
+					if container.RestartCount > 0 {
+						printFn(cIdentifer, log, err, true)
+					}
+				}
+			}
+			break
+		}
+	}
+}
+
 // rebootNode takes node name on provider through the following steps using c:
 //  - ensures the node is ready
 //  - ensures all pods on the node are running and ready
@@ -229,6 +264,8 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy.
 	if !checkPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
+		newPods := ps.List()
+		printStatusAndLogsForNotReadyPods(c, pods, newPods)
 		return false
 	}
 
