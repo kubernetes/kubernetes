@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kube-registry-v0
+  namespace: kube-system
+  labels:
+    k8s-app: kube-registry
+    version: v0
+#    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: kube-registry
+    version: v0
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-registry
+        version: v0
+#        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - name: registry
+        image: registry:2
+        resources:
+          # keep request = limit to keep this container in guaranteed class
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        env:
+        - name: REGISTRY_HTTP_ADDR
+          value: :5000
+        - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+          value: /var/lib/registry
+        - name: REGISTRY_AUTH_HTPASSWD_REALM
+          value: basic_realm
+        - name: REGISTRY_AUTH_HTPASSWD_PATH
+          value: /auth/htpasswd
+        volumeMounts:
+        - name: image-store
+          mountPath: /var/lib/registry
+        - name: auth-dir
+          mountPath: /auth
+        ports:
+        - containerPort: 5000
+          name: registry
+          protocol: TCP
+      volumes:
+      - name: image-store
+        emptyDir: {}
+      - name: auth-dir
+        secret:
+          secretName: registry-auth-secret
