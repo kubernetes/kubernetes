@@ -24,7 +24,7 @@ function load-docker-images() {
   
     if which docker 1>/dev/null 2>&1; then
   
-      timeout 30 docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1
+      timeout 120 docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1
       rc=$?
       if [[ $rc == 0 ]]; then
         let loadedImageFlags="$loadedImageFlags|1"
@@ -32,7 +32,7 @@ function load-docker-images() {
         restart_docker=true
       fi
   
-      timeout 30 docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1
+      timeout 120 docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1
       rc=$?
       if [[ $rc == 0 ]]; then
         let loadedImageFlags="$loadedImageFlags|2"
@@ -40,7 +40,7 @@ function load-docker-images() {
         restart_docker=true
       fi
   
-      timeout 30 docker load -i /srv/salt/kube-bins/kube-controller-manager.tar 1>/dev/null 2>&1
+      timeout 120 docker load -i /srv/salt/kube-bins/kube-controller-manager.tar 1>/dev/null 2>&1
       rc=$?
       if [[ $rc == 0 ]]; then
         let loadedImageFlags="$loadedImageFlags|4"

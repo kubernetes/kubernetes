@@ -34,6 +34,12 @@ source "${KUBE_ROOT}/cluster/azure-legacy/${KUBE_CONFIG_FILE-"config-default.sh"
 source "${KUBE_ROOT}/cluster/common.sh"
 
 
+function prepare-e2e() {
+  # (e2e script runs detect-project, I don't think we need to anything)
+  # Note: we can't print anything here, or else the test tools will break with the extra output
+  return
+}
+
 function azure_call {
     local -a params=()
     local param
@@ -278,6 +284,8 @@ function kube-up {
             -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt
     done
 
+    KUBE_MASTER_IP="${AZ_CS}.cloudapp.net"
+
     # Build up start up script for master
     echo "--> Building up start up script for master"
     (
@@ -294,9 +302,13 @@ function kube-up {
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
         echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
+        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
+        echo "readonly KUBE_USER='${KUBE_USER}'"
+        echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
+        echo "readonly KUBE_MASTER_IP='${KUBE_MASTER_IP}'"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/common.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/create-dynamic-salt-files.sh"
+        grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/create-kubeconfig.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/download-release.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/salt-master.sh"
     ) > "${KUBE_TEMP}/master-start.sh"
@@ -317,6 +329,7 @@ function kube-up {
 
     echo "--> Starting VM"
     azure_call vm create \
+        -z "$MASTER_SIZE" \
         -w "$AZ_VNET" \
         -n $MASTER_NAME \
         -l "$AZ_LOCATION" \
@@ -338,12 +351,17 @@ function kube-up {
             echo "CLIENT_CRT=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt)\""
             echo "CLIENT_KEY=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.key)\""
             echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+            echo "readonly KUBE_USER='${KUBE_USER}'"
+            echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
+            echo "readonly KUBE_MASTER_IP='${KUBE_MASTER_IP}'"
             grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/common.sh"
+            grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/create-kubeconfig.sh"
             grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/salt-minion.sh"
         ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
         echo "--> Starting VM"
         azure_call vm create \
+            -z "$MINION_SIZE" \
             -c -w "$AZ_VNET" \
             -n ${MINION_NAMES[$i]} \
             -l "$AZ_LOCATION" \
@@ -377,10 +395,11 @@ function kube-up {
     printf "\n"
     echo "Kubernetes cluster created."
 
+    export CONTEXT="azure_${INSTANCE_PREFIX}"
+    create-kubeconfig
     export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
     export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
     export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
-    export CONTEXT="azure_${INSTANCE_PREFIX}"
 
     # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
     # config file.  Distribute the same way the htpasswd is done.
@@ -391,8 +410,6 @@ function kube-up {
         sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
         sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
-
-    create-kubeconfig
 )
 
     echo "Sanity checking cluster..."
@@ -411,6 +428,31 @@ function kube-up {
             printf "."
             sleep 2
         done
+    done
+
+    sleep 60
+    KUBECONFIG_NAME="kubeconfig"
+    KUBECONFIG="${HOME}/.kube/config"
+    echo "Distributing kubeconfig for kubelet to master kubelet"
+    scp -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -P 22000 ${KUBECONFIG} \
+        $AZ_CS.cloudapp.net:${KUBECONFIG_NAME}
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+        sudo cp ${KUBECONFIG_NAME} /var/lib/kubelet/${KUBECONFIG_NAME}
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+        sudo service kubelet restart
+
+    echo "Distributing kubeconfig for kubelet to all minions"
+    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+        scp -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -P ${ssh_ports[$i]} ${KUBECONFIG} \
+            $AZ_CS.cloudapp.net:${KUBECONFIG_NAME}
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+            sudo cp ${KUBECONFIG_NAME} /var/lib/kubelet/${KUBECONFIG_NAME}
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+            sudo cp ${KUBECONFIG_NAME} /var/lib/kube-proxy/${KUBECONFIG_NAME}
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+            sudo service kubelet restart
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+            sudo killall kube-proxy
     done
 
     # ensures KUBECONFIG is set
@@ -498,4 +540,12 @@ function restart-kube-proxy {
 # Restart the kube-proxy on the master ($1)
 function restart-apiserver {
     ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+}
+
+function test-setup {
+    "${KUBE_ROOT}/cluster/kube-up.sh"
+}
+
+function test-teardown {
+    "${KUBE_ROOT}/cluster/kube-down.sh"
 }

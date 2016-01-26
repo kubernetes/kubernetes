@@ -14,7 +14,7 @@
 {% set srv_sshproxy_path = "/srv/sshproxy" -%}
 
 {% if grains.cloud is defined -%}
-  {% if grains.cloud not in ['vagrant', 'vsphere', 'photon-controller'] -%}
+  {% if grains.cloud not in ['vagrant', 'vsphere', 'photon-controller', 'azure-legacy'] -%}
     {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
   {% endif -%}
 
