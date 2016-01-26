@@ -22,7 +22,7 @@ while true; do
 
   if which docker 1>/dev/null 2>&1; then
 
-    timeout 30 docker load -i /srv/salt/kube-bins/kube-proxy.tar 1>/dev/null 2>&1
+    timeout 120 docker load -i /srv/salt/kube-bins/kube-proxy.tar 1>/dev/null 2>&1
     rc=$?
     if [[ "${rc}" == 0 ]]; then
       let loadedImageFlags="${loadedImageFlags}|1"

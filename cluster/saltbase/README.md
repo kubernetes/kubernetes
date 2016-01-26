@@ -8,7 +8,7 @@ configurations for Debian-on-GCE, Fedora-on-Vagrant, Ubuntu-on-AWS and
 Ubuntu-on-Azure. (That doesn't mean it can't be made to apply to an
 arbitrary configuration, but those are only the in-tree OS/IaaS
 combinations supported today.) As you peruse the configuration, these
-are shorthanded as `gce`, `vagrant`, `aws`, `azure` in `grains.cloud`;
+are shorthanded as `gce`, `vagrant`, `aws`, `azure-legacy` in `grains.cloud`;
 the documentation in this tree uses this same shorthand for convenience.
 
 See more:

@@ -20,7 +20,7 @@ base:
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
 {% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
     - openvpn-client
 {% endif %}
     - helpers
@@ -61,6 +61,9 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - supervisor
+{% if grains['cloud'] is defined and not grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere'] %}
+    - nginx
+{% endif %}
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
@@ -75,10 +78,10 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
     - openvpn
 {% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'vsphere', 'photon-controller' ] %}
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'vsphere', 'photon-controller', 'azure-legacy' ] %}
     - docker
     - kubelet
 {% endif %}
