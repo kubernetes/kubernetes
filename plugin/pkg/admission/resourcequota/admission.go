@@ -167,9 +167,13 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 // Return true if the usage must be recorded prior to admitting the new resource
 // Return an error if the operation should not pass admission control
 func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
-	// on update, the only resource that can modify the value of a quota is pods
-	// so if your not a pod, we exit quickly
-	if a.GetOperation() == admission.Update && a.GetResource() != api.Resource("pods") {
+	// NOTE:
+	// Right now, this operation ignores update operations for any resource type.
+	// At this time, we do not allow a pod's resource requirements to change dynamically.
+	// In the future, if we allow updating a pod's resource requirements post creation, we need to coordinate
+	// that change with how admission control works today to ensure that we do not break kubectl patch.
+	// see: https://github.com/kubernetes/kubernetes/issues/18272 for history
+	if a.GetOperation() == admission.Update {
 		return false, nil
 	}
 
