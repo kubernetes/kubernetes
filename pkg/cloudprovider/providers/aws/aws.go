@@ -42,6 +42,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -63,6 +64,9 @@ const MaxReadThenCreateRetries = 30
 // TODO: Remove when user/admin can configure volume types and thus we don't
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
+
+// Used to call aws_credentials.Init() just once
+var once sync.Once
 
 // Abstraction over AWS, to allow mocking/other implementations
 type AWSServices interface {
@@ -590,6 +594,11 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	} else {
 		glog.Infof("AWS cloud - no tag filtering")
 	}
+
+	// Register handler for ECR credentials
+	once.Do(func() {
+		aws_credentials.Init()
+	})
 
 	return awsCloud, nil
 }

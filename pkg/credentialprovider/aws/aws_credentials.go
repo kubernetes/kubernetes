@@ -27,7 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -66,9 +65,10 @@ type ecrProvider struct {
 	getter tokenGetter
 }
 
-// init registers the various means by which ECR credentials may
-// be resolved.
-func init() {
+// Not using the package init() function: this module should be initialized only
+// if using the AWS cloud provider. This way, we avoid timeouts waiting for a
+// non-existent provider.
+func Init() {
 	credentialprovider.RegisterCredentialProvider("aws-ecr-key",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &ecrProvider{},
@@ -82,7 +82,7 @@ func init() {
 // TODO: figure how to enable it manually for deployments that are not on AWS but still
 // use ECR somehow?
 func (p *ecrProvider) Enabled() bool {
-	provider, err := cloudprovider.GetCloudProvider(aws_cloud.ProviderName, nil)
+	provider, err := cloudprovider.GetCloudProvider("aws", nil)
 	if err != nil {
 		glog.Errorf("while initializing AWS cloud provider %v", err)
 		return false
