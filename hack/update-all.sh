@@ -23,9 +23,13 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 
 SILENT=true
+ALL=false
 
-while getopts ":v" opt; do
+while getopts ":va" opt; do
 	case $opt in
+		a)
+			ALL=true
+			;;
 		v)
 			SILENT=false
 			;;
@@ -36,8 +40,14 @@ while getopts ":v" opt; do
 	esac
 done
 
+trap 'exit 1' SIGINT
+
 if $SILENT ; then
 	echo "Running in the silent mode, run with -v if you want to see script logs."
+fi
+
+if ! $ALL ; then
+	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
 BASH_TARGETS="codecgen
@@ -52,10 +62,22 @@ BASH_TARGETS="codecgen
 
 for t in $BASH_TARGETS
 do
-	echo -e "Updating $t"
+	echo -e "${color_yellow}Updating $t${color_norm}"
 	if $SILENT ; then
-		bash "$KUBE_ROOT/hack/update-$t.sh" 1> /dev/null || echo -e "${color_red}FAILED${color_norm}" 
+		if ! bash "$KUBE_ROOT/hack/update-$t.sh" 1> /dev/null; then
+			echo -e "${color_red}Updating $t FAILED${color_norm}"
+			if ! $ALL; then
+				exit 1
+			fi
+		fi
 	else
-		bash "$KUBE_ROOT/hack/update-$t.sh"
+		if ! bash "$KUBE_ROOT/hack/update-$t.sh"; then
+			echo -e "${color_red}$Updating $t FAILED${color_norm}"
+			if ! $ALL; then
+				exit 1
+			fi
+		fi
 	fi
 done
+
+echo -e "${color_green}Update scripts completed successfully${color_norm}"
