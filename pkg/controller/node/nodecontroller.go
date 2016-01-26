@@ -503,7 +503,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
 			}
 		}
-		
+
 	}
 }
 
