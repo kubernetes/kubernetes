@@ -144,11 +144,14 @@ func (h *etcdHelper) Versioner() storage.Versioner {
 
 // Implements storage.Interface.
 func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	trace := util.NewTrace("etcdHelper::Create " + getTypeName(obj))
+	defer trace.LogIfLong(250 * time.Millisecond)
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
 	key = h.prefixEtcdKey(key)
 	data, err := runtime.Encode(h.codec, obj)
+	trace.Step("Object encoded")
 	if err != nil {
 		return err
 	}
@@ -157,6 +160,7 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 			return errors.New("resourceVersion may not be set on objects to be created")
 		}
 	}
+	trace.Step("Version checked")
 
 	startTime := time.Now()
 	opts := etcd.SetOptions{
@@ -165,6 +169,7 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	}
 	response, err := h.client.Set(ctx, key, string(data), &opts)
 	metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
+	trace.Step("Object created")
 	if err != nil {
 		return err
 	}
