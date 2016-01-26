@@ -46,39 +46,39 @@ cd $CURR_DIR
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
-gcloud compute disks create "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
+run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
+  ${GCLOUD_COMMON_ARGS} \
+  --type "${MASTER_DISK_TYPE}" \
+  --size "${MASTER_DISK_SIZE}"
 
-gcloud compute instances create "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${MASTER_IMAGE_PROJECT}" \
-    --image "${MASTER_IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
+  ${GCLOUD_COMMON_ARGS} \
+  --machine-type "${MASTER_SIZE}" \
+  --image-project="${MASTER_IMAGE_PROJECT}" \
+  --image "${MASTER_IMAGE}" \
+  --tags "${MASTER_TAG}" \
+  --network "${NETWORK}" \
+  --scopes "storage-ro,compute-rw,logging-write" \
+  --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
-gcloud compute firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
-    --project "${PROJECT}" \
-    --network "${NETWORK}" \
-    --source-ranges "0.0.0.0/0" \
-    --target-tags "${MASTER_TAG}" \
-    --allow "tcp:443"
+run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
+  --project "${PROJECT}" \
+  --network "${NETWORK}" \
+  --source-ranges "0.0.0.0/0" \
+  --target-tags "${MASTER_TAG}" \
+  --allow "tcp:443"
 
 MASTER_IP=$(gcloud compute instances describe ${MASTER_NAME} \
   --zone="${ZONE}" --project="${PROJECT}" | grep natIP: | cut -f2 -d":" | sed "s/ //g")
 
 if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
   EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
-  gcloud compute disks create "${EVENT_STORE_NAME}-pd" \
+    run-gcloud-compute-with-retries disks create "${EVENT_STORE_NAME}-pd" \
       ${GCLOUD_COMMON_ARGS} \
       --type "${MASTER_DISK_TYPE}" \
       --size "${MASTER_DISK_SIZE}"
 
-  gcloud compute instances create "${EVENT_STORE_NAME}" \
+    run-gcloud-compute-with-retries instances create "${EVENT_STORE_NAME}" \
       ${GCLOUD_COMMON_ARGS} \
       --machine-type "${MASTER_SIZE}" \
       --image-project="${MASTER_IMAGE_PROJECT}" \
@@ -119,15 +119,15 @@ done
 
 gcloud compute ssh --zone=${ZONE} --project="${PROJECT}" ${MASTER_NAME} \
   --command="sudo mkdir /srv/kubernetes -p && \
-  sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
-  sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
-  sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
-  sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
-  sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
-  sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
-  sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
-  sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
-  sudo bash -c \"echo admin,admin,admin > /srv/kubernetes/basic_auth.csv\""
+    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
+    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
+    sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo admin,admin,admin > /srv/kubernetes/basic_auth.csv\""
 
 if [ "${RUN_FROM_DISTRO}" == "false" ]; then
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
