@@ -225,9 +225,23 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("allocate-node-cidrs set to %v, node controller not creating routes", s.AllocateNodeCIDRs)
 	}
 
-	go resourcequotacontroller.NewResourceQuotaController(
-		clientForUserAgentOrDie(*kubeconfig, "resourcequota-controller"),
-		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
+	resourceQuotaControllerClient := clientForUserAgentOrDie(*kubeconfig, "resourcequota-controller")
+	resourceQuotaUsageRegistry := resourcequotacontroller.NewDefaultUsageFuncRegistry(resourceQuotaControllerClient)
+	resourceQuotaControllerFactory := resourcequotacontroller.NewMonitoringControllerFactory(resourceQuotaControllerClient)
+	groupKindsToMonitor := []unversioned.GroupKind{
+		unversioned.GroupKind{Group: "", Kind: "Pod"},
+		unversioned.GroupKind{Group: "", Kind: "Service"},
+		unversioned.GroupKind{Group: "", Kind: "ReplicationController"},
+		unversioned.GroupKind{Group: "", Kind: "PersistentVolumeClaim"},
+	}
+	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+		KubeClient:          resourceQuotaControllerClient,
+		ResyncPeriod:        controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod),
+		UsageRegistry:       resourceQuotaUsageRegistry,
+		ControllerFactory:   resourceQuotaControllerFactory,
+		GroupKindsToMonitor: groupKindsToMonitor,
+	}
+	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
