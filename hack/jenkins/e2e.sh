@@ -139,7 +139,7 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="false"
-      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${new_version}"
+      GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master --upgrade-target=${new_version}"
       ;;
 
     step4)
@@ -168,7 +168,7 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="false"
-      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${new_version}"
+      GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster --upgrade-target=${new_version}"
       ;;
 
     step6)
@@ -803,7 +803,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
@@ -840,7 +840,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
