@@ -1924,9 +1924,17 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	now := unversioned.Now()
-	grace := int64(30)
-	grace2 := int64(31)
+	var (
+		activeDeadlineSecondsZero     = int64(0)
+		activeDeadlineSecondsNegative = int64(-30)
+		activeDeadlineSecondsPositive = int64(30)
+		activeDeadlineSecondsLarger   = int64(31)
+
+		now    = unversioned.Now()
+		grace  = int64(30)
+		grace2 = int64(31)
+	)
+
 	tests := []struct {
 		a       api.Pod
 		b       api.Pod
@@ -2066,6 +2074,150 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
+						{},
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
+						},
+					},
+				},
+			},
+			false,
+			"image change to empty",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{},
+			},
+			api.Pod{
+				Spec: api.PodSpec{},
+			},
+			true,
+			"activeDeadlineSeconds no change, nil",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			true,
+			"activeDeadlineSeconds no change, set",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{},
+			true,
+			"activeDeadlineSeconds change to positive from nil",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
+				},
+			},
+			true,
+			"activeDeadlineSeconds change to smaller positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			false,
+			"activeDeadlineSeconds change to larger positive",
+		},
+
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
+				},
+			},
+			api.Pod{},
+			false,
+			"activeDeadlineSeconds change to negative from nil",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			false,
+			"activeDeadlineSeconds change to negative from positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			true,
+			"activeDeadlineSeconds change to zero from positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
+				},
+			},
+			api.Pod{},
+			true,
+			"activeDeadlineSeconds change to zero from nil",
+		},
+		{
+			api.Pod{},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			false,
+			"activeDeadlineSeconds change to nil from positive",
+		},
+
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
 						{
 							Image: "foo:V1",
 							Resources: api.ResourceRequirements{
@@ -2149,11 +2301,11 @@ func TestValidatePodUpdate(t *testing.T) {
 		errs := ValidatePodUpdate(&test.a, &test.b)
 		if test.isValid {
 			if len(errs) != 0 {
-				t.Errorf("unexpected invalid: %s %v, %v", test.test, test.a, test.b)
+				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.a, test.b)
 			}
 		} else {
 			if len(errs) == 0 {
-				t.Errorf("unexpected valid: %s %v, %v", test.test, test.a, test.b)
+				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.a, test.b)
 			}
 		}
 	}

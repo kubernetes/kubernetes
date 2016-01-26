@@ -788,6 +788,22 @@ func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	})
 }
 
+// waitForPodTerminatedInNamespace returns an error if it took too long for the pod
+// to terminate or if the pod terminated with an unexpected reason.
+func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespace string) error {
+	return waitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", podStartTimeout, func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase == api.PodFailed {
+			if pod.Status.Reason == reason {
+				return true, nil
+			} else {
+				return true, fmt.Errorf("Expected pod %n/%n to be terminated with reason %v, got reason: ", namespace, podName, reason, pod.Status.Reason)
+			}
+		}
+
+		return false, nil
+	})
+}
+
 // waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", podStartTimeout, func(pod *api.Pod) (bool, error) {
