@@ -1447,21 +1447,30 @@ func isEqualIPPermission(l, r *ec2.IpPermission, compareGroupUserIDs bool) bool 
 		}
 	}
 
-	if len(l.UserIdGroupPairs) != len(r.UserIdGroupPairs) {
-		return false
-	}
-	for j := range l.UserIdGroupPairs {
-		if !isEqualStringPointer(l.UserIdGroupPairs[j].GroupId, r.UserIdGroupPairs[j].GroupId) {
-			return false
-		}
-		if compareGroupUserIDs {
-			if !isEqualStringPointer(l.UserIdGroupPairs[j].UserId, r.UserIdGroupPairs[j].UserId) {
-				return false
+	for _, leftPair := range l.UserIdGroupPairs {
+		for _, rightPair := range r.UserIdGroupPairs {
+			if isEqualUserGroupPair(leftPair, rightPair, compareGroupUserIDs) {
+				return true
 			}
 		}
+		return false
 	}
 
 	return true
+}
+
+func isEqualUserGroupPair(l, r *ec2.UserIdGroupPair, compareGroupUserIDs bool) bool {
+	if isEqualStringPointer(l.GroupId, r.GroupId) {
+		if compareGroupUserIDs {
+			if isEqualStringPointer(l.UserId, r.UserId) {
+				return true
+			}
+		} else {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Makes sure the security group includes the specified permissions
@@ -1477,6 +1486,8 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 	if group == nil {
 		return false, fmt.Errorf("security group not found: %s", securityGroupId)
 	}
+
+	glog.V(2).Infof("Existing security group ingress: %s %v", securityGroupId, group.IpPermissions)
 
 	changes := []*ec2.IpPermission{}
 	for _, addPermission := range addPermissions {

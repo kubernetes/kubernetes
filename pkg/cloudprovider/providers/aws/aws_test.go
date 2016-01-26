@@ -799,3 +799,70 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	}
 
 }
+
+func TestIsEqualIPPermissionHandlesMultipleGroupIds(t *testing.T) {
+	oldIpPermission := ec2.IpPermission {
+		UserIdGroupPairs: []*ec2.UserIdGroupPair {
+			&ec2.UserIdGroupPair{GroupId: aws.String("firstGroupId")},
+			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId")},
+			&ec2.UserIdGroupPair{GroupId: aws.String("thirdGroupId")},
+		},
+	}
+
+	existingIpPermission := ec2.IpPermission {
+		UserIdGroupPairs: []*ec2.UserIdGroupPair {
+			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId")},
+		},
+	}
+
+	newIpPermission := ec2.IpPermission {
+		UserIdGroupPairs: []*ec2.UserIdGroupPair {
+			&ec2.UserIdGroupPair{GroupId: aws.String("fourthGroupId")},
+		},
+	}
+
+
+	equals := isEqualIPPermission(&existingIpPermission, &oldIpPermission, false)
+	if !equals {
+		t.Errorf("Should have been considered equal since first is in the second array of groups")
+	}
+
+	equals = isEqualIPPermission(&newIpPermission, &oldIpPermission, false)
+	if equals {
+		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+
+}
+
+func TestIsEqualIPPermissionHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
+	oldIpPermission := ec2.IpPermission {
+		UserIdGroupPairs: []*ec2.UserIdGroupPair {
+			&ec2.UserIdGroupPair{GroupId: aws.String("firstGroupId"), UserId: aws.String("firstUserId")},
+			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
+			&ec2.UserIdGroupPair{GroupId: aws.String("thirdGroupId"), UserId: aws.String("thirdUserId")},
+		},
+	}
+
+	existingIpPermission := ec2.IpPermission {
+		UserIdGroupPairs: []*ec2.UserIdGroupPair {
+			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
+		},
+	}
+
+	newIpPermission := ec2.IpPermission {
+		UserIdGroupPairs: []*ec2.UserIdGroupPair {
+			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId"), UserId: aws.String("anotherUserId")},
+		},
+	}
+
+
+	equals := isEqualIPPermission(&existingIpPermission, &oldIpPermission, true)
+	if !equals {
+		t.Errorf("Should have been considered equal since first is in the second array of groups")
+	}
+
+	equals = isEqualIPPermission(&newIpPermission, &oldIpPermission, true)
+	if equals {
+		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+}
