@@ -200,6 +200,11 @@ func (f *Framework) afterEach() {
 	f.Client = nil
 }
 
+// WaitForPodTerminated waits for the pod to be terminated with the given reason.
+func (f *Framework) WaitForPodTerminated(podName, reason string) error {
+	return waitForPodTerminatedInNamespace(f.Client, podName, reason, f.Namespace.Name)
+}
+
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
 	return waitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
