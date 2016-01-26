@@ -258,6 +258,26 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
+  
+  # Runs all non-flaky, non-slow tests on GCE, sequentially,
+  # and in a multi-zone ("Ubernetes Lite") cluster.
+  kubernetes-e2e-gce-ubernetes-lite)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-ubelite"}
+    : ${E2E_PUBLISH_GREEN_VERSION:="true"}
+    : ${E2E_NETWORK:="e2e-gce-ubelite"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-ubelite"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-ubelite"}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${E2E_MULTIZONE:="true"}
+    : ${E2E_ZONE:=""}
+    : ${E2E_ZONES:=us-central1-a us-central1-b us-central1-f}
+    ;;
 
   # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GCE.
   kubernetes-e2e-gce-serial)
@@ -742,6 +762,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${AWS_SHARED_CREDENTIALS_FILE:-}
 # GCE variables
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_GCE_ZONE=${E2E_ZONE}
+export MULTIZONE=${E2E_MULTIZONE:-}  # for building multi-zone Ubernetes Lite clusters
 export KUBE_GCE_NETWORK=${E2E_NETWORK}
 export KUBE_GCE_INSTANCE_PREFIX=${KUBE_GCE_INSTANCE_PREFIX:-}
 export KUBE_GCE_NODE_PROJECT=${KUBE_GCE_NODE_PROJECT:-}
@@ -804,6 +825,7 @@ export E2E_TEST="${E2E_TEST:-true}"
 export E2E_DOWN="${E2E_DOWN:-true}"
 export E2E_CLEAN_START="${E2E_CLEAN_START:-}"
 export E2E_PUBLISH_GREEN_VERSION="${E2E_PUBLISH_GREEN_VERSION:-false}"
+export E2E_ZONES=${E2E_ZONES:-} #  for building multi-zone Ubernetes Lite clusters
 # Used by hack/ginkgo-e2e.sh to enable ginkgo's parallel test runner.
 export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
 export GINKGO_PARALLEL_NODES=${GINKGO_PARALLEL_NODES:-}
