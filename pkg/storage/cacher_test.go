@@ -42,7 +42,7 @@ import (
 
 func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
-	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix)
+	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix, false)
 	return server, storage
 }
 
