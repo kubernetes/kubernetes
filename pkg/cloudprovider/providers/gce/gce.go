@@ -488,14 +488,15 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	}
 
 	if firewallNeedsUpdate {
+		desc := makeFirewallDescription(ipAddress)
 		// Unlike forwarding rules and target pools, firewalls can be updated
 		// without needing to be deleted and recreated.
 		if firewallExists {
-			if err := gce.updateFirewall(name, region, ipAddress, ports, hosts); err != nil {
+			if err := gce.updateFirewall(name, region, desc, "0.0.0.0/0", ports, hosts); err != nil {
 				return nil, err
 			}
 		} else {
-			if err := gce.createFirewall(name, region, ipAddress, ports, hosts); err != nil {
+			if err := gce.createFirewall(name, region, desc, "0.0.0.0/0", ports, hosts); err != nil {
 				return nil, err
 			}
 		}
@@ -727,8 +728,8 @@ func (gce *GCECloud) createTargetPool(name, region string, hosts []*gceInstance,
 	return nil
 }
 
-func (gce *GCECloud) createFirewall(name, region, ipAddress string, ports []*api.ServicePort, hosts []*gceInstance) error {
-	firewall, err := gce.firewallObject(name, region, ipAddress, ports, hosts)
+func (gce *GCECloud) createFirewall(name, region, desc, srcRange string, ports []*api.ServicePort, hosts []*gceInstance) error {
+	firewall, err := gce.firewallObject(name, region, desc, srcRange, ports, hosts)
 	if err != nil {
 		return err
 	}
@@ -745,8 +746,8 @@ func (gce *GCECloud) createFirewall(name, region, ipAddress string, ports []*api
 	return nil
 }
 
-func (gce *GCECloud) updateFirewall(name, region, ipAddress string, ports []*api.ServicePort, hosts []*gceInstance) error {
-	firewall, err := gce.firewallObject(name, region, ipAddress, ports, hosts)
+func (gce *GCECloud) updateFirewall(name, region, desc, srcRange string, ports []*api.ServicePort, hosts []*gceInstance) error {
+	firewall, err := gce.firewallObject(name, region, desc, srcRange, ports, hosts)
 	if err != nil {
 		return err
 	}
@@ -763,7 +764,7 @@ func (gce *GCECloud) updateFirewall(name, region, ipAddress string, ports []*api
 	return nil
 }
 
-func (gce *GCECloud) firewallObject(name, region, ipAddress string, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+func (gce *GCECloud) firewallObject(name, region, desc, srcRange string, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
@@ -774,9 +775,9 @@ func (gce *GCECloud) firewallObject(name, region, ipAddress string, ports []*api
 	}
 	firewall := &compute.Firewall{
 		Name:         makeFirewallName(name),
-		Description:  makeFirewallDescription(ipAddress),
+		Description:  desc,
 		Network:      gce.networkURL,
-		SourceRanges: []string{"0.0.0.0/0"},
+		SourceRanges: []string{srcRange},
 		TargetTags:   hostTags,
 		Allowed: []*compute.FirewallAllowed{
 			{
@@ -1036,6 +1037,94 @@ func (gce *GCECloud) deleteStaticIP(name, region string) error {
 	return nil
 }
 
+// Firewall management: These methods are just passthrough to the existing
+// internal firewall creation methods used to manage TCPLoadBalancer.
+
+// GetFirewall returns the Firewall by name.
+func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
+	return gce.service.Firewalls.Get(gce.projectID, name).Do()
+}
+
+// CreateFirewall creates the given firewall rule.
+func (gce *GCECloud) CreateFirewall(name, desc, srcRange string, ports []int64, hostNames []string) error {
+	region, err := GetGCERegion(gce.localZone)
+	if err != nil {
+		return err
+	}
+	// TODO: This completely breaks modularity in the cloudprovider but the methods
+	// shared with the TCPLoadBalancer take api.ServicePorts.
+	svcPorts := []*api.ServicePort{}
+	for _, p := range ports {
+		svcPorts = append(svcPorts, &api.ServicePort{Port: int(p)})
+	}
+	hosts, err := gce.getInstancesByNames(hostNames)
+	if err != nil {
+		return err
+	}
+	return gce.createFirewall(name, region, desc, srcRange, svcPorts, hosts)
+}
+
+// DeleteFirewall deletes the given firewall rule.
+func (gce *GCECloud) DeleteFirewall(name string) error {
+	region, err := GetGCERegion(gce.localZone)
+	if err != nil {
+		return err
+	}
+	return gce.deleteFirewall(name, region)
+}
+
+// UpdateFirewall applies the given firewall rule as an update to an existing
+// firewall rule with the same name.
+func (gce *GCECloud) UpdateFirewall(name, desc, srcRange string, ports []int64, hostNames []string) error {
+	region, err := GetGCERegion(gce.localZone)
+	if err != nil {
+		return err
+	}
+	// TODO: This completely breaks modularity in the cloudprovider but the methods
+	// shared with the TCPLoadBalancer take api.ServicePorts.
+	svcPorts := []*api.ServicePort{}
+	for _, p := range ports {
+		svcPorts = append(svcPorts, &api.ServicePort{Port: int(p)})
+	}
+	hosts, err := gce.getInstancesByNames(hostNames)
+	if err != nil {
+		return err
+	}
+	return gce.updateFirewall(name, region, desc, srcRange, svcPorts, hosts)
+}
+
+// Global static IP management
+
+// ReserveGlobalStaticIP creates a global static IP.
+// Caller is allocated a random IP if they do not specify an ipAddress. If an
+// ipAddress is specified, it must belong to the current project, eg: an
+// ephemeral IP associated with a global forwarding rule.
+func (gce *GCECloud) ReserveGlobalStaticIP(name, ipAddress string) (address *compute.Address, err error) {
+	op, err := gce.service.GlobalAddresses.Insert(gce.projectID, &compute.Address{Name: name, Address: ipAddress}).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err := gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	// We have to get the address to know which IP was allocated for us.
+	return gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+}
+
+// DeleteGlobalStaticIP deletes a global static IP by name.
+func (gce *GCECloud) DeleteGlobalStaticIP(name string) error {
+	op, err := gce.service.GlobalAddresses.Delete(gce.projectID, name).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// GetGlobalStaticIP returns the global static IP by name.
+func (gce *GCECloud) GetGlobalStaticIP(name string) (address *compute.Address, err error) {
+	return gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+}
+
 // UrlMap management
 
 // GetUrlMap returns the UrlMap by name.
@@ -1135,6 +1224,101 @@ func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 // ListTargetHttpProxies lists all TargetHttpProxies in the project.
 func (gce *GCECloud) ListTargetHttpProxies() (*compute.TargetHttpProxyList, error) {
 	return gce.service.TargetHttpProxies.List(gce.projectID).Do()
+}
+
+// TargetHttpsProxy management
+
+// GetTargetHttpsProxy returns the UrlMap by name.
+func (gce *GCECloud) GetTargetHttpsProxy(name string) (*compute.TargetHttpsProxy, error) {
+	return gce.service.TargetHttpsProxies.Get(gce.projectID, name).Do()
+}
+
+// CreateTargetHttpsProxy creates and returns a TargetHttpsProxy with the given UrlMap and SslCertificate.
+func (gce *GCECloud) CreateTargetHttpsProxy(urlMap *compute.UrlMap, sslCert *compute.SslCertificate, name string) (*compute.TargetHttpsProxy, error) {
+	proxy := &compute.TargetHttpsProxy{
+		Name:            name,
+		UrlMap:          urlMap.SelfLink,
+		SslCertificates: []string{sslCert.SelfLink},
+	}
+	op, err := gce.service.TargetHttpsProxies.Insert(gce.projectID, proxy).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetTargetHttpsProxy(name)
+}
+
+// SetUrlMapForTargetHttpsProxy sets the given UrlMap for the given TargetHttpsProxy.
+func (gce *GCECloud) SetUrlMapForTargetHttpsProxy(proxy *compute.TargetHttpsProxy, urlMap *compute.UrlMap) error {
+	op, err := gce.service.TargetHttpsProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{UrlMap: urlMap.SelfLink}).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// SetSslCertificateForTargetHttpsProxy sets the given SslCertificate for the given TargetHttpsProxy.
+func (gce *GCECloud) SetSslCertificateForTargetHttpsProxy(proxy *compute.TargetHttpsProxy, sslCert *compute.SslCertificate) error {
+	op, err := gce.service.TargetHttpsProxies.SetSslCertificates(gce.projectID, proxy.Name, &compute.TargetHttpsProxiesSetSslCertificatesRequest{SslCertificates: []string{sslCert.SelfLink}}).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteTargetHttpsProxy deletes the TargetHttpsProxy by name.
+func (gce *GCECloud) DeleteTargetHttpsProxy(name string) error {
+	op, err := gce.service.TargetHttpsProxies.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListTargetHttpsProxies lists all TargetHttpsProxies in the project.
+func (gce *GCECloud) ListTargetHttpsProxies() (*compute.TargetHttpsProxyList, error) {
+	return gce.service.TargetHttpsProxies.List(gce.projectID).Do()
+}
+
+// SSL Certificate management
+
+// GetSslCertificate returns the SslCertificate by name.
+func (gce *GCECloud) GetSslCertificate(name string) (*compute.SslCertificate, error) {
+	return gce.service.SslCertificates.Get(gce.projectID, name).Do()
+}
+
+// CreateSslCertificate creates and returns a SslCertificate.
+func (gce *GCECloud) CreateSslCertificate(sslCerts *compute.SslCertificate) (*compute.SslCertificate, error) {
+	op, err := gce.service.SslCertificates.Insert(gce.projectID, sslCerts).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetSslCertificate(sslCerts.Name)
+}
+
+// DeleteSslCertificate deletes the SslCertificate by name.
+func (gce *GCECloud) DeleteSslCertificate(name string) error {
+	op, err := gce.service.SslCertificates.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListSslCertificates lists all SslCertificates in the project.
+func (gce *GCECloud) ListSslCertificates() (*compute.SslCertificateList, error) {
+	return gce.service.SslCertificates.List(gce.projectID).Do()
 }
 
 // GlobalForwardingRule management
