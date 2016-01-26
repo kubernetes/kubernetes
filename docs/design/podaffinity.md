@@ -31,7 +31,7 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-NOTE: It is useful to read about [node affinity](https://github.com/kubernetes/kubernetes/pull/18261) first.
+NOTE: It is useful to read about [node affinity](nodeaffinity.md) first.
 
 This document describes a proposal for specifying and implementing inter-pod topological affinity and
 anti-affinity. By that we mean: rules that specify that certain pods should be placed
@@ -61,11 +61,11 @@ be met later on at runtime, for one of them the system will try to eventually ev
 while for the other the system may not try to do so. The third variant
 simply provides scheduling-time *hints* that the scheduler will try
 to satisfy but may not be able to. These three variants are directly analogous to the three
-variants of [node affinity](https://github.com/kubernetes/kubernetes/pull/18261).
+variants of [node affinity](nodeaffinity.md).
 
 Note that this proposal is only about *inter-pod* topological affinity and anti-affinity.
 There are other forms of topological affinity and anti-affinity. For example,
-you can use [node affinity](https://github.com/kubernetes/kubernetes/pull/18261) to require (prefer)
+you can use [node affinity](nodeaffinity.md) to require (prefer)
 that a set of pods all be scheduled in some specific zone Z. Node affinity is not
 capable of expressing inter-pod dependencies, and conversely the API
 we descibe in this document is not capable of expressing node affinity rules.
@@ -159,7 +159,7 @@ type PodAffinityTerm struct {
 	// nil list means "this pod's namespace," empty list means "all namespaces"
 	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
 	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
-	Namespaces []api.Namespace  `json:"namespaces"`
+	Namespaces []api.Namespace  `json:"namespaces,omitempty"`
 	// empty topology key is interpreted by the scheduler as "all topologies"
 	TopologyKey string `json:"topologyKey,omitempty"`
 }
@@ -405,12 +405,27 @@ RequiredDuringScheduling anti-affinity for all pods using a "node" `TopologyKey`
 (i.e. exclusive access to a node), it could charge for the resources of the
 average or largest node in the cluster. Likewise if a pod expresses RequiredDuringScheduling
 anti-affinity for all pods using a "cluster" `TopologyKey`, it could charge for the resources of the
-entire cluster. If a cluster administrator wants to overcommit quota, for
+entire cluster. If node affinity is used to
+constrain the pod to a particular topology domain, then the admission-time quota
+charging should take that into account (e.g. not charge for the average/largest machine
+if the PodSpec constrains the pod to a specific machine with a known size; instead charge
+for the size of the actual machine that the pod was constrained to). In all cases
+once the pod is scheduled, the quota charge should be adjusted down to the
+actual amount of resources allocated (e.g. the size of the actual machine that was
+assigned, not the average/largest). If a cluster administrator wants to overcommit quota, for
 example to allow more than N pods across all users to request exclusive node
 access in a cluster with N nodes, then a priority/preemption scheme should be added
 so that the most important pods run when resource demand exceeds supply.
 
-Our initial implementation will use quota that charges based on opportunity cost.
+An alternative approach, which is a bit of a blunt hammer, is to use a
+capability mechanism to restrict use of RequiredDuringScheduling anti-affinity
+to trusted users. A more complex capability mechanism might only restrict it when
+using a non-"node" TopologyKey.
+
+Our initial implementation will use a variant of the capability approach, which
+requires no configuration: we will simply reject ALL requests, regardless of user,
+that specify "all namespaces" with non-"node" TopologyKey for RequiredDuringScheduling anti-affinity.
+This allows the "exclusive node" use case while prohibiting the more dangerous ones.
 
 A weaker variant of the problem described in the previous paragraph is a pod's ability to use anti-affinity to degrade
 the scheduling quality of another pod, but not completely block it from scheduling.
@@ -505,8 +520,8 @@ affinity).
 2. Implement a scheduler predicate that takes `RequiredDuringSchedulingIgnoredDuringExecution`
 affinity and anti-affinity into account. Include a workaround for the issue described at the end of the Affinity section of the Examples section (can't schedule first pod).
 3. Implement a scheduler priority function that takes `PreferredDuringSchedulingIgnoredDuringExecution` affinity and anti-affinity into account
-4. Implement a quota mechanism that charges for the entire topology domain when `RequiredDuringScheduling` anti-affinity is used. Later
-this should be refined to only apply when it is used to request exclusive access, not when it is used to express conflict with specific pods.
+4. Implement admission controller that rejects requests that specify "all namespaces" with non-"node" TopologyKey for `RequiredDuringScheduling` anti-affinity.
+This admission controller should be enabled by default.
 5. Implement the recommended solution to the "co-existing with daemons" issue
 6. At this point, the feature can be deployed.
 7. Add the `RequiredDuringSchedulingRequiredDuringExecution` field to affinity and anti-affinity, and make sure
@@ -565,9 +580,9 @@ specified by adding an integer `Limit` to `PodAffinityTerm` just for the
 system and we do not intend to implement it.
 
 It is likely that the specification and implementation of pod anti-affinity
-can be unified with [taints and tolerations](https://github.com/kubernetes/kubernetes/pull/18263),
+can be unified with [taints and tolerations](taint-toleration-dedicated.md),
 and likewise that the specification and implementation of pod affinity
-can be unified with [node affinity](https://github.com/kubernetes/kubernetes/pull/18261).
+can be unified with [node affinity](nodeaffinity.md).
 The basic idea is that pod labels would be "inherited" by the node, and pods
 would only be able to specify affinity and anti-affinity for a node's labels.
 Our main motivation for not unifying taints and tolerations with
