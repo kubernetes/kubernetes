@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"fmt"
+	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -27,7 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 var (
@@ -341,4 +344,40 @@ func TestDSManagerNotReady(t *testing.T) {
 
 	manager.podStoreSynced = alwaysReady
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+func TestDSManagerInit(t *testing.T) {
+	// Insert a stable daemon set and make sure we don't create an extra pod
+	// for the one node which already has a daemon after a simulated restart.
+	ds := newDaemonSet("test")
+	ds.Status = extensions.DaemonSetStatus{
+		CurrentNumberScheduled: 1,
+		NumberMisscheduled:     0,
+		DesiredNumberScheduled: 1,
+	}
+	nodeName := "only-node"
+	podList := &api.PodList{
+		Items: []api.Pod{
+			*newPod("podname", nodeName, simpleDaemonSetLabel),
+		}}
+	response := runtime.EncodeOrDie(testapi.Default.Codec(), podList)
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: response,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
+
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewDaemonSetsController(client, controller.NoResyncPeriodFunc)
+	manager.dsStore.Add(ds)
+	manager.nodeStore.Add(newNode(nodeName, nil))
+	manager.podStoreSynced = alwaysReady
+	controller.SyncAllPodsWithStore(manager.kubeClient, manager.podStore.Store)
+
+	fakePodControl := &controller.FakePodControl{}
+	manager.podControl = fakePodControl
+	manager.syncHandler(getKey(ds, t))
+	validateSyncDaemonSets(t, fakePodControl, 0, 0)
 }
