@@ -42,7 +42,7 @@ KUBE_SCHEDULER_OPTS="   \${KUBE_LOGTOSTDERR}     \\
 cat <<EOF >/usr/lib/systemd/system/kube-scheduler.service
 [Unit]
 Description=Kubernetes Scheduler
-Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/kube-scheduler
