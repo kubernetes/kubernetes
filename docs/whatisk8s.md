@@ -38,6 +38,7 @@ Kubernetes is an [open-source platform for automating deployment, scaling, and o
 
 With Kubernetes, you are able to quickly and efficiently respond to customer demand:
 
+ - Deploy your applications quickly and predictably.
  - Scale your applications on the fly.
  - Seamlessly roll out new features.
  - Optimize use of your hardware by using only the resources you need.
@@ -48,7 +49,7 @@ Our goal is to foster an ecosystem of components and tools that relieve the burd
 
 * **portable**: public, private, hybrid, multi-cloud
 * **extensible**: modular, pluggable, hookable, composable
-* **self-healing**: auto-placement, auto-restart, auto-replication
+* **self-healing**: auto-placement, auto-restart, auto-replication, auto-scaling
 
 The Kubernetes project was started by Google in 2014. Kubernetes builds upon a [decade and a half of experience that Google has with running production workloads at scale](https://research.google.com/pubs/pub43438.html), combined with best-of-breed ideas and practices from the community.
 
@@ -134,11 +135,14 @@ This [design](design/principles.md) has enabled a number of other systems to bui
 
 #### Kubernetes is not:
 
-Kubernetes is not a traditional PaaS (Platform as a Service) system.
-* Kubernetes does not limit the types of applications supported. It does not dictate application frameworks, restrict the set of supported language runtimes, cater to only [12-factor applications](http://12factor.net/), nor distinguish "apps" from "services". Kubernetes aims to support an extremely diverse variety of workloads: if an application can run in a container, it should run great on Kubernetes.
-* Kubernetes does not provide middleware (e.g., message buses), databases (e.g., mysql), nor cluster storage systems (e.g., Ceph) as services.
-* Kubernetes does not have a click-to-deploy service catalog.
+Kubernetes is not a traditional, all-inclusive PaaS (Platform as a Service) system. We preserve user choice where it is important.
+* Kubernetes does not limit the types of applications supported. It does not dictate application frameworks (e.g., [Wildfly](http://wildfly.org/)), restrict the set of supported language runtimes (e.g., Java, Python, Ruby), cater to only [12-factor applications](http://12factor.net/), nor distinguish "apps" from "services". Kubernetes aims to support an extremely diverse variety of workloads, including stateless, stateful, and data-processing workloads. If an application can run in a container, it should run great on Kubernetes.
+* Kubernetes does not provide middleware (e.g., message buses), data-processing frameworks (e.g., Spark), databases (e.g., mysql), nor cluster storage systems (e.g., Ceph) as built-in services. Such applications run on Kubernetes.
+* Kubernetes does not have a click-to-deploy service marketplace.
 * Kubernetes is unopinionated in the source-to-image space. It does not deploy source code and does not build your application. Continuous Integration (CI) workflow is an area where different users and projects have their own requirements and preferences, so we support layering CI workflows on Kubernetes but don't dictate how it should work.
+* Kubernetes allows users to choose the logging, monitoring, and alerting systems of their choice. (Though we do provide some integrations as proof of concept.)
+* Kubernetes does not provide nor mandate a comprehensive application configuration language/system (e.g., [jsonnet](https://github.com/google/jsonnet)).
+* Kubernetes does not provide nor adopt any comprehensive machine configuration, maintenance, management, or self-healing systems.
 
 On the other hand, a number of PaaS systems run *on* Kubernetes, such as [Openshift](https://github.com/openshift/origin), [Deis](http://deis.io/), and [Gondor](https://gondor.io/). You could also roll your own custom PaaS, integrate with a CI system of your choice, or get along just fine with just Kubernetes: bring your container images and deploy them on Kubernetes.
 
