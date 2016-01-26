@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -71,7 +72,8 @@ type JobController struct {
 func NewJobController(kubeClient release_1_1.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Legacy().Events(""))
+	// TODO: remove the wrapper when every clients have moved to use the clientset.
+	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
 
 	jm := &JobController{
 		kubeClient: kubeClient,

@@ -91,7 +91,7 @@ type ReplicationManager struct {
 func NewReplicationManager(kubeClient release_1_1.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Legacy().Events(""))
+	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
