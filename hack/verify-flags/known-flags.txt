@@ -153,6 +153,7 @@ ir-user
 jenkins-host
 jenkins-jobs
 k8s-build-output
+keep-gogoproto
 km-path
 kube-api-burst
 kube-api-qps

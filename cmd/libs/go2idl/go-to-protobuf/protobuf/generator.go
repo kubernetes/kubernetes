@@ -42,10 +42,16 @@ type genProtoIDL struct {
 	imports        *ImportTracker
 
 	generateAll    bool
+	omitGogo       bool
 	omitFieldTypes map[types.Name]struct{}
 }
 
 func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
+	if g.omitGogo {
+		return []string{
+			fmt.Sprintf("option go_package = %q;", g.localGoPackage.Name),
+		}
+	}
 	return []string{
 		"option (gogoproto.marshaler_all) = true;",
 		"option (gogoproto.sizer_all) = true;",
@@ -117,7 +123,15 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 }
 
 func (g *genProtoIDL) Imports(c *generator.Context) (imports []string) {
-	return g.imports.ImportLines()
+	lines := []string{}
+	// TODO: this could be expressed more cleanly
+	for _, line := range g.imports.ImportLines() {
+		if g.omitGogo && line == "github.com/gogo/protobuf/gogoproto/gogo.proto" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 // GenerateType makes the body of a file implementing a set for type t.
@@ -130,7 +144,9 @@ func (g *genProtoIDL) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 
 			localGoPackage: g.localGoPackage.Package,
 		},
-		localPackage:   g.localPackage,
+		localPackage: g.localPackage,
+
+		omitGogo:       g.omitGogo,
 		omitFieldTypes: g.omitFieldTypes,
 
 		t: t,
@@ -201,6 +217,7 @@ func (p protobufLocator) ProtoTypeFor(t *types.Type) (*types.Type, error) {
 type bodyGen struct {
 	locator        ProtobufLocator
 	localPackage   types.Name
+	omitGogo       bool
 	omitFieldTypes map[types.Name]struct{}
 
 	t *types.Type
@@ -228,14 +245,18 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 			switch key {
 			case "marshal":
 				if v == "false" {
-					options = append(options,
-						"(gogoproto.marshaler) = false",
-						"(gogoproto.unmarshaler) = false",
-						"(gogoproto.sizer) = false",
-					)
+					if !b.omitGogo {
+						options = append(options,
+							"(gogoproto.marshaler) = false",
+							"(gogoproto.unmarshaler) = false",
+							"(gogoproto.sizer) = false",
+						)
+					}
 				}
 			default:
-				options = append(options, fmt.Sprintf("%s = %s", key, v))
+				if !b.omitGogo || !strings.HasPrefix(key, "(gogoproto.") {
+					options = append(options, fmt.Sprintf("%s = %s", key, v))
+				}
 			}
 		case k == "protobuf.embed":
 			fields = []protoField{
@@ -289,14 +310,19 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 		}
 		sw.Do(`$.Type|local$ $.Name$ = $.Tag$`, field)
 		if len(field.Extras) > 0 {
-			fmt.Fprintf(out, " [")
 			extras := []string{}
 			for k, v := range field.Extras {
+				if b.omitGogo && strings.HasPrefix(k, "(gogoproto.") {
+					continue
+				}
 				extras = append(extras, fmt.Sprintf("%s = %s", k, v))
 			}
 			sort.Sort(sort.StringSlice(extras))
-			fmt.Fprint(out, strings.Join(extras, ", "))
-			fmt.Fprintf(out, "]")
+			if len(extras) > 0 {
+				fmt.Fprintf(out, " [")
+				fmt.Fprint(out, strings.Join(extras, ", "))
+				fmt.Fprintf(out, "]")
+			}
 		}
 		fmt.Fprintf(out, ";\n")
 		if i != len(fields)-1 {
@@ -459,23 +485,18 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			Kind: typesKindProtobuf,
 		}
 	} else {
-		field.Type = &types.Type{
-			Name: types.Name{
-				Name:    parts[0],
-				Package: localPackage.Package,
-				Path:    localPackage.Path,
-			},
-			Kind: typesKindProtobuf,
+		switch parts[0] {
+		case "varint", "bytes", "fixed64":
+		default:
+			field.Type = &types.Type{
+				Name: types.Name{
+					Name:    parts[0],
+					Package: localPackage.Package,
+					Path:    localPackage.Path,
+				},
+				Kind: typesKindProtobuf,
+			}
 		}
-	}
-	switch parts[2] {
-	case "rep":
-		field.Repeated = true
-	case "opt":
-		field.Optional = true
-	case "req":
-	default:
-		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, field mode is %q not recognized\n", m.Name, t.Name, parts[2])
 	}
 	field.OptionalSet = true
 
@@ -485,7 +506,11 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 		if len(parts) != 2 {
 			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q\n", m.Name, t.Name, i+4, extra)
 		}
-		protoExtra[parts[0]] = parts[1]
+		switch parts[0] {
+		case "casttype":
+			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
+			protoExtra[parts[0]] = parts[1]
+		}
 	}
 
 	field.Extras = protoExtra
@@ -526,7 +551,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 			if len(field.Name) == 0 && len(parts[0]) != 0 {
 				field.Name = parts[0]
 			}
-			if field.Name == "-" {
+			if field.Tag == -1 && field.Name == "-" {
 				continue
 			}
 		}
