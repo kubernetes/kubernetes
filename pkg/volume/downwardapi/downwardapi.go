@@ -51,6 +51,10 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
+var wrappedVolumeSpec = volume.Spec{
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+}
+
 func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
@@ -77,11 +81,18 @@ func (plugin *downwardAPIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opt
 	}
 	return &downwardAPIVolumeBuilder{
 		downwardAPIVolume: v,
-		opts:              &opts}, nil
+		opts:              &opts,
+	}, nil
 }
 
 func (plugin *downwardAPIPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &downwardAPIVolumeCleaner{&downwardAPIVolume{volName: volName, podUID: podUID, plugin: plugin}}, nil
+	return &downwardAPIVolumeCleaner{
+		&downwardAPIVolume{
+			volName: volName,
+			podUID:  podUID,
+			plugin:  plugin,
+		},
+	}, nil
 }
 
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
@@ -92,11 +103,6 @@ type downwardAPIVolume struct {
 	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
 	plugin                  *downwardAPIPlugin
 	volume.MetricsNil
-}
-
-// This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
 }
 
 // downwardAPIVolumeBuilder fetches info from downward API from the pod
@@ -130,7 +136,7 @@ func (b *downwardAPIVolumeBuilder) SetUp() error {
 func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
 	glog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
-	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, b.pod, *b.opts)
 	if err != nil {
 		glog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
@@ -364,7 +370,7 @@ func (c *downwardAPIVolumeCleaner) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

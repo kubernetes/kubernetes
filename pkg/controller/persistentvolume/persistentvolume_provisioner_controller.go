@@ -473,11 +473,11 @@ func (c *PersistentVolumeProvisionerController) GetKubeClient() client.Interface
 	return c.client.GetKubeClient()
 }
 
-func (c *PersistentVolumeProvisionerController) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (c *PersistentVolumeProvisionerController) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return nil, fmt.Errorf("NewWrapperBuilder not supported by PVClaimBinder's VolumeHost implementation")
 }
 
-func (c *PersistentVolumeProvisionerController) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (volume.Cleaner, error) {
+func (c *PersistentVolumeProvisionerController) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("NewWrapperCleaner not supported by PVClaimBinder's VolumeHost implementation")
 }
 

@@ -41,6 +41,10 @@ type gitRepoPlugin struct {
 
 var _ volume.VolumePlugin = &gitRepoPlugin{}
 
+var wrappedVolumeSpec = volume.Spec{
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+}
+
 const (
 	gitRepoPluginName = "kubernetes.io/git-repo"
 )
@@ -128,11 +132,6 @@ func (b *gitRepoVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
 
-// This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-}
-
 // SetUpAt creates new directory and clones a git repo.
 func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
@@ -140,7 +139,7 @@ func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &b.pod, b.opts)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, &b.pod, b.opts)
 	if err != nil {
 		return err
 	}
@@ -218,8 +217,9 @@ func (c *gitRepoVolumeCleaner) TearDown() error {
 
 // TearDownAt simply deletes everything in the directory.
 func (c *gitRepoVolumeCleaner) TearDownAt(dir string) error {
+
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

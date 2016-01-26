@@ -58,16 +58,28 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, pod, opts)
+func (vh *volumeHost) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
+	wrapperVolumeName := "wrapped_" + volName
+	if spec.Volume != nil {
+		spec.Volume.Name = wrapperVolumeName
+	}
+
+	b, err := vh.kubelet.newVolumeBuilderFromPlugins(&spec, pod, opts)
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
 	}
 	return b, nil
 }
 
-func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (volume.Cleaner, error) {
-	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(spec)
+func (vh *volumeHost) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
+	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
+	wrapperVolumeName := "wrapped_" + volName
+	if spec.Volume != nil {
+		spec.Volume.Name = wrapperVolumeName
+	}
+
+	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(&spec)
 	if err != nil {
 		return nil, err
 	}

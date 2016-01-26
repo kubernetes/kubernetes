@@ -47,6 +47,10 @@ type secretPlugin struct {
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
+var wrappedVolumeSpec = volume.Spec{
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+}
+
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
@@ -62,14 +66,31 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 
 func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return &secretVolumeBuilder{
-		secretVolume: &secretVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
-		secretName:   spec.Volume.Secret.SecretName,
-		pod:          *pod,
-		opts:         &opts}, nil
+		secretVolume: &secretVolume{
+			spec.Name(),
+			pod.UID,
+			plugin,
+			plugin.host.GetMounter(),
+			plugin.host.GetWriter(),
+			volume.MetricsNil{},
+		},
+		secretName: spec.Volume.Secret.SecretName,
+		pod:        *pod,
+		opts:       &opts,
+	}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &secretVolumeCleaner{&secretVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
+	return &secretVolumeCleaner{
+		&secretVolume{
+			volName,
+			podUID,
+			plugin,
+			plugin.host.GetMounter(),
+			plugin.host.GetWriter(),
+			volume.MetricsNil{},
+		},
+	}, nil
 }
 
 type secretVolume struct {
@@ -111,11 +132,6 @@ func (b *secretVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
 
-// This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
-}
-
 func (b *secretVolumeBuilder) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, strings.EscapeQualifiedNameForDisk(secretPluginName)), b.volName)
 }
@@ -137,7 +153,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
 	if err != nil {
 		return err
 	}
@@ -202,7 +218,7 @@ func (c *secretVolumeCleaner) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}
