@@ -45,6 +45,9 @@ ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
 
+# Well known tags
+TAG_KEY_MASTER_IP="kubernetes.io/master-ip"
+
 # Defaults: ubuntu -> vivid
 if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   KUBE_OS_DISTRIBUTION=vivid
@@ -154,19 +157,28 @@ function get_security_group_id {
   | tr "\t" "\n"
 }
 
-function detect-master () {
+# Finds the master ip, if it is saved (tagged on the master disk)
+# Sets KUBE_MASTER_IP
+function find-tagged-master-ip {
+  if [[ -n "${MASTER_DISK_ID:-}" ]]; then
+    KUBE_MASTER_IP=$(get-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP})
+  fi
+}
+
+# Gets a tag value from an AWS resource
+# usage: get-tag <resource-id> <tag-name>
+# outputs: the tag value, or "" if no tag
+function get-tag {
+  $AWS_CMD describe-tags --filters Name=resource-id,Values=${1} \
+                                   Name=key,Values=${2} \
+                         --query Tags[].Value
+}
+
+# Gets an existing master, exiting if not found
+function detect-master() {
+  find-tagged-master-ip
   KUBE_MASTER=${MASTER_NAME}
-  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
-    KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
-  fi
-  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
-    exit 1
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+  if [[ -z "${KUBE_MASTER_IP:-}" ]]; then
     echo "Could not detect Kubernetes master node IP.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
@@ -473,6 +485,32 @@ function delete-instance-alarms {
   done
 }
 
+# Finds the existing master IP, or creates/reuses an Elastic IP
+# If MASTER_RESERVED_IP looks like an IP address, we will use it;
+# otherwise we will create a new elastic IP
+# Sets KUBE_MASTER_IP
+function ensure-master-ip {
+  find-tagged-master-ip
+
+  if [[ -z "${KUBE_MASTER_IP:-}" ]]; then
+    # Check if MASTER_RESERVED_IP looks like an IPv4 address
+    # Note that we used to only allocate an elastic IP when MASTER_RESERVED_IP=auto
+    # So be careful changing the IPV4 test, to be sure that 'auto' => 'allocate'
+    if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      KUBE_MASTER_IP="${MASTER_RESERVED_IP}"
+    else
+      KUBE_MASTER_IP=`$AWS_CMD allocate-address --domain vpc --query PublicIp`
+      echo "Allocated Elastic IP for master: ${KUBE_MASTER_IP}"
+
+      # We can't tag elastic ips.  Instead we put the tag on the persistent disk.
+      # It is a little weird, perhaps, but it sort of makes sense...
+      # The master mounts the master PD, and whoever mounts the master PD should also
+      # have the master IP
+      add-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP} ${KUBE_MASTER_IP}
+    fi
+  fi
+}
+
 # Creates a new DHCP option set configured correctly for Kubernetes
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
@@ -678,7 +716,8 @@ function allocate-elastic-ip {
   $AWS_CMD allocate-address --domain vpc --query PublicIp
 }
 
-function assign-ip-to-instance {
+# Attaches an elastic IP to the specified instance
+function attach-ip-to-instance {
   local ip_address=$1
   local instance_id=$2
 
@@ -687,21 +726,16 @@ function assign-ip-to-instance {
   $AWS_CMD associate-address --instance-id ${instance_id} --allocation-id ${elastic_ip_allocation_id} > $LOG
 }
 
-# If MASTER_RESERVED_IP looks like IP address, will try to assign it to master instance
-# If MASTER_RESERVED_IP is "auto", will allocate new elastic ip and assign that
-# If none of the above or something fails, will output originally assigne IP
-# Output: assigned IP address
-function assign-elastic-ip {
-  local assigned_public_ip=$1
-  local master_instance_id=$2
+# Releases an elastic IP
+function release-elastic-ip {
+  local ip_address=$1
 
-  # Check that MASTER_RESERVED_IP looks like an IPv4 address
-  if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
-  elif [[ "${MASTER_RESERVED_IP}" = "auto" ]]; then
-    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+  echo "Releasing Elastic IP: ${ip_address}"
+  elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --query Addresses[].AllocationId 2> $LOG) || true
+  if [[ -z "${elastic_ip_allocation_id}" ]]; then
+    echo "Elastic IP already released"
   else
-    echo "${assigned_public_ip}"
+    $AWS_CMD release-address --allocation-id ${elastic_ip_allocation_id} > $LOG
   fi
 }
 
@@ -878,6 +912,9 @@ function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
+  # Get or create master elastic IP
+  ensure-master-ip
+
   # Determine extra certificate names for master
   octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
@@ -975,13 +1012,9 @@ function start-master() {
       wait-for-instance-state ${master_id} "running"
 
       KUBE_MASTER=${MASTER_NAME}
-      echo -e " ${color_green}[master running @${ip}]${color_norm}"
+      echo -e " ${color_green}[master running]${color_norm}"
 
-      local attach_message
-      attach_message=$(assign-elastic-ip $ip $master_id)
-      # Get master ip again after attachment.
-      KUBE_MASTER_IP=$(get_instance_public_ip $master_id)
-      echo ${attach_message}
+      attach-ip-to-instance ${KUBE_MASTER_IP} ${master_id}
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
@@ -1278,6 +1311,18 @@ function kube-down {
       echo "All instances deleted"
     fi
 
+    find-master-pd
+    find-tagged-master-ip
+
+    if [[ -n "${KUBE_MASTER_IP:-}" ]]; then
+      release-elastic-ip ${KUBE_MASTER_IP}
+    fi
+
+    if [[ -n "${MASTER_DISK_ID:-}" ]]; then
+      echo "Deleting volume ${MASTER_DISK_ID}"
+      $AWS_CMD delete-volume --volume-id ${MASTER_DISK_ID} > $LOG
+    fi
+
     echo "Cleaning up resources in VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD describe-security-groups \
                              --filters Name=vpc-id,Values=${vpc_id} \
@@ -1349,6 +1394,7 @@ function kube-down {
       $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
     done
 
+    echo "Deleting VPC: ${vpc_id}"
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
   fi
 }
