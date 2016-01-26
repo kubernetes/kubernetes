@@ -21,6 +21,7 @@ package oom
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 
@@ -48,7 +49,18 @@ func getPids(cgroupName string) ([]int, error) {
 	return fsManager.GetPids()
 }
 
+func syscallNotExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	if e, ok := err.(*os.SyscallError); ok && os.IsNotExist(e) {
+		return true
+	}
+	return false
+}
+
 // Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
+// Returns os.ErrNotExist if the `pid` does not exist.
 func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	if pid < 0 {
 		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
@@ -61,20 +73,18 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 		pidStr = strconv.Itoa(pid)
 	}
 
-	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 	maxTries := 2
+	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
+	value := strconv.Itoa(oomScoreAdj)
 	var err error
 	for i := 0; i < maxTries; i++ {
-		_, readErr := ioutil.ReadFile(oomScoreAdjPath)
-		if readErr != nil {
-			err = fmt.Errorf("failed to read oom_score_adj: %v", readErr)
-		} else if writeErr := ioutil.WriteFile(oomScoreAdjPath, []byte(strconv.Itoa(oomScoreAdj)), 0700); writeErr != nil {
-			err = fmt.Errorf("failed to set oom_score_adj to %d: %v", oomScoreAdj, writeErr)
-		} else {
-			return nil
+		if err = ioutil.WriteFile(oomScoreAdjPath, []byte(value), 0700); err != nil {
+			if syscallNotExists(err) {
+				return os.ErrNotExist
+			}
+			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", err)
 		}
 	}
-
 	return err
 }
 
@@ -86,6 +96,10 @@ func (oomAdjuster *OOMAdjuster) applyOOMScoreAdjContainer(cgroupName string, oom
 		continueAdjusting := false
 		pidList, err := oomAdjuster.pidLister(cgroupName)
 		if err != nil {
+			if syscallNotExists(err) {
+				// Nothing to do since the container doesn't exist anymore.
+				return os.ErrNotExist
+			}
 			continueAdjusting = true
 			glog.Errorf("Error getting process list for cgroup %s: %+v", cgroupName, err)
 		} else if len(pidList) == 0 {
@@ -97,6 +111,7 @@ func (oomAdjuster *OOMAdjuster) applyOOMScoreAdjContainer(cgroupName string, oom
 					if err = oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err == nil {
 						adjustedProcessSet[pid] = true
 					}
+					// Processes can come and go while we try to apply oom score adjust value. So ignore errors here.
 				}
 			}
 		}
