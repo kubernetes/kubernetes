@@ -158,7 +158,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		metrics := heapster.MetricResultList{}
 		for _, level := range tc.reportedLevels {
 			metric := heapster.MetricResult{
-				Metrics:         []heapster.MetricPoint{{timestamp, level}},
+				Metrics:         []heapster.MetricPoint{{timestamp, level, nil}},
 				LatestTimestamp: timestamp,
 			}
 			metrics.Items = append(metrics.Items, metric)

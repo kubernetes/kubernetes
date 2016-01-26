@@ -119,7 +119,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 				if latestTimestamp.Before(timestamp) {
 					latestTimestamp = timestamp
 				}
-				heapsterMetricPoint := heapster.MetricPoint{timestamp, reportedMetricPoint.level}
+				heapsterMetricPoint := heapster.MetricPoint{timestamp, reportedMetricPoint.level, nil}
 				heapsterMetricPoints = append(heapsterMetricPoints, heapsterMetricPoint)
 			}
 			metric := heapster.MetricResult{
