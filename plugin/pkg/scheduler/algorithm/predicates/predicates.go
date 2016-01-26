@@ -242,6 +242,7 @@ type ResourceFit struct {
 type resourceRequest struct {
 	milliCPU int64
 	memory   int64
+	devices  int64
 }
 
 func getResourceRequest(pod *api.Pod) resourceRequest {
