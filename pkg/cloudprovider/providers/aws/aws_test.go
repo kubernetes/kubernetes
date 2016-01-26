@@ -801,26 +801,25 @@ func TestSubnetIDsinVPC(t *testing.T) {
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
-	oldIpPermission := ec2.IpPermission {
-		UserIdGroupPairs: []*ec2.UserIdGroupPair {
-			&ec2.UserIdGroupPair{GroupId: aws.String("firstGroupId")},
-			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId")},
-			&ec2.UserIdGroupPair{GroupId: aws.String("thirdGroupId")},
+	oldIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("firstGroupId")},
+			{GroupId: aws.String("secondGroupId")},
+			{GroupId: aws.String("thirdGroupId")},
 		},
 	}
 
-	existingIpPermission := ec2.IpPermission {
-		UserIdGroupPairs: []*ec2.UserIdGroupPair {
-			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId")},
+	existingIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("secondGroupId")},
 		},
 	}
 
-	newIpPermission := ec2.IpPermission {
-		UserIdGroupPairs: []*ec2.UserIdGroupPair {
-			&ec2.UserIdGroupPair{GroupId: aws.String("fourthGroupId")},
+	newIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("fourthGroupId")},
 		},
 	}
-
 
 	equals := ipPermissionExists(&existingIpPermission, &oldIpPermission, false)
 	if !equals {
@@ -834,26 +833,25 @@ func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
-	oldIpPermission := ec2.IpPermission {
-		UserIdGroupPairs: []*ec2.UserIdGroupPair {
-			&ec2.UserIdGroupPair{GroupId: aws.String("firstGroupId"), UserId: aws.String("firstUserId")},
-			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
-			&ec2.UserIdGroupPair{GroupId: aws.String("thirdGroupId"), UserId: aws.String("thirdUserId")},
+	oldIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("firstGroupId"), UserId: aws.String("firstUserId")},
+			{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
+			{GroupId: aws.String("thirdGroupId"), UserId: aws.String("thirdUserId")},
 		},
 	}
 
-	existingIpPermission := ec2.IpPermission {
-		UserIdGroupPairs: []*ec2.UserIdGroupPair {
-			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
+	existingIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
 		},
 	}
 
-	newIpPermission := ec2.IpPermission {
-		UserIdGroupPairs: []*ec2.UserIdGroupPair {
-			&ec2.UserIdGroupPair{GroupId: aws.String("secondGroupId"), UserId: aws.String("anotherUserId")},
+	newIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("secondGroupId"), UserId: aws.String("anotherUserId")},
 		},
 	}
-
 
 	equals := ipPermissionExists(&existingIpPermission, &oldIpPermission, true)
 	if !equals {
