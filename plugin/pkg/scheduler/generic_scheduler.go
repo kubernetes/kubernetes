@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -41,17 +42,15 @@ type FitError struct {
 
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
-// implementation of the error interface
+// Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
-	var reason string
-	// We iterate over all nodes for logging purposes, even though we only return one reason from one node
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
 	for node, predicateList := range f.FailedPredicates {
-		glog.V(2).Infof("Failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
-		if len(reason) == 0 {
-			reason, _ = predicateList.PopAny()
-		}
+		reason := fmt.Sprintf("fit failure on node (%s): %s\n", node, strings.Join(predicateList.List(), ","))
+		buf.WriteString(reason)
 	}
-	return fmt.Sprintf("Failed for reason %s and possibly others", reason)
+	return buf.String()
 }
 
 type genericScheduler struct {
