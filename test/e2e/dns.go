@@ -76,7 +76,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *api.Pod {
 					},
 				},
 				{
-					Name:    "querier",
+					Name:    "wheezy-querier",
 					Image:   "gcr.io/google_containers/dnsutils",
 					Command: []string{"sh", "-c", wheezyProbeCmd},
 					VolumeMounts: []api.VolumeMount{
@@ -107,19 +107,17 @@ func createProbeCommand(namesToResolve []string, fileNamePrefix string) (string,
 	fileNames := make([]string, 0, len(namesToResolve)*2)
 	probeCmd := "for i in `seq 1 600`; do "
 	for _, name := range namesToResolve {
-		// Resolve by TCP and UDP DNS.  Use $$(...) because $(...) is
-		// expanded by kubernetes (though this won't expand so should
-		// remain a literal, safe > sorry).
+		// Resolve by TCP and UDP DNS.
 		lookup := "A"
 		if strings.HasPrefix(name, "_") {
 			lookup = "SRV"
 		}
 		fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search %s %s)" && echo OK > /results/%s;`, name, lookup, fileName)
+		probeCmd += fmt.Sprintf(`test -n "$(dig +notcp +noall +answer +search %s %s)" && echo OK > /results/%s;`, name, lookup, fileName)
 		fileName = fmt.Sprintf("%s_tcp@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s %s)" && echo OK > /results/%s;`, name, lookup, fileName)
+		probeCmd += fmt.Sprintf(`test -n "$(dig +tcp +noall +answer +search %s %s)" && echo OK > /results/%s;`, name, lookup, fileName)
 	}
 	probeCmd += "sleep 1; done"
 	return probeCmd, fileNames
@@ -231,6 +229,8 @@ var _ = Describe("DNS", func() {
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, "wheezy")
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, "jessie")
 
+		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
+
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
@@ -313,6 +313,8 @@ var _ = Describe("DNS", func() {
 
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, "wheezy")
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, "jessie")
+
+		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
