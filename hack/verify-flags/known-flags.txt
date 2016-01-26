@@ -28,7 +28,6 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
-cadvisor-port
 cert-dir
 certificate-authority
 cgroup-root
@@ -45,6 +44,8 @@ cluster-dns
 cluster-domain
 cluster-name
 cluster-tag
+collector
+collector-url
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-resource-quota-syncs
@@ -161,7 +162,6 @@ kube-reserved
 kubecfg-file
 kubectl-path
 kubelet-address
-kubelet-cadvisor-port
 kubelet-certificate-authority
 kubelet-client-certificate
 kubelet-client-key

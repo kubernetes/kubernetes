@@ -21,14 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 )
 
 func TestBasic(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
-	mockCadvisor := &cadvisor.Fake{}
+	mockCollector := &collector.Fake{}
 	node := &api.ObjectReference{}
-	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder)
+	oomWatcher := NewOOMWatcher(mockCollector, fakeRecorder)
 	err := oomWatcher.Start(node)
 	if err != nil {
 		t.Errorf("Should not have failed: %v", err)

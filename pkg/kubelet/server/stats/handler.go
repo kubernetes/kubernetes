@@ -26,17 +26,17 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 // Host methods required by stats handlers.
 type StatsProvider interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
+	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *collector.ContainerInfoRequest) (map[string]interface{}, error)
+	GetRawContainerInfo(containerName string, req *collector.ContainerInfoRequest, subcontainers bool) (map[string]interface{}, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 }
 
@@ -97,8 +97,8 @@ type StatsRequest struct {
 	Subcontainers bool `json:"subcontainers,omitempty"`
 }
 
-func (r *StatsRequest) cadvisorRequest() *cadvisorapi.ContainerInfoRequest {
-	return &cadvisorapi.ContainerInfoRequest{
+func (r *StatsRequest) collectorRequest() *collector.ContainerInfoRequest {
+	return &collector.ContainerInfoRequest{
 		NumStats: r.NumStats,
 		Start:    r.Start,
 		End:      r.End,
@@ -127,7 +127,7 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 	}
 
 	// Root container stats.
-	statsMap, err := h.provider.GetRawContainerInfo("/", query.cadvisorRequest(), false)
+	statsMap, err := h.provider.GetRawContainerInfo("/", query.collectorRequest(), false)
 	if err != nil {
 		handleError(response, err)
 		return
@@ -155,7 +155,7 @@ func (h *handler) handleSystemContainer(request *restful.Request, response *rest
 	// Non-Kubernetes container stats.
 	containerName := path.Join("/", query.ContainerName)
 	stats, err := h.provider.GetRawContainerInfo(
-		containerName, query.cadvisorRequest(), query.Subcontainers)
+		containerName, query.collectorRequest(), query.Subcontainers)
 	if err != nil {
 		handleError(response, err)
 		return
@@ -198,7 +198,7 @@ func (h *handler) handlePodContainer(request *restful.Request, response *restful
 		kubecontainer.GetPodFullName(pod),
 		types.UID(params["uid"]),
 		params["containerName"],
-		query.cadvisorRequest())
+		query.collectorRequest())
 
 	if err != nil {
 		handleError(response, err)

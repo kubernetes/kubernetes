@@ -31,8 +31,6 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -41,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -85,7 +83,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 type TestKubelet struct {
 	kubelet          *Kubelet
 	fakeRuntime      *kubecontainer.FakeRuntime
-	fakeCadvisor     *cadvisor.Mock
+	fakeCollector    *collector.Mock
 	fakeKubeClient   *testclient.Fake
 	fakeMirrorClient *kubepod.FakeMirrorClient
 	fakeClock        *util.FakeClock
@@ -134,13 +132,13 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
 	kubelet.daemonEndpoints = &api.NodeDaemonEndpoints{}
-	mockCadvisor := &cadvisor.Mock{}
-	kubelet.cadvisor = mockCadvisor
+	mockCollector := &collector.Mock{}
+	kubelet.collector = mockCollector
 	fakeMirrorClient := kubepod.NewFakeMirrorClient()
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
+	diskSpaceManager, err := newDiskSpaceManager(mockCollector, DiskSpacePolicy{})
 	if err != nil {
 		t.Fatalf("can't initialize disk space manager: %v", err)
 	}
@@ -169,7 +167,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
+	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCollector, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
 	fakeClock := &util.FakeClock{Time: time.Now()}
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
@@ -185,7 +183,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil)
 	kubelet.clock = fakeClock
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
+	return &TestKubelet{kubelet, fakeRuntime, mockCollector, fakeKubeClient, fakeMirrorClient, fakeClock}
 }
 
 func newTestPods(count int) []*api.Pod {
@@ -365,7 +363,7 @@ var emptyPodUIDs map[types.UID]kubetypes.SyncPodType
 
 func TestSyncLoopTimeUpdate(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
 	loopTime1 := kubelet.LatestLoopEntryTime()
@@ -394,7 +392,7 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 
 func TestSyncLoopAbort(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 	kubelet.runtimeState.setRuntimeSync(time.Now())
 	// The syncLoop waits on time.After(resyncInterval), set it really big so that we don't race for
@@ -416,9 +414,9 @@ func TestSyncLoopAbort(t *testing.T) {
 
 func TestSyncPodsStartPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
 	pods := []*api.Pod{
@@ -445,9 +443,9 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 	kubelet := testKubelet.kubelet
 	kubelet.sourcesReady = func(_ sets.String) bool { return ready }
 
@@ -647,18 +645,16 @@ func TestMakeVolumeMounts(t *testing.T) {
 func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: containerPath,
-		},
+	containerInfo := map[string]interface{}{
+		"Name": containerPath,
 	}
 
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("ContainerInfo", containerID, req, false, false).Return(containerInfo, nil)
 	fakeRuntime.PodList = []*kubecontainer.Pod{
 		{
 			ID:        "12345678",
@@ -672,76 +668,66 @@ func TestGetContainerInfo(t *testing.T) {
 			},
 		},
 	}
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if stats == nil {
 		t.Fatalf("stats should not be nil")
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestGetRawContainerInfoRoot(t *testing.T) {
 	containerPath := "/"
-	containerInfo := &cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: containerPath,
-		},
+	containerInfo := map[string]interface{}{
+		"Name": containerPath,
 	}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("ContainerInfo", containerPath, req, false, true).Return(containerInfo, nil)
 
-	_, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, false)
+	_, err := kubelet.GetRawContainerInfo(containerPath, req, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 	containerPath := "/kubelet"
-	containerInfo := map[string]*cadvisorapi.ContainerInfo{
-		containerPath: {
-			ContainerReference: cadvisorapi.ContainerReference{
-				Name: containerPath,
-			},
-		},
-		"/kubelet/sub": {
-			ContainerReference: cadvisorapi.ContainerReference{
-				Name: "/kubelet/sub",
-			},
-		},
+	containerInfo := map[string]interface{}{
+		"Name":         containerPath,
+		"/kubelet/sub": "/kubelet/sub",
 	}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor.On("SubcontainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("ContainerInfo", containerPath, req, true, true).Return(containerInfo, nil)
 
-	result, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, true)
+	result, err := kubelet.GetRawContainerInfo(containerPath, req, true)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(result) != 2 {
 		t.Errorf("Expected 2 elements, received: %+v", result)
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
-func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
+func TestGetContainerInfoWhenCollectorFailed(t *testing.T) {
 	containerID := "ab2cdf"
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
 	fakeRuntime := testKubelet.fakeRuntime
-	cadvisorApiFailure := fmt.Errorf("cAdvisor failure")
-	containerInfo := cadvisorapi.ContainerInfo{}
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
+	collectorApiFailure := fmt.Errorf("collector failure")
+	containerInfo := map[string]interface{}{}
+	mockCollector.On("ContainerInfo", containerID, req, false, false).Return(containerInfo, collectorApiFailure)
 	fakeRuntime.PodList = []*kubecontainer.Pod{
 		{
 			ID:        "uuid",
@@ -754,43 +740,45 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 			},
 		},
 	}
-	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
-	if stats != nil {
-		t.Errorf("non-nil stats on error")
+	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", req)
+	if len(stats) != 0 {
+		t.Errorf("non-nil stats on error: %+v", stats)
 	}
 	if err == nil {
 		t.Errorf("expect error but received nil error")
 		return
 	}
-	if err.Error() != cadvisorApiFailure.Error() {
-		t.Errorf("wrong error message. expect %v, got %v", cadvisorApiFailure, err)
+	if err.Error() != collectorApiFailure.Error() {
+		t.Errorf("wrong error message. expect %v, got %v", collectorApiFailure, err)
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeRuntime.PodList = []*kubecontainer.Pod{}
 
-	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", req)
 	if stats != nil {
 		t.Errorf("non-nil stats on non exist container")
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
 	fakeRuntime := testKubelet.fakeRuntime
 	expectedErr := fmt.Errorf("List containers error")
 	fakeRuntime.Err = expectedErr
 
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", req)
 	if err == nil {
 		t.Errorf("expected error from dockertools, got none")
 	}
@@ -800,17 +788,18 @@ func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools failed")
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestGetContainerInfoWithNoContainers(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
 
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", req)
 	if err == nil {
-		t.Errorf("expected error from cadvisor client, got none")
+		t.Errorf("expected error from collector client, got none")
 	}
 	if err != kubecontainer.ErrContainerNotFound {
 		t.Errorf("expected error %v, got %v", kubecontainer.ErrContainerNotFound.Error(), err.Error())
@@ -818,7 +807,7 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools returned no containers")
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestNodeIPParam(t *testing.T) {
@@ -865,7 +854,8 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
+	req := &collector.ContainerInfoRequest{}
+	mockCollector := testKubelet.fakeCollector
 	fakeRuntime.PodList = []*kubecontainer.Pod{
 		{
 			ID:        "12345678",
@@ -878,9 +868,9 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 			}},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", req)
 	if err == nil {
-		t.Errorf("Expected error from cadvisor client, got none")
+		t.Errorf("Expected error from collector client, got none")
 	}
 	if err != kubecontainer.ErrContainerNotFound {
 		t.Errorf("Expected error %v, got %v", kubecontainer.ErrContainerNotFound.Error(), err.Error())
@@ -888,7 +878,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools returned no containers")
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 type fakeContainerCommandRunner struct {
@@ -2239,9 +2229,9 @@ func TestGetHostPortConflicts(t *testing.T) {
 func TestHandlePortConflicts(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 
 	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
 	pods := []*api.Pod{
@@ -2289,9 +2279,9 @@ func TestHandleNodeSelector(t *testing.T) {
 	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
 	}}
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -2328,9 +2318,9 @@ func TestHandleNodeSelector(t *testing.T) {
 func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{MemoryCapacity: 100}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{MemoryCapacity: 100}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 
 	spec := api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
 		Requests: api.ResourceList{
@@ -2375,9 +2365,9 @@ func TestHandleMemExceeded(t *testing.T) {
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 
 	kl := testKubelet.kubelet
 	pods := []*api.Pod{
@@ -2500,17 +2490,17 @@ func TestValidateContainerStatus(t *testing.T) {
 }
 
 // updateDiskSpacePolicy creates a new DiskSpaceManager with a new policy. This new manager along
-// with the mock FsInfo values added to Cadvisor should make the kubelet report that it has
+// with the mock FsInfo values added to Collector should make the kubelet report that it has
 // sufficient disk space or it is out of disk, depending on the capacity, availability and
 // threshold values.
-func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisor.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
-	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
+func updateDiskSpacePolicy(kubelet *Kubelet, mockCollector *collector.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
+	dockerimagesFsInfo := collector.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
+	rootFsInfo := collector.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
+	mockCollector.On("FsInfo", collector.LabelDockerImages).Return(&dockerimagesFsInfo, nil)
+	mockCollector.On("FsInfo", collector.LabelSystemRoot).Return(&rootFsInfo, nil)
 
 	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	diskSpaceManager, err := newDiskSpaceManager(mockCollector, dsp)
 	if err != nil {
 		return err
 	}
@@ -2528,24 +2518,24 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
-	machineInfo := &cadvisorapi.MachineInfo{
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 10E9, // 10G
 	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("Start").Return(nil)
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("Start").Return(nil)
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
 
 	// Make kubelet report that it has sufficient disk space.
-	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
+	if err := updateDiskSpacePolicy(kubelet, mockCollector, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
 
@@ -2651,24 +2641,24 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
-	machineInfo := &cadvisorapi.MachineInfo{
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 1024,
 	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("Start").Return(nil)
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("Start").Return(nil)
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
 
 	// Make Kubelet report that it has sufficient disk space.
-	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
+	if err := updateDiskSpacePolicy(kubelet, mockCollector, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
 
@@ -2731,23 +2721,23 @@ func testDockerRuntimeVersion(t *testing.T) {
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
-	machineInfo := &cadvisorapi.MachineInfo{
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 1024,
 	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
 
 	// Make kubelet report that it has sufficient disk space.
-	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
+	if err := updateDiskSpacePolicy(kubelet, mockCollector, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
 
@@ -2907,24 +2897,24 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			},
 		},
 	}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("Start").Return(nil)
-	machineInfo := &cadvisorapi.MachineInfo{
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("Start").Return(nil)
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 20E9,
 	}
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
 
 	// Make kubelet report that it is out of disk space.
-	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 50, 50, 100, 100); err != nil {
+	if err := updateDiskSpacePolicy(kubelet, mockCollector, 500, 500, 50, 50, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
 
@@ -3057,22 +3047,22 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 			},
 		},
 	}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	machineInfo := &cadvisorapi.MachineInfo{
+	mockCollector := testKubelet.fakeCollector
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 1024,
 	}
-	mockCadvisor.On("Start").Return(nil)
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector.On("Start").Return(nil)
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 		DockerVersion:      "1.5.0",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
 
 	kubelet.outOfDiskTransitionFrequency = 5 * time.Second
 
@@ -3143,7 +3133,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		}
 
 		// Make kubelet report that it has sufficient disk space
-		if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, tc.rootFsAvail, tc.dockerFsAvail, 100, 100); err != nil {
+		if err := updateDiskSpacePolicy(kubelet, mockCollector, 500, 500, tc.rootFsAvail, tc.dockerFsAvail, 100, 100); err != nil {
 			t.Fatalf("can't update disk space manager: %v", err)
 		}
 
@@ -3187,24 +3177,24 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("Start").Return(nil)
-	machineInfo := &cadvisorapi.MachineInfo{
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("Start").Return(nil)
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 10E9,
 	}
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
 
 	// Make kubelet report that it has sufficient disk space.
-	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
+	if err := updateDiskSpacePolicy(kubelet, mockCollector, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
 
@@ -3351,10 +3341,10 @@ func TestCreateMirrorPod(t *testing.T) {
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("Start").Return(nil)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("Start").Return(nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 
 	kl := testKubelet.kubelet
 	manager := testKubelet.fakeMirrorClient
@@ -3406,10 +3396,10 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("Start").Return(nil)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("Start").Return(nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 
 	kl := testKubelet.kubelet
 	manager := testKubelet.fakeMirrorClient
@@ -3492,17 +3482,15 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: containerPath,
-		},
+	containerInfo := map[string]interface{}{
+		"Name": containerPath,
 	}
 
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
-	mockCadvisor := testKubelet.fakeCadvisor
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
+	mockCollector := testKubelet.fakeCollector
+	req := &collector.ContainerInfoRequest{}
+	mockCollector.On("ContainerInfo", containerID, req, false, false).Return(containerInfo, nil)
 	kubelet := testKubelet.kubelet
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
@@ -3521,14 +3509,14 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	// Use the mirror pod UID to retrieve the stats.
-	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if stats == nil {
 		t.Fatalf("stats should not be nil")
 	}
-	mockCadvisor.AssertExpectations(t)
+	mockCollector.AssertExpectations(t)
 }
 
 func TestHostNetworkAllowed(t *testing.T) {
@@ -3688,27 +3676,27 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	kubeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
-	machineInfo := &cadvisorapi.MachineInfo{
+	machineInfo := &collector.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 1024,
 	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
+	mockCollector := testKubelet.fakeCollector
+	mockCollector.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &collector.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 		DockerVersion:      "1.5.0",
 	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCollector.On("VersionInfo").Return(versionInfo, nil)
+	mockCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 600 * mb,
 	}, nil)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
@@ -3830,7 +3818,7 @@ func TestIsPodPastActiveDeadline(t *testing.T) {
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
 	now := unversioned.Now()
@@ -3881,7 +3869,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
 	now := unversioned.Now()
@@ -3931,9 +3919,9 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 	kl := testKubelet.kubelet
 	pods := []*api.Pod{
 		{
@@ -3990,9 +3978,9 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*api.Pod
 
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 	kl := testKubelet.kubelet
 	pods := []*api.Pod{
 		{
@@ -4028,9 +4016,9 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 
 func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, nil)
+	testKubelet.fakeCollector.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{}, nil)
 	runningPod := &kubecontainer.Pod{
 		ID:        "12345678",
 		Name:      "pod1",

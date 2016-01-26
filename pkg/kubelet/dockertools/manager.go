@@ -34,10 +34,10 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -89,7 +89,7 @@ type DockerManager struct {
 	recorder            record.EventRecorder
 	containerRefManager *kubecontainer.RefManager
 	os                  kubecontainer.OSInterface
-	machineInfo         *cadvisorapi.MachineInfo
+	machineInfo         *collector.MachineInfo
 
 	// The image name of the pod infra container.
 	podInfraContainerImage string
@@ -149,7 +149,7 @@ func NewDockerManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
-	machineInfo *cadvisorapi.MachineInfo,
+	machineInfo *collector.MachineInfo,
 	podInfraContainerImage string,
 	qps float32,
 	burst int,

@@ -14,15 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cadvisor
+package collector
 
 import (
-	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
+func CapacityFromMachineInfo(info *MachineInfo) api.ResourceList {
 	c := api.ResourceList{
 		api.ResourceCPU: *resource.NewMilliQuantity(
 			int64(info.NumCores*1000),

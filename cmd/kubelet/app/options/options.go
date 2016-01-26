@@ -68,10 +68,11 @@ func NewKubeletServer() *KubeletServer {
 		KubeReserved:   make(util.ConfigurationMap),
 		KubeletConfiguration: componentconfig.KubeletConfiguration{
 			Address:                     "0.0.0.0",
-			CAdvisorPort:                4194,
 			CertDirectory:               "/var/run/kubernetes",
 			CgroupRoot:                  "",
 			ConfigureCBR0:               false,
+			Collector:                   "cadvisor",
+			CollectorURL:                "4194",
 			ContainerRuntime:            "docker",
 			CPUCFSQuota:                 false,
 			DockerExecHandlerName:       "native",
@@ -164,7 +165,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
-	fs.UintVar(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.StringVar(&s.Collector, "collector", s.Collector, "Type of metrics collector to use")
+	fs.StringVar(&s.CollectorURL, "collector-url", s.CollectorURL, "The URL of a built-in or a 3rd party metrics collector. Refers to specific collector to see what are the valid URL formats")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(componentconfig.IPVar{&s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")

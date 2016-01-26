@@ -178,15 +178,15 @@ func (s *KubeletExecutorServer) runKubelet(
 		panic("cloud provider must not be set")
 	}
 
-	// create custom cAdvisor interface which return the resource values that Mesos reports
+	// create custom collector interface which return the resource values that Mesos reports
 	ni := <-nodeInfos
-	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, s.CAdvisorPort)
+	collectorInterface, err := NewMesosCollector(ni.Cores, ni.Mem, s.Collector, s.CollectorURL)
 	if err != nil {
 		return err
 	}
 
-	kcfg.CAdvisorInterface = cAdvisorInterface
-	kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, cAdvisorInterface)
+	kcfg.CollectorInterface = collectorInterface
+	kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, collectorInterface)
 	if err != nil {
 		return err
 	}

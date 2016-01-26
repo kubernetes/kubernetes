@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -39,6 +39,6 @@ func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 
-func NewContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface) (ContainerManager, error) {
+func NewContainerManager(mounter mount.Interface, collectorInterface collector.Interface) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

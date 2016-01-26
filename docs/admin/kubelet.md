@@ -67,7 +67,6 @@ kubelet
       --address=0.0.0.0: The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
       --allow-privileged[=false]: If true, allow containers to request privileged mode. [default=false]
       --api-servers=[]: List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.
-      --cadvisor-port=4194: The port of the localhost cAdvisor endpoint
       --cert-dir="/var/run/kubernetes": The directory where the TLS certs are located (by default /var/run/kubernetes). If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.
       --cgroup-root="": Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.
       --chaos-chance=0: If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]
@@ -75,6 +74,8 @@ kubelet
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
       --cluster-dns="": IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
       --cluster-domain="": Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
+      --collector="cadvisor": Type of metrics collector to use
+      --collector-url="4194": The URL of a built-in or a 3rd party metrics collector. Refers to specific collector to see what are the valid URL formats
       --config="": Path to the config file or directory of files
       --configure-cbr0[=false]: If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.
       --container-runtime="docker": The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.

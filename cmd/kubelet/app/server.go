@@ -47,8 +47,9 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
+	"k8s.io/kubernetes/pkg/kubelet/collector/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -181,11 +182,11 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Address:                   net.ParseIP(s.Address),
 		AllowPrivileged:           s.AllowPrivileged,
 		Auth:                      nil, // default does not enforce auth[nz]
-		CAdvisorInterface:         nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
 		ClusterDNS:                net.ParseIP(s.ClusterDNS),
 		ClusterDomain:             s.ClusterDomain,
+		CollectorInterface:        nil,
 		ConfigFile:                s.Config,
 		ConfigureCBR0:             s.ConfigureCBR0,
 		ContainerManager:          nil,
@@ -290,15 +291,20 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 		kcfg.Cloud = cloud
 	}
 
-	if kcfg.CAdvisorInterface == nil {
-		kcfg.CAdvisorInterface, err = cadvisor.New(s.CAdvisorPort)
-		if err != nil {
-			return err
+	if kcfg.CollectorInterface == nil {
+		switch s.Collector {
+		case "cadvisor":
+			kcfg.CollectorInterface, err = cadvisor.NewCadvisorCollector(s.CollectorURL)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("Unrecognized collector type: %s", s.Collector)
 		}
 	}
 
 	if kcfg.ContainerManager == nil {
-		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface)
+		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CollectorInterface)
 		if err != nil {
 			return err
 		}
@@ -464,7 +470,7 @@ func SimpleKubelet(client *client.Client,
 	masterServiceNamespace string,
 	volumePlugins []volume.VolumePlugin,
 	tlsOptions *server.TLSOptions,
-	cadvisorInterface cadvisor.Interface,
+	collectorInterface collector.Interface,
 	configFilePath string,
 	cloud cloudprovider.Interface,
 	osInterface kubecontainer.OSInterface,
@@ -482,7 +488,7 @@ func SimpleKubelet(client *client.Client,
 
 	kcfg := KubeletConfig{
 		Address:                   net.ParseIP(address),
-		CAdvisorInterface:         cadvisorInterface,
+		CollectorInterface:        collectorInterface,
 		CgroupRoot:                "",
 		Cloud:                     cloud,
 		ClusterDNS:                clusterDNS,
@@ -656,7 +662,7 @@ type KubeletConfig struct {
 	AllowPrivileged                bool
 	Auth                           server.AuthInterface
 	Builder                        KubeletBuilder
-	CAdvisorInterface              cadvisor.Interface
+	CollectorInterface             collector.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface
 	ClusterDNS                     net.IP
@@ -784,7 +790,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.NetworkPluginName,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
-		kc.CAdvisorInterface,
+		kc.CollectorInterface,
 		kc.ImageGCPolicy,
 		kc.DiskSpacePolicy,
 		kc.Cloud,

@@ -45,8 +45,8 @@ import (
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -195,7 +195,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
-	cadvisorInterface := new(cadvisor.Fake)
+	collectorInterface := &collector.Fake{}
 
 	// Kubelet (localhost)
 	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
@@ -215,7 +215,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		api.NamespaceDefault,
 		empty_dir.ProbeVolumePlugins(),
 		nil,
-		cadvisorInterface,
+		collectorInterface,
 		configFilePath,
 		nil,
 		kubecontainer.FakeOS{},
@@ -248,7 +248,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		api.NamespaceDefault,
 		empty_dir.ProbeVolumePlugins(),
 		nil,
-		cadvisorInterface,
+		collectorInterface,
 		"",
 		nil,
 		kubecontainer.FakeOS{},

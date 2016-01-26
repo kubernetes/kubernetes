@@ -21,28 +21,27 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/ssoroka/ttime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 var zero time.Time
 
-func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.FakeRuntime, *cadvisor.Mock) {
+func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.FakeRuntime, *collector.Mock) {
 	fakeRuntime := &container.FakeRuntime{}
-	mockCadvisor := new(cadvisor.Mock)
+	mockCollector := new(collector.Mock)
 	return &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
 		minAge:       0,
 		imageRecords: make(map[string]*imageRecord),
-		cadvisor:     mockCadvisor,
+		collector:    mockCollector,
 		recorder:     &record.FakeRecorder{},
-	}, fakeRuntime, mockCadvisor
+	}, fakeRuntime, mockCollector
 }
 
 // Accessors used for thread-safe testing.
@@ -342,10 +341,10 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, _, mockCadvisor := newRealImageManager(policy)
+	manager, _, mockCollector := newRealImageManager(policy)
 
 	// Expect 40% usage.
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{
 		Usage:    400,
 		Capacity: 1000,
 	}, nil)
@@ -353,14 +352,14 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 	assert.NoError(t, manager.GarbageCollect())
 }
 
-func TestGarbageCollectCadvisorFailure(t *testing.T) {
+func TestGarbageCollectCollectorFailure(t *testing.T) {
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, _, mockCadvisor := newRealImageManager(policy)
+	manager, _, mockCollector := newRealImageManager(policy)
 
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, fmt.Errorf("error"))
+	mockCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{}, fmt.Errorf("error"))
 	assert.NotNil(t, manager.GarbageCollect())
 }
 
@@ -369,10 +368,10 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
+	manager, fakeRuntime, mockCollector := newRealImageManager(policy)
 
 	// Expect 95% usage and most of it gets freed.
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{
 		Usage:    950,
 		Capacity: 1000,
 	}, nil)
@@ -388,10 +387,10 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
+	manager, fakeRuntime, mockCollector := newRealImageManager(policy)
 
 	// Expect 95% usage and little of it gets freed.
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCollector.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{
 		Usage:    950,
 		Capacity: 1000,
 	}, nil)

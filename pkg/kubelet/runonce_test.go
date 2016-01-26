@@ -22,12 +22,10 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -35,19 +33,19 @@ import (
 )
 
 func TestRunOnce(t *testing.T) {
-	cadvisor := &cadvisor.Mock{}
-	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	cadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	cc := &collector.Mock{}
+	cc.On("MachineInfo").Return(&collector.MachineInfo{}, nil)
+	cc.On("FsInfo", collector.LabelDockerImages).Return(&collector.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 600 * mb,
 	}, nil)
-	cadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+	cc.On("FsInfo", collector.LabelSystemRoot).Return(&collector.FsInfo{
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
 	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
-	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
+	diskSpaceManager, _ := newDiskSpaceManager(cc, DiskSpacePolicy{})
 	fakeRuntime := &kubecontainer.FakeRuntime{}
 	basePath, err := ioutil.TempDir(os.TempDir(), "kubelet")
 	if err != nil {
@@ -57,7 +55,7 @@ func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{
 		rootDirectory:       basePath,
 		recorder:            &record.FakeRecorder{},
-		cadvisor:            cadvisor,
+		collector:           cc,
 		nodeLister:          testNodeLister{},
 		nodeInfo:            testNodeInfo{},
 		statusManager:       status.NewManager(nil, podManager),
