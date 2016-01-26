@@ -3,6 +3,7 @@
     description: '{description} Test owner: {test-owner}.'
     logrotate:
         daysToKeep: 7
+    disabled: false
     builders:
         - shell: |
             curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
