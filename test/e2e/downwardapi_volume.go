@@ -41,7 +41,7 @@ var _ = Describe("Downward API volume", func() {
 		}, f.Namespace.Name)
 	})
 
-	It("should provide podname as non-root with fsgroup [Conformance] [Skipped]", func() {
+	It("should provide podname as non-root with fsgroup [Feature:FSGroup]", func() {
 		podName := "metadata-volume-" + string(util.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)

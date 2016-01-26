@@ -37,21 +37,20 @@ var _ = Describe("EmptyDir volumes", func() {
 
 	f := NewFramework("emptydir")
 
-	// TODO: Remove [Skipped] when security context is enabled everywhere
-	Context("when FSGroup is specified [Skipped]", func() {
-		It("new files should be created with FSGroup ownership when container is root [Conformance]", func() {
+	Context("when FSGroup is specified [Feature:FSGroup]", func() {
+		It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, api.StorageMediumMemory)
 		})
 
-		It("new files should be created with FSGroup ownership when container is non-root [Conformance]", func() {
+		It("new files should be created with FSGroup ownership when container is non-root", func() {
 			doTestSetgidFSGroup(f, testImageNonRootUid, api.StorageMediumMemory)
 		})
 
-		It("volume on default medium should have the correct mode using FSGroup [Conformance]", func() {
+		It("volume on default medium should have the correct mode using FSGroup", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, api.StorageMediumDefault)
 		})
 
-		It("volume on tmpfs should have the correct mode using FSGroup [Conformance]", func() {
+		It("volume on tmpfs should have the correct mode using FSGroup", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, api.StorageMediumMemory)
 		})
 	})
