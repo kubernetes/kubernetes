@@ -1339,23 +1339,13 @@ func testContainerOutputMatcher(scenarioName string,
 
 	By(fmt.Sprintf("Trying to get logs from node %s pod %s container %s: %v",
 		podStatus.Spec.NodeName, podStatus.Name, containerName, err))
-	var logs []byte
+	var logs string
 	start := time.Now()
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
 	for time.Now().Sub(start) < (60 * time.Second) {
 		err = nil
-		logs, err = c.Get().
-			Resource("pods").
-			Namespace(ns).
-			Name(pod.Name).
-			SubResource("log").
-			Param("container", containerName).
-			Do().
-			Raw()
-		if err == nil && strings.Contains(string(logs), "Internal Error") {
-			err = fmt.Errorf("Fetched log contains \"Internal Error\": %q.", string(logs))
-		}
+		logs, err = getPodLogs(c, ns, pod.Name, containerName)
 		if err != nil {
 			By(fmt.Sprintf("Warning: Failed to get logs from node %q pod %q container %q. %v",
 				podStatus.Spec.NodeName, podStatus.Name, containerName, err))
@@ -1363,12 +1353,12 @@ func testContainerOutputMatcher(scenarioName string,
 			continue
 
 		}
-		By(fmt.Sprintf("Successfully fetched pod logs:%v\n", string(logs)))
+		By(fmt.Sprintf("Successfully fetched pod logs:%v\n", logs))
 		break
 	}
 
 	for _, m := range expectedOutput {
-		Expect(string(logs)).To(matcher(m), "%q in container output", m)
+		Expect(logs).To(matcher(m), "%q in container output", m)
 	}
 }
 
@@ -2715,4 +2705,31 @@ func scaleRCByName(client *client.Client, ns, name string, replicas uint) error 
 		return waitForPodsWithLabelRunning(
 			client, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector)))
 	}
+}
+
+func getPodLogs(c *client.Client, namespace, podName, containerName string) (string, error) {
+	return getPodLogsInternal(c, namespace, podName, containerName, false)
+}
+
+func getPreviousPodLogs(c *client.Client, namespace, podName, containerName string) (string, error) {
+	return getPodLogsInternal(c, namespace, podName, containerName, true)
+}
+
+// utility function for gomega Eventually
+func getPodLogsInternal(c *client.Client, namespace, podName, containerName string, previous bool) (string, error) {
+	logs, err := c.Get().
+		Resource("pods").
+		Namespace(namespace).
+		Name(podName).SubResource("log").
+		Param("container", containerName).
+		Param("previous", strconv.FormatBool(previous)).
+		Do().
+		Raw()
+	if err != nil {
+		return "", err
+	}
+	if err == nil && strings.Contains(string(logs), "Internal Error") {
+		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q.", string(logs))
+	}
+	return string(logs), err
 }

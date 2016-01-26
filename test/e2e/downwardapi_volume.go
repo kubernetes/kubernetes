@@ -18,11 +18,9 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -31,18 +29,6 @@ import (
 
 // How long to wait for a log pod to be displayed
 const podLogTimeout = 45 * time.Second
-
-// utility function for gomega Eventually
-func getPodLogs(c *client.Client, namespace, podName, containerName string) (string, error) {
-	logs, err := c.Get().Resource("pods").Namespace(namespace).Name(podName).SubResource("log").Param("container", containerName).Do().Raw()
-	if err != nil {
-		return "", err
-	}
-	if err == nil && strings.Contains(string(logs), "Internal Error") {
-		return "", fmt.Errorf("Internal Error")
-	}
-	return string(logs), err
-}
 
 var _ = Describe("Downward API volume", func() {
 	f := NewFramework("downward-api")
