@@ -2012,6 +2012,8 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
+	// Devices
+	ResourceDevices ResourceName = "devices"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

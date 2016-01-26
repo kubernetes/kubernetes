@@ -1646,6 +1646,8 @@ const (
 	// GPU, in cards. (500m = .5 cards)
 	ResourceGPU ResourceName = "gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods
+	// Devices
+	ResourceDevices ResourceName = "Devices"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

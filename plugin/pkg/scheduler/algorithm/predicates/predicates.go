@@ -242,7 +242,8 @@ type ResourceFit struct {
 type resourceRequest struct {
 	milliCPU int64
 	memory   int64
-	devices  int64
+	// Needs to be changed.
+	devices int64
 }
 
 func getResourceRequest(pod *api.Pod) resourceRequest {
@@ -251,19 +252,23 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 		requests := container.Resources.Requests
 		result.memory += requests.Memory().Value()
 		result.milliCPU += requests.Cpu().MilliValue()
+		result.devices += requests.Devices().Value()
 	}
 	return result
 }
 
-func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory []*api.Pod) {
+func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingDevices []*api.Pod) {
 	totalMilliCPU := allocatable.Cpu().MilliValue()
 	totalMemory := allocatable.Memory().Value()
+	totalDevices := allocatable.Devices().Value()
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
+	devicesRequested := int64(0)
 	for _, pod := range pods {
 		podRequest := getResourceRequest(pod)
 		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
+		fitDevices := totalDevices == 0 || (totalDevices-devicesRequested) >= podRequest.devices
 		if !fitsCPU {
 			// the pod doesn't fit due to CPU request
 			notFittingCPU = append(notFittingCPU, pod)
@@ -274,9 +279,16 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceLi
 			notFittingMemory = append(notFittingMemory, pod)
 			continue
 		}
+		if !fitDevices {
+			// the pod doesn't fit due to devices request
+			notFittingDevices = append(notFittingDevices, pod)
+			continue
+		}
+
 		// the pod fits
 		milliCPURequested += podRequest.milliCPU
 		memoryRequested += podRequest.memory
+		devicesRequested += podRequest.devices
 		fitting = append(fitting, pod)
 	}
 	return
@@ -300,12 +312,12 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	}
 
 	podRequest := getResourceRequest(pod)
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
+	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.devices == 0 {
 		return true, nil
 	}
 
 	pods := append(existingPods, pod)
-	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, allocatable)
+	_, exceedingCPU, exceedingMemory, exceedingDevices := CheckPodsExceedingFreeResources(pods, allocatable)
 	if len(exceedingCPU) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), node)
 		return false, ErrInsufficientFreeCPU
@@ -314,6 +326,11 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Memory", podName(pod), node)
 		return false, ErrInsufficientFreeMemory
 	}
+	if len(exceedingDevices) > 0 {
+		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Devices", podName(pod), node)
+		return false, ErrInsufficientFreeDevices
+	}
+
 	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.", podName(pod), node, len(pods)-1, allocatable.Pods().Value())
 	return true, nil
 }

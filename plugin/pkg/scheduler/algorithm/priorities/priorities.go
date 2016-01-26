@@ -51,11 +51,12 @@ func calculateScore(requested int64, capacity int64, node string) int {
 // As described in #11713, we use request instead of limit to deal with resource requirements.
 const defaultMilliCpuRequest int64 = 100             // 0.1 core
 const defaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
+const defaultDevicesRequest int64 = 0
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
-func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
-	var out_millicpu, out_memory int64
+func getNonzeroRequests(requests *api.ResourceList) (int64, int64, int64) {
+	var out_millicpu, out_memory, out_devices int64
 	// Override if un-set, but not if explicitly set to zero
 	if (*requests.Cpu() == resource.Quantity{}) {
 		out_millicpu = defaultMilliCpuRequest
@@ -68,7 +69,14 @@ func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 	} else {
 		out_memory = requests.Memory().Value()
 	}
-	return out_millicpu, out_memory
+	// Override if un-set, but not if explicitly set to zero
+	if (*requests.Devices() == resource.Quantity{}) {
+		out_devices = defaultDevicesRequest
+	} else {
+		out_devices = requests.Devices().Value()
+	}
+
+	return out_millicpu, out_memory, out_devices
 }
 
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
@@ -76,37 +84,42 @@ func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
+	totalDevices := int64(0)
 	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
 	capacityMemory := node.Status.Allocatable.Memory().Value()
+	capacityDevices := node.Status.Allocatable.Devices().Value()
 
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := getNonzeroRequests(&container.Resources.Requests)
+			cpu, memory, devices := getNonzeroRequests(&container.Resources.Requests)
 			totalMilliCPU += cpu
 			totalMemory += memory
+			totalDevices += devices
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := getNonzeroRequests(&container.Resources.Requests)
+		cpu, memory, devices := getNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
+		totalDevices += devices
 	}
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
+	devicesScore := calculateScore(totalDevices, capacityDevices, node.Name)
 	glog.V(10).Infof(
-		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
+		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d, %d) / (%d, %d, %d) Score: (%d, %d, %d)",
 		pod.Name, node.Name,
-		totalMilliCPU, totalMemory,
-		capacityMilliCPU, capacityMemory,
-		cpuScore, memoryScore,
+		totalMilliCPU, totalMemory, totalDevices,
+		capacityMilliCPU, capacityMemory, capacityDevices,
+		cpuScore, memoryScore, devicesScore,
 	)
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: int((cpuScore + memoryScore) / 2),
+		Score: int((cpuScore + memoryScore + devicesScore) / 2),
 	}
 }
 
@@ -192,28 +205,33 @@ func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.P
 func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
+	totalDevices := int64(0)
 	score := int(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := getNonzeroRequests(&container.Resources.Requests)
+			cpu, memory, devices := getNonzeroRequests(&container.Resources.Requests)
 			totalMilliCPU += cpu
 			totalMemory += memory
+			totalDevices += devices
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := getNonzeroRequests(&container.Resources.Requests)
+		cpu, memory, devices := getNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
+		totalDevices += devices
 	}
 
 	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
 	capacityMemory := node.Status.Allocatable.Memory().Value()
+	capacityDevices := node.Status.Allocatable.Devices().Value()
 
 	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU)
 	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory)
-	if cpuFraction >= 1 || memoryFraction >= 1 {
+	devicesFraction := fractionOfCapacity(totalDevices, capacityDevices)
+	if cpuFraction >= 1 || memoryFraction >= 1 || devicesFraction >= 1 {
 		// if requested >= capacity, the corresponding host should never be preferrred.
 		score = 0
 	} else {
@@ -221,14 +239,14 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 		// respectively. Multilying the absolute value of the difference by 10 scales the value to
 		// 0-10 with 0 representing well balanced allocation and 10 poorly balanced. Subtracting it from
 		// 10 leads to the score which also scales from 0 to 10 while 10 representing well balanced.
-		diff := math.Abs(cpuFraction - memoryFraction)
+		diff := math.Abs(cpuFraction - memoryFraction - devicesFraction)
 		score = int(10 - diff*10)
 	}
 	glog.V(10).Infof(
-		"%v -> %v: Balanced Resource Allocation, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d)",
+		"%v -> %v: Balanced Resource Allocation, Absolute/Requested: (%d, %d, %d) / (%d, %d, %d) Score: (%d)",
 		pod.Name, node.Name,
-		totalMilliCPU, totalMemory,
-		capacityMilliCPU, capacityMemory,
+		totalMilliCPU, totalMemory, totalDevices,
+		capacityMilliCPU, capacityMemory, capacityDevices,
 		score,
 	)
 
