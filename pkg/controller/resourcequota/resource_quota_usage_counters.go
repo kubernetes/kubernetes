@@ -55,7 +55,10 @@ func podUsageFunc(kubeClient client.Interface) UsageFunc {
 		usage := Usage{Used: api.ResourceList{}}
 
 		match := false
-		resourceMatches := []api.ResourceName{api.ResourcePods, api.ResourceCPU, api.ResourceMemory}
+
+		quotaComputeResources := ResourceQuotaComputeResources()
+		resourceMatches := append([]api.ResourceName{api.ResourcePods}, quotaComputeResources...)
+
 		for _, resourceMatch := range resourceMatches {
 			if _, found := options.Resources[resourceMatch]; found {
 				match = true
@@ -67,6 +70,7 @@ func podUsageFunc(kubeClient client.Interface) UsageFunc {
 		}
 
 		pods, err := kubeClient.Pods(options.Namespace).List(api.ListOptions{})
+
 		if err != nil {
 			return usage, err
 		}
@@ -77,10 +81,15 @@ func podUsageFunc(kubeClient client.Interface) UsageFunc {
 			usage.Used[api.ResourcePods] = *value
 		}
 
-		computeResources := []api.ResourceName{api.ResourceMemory, api.ResourceCPU}
-		for _, computeResource := range computeResources {
-			value := PodsRequests(filteredPods, computeResource)
-			usage.Used[computeResource] = *value
+		for _, quotaComputeResource := range quotaComputeResources {
+			// transform the quota name (i.e. memory.request) to the pod name (memory, useRequest=true)
+			podComputeResourceName, useRequest, err := ResourceQuotaToPodComputeResource(quotaComputeResource)
+			if err != nil {
+				return usage, err
+			}
+			value := PodsResourceRequirement(filteredPods, podComputeResourceName, useRequest)
+			// make sure you store usage relative to the quota resource name
+			usage.Used[quotaComputeResource] = *value
 		}
 
 		return usage, nil
@@ -196,19 +205,38 @@ func FilterQuotaPods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
-// PodsRequests returns sum of each resource request for each pod in list
-// If a given pod in the list does not have a request for the named resource, we log the error
-// but still attempt to get the most representative count
-func PodsRequests(pods []*api.Pod, resourceName api.ResourceName) *resource.Quantity {
+// PodHasResourceRequirement verifies that a pod has a resource requirement for the named resource
+// If useRequests is true, it verifies that the pod has a resource request for the named resource
+// If useRequests is false, it verifies that the pod has a resource limit for the named resource
+func PodHasResourceRequirement(pod *api.Pod, resourceName api.ResourceName, useRequests bool) bool {
+	for j := range pod.Spec.Containers {
+		resources := pod.Spec.Containers[j].Resources
+		resourceList := resources.Limits
+		if useRequests {
+			resourceList = resources.Requests
+		}
+		value, valueSet := resourceList[resourceName]
+		if !valueSet || value.Value() == int64(0) {
+			return false
+		}
+	}
+	return true
+}
+
+// PodsResourceRequirement sums the resource requirement across all pods in either requests or limits based on flag.
+// If a pod does not enumerate a resource requirement for the resource, we log an error but still attempt to get accurate count.
+func PodsResourceRequirement(pods []*api.Pod, resourceName api.ResourceName, useRequests bool) *resource.Quantity {
+	requirement := "limit"
+	if useRequests {
+		requirement = "request"
+	}
+
 	var sum *resource.Quantity
 	for i := range pods {
 		pod := pods[i]
-		podQuantity, err := PodRequests(pod, resourceName)
+		podQuantity, err := PodResourceRequirement(pod, resourceName, useRequests)
 		if err != nil {
-			// log the error, but try to keep the most accurate count possible in log
-			// rationale here is that you may have had pods in a namespace that did not have
-			// explicit requests prior to adding the quota
-			glog.Infof("No explicit request for resource, pod %s/%s, %s", pod.Namespace, pod.Name, resourceName)
+			glog.Infof("Pod %s/%s does not specify a %s for %s.", pod.Namespace, pod.Name, requirement, resourceName)
 		} else {
 			if sum == nil {
 				sum = podQuantity
@@ -225,14 +253,23 @@ func PodsRequests(pods []*api.Pod, resourceName api.ResourceName) *resource.Quan
 	return sum
 }
 
-// PodRequests returns sum of each resource request across all containers in pod
-func PodRequests(pod *api.Pod, resourceName api.ResourceName) (*resource.Quantity, error) {
-	if !PodHasRequests(pod, resourceName) {
-		return nil, fmt.Errorf("Each container in pod %s/%s does not have an explicit request for resource %s.", pod.Namespace, pod.Name, resourceName)
+// PodResourceRequirement sums the resource requirement in either request or limit based on flag.
+// It errors if a requirement is not enumerated
+func PodResourceRequirement(pod *api.Pod, resourceName api.ResourceName, useRequests bool) (*resource.Quantity, error) {
+	if !PodHasResourceRequirement(pod, resourceName, useRequests) {
+		requirement := "limit"
+		if useRequests {
+			requirement = "request"
+		}
+		return nil, fmt.Errorf("Pod %s/%s does not specify a %s for %s.", pod.Namespace, pod.Name, requirement, resourceName)
 	}
 	var sum *resource.Quantity
 	for j := range pod.Spec.Containers {
-		value, _ := pod.Spec.Containers[j].Resources.Requests[resourceName]
+		resourceList := pod.Spec.Containers[j].Resources.Limits
+		if useRequests {
+			resourceList = pod.Spec.Containers[j].Resources.Requests
+		}
+		value, _ := resourceList[resourceName]
 		if sum == nil {
 			sum = value.Copy()
 		} else {
@@ -250,13 +287,31 @@ func PodRequests(pod *api.Pod, resourceName api.ResourceName) (*resource.Quantit
 	return sum, nil
 }
 
-// PodHasRequests verifies that each container in the pod has an explicit request that is non-zero for a named resource
-func PodHasRequests(pod *api.Pod, resourceName api.ResourceName) bool {
-	for j := range pod.Spec.Containers {
-		value, valueSet := pod.Spec.Containers[j].Resources.Requests[resourceName]
-		if !valueSet || value.Value() == int64(0) {
-			return false
-		}
+// ResourceQuotaComputeResources returns the set of quota tracked resources that map to compute resources
+func ResourceQuotaComputeResources() []api.ResourceName {
+	return []api.ResourceName{
+		api.ResourceMemory,
+		api.ResourceMemoryRequest,
+		api.ResourceMemoryLimit,
+		api.ResourceCPU,
+		api.ResourceCPURequest,
+		api.ResourceCPULimit,
 	}
-	return true
+}
+
+// ResourceQuotaToPodResource takes a name of a resource tracked by quota
+// and returns a triplet of resource name, a bool if the resource maps to a
+// request, and an error if the resource is unknown
+func ResourceQuotaToPodComputeResource(resourceName api.ResourceName) (api.ResourceName, bool, error) {
+	switch resourceName {
+	case api.ResourceMemoryLimit:
+		return api.ResourceMemory, false, nil
+	case api.ResourceCPULimit:
+		return api.ResourceCPU, false, nil
+	case api.ResourceMemory, api.ResourceMemoryRequest:
+		return api.ResourceMemory, true, nil
+	case api.ResourceCPU, api.ResourceCPURequest:
+		return api.ResourceCPU, true, nil
+	}
+	return resourceName, false, fmt.Errorf("Resource %v does not map to a pod compute resource", resourceName)
 }
