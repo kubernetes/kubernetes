@@ -2769,6 +2769,8 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 	}
 	out.Replicas = int32(in.Replicas)
 	out.UpdatedReplicas = int32(in.UpdatedReplicas)
+	out.AvailableReplicas = int32(in.AvailableReplicas)
+	out.UnavailableReplicas = int32(in.UnavailableReplicas)
 	return nil
 }
 
@@ -3942,6 +3944,8 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 	}
 	out.Replicas = int(in.Replicas)
 	out.UpdatedReplicas = int(in.UpdatedReplicas)
+	out.AvailableReplicas = int(in.AvailableReplicas)
+	out.UnavailableReplicas = int(in.UnavailableReplicas)
 	return nil
 }
 
