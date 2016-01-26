@@ -36,7 +36,7 @@ set -o pipefail
 set -o xtrace
 
 if [[ ${JOB_NAME} =~ -pull- ]]; then
-  : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/${ghprbActualCommit:-unknown}"}
+  : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/pull/${ghprbPullId:-unknown}"}
 else
   : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}
 fi
