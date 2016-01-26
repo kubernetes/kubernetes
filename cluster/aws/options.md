@@ -88,4 +88,47 @@ Defaults to vivid (Ubuntu Vivid Vervet), which has a modern kernel and does not 
 Other options may require reboots, updates or configuration, and should be used only if you have a compelling
 requirement to do so.
 
+**NON_MASQUERADE_CIDR**
+
+The 'internal' IP range which Kuberenetes will use, which will therefore not
+use IP masquerade.  By default kubernetes runs an internal network for traffic
+between pods (and between pods and services), and by default this uses the
+`10.0.0.0/8` range.  However, this sometimes overlaps with a range that you may
+want to use; in particular the range cannot be used with EC2 ClassicLink.  You
+may also want to run kubernetes in an existing VPC where you have chosen a CIDR
+in the `10.0.0.0/8` range.
+
+Setting this flag allows you to change this internal network CIDR.  Note that
+you must set other values consistently within the CIDR that you choose.
+
+For example, you might choose `172.16.0.0/14`; and you could then choose to
+configure like this:
+
+```
+export NON_MASQUERADE_CIDR="172.16.0.0/14"
+export SERVICE_CLUSTER_IP_RANGE="172.16.0.0/16"
+export DNS_SERVER_IP="172.16.0.10"
+export MASTER_IP_RANGE="172.17.0.0/24"
+export CLUSTER_IP_RANGE="172.18.0.0/16"
+```
+
+When choosing a CIDR in the 172.20/12 reserved range you should be careful not
+to choose a CIDR that overlaps your VPC CIDR (the kube-up script sets the VPC
+CIDR to 172.20.0.0/16 by default, so you should not overlap that).  If you want
+to allow inter-VPC traffic you should be careful to avoid your other VPCs as
+well.
+
+There is also a 100.64/10 address block which is reserved for "Carrier Grade
+NAT", and which some users have reported success using.  While we haven't seen
+any problems, or conflicts with any AWS networks, we can't guarantee it.  If you
+decide you are comfortable using 100.64, you might use:
+
+```
+export NON_MASQUERADE_CIDR="100.64.0.0/10"
+export SERVICE_CLUSTER_IP_RANGE="100.64.0.0/16"
+export DNS_SERVER_IP="100.64.0.10"
+export MASTER_IP_RANGE="100.65.0.0/24"
+export CLUSTER_IP_RANGE="100.66.0.0/16"
+```
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()
