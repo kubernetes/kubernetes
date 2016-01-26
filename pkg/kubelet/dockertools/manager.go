@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-semver/semver"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
@@ -945,18 +946,47 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 	return podInfraContainerStatus.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
 }
 
-type dockerVersion docker.APIVersion
-
-func NewVersion(input string) (dockerVersion, error) {
-	version, err := docker.NewAPIVersion(input)
-	return dockerVersion(version), err
+// dockerVersion implementes kubecontainer.Version interface by implementing
+// Compare() and String() (which is implemented by the underlying semver.Version)
+// TODO: this code is the same as rktVersion and may make sense to be moved to
+// somewhere shared.
+type dockerVersion struct {
+	*semver.Version
 }
 
-func (dv dockerVersion) String() string {
+func newDockerVersion(version string) (dockerVersion, error) {
+	sem, err := semver.NewVersion(version)
+	if err != nil {
+		return dockerVersion{}, err
+	}
+	return dockerVersion{sem}, nil
+}
+
+func (r dockerVersion) Compare(other string) (int, error) {
+	v, err := semver.NewVersion(other)
+	if err != nil {
+		return -1, err
+	}
+
+	if r.LessThan(*v) {
+		return -1, nil
+	}
+	if v.LessThan(*r.Version) {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+// dockerVersion implementes kubecontainer.Version interface by implementing
+// Compare() and String() on top og go-dockerclient's APIVersion. This version
+// string doesn't conform to semantic versioning, as it is only "x.y"
+type dockerAPIVersion docker.APIVersion
+
+func (dv dockerAPIVersion) String() string {
 	return docker.APIVersion(dv).String()
 }
 
-func (dv dockerVersion) Compare(other string) (int, error) {
+func (dv dockerAPIVersion) Compare(other string) (int, error) {
 	a := docker.APIVersion(dv)
 	b, err := docker.NewAPIVersion(other)
 	if err != nil {
@@ -982,12 +1012,12 @@ func (dm *DockerManager) Version() (kubecontainer.Version, error) {
 	}
 
 	engineVersion := env.Get("Version")
-	version, err := docker.NewAPIVersion(engineVersion)
+	version, err := newDockerVersion(engineVersion)
 	if err != nil {
 		glog.Errorf("docker: failed to parse docker server version %q: %v", engineVersion, err)
 		return nil, fmt.Errorf("docker: failed to parse docker server version %q: %v", engineVersion, err)
 	}
-	return dockerVersion(version), nil
+	return version, nil
 }
 
 func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
@@ -1002,7 +1032,7 @@ func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
 		glog.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
 		return nil, fmt.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
 	}
-	return dockerVersion(version), nil
+	return dockerAPIVersion(version), nil
 }
 
 // The first version of docker that supports exec natively is 1.3.0 == API 1.15
