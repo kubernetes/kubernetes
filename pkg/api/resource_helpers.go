@@ -49,6 +49,14 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
+// Returns the Memory limit if specified.
+func (self *ResourceList) Devices() *resource.Quantity {
+	if val, ok := (*self)[ResourceMemory]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
+
 func (self *ResourceList) Pods() *resource.Quantity {
 	if val, ok := (*self)[ResourcePods]; ok {
 		return &val
