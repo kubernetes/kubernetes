@@ -43,10 +43,28 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: $MINION_IP_RANGE
-  cloud: azure
+  cloud: azure-legacy
   hostnamef: $hostnamef
   cbr-string: $cbrstring
 EOF
+
+if [[ -n "${DOCKER_OPTS}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+EOF
+fi
+
+if [[ -n "${DOCKER_ROOT}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
+EOF
+fi
+
+if [[ -n "${KUBELET_ROOT}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
+EOF
+fi
 
 install-salt
 
