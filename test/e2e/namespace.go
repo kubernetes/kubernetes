@@ -75,7 +75,35 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 		}))
 }
 
-var _ = Describe("Namespaces", func() {
+// This test must run [Serial] due to the impact of running other parallel
+// tests can have on its performance.  Each test that follows the common
+// test framework follows this pattern:
+//   1. Create a Namespace
+//   2. Do work that generates content in that namespace
+//   3. Delete a Namespace
+// Creation of a Namespace is non-trivial since it requires waiting for a
+// ServiceAccount to be generated.
+// Deletion of a Namespace is non-trivial and performance intensive since
+// its an orchestrated process.  The controller that handles deletion must
+// query the namespace for all existing content, and then delete each piece
+// of content in turn.  As the API surface grows to add more KIND objects
+// that could exist in a Namespace, the number of calls that the namespace
+// controller must orchestrate grows since it must LIST, DELETE (1x1) each
+// KIND.
+// There is work underway to improve this, but it's
+// most likely not going to get significantly better until etcd v3.
+// Going back to this test, this test generates 100 Namespace objects, and then
+// rapidly deletes all of them.  This causes the NamespaceController to observe
+// and attempt to process a large number of deletes concurrently.  In effect,
+// it's like running 100 traditional e2e tests in parallel.  If the namespace
+// controller orchestrating deletes is slowed down deleting another test's
+// content then this test may fail.  Since the goal of this test is to soak
+// Namespace creation, and soak Namespace deletion, its not appropriate to
+// further soak the cluster with other parallel Namespace deletion activities
+// that each have a variable amount of content in the associated Namespace.
+// When run in [Serial] this test appears to delete Namespace objects at a
+// rate of approximately 1 per second.
+var _ = Describe("Namespaces [Serial]", func() {
 
 	//This namespace is modified throughout the course of the test.
 	var c *client.Client
@@ -89,11 +117,7 @@ var _ = Describe("Namespaces", func() {
 	AfterEach(func() {
 	})
 
-	//Confirms that namespace draining is functioning reasonably
-	//at minute intervals.
-	//
-	// Flaky issue #19026
-	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds) [Flaky]",
+	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
 		func() { extinguish(c, 100, 10, 150) })
 
 	//comprehensive draining ; uncomment after #7372
