@@ -3,7 +3,7 @@ set -e
 
 ### BEGIN INIT INFO
 # Provides:           kube-proxy
-# Required-Start:     $etcd
+# Required-Start:     $flannel
 # Required-Stop:      
 # Should-Start:       
 # Should-Stop:        
