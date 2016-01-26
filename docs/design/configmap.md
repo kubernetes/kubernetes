@@ -31,12 +31,12 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-This proposal proposes a new API resource, `ConfigMap`, that stores data used for the configuration
-of applications deployed on `Kubernetes`.
+The `ConfigMap` API resource stores data used for the configuration of applications deployed on
+Kubernetes.
 
-The main focus points of this proposal are:
+The main focus of this resource is to:
 
-* Dynamic distribution of configuration data to deployed applications.
+* Provide dynamic distribution of configuration data to deployed applications.
 * Encapsulate configuration information and simplify `Kubernetes` deployments.
 * Create a flexible configuration model for `Kubernetes`.
 
@@ -118,7 +118,7 @@ consumed in environment variables will not be updated.
 
 ### API Resource
 
-The `ConfigMap` resource will be added to the `extensions` API Group:
+The `ConfigMap` resource will be added to the main API:
 
 ```go
 package api
@@ -180,15 +180,22 @@ type VolumeSource struct {
   ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 }
 
-// ConfigMapVolumeSource represents a volume that holds configuration data
+// Represents a volume that holds configuration data.
 type ConfigMapVolumeSource struct {
-  // A list of configuration data keys to project into the volume in files
-  Files []ConfigMapVolumeFile `json:"files"`
+  LocalObjectReference `json:",inline"`
+  // A list of keys to project into the volume.
+  // If unspecified, each key-value pair in the Data field of the
+  // referenced ConfigMap will be projected into the volume as a file whose name
+  // is the key and content is the value.
+  // If specified, the listed keys will be project into the specified paths, and
+  // unlisted keys will not be present.
+  Items []KeyToPath `json:"items,omitempty"`
 }
 
-// ConfigMapVolumeFile represents a single file containing configuration data
-type ConfigMapVolumeFile struct {
-  ConfigMapSelector `json:",inline"`
+// Represents a mapping of a key to a relative path.
+type KeyToPath struct {
+  // The name of the key to select
+  Key string `json:"key"`
 
   // The relative path name of the file to be created.
   // Must not be absolute or contain the '..' path. Must be utf-8 encoded.
@@ -200,22 +207,27 @@ type ConfigMapVolumeFile struct {
 **Note:** The update logic used in the downward API volume plug-in will be extracted and re-used in
 the volume plug-in for `ConfigMap`.
 
+### Changes to Secret
+
+We will update the Secret volume plugin to have a similar API to the new ConfigMap volume plugin.
+The secret volume plugin will also begin updating secret content in the volume when secrets change.
+
 ## Examples
 
 #### Consuming `ConfigMap` as Environment Variables
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etcd-env-config
 data:
-  number_of_members: 1
-  initial_cluster_state: new
-  initial_cluster_token: DUMMY_ETCD_INITIAL_CLUSTER_TOKEN
-  discovery_token: DUMMY_ETCD_DISCOVERY_TOKEN
-  discovery_url: http://etcd-discovery:2379
-  etcdctl_peers: http://etcd:2379
+  number-of-members: 1
+  initial-cluster-state: new
+  initial-cluster-token: DUMMY_ETCD_INITIAL_CLUSTER_TOKEN
+  discovery-token: DUMMY_ETCD_DISCOVERY_TOKEN
+  discovery-url: http://etcd-discovery:2379
+  etcdctl-peers: http://etcd:2379
 ```
 
 This pod consumes the `ConfigMap` as environment variables:
@@ -239,30 +251,30 @@ spec:
       valueFrom:
         configMap:
           configMapName: etcd-env-config
-          key: number_of_members
+          key: number-of-members
     - name: ETCD_INITIAL_CLUSTER_STATE
       valueFrom:
         configMap:
           configMapName: etcd-env-config
-          key: initial_cluster_state
+          key: initial-cluster-state
     - name: ETCD_DISCOVERY_TOKEN
       valueFrom:
         configMap:
           configMapName: etcd-env-config
-          key: discovery_token
+          key: discovery-token
     - name: ETCD_DISCOVERY_URL
       valueFrom:
         configMap:
           configMapName: etcd-env-config
-          key: discovery_url
+          key: discovery-url
     - name: ETCDCTL_PEERS
       valueFrom:
         configMap:
           configMapName: etcd-env-config
-          key: etcdctl_peers
+          key: etcdctl-peers
 ```
 
-### Consuming `ConfigMap` as Volumes
+#### Consuming `ConfigMap` as Volumes
 
 `redis-volume-config` is intended to be used as a volume containing a config file:
 
@@ -293,19 +305,19 @@ spec:
         - name: config-map-volume
           mountPath: /mnt/config-map
   volumes:
-  - name: config-map-volume
-    configMap:
-      files:
-        - path: "etc/redis.conf"
-          configMapName: redis-volume-config
-          key: redis.conf
+    - name: config-map-volume
+      configMap:
+        name: redis-volume-config
+        items:
+          - path: "etc/redis.conf"
+            key: redis.conf
 ```
 
-### Future Improvements
+## Future Improvements
 
 In the future, we may add the ability to specify an init-container that can watch the volume
 contents for updates and respond to changes when they occur.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/configmap.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/configmap.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
