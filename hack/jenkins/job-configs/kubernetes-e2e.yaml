@@ -1,7 +1,6 @@
 - job-template:
     name: 'kubernetes-e2e-{suffix}'
     description: '{description} Test owner: {test-owner}.'
-    disabled: '{disabled}'
     logrotate:
         daysToKeep: 7
     builders:
@@ -20,7 +19,7 @@
         - reverse:
             jobs: '{trigger-job}'
             result: success
-        - timed: '{cron-string}'
+        - timed: 'H/30 * * * *'
     wrappers:
         - ansicolor:
             colormap: xterm
@@ -103,29 +102,6 @@
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
             timeout: 300
-    jobs:
-        - 'kubernetes-e2e-{suffix}'
-
-- project:
-    name: kubernetes-aws
-    test-owner: 'bburns'
-    disabled: true
-    emails: 'bburns@google.com'
-    cron-string: '@daily'
-    trigger-job: ''
-    suffix:
-        - 'aws':
-            description: 'Run e2e tests on AWS using the latest successful Kubernetes build.'
-            timeout: 240
-            branch: 'master'
-        - 'aws-parallel':
-            description: 'Run parallel e2e tests on AWS using the latest successful Kubernetes build.'
-            timeout: 60
-            branch: 'master'
-        - 'aws-release-1.1':
-            description: 'Run e2e tests on AWS using the latest successful 1.1 Kubernetes build.'
-            timeout: 240
-            branch: 'release-1.1'
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
