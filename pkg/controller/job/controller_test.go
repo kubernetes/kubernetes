@@ -406,8 +406,8 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 }
 
 func TestSyncJobComplete(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := release_1_1.NewForConfigOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady

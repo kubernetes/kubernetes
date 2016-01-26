@@ -905,8 +905,8 @@ func TestRCManagerInit(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer testServer.Close()
 
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
-	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)
+	clientset := release_1_1.NewForConfigOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewReplicationManager(clientset, controller.NoResyncPeriodFunc, BurstReplicas)
 	manager.rcStore.Store.Add(rc)
 	manager.podStoreSynced = alwaysReady
 	controller.SyncAllPodsWithStore(manager.kubeClient, manager.podStore.Store)

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"

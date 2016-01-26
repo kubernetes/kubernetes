@@ -444,12 +444,12 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 //
 // TODO: Extend this logic to load arbitrary local state for the controllers
 // instead of just pods.
-func SyncAllPodsWithStore(kubeClient client.Interface, store cache.Store) {
+func SyncAllPodsWithStore(kubeClient release_1_1.Interface, store cache.Store) {
 	var allPods *api.PodList
 	var err error
 	listOptions := api.ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything()}
 	for {
-		if allPods, err = kubeClient.Pods(api.NamespaceAll).List(listOptions); err != nil {
+		if allPods, err = kubeClient.Legacy().Pods(api.NamespaceAll).List(listOptions); err != nil {
 			glog.Warningf("Retrying pod list: %v", err)
 			continue
 		}

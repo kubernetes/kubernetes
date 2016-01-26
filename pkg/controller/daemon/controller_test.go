@@ -370,8 +370,8 @@ func TestDSManagerInit(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer testServer.Close()
 
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
-	manager := NewDaemonSetsController(client, controller.NoResyncPeriodFunc)
+	clientset := release_1_1.NewForConfigOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewDaemonSetsController(clientset, controller.NoResyncPeriodFunc)
 	manager.dsStore.Add(ds)
 	manager.nodeStore.Add(newNode(nodeName, nil))
 	manager.podStoreSynced = alwaysReady
