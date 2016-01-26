@@ -44,6 +44,7 @@ env_to_salt docker_root
 env_to_salt kubelet_root
 env_to_salt master_extra_sans
 env_to_salt runtime_config
+env_to_salt non_masquerade_cidr
 
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d

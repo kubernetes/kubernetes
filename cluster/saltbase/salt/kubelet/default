@@ -85,6 +85,11 @@
   {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 
+{% set non_masquerade_cidr = "" -%}
+{% if grains.non_masquerade_cidr is defined -%}
+  {% set non_masquerade_cidr = "--non-masquerade-cidr=" + grains.non_masquerade_cidr -%}
+{% endif -%}
+
 # The master kubelet cannot wait for the flannel daemon because it is responsible
 # for starting up the flannel server in a static pod. So even though the flannel
 # daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
@@ -137,4 +142,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"

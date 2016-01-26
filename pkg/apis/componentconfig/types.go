@@ -274,6 +274,8 @@ type KubeletConfiguration struct {
 	NodeIP string `json:"nodeIP,omitempty"`
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string `json:"nodeLabels"`
+	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
+	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

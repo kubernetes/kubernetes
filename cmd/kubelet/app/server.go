@@ -222,6 +222,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
 		NodeLabels:                s.NodeLabels,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency.Duration,
+		NonMasqueradeCIDR:         s.NonMasqueradeCIDR,
 		OOMAdjuster:               oom.NewOOMAdjuster(),
 		OSInterface:               kubecontainer.RealOS{},
 		PodCIDR:                   s.PodCIDR,
@@ -700,6 +701,7 @@ type KubeletConfig struct {
 	NodeName                       string
 	NodeLabels                     map[string]string
 	NodeStatusUpdateFrequency      time.Duration
+	NonMasqueradeCIDR              string
 	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
@@ -803,6 +805,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
+		kc.NonMasqueradeCIDR,
 		kc.PodCIDR,
 		kc.ReconcileCIDR,
 		kc.MaxPods,

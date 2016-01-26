@@ -29,6 +29,7 @@ function generate-minion-user-data {
   echo "#! /bin/bash"
   echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
   echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
+  echo "readonly NON_MASQUERADE_CIDR='${NON_MASQUERADE_CIDR:-}'"
   echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
