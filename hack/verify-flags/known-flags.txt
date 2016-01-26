@@ -90,6 +90,7 @@ enable-server
 etcd-config
 etcd-mutation-timeout
 etcd-prefix
+etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides

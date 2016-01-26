@@ -133,7 +133,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newEtcd := func(serverList []string, _ runtime.NegotiatedSerializer, _, _ string) (storage.Interface, error) {
+		newEtcd := func(serverList []string, _ runtime.NegotiatedSerializer, _, _ string, _ bool) (storage.Interface, error) {
 			if !reflect.DeepEqual(test.servers, serverList) {
 				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, serverList)
 			}
@@ -141,7 +141,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		}
 		storageDestinations := genericapiserver.NewStorageDestinations()
 		override := test.apigroup + "/" + test.resource + "#" + strings.Join(test.servers, ";")
-		updateEtcdOverrides([]string{override}, storageVersions, "", &storageDestinations, newEtcd)
+		updateEtcdOverrides([]string{override}, storageVersions, "", false, &storageDestinations, newEtcd)
 		apigroup, ok := storageDestinations.APIGroups[test.apigroup]
 		if !ok {
 			t.Errorf("apigroup: %s not created", test.apigroup)
