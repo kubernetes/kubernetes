@@ -152,9 +152,9 @@ created in the volume will inherit the owning GID of the volume.
 
 ## Community Design Discussion
 
-- [kubernetes/2630](https://github.com/GoogleCloudPlatform/kubernetes/issues/2630)
-- [kubernetes/11319](https://github.com/GoogleCloudPlatform/kubernetes/issues/11319)
-- [kubernetes/9384](https://github.com/GoogleCloudPlatform/kubernetes/pull/9384)
+- [kubernetes/2630](https://github.com/kubernetes/kubernetes/issues/2630)
+- [kubernetes/11319](https://github.com/kubernetes/kubernetes/issues/11319)
+- [kubernetes/9384](https://github.com/kubernetes/kubernetes/pull/9384)
 
 ## Analysis
 
