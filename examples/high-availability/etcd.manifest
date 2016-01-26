@@ -13,7 +13,7 @@
 	      "--initial-advertise-peer-urls",  "http://NODE_IP:2380",
 	      "--listen-peer-urls",     	"http://NODE_IP:2380",
 	      "--advertise-client-urls",    	"http://NODE_IP:2379",
-	      "-initial-cluster", "kube0.ha=http://192.168.4.100:2380",
+	      "-initial-cluster", "kube0=http://192.168.4.100:2380",
 	      "--listen-client-urls",   	"http://127.0.0.1:2379,http://NODE_IP:2379",
           "--data-dir","/var/etcd/data"
     ],

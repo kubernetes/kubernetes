@@ -12,7 +12,7 @@ KUBELET_ADDRESS=""
 # KUBELET_HOSTNAME="--hostname-override=0.0.0."
 
 # location of the api-server
-KUBELET_API_SERVER="--api-servers=http://0.0.0.0:8080,kube1.ha:8080,kube0.ha:8080 "
+KUBELET_API_SERVER="--api-servers=http://0.0.0.0:8080,kube1:8080,kube0:8080 "
 # --cert-dir="/var/run/kubernetes": The directory where the TLS certs are located (by default /var/run/kubernetes). If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.
 # --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to the directory passed to --cert-dir.
 #  --tls-private-key-file="": File containing x509 private key matching --tls-cert-file.
