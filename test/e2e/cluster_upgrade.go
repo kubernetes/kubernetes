@@ -144,7 +144,7 @@ func nodeUpgradeGKE(v string) error {
 	return err
 }
 
-var _ = Describe("Cluster Upgrade [Skipped]", func() {
+var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 
 	svcName, replicas := "baz", 2
 	var rcName, ip, v string
