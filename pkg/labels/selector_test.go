@@ -34,11 +34,14 @@ func TestSelectorParse(t *testing.T) {
 		"x=,z= ",
 		"x= ,z= ",
 		"!x",
+		"x>1.1",
+		"x>1.1,z<5.3",
 	}
 	testBadStrings := []string{
 		"x=a||y=b",
 		"x==a==b",
 		"!x=a",
+		"x<a",
 	}
 	for _, test := range testGoodStrings {
 		lq, err := Parse(test)
@@ -107,12 +110,16 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "notin=in", Set{"notin": "in"}) // in and notin in exactMatch
 	expectMatch(t, "x", Set{"x": "z"})
 	expectMatch(t, "!x", Set{"y": "z"})
+	expectMatch(t, "x>1.1", Set{"x": "1.2"})
+	expectMatch(t, "x<1.1", Set{"x": "0.8"})
 	expectNoMatch(t, "x=z", Set{})
 	expectNoMatch(t, "x=y", Set{"x": "z"})
 	expectNoMatch(t, "x=y,z=w", Set{"x": "w", "z": "w"})
 	expectNoMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "w"})
 	expectNoMatch(t, "x", Set{"y": "z"})
 	expectNoMatch(t, "!x", Set{"x": "z"})
+	expectNoMatch(t, "x>1.1", Set{"x": "0.8"})
+	expectNoMatch(t, "x<1.1", Set{"x": "1.1"})
 
 	labelset := Set{
 		"foo": "bar",
@@ -184,6 +191,8 @@ func TestLexer(t *testing.T) {
 		{"in", InToken},
 		{"=", EqualsToken},
 		{"==", DoubleEqualsToken},
+		{">", GreaterThanToken},
+		{"<", LessThanToken},
 		//Note that Lex returns the longest valid token found
 		{"!", DoesNotExistToken},
 		{"!=", NotEqualsToken},
@@ -226,6 +235,8 @@ func TestLexerSequence(t *testing.T) {
 		{"()", []Token{OpenParToken, ClosedParToken}},
 		{"x in (),y", []Token{IdentifierToken, InToken, OpenParToken, ClosedParToken, CommaToken, IdentifierToken}},
 		{"== != (), = notin", []Token{DoubleEqualsToken, NotEqualsToken, OpenParToken, ClosedParToken, CommaToken, EqualsToken, NotInToken}},
+		{"key>1.1", []Token{IdentifierToken, GreaterThanToken, IdentifierToken}},
+		{"key<0.8", []Token{IdentifierToken, LessThanToken, IdentifierToken}},
 	}
 	for _, v := range testcases {
 		var literals []string
@@ -263,6 +274,8 @@ func TestParserLookahead(t *testing.T) {
 		{"", []Token{EndOfStringToken}},
 		{"x in (),y", []Token{IdentifierToken, InToken, OpenParToken, ClosedParToken, CommaToken, IdentifierToken, EndOfStringToken}},
 		{"== != (), = notin", []Token{DoubleEqualsToken, NotEqualsToken, OpenParToken, ClosedParToken, CommaToken, EqualsToken, NotInToken, EndOfStringToken}},
+		{"key>1.1", []Token{IdentifierToken, GreaterThanToken, IdentifierToken, EndOfStringToken}},
+		{"key<0.8", []Token{IdentifierToken, LessThanToken, IdentifierToken, EndOfStringToken}},
 	}
 	for _, v := range testcases {
 		p := &Parser{l: &Lexer{s: v.s, pos: 0}, position: 0}
@@ -299,6 +312,10 @@ func TestRequirementConstructor(t *testing.T) {
 		{"x", DoesNotExistOperator, nil, true},
 		{"1foo", InOperator, sets.NewString("bar"), true},
 		{"1234", InOperator, sets.NewString("bar"), true},
+		{"y", GreaterThanOperator, sets.NewString("1.1"), true},
+		{"z", LessThanOperator, sets.NewString("5.3"), true},
+		{"foo", GreaterThanOperator, sets.NewString("bar"), false},
+		{"barz", LessThanOperator, sets.NewString("blah"), false},
 		{strings.Repeat("a", 254), ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 253
 	}
 	for _, rc := range requirementConstructorTests {
@@ -343,6 +360,11 @@ func TestToString(t *testing.T) {
 			getRequirement("z", NotEqualsOperator, sets.NewString("a"), t),
 			getRequirement("z", ExistsOperator, nil, t)},
 			"x=abc,y==jkl,z!=a,z", true},
+		{&internalSelector{
+			getRequirement("x", GreaterThanOperator, sets.NewString("2.4"), t),
+			getRequirement("y", LessThanOperator, sets.NewString("7.1"), t),
+			getRequirement("z", ExistsOperator, nil, t)},
+			"x>2.4,y<7.1,z", true},
 	}
 	for _, ts := range toStringTests {
 		if out := ts.In.String(); out == "" && ts.Valid {
@@ -385,6 +407,12 @@ func TestRequirementSelectorMatching(t *testing.T) {
 		}, false},
 		{Set{"y": "baz"}, &internalSelector{
 			getRequirement("x", InOperator, sets.NewString(""), t),
+		}, false},
+		{Set{"z": "1.2"}, &internalSelector{
+			getRequirement("z", GreaterThanOperator, sets.NewString("1.0"), t),
+		}, true},
+		{Set{"z": "v1.2"}, &internalSelector{
+			getRequirement("z", GreaterThanOperator, sets.NewString("1.0"), t),
 		}, false},
 	}
 	for _, lsm := range labelSelectorMatchingTests {
@@ -444,6 +472,12 @@ func TestSetSelectorParser(t *testing.T) {
 		}, false, true},
 		{"x=a", internalSelector{
 			getRequirement("x", EqualsOperator, sets.NewString("a"), t),
+		}, true, true},
+		{"x>1.1", internalSelector{
+			getRequirement("x", GreaterThanOperator, sets.NewString("1.1"), t),
+		}, true, true},
+		{"x<7.1", internalSelector{
+			getRequirement("x", LessThanOperator, sets.NewString("7.1"), t),
 		}, true, true},
 		{"x=a,y!=b", internalSelector{
 			getRequirement("x", EqualsOperator, sets.NewString("a"), t),

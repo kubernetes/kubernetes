@@ -18,6 +18,7 @@ package api
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -262,4 +263,55 @@ func ParseRFC3339(s string, nowFn func() unversioned.Time) (unversioned.Time, er
 		return unversioned.Time{}, err
 	}
 	return unversioned.Time{t}, nil
+}
+
+// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
+// labels.Selector.
+func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.Selector, error) {
+	if len(nsm) == 0 {
+		return labels.Nothing(), nil
+	}
+	selector := labels.NewSelector()
+	for _, expr := range nsm {
+		var op labels.Operator
+		switch expr.Operator {
+		case NodeSelectorOpIn:
+			op = labels.InOperator
+		case NodeSelectorOpNotIn:
+			op = labels.NotInOperator
+		case NodeSelectorOpExists:
+			op = labels.ExistsOperator
+		case NodeSelectorOpDoesNotExist:
+			op = labels.DoesNotExistOperator
+		case NodeSelectorOpGt:
+			op = labels.GreaterThanOperator
+		case NodeSelectorOpLt:
+			op = labels.LessThanOperator
+		default:
+			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
+		}
+		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*r)
+	}
+	return selector, nil
+}
+
+// AffinityAnnotationKey represents the key of affinity data (json serialized)
+// in the Annotations of a Pod.
+const AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
+
+// GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
+// and converts it to the Affinity type in api.
+func GetAffinityFromPodAnnotations(annotations map[string]string) (Affinity, error) {
+	var affinity Affinity
+	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
+		if err != nil {
+			return affinity, err
+		}
+	}
+	return affinity, nil
 }

@@ -320,6 +320,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../docs/user-guide/node-selection": {
 			"pod": &api.Pod{},
+			"pod-with-node-affinity": &api.Pod{},
 		},
 		"../examples/openshift-origin": {
 			"openshift-origin-namespace": &api.Namespace{},
