@@ -514,7 +514,7 @@ func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*
 			return &podList, err
 		},
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			return dc.rcStore.List()
+			return dc.rcStore.ReplicationControllers(namespace).List()
 		})
 }
 
@@ -523,7 +523,7 @@ func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*
 func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api.ReplicationController, error) {
 	existingNewRC, err := deploymentutil.GetNewRCFromList(deployment, dc.client,
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			return dc.rcStore.List()
+			return dc.rcStore.ReplicationControllers(namespace).List()
 		})
 	if err != nil || existingNewRC != nil {
 		return existingNewRC, err

@@ -161,6 +161,25 @@ func (s *StoreToReplicationControllerLister) List() (controllers []api.Replicati
 	return controllers, nil
 }
 
+func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace string) storeReplicationControllersNamespacer {
+	return storeReplicationControllersNamespacer{s.Store, namespace}
+}
+
+type storeReplicationControllersNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s storeReplicationControllersNamespacer) List() (controllers []api.ReplicationController, err error) {
+	for _, c := range s.store.List() {
+		rc := *(c.(*api.ReplicationController))
+		if s.namespace == api.NamespaceAll || s.namespace == rc.Namespace {
+			controllers = append(controllers, rc)
+		}
+	}
+	return
+}
+
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
 func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
 	var selector labels.Selector
