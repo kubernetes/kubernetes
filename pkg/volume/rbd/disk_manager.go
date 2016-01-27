@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Abstract interface to disk operations.
@@ -39,7 +40,7 @@ type diskManager interface {
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.Interface) error {
+func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
@@ -70,6 +71,11 @@ func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.
 		glog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err
 	}
+
+	if !b.ReadOnly {
+		volume.SetVolumeOwnership(&b, fsGroup)
+	}
+
 	return nil
 }
 

@@ -122,21 +122,20 @@ var _ volume.Builder = &secretVolumeBuilder{}
 
 func (sv *secretVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    true,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        true,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
-func (b *secretVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *secretVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 func (b *secretVolumeBuilder) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, strings.EscapeQualifiedNameForDisk(secretPluginName)), b.volName)
 }
 
-func (b *secretVolumeBuilder) SetUpAt(dir string) error {
+func (b *secretVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -157,7 +156,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
 
@@ -188,6 +187,8 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 			return err
 		}
 	}
+
+	volume.SetVolumeOwnership(b, fsGroup)
 
 	volumeutil.SetReady(b.getMetaDir())
 

@@ -142,20 +142,19 @@ type emptyDir struct {
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    false,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        false,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp() error {
-	return ed.SetUpAt(ed.GetPath())
+func (ed *emptyDir) SetUp(fsGroup *int64) error {
+	return ed.SetUpAt(ed.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string) error {
+func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -189,6 +188,8 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
+
+	volume.SetVolumeOwnership(ed, fsGroup)
 
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())

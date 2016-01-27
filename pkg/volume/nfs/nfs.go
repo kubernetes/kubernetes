@@ -151,19 +151,18 @@ var _ volume.Builder = &nfsBuilder{}
 
 func (b *nfsBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        b.readOnly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *nfsBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *nfsBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *nfsBuilder) SetUpAt(dir string) error {
+func (b *nfsBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

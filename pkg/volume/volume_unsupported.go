@@ -1,7 +1,7 @@
 // +build !linux
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,13 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package volume
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/volume"
-)
-
-func (_ *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, builder volume.Builder, fsGroup int64) error {
+func SetVolumeOwnership(builder Builder, fsGroup *int64) error {
 	return nil
 }

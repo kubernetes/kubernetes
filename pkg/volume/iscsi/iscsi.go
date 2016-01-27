@@ -168,20 +168,19 @@ var _ volume.Builder = &iscsiDiskBuilder{}
 
 func (b *iscsiDiskBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 
-func (b *iscsiDiskBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *iscsiDiskBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *iscsiDiskBuilder) SetUpAt(dir string) error {
+func (b *iscsiDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
 		glog.Errorf("iscsi: failed to setup")
 	}

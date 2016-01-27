@@ -155,20 +155,19 @@ var _ volume.Builder = &cephfsBuilder{}
 
 func (cephfsVolume *cephfsBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    cephfsVolume.readonly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        cephfsVolume.readonly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsBuilder) SetUp() error {
-	return cephfsVolume.SetUpAt(cephfsVolume.GetPath())
+func (cephfsVolume *cephfsBuilder) SetUp(fsGroup *int64) error {
+	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsBuilder) SetUpAt(dir string) error {
+func (cephfsVolume *cephfsBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

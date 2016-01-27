@@ -120,20 +120,19 @@ var _ volume.Builder = &gitRepoVolumeBuilder{}
 
 func (b *gitRepoVolumeBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    false,
-		Managed:                     true,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             true, // xattr change should be okay, TODO: double check
+		ReadOnly:        false,
+		Managed:         true,
+		SupportsSELinux: true, // xattr change should be okay, TODO: double check
 	}
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *gitRepoVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
+func (b *gitRepoVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
@@ -143,7 +142,7 @@ func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
 

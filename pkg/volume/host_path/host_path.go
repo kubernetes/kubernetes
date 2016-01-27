@@ -178,20 +178,19 @@ var _ volume.Builder = &hostPathBuilder{}
 
 func (b *hostPathBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        b.readOnly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
 
 // SetUp does nothing.
-func (b *hostPathBuilder) SetUp() error {
+func (b *hostPathBuilder) SetUp(fsGroup *int64) error {
 	return nil
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathBuilder) SetUpAt(dir string) error {
+func (b *hostPathBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 
