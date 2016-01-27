@@ -51,10 +51,10 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	}))
 
 	c := client.NewOrDie(&client.Config{
-		Host:         s.URL,
-		GroupVersion: testapi.Default.GroupVersion(),
-		QPS:          5000.0,
-		Burst:        5000,
+		Host:          s.URL,
+		ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+		QPS:           5000.0,
+		Burst:         5000,
 	})
 
 	schedulerConfigFactory = factory.NewConfigFactory(c, api.DefaultSchedulerName)
