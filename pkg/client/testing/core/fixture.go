@@ -57,7 +57,6 @@ type ObjectScheme interface {
 // ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
 // TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
-
 	return func(action Action) (bool, runtime.Object, error) {
 		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
 		if err != nil {
@@ -155,6 +154,7 @@ func NewObjects(scheme ObjectScheme, decoder runtime.Decoder) ObjectRetriever {
 func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
 	kind.Version = runtime.APIVersionInternal
 	empty, err := o.scheme.New(kind)
+	fmt.Println("CHAO: object's types=", o.types)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
 	arr, ok := o.types[kind.Kind]
