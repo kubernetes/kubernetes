@@ -396,7 +396,7 @@ function provision-master() {
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
-    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
       ${BASH_DEBUG_FLAGS}
 
       cp ~/kube/default/* /etc/default/
@@ -529,7 +529,7 @@ function provision-masterandnode() {
       '${MASTER_IP}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
-    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
+    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
       ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/

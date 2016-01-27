@@ -34,6 +34,15 @@ export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-192.168.3.0/24}  # f
 # define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
 export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 
+# Optionally add other contents to the Flannel configuration JSON
+# object normally stored in etcd as /coreos.com/network/config.  Use
+# JSON syntax suitable for insertion into a JSON object constructor
+# after other field name:value pairs.  For example:
+# FLANNEL_OTHER_NET_CONFIG=', "SubnetMin": "172.16.10.0", "SubnetMax": "172.16.90.0"'
+
+export FLANNEL_OTHER_NET_CONFIG
+FLANNEL_OTHER_NET_CONFIG=''
+
 # Admission Controllers to invoke prior to persisting objects in cluster
 export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny
 
