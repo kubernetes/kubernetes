@@ -1,41 +1,12 @@
-# Build the hyperkube image.
-#
-# Usage:
-#   VERSION=v1.1.2 [REGISTRY="gcr.io/google_containers"] make build
+# build the hyperkube image.
 
-REGISTRY?="gcr.io/google_containers"
-ARCH=amd64
-BASEIMAGE=debian:jessie
-TEMP_DIR:=$(shell mktemp -d)
+VERSION=v1.0.1
 
-## Comment in for arm builds, must be run on an arm machine
-# ARCH=arm
-# need to escape '/' for the regexp below
-# BASEIMAGE=armbuild\\/debian:jessie
-
-all: build
-
-build:
-ifndef VERSION
-    $(error VERSION is undefined)
-endif
-	cp ./* ${TEMP_DIR}
-	cp ../../saltbase/salt/helpers/safe_format_and_mount ${TEMP_DIR}
-	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
-	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
-	cd ${TEMP_DIR} && sed -i "s/VERSION/${VERSION}/g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i "s/ARCH/${ARCH}/g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i "s/BASEIMAGE/${BASEIMAGE}/g" Dockerfile
-	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
-	# Backward compatability.  TODO: deprecate this image tag
-ifeq ($(ARCH),amd64)
-	docker tag -f ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
-endif
-
-push: build
-	gcloud docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
-ifeq ($(ARCH),amd64)
-	gcloud docker push ${REGISTRY}/hyperkube:${VERSION}
-endif
+all:
+	cp ../../saltbase/salt/helpers/safe_format_and_mount .
+	curl -O https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64/hyperkube
+	sed -i "s/VERSION/${VERSION}/g" master-multi.json master.json
+	docker build -t gcr.io/google_containers/hyperkube:${VERSION} .
+	gcloud docker push gcr.io/google_containers/hyperkube:${VERSION}
 
 .PHONY: all
