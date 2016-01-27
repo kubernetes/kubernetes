@@ -22,26 +22,26 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/labels"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.
-func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
+func GetOldRCs(deployment extensions.Deployment, c release_1_1.Interface) ([]*api.ReplicationController, error) {
 	return GetOldRCsFromLists(deployment, c,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			return c.Pods(namespace).List(options)
+			return c.Legacy().Pods(namespace).List(options)
 		},
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			rcList, err := c.ReplicationControllers(namespace).List(options)
+			rcList, err := c.Legacy().ReplicationControllers(namespace).List(options)
 			return rcList.Items, err
 		})
 }
 
 // GetOldRCsFromLists returns the old RCs targeted by the given Deployment; get PodList and RCList with input functions.
-func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, error) {
+func GetOldRCsFromLists(deployment extensions.Deployment, c release_1_1.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
 	selector := labels.SelectorFromSet(deployment.Spec.Selector)
@@ -81,17 +81,17 @@ func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, ge
 
 // GetNewRC returns an RC that matches the intent of the given deployment; get RCList from client interface.
 // Returns nil if the new RC doesnt exist yet.
-func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.ReplicationController, error) {
+func GetNewRC(deployment extensions.Deployment, c release_1_1.Interface) (*api.ReplicationController, error) {
 	return GetNewRCFromList(deployment, c,
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			rcList, err := c.ReplicationControllers(namespace).List(options)
+			rcList, err := c.Legacy().ReplicationControllers(namespace).List(options)
 			return rcList.Items, err
 		})
 }
 
 // GetNewRCFromList returns an RC that matches the intent of the given deployment; get RCList with the input function.
 // Returns nil if the new RC doesnt exist yet.
-func GetNewRCFromList(deployment extensions.Deployment, c client.Interface, getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) (*api.ReplicationController, error) {
+func GetNewRCFromList(deployment extensions.Deployment, c release_1_1.Interface, getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	rcList, err := getRcList(namespace, api.ListOptions{})
 	if err != nil {
@@ -133,7 +133,7 @@ func GetReplicaCountForRCs(replicationControllers []*api.ReplicationController) 
 }
 
 // Returns the number of available pods corresponding to the given RCs.
-func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController, minReadySeconds int) (int, error) {
+func GetAvailablePodsForRCs(c release_1_1.Interface, rcs []*api.ReplicationController, minReadySeconds int) (int, error) {
 	allPods, err := getPodsForRCs(c, rcs)
 	if err != nil {
 		return 0, err
@@ -165,12 +165,12 @@ func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 	return readyPodCount
 }
 
-func getPodsForRCs(c client.Interface, replicationControllers []*api.ReplicationController) ([]api.Pod, error) {
+func getPodsForRCs(c release_1_1.Interface, replicationControllers []*api.ReplicationController) ([]api.Pod, error) {
 	allPods := []api.Pod{}
 	for _, rc := range replicationControllers {
 		selector := labels.SelectorFromSet(rc.Spec.Selector)
 		options := api.ListOptions{LabelSelector: selector}
-		podList, err := c.Pods(rc.ObjectMeta.Namespace).List(options)
+		podList, err := c.Legacy().Pods(rc.ObjectMeta.Namespace).List(options)
 		if err != nil {
 			return allPods, fmt.Errorf("error listing pods: %v", err)
 		}

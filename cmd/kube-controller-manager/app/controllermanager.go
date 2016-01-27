@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -100,6 +101,17 @@ func clientForUserAgentOrDie(config client.Config, userAgent string) *client.Cli
 	fullUserAgent := client.DefaultKubernetesUserAgent() + "/" + userAgent
 	config.UserAgent = fullUserAgent
 	kubeClient, err := client.New(&config)
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+	return kubeClient
+}
+
+// clientsetForUserAgentOrDie is going to replace clientForUserAgentOrDie
+func clientsetForUserAgentOrDie(config client.Config, userAgent string) release_1_1.Interface {
+	fullUserAgent := client.DefaultKubernetesUserAgent() + "/" + userAgent
+	config.UserAgent = fullUserAgent
+	kubeClient, err := release_1_1.NewForConfig(&config)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -186,7 +198,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(
-		clientForUserAgentOrDie(*kubeconfig, "replication-controller"),
+		clientsetForUserAgentOrDie(*kubeconfig, "replication-controller"),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
 	).Run(s.ConcurrentRCSyncs, util.NeverStop)
@@ -272,19 +284,19 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(clientForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), ResyncPeriod(s)).
+			go daemon.NewDaemonSetsController(clientsetForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), ResyncPeriod(s)).
 				Run(s.ConcurrentDSCSyncs, util.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(clientForUserAgentOrDie(*kubeconfig, "job-controller"), ResyncPeriod(s)).
+			go job.NewJobController(clientsetForUserAgentOrDie(*kubeconfig, "job-controller"), ResyncPeriod(s)).
 				Run(s.ConcurrentJobSyncs, util.NeverStop)
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
-			go deployment.NewDeploymentController(clientForUserAgentOrDie(*kubeconfig, "deployment-controller"), ResyncPeriod(s)).
+			go deployment.NewDeploymentController(clientsetForUserAgentOrDie(*kubeconfig, "deployment-controller"), ResyncPeriod(s)).
 				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
 		}
 	}

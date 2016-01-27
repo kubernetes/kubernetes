@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -133,7 +134,9 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
+	// TODO: caesarxuchao: remove cl when the refactoring of client is done.
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	clientset := release_1_1.NewForConfigOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
@@ -189,7 +192,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		Run(3, util.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	go replicationcontroller.NewReplicationManager(cl, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
 		Run(3, util.NeverStop)
 
 	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
