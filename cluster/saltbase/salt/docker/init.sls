@@ -1,7 +1,7 @@
 {% if pillar.get('is_systemd') %}
-{% set environment_file = '/etc/sysconfig/docker' %}
+  {% set environment_file = '/etc/sysconfig/docker' %}
 {% else %}
-{% set environment_file = '/etc/default/docker' %}
+  {% set environment_file = '/etc/default/docker' %}
 {% endif %}
 
 bridge-utils:
@@ -47,6 +47,96 @@ docker:
       - pkg: docker-io
 
 {% endif %}
+{% elif grains.cloud is defined and grains.cloud == 'vsphere' and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
+
+{% if pillar.get('is_systemd') %}
+
+{{ pillar.get('systemd_system_path') }}/docker.service:
+  file.managed:
+    - source: salt://docker/docker.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - defaults:
+        environment_file: {{ environment_file }}
+
+# The docker service.running block below doesn't work reliably
+# Instead we run our script which e.g. does a systemd daemon-reload
+# But we keep the service block below, so it can be used by dependencies
+# TODO: Fix this
+fix-service-docker:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker.service
+      - file: {{ environment_file }}
+{% endif %}
+
+{{ environment_file }}:
+  file.managed:
+    - source: salt://docker/docker-defaults
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - require:
+      - pkg: docker-engine
+
+'apt-key':
+   cmd.run:
+     - name: 'apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D'
+     - unless: 'apt-key finger | grep "5811 8E89"'
+
+'apt-update':
+  cmd.wait:
+    - name: '/usr/bin/apt-get update -y'
+    - require:
+       - cmd : 'apt-key'
+
+lxc-docker:
+  pkg:
+    - purged
+
+docker-io:
+  pkg:
+    - purged
+
+cbr0:
+  network.managed:
+    - enabled: True
+    - type: bridge
+    - proto: dhcp
+    - ports: none
+    - bridge: cbr0
+    - delay: 0
+    - bypassfirewall: True
+    - require_in:
+      - service: docker
+
+/etc/apt/sources.list.d/docker.list:
+  file.managed:
+    - source: salt://docker/docker.list
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - require:
+      - cmd: 'apt-update'
+
+docker-engine:
+   pkg:
+     - installed
+     - require:
+       - file: /etc/apt/sources.list.d/docker.list
+docker:
+   service.running:
+     - enable: True
+     - require:
+       - file: {{ environment_file }}
+     - watch:
+       - file: {{ environment_file }}
 
 {% else %}
 
@@ -216,3 +306,4 @@ docker:
       - pkg: docker-upgrade
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'
+
