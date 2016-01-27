@@ -17,11 +17,10 @@ Non-goal:
 
 ## Current State
 
-At HEAD as of 25 Jan 2016, we have 6 API groups:
+At HEAD as of 25 Jan 2016, we have 5 API groups:
 
 ```
 /api/v1
-/apis/extensions/v1beta1
 /apis/extensions/v1beta1
 /apis/abac/v0
 /apis/abac/v1beta1
@@ -31,21 +30,20 @@ At HEAD as of 25 Jan 2016, we have 6 API groups:
 
 Those api groups have nearly 50 "top-level" types: types that are
 visible to users and which you can GET and/or POST by themselves
-(not nested in some other type).
+(not nested in some other type).  Subresources, unused objects, and component config
+objects are not included.
 
 ```
 /api/v1
 	persistentVolume
 	persistentVolumeClaim
 	pod
-	podTemplate
 	replicationController
 	service
 	serviceAccount
 	endpoints
 	node
 	namespace
-	binding
 	event
 	limitRange
 	resourceQuota
@@ -54,7 +52,6 @@ visible to users and which you can GET and/or POST by themselves
 	configMap
 
 /apis/extensions/v1beta1
-	scale
 	horizontalPodAutoscaler
 	thirdPartyResource
 	thirdPartyResourceData
@@ -62,10 +59,7 @@ visible to users and which you can GET and/or POST by themselves
 	daemonSet
 	job
 	ingress
-	clusterAutoscaler
 	replicaSet
-	scaleStatus
-	scale
 
 /apis/abac/v0
 	policy // not currently available through API, but might be some day.
@@ -133,20 +127,23 @@ addons,
 But, why not one group for "the project" and then add another group
 for any "third-party" APIs?
 
-Some reasons are:
+The three most important reasons, according to @bgrant0607, are:
 
-- Groups will eventually allow extension by third parties that we as a core project
+1. To allow api versioning at different rates
+  - This is described in #635.
+  - It is particularly for hosted implementations of Kubernetes.
+2. So that users can focus on learning one group at a time.
+3. Groups will eventually allow extension by third parties that we as a core project
   would not accept.  We as a core project have to use the extension mechanism to keep
   ourselves honest, though.
 
-- The same reasons programs have packages: to enforce boundaries, and prevent coupling (taken from #635).
-- To allow api versioning at different rates (taken from #635)
-  - particularly for hosted implementations
-- To allow replacement of project-provided kinds with proprietary types
-  - PaaSes on top of Kubernetes might to do this.
-- So that users can focus on learning one group at a time.
+Other, unranked reasons:
+
 - So that security/policy admins can audit/enable an API group at a time, and not need to
   review all kinds at once.
+- The same reasons programs have packages: to enforce boundaries, and prevent coupling (taken from #635).
+- To allow replacement of project-provided kinds with proprietary types
+  - PaaSes on top of Kubernetes might to do this.
 - So that different groups within the kubernetes project can have a greater degree of autonomy
   - Conways law 
   - have trusted api reviewers per group.
@@ -183,7 +180,6 @@ apis/nodes/v1
 
 # end-user execution objects:
 	pod
-	podTemplate
 	secret
  	configMap
 	persistentVolumeClaim
@@ -228,6 +224,15 @@ apis/nodes/v1
 	...
 ```
 
+### Things nodes care about vs other things
+
+One way to slice this is what the node (kubelet + kube-proxy) needs to understand. Those types are "core" in a way that others are not.
+
+Things nodes care about:
+- User execution concepts: Pod, Secret, ConfigMap, PersistentVolumeClaim
+- Infrastructure concepts: Node, PersistentVolume
+- Networking concepts: Service, Endpoints
+
 ### Admin vs User
 
 Issue #3806 proposed splitting "Cluster" and
@@ -238,7 +243,6 @@ that would look something like this:
 /api/v1
 	persistentVolumeClaim
 	pod
-	podTemplate
 	replicationController
 	service
 	serviceAccount
@@ -258,12 +262,10 @@ that would look something like this:
 /apis/cluster/v1
 	node
 	namespace
-	binding
 	persistentVolume
 	limitRange
 	resourceQuota
 	daemonSet
-	clusterAutoscaler
 	metadataPolicy
 	podSecurityPolicy
 
@@ -272,15 +274,12 @@ that would look something like this:
 	Node
 
 /apis/extensions/v1beta1
-	scale
 	horizontalPodAutoscaler
 	thirdPartyResource
 	thirdPartyResourceData
 	deployment
 	job
 	replicaSet
-	scaleStatus
-	scale
 ```
 
 Evaluation:
@@ -289,7 +288,7 @@ Evaluation:
   is stuff that makes sense to namespace, since they are things you replicate if
   you make a "copy" of a service or system.
 - Everything in the `apis/cluster/v1` group does not need a namespace,
-  except clusterAutoscaler, limitRange, and resourceQuota
+  except limitRange, and resourceQuota
 - Everything in `apis/cluster/v1` is ostensibly stuff that a tenant does not need
   to view or modify to use the system.  And it is stuff that the a hosted
   kubernetes provider certainly wants tight control over, and may want
@@ -366,7 +365,6 @@ Sketch of final groupings (not showing types that may remain for deprecation pur
 /api/v1
 	persistentVolumeClaim
 	pod
-	podTemplate
 	service
 	serviceAccount
 	endpoints
@@ -385,20 +383,14 @@ Sketch of final groupings (not showing types that may remain for deprecation pur
 /apis/cluster/v1
 	node
 	namespace
-	binding
 	persistentVolume
 	limitRange
 	resourceQuota
 	daemonSet
-	clusterAutoscaler
 	metadataPolicy
 	podSecurityPolicy
 
-/apis/clusterAutoScaling/v1
-	clusterAutoscaler
-
 /apis/scaling/v1
-	scale
 	horizontalPodAutoscaler
 
 /apis/thirdParty
