@@ -107,11 +107,11 @@ func (s *Standalone) Cancel() {
 	s.cancelOnce.Do(func() { close(s.done) })
 }
 
-// poll for changes to master leadership via current leader's /state.json endpoint.
+// poll for changes to master leadership via current leader's /state endpoint.
 // we poll the `initial` leader, aborting if none was specified.
 //
 // TODO(jdef) follow the leader: change who we poll based on the prior leader
-// TODO(jdef) somehow determine all masters in cluster from the state.json?
+// TODO(jdef) somehow determine all masters in cluster from the /state?
 //
 func (s *Standalone) _poller(pf fetcherFunc) {
 	defer func() {
@@ -193,7 +193,7 @@ func (s *Standalone) _poller(pf fetcherFunc) {
 // assumes that address is in host:port format
 func (s *Standalone) _fetchPid(ctx context.Context, address string) (*upid.UPID, error) {
 	//TODO(jdef) need SSL support
-	uri := fmt.Sprintf("http://%s/state.json", address)
+	uri := fmt.Sprintf("http://%s/state", address)
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return nil, err
