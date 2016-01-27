@@ -31,7 +31,7 @@ type FakePersistentVolumeClaims struct {
 
 func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("persistentVolumeClaims", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+		Invokes(core.NewCreateAction("persistentvolumeclaims", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.Persisten
 
 func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("persistentVolumeClaims", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+		Invokes(core.NewUpdateAction("persistentvolumeclaims", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *api.Persisten
 
 func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("persistentVolumeClaims", "status", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+		Invokes(core.NewUpdateSubresourceAction("persistentvolumeclaims", "status", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.Per
 
 func (c *FakePersistentVolumeClaims) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("persistentVolumeClaims", c.ns, name), &api.PersistentVolumeClaim{})
+		Invokes(core.NewDeleteAction("persistentvolumeclaims", c.ns, name), &api.PersistentVolumeClaim{})
 
 	return err
 }
@@ -75,7 +75,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(options *api.DeleteOptions
 
 func (c *FakePersistentVolumeClaims) Get(name string) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("persistentVolumeClaims", c.ns, name), &api.PersistentVolumeClaim{})
+		Invokes(core.NewGetAction("persistentvolumeclaims", c.ns, name), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (c *FakePersistentVolumeClaims) Get(name string) (result *api.PersistentVol
 
 func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("persistentVolumeClaims", c.ns, opts), &api.PersistentVolumeClaimList{})
+		Invokes(core.NewListAction("persistentvolumeclaims", c.ns, opts), &api.PersistentVolumeClaimList{})
 
 	if obj == nil {
 		return nil, err
@@ -107,6 +107,6 @@ func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *api.Per
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
 func (c *FakePersistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("persistentVolumeClaims", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("persistentvolumeclaims", c.ns, opts))
 
 }

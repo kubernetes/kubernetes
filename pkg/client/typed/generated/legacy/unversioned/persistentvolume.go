@@ -56,7 +56,7 @@ func newPersistentVolumes(c *LegacyClient) *persistentVolumes {
 func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Post().
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		Body(persistentVolume).
 		Do().
 		Into(result)
@@ -67,7 +67,7 @@ func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (resu
 func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Put().
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		Body(persistentVolume).
 		Do().
@@ -75,16 +75,22 @@ func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (resu
 	return
 }
 
-func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	result := &api.PersistentVolume{}
-	err := c.client.Put().Resource("persistentVolumes").Name(persistentVolume.Name).SubResource("status").Body(persistentVolume).Do().Into(result)
-	return result, err
+func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
+	result = &api.PersistentVolume{}
+	err = c.client.Put().
+		Resource("persistentvolumes").
+		Name(persistentVolume.Name).
+		SubResource("status").
+		Body(persistentVolume).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
 func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		Name(name).
 		Body(options).
 		Do().
@@ -94,7 +100,7 @@ func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) erro
 // DeleteCollection deletes a collection of objects.
 func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -105,7 +111,7 @@ func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOpt
 func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Get().
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		Name(name).
 		Do().
 		Into(result)
@@ -116,7 +122,7 @@ func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err 
 func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -127,7 +133,7 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Resource("persistentVolumes").
+		Resource("persistentvolumes").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

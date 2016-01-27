@@ -80,10 +80,17 @@ func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 	return
 }
 
-func (c *jobs) UpdateStatus(job *extensions.Job) (*extensions.Job, error) {
-	result := &extensions.Job{}
-	err := c.client.Put().Resource("jobs").Name(job.Name).SubResource("status").Body(job).Do().Into(result)
-	return result, err
+func (c *jobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
+	result = &extensions.Job{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("jobs").
+		Name(job.Name).
+		SubResource("status").
+		Body(job).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.

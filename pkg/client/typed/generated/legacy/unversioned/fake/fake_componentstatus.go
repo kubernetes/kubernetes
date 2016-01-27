@@ -30,7 +30,7 @@ type FakeComponentStatus struct {
 
 func (c *FakeComponentStatus) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction("componentStatus", componentStatus), &api.ComponentStatus{})
+		Invokes(core.NewRootCreateAction("componentstatus", componentStatus), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (c *FakeComponentStatus) Create(componentStatus *api.ComponentStatus) (resu
 
 func (c *FakeComponentStatus) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction("componentStatus", componentStatus), &api.ComponentStatus{})
+		Invokes(core.NewRootUpdateAction("componentstatus", componentStatus), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (c *FakeComponentStatus) Update(componentStatus *api.ComponentStatus) (resu
 
 func (c *FakeComponentStatus) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction("componentStatus", name), &api.ComponentStatus{})
+		Invokes(core.NewRootDeleteAction("componentstatus", name), &api.ComponentStatus{})
 	return err
 }
 
@@ -61,7 +61,7 @@ func (c *FakeComponentStatus) DeleteCollection(options *api.DeleteOptions, listO
 
 func (c *FakeComponentStatus) Get(name string) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction("componentStatus", name), &api.ComponentStatus{})
+		Invokes(core.NewRootGetAction("componentstatus", name), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (c *FakeComponentStatus) Get(name string) (result *api.ComponentStatus, err
 
 func (c *FakeComponentStatus) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction("componentStatus", opts), &api.ComponentStatusList{})
+		Invokes(core.NewRootListAction("componentstatus", opts), &api.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -91,5 +91,5 @@ func (c *FakeComponentStatus) List(opts api.ListOptions) (result *api.ComponentS
 // Watch returns a watch.Interface that watches the requested componentStatus.
 func (c *FakeComponentStatus) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction("componentStatus", opts))
+		InvokesWatch(core.NewRootWatchAction("componentstatus", opts))
 }

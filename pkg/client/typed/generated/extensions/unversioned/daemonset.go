@@ -60,7 +60,7 @@ func (c *daemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions
 	result = &extensions.DaemonSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		Body(daemonSet).
 		Do().
 		Into(result)
@@ -72,7 +72,7 @@ func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions
 	result = &extensions.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		Name(daemonSet.Name).
 		Body(daemonSet).
 		Do().
@@ -80,17 +80,24 @@ func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions
 	return
 }
 
-func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensions.DaemonSet, error) {
-	result := &extensions.DaemonSet{}
-	err := c.client.Put().Resource("daemonSets").Name(daemonSet.Name).SubResource("status").Body(daemonSet).Do().Into(result)
-	return result, err
+func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
+	result = &extensions.DaemonSet{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("daemonsets").
+		Name(daemonSet.Name).
+		SubResource("status").
+		Body(daemonSet).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
 func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		Name(name).
 		Body(options).
 		Do().
@@ -101,7 +108,7 @@ func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
 func (c *daemonSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -113,7 +120,7 @@ func (c *daemonSets) Get(name string) (result *extensions.DaemonSet, err error) 
 	result = &extensions.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		Name(name).
 		Do().
 		Into(result)
@@ -125,7 +132,7 @@ func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetLis
 	result = &extensions.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -137,7 +144,7 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("daemonSets").
+		Resource("daemonsets").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

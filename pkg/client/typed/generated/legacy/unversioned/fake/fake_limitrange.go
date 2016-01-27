@@ -31,7 +31,7 @@ type FakeLimitRanges struct {
 
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("limitRanges", c.ns, limitRange), &api.LimitRange{})
+		Invokes(core.NewCreateAction("limitranges", c.ns, limitRange), &api.LimitRange{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitR
 
 func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("limitRanges", c.ns, limitRange), &api.LimitRange{})
+		Invokes(core.NewUpdateAction("limitranges", c.ns, limitRange), &api.LimitRange{})
 
 	if obj == nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (result *api.LimitR
 
 func (c *FakeLimitRanges) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("limitRanges", c.ns, name), &api.LimitRange{})
+		Invokes(core.NewDeleteAction("limitranges", c.ns, name), &api.LimitRange{})
 
 	return err
 }
@@ -65,7 +65,7 @@ func (c *FakeLimitRanges) DeleteCollection(options *api.DeleteOptions, listOptio
 
 func (c *FakeLimitRanges) Get(name string) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("limitRanges", c.ns, name), &api.LimitRange{})
+		Invokes(core.NewGetAction("limitranges", c.ns, name), &api.LimitRange{})
 
 	if obj == nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *FakeLimitRanges) Get(name string) (result *api.LimitRange, err error) {
 
 func (c *FakeLimitRanges) List(opts api.ListOptions) (result *api.LimitRangeList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("limitRanges", c.ns, opts), &api.LimitRangeList{})
+		Invokes(core.NewListAction("limitranges", c.ns, opts), &api.LimitRangeList{})
 
 	if obj == nil {
 		return nil, err
@@ -97,6 +97,6 @@ func (c *FakeLimitRanges) List(opts api.ListOptions) (result *api.LimitRangeList
 // Watch returns a watch.Interface that watches the requested limitRanges.
 func (c *FakeLimitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("limitRanges", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("limitranges", c.ns, opts))
 
 }
