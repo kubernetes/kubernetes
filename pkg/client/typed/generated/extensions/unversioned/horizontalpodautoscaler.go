@@ -60,7 +60,7 @@ func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.Ho
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Body(horizontalPodAutoscaler).
 		Do().
 		Into(result)
@@ -72,7 +72,7 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
 		Body(horizontalPodAutoscaler).
 		Do().
@@ -80,17 +80,24 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	return
 }
 
-func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error) {
-	result := &extensions.HorizontalPodAutoscaler{}
-	err := c.client.Put().Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
-	return result, err
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("horizontalpodautoscalers").
+		Name(horizontalPodAutoscaler.Name).
+		SubResource("status").
+		Body(horizontalPodAutoscaler).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
 func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Name(name).
 		Body(options).
 		Do().
@@ -101,7 +108,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -113,7 +120,7 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.Horizont
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Name(name).
 		Do().
 		Into(result)
@@ -125,7 +132,7 @@ func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *extension
 	result = &extensions.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -137,7 +144,7 @@ func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface,
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

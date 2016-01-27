@@ -79,10 +79,17 @@ func (c *services) Update(service *api.Service) (result *api.Service, err error)
 	return
 }
 
-func (c *services) UpdateStatus(service *api.Service) (*api.Service, error) {
-	result := &api.Service{}
-	err := c.client.Put().Resource("services").Name(service.Name).SubResource("status").Body(service).Do().Into(result)
-	return result, err
+func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("services").
+		Name(service.Name).
+		SubResource("status").
+		Body(service).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.

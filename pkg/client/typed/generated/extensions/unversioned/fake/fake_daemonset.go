@@ -32,7 +32,7 @@ type FakeDaemonSets struct {
 
 func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("daemonSets", c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(core.NewCreateAction("daemonsets", c.ns, daemonSet), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extens
 
 func (c *FakeDaemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("daemonSets", c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(core.NewUpdateAction("daemonsets", c.ns, daemonSet), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (c *FakeDaemonSets) Update(daemonSet *extensions.DaemonSet) (result *extens
 
 func (c *FakeDaemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensions.DaemonSet, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("daemonSets", "status", c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(core.NewUpdateSubresourceAction("daemonsets", "status", c.ns, daemonSet), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (c *FakeDaemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensi
 
 func (c *FakeDaemonSets) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("daemonSets", c.ns, name), &extensions.DaemonSet{})
+		Invokes(core.NewDeleteAction("daemonsets", c.ns, name), &extensions.DaemonSet{})
 
 	return err
 }
@@ -76,7 +76,7 @@ func (c *FakeDaemonSets) DeleteCollection(options *api.DeleteOptions, listOption
 
 func (c *FakeDaemonSets) Get(name string) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("daemonSets", c.ns, name), &extensions.DaemonSet{})
+		Invokes(core.NewGetAction("daemonsets", c.ns, name), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (c *FakeDaemonSets) Get(name string) (result *extensions.DaemonSet, err err
 
 func (c *FakeDaemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("daemonSets", c.ns, opts), &extensions.DaemonSetList{})
+		Invokes(core.NewListAction("daemonsets", c.ns, opts), &extensions.DaemonSetList{})
 
 	if obj == nil {
 		return nil, err
@@ -108,6 +108,6 @@ func (c *FakeDaemonSets) List(opts api.ListOptions) (result *extensions.DaemonSe
 // Watch returns a watch.Interface that watches the requested daemonSets.
 func (c *FakeDaemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("daemonSets", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("daemonsets", c.ns, opts))
 
 }

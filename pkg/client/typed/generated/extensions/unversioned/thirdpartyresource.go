@@ -59,7 +59,7 @@ func (c *thirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyRe
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Body(thirdPartyResource).
 		Do().
 		Into(result)
@@ -71,7 +71,7 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Name(thirdPartyResource.Name).
 		Body(thirdPartyResource).
 		Do().
@@ -83,7 +83,7 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Name(name).
 		Body(options).
 		Do().
@@ -94,7 +94,7 @@ func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) er
 func (c *thirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -106,7 +106,7 @@ func (c *thirdPartyResources) Get(name string) (result *extensions.ThirdPartyRes
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Name(name).
 		Do().
 		Into(result)
@@ -118,7 +118,7 @@ func (c *thirdPartyResources) List(opts api.ListOptions) (result *extensions.Thi
 	result = &extensions.ThirdPartyResourceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -130,7 +130,7 @@ func (c *thirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, erro
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

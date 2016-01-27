@@ -157,8 +157,8 @@ type Fake$.type|publicPlural$ struct {
 var listTemplate = `
 func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListAction|raw$("$.type|privatePlural$", c.ns, opts), &$.type|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$("$.type|privatePlural$", opts), &$.type|raw$List{})$end$
+		$if .namespaced$Invokes($.NewListAction|raw$("$.type|allLowercasePlural$", c.ns, opts), &$.type|raw$List{})
+		$else$Invokes($.NewRootListAction|raw$("$.type|allLowercasePlural$", opts), &$.type|raw$List{})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -169,8 +169,8 @@ func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.t
 var listUsingOptionsTemplate = `
 func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListAction|raw$("$.type|privatePlural$", c.ns, opts), &$.type|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$("$.type|privatePlural$", opts), &$.type|raw$List{})$end$
+		$if .namespaced$Invokes($.NewListAction|raw$("$.type|allLowercasePlural$", c.ns, opts), &$.type|raw$List{})
+		$else$Invokes($.NewRootListAction|raw$("$.type|allLowercasePlural$", opts), &$.type|raw$List{})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -192,8 +192,8 @@ func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.t
 var getTemplate = `
 func (c *Fake$.type|publicPlural$) Get(name string) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewGetAction|raw$("$.type|privatePlural$", c.ns, name), &$.type|raw${})
-		$else$Invokes($.NewRootGetAction|raw$("$.type|privatePlural$", name), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewGetAction|raw$("$.type|allLowercasePlural$", c.ns, name), &$.type|raw${})
+		$else$Invokes($.NewRootGetAction|raw$("$.type|allLowercasePlural$", name), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -204,8 +204,8 @@ func (c *Fake$.type|publicPlural$) Get(name string) (result *$.type|raw$, err er
 var deleteTemplate = `
 func (c *Fake$.type|publicPlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
 	_, err := c.Fake.
-		$if .namespaced$Invokes($.NewDeleteAction|raw$("$.type|privatePlural$", c.ns, name), &$.type|raw${})
-		$else$Invokes($.NewRootDeleteAction|raw$("$.type|privatePlural$", name), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewDeleteAction|raw$("$.type|allLowercasePlural$", c.ns, name), &$.type|raw${})
+		$else$Invokes($.NewRootDeleteAction|raw$("$.type|allLowercasePlural$", name), &$.type|raw${})$end$
 	return err
 }
 `
@@ -223,8 +223,8 @@ func (c *Fake$.type|publicPlural$) DeleteCollection(options *$.apiDeleteOptions|
 var createTemplate = `
 func (c *Fake$.type|publicPlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewCreateAction|raw$("$.type|privatePlural$", c.ns, $.type|private$), &$.type|raw${})
-		$else$Invokes($.NewRootCreateAction|raw$("$.type|privatePlural$", $.type|private$), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewCreateAction|raw$("$.type|allLowercasePlural$", c.ns, $.type|private$), &$.type|raw${})
+		$else$Invokes($.NewRootCreateAction|raw$("$.type|allLowercasePlural$", $.type|private$), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -235,8 +235,8 @@ func (c *Fake$.type|publicPlural$) Create($.type|private$ *$.type|raw$) (result 
 var updateTemplate = `
 func (c *Fake$.type|publicPlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewUpdateAction|raw$("$.type|privatePlural$", c.ns, $.type|private$), &$.type|raw${})
-		$else$Invokes($.NewRootUpdateAction|raw$("$.type|privatePlural$", $.type|private$), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewUpdateAction|raw$("$.type|allLowercasePlural$", c.ns, $.type|private$), &$.type|raw${})
+		$else$Invokes($.NewRootUpdateAction|raw$("$.type|allLowercasePlural$", $.type|private$), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -247,8 +247,8 @@ func (c *Fake$.type|publicPlural$) Update($.type|private$ *$.type|raw$) (result 
 var updateStatusTemplate = `
 func (c *Fake$.type|publicPlural$) UpdateStatus($.type|private$ *$.type|raw$) (*$.type|raw$, error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewUpdateSubresourceAction|raw$("$.type|privatePlural$", "status", c.ns, $.type|private$), &$.type|raw${})
-		$else$Invokes($.NewRootUpdateSubresourceAction|raw$("$.type|privatePlural$", "status", $.type|private$), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewUpdateSubresourceAction|raw$("$.type|allLowercasePlural$", "status", c.ns, $.type|private$), &$.type|raw${})
+		$else$Invokes($.NewRootUpdateSubresourceAction|raw$("$.type|allLowercasePlural$", "status", $.type|private$), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *Fake$.type|publicPlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.Fake.
-		$if .namespaced$InvokesWatch($.NewWatchAction|raw$("$.type|privatePlural$", c.ns, opts))
-		$else$InvokesWatch($.NewRootWatchAction|raw$("$.type|privatePlural$", opts))$end$
+		$if .namespaced$InvokesWatch($.NewWatchAction|raw$("$.type|allLowercasePlural$", c.ns, opts))
+		$else$InvokesWatch($.NewRootWatchAction|raw$("$.type|allLowercasePlural$", opts))$end$
 }
 `

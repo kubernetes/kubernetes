@@ -31,7 +31,7 @@ type FakeServiceAccounts struct {
 
 func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("serviceAccounts", c.ns, serviceAccount), &api.ServiceAccount{})
+		Invokes(core.NewCreateAction("serviceaccounts", c.ns, serviceAccount), &api.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (result
 
 func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("serviceAccounts", c.ns, serviceAccount), &api.ServiceAccount{})
+		Invokes(core.NewUpdateAction("serviceaccounts", c.ns, serviceAccount), &api.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (result
 
 func (c *FakeServiceAccounts) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("serviceAccounts", c.ns, name), &api.ServiceAccount{})
+		Invokes(core.NewDeleteAction("serviceaccounts", c.ns, name), &api.ServiceAccount{})
 
 	return err
 }
@@ -65,7 +65,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *api.DeleteOptions, listO
 
 func (c *FakeServiceAccounts) Get(name string) (result *api.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("serviceAccounts", c.ns, name), &api.ServiceAccount{})
+		Invokes(core.NewGetAction("serviceaccounts", c.ns, name), &api.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *FakeServiceAccounts) Get(name string) (result *api.ServiceAccount, err 
 
 func (c *FakeServiceAccounts) List(opts api.ListOptions) (result *api.ServiceAccountList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("serviceAccounts", c.ns, opts), &api.ServiceAccountList{})
+		Invokes(core.NewListAction("serviceaccounts", c.ns, opts), &api.ServiceAccountList{})
 
 	if obj == nil {
 		return nil, err
@@ -97,6 +97,6 @@ func (c *FakeServiceAccounts) List(opts api.ListOptions) (result *api.ServiceAcc
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *FakeServiceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("serviceAccounts", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("serviceaccounts", c.ns, opts))
 
 }

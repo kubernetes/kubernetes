@@ -32,7 +32,7 @@ type FakeHorizontalPodAutoscalers struct {
 
 func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("horizontalPodAutoscalers", c.ns, horizontalPodAutoscaler), &extensions.HorizontalPodAutoscaler{})
+		Invokes(core.NewCreateAction("horizontalpodautoscalers", c.ns, horizontalPodAutoscaler), &extensions.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *extension
 
 func (c *FakeHorizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("horizontalPodAutoscalers", c.ns, horizontalPodAutoscaler), &extensions.HorizontalPodAutoscaler{})
+		Invokes(core.NewUpdateAction("horizontalpodautoscalers", c.ns, horizontalPodAutoscaler), &extensions.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (c *FakeHorizontalPodAutoscalers) Update(horizontalPodAutoscaler *extension
 
 func (c *FakeHorizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("horizontalPodAutoscalers", "status", c.ns, horizontalPodAutoscaler), &extensions.HorizontalPodAutoscaler{})
+		Invokes(core.NewUpdateSubresourceAction("horizontalpodautoscalers", "status", c.ns, horizontalPodAutoscaler), &extensions.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (c *FakeHorizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *ext
 
 func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("horizontalPodAutoscalers", c.ns, name), &extensions.HorizontalPodAutoscaler{})
+		Invokes(core.NewDeleteAction("horizontalpodautoscalers", c.ns, name), &extensions.HorizontalPodAutoscaler{})
 
 	return err
 }
@@ -76,7 +76,7 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptio
 
 func (c *FakeHorizontalPodAutoscalers) Get(name string) (result *extensions.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("horizontalPodAutoscalers", c.ns, name), &extensions.HorizontalPodAutoscaler{})
+		Invokes(core.NewGetAction("horizontalpodautoscalers", c.ns, name), &extensions.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string) (result *extensions.Hori
 
 func (c *FakeHorizontalPodAutoscalers) List(opts api.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("horizontalPodAutoscalers", c.ns, opts), &extensions.HorizontalPodAutoscalerList{})
+		Invokes(core.NewListAction("horizontalpodautoscalers", c.ns, opts), &extensions.HorizontalPodAutoscalerList{})
 
 	if obj == nil {
 		return nil, err
@@ -108,6 +108,6 @@ func (c *FakeHorizontalPodAutoscalers) List(opts api.ListOptions) (result *exten
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
 func (c *FakeHorizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("horizontalPodAutoscalers", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("horizontalpodautoscalers", c.ns, opts))
 
 }
