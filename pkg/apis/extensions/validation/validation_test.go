@@ -726,7 +726,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
-				Template: &validPodTemplate.Template,
+				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: "",
 					RollingUpdate: &extensions.RollingUpdateDaemonSet{
@@ -742,7 +742,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
-				Template: &validPodTemplate.Template,
+				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type:          extensions.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: nil,
@@ -756,7 +756,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
-				Template: &validPodTemplate.Template,
+				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &extensions.RollingUpdateDaemonSet{
@@ -773,7 +773,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
-				Template: &validPodTemplate.Template,
+				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &extensions.RollingUpdateDaemonSet{
@@ -790,7 +790,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
-				Template: &validPodTemplate.Template,
+				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &extensions.RollingUpdateDaemonSet{
@@ -807,7 +807,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
-				Template: &validPodTemplate.Template,
+				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &extensions.RollingUpdateDaemonSet{
