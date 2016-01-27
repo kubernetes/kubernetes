@@ -45,6 +45,8 @@ Updated: 8/27/2015
   - [Flag conventions](#flag-conventions)
   - [Output conventions](#output-conventions)
   - [Documentation conventions](#documentation-conventions)
+  - [Command implementation conventions](#command-implementation-conventions)
+  - [Generators](#generators)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -59,19 +61,15 @@ Updated: 8/27/2015
 ## Command conventions
 
 * Command names are all lowercase, and hyphenated if multiple words.
-* kubectl VERB NOUNs for commands that apply to multiple resource types
-* NOUNs may be specified as TYPE name1 name2 ... or TYPE/name1 TYPE/name2; TYPE is omitted when only a single type is expected
-* Resource types are all lowercase, with no hyphens; both singular and plural forms are accepted
+* kubectl VERB NOUNs for commands that apply to multiple resource types.
+* NOUNs may be specified as `TYPE name1 name2` or `TYPE/name1 TYPE/name2` or `TYPE1,TYPE2,TYPE3/name1`; TYPE is omitted when only a single type is expected.
+* Resource types are all lowercase, with no hyphens; both singular and plural forms are accepted.
 * NOUNs may also be specified by one or more file arguments: -f file1 -f file2 ...
 * Resource types may have 2- or 3-letter aliases.
 * Business logic should be decoupled from the command framework, so that it can be reused independently of kubectl, cobra, etc.
-  * Ideally, commonly needed functionality would be implemented server-side in order to avoid problems typical of "fat" clients and to make it readily available to non-Go clients
-* Commands that generate resources, such as `run` or `expose`, should obey the following conventions:
-  * Flags should be converted to a parameter Go map or json map prior to invoking the generator
-  * The generator must be versioned so that users depending on a specific behavior may pin to that version, via `--generator=`
-  * Generation should be decoupled from creation
-  * `--dry-run` should output the resource that would be created, without creating it
-* A command group (e.g., `kubectl config`) may be used to group related non-standard commands, such as custom generators, mutations, and computations
+  * Ideally, commonly needed functionality would be implemented server-side in order to avoid problems typical of "fat" clients and to make it readily available to non-Go clients.
+* Commands that generate resources, such as `run` or `expose`, should obey specific conventions, see [generators](#generators).
+* A command group (e.g., `kubectl config`) may be used to group related non-standard commands, such as custom generators, mutations, and computations.
 
 ## Flag conventions
 
@@ -135,6 +133,124 @@ Updated: 8/27/2015
 * Use "FILENAME" for filenames
 * Use "TYPE" for the particular flavor of resource type accepted by kubectl, rather than "RESOURCE" or "KIND"
 * Use "NAME" for resource names
+
+## Command implementation conventions
+
+For every command there should be a `NewCmd<CommandName>` function that creates the command and returns a pointer to a `cobra.Command`, which can later be added to other parent commands to compose the structure tree. There should also be a `<CommandName>Config` struct with a variable to every flag and argument declared by the command (and any other variable required for the command to run). This makes tests and mocking easier. The struct ideally exposes three methods:
+
+* `Complete`: Completes the struct fields with values that may or may not be directly provided by the user, for example, by flags pointers, by the `args` slice, by using the Factory, etc.
+* `Validate`: performs validation on the struct fields and returns appropriate errors.
+* `Run<CommandName>`: runs the actual logic of the command, taking as assumption that the struct is complete with all required values to run, and they are valid.
+
+Sample command skeleton:
+
+```go
+// MineRecommendedName is the recommended command name for kubectl mine.
+const MineRecommendedName = "mine"
+
+// MineConfig contains all the options for running the mine cli command.
+type MineConfig struct {
+  mineLatest bool
+}
+
+const (
+  mineLong = `Some long description
+for my command.`
+
+  mineExample = `  # Run my command's first action
+  $ %[1]s first
+
+  # Run my command's second action on latest stuff
+  $ %[1]s second --latest`
+)
+
+// NewCmdMine implements the kubectl mine command.
+func NewCmdMine(parent, name string, f *cmdutil.Factory, out io.Writer) *cobra.Command {
+  opts := &MineConfig{}
+
+  cmd := &cobra.Command{
+    Use:     fmt.Sprintf("%s [--latest]", name),
+    Short:   "Run my command",
+    Long:    mineLong,
+    Example: fmt.Sprintf(mineExample, parent+" "+name),
+    Run: func(cmd *cobra.Command, args []string) {
+      if err := opts.Complete(f, cmd, args, out); err != nil {
+        cmdutil.CheckErr(err)
+      }
+      if err := opts.Validate(); err != nil {
+        cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+      }
+      if err := opts.RunMine(); err != nil {
+        cmdutil.CheckErr(err)
+      }
+    },
+  }
+  
+  cmd.Flags().BoolVar(&options.mineLatest, "latest", false, "Use latest stuff")
+  return cmd
+}
+
+// Complete completes all the required options for mine.
+func (o *MineConfig) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+  return nil
+}
+
+// Validate validates all the required options for mine.
+func (o MineConfig) Validate() error {
+  return nil
+}
+
+// RunMine implements all the necessary functionality for mine.
+func (o MineConfig) RunMine() error {
+  return nil
+}
+```
+
+The `Run<CommandName>` method should contain the business logic of the command and as noted in [command conventions](#command-conventions), ideally that logic should exist server-side so any client could take advantage of it. Notice that this is not a mandatory structure and not every command is implemented this way, but this is a nice convention so try to be compliant with it. As an example, have a look at how [kubectl logs](../../pkg/kubectl/cmd/logs.go) is implemented.
+
+## Generators
+
+Generators are kubectl commands that generate resources based on a set of inputs (other resources, flags, or a combination of both).
+
+The point of generators is:
+* to enable users using kubectl in a scripted fashion to pin to a particular behavior which may change in the future. Explicit use of a generator will always guarantee that the expected behavior stays the same.
+* to enable potential expansion of the generated resources for scenarios other than just creation, similar to how -f is supported for most general-purpose commands.
+
+Generator commands shoud obey to the following conventions:
+* A `--generator` flag should be defined. Users then can choose between different generators, if the command supports them (for example, `kubectl run` currently supports generators for pods, jobs, replication controllers, and deployments), or between different versions of a generator so that users depending on a specific behavior may pin to that version (for example, `kubectl expose` currently supports two different versions of a service generator).
+* Generation should be decoupled from creation. A generator should implement the `kubectl.StructuredGenerator` interface and have no dependencies on cobra or the Factory. See, for example, how the first version of the namespace generator is defined:
+
+```go
+// NamespaceGeneratorV1 supports stable generation of a namespace
+type NamespaceGeneratorV1 struct {
+  // Name of namespace
+  Name string
+}
+
+// Ensure it supports the generator pattern that uses parameters specified during construction
+var _ StructuredGenerator = &NamespaceGeneratorV1{}
+
+// StructuredGenerate outputs a namespace object using the configured fields
+func (g *NamespaceGeneratorV1) StructuredGenerate() (runtime.Object, error) {
+  if err := g.validate(); err != nil {
+    return nil, err
+  }
+  namespace := &api.Namespace{}
+  namespace.Name = g.Name
+  return namespace, nil
+}
+
+// validate validates required fields are set to support structured generation
+func (g *NamespaceGeneratorV1) validate() error {
+  if len(g.Name) == 0 {
+    return fmt.Errorf("name must be specified")
+  }
+  return nil
+}
+```
+
+The generator struct (`NamespaceGeneratorV1`) holds the necessary fields for namespace generation. It also satisfies the `kubectl.StructuredGenerator` interface by implementing the `StructuredGenerate() (runtime.Object, error)` method which configures the generated namespace that callers of the generator (`kubectl create namespace` in our case) need to create.
+* `--dry-run` should output the resource that would be created, without creating it.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/kubectl-conventions.md?pixel)]()
