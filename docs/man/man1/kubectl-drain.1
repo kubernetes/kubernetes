@@ -18,9 +18,12 @@ Drain node in preparation for maintenance.
 .PP
 The given node will be marked unschedulable to prevent new pods from arriving.
 Then drain deletes all pods except mirror pods (which cannot be deleted through
-the API server).  If there are any pods that are neither mirror pods nor
-managed by a ReplicationController, Job, or DaemonSet, then drain will not
-delete any pods unless you use \-\-force.
+the API server).  If there are DaemonSet\-managed pods, drain will not proceed
+without \-\-ignore\-daemonsets, and regardless it will not delete any
+DaemonSet\-managed pods, because those pods would be immediately replaced by the
+DaemonSet controller, which ignores unschedulable marknigs.  If there are any
+pods that are neither mirror pods nor managed\-\-by ReplicationController,
+DaemonSet or Job\-\-, then drain will not delete any pods unless you use \-\-force.
 
 .PP
 When you are ready to put the node back into service, use kubectl uncordon, which
@@ -35,6 +38,10 @@ will make the node schedulable again.
 .PP
 \fB\-\-grace\-period\fP=\-1
     Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.
+
+.PP
+\fB\-\-ignore\-daemonsets\fP=false
+    Ignore DaemonSet\-managed pods.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
