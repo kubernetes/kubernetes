@@ -8,6 +8,7 @@ bitbucket.org/ww/goautoneg | spdxBSD3
 github.com/abbot/go-http-auth | Apache-2
 github.com/appc/cni | Apache-2
 github.com/appc/spec | Apache-2
+github.com/armon/go-metrics | MITname
 github.com/aws/aws-sdk-go | Apache-2
 github.com/beorn7/perks/quantile | MIT?
 github.com/blang/semver | MITname
@@ -49,6 +50,9 @@ github.com/google/cadvisor | Apache-2
 github.com/google/gofuzz | Apache-2
 github.com/gorilla/context | spdxBSD3
 github.com/gorilla/mux | spdxBSD3
+github.com/hashicorp/go-msgpack | spdxBSD3
+github.com/hashicorp/raft | IntelPart08
+github.com/hashicorp/raft-boltdb | IntelPart08
 github.com/imdario/mergo | spdxBSD3
 github.com/inconshreveable/mousetrap | Apache-2
 github.com/influxdb/influxdb | MITname
