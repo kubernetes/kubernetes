@@ -94,7 +94,6 @@ func (s *runtimeState) errors() []string {
 func newRuntimeState(
 	runtimeSyncThreshold time.Duration,
 	configureNetwork bool,
-	cidr string,
 	runtimeCompatibility func() error,
 ) *runtimeState {
 	var networkError error = nil
@@ -105,7 +104,6 @@ func newRuntimeState(
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
 		networkError:             networkError,
-		cidr:                     cidr,
 		internalError:            nil,
 		runtimeCompatibility:     runtimeCompatibility,
 	}
