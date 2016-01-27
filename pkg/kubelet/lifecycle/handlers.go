@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -35,7 +36,7 @@ type HandlerRunner struct {
 }
 
 type podStatusProvider interface {
-	GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error)
+	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
 func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
@@ -86,15 +87,15 @@ func resolvePort(portReference intstr.IntOrString, container *api.Container) (in
 func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
-		status, err := hr.containerManager.GetAPIPodStatus(pod)
+		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
 			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return err
 		}
-		if status.PodIP == "" {
+		if status.IP == "" {
 			return fmt.Errorf("failed to find networking container: %v", status)
 		}
-		host = status.PodIP
+		host = status.IP
 	}
 	var port int
 	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
