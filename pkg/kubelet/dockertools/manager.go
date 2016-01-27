@@ -748,8 +748,11 @@ func (dm *DockerManager) runContainer(
 		CPUShares:  cpuShares,
 	}
 
-	gpuDevice GPUDevice
-	err := gpu.Detect(&gpuDevice) 
+	var gpuDevice gpu.GPUDevice
+	gooderr := gpu.Detect(&gpuDevice) 
+	if gooderr  != nil {
+		securityContextProvider.ModifyHostConfig(pod, container, hc)
+	}
 
 	if dm.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned to allow full usage of cpu resource.
