@@ -165,7 +165,7 @@ func TestCordon(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := test.cmd(f, buf)
@@ -387,7 +387,7 @@ func TestDrain(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdDrain(f, buf)

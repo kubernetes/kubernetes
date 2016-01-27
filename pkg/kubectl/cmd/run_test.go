@@ -264,7 +264,7 @@ func TestGenerateService(t *testing.T) {
 	for _, test := range tests {
 		sawPOST := false
 		f, tf, codec := NewAPIFactory()
-		tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

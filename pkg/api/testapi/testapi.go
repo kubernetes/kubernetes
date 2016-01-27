@@ -79,6 +79,10 @@ func init() {
 	Extensions = Groups[extensions.GroupName]
 }
 
+func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
+	return "application/json", g.GroupVersion(), g.Codec()
+}
+
 func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
 	copyOfGroupVersion := g.externalGroupVersion
 	return &copyOfGroupVersion

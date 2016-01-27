@@ -56,7 +56,7 @@ func TestSecrets(t *testing.T) {
 	m = master.New(masterConfig)
 
 	framework.DeleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	DoTestSecrets(t, client)
 }
 
