@@ -18,26 +18,25 @@ package util
 
 import (
 	"sync"
-	"time"
 
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 var uuidLock sync.Mutex
+var lastUUID uuid.UUID
 
-/**
- * The UUID package is naive and can generate identical UUIDs if the time interval is quick enough.
- * Block subsequent UUIDs for 200 Nanoseconds, the UUID uses 100 ns increments, we block for 200 to be safe
- * Blocks in a go routine, so that the caller doesn't have to wait.
- * TODO: save old unused UUIDs so that no one has to block.
- */
 func NewUUID() types.UID {
 	uuidLock.Lock()
+	defer uuidLock.Unlock()
 	result := uuid.NewUUID()
-	go func() {
-		time.Sleep(200 * time.Nanosecond)
-		uuidLock.Unlock()
-	}()
+	// The UUID package is naive and can generate identical UUIDs if the
+	// time interval is quick enough.
+	// The UUID uses 100 ns increments so it's short enough to actively
+	// wait for a new value.
+	for uuid.Equal(lastUUID, result) == true {
+		result = uuid.NewUUID()
+	}
+	lastUUID = result
 	return types.UID(result.String())
 }
