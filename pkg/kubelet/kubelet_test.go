@@ -4348,3 +4348,5 @@ func TestGetPodsToSync(t *testing.T) {
 		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
 	}
 }
+
+// TODO(random-liu): Add unit test for convertStatusToAPIStatus (issue #20478)

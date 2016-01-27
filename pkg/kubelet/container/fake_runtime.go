@@ -236,15 +236,6 @@ func (f *FakeRuntime) KillContainerInPod(container api.Container, pod *api.Pod) 
 	return f.Err
 }
 
-func (f *FakeRuntime) GetAPIPodStatus(*api.Pod) (*api.PodStatus, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetAPIPodStatus")
-	status := f.APIPodStatus
-	return &status, f.Err
-}
-
 func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
