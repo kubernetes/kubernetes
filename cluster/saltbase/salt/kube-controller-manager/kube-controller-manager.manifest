@@ -27,7 +27,7 @@
 {% set cloud_config_volume = "" -%}
 
 {% if grains.cloud is defined -%}
-  {% if grains.cloud != 'vagrant' -%}
+  {% if grains.cloud not in ['vagrant', 'vsphere'] -%}
     {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
   {% endif -%}
   {% set service_account_key = "--service-account-private-key-file=/srv/kubernetes/server.key" -%}
@@ -41,7 +41,7 @@
 
 {% set root_ca_file = "" -%}
 
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]    %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere' ]    %}
    {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 

@@ -42,6 +42,7 @@ grains:
     - kubernetes-pool
     - kubernetes-pool-vsphere
   cbr-cidr: $NODE_IP_RANGE
+  cloud: vsphere
 EOF
 
 # Install Salt
