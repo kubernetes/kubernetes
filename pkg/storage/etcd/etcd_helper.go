@@ -473,6 +473,7 @@ func (h *etcdHelper) listEtcdNode(ctx context.Context, key string) ([]*etcd.Node
 	opts := etcd.GetOptions{
 		Recursive: true,
 		Sort:      true,
+		Quorum:    true,
 	}
 	result, err := h.client.Get(ctx, key, &opts)
 	if err != nil {
