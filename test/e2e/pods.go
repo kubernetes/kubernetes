@@ -343,8 +343,12 @@ var _ = Describe("Pods", func() {
 			Fail("Timeout while waiting for pod creation")
 		}
 
+		// We need to wait for the pod to be scheduled, otherwise the deletion
+		// will be carried out immediately rather than gracefully.
+		expectNoError(framework.WaitForPodRunning(pod.Name))
+
 		By("deleting the pod gracefully")
-		if err := podClient.Delete(pod.Name, nil); err != nil {
+		if err := podClient.Delete(pod.Name, api.NewDeleteOptions(30)); err != nil {
 			Failf("Failed to delete pod: %v", err)
 		}
 
@@ -352,7 +356,7 @@ var _ = Describe("Pods", func() {
 		deleted := false
 		timeout := false
 		var lastPod *api.Pod
-		timer := time.After(podStartTimeout)
+		timer := time.After(30 * time.Second)
 		for !deleted && !timeout {
 			select {
 			case event, _ := <-w.ResultChan():
