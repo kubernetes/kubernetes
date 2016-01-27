@@ -49,7 +49,6 @@ verify:
 	hack/verify-generated-deep-copies.sh
 	hack/verify-generated-docs.sh
 	hack/verify-swagger-spec.sh
-	hack/verify-linkcheck.sh
 	hack/verify-flags-underscore.py
 	hack/verify-godeps.sh $(BRANCH)
 	hack/verify-godep-licenses.sh $(BRANCH)
