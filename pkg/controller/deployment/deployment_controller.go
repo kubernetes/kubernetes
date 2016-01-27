@@ -410,6 +410,11 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
+	if d.Spec.Paused {
+		// Ignore paused deployments
+		glog.V(4).Infof("Ignoring paused deployment %s/%s", d.Namespace, d.Name)
+		return nil
+	}
 	switch d.Spec.Strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
 		return dc.syncRecreateDeployment(d)

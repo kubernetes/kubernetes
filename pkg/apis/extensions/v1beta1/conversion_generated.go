@@ -2760,6 +2760,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := s.Convert(&in.UniqueLabelKey, &out.UniqueLabelKey, 0); err != nil {
 		return err
 	}
+	out.Paused = in.Paused
 	return nil
 }
 
@@ -3935,6 +3936,7 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 		return err
 	}
 	// in.UniqueLabelKey has no peer in out
+	out.Paused = in.Paused
 	return nil
 }
 
