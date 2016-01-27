@@ -31,7 +31,7 @@ import (
 var _ = Describe("EmptyDir wrapper volumes", func() {
 	f := NewFramework("secrets")
 
-	It("should becomes running [Conformance]", func() {
+	It("should becomes running", func() {
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
