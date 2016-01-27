@@ -760,6 +760,14 @@ runTests() {
   [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep '.dockercfg:')" ]]
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
+
+  ### Create a secret using output flags
+  # Pre-condition: no secret exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  [[ "$(kubectl create secret generic test-secret --namespace=test-secrets --from-literal=key1=value1 --output=go-template --template=\"{{.metadata.name}}:\" | grep 'test-secret:')" ]]
+  ## Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets  
   # Clean up
   kubectl delete namespace test-secrets
 
