@@ -504,13 +504,11 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
 func (dc *DeploymentController) syncDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
-	totalReplicas := deploymentutil.GetReplicaCountForRCs(allRCs)
-	updatedReplicas := deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
-	availablePods, err := deploymentutil.GetAvailablePodsForRCs(dc.client, allRCs, deployment.Spec.Strategy.RollingUpdate.MinReadySeconds)
+	totalReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRCs, newRC, deployment)
 	if err != nil {
-		return fmt.Errorf("failed to count ready pods: %v", err)
+		return err
 	}
-	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas || deployment.Status.AvailableReplicas != availablePods {
+	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas || deployment.Status.AvailableReplicas != availableReplicas {
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
 	return nil
@@ -709,22 +707,36 @@ func (dc *DeploymentController) scaleUpNewRCForRecreate(newRC *api.ReplicationCo
 }
 
 func (dc *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
-	totalReplicas := deploymentutil.GetReplicaCountForRCs(allRCs)
-	updatedReplicas := deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
-	availablePods, err := deploymentutil.GetAvailablePodsForRCs(dc.client, allRCs, deployment.Spec.Strategy.RollingUpdate.MinReadySeconds)
+	totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas, err := dc.calculateStatus(allRCs, newRC, deployment)
 	if err != nil {
-		return fmt.Errorf("failed to count ready pods: %v", err)
+		return err
 	}
 	newDeployment := deployment
 	// TODO: Reconcile this with API definition. API definition talks about ready pods, while this just computes created pods.
 	newDeployment.Status = extensions.DeploymentStatus{
 		Replicas:            totalReplicas,
 		UpdatedReplicas:     updatedReplicas,
-		AvailableReplicas:   availablePods,
-		UnavailableReplicas: totalReplicas - availablePods,
+		AvailableReplicas:   availableReplicas,
+		UnavailableReplicas: unavailableReplicas,
 	}
 	_, err = dc.expClient.Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
 	return err
+}
+
+func (dc *DeploymentController) calculateStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) (totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
+	totalReplicas = deploymentutil.GetReplicaCountForRCs(allRCs)
+	updatedReplicas = deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
+	minReadySeconds := 0
+	if deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType {
+		minReadySeconds = deployment.Spec.Strategy.RollingUpdate.MinReadySeconds
+	}
+	availableReplicas, err = deploymentutil.GetAvailablePodsForRCs(dc.client, allRCs, minReadySeconds)
+	if err != nil {
+		err = fmt.Errorf("failed to count available pods: %v", err)
+		return
+	}
+	unavailableReplicas = totalReplicas - availableReplicas
+	return
 }
 
 func (dc *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationController, newScale int, deployment extensions.Deployment) (*api.ReplicationController, error) {
