@@ -13,7 +13,7 @@ etcd:
     --initial-cluster-state new
 mesosmaster1:
   hostname: mesosmaster1
-  image: mesosphere/mesos:0.24.0-1.0.27.ubuntu1404
+  image: mesosphere/mesos:0.26.0-0.2.145.ubuntu1404
   entrypoint: [ "mesos-master" ]
   ports: [ "5050:5050" ]
   environment:
@@ -30,7 +30,7 @@ mesosmaster1:
 mesosslave:
   hostname: mesosslave
   privileged: true
-  image: mesosphere/mesos-slave-dind:0.2.2_mesos-0.24.0_docker-1.8.2_ubuntu-14.04.3
+  image: mesosphere/mesos-slave-dind:0.2.4_mesos-0.26.0_docker-1.8.2_ubuntu-14.04.3
   ports: [ "10248","10249" ]
   entrypoint:
   - bash
