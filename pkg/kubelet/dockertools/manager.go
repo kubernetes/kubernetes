@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
 
@@ -408,112 +406,6 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateUnknown
 	}
 	return &status, "", nil
-}
-
-func (dm *DockerManager) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) (*api.PodStatus, error) {
-	var apiPodStatus api.PodStatus
-	uid := pod.UID
-
-	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
-	// Create a map of expected containers based on the pod spec.
-	expectedContainers := make(map[string]api.Container)
-	for _, container := range pod.Spec.Containers {
-		expectedContainers[container.Name] = container
-	}
-
-	containerDone := sets.NewString()
-	apiPodStatus.PodIP = podStatus.IP
-	for _, containerStatus := range podStatus.ContainerStatuses {
-		cName := containerStatus.Name
-		if _, ok := expectedContainers[cName]; !ok {
-			// This would also ignore the infra container.
-			continue
-		}
-		if containerDone.Has(cName) {
-			continue
-		}
-		status := containerStatusToAPIContainerStatus(containerStatus)
-		if existing, found := statuses[cName]; found {
-			existing.LastTerminationState = status.State
-			containerDone.Insert(cName)
-		} else {
-			statuses[cName] = status
-		}
-	}
-
-	// Handle the containers for which we cannot find any associated active or dead docker containers or are in restart backoff
-	// Fetch old containers statuses from old pod status.
-	oldStatuses := make(map[string]api.ContainerStatus, len(pod.Spec.Containers))
-	for _, status := range pod.Status.ContainerStatuses {
-		oldStatuses[status.Name] = status
-	}
-	for _, container := range pod.Spec.Containers {
-		if containerStatus, found := statuses[container.Name]; found {
-			reasonInfo, ok := dm.reasonCache.Get(uid, container.Name)
-			if ok && reasonInfo.reason == kubecontainer.ErrCrashLoopBackOff.Error() {
-				containerStatus.LastTerminationState = containerStatus.State
-				containerStatus.State = api.ContainerState{
-					Waiting: &api.ContainerStateWaiting{
-						Reason:  reasonInfo.reason,
-						Message: reasonInfo.message,
-					},
-				}
-			}
-			continue
-		}
-		var containerStatus api.ContainerStatus
-		containerStatus.Name = container.Name
-		containerStatus.Image = container.Image
-		if oldStatus, found := oldStatuses[container.Name]; found {
-			// Some states may be lost due to GC; apply the last observed
-			// values if possible.
-			containerStatus.RestartCount = oldStatus.RestartCount
-			containerStatus.LastTerminationState = oldStatus.LastTerminationState
-		}
-		// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
-		reasonInfo, ok := dm.reasonCache.Get(uid, container.Name)
-
-		if !ok {
-			// default position for a container
-			// At this point there are no active or dead containers, the reasonCache is empty (no entry or the entry has expired)
-			// its reasonable to say the container is being created till a more accurate reason is logged
-			containerStatus.State = api.ContainerState{
-				Waiting: &api.ContainerStateWaiting{
-					Reason:  fmt.Sprintf("ContainerCreating"),
-					Message: fmt.Sprintf("Image: %s is ready, container is creating", container.Image),
-				},
-			}
-		} else if reasonInfo.reason == kubecontainer.ErrImagePullBackOff.Error() ||
-			reasonInfo.reason == kubecontainer.ErrImageInspect.Error() ||
-			reasonInfo.reason == kubecontainer.ErrImagePull.Error() ||
-			reasonInfo.reason == kubecontainer.ErrImageNeverPull.Error() {
-			// mark it as waiting, reason will be filled bellow
-			containerStatus.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
-		} else if reasonInfo.reason == kubecontainer.ErrRunContainer.Error() {
-			// mark it as waiting, reason will be filled bellow
-			containerStatus.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
-		}
-		statuses[container.Name] = &containerStatus
-	}
-
-	apiPodStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
-	for containerName, status := range statuses {
-		if status.State.Waiting != nil {
-			status.State.Running = nil
-			// For containers in the waiting state, fill in a specific reason if it is recorded.
-			if reasonInfo, ok := dm.reasonCache.Get(uid, containerName); ok {
-				status.State.Waiting.Reason = reasonInfo.reason
-				status.State.Waiting.Message = reasonInfo.message
-			}
-		}
-		apiPodStatus.ContainerStatuses = append(apiPodStatus.ContainerStatuses, *status)
-	}
-
-	// Sort the container statuses since clients of this interface expect the list
-	// of containers in a pod to behave like the output of `docker list`, which has a
-	// deterministic order.
-	sort.Sort(kubetypes.SortedContainerStatuses(apiPodStatus.ContainerStatuses))
-	return &apiPodStatus, nil
 }
 
 // makeEnvList converts EnvVar list to a list of strings, in the form of
