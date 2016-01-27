@@ -37,7 +37,7 @@
     suffix:
         - 'gce':
             description: 'Run E2E tests on GCE using the latest successful build.'
-            timeout: 150
+            timeout: 180
         - 'gce-autoscaling':
             description: 'Run autoscaling E2E tests on GCE using the latest successful build.'
             timeout: 210
