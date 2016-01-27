@@ -40,6 +40,6 @@ exec docker run --rm -i -v "${KUBE_ROOT}:/repo" mesosphere/godep-licenses:latest
   -e github.com/shurcooL/sanitized_anchor_name:MIT? \
   -e github.com/spf13/cobra:Apache-2 \
   -e github.com/stretchr/objx:MIT? \
-  -e github.com/stretchr/testify:MIT? \
   -e github.com/docker/spdystream:SeeFile \
+  -e gopkg.in/yaml.v2:LesserExceptionGPLVer3-TOOLONG \
   -o md > Godeps/LICENSES.md
