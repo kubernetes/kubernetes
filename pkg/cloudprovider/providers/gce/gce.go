@@ -1323,11 +1323,13 @@ func (gce *GCECloud) ListSslCertificates() (*compute.SslCertificateList, error) 
 
 // GlobalForwardingRule management
 
-// CreateGlobalForwardingRule creates and returns a GlobalForwardingRule that points to the given TargetHttpProxy.
-func (gce *GCECloud) CreateGlobalForwardingRule(proxy *compute.TargetHttpProxy, name string, portRange string) (*compute.ForwardingRule, error) {
+// CreateGlobalForwardingRule creates and returns a GlobalForwardingRule that points to the given TargetHttp(s)Proxy.
+// targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
+func (gce *GCECloud) CreateGlobalForwardingRule(targetProxyLink, ip, name, portRange string) (*compute.ForwardingRule, error) {
 	rule := &compute.ForwardingRule{
 		Name:       name,
-		Target:     proxy.SelfLink,
+		IPAddress:  ip,
+		Target:     targetProxyLink,
 		PortRange:  portRange,
 		IPProtocol: "TCP",
 	}
@@ -1341,9 +1343,10 @@ func (gce *GCECloud) CreateGlobalForwardingRule(proxy *compute.TargetHttpProxy, 
 	return gce.GetGlobalForwardingRule(name)
 }
 
-// SetProxyForGlobalForwardingRule links the given TargetHttpProxy with the given GlobalForwardingRule.
-func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, proxy *compute.TargetHttpProxy) error {
-	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{Target: proxy.SelfLink}).Do()
+// SetProxyForGlobalForwardingRule links the given TargetHttp(s)Proxy with the given GlobalForwardingRule.
+// targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
+func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, targetProxyLink string) error {
+	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{Target: targetProxyLink}).Do()
 	if err != nil {
 		return err
 	}
