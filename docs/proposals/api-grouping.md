@@ -176,6 +176,58 @@ apis/nodes/v1
 	Nodes
 ```
 
+### Proposal from #8190
+
+```
+# Does not suggest names for groups
+
+# end-user execution objects:
+	pod
+	podTemplate
+	secret
+ 	configMap
+	persistentVolumeClaim
+
+# end-user networking-related objects:
+	service
+	ingress
+
+# end-user app deployment objects:
+	replicaSet
+	deployment
+	petSet		# added
+
+# end-user batch objects:
+	job
+	scheduled job
+	workflow 	# added
+
+# app admin objects:
+	namespace
+	limitRange
+	resourceQuota
+
+# identity/auth objects:
+	serviceAccount
+	user	 (future)
+
+# system / tooling objects:
+	event
+	endpoints
+	componentStatus
+	metrics
+
+# infrastructure / cluster admin deployment objects:
+	daemon set
+
+# infrastructure / cluster admin infrastructure objects:
+	node
+	persistent volume
+
+# experimental apis and plugins
+	...
+```
+
 ### Admin vs User
 
 Issue #3806 proposed splitting "Cluster" and
