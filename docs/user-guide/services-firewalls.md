@@ -50,6 +50,22 @@ the wilds of the internet.
 
 This will be fixed in an upcoming release of Kubernetes.
 
+
+### Microsoft Azure
+
+After following the [installation instuctions](https://azure.microsoft.com/en-gb/documentation/articles/xplat-cli-install/) for the Azure command line tools, the following command will create a public hole in the Kubernetes cluster.
+
+```console
+$ ./node_modules/.bin/azure vm endpoint create kube-00 80 <port>
+```
+
+Use the following to show the endpoint setup (and most importantly the cluster's external IP):
+
+```console
+$ ./node_modules/.bin/azure vm endpoint show kube-00 tcp-80-<port>
+```
+
+
 ### Other cloud providers
 
 Coming soon.
