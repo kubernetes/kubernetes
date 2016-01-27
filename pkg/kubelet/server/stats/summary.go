@@ -18,8 +18,10 @@ package stats
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -111,6 +113,7 @@ func buildSummaryPods(cinfos map[string]cadvisorapiv2.ContainerInfo) []PodStats 
 			stats.Network = containerInfoV2ToNetworkStats(&cinfo)
 		} else {
 			stats.Containers = append(stats.Containers, containerInfoV2ToStats(containerName, &cinfo))
+			stats.UserDefinedMetrics = append(stats.UserDefinedMetrics, containerInfoV2ToUserDefinedMetrics(&cinfo)...)
 		}
 	}
 
@@ -199,4 +202,52 @@ func containerInfoV2ToNetworkStats(info *cadvisorapiv2.ContainerInfo) *NetworkSt
 		TxBytes:  resource.NewQuantity(txBytes, resource.DecimalSI),
 		TxErrors: &txErrors,
 	}
+}
+
+func containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []UserDefinedMetric {
+	type specVal struct {
+		ref     UserDefinedMetricDescriptor
+		valType cadvisorapiv1.DataType
+		time    time.Time
+		value   float64
+	}
+	udmMap := map[string]*specVal{}
+	for _, spec := range info.Spec.CustomMetrics {
+		udmMap[spec.Name] = &specVal{
+			ref: UserDefinedMetricDescriptor{
+				Name:  spec.Name,
+				Type:  UserDefinedMetricType(spec.Type),
+				Units: spec.Units,
+			},
+			valType: spec.Format,
+		}
+	}
+	for _, stat := range info.Stats {
+		for name, values := range stat.CustomMetrics {
+			specVal, ok := udmMap[name]
+			if !ok {
+				glog.Warningf("spec for custom metric %q is missing from cAdvisor output. Spec: %+v, Metrics: %+v", name, info.Spec, stat.CustomMetrics)
+				continue
+			}
+			for _, value := range values {
+				// Pick the most recent value
+				if value.Timestamp.Before(specVal.time) {
+					continue
+				}
+				specVal.time = value.Timestamp
+				specVal.value = value.FloatValue
+				if specVal.valType == cadvisorapiv1.IntType {
+					specVal.value = float64(value.IntValue)
+				}
+			}
+		}
+	}
+	var udm []UserDefinedMetric
+	for _, specVal := range udmMap {
+		udm = append(udm, UserDefinedMetric{
+			UserDefinedMetricDescriptor: specVal.ref,
+			Value: specVal.value,
+		})
+	}
+	return udm
 }

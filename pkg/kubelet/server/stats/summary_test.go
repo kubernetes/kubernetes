@@ -18,9 +18,11 @@ package stats
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
+	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -168,7 +170,68 @@ func TestBuildSummary(t *testing.T) {
 	checkNetworkStats(t, "Pod", seedPod2Infra, ps.Network)
 }
 
+func generateCustomMetricSpec() []v1.MetricSpec {
+	f := fuzz.New().NilChance(0).Funcs(
+		func(e *v1.MetricSpec, c fuzz.Continue) {
+			c.Fuzz(&e.Name)
+			switch c.Intn(3) {
+			case 0:
+				e.Type = v1.MetricGauge
+			case 1:
+				e.Type = v1.MetricCumulative
+			case 2:
+				e.Type = v1.MetricDelta
+			}
+			switch c.Intn(2) {
+			case 0:
+				e.Format = v1.IntType
+			case 1:
+				e.Format = v1.FloatType
+			}
+			c.Fuzz(&e.Units)
+		})
+	var ret []v1.MetricSpec
+	f.Fuzz(&ret)
+	return ret
+}
+
+func generateCustomMetrics(spec []v1.MetricSpec) map[string][]v1.MetricVal {
+	ret := map[string][]v1.MetricVal{}
+	for _, metricSpec := range spec {
+		f := fuzz.New().NilChance(0).Funcs(
+			func(e *v1.MetricVal, c fuzz.Continue) {
+				switch metricSpec.Format {
+				case v1.IntType:
+					c.Fuzz(&e.IntValue)
+				case v1.FloatType:
+					c.Fuzz(&e.FloatValue)
+				}
+			})
+
+		var metrics []v1.MetricVal
+		f.Fuzz(&metrics)
+		ret[metricSpec.Name] = metrics
+	}
+	return ret
+}
+
 func summaryTestContainerInfo(seed int, podName string, podNamespace string, containerName string) v2.ContainerInfo {
+	labels := map[string]string{}
+	if podName != "" {
+		labels = map[string]string{
+			"io.kubernetes.pod.name":       podName,
+			"io.kubernetes.pod.namespace":  podNamespace,
+			"io.kubernetes.container.name": containerName,
+		}
+	}
+	spec := v2.ContainerSpec{
+		HasCpu:        true,
+		HasMemory:     true,
+		HasNetwork:    true,
+		Labels:        labels,
+		CustomMetrics: generateCustomMetricSpec(),
+	}
+
 	stats := v2.ContainerStats{
 		Cpu:     &v1.CpuStats{},
 		CpuInst: &v2.CpuInstStats{},
@@ -188,24 +251,12 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 				TxErrors: uint64(seed + offsetNetTxErrors),
 			}},
 		},
+		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
 	}
 	stats.Cpu.Usage.Total = uint64(seed + offsetCPUUsageCoreSeconds)
 	stats.CpuInst.Usage.Total = uint64(seed + offsetCPUUsageCores)
-	labels := map[string]string{}
-	if podName != "" {
-		labels = map[string]string{
-			"io.kubernetes.pod.name":       podName,
-			"io.kubernetes.pod.namespace":  podNamespace,
-			"io.kubernetes.container.name": containerName,
-		}
-	}
 	return v2.ContainerInfo{
-		Spec: v2.ContainerSpec{
-			HasCpu:     true,
-			HasMemory:  true,
-			HasNetwork: true,
-			Labels:     labels,
-		},
+		Spec:  spec,
 		Stats: []*v2.ContainerStats{&stats},
 	}
 }
@@ -227,4 +278,73 @@ func checkMemoryStats(t *testing.T, label string, seed int, stats *MemoryStats) 
 	assert.EqualValues(t, seed+offsetMemWorkingSetBytes, stats.WorkingSetBytes.Value(), label+".Mem.WorkingSetBytes")
 	assert.EqualValues(t, seed+offsetMemPageFaults, *stats.PageFaults, label+".Mem.PageFaults")
 	assert.EqualValues(t, seed+offsetMemMajorPageFaults, *stats.MajorPageFaults, label+".Mem.MajorPageFaults")
+}
+
+func TestCustomMetrics(t *testing.T) {
+	spec := []v1.MetricSpec{
+		{
+			Name:   "qos",
+			Type:   v1.MetricGauge,
+			Format: v1.IntType,
+			Units:  "per second",
+		},
+		{
+			Name:   "cpuLoad",
+			Type:   v1.MetricCumulative,
+			Format: v1.FloatType,
+			Units:  "count",
+		},
+	}
+	metrics := map[string][]v1.MetricVal{
+		"qos": []v1.MetricVal{
+			{
+				Timestamp: time.Now(),
+				IntValue:  10,
+			},
+			{
+				Timestamp: time.Now().Add(time.Minute),
+				IntValue:  100,
+			},
+		},
+		"cpuLoad": []v1.MetricVal{
+			{
+				Timestamp:  time.Now(),
+				FloatValue: 1.2,
+			},
+			{
+				Timestamp:  time.Now().Add(time.Minute),
+				FloatValue: 2.1,
+			},
+		},
+	}
+	cInfo := v2.ContainerInfo{
+		Spec: v2.ContainerSpec{
+			CustomMetrics: spec,
+		},
+		Stats: []*v2.ContainerStats{
+			{
+				CustomMetrics: metrics,
+			},
+		},
+	}
+	expected := []UserDefinedMetric{
+		{
+			UserDefinedMetricDescriptor: UserDefinedMetricDescriptor{
+				Name:  "qos",
+				Type:  MetricGauge,
+				Units: "per second",
+			},
+			Value: 100,
+		},
+		{
+			UserDefinedMetricDescriptor: UserDefinedMetricDescriptor{
+				Name:  "cpuLoad",
+				Type:  MetricCumulative,
+				Units: "count",
+			},
+			Value: 2.1,
+		},
+	}
+	actual := containerInfoV2ToUserDefinedMetrics(&cInfo)
+	assert.Equal(t, actual, expected)
 }
