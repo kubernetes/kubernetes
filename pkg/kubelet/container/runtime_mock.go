@@ -82,11 +82,6 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
-func (r *Mock) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus *PodStatus) (*api.PodStatus, error) {
-	args := r.Called(pod, podStatus)
-	return args.Get(0).(*api.PodStatus), args.Error(1)
-}
-
 func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
