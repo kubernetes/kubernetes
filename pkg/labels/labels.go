@@ -38,7 +38,11 @@ type Set map[string]string
 func (ls Set) String() string {
 	selector := make([]string, 0, len(ls))
 	for key, value := range ls {
-		selector = append(selector, key+"="+value)
+		if value != "" {
+			selector = append(selector, key+"="+value)
+		} else {
+			selector = append(selector, key)
+		}
 	}
 	// Sort for determinism.
 	sort.StringSlice(selector).Sort()
