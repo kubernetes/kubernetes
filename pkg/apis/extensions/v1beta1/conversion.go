@@ -262,6 +262,7 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	}
 	out.UniqueLabelKey = new(string)
 	*out.UniqueLabelKey = in.UniqueLabelKey
+	out.Paused = in.Paused
 	return nil
 }
 
@@ -289,6 +290,7 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if in.UniqueLabelKey != nil {
 		out.UniqueLabelKey = *in.UniqueLabelKey
 	}
+	out.Paused = in.Paused
 	return nil
 }
 

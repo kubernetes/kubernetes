@@ -18,9 +18,11 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/labels"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -45,6 +47,9 @@ var _ = Describe("Deployment", func() {
 	})
 	It("deployment should support rollover [Flaky]", func() {
 		testRolloverDeployment(f)
+	})
+	It("paused deployment should be ignored by the controller", func() {
+		testPausedDeployment(f)
 	})
 })
 
@@ -389,4 +394,75 @@ func testRolloverDeployment(f *Framework) {
 	// Make sure new RC contains "redis" image
 	newRC, err = deploymentutil.GetNewRC(*deployment, c)
 	Expect(newRC.Spec.Template.Spec.Containers[0].Image).Should(Equal(updatedDeploymentImage))
+}
+
+func testPausedDeployment(f *Framework) {
+	ns := f.Namespace.Name
+	c := f.Client
+	deploymentName := "nginx"
+	podLabels := map[string]string{"name": "nginx"}
+	d := newDeployment(deploymentName, 1, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType)
+	d.Spec.Paused = true
+	Logf("Creating paused deployment %s", deploymentName)
+	_, err := c.Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		_, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
+		Logf("deleting deployment %s", deploymentName)
+		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+	}()
+	// Check that deployment is created fine.
+	deployment, err := c.Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Verify that there is no latest state realized for the new deployment.
+	rc, err := deploymentutil.GetNewRC(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	if rc != nil {
+		err = fmt.Errorf("unexpected new rc/%s for deployment/%s", rc.Name, deployment.Name)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Update the deployment to run
+	deployment.Spec.Paused = false
+	deployment, err = c.Deployments(ns).Update(deployment)
+	Expect(err).NotTo(HaveOccurred())
+
+	opts := api.ListOptions{LabelSelector: labels.Set(deployment.Spec.Selector).AsSelector()}
+	w, err := c.ReplicationControllers(ns).Watch(opts)
+	Expect(err).NotTo(HaveOccurred())
+
+	select {
+	case <-w.ResultChan():
+		// this is it
+	case <-time.After(time.Minute):
+		err = fmt.Errorf("expected a new rc to be created")
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Pause the deployment and delete the replication controller.
+	// The paused deployment shouldn't recreate a new one.
+	deployment.Spec.Paused = true
+	deployment.ResourceVersion = ""
+	deployment, err = c.Deployments(ns).Update(deployment)
+	Expect(err).NotTo(HaveOccurred())
+
+	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+
+	deployment, err = c.Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	if !deployment.Spec.Paused {
+		err = fmt.Errorf("deployment %q should be paused", deployment.Name)
+		Expect(err).NotTo(HaveOccurred())
+	}
+	shouldBeNil, err := deploymentutil.GetNewRC(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	if shouldBeNil != nil {
+		err = fmt.Errorf("deployment %q shouldn't have a rc but there is %q", deployment.Name, shouldBeNil.Name)
+		Expect(err).NotTo(HaveOccurred())
+	}
 }
