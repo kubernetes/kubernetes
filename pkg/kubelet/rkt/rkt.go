@@ -434,6 +434,17 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 	}
 	setSupplementaryGIDs(app, podCtx)
 
+	// If 'User' or 'Group' are still empty at this point,
+	// then apply the root UID and GID.
+	// TODO(yifan): Instead of using root GID, we should use
+	// the GID which the user is in.
+	if app.User == "" {
+		app.User = "0"
+	}
+	if app.Group == "" {
+		app.Group = "0"
+	}
+
 	// Set working directory.
 	if len(c.WorkingDir) > 0 {
 		app.WorkingDirectory = c.WorkingDir
