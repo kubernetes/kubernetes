@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-var _ = Describe("Initial Resources [Skipped] ", func() {
+var _ = Describe("Initial Resources [Feature:Autoscaling]", func() {
 	f := NewFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {
