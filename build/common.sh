@@ -899,7 +899,8 @@ function kube::release::package_kube_manifests_tarball() {
 
   # Source 2: manifests from cluster/gce/kube-manifests.
   # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
-  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/"* "${release_stage}/"
+  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/*" "${release_stage}/"
+  cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
   kube::release::clean_cruft
 

@@ -212,7 +212,7 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
   SALT_TAR_URL="${salt_gs_url/gs:\/\//https://storage.googleapis.com/}"
 
-  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
     local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
     KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
     copy-if-not-staged "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
@@ -1513,6 +1513,8 @@ EOF
   if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
+KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
+KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
 KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-docker})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
 RKT_PATH: $(yaml-quote ${RKT_PATH:-})
