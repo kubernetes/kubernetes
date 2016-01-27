@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,26 +16,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package volume
 
 import (
-	"os"
+	"k8s.io/kubernetes/pkg/util/chmod"
+	"k8s.io/kubernetes/pkg/util/chown"
 	"path/filepath"
 	"syscall"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/volume"
+	"os"
 )
 
-// Bitmasks to OR with current ownership of volumes that allow ownership management by the Kubelet
 const (
 	rwMask = os.FileMode(0660)
 	roMask = os.FileMode(0440)
 )
 
-// manageVolumeOwnership modifies the given volume to be owned by fsGroup.
-func (kl *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, builder volume.Builder, fsGroup int64) error {
+// SetVolumeOwnership modifies the given volume to be owned by
+// fsGroup, and sets SetGid so that newly created files are owned by
+// fsGroup. If fsGroup is nil nothing is done.
+func SetVolumeOwnership(builder Builder, fsGroup *int64) error {
+
+	if fsGroup == nil {
+		return nil
+	}
+
+	chownRunner := chown.New()
+	chmodRunner := chmod.New()
 	return filepath.Walk(builder.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -47,11 +55,11 @@ func (kl *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, bui
 		}
 
 		if stat == nil {
-			glog.Errorf("Got nil stat_t for path %v while managing ownership of volume %v for pod %s/%s", path, volSpec.Name, pod.Namespace, pod.Name)
+			glog.Errorf("Got nil stat_t for path %v while setting ownership of volume", path)
 			return nil
 		}
 
-		err = kl.chownRunner.Chown(path, int(stat.Uid), int(fsGroup))
+		err = chownRunner.Chown(path, int(stat.Uid), int(*fsGroup))
 		if err != nil {
 			glog.Errorf("Chown failed on %v: %v", path, err)
 		}
@@ -61,7 +69,7 @@ func (kl *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, bui
 			mask = roMask
 		}
 
-		err = kl.chmodRunner.Chmod(path, info.Mode()|mask|os.ModeSetgid)
+		err = chmodRunner.Chmod(path, info.Mode()|mask|os.ModeSetgid)
 		if err != nil {
 			glog.Errorf("Chmod failed on %v: %v", path, err)
 		}

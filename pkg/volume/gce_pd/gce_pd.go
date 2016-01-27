@@ -211,20 +211,19 @@ var _ volume.Builder = &gcePersistentDiskBuilder{}
 
 func (b *gcePersistentDiskBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *gcePersistentDiskBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *gcePersistentDiskBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
+func (b *gcePersistentDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
@@ -278,6 +277,10 @@ func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(b.gcePersistentDisk)
 		return err
+	}
+
+	if !b.readOnly {
+		volume.SetVolumeOwnership(b, fsGroup)
 	}
 
 	return nil

@@ -118,10 +118,9 @@ var _ volume.Builder = &downwardAPIVolumeBuilder{}
 // downward API volumes are always ReadOnlyManaged
 func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    true,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        true,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 
@@ -129,11 +128,11 @@ func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.
 // TODO: Add volume specific ticker and refresh loop
-func (b *downwardAPIVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *downwardAPIVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
+func (b *downwardAPIVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
 	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, b.pod, *b.opts)
@@ -141,7 +140,7 @@ func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
 		glog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
@@ -163,6 +162,9 @@ func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
 	}
 
 	glog.V(3).Infof("Data dumped for downwardAPI volume %v for pod %v/%v", b.volName, b.pod.Namespace, b.pod.Name)
+
+	volume.SetVolumeOwnership(b, fsGroup)
+
 	return nil
 }
 

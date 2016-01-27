@@ -185,7 +185,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
-	if err := builder.SetUp(); err != nil {
+	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 

@@ -189,18 +189,17 @@ type FakeVolume struct {
 
 func (_ *FakeVolume) GetAttributes() Attributes {
 	return Attributes{
-		ReadOnly:                    false,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        false,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 
-func (fv *FakeVolume) SetUp() error {
-	return fv.SetUpAt(fv.GetPath())
+func (fv *FakeVolume) SetUp(fsGroup *int64) error {
+	return fv.SetUpAt(fv.GetPath(), fsGroup)
 }
 
-func (fv *FakeVolume) SetUpAt(dir string) error {
+func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return os.MkdirAll(dir, 0750)
 }
 
