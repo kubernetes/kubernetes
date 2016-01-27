@@ -127,8 +127,8 @@
 {% endif -%}
 
 {% set network_plugin = "" -%}
-{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
-  {% set network_plugin = "--network-plugin=opencontrail" %}
+{% if grains['roles'][0] != 'kubernetes-master' and grains.get('network_provider') and grains['network_provider'] == 'opencontrail' %}
+      {% set network_plugin = "--network_plugin=" + grains['network_provider'] %}
 {% endif -%}
 
 {% set kubelet_port = "" -%}

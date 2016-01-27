@@ -20,8 +20,13 @@ base:
     - cadvisor
     - kube-client-tools
     - kube-node-unpacker
-    - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-kubelet-plugin
+{% endif %}
+    - kubelet
+    - supervisor
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-vrouter-kernel
     - opencontrail-networking-minion
 {% else %}
     - kube-proxy
@@ -37,7 +42,6 @@ base:
     - kube-registry-proxy
 {% endif %}
     - logrotate
-    - supervisor
 
   'roles:kubernetes-master':
     - match: grain
@@ -46,6 +50,10 @@ base:
 {% if pillar.get('network_provider', '').lower() == 'flannel' %}
     - flannel-server
     - flannel
+{% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
+    - docker
+    - kubelet
 {% endif %}
     - kube-apiserver
     - kube-controller-manager
@@ -69,10 +77,6 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
-    - docker
-    - kubelet
-{% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
 {% endif %}
@@ -80,3 +84,10 @@ base:
   'roles:kubernetes-pool-vsphere':
     - match: grain
     - static-routes
+
+  'roles:kubernetes-network-provider-gateway':
+    - match: grain
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-vrouter-kernel
+    - opencontrail-networking-gateway
+{% endif %}
