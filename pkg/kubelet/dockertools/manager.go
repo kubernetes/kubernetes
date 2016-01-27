@@ -748,6 +748,9 @@ func (dm *DockerManager) runContainer(
 		CPUShares:  cpuShares,
 	}
 
+	gpuDevice GPUDevice
+	err := gpu.Detect(&gpuDevice) 
+
 	if dm.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned to allow full usage of cpu resource.
 		cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
