@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // the unused capacity is calculated on a scale of 0-10
@@ -114,7 +115,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) sc
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2
-func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return schedulerapi.HostPriorityList{}, err
@@ -122,7 +123,7 @@ func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, 
 
 	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateResourceOccupancy(pod, node, machinesToPods[node.Name]))
+		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name].Pods()))
 	}
 	return list, nil
 }
@@ -143,7 +144,7 @@ func NewNodeLabelPriority(label string, presence bool) algorithm.PriorityFunctio
 // CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var score int
 	nodes, err := nodeLister.List()
 	if err != nil {
@@ -182,7 +183,7 @@ const (
 // based on the total size of those images.
 // - If none of the images are present, this node will be given the lowest priority.
 // - If some of the images are present on a node, the larger their sizes' sum, the higher the node's priority.
-func ImageLocalityPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	sumSizeMap := make(map[string]int64)
 
 	nodes, err := nodeLister.List()
@@ -248,7 +249,7 @@ func calculateScoreFromSize(sumSize int64) int {
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return schedulerapi.HostPriorityList{}, err
@@ -256,7 +257,7 @@ func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.P
 
 	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateBalancedResourceAllocation(pod, node, machinesToPods[node.Name]))
+		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name].Pods()))
 	}
 	return list, nil
 }

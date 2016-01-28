@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func makeNode(node string, milliCPU, memory int64) api.Node {
@@ -132,18 +132,15 @@ func TestZeroRequest(t *testing.T) {
 
 	const expectedPriority int = 25
 	for _, test := range tests {
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
-			m2p,
+			nodeNameToInfo,
 			algorithm.FakePodLister(test.pods),
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
-			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{})), Weight: 1}},
+			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{})), Weight: 1}},
 			algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -387,11 +384,8 @@ func TestLeastRequested(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		list, err := LeastRequestedPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		list, err := LeastRequestedPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -485,7 +479,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 			label:    test.label,
 			presence: test.presence,
 		}
-		list, err := prioritizer.CalculateNodeLabelPriority(nil, map[string][]*api.Pod{}, nil, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		list, err := prioritizer.CalculateNodeLabelPriority(nil, map[string]*schedulercache.NodeInfo{}, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -723,11 +717,8 @@ func TestBalancedResourceAllocation(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		list, err := BalancedResourceAllocation(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		list, err := BalancedResourceAllocation(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -870,11 +861,8 @@ func TestImageLocalityPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		list, err := ImageLocalityPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		list, err := ImageLocalityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
