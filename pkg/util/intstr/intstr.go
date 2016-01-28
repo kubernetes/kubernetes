@@ -144,5 +144,5 @@ func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 		}
 		return int(v), true, nil
 	}
-	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
+	return 0, false, fmt.Errorf("invalid type: neither int nor percentage")
 }
