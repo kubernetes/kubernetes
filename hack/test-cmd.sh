@@ -646,7 +646,7 @@ runTests() {
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --generator=job/v1beta1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created 
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
