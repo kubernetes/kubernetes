@@ -115,6 +115,16 @@ func (ComponentStatusList) SwaggerDoc() map[string]string {
 	return map_ComponentStatusList
 }
 
+var map_ConfigMap = map[string]string{
+	"":         "ConfigMap holds configuration data for pods to consume.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"data":     "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+}
+
+func (ConfigMap) SwaggerDoc() map[string]string {
+	return map_ConfigMap
+}
+
 var map_ConfigMapKeySelector = map[string]string{
 	"":    "Selects a key from a ConfigMap.",
 	"key": "The key to select.",
@@ -122,6 +132,16 @@ var map_ConfigMapKeySelector = map[string]string{
 
 func (ConfigMapKeySelector) SwaggerDoc() map[string]string {
 	return map_ConfigMapKeySelector
+}
+
+var map_ConfigMapList = map[string]string{
+	"":         "ConfigMapList is a resource containing a list of ConfigMap objects.",
+	"metadata": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is the list of ConfigMaps.",
+}
+
+func (ConfigMapList) SwaggerDoc() map[string]string {
+	return map_ConfigMapList
 }
 
 var map_Container = map[string]string{
