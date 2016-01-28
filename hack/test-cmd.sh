@@ -28,9 +28,12 @@ source "${KUBE_ROOT}/hack/lib/test.sh"
 # Stops the running kubectl proxy, if there is one.
 function stop-proxy()
 {
+  [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
   [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
+  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f ${PROXY_PORT_FILE}
   PROXY_PID=
   PROXY_PORT=
+  PROXY_PORT_FILE=
 }
 
 # Starts "kubect proxy" to test the client proxy. $1: api_prefix
@@ -38,22 +41,32 @@ function start-proxy()
 {
   stop-proxy
 
-  kube::log::status "Starting kubectl proxy"
+  PROXY_PORT_FILE=$(mktemp proxy-port.out.XXXXX)
+  kube::log::status "Starting kubectl proxy on random port; output file in ${PROXY_PORT_FILE}; args: ${1-}"
 
-  for retry in $(seq 1 3); do
-    PROXY_PORT=$(kube::util::get_random_port)
-    kube::log::status "On try ${retry}, use proxy port ${PROXY_PORT} if it's free"
-    if kube::util::test_host_port_free "127.0.0.1" "${PROXY_PORT}"; then
-      if [ $# -eq 0 ]; then
-        kubectl proxy -p ${PROXY_PORT} --www=. 1>&2 & break
-      else
-        kubectl proxy -p ${PROXY_PORT} --www=. --api-prefix="$1" 1>&2 & break
-      fi
+
+  if [ $# -eq 0 ]; then
+    kubectl proxy --port=0 --www=. 1>${PROXY_PORT_FILE} 2>&1 &
+  else
+    kubectl proxy --port=0 --www=. --api-prefix="$1" 1>${PROXY_PORT_FILE} 2>&1 &
+  fi
+  PROXY_PID=$!
+  PROXY_PORT=
+
+  local attempts=0
+  while [[ -z ${PROXY_PORT} ]]; do
+    if (( ${attempts} > 9 )); then
+      kill "${PROXY_PID}"
+      kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat ${PROXY_PORT_FILE})"
     fi
-    sleep 1;
+    sleep .5
+    kube::log::status "Attempt ${attempts} to read ${PROXY_PORT_FILE}..."
+    PROXY_PORT=$(sed 's/.*Starting to serve on 127.0.0.1:\([0-9]*\)$/\1/'< ${PROXY_PORT_FILE})
+    attempts=$((attempts+1))
   done
 
-  PROXY_PID=$!
+  kube::log::status "kubectl proxy running on port ${PROXY_PORT}"
+
   # We try checking kubectl proxy 30 times with 1s delays to avoid occasional
   # failures.
   if [ $# -eq 0 ]; then
