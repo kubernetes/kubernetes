@@ -96,26 +96,27 @@ const (
 )
 
 type SchedulerServer struct {
-	port                int
-	address             net.IP
-	enableProfiling     bool
-	authPath            string
-	apiServerList       []string
-	etcdServerList      []string
-	allowPrivileged     bool
-	executorPath        string
-	proxyPath           string
-	mesosMaster         string
-	mesosUser           string
-	frameworkRoles      []string
-	defaultPodRoles     []string
-	mesosAuthPrincipal  string
-	mesosAuthSecretFile string
-	mesosCgroupPrefix   string
-	mesosExecutorCPUs   mresource.CPUShares
-	mesosExecutorMem    mresource.MegaBytes
-	checkpoint          bool
-	failoverTimeout     float64
+	port                  int
+	address               net.IP
+	enableProfiling       bool
+	authPath              string
+	apiServerList         []string
+	etcdServerList        []string
+	allowPrivileged       bool
+	executorPath          string
+	proxyPath             string
+	mesosMaster           string
+	mesosUser             string
+	frameworkRoles        []string
+	defaultPodRoles       []string
+	mesosAuthPrincipal    string
+	mesosAuthSecretFile   string
+	mesosCgroupPrefix     string
+	mesosExecutorCPUs     mresource.CPUShares
+	mesosExecutorMem      mresource.MegaBytes
+	checkpoint            bool
+	failoverTimeout       float64
+	generateTaskDiscovery bool
 
 	executorLogV                   int
 	executorBindall                bool
@@ -262,6 +263,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.mesosExecutorMem, "mesos-executor-mem", "Initial memory (MB) to allocate for each Mesos executor container.")
 	fs.BoolVar(&s.checkpoint, "checkpoint", s.checkpoint, "Enable/disable checkpointing for the kubernetes-mesos framework.")
 	fs.Float64Var(&s.failoverTimeout, "failover-timeout", s.failoverTimeout, fmt.Sprintf("Framework failover timeout, in sec."))
+	fs.BoolVar(&s.generateTaskDiscovery, "mesos-generate-task-discovery", s.generateTaskDiscovery, "Enable/disable generation of DiscoveryInfo for Mesos tasks.")
 	fs.UintVar(&s.driverPort, "driver-port", s.driverPort, "Port that the Mesos scheduler driver process should listen on.")
 	fs.StringVar(&s.hostnameOverride, "hostname-override", s.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.Int64Var(&s.reconcileInterval, "reconcile-interval", s.reconcileInterval, "Interval at which to execute task reconciliation, in sec. Zero disables.")
@@ -553,6 +555,7 @@ func (s *SchedulerServer) getDriver() (driver bindings.SchedulerDriver) {
 }
 
 func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
+	podtask.GenerateTaskDiscoveryEnabled = s.generateTaskDiscovery
 	if n := len(s.frameworkRoles); n == 0 || n > 2 || (n == 2 && s.frameworkRoles[0] != "*" && s.frameworkRoles[1] != "*") {
 		log.Fatalf(`only one custom role allowed in addition to "*"`)
 	}
