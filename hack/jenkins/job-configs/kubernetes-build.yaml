@@ -1,6 +1,7 @@
 - job-template:
     name: 'kubernetes-{build}'
     description: 'Grab the latest from GitHub, build. Test owner: Build Cop.'
+    node: 'build'
     logrotate:
         numToKeep: 200
     builders:
