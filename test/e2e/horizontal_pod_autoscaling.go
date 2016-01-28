@@ -31,7 +31,7 @@ const (
 	subresource    = "scale"
 )
 
-var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Skipped]", func() {
+var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Feature:Autoscaling]", func() {
 	var rc *ResourceConsumer
 	f := NewFramework("horizontal-pod-autoscaling")
 
@@ -48,7 +48,7 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Skipped]", f
 		})
 	})
 
-	Describe("ReplicationController [Feature:Autoscaling]", func() {
+	Describe("ReplicationController", func() {
 		// CPU tests via replication controllers
 		It(titleUp, func() {
 			scaleUp("rc", kindRC, rc, f)

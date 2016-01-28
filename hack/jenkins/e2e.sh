@@ -54,7 +54,6 @@ function join_regex_no_empty() {
 # Assumes globals:
 #   $JOB_NAME
 #   $KUBERNETES_PROVIDER
-#   $GKE_DEFAULT_SKIP_TESTS
 #   $GCE_DEFAULT_SKIP_TESTS
 #   $GCE_FLAKY_TESTS
 #   $GCE_SLOW_TESTS
@@ -87,7 +86,6 @@ function configure_upgrade_step() {
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
         )"
   local -r gke_test_args="--ginkgo.skip=$(join_regex_allow_empty \
-        ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
@@ -272,37 +270,6 @@ GCE_DEFAULT_SKIP_TESTS=(
     "\[Feature:.+\]"
     )
 
-# PROVIDER SKIPS --------------------------------------
-
-# Tests which cannot be run on GKE, e.g. because they require
-# master ssh access.
-GKE_REQUIRED_SKIP_TESTS=(
-    "Nodes"
-    "Etcd\sFailure"
-    "MasterCerts"
-    "experimental\sresource\susage\stracking" # Expect --max-pods=110
-    "ServiceLoadBalancer" # issue: #16602
-    "Shell"
-    # Alpha features, remove from skip when these move to beta
-    "Daemon\sset"
-    "Deployment"
-    )
-
-# Specialized tests which should be skipped by default for GKE.
-GKE_DEFAULT_SKIP_TESTS=(
-    # Perf test, slow by design
-    "resource\susage\stracking"
-    "${GKE_REQUIRED_SKIP_TESTS[@]}"
-    )
-
-# Tests which cannot be run on AWS.
-AWS_REQUIRED_SKIP_TESTS=(
-    "experimental\sresource\susage\stracking" # Expect --max-pods=110
-    "GCE\sL7\sLoadBalancer\sController" # GCE L7 loadbalancing
-)
-
-# END PROVIDER SKIPS --------------------------------------
-
 # Tests which kills or restarts components and/or nodes.
 DISRUPTIVE_TESTS=(
     "\[Disruptive\]"
@@ -364,7 +331,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
 	  )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
@@ -472,7 +438,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
           )"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
@@ -633,9 +598,9 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     ;;
 
@@ -651,7 +616,6 @@ case ${JOB_NAME} in
           ) --ginkgo.skip=$(join_regex_no_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           )"}
     ;;
 
@@ -661,9 +625,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}}) \
-          --ginkgo.focus=$(join_regex_no_empty \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     ;;
@@ -696,7 +658,6 @@ case ${JOB_NAME} in
     # DISRUPTIVE_TESTS kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \

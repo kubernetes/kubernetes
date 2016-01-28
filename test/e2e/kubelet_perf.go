@@ -184,7 +184,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			})
 		}
 	})
-	Describe("experimental resource usage tracking", func() {
+	Describe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
 		density := []int{100}
 		for i := range density {
 			podsPerNode := density[i]
