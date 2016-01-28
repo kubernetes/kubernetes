@@ -477,6 +477,9 @@ func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api
 			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
 		return true
 	}
+	if len(oldService.Labels) != len(newService.Labels) {
+		return true
+	}
 	for i := range oldService.Spec.ExternalIPs {
 		if oldService.Spec.ExternalIPs[i] != newService.Spec.ExternalIPs[i] {
 			s.eventRecorder.Eventf(newService, api.EventTypeNormal, "ExternalIP", "Added: %v",

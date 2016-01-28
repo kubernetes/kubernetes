@@ -58,6 +58,9 @@ const TagNameKubernetesCluster = "KubernetesCluster"
 // The tag name we use to differentiate multiple services. Used currently for ELBs only.
 const TagNameKubernetesService = "kubernetes.io/service-name"
 
+// The label we use to decide if the load balancer is internal
+const LabelLoadBalancerIsInternal = "kubernetes.io/aws-lb-internal"
+
 // We sometimes read to see if something exists; then try to create it if we didn't find it
 // This can fail once in a consistent system if done in parallel
 // In an eventually consistent system, it could fail unboundedly
@@ -1997,8 +2000,11 @@ func (s *AWSCloud) EnsureLoadBalancer(service *api.Service, hosts []string) (*ap
 		listeners = append(listeners, listener)
 	}
 
+	// Determine whether to build an internal or internet-facing load balancer
+	isInternal := service.Labels[LabelLoadBalancerIsInternal] == "true"
+
 	// Build the load balancer itself
-	loadBalancer, err := s.ensureLoadBalancer(serviceName, name, listeners, subnetIDs, securityGroupIDs)
+	loadBalancer, err := s.ensureLoadBalancer(serviceName, name, listeners, subnetIDs, securityGroupIDs, isInternal)
 	if err != nil {
 		return nil, err
 	}
