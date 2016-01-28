@@ -37,7 +37,7 @@ const (
 	serverStartTimeout = podStartTimeout + 3*time.Minute
 )
 
-var _ = Describe("[Example] [Skipped]", func() {
+var _ = Describe("[Feature:Example]", func() {
 	framework := NewFramework("examples")
 	var c *client.Client
 	var ns string
