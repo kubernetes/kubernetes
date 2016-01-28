@@ -990,8 +990,8 @@
 		},
 		{
 			"ImportPath": "k8s.io/heapster/api/v1/types",
-			"Comment": "v0.17.0-75-g0e1b652",
-			"Rev": "0e1b652781812dee2c51c75180fc590223e0b9c6"
+			"Comment": "v0.19.1",
+			"Rev": "0991ac528ea24aae194e45d6dcf01896cb42cbea"
 		},
 		{
 			"ImportPath": "speter.net/go/exp/math/dec/inf",
