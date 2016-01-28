@@ -440,7 +440,6 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		fw = limitwriter.New(fw, *logOptions.LimitBytes)
 	}
 	response.Header().Set("Transfer-Encoding", "chunked")
-	response.WriteHeader(http.StatusOK)
 	if err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
 		if err != limitwriter.ErrMaximumWrite {
 			response.WriteError(http.StatusInternalServerError, err)
