@@ -770,7 +770,10 @@ var _ = Describe("Kubectl client", func() {
 				}
 
 				By("restricting to a time range")
-				time.Sleep(1500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
+				// Note: we must wait at least two seconds,
+				// because the granularity is only 1 second and
+				// it could end up rounding the wrong way.
+				time.Sleep(2500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
 				recent_out := runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=1s")
 				recent := len(strings.Split(recent_out, "\n"))
 				older_out := runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=24h")
