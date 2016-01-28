@@ -40,6 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+// Maximum time a kube-proxy daemon on a node is allowed to not
+// notice a Service update, such as type=NodePort.
+const kubeProxyLagTimeout = 45 * time.Second
+
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
@@ -394,12 +398,17 @@ var _ = Describe("Services", func() {
 
 		By("hitting the pod through the service's NodePort")
 		ip := pickNodeIP(c)
-		testReachable(ip, nodePort)
+		// Loop for kubeProxyLagTimeout, because different kube-proxies might take
+		// different times to notice the new Service and open up the node port.
+		if err := wait.PollImmediate(poll, kubeProxyLagTimeout, func() (bool, error) { return testReachable(ip, nodePort) }); err != nil {
+			Failf("Could not reach nodePort service through node-ip %v:%v in %v", ip, nodePort, kubeProxyLagTimeout)
+		}
 
 		By("verifying the node port is locked")
 		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
-		// Loop a bit because we see transient flakes.
-		cmd := fmt.Sprintf(`for i in $(seq 1 10); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 0.1; done; exit 1`, nodePort)
+		// Even if the node-ip:node-port check above passed, this hostexec pod
+		// might fall on a node with a laggy kube-proxy.
+		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
 		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 		if err != nil {
 			Failf("expected node port (%d) to be in use, stdout: %v", nodePort, stdout)
@@ -470,7 +479,12 @@ var _ = Describe("Services", func() {
 		By("hitting the pod through the service's NodePort")
 		ip := pickNodeIP(f.Client)
 		nodePort1 := port.NodePort // Save for later!
-		testReachable(ip, nodePort1)
+
+		// Loop for kubeProxyLagTimeout, because different kube-proxies might take
+		// different times to notice the new Service and open up the node port.
+		if err := wait.PollImmediate(poll, kubeProxyLagTimeout, func() (bool, error) { return testReachable(ip, nodePort1) }); err != nil {
+			Failf("Could not reach nodePort service through node-ip %v:%v in %v", ip, nodePort1, kubeProxyLagTimeout)
+		}
 
 		By("changing service " + serviceName + " to type=LoadBalancer")
 		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
@@ -502,7 +516,13 @@ var _ = Describe("Services", func() {
 
 		By("hitting the pod through the service's NodePort")
 		ip = pickNodeIP(f.Client)
-		testReachable(ip, nodePort1)
+
+		// Loop for kubeProxyLagTimeout, because different kube-proxies might take
+		// different times to notice the new Service and open up the node port.
+		if err := wait.PollImmediate(poll, kubeProxyLagTimeout, func() (bool, error) { return testReachable(ip, nodePort1) }); err != nil {
+			Failf("Could not reach nodePort service through node-ip %v:%v in %v", ip, nodePort1, kubeProxyLagTimeout)
+		}
+
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress1, 80)
 
@@ -539,7 +559,13 @@ var _ = Describe("Services", func() {
 		}
 
 		By("hitting the pod through the service's updated NodePort")
-		testReachable(ip, nodePort2)
+
+		// Loop for kubeProxyLagTimeout, because different kube-proxies might take
+		// different times to notice the new Service and open up the node port.
+		if err := wait.PollImmediate(poll, kubeProxyLagTimeout, func() (bool, error) { return testReachable(ip, nodePort2) }); err != nil {
+			Failf("Could not reach nodePort service through node-ip %v:%v in %v", ip, nodePort2, kubeProxyLagTimeout)
+		}
+
 		By("checking the old NodePort is closed")
 		testNotReachable(ip, nodePort1)
 
@@ -870,8 +896,10 @@ var _ = Describe("Services", func() {
 
 			if svc1.Spec.Ports[0].Protocol == api.ProtocolTCP {
 				By("hitting the pod through the service's NodePort")
-				testReachable(pickNodeIP(c), port.NodePort)
-
+				ip := pickNodeIP(c)
+				if err := wait.PollImmediate(poll, kubeProxyLagTimeout, func() (bool, error) { return testReachable(ip, port.NodePort) }); err != nil {
+					Failf("Could not reach nodePort service through node-ip %v:%v in %v", ip, port.NodePort, kubeProxyLagTimeout)
+				}
 				By("hitting the pod through the service's external load balancer")
 				testLoadBalancerReachable(ingress, servicePort)
 			} else {
