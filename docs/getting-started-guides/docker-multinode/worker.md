@@ -72,6 +72,12 @@ Run:
 sudo sh -c 'docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null &'
 ```
 
+_If you have Docker 1.8.0 or higher run this instead_
+
+```sh
+sudo sh -c 'docker daemon -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null &'
+```
+
 _Important Note_:
 If you are running this on a long running system, rather than experimenting, you should run the bootstrap Docker instance under something like SysV init, upstart or systemd so that it is restarted
 across reboots and failures.
@@ -172,7 +178,7 @@ sudo docker run \
     --volume=/var/run:/var/run:rw \
     --net=host \
     --privileged=true \
-    --pid=host \ 
+    --pid=host \
     -d \
     gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
     /hyperkube kubelet \

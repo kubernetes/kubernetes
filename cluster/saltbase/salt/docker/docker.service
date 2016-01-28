@@ -6,7 +6,7 @@ Requires=docker.socket
 
 [Service]
 EnvironmentFile={{ environment_file }}
-ExecStart=/usr/bin/docker -d -H fd:// "$DOCKER_OPTS"
+ExecStart=/usr/bin/docker daemon -H fd:// "$DOCKER_OPTS"
 MountFlags=slave
 LimitNOFILE=1048576
 LimitNPROC=1048576
