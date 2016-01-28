@@ -2019,6 +2019,14 @@ const (
 	ResourceSecrets ResourceName = "secrets"
 	// ResourcePersistentVolumeClaims, number
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	// CPU request, in cores. (500m = .5 cores)
+	ResourceCPURequest ResourceName = "cpu.request"
+	// CPU limit, in cores. (500m = .5 cores)
+	ResourceCPULimit ResourceName = "cpu.limit"
+	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceMemoryRequest ResourceName = "memory.request"
+	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceMemoryLimit ResourceName = "memory.limit"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota

@@ -3535,11 +3535,22 @@ func TestValidateResourceQuota(t *testing.T) {
 	spec := api.ResourceQuotaSpec{
 		Hard: api.ResourceList{
 			api.ResourceCPU:                    resource.MustParse("100"),
+			api.ResourceCPURequest:             resource.MustParse("100"),
+			api.ResourceCPULimit:               resource.MustParse("100"),
 			api.ResourceMemory:                 resource.MustParse("10000"),
+			api.ResourceMemoryRequest:          resource.MustParse("10000"),
+			api.ResourceMemoryLimit:            resource.MustParse("10000"),
 			api.ResourcePods:                   resource.MustParse("10"),
 			api.ResourceServices:               resource.MustParse("0"),
 			api.ResourceReplicationControllers: resource.MustParse("10"),
 			api.ResourceQuotas:                 resource.MustParse("10"),
+		},
+	}
+
+	// storage is not yet supported as a quota tracked resource
+	invalidQuotaResourceSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceStorage: resource.MustParse("10"),
 		},
 	}
 
@@ -3619,6 +3630,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"fractional-api-resource": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
 			isNotIntegerErrorMsg,
+		},
+		"invalid-quota-resource": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
+			isInvalidQuotaResource,
 		},
 	}
 	for k, v := range errorCases {

@@ -199,13 +199,25 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	}
 
 	if a.GetResource() == api.Resource("pods") {
-		for _, resourceName := range []api.ResourceName{api.ResourceMemory, api.ResourceCPU} {
+		for _, resourceName := range resourcequotacontroller.ResourceQuotaComputeResources() {
+
+			// determine the name of the underlying compute resource and if its a request or limit
+			computeResourceName, useRequest, err := resourcequotacontroller.ResourceQuotaToPodComputeResource(resourceName)
+			if err != nil {
+				return false, err
+			}
+
+			requirement := "limit"
+			if useRequest {
+				requirement = "request"
+			}
 
 			// ignore tracking the resource if it's not in the quota document
 			if !set[resourceName] {
 				continue
 			}
 
+			// verify there is still a hard limit
 			hard, hardFound := status.Hard[resourceName]
 			if !hardFound {
 				continue
@@ -219,10 +231,10 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 
 			// the amount of resource being requested, or an error if it does not make a request that is tracked
 			pod := obj.(*api.Pod)
-			delta, err := resourcequotacontroller.PodRequests(pod, resourceName)
+			deltaUsage, err := resourcequotacontroller.PodResourceRequirement(pod, computeResourceName, useRequest)
 
 			if err != nil {
-				return false, fmt.Errorf("%s is limited by quota, must make explicit request.", resourceName)
+				return false, fmt.Errorf("%s is limited by quota, must specify an explicit %s", computeResourceName, requirement)
 			}
 
 			// if this operation is an update, we need to find the delta usage from the previous state
@@ -232,13 +244,13 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 					return false, err
 				}
 
-				// if the previous version of the resource made a resource request, we need to subtract the old request
-				// from the current to get the actual resource request delta.  if the previous version of the pod
-				// made no request on the resource, then we get an err value.  we ignore the err value, and delta
-				// will just be equal to the total resource request on the pod since there is nothing to subtract.
-				oldRequest, err := resourcequotacontroller.PodRequests(oldPod, resourceName)
+				// if the previous version of the resource made a resource requirement, we need to subtract the old
+				// from the current to get the actual resource delta.  if the previous version of the pod
+				// made no requirement on the resource, then we get an err value.  we ignore the err value, and delta
+				// will just be equal to the total requirement on the pod since there is nothing to subtract.
+				oldUsage, err := resourcequotacontroller.PodResourceRequirement(oldPod, computeResourceName, useRequest)
 				if err == nil {
-					err = delta.Sub(*oldRequest)
+					err = deltaUsage.Sub(*oldUsage)
 					if err != nil {
 						return false, err
 					}
@@ -246,7 +258,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			}
 
 			newUsage := used.Copy()
-			newUsage.Add(*delta)
+			newUsage.Add(*deltaUsage)
 
 			// make the most precise comparison possible
 			newUsageValue := newUsage.Value()
@@ -257,7 +269,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			}
 
 			if newUsageValue > hardUsageValue {
-				errs = append(errs, fmt.Errorf("%s quota is %s, current usage is %s, requesting %s.", resourceName, hard.String(), used.String(), delta.String()))
+				errs = append(errs, fmt.Errorf("%s quota is %s, current usage is %s, requesting %s.", resourceName, hard.String(), used.String(), deltaUsage.String()))
 				dirty = false
 			} else {
 				status.Used[resourceName] = *newUsage

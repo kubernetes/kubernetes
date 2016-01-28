@@ -78,9 +78,45 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
-var standardResources = sets.NewString(
+var standardContainerResources = sets.NewString(
 	string(ResourceCPU),
 	string(ResourceMemory),
+)
+
+// IsStandardContainerResourceName returns true if the container can make a resource request
+// for the specified resource
+func IsStandardContainerResourceName(str string) bool {
+	return standardContainerResources.Has(str)
+}
+
+var standardQuotaResources = sets.NewString(
+	string(ResourceCPU),
+	string(ResourceCPURequest),
+	string(ResourceCPULimit),
+	string(ResourceMemory),
+	string(ResourceMemoryRequest),
+	string(ResourceMemoryLimit),
+	string(ResourcePods),
+	string(ResourceQuotas),
+	string(ResourceServices),
+	string(ResourceReplicationControllers),
+	string(ResourceSecrets),
+	string(ResourcePersistentVolumeClaims),
+)
+
+// IsStandardQuotaResourceName returns true if the resource is known to
+// the quota tracking system
+func IsStandardQuotaResourceName(str string) bool {
+	return standardQuotaResources.Has(str)
+}
+
+var standardResources = sets.NewString(
+	string(ResourceCPU),
+	string(ResourceCPURequest),
+	string(ResourceCPULimit),
+	string(ResourceMemory),
+	string(ResourceMemoryRequest),
+	string(ResourceMemoryLimit),
 	string(ResourcePods),
 	string(ResourceQuotas),
 	string(ResourceServices),

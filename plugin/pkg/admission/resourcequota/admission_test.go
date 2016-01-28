@@ -113,7 +113,7 @@ func TestIncrementUsagePodResources(t *testing.T) {
 	}
 	testCases := []testCase{
 		{
-			testName:      "memory-allowed",
+			testName:      "track-request-memory-allowed",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
 			resourceName:  api.ResourceMemory,
@@ -122,10 +122,27 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			testName:      "memory-not-allowed",
+			testName:      "track-limit-memory-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "50Mi"), getResourceList("", "100Mi"))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "50Mi"), getResourceList("", "100Mi"))),
+			resourceName:  api.ResourceMemoryLimit,
+			hard:          resource.MustParse("500Mi"),
+			expectedUsage: resource.MustParse("200Mi"),
+			expectedError: false,
+		},
+		{
+			testName:      "track-request-memory-not-allowed",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
 			resourceName:  api.ResourceMemory,
+			hard:          resource.MustParse("500Mi"),
+			expectedError: true,
+		},
+		{
+			testName:      "track-limit-memory-not-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "100Mi"))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "450Mi"))),
+			resourceName:  api.ResourceMemoryLimit,
 			hard:          resource.MustParse("500Mi"),
 			expectedError: true,
 		},
@@ -138,7 +155,7 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			testName:      "memory-no-request",
+			testName:      "track-request-memory-not-specified",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
 			resourceName:  api.ResourceMemory,
@@ -146,7 +163,15 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			testName:      "cpu-allowed",
+			testName:      "track-limit-memory-not-specified",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "100Mi"))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName:  api.ResourceMemoryLimit,
+			hard:          resource.MustParse("500Mi"),
+			expectedError: true,
+		},
+		{
+			testName:      "track-request-cpu-allowed",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
 			resourceName:  api.ResourceCPU,
@@ -155,7 +180,16 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			testName:      "cpu-not-allowed",
+			testName:      "track-limit-cpu-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			resourceName:  api.ResourceCPULimit,
+			hard:          resource.MustParse("2"),
+			expectedUsage: resource.MustParse("2"),
+			expectedError: false,
+		},
+		{
+			testName:      "track-request-cpu-not-allowed",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("600m", ""), getResourceList("", ""))),
 			resourceName:  api.ResourceCPU,
@@ -163,10 +197,26 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			testName:      "cpu-no-request",
+			testName:      "track-limit-cpu-not-allowed",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("600m", ""))),
+			resourceName:  api.ResourceCPULimit,
+			hard:          resource.MustParse("1500m"),
+			expectedError: true,
+		},
+		{
+			testName:      "track-request-cpu-not-specified",
 			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
 			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
 			resourceName:  api.ResourceCPU,
+			hard:          resource.MustParse("1500m"),
+			expectedError: true,
+		},
+		{
+			testName:      "track-limit-cpu-not-specified",
+			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName:  api.ResourceCPULimit,
 			hard:          resource.MustParse("1500m"),
 			expectedError: true,
 		},
@@ -178,7 +228,13 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			Hard: api.ResourceList{},
 			Used: api.ResourceList{},
 		}
-		used, err := resourcequotacontroller.PodRequests(item.existing, item.resourceName)
+
+		// determine the name of the underlying compute resource and if its a request or limit
+		computeResourceName, useRequest, err := resourcequotacontroller.ResourceQuotaToPodComputeResource(item.resourceName)
+		if err != nil {
+			t.Errorf("Test %s, unexpected error", err)
+		}
+		used, err := resourcequotacontroller.PodResourceRequirement(item.existing, computeResourceName, useRequest)
 		if err != nil {
 			t.Errorf("Test %s, unexpected error %v", item.testName, err)
 		}
