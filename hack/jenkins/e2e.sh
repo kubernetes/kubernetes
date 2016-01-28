@@ -265,7 +265,6 @@ CURRENT_RELEASE_PUBLISHED_VERSION="ci/latest-1.1"
 
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
-    "\[Example\]" # previously in REBOOT_SKIP_TESTS..., dates back before version control (#10078)
     "\[Skipped\]"
     "\[Feature:.+\]"
     )
@@ -346,7 +345,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-examples)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
     : ${E2E_NETWORK:="e2e-examples"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Example\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Example\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-examples"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
