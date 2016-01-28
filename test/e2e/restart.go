@@ -48,9 +48,7 @@ const (
 	restartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-// TODO(ihmccreery): These tests haven't been run for a while, so until they're
-// known stable, consider them a non-core feature.
-var _ = Describe("Restart [Feature:Restart]", func() {
+var _ = Describe("Restart [Disruptive]", func() {
 	var c *client.Client
 	var ps *podStore
 	var skipped bool
