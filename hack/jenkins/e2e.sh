@@ -304,16 +304,13 @@ GCE_PARALLEL_SKIP_TESTS=(
 # release branches defines relevant jobs for that particular version of
 # Kubernetes.
 case ${JOB_NAME} in
-  # Runs all non-flaky, non-slow tests on GCE, sequentially.
+  # Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.
   kubernetes-e2e-gce)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
     : ${E2E_PUBLISH_GREEN_VERSION:="true"}
     : ${E2E_NETWORK:="e2e-gce"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
+    : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
     : ${ENABLE_DEPLOYMENTS:=true}
@@ -591,17 +588,15 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
-  kubernetes-e2e-gke-ci)
+  # Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel.
+  kubernetes-e2e-gke)
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
     : ${E2E_NETWORK:="e2e-gke-ci"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
+    : ${GINKGO_PARALLEL:="y"}
     ;;
 
   # Run the GCE_PARALLEL_SKIP_TESTS on GKE.
