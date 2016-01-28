@@ -80,13 +80,17 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("deployment should label adopted RSs and pods", func() {
 		testDeploymentLabelAdopted(f)
 	})
+	It("paused deployment should be able to scale", func() {
+		testScalePausedDeployment(f)
+	})
 })
 
 func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
 	zero := int64(0)
 	return &extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
-			Name: rsName,
+			Name:   rsName,
+			Labels: rsPodLabels,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: replicas,
@@ -945,4 +949,116 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	err = framework.CheckPodHashLabel(pods)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(int32(len(pods.Items))).Should(Equal(replicas))
+}
+
+func testScalePausedDeployment(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := adapter.FromUnversionedClient(f.Client)
+
+	podLabels := map[string]string{"name": nginxImageName}
+	replicas := int32(3)
+
+	// Create old replica set so it can be adopted by the nginx deployment later.
+	oldRS := newRS("nginx-v1", 2, podLabels, nginxImageName, nginxImage)
+	one := int64(1)
+	oldRS.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+	framework.Logf("Creating old replica set %q", oldRS.Name)
+	oldRS, err := c.Extensions().ReplicaSets(ns).Create(oldRS)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create new replica set so it can be adopted by the nginx deployment later.
+	rs := newRS("nginx-v2", 1, podLabels, nginxImageName, nginxImage)
+	framework.Logf("Creating new replica set %q", rs.Name)
+	rs, err = c.Extensions().ReplicaSets(ns).Create(rs)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create a nginx deployment.
+	deploymentName := "nginx-deployment"
+	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
+	d.Spec.Paused = true
+	framework.Logf("Creating paused deployment %q", deploymentName)
+	_, err = c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	defer stopDeployment(c, f.Client, ns, deploymentName)
+
+	// Check that deployment is created fine.
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Make sure the controller is synced.
+	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Scale the paused deployment.
+	// TODO: Use the scale subresource once it's back in master
+	framework.Logf("Scaling up the paused deployment %q", deploymentName)
+	newReplicas := int32(5)
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+		update.Spec.Replicas = newReplicas
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	desiredGeneration := deployment.Generation
+	err = wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		return deployment.Status.ObservedGeneration >= desiredGeneration && deployment.Spec.Replicas == deployment.Status.Replicas, nil
+	})
+
+	// both replica sets should be proportionally scaled up
+	// rs should go from 1 to 2
+	// oldRS should go from 2 to 3
+	framework.Logf("Checking if proportional scaling works fine")
+	err = wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err = c.Extensions().ReplicaSets(ns).Get(rs.Name)
+		if err != nil {
+			return false, err
+		}
+
+		oldRS, err = c.Extensions().ReplicaSets(ns).Get(oldRS.Name)
+		if err != nil {
+			return false, err
+		}
+
+		return rs.Generation <= rs.Status.ObservedGeneration &&
+			rs.Spec.Replicas == 2 &&
+			oldRS.Generation <= oldRS.Status.ObservedGeneration &&
+			oldRS.Spec.Replicas == 3, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Proportional scaling successfully done")
+
+	Expect(rs.Annotations[deploymentutil.DesiredReplicasAnnotation]).Should(Equal("5"))
+	Expect(rs.Annotations[deploymentutil.TotalReplicasAnnotation]).Should(Equal("6"))
+	Expect(oldRS.Annotations[deploymentutil.DesiredReplicasAnnotation]).Should(Equal("5"))
+	Expect(oldRS.Annotations[deploymentutil.TotalReplicasAnnotation]).Should(Equal("6"))
+
+	// Update the deployment to run
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *extensions.Deployment) {
+		update.Spec.Paused = false
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Checking that the rollout proceeds after resuming")
+	err = wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err = c.Extensions().ReplicaSets(ns).Get(rs.Name)
+		if err != nil {
+			return false, err
+		}
+
+		oldRS, err = c.Extensions().ReplicaSets(ns).Get(oldRS.Name)
+		if err != nil {
+			return false, err
+		}
+		framework.Logf("new replicas: %d, old replicas: %d, newGen: %d, newObs: %d, oldGen: %d, oldObs: %d",
+			rs.Spec.Replicas, oldRS.Spec.Replicas, rs.Generation, rs.Status.ObservedGeneration, oldRS.Generation, oldRS.Status.ObservedGeneration)
+		return rs.Generation <= rs.Status.ObservedGeneration &&
+			rs.Spec.Replicas == 5 &&
+			oldRS.Generation <= oldRS.Status.ObservedGeneration &&
+			oldRS.Spec.Replicas == 0, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Rollout after resuming successfully done")
 }

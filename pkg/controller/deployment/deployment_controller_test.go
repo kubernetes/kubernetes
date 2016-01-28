@@ -127,11 +127,123 @@ func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet
 			Template: d.Spec.Template,
 		},
 	}
-
 }
 
 func newListOptions() api.ListOptions {
 	return api.ListOptions{}
+}
+
+func TestProportionallyScaling(t *testing.T) {
+	tests := []struct {
+		name       string
+		deployment exp.Deployment
+
+		newRS  *exp.ReplicaSet
+		oldRSs []*exp.ReplicaSet
+
+		expectedNew *exp.ReplicaSet
+		expectedOld []*exp.ReplicaSet
+	}{
+		{
+			name:       "normal scaling event: 10 -> 12",
+			deployment: deployment("foo", 12, intstr.FromInt(1), intstr.FromInt(0)),
+
+			newRS:  rs("foo-v1", 10, nil),
+			oldRSs: []*exp.ReplicaSet{},
+
+			expectedNew: rs("foo-v1", 12, nil),
+			expectedOld: []*exp.ReplicaSet{},
+		},
+		{
+			name:       "normal scaling event: 10 -> 5",
+			deployment: deployment("foo", 5, intstr.FromInt(0), intstr.FromInt(1)),
+
+			newRS:  rs("foo-v1", 10, nil),
+			oldRSs: []*exp.ReplicaSet{},
+
+			expectedNew: rs("foo-v1", 5, nil),
+			expectedOld: []*exp.ReplicaSet{},
+		},
+		{
+			name:       "proportional scaling: 5 -> 10",
+			deployment: deployment("foo", 10, intstr.FromInt(1), intstr.FromInt(0)),
+
+			newRS:  rs("foo-v2", 2, nil),
+			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 3, nil)},
+
+			expectedNew: rs("foo-v2", 4, nil),
+			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 6, nil)},
+		},
+		{
+			name:       "proportional scaling: 5 -> 2",
+			deployment: deployment("foo", 2, intstr.FromInt(0), intstr.FromInt(0)),
+
+			newRS:  rs("foo-v2", 2, nil),
+			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 3, nil)},
+
+			expectedNew: rs("foo-v2", 1, nil),
+			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 1, nil)},
+		},
+		{
+			name:       "proportional scaling: 9 -> 4",
+			deployment: deployment("foo", 4, intstr.FromInt(0), intstr.FromInt(0)),
+
+			newRS:  rs("foo-v2", 8, nil),
+			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 1, nil)},
+
+			expectedNew: rs("foo-v2", 4, nil),
+			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 0, nil)},
+		},
+		{
+			name:       "proportional scaling: 7 -> 10",
+			deployment: deployment("foo", 10, intstr.FromInt(2), intstr.FromInt(0)),
+
+			newRS:  rs("foo-v2", 2, nil),
+			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 3, nil), rs("foo-v1", 2, nil)},
+
+			expectedNew: rs("foo-v2", 3, nil),
+			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 4, nil), rs("foo-v1", 3, nil)},
+		},
+		{
+			name:       "proportional scaling: 13 -> 8",
+			deployment: deployment("foo", 8, intstr.FromInt(2), intstr.FromInt(0)),
+
+			newRS:  rs("foo-v2", 2, nil),
+			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 8, nil), rs("foo-v1", 3, nil)},
+
+			expectedNew: rs("foo-v2", 1, nil),
+			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 5, nil), rs("foo-v1", 2, nil)},
+		},
+	}
+
+	for _, test := range tests {
+		t.Log(test.name)
+		fake := fake.Clientset{}
+		dc := &DeploymentController{
+			client:        &fake,
+			eventRecorder: &record.FakeRecorder{},
+		}
+
+		if err := dc.proportionalScaling(&test.deployment, test.newRS, test.oldRSs); err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if test.expectedNew.Spec.Replicas != test.newRS.Spec.Replicas {
+			t.Errorf("new replica set (%s) mismatch! Expected replicas: %d, got: %d", test.newRS.Name, test.expectedNew.Spec.Replicas, test.newRS.Spec.Replicas)
+			continue
+		}
+		if len(test.expectedOld) != len(test.oldRSs) {
+			t.Errorf("unexpected old replica set mismatch! Expected %d old replica sets, got %d", len(test.expectedOld), len(test.oldRSs))
+			continue
+		}
+		for n := range test.oldRSs {
+			rs := test.oldRSs[n]
+			exp := test.expectedOld[n]
+			if exp.Spec.Replicas != rs.Spec.Replicas {
+				t.Errorf("old replica set (%s) mismatch! Expected replicas: %d, got: %d", rs.Name, exp.Spec.Replicas, rs.Spec.Replicas)
+			}
+		}
+	}
 }
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {

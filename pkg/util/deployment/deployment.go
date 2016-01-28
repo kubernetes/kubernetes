@@ -40,6 +40,12 @@ import (
 const (
 	// The revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
+	// in its replica sets.
+	DesiredReplicasAnnotation = "deployment.kubernetes.io/desired-replicas"
+	// TotalReplicasAnnotation is the total replicas for a deployment (desired+maxSurge in case the
+	// new replica set is not satured) recorded in its replica sets.
+	TotalReplicasAnnotation = "deployment.kubernetes.io/total-replicas"
 
 	// Here are the possible rollback event reasons
 	RollbackRevisionNotFound  = "DeploymentRollbackRevisionNotFound"
@@ -365,6 +371,23 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 	default:
 		return 0, fmt.Errorf("deployment type %v isn't supported", deployment.Spec.Strategy.Type)
 	}
+}
+
+// NewRsIsSaturated looks into the replica set annotations and determines
+// if the new replica set is saturated.
+func NewRsIsSaturated(deployment *extensions.Deployment, newRS *extensions.ReplicaSet) bool {
+	if newRS == nil {
+		return false
+	}
+	desiredString, ok := newRS.Annotations[DesiredReplicasAnnotation]
+	if !ok {
+		return false
+	}
+	desired, err := strconv.Atoi(desiredString)
+	if err != nil {
+		return false
+	}
+	return newRS.Spec.Replicas == int32(desired) && deployment.Spec.Replicas == int32(desired)
 }
 
 // Polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
