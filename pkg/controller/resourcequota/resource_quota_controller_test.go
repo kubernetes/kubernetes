@@ -23,10 +23,31 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
+
+func newResourceQuotaController(kubeClient client.Interface) *ResourceQuotaController {
+	resourceQuotaUsageRegistry := NewDefaultUsageFuncRegistry(kubeClient)
+	resourceQuotaControllerFactory := NewMonitoringControllerFactory(kubeClient)
+	groupKindsToMonitor := []unversioned.GroupKind{
+		unversioned.GroupKind{Group: "", Kind: "Pod"},
+		unversioned.GroupKind{Group: "", Kind: "Service"},
+		unversioned.GroupKind{Group: "", Kind: "ReplicationController"},
+		unversioned.GroupKind{Group: "", Kind: "PersistentVolumeClaim"},
+	}
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:          kubeClient,
+		ResyncPeriod:        controller.StaticResyncPeriodFunc(time.Second),
+		UsageRegistry:       resourceQuotaUsageRegistry,
+		ControllerFactory:   resourceQuotaControllerFactory,
+		GroupKindsToMonitor: groupKindsToMonitor,
+	}
+	return NewResourceQuotaController(resourceQuotaControllerOptions)
+}
 
 func getResourceList(cpu, memory string) api.ResourceList {
 	res := api.ResourceList{}
@@ -174,8 +195,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 	kubeClient := testclient.NewSimpleFake(&podList, &quota)
-
-	ResourceQuotaController := NewResourceQuotaController(kubeClient, controller.StaticResyncPeriodFunc(time.Second))
+	ResourceQuotaController := newResourceQuotaController(kubeClient)
 	err := ResourceQuotaController.syncResourceQuota(quota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
@@ -231,8 +251,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	}
 
 	kubeClient := testclient.NewSimpleFake(&quota)
-
-	ResourceQuotaController := NewResourceQuotaController(kubeClient, controller.StaticResyncPeriodFunc(time.Second))
+	ResourceQuotaController := newResourceQuotaController(kubeClient)
 	err := ResourceQuotaController.syncResourceQuota(quota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
@@ -279,7 +298,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 
 	kubeClient := testclient.NewSimpleFake(&api.PodList{}, &quota)
 
-	ResourceQuotaController := NewResourceQuotaController(kubeClient, controller.StaticResyncPeriodFunc(time.Second))
+	ResourceQuotaController := newResourceQuotaController(kubeClient)
 	err := ResourceQuotaController.syncResourceQuota(quota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
