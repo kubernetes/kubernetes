@@ -70,6 +70,8 @@ type PodStats struct {
 	// Stats pertaining to volume usage of filesystem resources.
 	// VolumeStats.UsedBytes is the number of bytes used by the Volume
 	VolumeStats []VolumeStats `json:"volume,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
+	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ContainerStats holds container-level unprocessed sample stats.
@@ -146,4 +148,38 @@ type FsStats struct {
 	// This may differ from the total bytes used on the filesystem and may not equal CapacityBytes - AvailableBytes.
 	// e.g. For ContainerStats.Rootfs this is the bytes used by the container rootfs on the filesystem.
 	UsedBytes *resource.Quantity `json:"usedBytes,omitempty"`
+}
+
+// UserDefinedMetricType defines how the metric should be interpreted by the user.
+type UserDefinedMetricType string
+
+const (
+	// Instantaneous value. May increase or decrease.
+	MetricGauge UserDefinedMetricType = "gauge"
+
+	// A counter-like value that is only expected to increase.
+	MetricCumulative UserDefinedMetricType = "cumulative"
+
+	// Rate over a time period.
+	MetricDelta UserDefinedMetricType = "delta"
+)
+
+// UserDefinedMetricDescriptor contains metadata that describes a user defined metric.
+type UserDefinedMetricDescriptor struct {
+	// The name of the metric.
+	Name string `json:"name"`
+
+	// Type of the metric.
+	Type UserDefinedMetricType `json:"type"`
+
+	// Display Units for the stats.
+	Units string `json:"units"`
+}
+
+// UserDefinedMetric represents a metric defined and generate by users.
+type UserDefinedMetric struct {
+	UserDefinedMetricDescriptor `json:",inline"`
+	// Value of the metric. Float64s have 53 bit precision.
+	// We do not forsee any metrics exceeding that value.
+	Value float64 `json:"value"`
 }

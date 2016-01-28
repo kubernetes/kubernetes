@@ -40,6 +40,12 @@ func (c *Mock) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest)
 	return args.Get(0).(*cadvisorapi.ContainerInfo), args.Error(1)
 }
 
+// ContainerInfoV2 is a mock implementation of Interface.ContainerInfoV2.
+func (c *Mock) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	args := c.Called(name, options)
+	return args.Get(0).(map[string]cadvisorapiv2.ContainerInfo), args.Error(1)
+}
+
 func (c *Mock) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	args := c.Called(name, req)
 	return args.Get(0).(map[string]*cadvisorapi.ContainerInfo), args.Error(1)
