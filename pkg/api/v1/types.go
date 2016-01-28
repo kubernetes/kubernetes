@@ -1971,7 +1971,7 @@ const (
 
 // NodeCondition contains condition infromation for a node.
 type NodeCondition struct {
-	// Type of node condition, currently only Ready.
+	// Type of node condition.
 	Type NodeConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status ConditionStatus `json:"status"`

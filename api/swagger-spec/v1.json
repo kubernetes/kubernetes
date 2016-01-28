@@ -13683,7 +13683,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type of node condition, currently only Ready."
+      "description": "Type of node condition."
      },
      "status": {
       "type": "string",

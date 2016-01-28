@@ -701,7 +701,7 @@ func (NodeAddress) SwaggerDoc() map[string]string {
 
 var map_NodeCondition = map[string]string{
 	"":                   "NodeCondition contains condition infromation for a node.",
-	"type":               "Type of node condition, currently only Ready.",
+	"type":               "Type of node condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastHeartbeatTime":  "Last time we got an update on a given condition.",
 	"lastTransitionTime": "Last time the condition transit from one status to another.",
