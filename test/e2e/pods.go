@@ -689,7 +689,7 @@ var _ = Describe("Pods", func() {
 									Port: intstr.FromInt(8080),
 								},
 							},
-							InitialDelaySeconds: 15,
+							InitialDelaySeconds: 30,
 							FailureThreshold:    1,
 						},
 					},
