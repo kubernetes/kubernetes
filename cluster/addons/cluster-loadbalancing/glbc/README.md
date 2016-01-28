@@ -85,7 +85,7 @@ Events:
 
 Since GLBC runs as a cluster addon, you cannot simply delete the RC. The easiest way to disable it is to do as follows:
 
-* IFF you want to tear down existing L7 loadbalancers, hit the /delete-all-and-quit endpoint on the pod:
+* IF you want to tear down existing L7 loadbalancers, hit the /delete-all-and-quit endpoint on the pod:
 
 ```console
 $ kubectl get pods --namespace=kube-system
