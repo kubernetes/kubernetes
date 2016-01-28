@@ -417,12 +417,12 @@ func setSupplementaryGIDs(app *appctypes.App, podCtx *api.PodSecurityContext) {
 
 // setApp merges the container spec with the image's manifest.
 func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContainerOptions, ctx *api.SecurityContext, podCtx *api.PodSecurityContext) error {
-	// Override the exec.
-	if len(c.Command) > 0 {
-		app.Exec = c.Command
-	}
-	if len(c.Args) > 0 {
-		app.Exec = append(app.Exec, c.Args...)
+	// TODO(yifan): If ENTRYPOINT and CMD are both specified in the image,
+	// we cannot override just one of these at this point as they are already mixed.
+	command, args := kubecontainer.ExpandContainerCommandAndArgs(c, opts.Envs)
+	exec := append(command, args...)
+	if len(exec) > 0 {
+		app.Exec = exec
 	}
 
 	// Set UID and GIDs.
