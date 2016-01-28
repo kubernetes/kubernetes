@@ -2179,9 +2179,10 @@ func issueSSHCommand(cmd, provider string, node *api.Node) error {
 	if host == "" {
 		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
 	}
-	Logf("Calling %s on %s", cmd, node.Name)
-	if result, err := SSH(cmd, host, provider); result.Code != 0 || err != nil {
-		LogSSHResult(result)
+	Logf("Calling %s on %s(%s)", cmd, node.Name, host)
+	result, err := SSH(cmd, host, provider)
+	LogSSHResult(result)
+	if result.Code != 0 || err != nil {
 		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
 	}
 	return nil
