@@ -36,10 +36,11 @@ type HandlerRunner interface {
 	Run(containerID ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error
 }
 
-// RunContainerOptionsGenerator generates the options that necessary for
-// container runtime to run a container.
-type RunContainerOptionsGenerator interface {
+// RuntimeHelper wraps kubelet to make container runtime
+// able to get necessary informations like the RunContainerOptions, DNS settings.
+type RuntimeHelper interface {
 	GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*RunContainerOptions, error)
+	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
