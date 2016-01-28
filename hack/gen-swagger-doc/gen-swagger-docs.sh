@@ -22,7 +22,15 @@ set -o pipefail
 
 cd /build
 
-wget "$2" -O register.go
+# wget doesn't retry on 503, so adding a loop to make it more resilient.
+for i in {1..3}; do
+  if wget "$2" -O register.go; then
+    break
+  fi
+  if [ $i -eq 3 ]; then
+    exit 1
+  fi
+done
 
 # gendocs takes "input.json" as the input swagger spec.
 cp /swagger-source/"$1".json input.json
