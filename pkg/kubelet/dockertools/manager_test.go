@@ -58,13 +58,15 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	return nil, f.err
 }
 
-type fakeOptionGenerator struct{}
+// fakeRuntimeHelper implementes kubecontainer.RuntimeHelper inter
+// faces for testing purposes.
+type fakeRuntimeHelper struct{}
 
-var _ kubecontainer.RunContainerOptionsGenerator = &fakeOptionGenerator{}
+var _ kubecontainer.RuntimeHelper = &fakeRuntimeHelper{}
 
 var testPodContainerDir string
 
-func (*fakeOptionGenerator) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
+func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
 	var opts kubecontainer.RunContainerOptions
 	var err error
 	if len(container.TerminationMessagePath) != 0 {
@@ -77,12 +79,15 @@ func (*fakeOptionGenerator) GenerateRunContainerOptions(pod *api.Pod, container 
 	return &opts, nil
 }
 
+func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
+	return nil, nil, fmt.Errorf("not implemented")
+}
+
 func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManager, *FakeDockerClient) {
 	fakeDocker := NewFakeDockerClient()
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
 	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	optionGenerator := &fakeOptionGenerator{}
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
@@ -93,7 +98,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 		0, 0, "",
 		kubecontainer.FakeOS{},
 		networkPlugin,
-		optionGenerator,
+		&fakeRuntimeHelper{},
 		fakeHTTPClient,
 		util.NewBackOff(time.Second, 300*time.Second))
 
