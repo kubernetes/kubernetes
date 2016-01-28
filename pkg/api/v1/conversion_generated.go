@@ -195,6 +195,28 @@ func Convert_api_ComponentStatusList_To_v1_ComponentStatusList(in *api.Component
 	return autoConvert_api_ComponentStatusList_To_v1_ComponentStatusList(in, out, s)
 }
 
+func autoConvert_api_ConfigMap_To_v1_ConfigMap(in *api.ConfigMap, out *ConfigMap, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ConfigMap))(in)
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make(map[string]string)
+		for key, val := range in.Data {
+			out.Data[key] = val
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func Convert_api_ConfigMap_To_v1_ConfigMap(in *api.ConfigMap, out *ConfigMap, s conversion.Scope) error {
+	return autoConvert_api_ConfigMap_To_v1_ConfigMap(in, out, s)
+}
+
 func autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigMapKeySelector, out *ConfigMapKeySelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ConfigMapKeySelector))(in)
@@ -208,6 +230,30 @@ func autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.Con
 
 func Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigMapKeySelector, out *ConfigMapKeySelector, s conversion.Scope) error {
 	return autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in, out, s)
+}
+
+func autoConvert_api_ConfigMapList_To_v1_ConfigMapList(in *api.ConfigMapList, out *ConfigMapList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ConfigMapList))(in)
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ConfigMap, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_api_ConfigMap_To_v1_ConfigMap(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_api_ConfigMapList_To_v1_ConfigMapList(in *api.ConfigMapList, out *ConfigMapList, s conversion.Scope) error {
+	return autoConvert_api_ConfigMapList_To_v1_ConfigMapList(in, out, s)
 }
 
 func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container, s conversion.Scope) error {
@@ -3313,6 +3359,28 @@ func Convert_v1_ComponentStatusList_To_api_ComponentStatusList(in *ComponentStat
 	return autoConvert_v1_ComponentStatusList_To_api_ComponentStatusList(in, out, s)
 }
 
+func autoConvert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ConfigMap))(in)
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make(map[string]string)
+		for key, val := range in.Data {
+			out.Data[key] = val
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func Convert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMap_To_api_ConfigMap(in, out, s)
+}
+
 func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ConfigMapKeySelector))(in)
@@ -3326,6 +3394,30 @@ func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigM
 
 func Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
 	return autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in, out, s)
+}
+
+func autoConvert_v1_ConfigMapList_To_api_ConfigMapList(in *ConfigMapList, out *api.ConfigMapList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ConfigMapList))(in)
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.ConfigMap, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_v1_ConfigMap_To_api_ConfigMap(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1_ConfigMapList_To_api_ConfigMapList(in *ConfigMapList, out *api.ConfigMapList, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMapList_To_api_ConfigMapList(in, out, s)
 }
 
 func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container, s conversion.Scope) error {
@@ -6152,6 +6244,8 @@ func init() {
 		autoConvert_api_ComponentStatusList_To_v1_ComponentStatusList,
 		autoConvert_api_ComponentStatus_To_v1_ComponentStatus,
 		autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector,
+		autoConvert_api_ConfigMapList_To_v1_ConfigMapList,
+		autoConvert_api_ConfigMap_To_v1_ConfigMap,
 		autoConvert_api_ContainerImage_To_v1_ContainerImage,
 		autoConvert_api_ContainerPort_To_v1_ContainerPort,
 		autoConvert_api_ContainerStateRunning_To_v1_ContainerStateRunning,
@@ -6275,6 +6369,8 @@ func init() {
 		autoConvert_v1_ComponentStatusList_To_api_ComponentStatusList,
 		autoConvert_v1_ComponentStatus_To_api_ComponentStatus,
 		autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector,
+		autoConvert_v1_ConfigMapList_To_api_ConfigMapList,
+		autoConvert_v1_ConfigMap_To_api_ConfigMap,
 		autoConvert_v1_ContainerImage_To_api_ContainerImage,
 		autoConvert_v1_ContainerPort_To_api_ContainerPort,
 		autoConvert_v1_ContainerStateRunning_To_api_ContainerStateRunning,
