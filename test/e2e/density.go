@@ -104,11 +104,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 	return constraints
 }
 
-// This test suite can take a long time to run, and can affect or be affected by other tests.
-// So by default it is added to the ginkgo.skip list (see driver.go).
-// To run this suite you must explicitly ask for it by setting the
-// -t/--test flag or ginkgo.focus flag.
-var _ = Describe("Density [Skipped]", func() {
+var _ = Describe("Density", func() {
 	var c *client.Client
 	var nodeCount int
 	var RCName string
@@ -189,9 +185,13 @@ var _ = Describe("Density [Skipped]", func() {
 
 	for _, testArg := range densityTests {
 		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
-		if testArg.podsPerNode == 30 {
-			name = "[Performance] " + name
+		// More than 30 pods per node is outside our v1.0 goals.
+		// We might want to enable those tests in the future.
+		if testArg.podsPerNode <= 30 {
+			name = "[Feature:Performance] " + name
 			framework.addonResourceConstraints = density30AddonResourceVerifier()
+		} else {
+			name = "[Feature:ExperimentalPerformance] " + name
 		}
 		itArg := testArg
 		It(name, func() {
