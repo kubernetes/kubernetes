@@ -19,10 +19,12 @@ package daemon
 import (
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -32,9 +34,11 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-	"sync"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 const (
@@ -325,7 +329,7 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	node := obj.(*api.Node)
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
-		shouldEnqueue := nodeShouldRunDaemonPod(node, ds)
+		shouldEnqueue := dsc.nodeShouldRunDaemonPod(node, ds)
 		if shouldEnqueue {
 			dsc.enqueueDaemonSet(ds)
 		}
@@ -346,7 +350,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	}
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
-		shouldEnqueue := (nodeShouldRunDaemonPod(oldNode, ds) != nodeShouldRunDaemonPod(curNode, ds))
+		shouldEnqueue := (dsc.nodeShouldRunDaemonPod(oldNode, ds) != dsc.nodeShouldRunDaemonPod(curNode, ds))
 		if shouldEnqueue {
 			dsc.enqueueDaemonSet(ds)
 		}
@@ -387,7 +391,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
 	for _, node := range nodeList.Items {
-		shouldRun := nodeShouldRunDaemonPod(&node, ds)
+		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds)
 
 		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
@@ -498,7 +502,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int
 	for _, node := range nodeList.Items {
-		shouldRun := nodeShouldRunDaemonPod(&node, ds)
+		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds)
 
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 
@@ -563,21 +567,50 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return nil
 }
 
-func nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
 	// Check if the node satisfies the daemon set's node selector.
 	nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-	shouldRun := nodeSelector.Matches(labels.Set(node.Labels))
+	if !nodeSelector.Matches(labels.Set(node.Labels)) {
+		return false
+	}
 	// If the daemon set specifies a node name, check that it matches with node.Name.
-	shouldRun = shouldRun && (ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name)
+	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
+		return false
+	}
 	// If the node is not ready, don't run on it.
 	// TODO(mikedanese): remove this once daemonpods forgive nodes
-	shouldRun = shouldRun && api.IsNodeReady(node)
+	if !api.IsNodeReady(node) {
+		return false
+	}
 
-	// If the node is unschedulable, don't run it
-	// TODO(mikedanese): remove this once we have the right node admitance levels.
-	// See https://github.com/kubernetes/kubernetes/issues/17297#issuecomment-156857375.
-	shouldRun = shouldRun && !node.Spec.Unschedulable
-	return shouldRun
+	for _, c := range node.Status.Conditions {
+		if c.Type == api.NodeOutOfDisk && c.Status == api.ConditionTrue {
+			return false
+		}
+	}
+
+	newPod := &api.Pod{Spec: ds.Spec.Template.Spec}
+	newPod.Spec.NodeName = node.Name
+	pods := []*api.Pod{newPod}
+
+	for _, m := range dsc.podStore.Store.List() {
+		pod := m.(*api.Pod)
+		if pod.Spec.NodeName != node.Name {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, node.Status.Allocatable)
+	if len(notFittingCPU)+len(notFittingMemory) != 0 {
+		return false
+	}
+	ports := sets.String{}
+	for _, pod := range pods {
+		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.Containers, &ports, field.NewPath("spec", "containers")); len(errs) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
