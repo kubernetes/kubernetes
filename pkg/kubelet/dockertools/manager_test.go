@@ -1777,7 +1777,7 @@ func TestVerifyNonRoot(t *testing.T) {
 					User: "foo",
 				},
 			},
-			expectedError: "unable to validate image is non-root, non-numeric user",
+			expectedError: "non-numeric user",
 		},
 		"numeric root image user": {
 			container: &api.Container{},
@@ -1812,10 +1812,10 @@ func TestVerifyNonRoot(t *testing.T) {
 		fakeDocker.Image = v.inspectImage
 		err := dm.verifyNonRoot(v.container)
 		if v.expectedError == "" && err != nil {
-			t.Errorf("%s had unexpected error %v", k, err)
+			t.Errorf("case[%q]: unexpected error: %v", k, err)
 		}
 		if v.expectedError != "" && !strings.Contains(err.Error(), v.expectedError) {
-			t.Errorf("%s expected error %s but received %s", k, v.expectedError, err.Error())
+			t.Errorf("case[%q]: expected: %q, got: %q", k, v.expectedError, err.Error())
 		}
 	}
 }
