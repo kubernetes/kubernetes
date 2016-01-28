@@ -1573,7 +1573,7 @@ func (s *AWSCloud) removeSecurityGroupIngress(group *ec2.SecurityGroup, removePe
 
 // Makes sure the security group exists
 // Returns the security group id or error
-func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID string) (string, error) {
+func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID string, tags []*ec2.Tag) (string, error) {
 	groupID := ""
 	attempt := 0
 	for {
@@ -1627,7 +1627,9 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		return "", fmt.Errorf("created security group, but id was not returned: %s", name)
 	}
 
-	tags := []*ec2.Tag{}
+	if tags == nil {
+		tags = []*ec2.Tag{}
+	}
 	for k, v := range s.filterTags {
 		tag := &ec2.Tag{}
 		tag.Key = aws.String(k)
@@ -1707,8 +1709,10 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
-func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
+func (s *AWSCloud) EnsureLoadBalancer(name, namespace string, friendlyName string, region string, publicIP net.IP,
+	ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
+		name, namespace, friendlyName, region, publicIP, ports, hosts)
 
 	if region != s.region {
 		return nil, fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
@@ -1752,7 +1756,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Create a security group for the load balancer
-	securityGroupID, err := s.createSecurityGroupForLoadBalancer(name, vpcId, ports)
+	securityGroupID, err := s.createSecurityGroupForLoadBalancer(name, namespace, friendlyName, vpcId, ports)
 	if err != nil {
 		glog.Error("error creating security group for load balancer", err)
 		return nil, err
@@ -1780,7 +1784,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Build the load balancer itself
-	loadBalancer, err := s.ensureLoadBalancer(name, listeners, subnetIDs, securityGroupIDs)
+	loadBalancer, err := s.ensureLoadBalancer(name, namespace, friendlyName, listeners, subnetIDs, securityGroupIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -2159,11 +2163,41 @@ func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 	return filters
 }
 
+func (s *AWSCloud) getFriendlyEC2TagsForLoadBalancer(namespace string, friendlyName string) []*ec2.Tag {
+	tagKey := "k8s-service"
+	tagValue := namespace + ":" + friendlyName
+
+	result := []*ec2.Tag{{
+		Key:   &tagKey,
+		Value: &tagValue,
+	}}
+
+	return result
+}
+
+func (s *AWSCloud) getFriendlyELBTagsForLoadBalancer(namespace string, friendlyName string) []*elb.Tag {
+	ec2Tags := s.getFriendlyEC2TagsForLoadBalancer(namespace, friendlyName)
+
+	result := []*elb.Tag{}
+	for _, tag := range ec2Tags {
+		elbTag := &elb.Tag{
+			Key:   tag.Key,
+			Value: tag.Value,
+		}
+		result = append(result, elbTag)
+	}
+
+	return result
+}
+
 // Create a security group for a load balancer
-func (s *AWSCloud) createSecurityGroupForLoadBalancer(name string, vpcID string, ports []*api.ServicePort) (string, error) {
+func (s *AWSCloud) createSecurityGroupForLoadBalancer(name string, namespace string, friendlyName string, vpcID string,
+	ports []*api.ServicePort) (string, error) {
 	sgName := "k8s-elb-" + name
 	sgDescription := "Security group for Kubernetes ELB " + name
-	securityGroupID, err := s.ensureSecurityGroup(sgName, sgDescription, vpcID)
+	sgTags := s.getFriendlyEC2TagsForLoadBalancer(namespace, friendlyName)
+
+	securityGroupID, err := s.ensureSecurityGroup(sgName, sgDescription, vpcID, sgTags)
 	if err != nil {
 		glog.Error("Error creating load balancer security group: ", err)
 		return "", err
@@ -2196,8 +2230,8 @@ func (s *AWSCloud) createSecurityGroupForLoadBalancer(name string, vpcID string,
 func (s *AWSCloud) ensureSharedInstanceSecurityGroupForLoadBalancing(vpcID string, allInstances []*ec2.Instance) (*string, error) {
 	sgName := "k8s-elb-instance-ingress"
 	sgDescription := "Shared instance security group for Kubernetes ELB ingress"
- 	sharedGroupId, err := s.ensureSecurityGroup(sgName, sgDescription, vpcID)
- 	if err != nil {
+	sharedGroupId, err := s.ensureSecurityGroup(sgName, sgDescription, vpcID, nil)
+	if err != nil {
 		glog.Error("Error creating shared instance security group for load balancing: ", err)
 		return nil, err
 	}
