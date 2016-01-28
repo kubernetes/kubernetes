@@ -274,6 +274,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	serviceAccountStorage := serviceaccountetcd.NewREST(dbClient("serviceAccounts"), storageDecorator)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(dbClient("persistentVolumes"), storageDecorator)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(dbClient("persistentVolumeClaims"), storageDecorator)
+	configMapStorage := configmapetcd.NewREST(dbClient("configMaps"), storageDecorator)
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(dbClient("namespaces"), storageDecorator)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -352,6 +353,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
+		"configMaps":                    configMapStorage,
 
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
@@ -569,7 +571,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // getExperimentalResources returns the resources for extenstions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses", "configmaps")
+	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
@@ -630,9 +632,6 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
-	}
-	if isEnabled("configmaps") {
-		storage["configmaps"] = configmapetcd.NewREST(dbClient("configmaps"), storageDecorator)
 	}
 
 	return storage

@@ -39,7 +39,9 @@ func init() {
 		deepCopy_api_ComponentCondition,
 		deepCopy_api_ComponentStatus,
 		deepCopy_api_ComponentStatusList,
+		deepCopy_api_ConfigMap,
 		deepCopy_api_ConfigMapKeySelector,
+		deepCopy_api_ConfigMapList,
 		deepCopy_api_Container,
 		deepCopy_api_ContainerImage,
 		deepCopy_api_ContainerPort,
@@ -297,11 +299,51 @@ func deepCopy_api_ComponentStatusList(in ComponentStatusList, out *ComponentStat
 	return nil
 }
 
+func deepCopy_api_ConfigMap(in ConfigMap, out *ConfigMap, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		in, out := in.Data, &out.Data
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
 func deepCopy_api_ConfigMapKeySelector(in ConfigMapKeySelector, out *ConfigMapKeySelector, c *conversion.Cloner) error {
 	if err := deepCopy_api_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
 		return err
 	}
 	out.Key = in.Key
+	return nil
+}
+
+func deepCopy_api_ConfigMapList(in ConfigMapList, out *ConfigMapList, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ConfigMap, len(in))
+		for i := range in {
+			if err := deepCopy_api_ConfigMap(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

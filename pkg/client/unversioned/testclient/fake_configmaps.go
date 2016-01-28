@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -29,48 +28,48 @@ const (
 // FakeConfigMaps implements ConfigMapInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeConfigMaps struct {
-	Fake      *FakeExperimental
+	Fake      *Fake
 	Namespace string
 }
 
-func (c *FakeConfigMaps) Get(name string) (*extensions.ConfigMap, error) {
-	obj, err := c.Fake.Invokes(NewGetAction(configMapResourceName, c.Namespace, name), &extensions.ConfigMap{})
+func (c *FakeConfigMaps) Get(name string) (*api.ConfigMap, error) {
+	obj, err := c.Fake.Invokes(NewGetAction(configMapResourceName, c.Namespace, name), &api.ConfigMap{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMap), err
+	return obj.(*api.ConfigMap), err
 }
 
-func (c *FakeConfigMaps) List(opts api.ListOptions) (*extensions.ConfigMapList, error) {
-	obj, err := c.Fake.Invokes(NewListAction(configMapResourceName, c.Namespace, opts), &extensions.ConfigMapList{})
+func (c *FakeConfigMaps) List(opts api.ListOptions) (*api.ConfigMapList, error) {
+	obj, err := c.Fake.Invokes(NewListAction(configMapResourceName, c.Namespace, opts), &api.ConfigMapList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMapList), err
+	return obj.(*api.ConfigMapList), err
 }
 
-func (c *FakeConfigMaps) Create(cfg *extensions.ConfigMap) (*extensions.ConfigMap, error) {
+func (c *FakeConfigMaps) Create(cfg *api.ConfigMap) (*api.ConfigMap, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction(configMapResourceName, c.Namespace, cfg), cfg)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMap), err
+	return obj.(*api.ConfigMap), err
 }
 
-func (c *FakeConfigMaps) Update(cfg *extensions.ConfigMap) (*extensions.ConfigMap, error) {
+func (c *FakeConfigMaps) Update(cfg *api.ConfigMap) (*api.ConfigMap, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction(configMapResourceName, c.Namespace, cfg), cfg)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMap), err
+	return obj.(*api.ConfigMap), err
 }
 
 func (c *FakeConfigMaps) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction(configMapResourceName, c.Namespace, name), &extensions.ConfigMap{})
+	_, err := c.Fake.Invokes(NewDeleteAction(configMapResourceName, c.Namespace, name), &api.ConfigMap{})
 	return err
 }
 

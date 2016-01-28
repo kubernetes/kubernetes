@@ -142,11 +142,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 			}
 		},
-		func(obj *ConfigMap) {
-			if obj.Data == nil {
-				obj.Data = make(map[string]string)
-			}
-		},
 		func(obj *ReplicaSet) {
 			var labels map[string]string
 			if obj.Spec.Template != nil {

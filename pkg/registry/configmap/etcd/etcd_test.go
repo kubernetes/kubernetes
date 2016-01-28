@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -30,12 +29,12 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	return NewREST(etcdStorage, generic.UndecoratedStorage), server
 }
 
-func validNewConfigMap() *extensions.ConfigMap {
-	return &extensions.ConfigMap{
+func validNewConfigMap() *api.ConfigMap {
+	return &api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
@@ -62,13 +61,13 @@ func TestCreate(t *testing.T) {
 
 	test.TestCreate(
 		validConfigMap,
-		&extensions.ConfigMap{
+		&api.ConfigMap{
 			ObjectMeta: api.ObjectMeta{Name: "badName"},
 			Data: map[string]string{
 				"key": "value",
 			},
 		},
-		&extensions.ConfigMap{
+		&api.ConfigMap{
 			ObjectMeta: api.ObjectMeta{Name: "name-2"},
 			Data: map[string]string{
 				"..dotfile": "do: nothing\n",
@@ -86,13 +85,13 @@ func TestUpdate(t *testing.T) {
 		validNewConfigMap(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			cfg := obj.(*extensions.ConfigMap)
+			cfg := obj.(*api.ConfigMap)
 			cfg.Data["update-test"] = "value"
 			return cfg
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			cfg := obj.(*extensions.ConfigMap)
+			cfg := obj.(*api.ConfigMap)
 			cfg.Data["badKey"] = "value"
 			return cfg
 		},

@@ -1186,6 +1186,61 @@ Examples:<br>
 
 </div>
 <div class="sect2">
+<h3 id="_v1_configmaplist">v1.ConfigMapList</h3>
+<div class="paragraph">
+<p>ConfigMapList is a resource containing a list of ConfigMap objects.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of ConfigMaps.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_configmap">v1.ConfigMap</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_persistentvolumestatus">v1.PersistentVolumeStatus</h3>
 <div class="paragraph">
 <p>PersistentVolumeStatus is the current status of a persistent volume.</p>
@@ -1330,6 +1385,61 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Target directory name. Must not contain or start with <em>..</em>.  If <em>.</em> is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_configmap">v1.ConfigMap</h3>
+<div class="paragraph">
+<p>ConfigMap holds configuration data for pods to consume.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">data</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -7145,7 +7255,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-01-22 02:17:17 UTC
+Last updated 2016-01-28 22:16:30 UTC
 </div>
 </div>
 </body>

@@ -40,6 +40,7 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
+	ConfigMapsNamespacer
 	Extensions() ExtensionsInterface
 	Discovery() DiscoveryInterface
 }
@@ -101,6 +102,10 @@ func (c *Client) PersistentVolumeClaims(namespace string) PersistentVolumeClaimI
 
 func (c *Client) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
+}
+
+func (c *Client) ConfigMaps(namespace string) ConfigMapsInterface {
+	return newConfigMaps(c, namespace)
 }
 
 // Client is the implementation of a Kubernetes client.
