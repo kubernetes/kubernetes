@@ -1215,8 +1215,14 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
 	}
 
+	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
+	glog.V(4).Infof("executing port forwarding command: %s", commandString)
+
 	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream
+
+	stderr := new(bytes.Buffer)
+	command.Stderr = stderr
 
 	// If we use Stdin, command.Run() won't return until the goroutine that's copying
 	// from stream finishes. Unfortunately, if you have a client like telnet connected
@@ -1236,7 +1242,11 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 		inPipe.Close()
 	}()
 
-	return command.Run()
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("%v: %s", err, stderr.String())
+	}
+
+	return nil
 }
 
 // Get the IP address of a container's interface using nsenter
