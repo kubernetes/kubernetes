@@ -52,6 +52,14 @@ type MemorySpec struct {
 	SwapLimit uint64 `json:"swap_limit,omitempty"`
 }
 
+type ContainerInfo struct {
+	// Describes the container.
+	Spec ContainerSpec `json:"spec,omitempty"`
+
+	// Historical statistics gathered from the container.
+	Stats []*ContainerStats `json:"stats,omitempty"`
+}
+
 type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
@@ -66,6 +74,8 @@ type ContainerSpec struct {
 
 	// Metadata labels associated with this container.
 	Labels map[string]string `json:"labels,omitempty"`
+	// Metadata envs associated with this container. Only whitelisted envs are added.
+	Envs map[string]string `json:"envs,omitempty"`
 
 	HasCpu bool    `json:"has_cpu"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
@@ -85,7 +95,7 @@ type ContainerSpec struct {
 	Image string `json:"image,omitempty"`
 }
 
-type ContainerStats struct {
+type DeprecatedContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time `json:"timestamp"`
 	// CPU statistics
@@ -112,6 +122,28 @@ type ContainerStats struct {
 	// Custom Metrics
 	HasCustomMetrics bool                      `json:"has_custom_metrics"`
 	CustomMetrics    map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
+}
+
+type ContainerStats struct {
+	// The time of this stat point.
+	Timestamp time.Time `json:"timestamp"`
+	// CPU statistics
+	// In nanoseconds (aggregated)
+	Cpu *v1.CpuStats `json:"cpu,omitempty"`
+	// In nanocores per second (instantaneous)
+	CpuInst *CpuInstStats `json:"cpu_inst,omitempty"`
+	// Disk IO statistics
+	DiskIo *v1.DiskIoStats `json:"diskio,omitempty"`
+	// Memory statistics
+	Memory *v1.MemoryStats `json:"memory,omitempty"`
+	// Network statistics
+	Network *NetworkStats `json:"network,omitempty"`
+	// Filesystem statistics
+	Filesystem *FilesystemStats `json:"filesystem,omitempty"`
+	// Task load statistics
+	Load *v1.LoadStats `json:"load_stats,omitempty"`
+	// Custom Metrics
+	CustomMetrics map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
 }
 
 type Percentiles struct {
@@ -251,4 +283,12 @@ type CpuInstUsage struct {
 	// Time spent in kernel space.
 	// Unit: nanocores per second
 	System uint64 `json:"system"`
+}
+
+// Filesystem usage statistics.
+type FilesystemStats struct {
+	// Total Number of bytes consumed by container.
+	TotalUsageBytes *uint64 `json:"totalUsageBytes,omitempty"`
+	// Number of bytes consumed by a container through its root filesystem.
+	BaseUsageBytes *uint64 `json:"baseUsageBytes,omitempty"`
 }

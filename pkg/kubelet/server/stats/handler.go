@@ -27,8 +27,10 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -36,8 +38,12 @@ import (
 // Host methods required by stats handlers.
 type StatsProvider interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
+	GetRunningPods() ([]*api.Pod, error)
+	GetNode() (*api.Node, error)
+	GetNodeConfig() cm.NodeConfig
 }
 
 type handler struct {
@@ -137,11 +143,36 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 
 // Handles stats summary requests to /stats/summary
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
-	summary := Summary{}
+	options := cadvisorapiv2.RequestOptions{
+		IdType:    cadvisorapiv2.TypeName,
+		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
+		Recursive: true,
+	}
+	infos, err := h.provider.GetContainerInfoV2("/", options)
+	if err != nil {
+		handleError(response, err)
+		return
+	}
 
-	// TODO(timstclair): Fill in summary from cAdvisor v2 endpoint.
+	node, err := h.provider.GetNode()
+	if err != nil {
+		handleError(response, err)
+		return
+	}
 
-	writeResponse(response, summary)
+	nodeConfig := h.provider.GetNodeConfig()
+	pods, err := h.provider.GetRunningPods()
+	if err != nil {
+		handleError(response, err)
+		return
+	}
+
+	summary, err := buildSummary(node, nodeConfig, pods, infos)
+	if err != nil {
+		handleError(response, err)
+	} else {
+		writeResponse(response, summary)
+	}
 }
 
 // Handles non-kubernetes container stats requests to /stats/container/

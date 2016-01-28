@@ -32,6 +32,7 @@ import (
 
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
+	zfs "github.com/mistifyio/go-zfs"
 )
 
 const (
@@ -73,8 +74,10 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		// all ext systems are checked through prefix.
 		"btrfs": true,
 		"xfs":   true,
+		"zfs":   true,
 	}
 	for _, mount := range mounts {
+		var Fstype string
 		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
 			continue
 		}
@@ -82,7 +85,11 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		if _, ok := partitions[mount.Source]; ok {
 			continue
 		}
+		if mount.Fstype == "zfs" {
+			Fstype = mount.Fstype
+		}
 		partitions[mount.Source] = partition{
+			fsType:     Fstype,
 			mountpoint: mount.Mountpoint,
 			major:      uint(mount.Major),
 			minor:      uint(mount.Minor),
@@ -128,7 +135,7 @@ func getDockerImagePaths(context Context) []string {
 	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
 	dockerRoot := context.DockerRoot
 	dockerImagePaths := []string{}
-	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay"} {
+	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay", "zfs"} {
 		dockerImagePaths = append(dockerImagePaths, path.Join(dockerRoot, dir))
 	}
 	for dockerRoot != "/" && dockerRoot != "." {
@@ -201,6 +208,8 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 			switch partition.fsType {
 			case "devicemapper":
 				total, free, avail, err = getDMStats(device, partition.blockSize)
+			case "zfs":
+				total, free, avail, err = getZfstats(device)
 			default:
 				total, free, avail, err = getVfsStats(partition.mountpoint)
 			}
@@ -422,4 +431,16 @@ func parseDMStatus(dmStatus string) (uint64, uint64, error) {
 	}
 
 	return used, total, nil
+}
+
+// getZfstats returns ZFS mount stats using zfsutils
+func getZfstats(poolName string) (uint64, uint64, uint64, error) {
+	dataset, err := zfs.GetDataset(poolName)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	total := dataset.Used + dataset.Avail + dataset.Usedbydataset
+
+	return total, dataset.Avail, dataset.Avail, nil
 }
