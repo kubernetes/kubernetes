@@ -1451,7 +1451,7 @@ func printHorizontalPodAutoscalerList(list *extensions.HorizontalPodAutoscalerLi
 	return nil
 }
 
-func printConfigMap(configMap *extensions.ConfigMap, w io.Writer, options printOptions) error {
+func printConfigMap(configMap *api.ConfigMap, w io.Writer, options printOptions) error {
 	name := configMap.Name
 	namespace := configMap.Namespace
 
@@ -1467,7 +1467,7 @@ func printConfigMap(configMap *extensions.ConfigMap, w io.Writer, options printO
 	return err
 }
 
-func printConfigMapList(list *extensions.ConfigMapList, w io.Writer, options printOptions) error {
+func printConfigMapList(list *api.ConfigMapList, w io.Writer, options printOptions) error {
 	for i := range list.Items {
 		if err := printConfigMap(&list.Items[i], w, options); err != nil {
 			return err

@@ -19,17 +19,16 @@ package configmap
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ConfigMaps.
 type Registry interface {
-	ListConfigMaps(ctx api.Context, options *api.ListOptions) (*extensions.ConfigMapList, error)
+	ListConfigMaps(ctx api.Context, options *api.ListOptions) (*api.ConfigMapList, error)
 	WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetConfigMap(ctx api.Context, name string) (*extensions.ConfigMap, error)
-	CreateConfigMap(ctx api.Context, cfg *extensions.ConfigMap) (*extensions.ConfigMap, error)
-	UpdateConfigMap(ctx api.Context, cfg *extensions.ConfigMap) (*extensions.ConfigMap, error)
+	GetConfigMap(ctx api.Context, name string) (*api.ConfigMap, error)
+	CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
+	UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
 	DeleteConfigMap(ctx api.Context, name string) error
 }
 
@@ -44,44 +43,44 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListConfigMaps(ctx api.Context, options *api.ListOptions) (*extensions.ConfigMapList, error) {
+func (s *storage) ListConfigMaps(ctx api.Context, options *api.ListOptions) (*api.ConfigMapList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMapList), err
+	return obj.(*api.ConfigMapList), err
 }
 
 func (s *storage) WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetConfigMap(ctx api.Context, name string) (*extensions.ConfigMap, error) {
+func (s *storage) GetConfigMap(ctx api.Context, name string) (*api.ConfigMap, error) {
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMap), nil
+	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) CreateConfigMap(ctx api.Context, cfg *extensions.ConfigMap) (*extensions.ConfigMap, error) {
+func (s *storage) CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
 	obj, err := s.Create(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMap), nil
+	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) UpdateConfigMap(ctx api.Context, cfg *extensions.ConfigMap) (*extensions.ConfigMap, error) {
+func (s *storage) UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
 	obj, _, err := s.Update(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return obj.(*extensions.ConfigMap), nil
+	return obj.(*api.ConfigMap), nil
 }
 
 func (s *storage) DeleteConfigMap(ctx api.Context, name string) error {

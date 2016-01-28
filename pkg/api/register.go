@@ -98,6 +98,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
+		&ConfigMap{},
+		&ConfigMapList{},
 	)
 
 	// Register Unversioned types under their own special group
@@ -172,3 +174,6 @@ func (obj *RangeAllocation) GetObjectMeta() meta.Object                      { r
 func (obj *RangeAllocation) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
 func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind           { return obj }
 func (obj *ExportOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *ConfigMap) GetObjectMeta() meta.Object                            { return &obj.ObjectMeta }
+func (obj *ConfigMap) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
+func (obj *ConfigMapList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }

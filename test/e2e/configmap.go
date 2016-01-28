@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -31,7 +30,7 @@ var _ = Describe("ConfigMap", func() {
 
 	It("should be consumable via environment variable [Conformance]", func() {
 		name := "configmap-test-" + string(util.NewUUID())
-		configMap := &extensions.ConfigMap{
+		configMap := &api.ConfigMap{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      name,
@@ -46,12 +45,12 @@ var _ = Describe("ConfigMap", func() {
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		defer func() {
 			By("Cleaning up the configMap")
-			if err := f.Client.Extensions().ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
+			if err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
 				Failf("unable to delete configMap %v: %v", configMap.Name, err)
 			}
 		}()
 		var err error
-		if configMap, err = f.Client.Extensions().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 

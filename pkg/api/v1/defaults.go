@@ -243,6 +243,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				}
 			}
 		},
+		func(obj *ConfigMap) {
+			if obj.Data == nil {
+				obj.Data = make(map[string]string)
+			}
+		},
 	)
 }
 

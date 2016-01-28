@@ -2522,58 +2522,6 @@ func Convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(i
 	return autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in, out, s)
 }
 
-func autoConvert_extensions_ConfigMap_To_v1beta1_ConfigMap(in *extensions.ConfigMap, out *ConfigMap, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ConfigMap))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if in.Data != nil {
-		out.Data = make(map[string]string)
-		for key, val := range in.Data {
-			out.Data[key] = val
-		}
-	} else {
-		out.Data = nil
-	}
-	return nil
-}
-
-func Convert_extensions_ConfigMap_To_v1beta1_ConfigMap(in *extensions.ConfigMap, out *ConfigMap, s conversion.Scope) error {
-	return autoConvert_extensions_ConfigMap_To_v1beta1_ConfigMap(in, out, s)
-}
-
-func autoConvert_extensions_ConfigMapList_To_v1beta1_ConfigMapList(in *extensions.ConfigMapList, out *ConfigMapList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ConfigMapList))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ConfigMap, len(in.Items))
-		for i := range in.Items {
-			if err := Convert_extensions_ConfigMap_To_v1beta1_ConfigMap(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_extensions_ConfigMapList_To_v1beta1_ConfigMapList(in *extensions.ConfigMapList, out *ConfigMapList, s conversion.Scope) error {
-	return autoConvert_extensions_ConfigMapList_To_v1beta1_ConfigMapList(in, out, s)
-}
-
 func autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet, out *DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DaemonSet))(in)
@@ -3704,58 +3652,6 @@ func Convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(i
 	return autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_ConfigMap_To_extensions_ConfigMap(in *ConfigMap, out *extensions.ConfigMap, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ConfigMap))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if in.Data != nil {
-		out.Data = make(map[string]string)
-		for key, val := range in.Data {
-			out.Data[key] = val
-		}
-	} else {
-		out.Data = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_ConfigMap_To_extensions_ConfigMap(in *ConfigMap, out *extensions.ConfigMap, s conversion.Scope) error {
-	return autoConvert_v1beta1_ConfigMap_To_extensions_ConfigMap(in, out, s)
-}
-
-func autoConvert_v1beta1_ConfigMapList_To_extensions_ConfigMapList(in *ConfigMapList, out *extensions.ConfigMapList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ConfigMapList))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]extensions.ConfigMap, len(in.Items))
-		for i := range in.Items {
-			if err := Convert_v1beta1_ConfigMap_To_extensions_ConfigMap(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_ConfigMapList_To_extensions_ConfigMapList(in *ConfigMapList, out *extensions.ConfigMapList, s conversion.Scope) error {
-	return autoConvert_v1beta1_ConfigMapList_To_extensions_ConfigMapList(in, out, s)
-}
-
 func autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSet))(in)
@@ -4840,8 +4736,6 @@ func init() {
 		autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList,
 		autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec,
 		autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler,
-		autoConvert_extensions_ConfigMapList_To_v1beta1_ConfigMapList,
-		autoConvert_extensions_ConfigMap_To_v1beta1_ConfigMap,
 		autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList,
 		autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
 		autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
@@ -4937,8 +4831,6 @@ func init() {
 		autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList,
 		autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec,
 		autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler,
-		autoConvert_v1beta1_ConfigMapList_To_extensions_ConfigMapList,
-		autoConvert_v1beta1_ConfigMap_To_extensions_ConfigMap,
 		autoConvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList,
 		autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,

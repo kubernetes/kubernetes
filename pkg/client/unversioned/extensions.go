@@ -34,7 +34,6 @@ type ExtensionsInterface interface {
 	JobsNamespacer
 	IngressNamespacer
 	ThirdPartyResourceNamespacer
-	ConfigMapsNamespacer
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
@@ -66,10 +65,6 @@ func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
 
 func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {
 	return newIngress(c, namespace)
-}
-
-func (c *ExtensionsClient) ConfigMaps(namespace string) ConfigMapsInterface {
-	return newConfigMaps(c, namespace)
 }
 
 func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {

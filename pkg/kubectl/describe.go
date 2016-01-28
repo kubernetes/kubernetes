@@ -84,13 +84,13 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("PersistentVolumeClaim"): &PersistentVolumeClaimDescriber{c},
 		api.Kind("Namespace"):             &NamespaceDescriber{c},
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
+		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
 		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
 		extensions.Kind("Job"):                     &JobDescriber{c},
 		extensions.Kind("Deployment"):              &DeploymentDescriber{c},
 		extensions.Kind("Ingress"):                 &IngressDescriber{c},
-		extensions.Kind("ConfigMap"):               &ConfigMapDescriber{c},
 	}
 
 	return m
@@ -1709,7 +1709,7 @@ type ConfigMapDescriber struct {
 }
 
 func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
-	c := d.Extensions().ConfigMaps(namespace)
+	c := d.ConfigMaps(namespace)
 
 	configMap, err := c.Get(name)
 	if err != nil {
@@ -1719,7 +1719,7 @@ func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
 	return describeConfigMap(configMap)
 }
 
-func describeConfigMap(configMap *extensions.ConfigMap) (string, error) {
+func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", configMap.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", configMap.Namespace)

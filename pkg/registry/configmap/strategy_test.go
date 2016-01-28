@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -35,7 +34,7 @@ func TestConfigMapStrategy(t *testing.T) {
 		t.Errorf("ConfigMap should not allow create on update")
 	}
 
-	cfg := &extensions.ConfigMap{
+	cfg := &api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "valid-config-data",
 			Namespace: api.NamespaceDefault,
@@ -52,7 +51,7 @@ func TestConfigMapStrategy(t *testing.T) {
 		t.Errorf("unexpected error validating %v", errs)
 	}
 
-	newCfg := &extensions.ConfigMap{
+	newCfg := &api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "valid-config-data-2",
 			Namespace:       api.NamespaceDefault,
@@ -73,9 +72,9 @@ func TestConfigMapStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Extensions.GroupVersion().String(),
+		testapi.Default.GroupVersion().String(),
 		"ConfigMap",
-		labels.Set(ConfigMapToSelectableFields(&extensions.ConfigMap{})),
+		labels.Set(ConfigMapToSelectableFields(&api.ConfigMap{})),
 		nil,
 	)
 }
