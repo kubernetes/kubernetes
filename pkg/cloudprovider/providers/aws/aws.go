@@ -1530,18 +1530,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 // Makes sure the security group no longer includes the specified permissions
 // Returns true if and only if changes were made
 // If the security group no longer exists, will return (false, nil)
-func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IpPermission) (bool, error) {
-	group, err := s.findSecurityGroup(securityGroupId)
-	if err != nil {
-		glog.Warning("Error retrieving security group", err)
-		return false, err
-	}
-
-	if group == nil {
-		glog.Warning("Security group not found: ", securityGroupId)
-		return false, nil
-	}
-
+func (s *AWSCloud) removeSecurityGroupIngress(group *ec2.SecurityGroup, removePermissions []*ec2.IpPermission) (bool, error) {
 	changes := []*ec2.IpPermission{}
 	for _, removePermission := range removePermissions {
 		hasUserID := false
@@ -1568,12 +1557,12 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 		return false, nil
 	}
 
-	glog.V(2).Infof("Removing security group ingress: %s %v", securityGroupId, changes)
+	glog.V(2).Infof("Removing security group ingress: %s %v", group.GroupId, changes)
 
 	request := &ec2.RevokeSecurityGroupIngressInput{}
-	request.GroupId = &securityGroupId
+	request.GroupId = group.GroupId
 	request.IpPermissions = changes
-	_, err = s.ec2.RevokeSecurityGroupIngress(request)
+	_, err := s.ec2.RevokeSecurityGroupIngress(request)
 	if err != nil {
 		glog.Warning("Error revoking security group ingress", err)
 		return false, err
@@ -1650,7 +1639,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 	tagRequest.Resources = []*string{&groupID}
 	tagRequest.Tags = tags
 	if _, err := s.createTags(tagRequest); err != nil {
-		// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
+		// Not clear how to recover fully from this.
 		return "", fmt.Errorf("error tagging security group: %v", err)
 	}
 	return groupID, nil
@@ -1763,34 +1752,10 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Create a security group for the load balancer
-	var securityGroupID string
-	{
-		sgName := "k8s-elb-" + name
-		sgDescription := "Security group for Kubernetes ELB " + name
-		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, vpcId)
-		if err != nil {
-			glog.Error("Error creating load balancer security group: ", err)
-			return nil, err
-		}
-
-		permissions := []*ec2.IpPermission{}
-		for _, port := range ports {
-			portInt64 := int64(port.Port)
-			protocol := strings.ToLower(string(port.Protocol))
-			sourceIp := "0.0.0.0/0"
-
-			permission := &ec2.IpPermission{}
-			permission.FromPort = &portInt64
-			permission.ToPort = &portInt64
-			permission.IpRanges = []*ec2.IpRange{{CidrIp: &sourceIp}}
-			permission.IpProtocol = &protocol
-
-			permissions = append(permissions, permission)
-		}
-		_, err = s.ensureSecurityGroupIngress(securityGroupID, permissions)
-		if err != nil {
-			return nil, err
-		}
+	securityGroupID, err := s.createSecurityGroupForLoadBalancer(name, vpcId, ports)
+	if err != nil {
+		glog.Error("error creating security group for load balancer", err)
+		return nil, err
 	}
 	securityGroupIDs := []string{securityGroupID}
 
@@ -1825,7 +1790,14 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
-	err = s.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
+	// Ensure the shared security group for instances exists and is attached to all hosts.
+	instanceSecurityGroupID, err := s.ensureSharedInstanceSecurityGroupForLoadBalancing(vpcId, instances)
+	if err != nil {
+		glog.Error("error creating shared instance security group for load balancing", err)
+		return nil, err
+	}
+
+	err = s.updateInstanceSecurityGroupForLoadBalancer(loadBalancer, instanceSecurityGroupID)
 	if err != nil {
 		glog.Warning("Error opening ingress rules for the load balancer to the instances: ", err)
 		return nil, err
@@ -1876,36 +1848,9 @@ func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
 	return status
 }
 
-// Returns the first security group for an instance, or nil
-// We only create instances with one security group, so we warn if there are multiple or none
-func findSecurityGroupForInstance(instance *ec2.Instance) *string {
-	var securityGroupId *string
-	for _, securityGroup := range instance.SecurityGroups {
-		if securityGroup == nil || securityGroup.GroupId == nil {
-			// Not expected, but avoid panic
-			glog.Warning("Unexpected empty security group for instance: ", orEmpty(instance.InstanceId))
-			continue
-		}
-
-		if securityGroupId != nil {
-			// We create instances with one SG
-			glog.Warningf("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceId), *securityGroupId)
-			continue
-		} else {
-			securityGroupId = securityGroup.GroupId
-		}
-	}
-
-	if securityGroupId == nil {
-		glog.Warning("No security group found for instance ", orEmpty(instance.InstanceId))
-	}
-
-	return securityGroupId
-}
-
-// Open security group ingress rules on the instances so that the load balancer can talk to them
-// Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
-func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, allInstances []*ec2.Instance) error {
+// Ensure the ELB's security group is present in the ingress rules for the shared instance security group, if provided.
+// Will also remove the ELB security group from other k8s owned groups to make removal idempotent.
+func (s *AWSCloud) updateInstanceSecurityGroupForLoadBalancer(lb *elb.LoadBalancerDescription, instanceSecurityGroupID *string) error {
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupId := ""
 	for _, securityGroup := range lb.SecurityGroups {
@@ -1922,86 +1867,49 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		return fmt.Errorf("Could not determine security group for load balancer: %s", orEmpty(lb.LoadBalancerName))
 	}
 
-	// Get the actual list of groups that allow ingress from the load-balancer
+	sourceGroupId := &ec2.UserIdGroupPair{}
+	sourceGroupId.GroupId = &loadBalancerSecurityGroupId
+
+	allProtocols := "-1"
+
+	permission := &ec2.IpPermission{}
+	permission.IpProtocol = &allProtocols
+	permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{sourceGroupId}
+
+	permissions := []*ec2.IpPermission{permission}
+
+	// Gather all k8s owned security groups
 	describeRequest := &ec2.DescribeSecurityGroupsInput{}
 	filters := []*ec2.Filter{}
-	filters = append(filters, newEc2Filter("ip-permission.group-id", loadBalancerSecurityGroupId))
 	describeRequest.Filters = s.addFilters(filters)
 	actualGroups, err := s.ec2.DescribeSecurityGroups(describeRequest)
 	if err != nil {
 		return fmt.Errorf("error querying security groups: %v", err)
 	}
 
-	// Open the firewall from the load balancer to the instance
-	// We don't actually have a trivial way to know in advance which security group the instance is in
-	// (it is probably the minion security group, but we don't easily have that).
-	// However, we _do_ have the list of security groups on the instance records.
-
-	// Map containing the changes we want to make; true to add, false to remove
-	instanceSecurityGroupIds := map[string]bool{}
-
-	// Scan instances for groups we want open
-	for _, instance := range allInstances {
-		securityGroupId := findSecurityGroupForInstance(instance)
-		if isNilOrEmpty(securityGroupId) {
-			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
+	// Take necessary actions for each group.
+	for _, group := range actualGroups {
+		if isNilOrEmpty(group.GroupId) {
+			glog.Warning("Ignoring group without ID: ", group)
 			continue
 		}
+		groupId := group.GroupId
 
-		instanceSecurityGroupIds[*securityGroupId] = true
-	}
-
-	// Compare to actual groups
-	for _, actualGroup := range actualGroups {
-		if isNilOrEmpty(actualGroup.GroupId) {
-			glog.Warning("Ignoring group without ID: ", actualGroup)
-			continue
-		}
-
-		actualGroupID := *actualGroup.GroupId
-
-		adding, found := instanceSecurityGroupIds[actualGroupID]
-		if found && adding {
-			// We don't need to make a change; the permission is already in place
-			delete(instanceSecurityGroupIds, actualGroupID)
-		} else {
-			// This group is not needed by allInstances; delete it
-			instanceSecurityGroupIds[actualGroupID] = false
-		}
-	}
-
-	for instanceSecurityGroupId, add := range instanceSecurityGroupIds {
-		if add {
-			glog.V(2).Infof("Adding rule for traffic from the load balancer (%s) to instances (%s)", loadBalancerSecurityGroupId, instanceSecurityGroupId)
-		} else {
-			glog.V(2).Infof("Removing rule for traffic from the load balancer (%s) to instance (%s)", loadBalancerSecurityGroupId, instanceSecurityGroupId)
-		}
-		sourceGroupId := &ec2.UserIdGroupPair{}
-		sourceGroupId.GroupId = &loadBalancerSecurityGroupId
-
-		allProtocols := "-1"
-
-		permission := &ec2.IpPermission{}
-		permission.IpProtocol = &allProtocols
-		permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{sourceGroupId}
-
-		permissions := []*ec2.IpPermission{permission}
-
-		if add {
-			changed, err := s.ensureSecurityGroupIngress(instanceSecurityGroupId, permissions)
+		if instanceSecurityGroupID != nil && *groupId == *instanceSecurityGroupID {
+			changed, err := s.ensureSecurityGroupIngress(*groupId, permissions)
 			if err != nil {
 				return err
 			}
 			if !changed {
-				glog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
+				glog.Warning("allowing ingress was not needed; concurrent change? groupId=", *groupId)
 			}
 		} else {
-			changed, err := s.removeSecurityGroupIngress(instanceSecurityGroupId, permissions)
+			changed, err := s.removeSecurityGroupIngress(group, permissions)
 			if err != nil {
 				return err
 			}
 			if !changed {
-				glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
+				glog.Warning("revoking ingress was not needed; concurrent change? groupId=", *groupId)
 			}
 		}
 	}
@@ -2027,7 +1935,7 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
 
 	{
 		// De-authorize the load balancer security group from the instances security group
-		err = s.updateInstanceSecurityGroupsForLoadBalancer(lb, nil)
+		err = s.updateInstanceSecurityGroupForLoadBalancer(lb, nil)
 		if err != nil {
 			glog.Error("Error deregistering load balancer from instance security groups: ", err)
 			return err
@@ -2114,6 +2022,11 @@ func (s *AWSCloud) UpdateLoadBalancer(name, region string, hosts []string) error
 		return err
 	}
 
+	vpcID, err := s.findVPCID()
+	if err != nil {
+		return err
+	}
+
 	lb, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return err
@@ -2128,7 +2041,12 @@ func (s *AWSCloud) UpdateLoadBalancer(name, region string, hosts []string) error
 		return nil
 	}
 
-	err = s.updateInstanceSecurityGroupsForLoadBalancer(lb, instances)
+	instanceSecurityGroupID, err := s.ensureSharedInstanceSecurityGroupForLoadBalancing(vpcID, instances)
+	if err != nil {
+		return nil
+	}
+
+	err = s.updateInstanceSecurityGroupForLoadBalancer(lb, instanceSecurityGroupID)
 	if err != nil {
 		return err
 	}
@@ -2238,4 +2156,86 @@ func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 		filters = append(filters, newEc2Filter("tag:"+k, v))
 	}
 	return filters
+}
+
+// Create a security group for a load balancer
+func (s *AWSCloud) createSecurityGroupForLoadBalancer(name string, vpcID string, ports []*api.ServicePort) (string, error) {
+	sgName := "k8s-elb-" + name
+	sgDescription := "Security group for Kubernetes ELB " + name
+	securityGroupID, err := s.ensureSecurityGroup(sgName, sgDescription, vpcID)
+	if err != nil {
+		glog.Error("Error creating load balancer security group: ", err)
+		return "", err
+	}
+
+	permissions := []*ec2.IpPermission{}
+	for _, port := range ports {
+		portInt64 := int64(port.Port)
+		protocol := strings.ToLower(string(port.Protocol))
+		sourceIp := "0.0.0.0/0"
+
+		permission := &ec2.IpPermission{}
+		permission.FromPort = &portInt64
+		permission.ToPort = &portInt64
+		permission.IpRanges = []*ec2.IpRange{{CidrIp: &sourceIp}}
+		permission.IpProtocol = &protocol
+
+		permissions = append(permissions, permission)
+	}
+	_, err = s.ensureSecurityGroupIngress(securityGroupID, permissions)
+	if err != nil {
+		return "", err
+	}
+
+	return securityGroupID, nil
+}
+
+// Creates a security group which allows ingress from all Kubernetes owned ELBs. This group is meant to be
+// attached to all node instances.
+func (s *AWSCloud) ensureSharedInstanceSecurityGroupForLoadBalancing(vpcID string, allInstances []*ec2.Instance) (*string, error) {
+	sgName := "k8s-elb-instance-ingress"
+	sgDescription := "Shared instance security group for Kubernetes ELB ingress"
+	sharedGroupId, err := s.ensureSecurityGroup(sgName, sgDescription, vpcID)
+	if err != nil {
+		glog.Error("Error creating shared instance security group for load balancing: ", err)
+		return nil, err
+	}
+
+	// Ensure this group is attached to all instances.
+	for _, instance := range allInstances {
+		foundSharedGroupForInstance := false
+		existingGroupIds := []*string{}
+		for _, securityGroup := range instance.SecurityGroups {
+			if securityGroup == nil || securityGroup.GroupId == nil {
+				// Not expected, but avoid panic
+				glog.Warning("Unexpected empty security group for instance: ", orEmpty(instance.InstanceId))
+				continue
+			}
+			groupId := securityGroup.GroupId
+
+			if *groupId == sharedGroupId {
+				foundSharedGroupForInstance = true
+				break
+			}
+			existingGroupIds = append(existingGroupIds, groupId)
+		}
+
+		if !foundSharedGroupForInstance {
+			existingGroupIds = append(existingGroupIds, &sharedGroupId)
+			attribute := "groupSet"
+			modifyRequest := &ec2.ModifyInstanceAttributeInput{
+				InstanceId: instance.InstanceId,
+				Attribute:  &attribute,
+				Groups:     existingGroupIds,
+			}
+
+			_, err := s.ec2.ModifyInstanceAttribute(modifyRequest)
+			if err != nil {
+				glog.Error("Error attaching shared instance security group to instance (%s): %s", instance.InstanceId, err)
+				return nil, err
+			}
+		}
+	}
+
+	return &sharedGroupId, nil
 }
