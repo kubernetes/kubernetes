@@ -43,8 +43,15 @@ Then, use the [`examples/spark/spark-master-service.json`](spark-master-service.
 create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
+
 ```sh
 $ kubectl create -f examples/spark/spark-master-service.json
+```
+
+You can create a service for the Spark Master WebUI to monitor of the Spark cluster.
+
+```sh
+$ kubectl create -f examples/spark/spark-webui.json
 ```
 
 ### Check to see if Master is running and accessible
