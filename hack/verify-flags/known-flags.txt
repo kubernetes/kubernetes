@@ -212,6 +212,7 @@ mesos-default-pod-roles
 mesos-executor-cpus
 mesos-executor-mem
 mesos-framework-roles
+mesos-generate-task-discovery
 mesos-launch-grace-period
 mesos-master
 mesos-sandbox-overlay

@@ -25,7 +25,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	mesosmeta "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/api"
 
@@ -127,7 +127,58 @@ func generateTaskName(pod *api.Pod) string {
 	if ns == "" {
 		ns = api.NamespaceDefault
 	}
-	return fmt.Sprintf("%s.%s.pods", pod.Name, ns)
+	return fmt.Sprintf("%s.%s.pod", pod.Name, ns)
+}
+
+// GenerateTaskDiscoveryEnabled turns on/off the generation of DiscoveryInfo for TaskInfo records
+var GenerateTaskDiscoveryEnabled = false
+
+func generateTaskDiscovery(pod *api.Pod) *mesos.DiscoveryInfo {
+	di := &mesos.DiscoveryInfo{
+		Visibility: mesos.DiscoveryInfo_CLUSTER.Enum(),
+	}
+	switch visibility := pod.Annotations[mesosmeta.Namespace+"/discovery-visibility"]; visibility {
+	case "framework":
+		di.Visibility = mesos.DiscoveryInfo_FRAMEWORK.Enum()
+	case "external":
+		di.Visibility = mesos.DiscoveryInfo_EXTERNAL.Enum()
+	case "", "cluster":
+		// noop, pick the default we already set
+	default:
+		// default to CLUSTER, just warn the user
+		log.Warningf("unsupported discovery-visibility annotation: %q", visibility)
+	}
+	// name should be {{label|annotation}:name}.{pod:namespace}.pod
+	nameDecorator := func(n string) *string {
+		ns := pod.Namespace
+		if ns == "" {
+			ns = api.NamespaceDefault
+		}
+		x := n + "." + ns + "." + "pod"
+		return &x
+	}
+	for _, tt := range []struct {
+		fieldName string
+		dest      **string
+		decorator func(string) *string
+	}{
+		{"name", &di.Name, nameDecorator},
+		{"environment", &di.Environment, nil},
+		{"location", &di.Location, nil},
+		{"version", &di.Version, nil},
+	} {
+		d := tt.decorator
+		if d == nil {
+			d = func(s string) *string { return &s }
+		}
+		if v, ok := pod.Labels[tt.fieldName]; ok && v != "" {
+			*tt.dest = d(v)
+		}
+		if v, ok := pod.Annotations[mesosmeta.Namespace+"/discovery-"+tt.fieldName]; ok && v != "" {
+			*tt.dest = d(v)
+		}
+	}
+	return di
 }
 
 func (t *T) BuildTaskInfo() (*mesos.TaskInfo, error) {
@@ -142,6 +193,10 @@ func (t *T) BuildTaskInfo() (*mesos.TaskInfo, error) {
 		Data:      t.Spec.Data,
 		Resources: t.Spec.Resources,
 		SlaveId:   mutil.NewSlaveID(t.Spec.SlaveID),
+	}
+
+	if GenerateTaskDiscoveryEnabled {
+		info.Discovery = generateTaskDiscovery(&t.Pod)
 	}
 
 	return info, nil
@@ -173,7 +228,7 @@ func (t *T) Has(f FlagType) (exists bool) {
 // If the pod has roles annotations defined they are being used
 // else default pod roles are being returned.
 func (t *T) Roles() (result []string) {
-	if r, ok := t.Pod.ObjectMeta.Annotations[annotation.RolesKey]; ok {
+	if r, ok := t.Pod.ObjectMeta.Annotations[mesosmeta.RolesKey]; ok {
 		roles := strings.Split(r, ",")
 
 		for i, r := range roles {
@@ -229,10 +284,10 @@ func New(ctx api.Context, id string, pod *api.Pod, prototype *mesos.ExecutorInfo
 }
 
 func (t *T) SaveRecoveryInfo(dict map[string]string) {
-	dict[annotation.TaskIdKey] = t.ID
-	dict[annotation.SlaveIdKey] = t.Spec.SlaveID
-	dict[annotation.OfferIdKey] = t.Offer.Details().Id.GetValue()
-	dict[annotation.ExecutorIdKey] = t.Spec.Executor.ExecutorId.GetValue()
+	dict[mesosmeta.TaskIdKey] = t.ID
+	dict[mesosmeta.SlaveIdKey] = t.Spec.SlaveID
+	dict[mesosmeta.OfferIdKey] = t.Offer.Details().Id.GetValue()
+	dict[mesosmeta.ExecutorIdKey] = t.Spec.Executor.ExecutorId.GetValue()
 }
 
 // reconstruct a task from metadata stashed in a pod entry. there are limited pod states that
@@ -287,25 +342,25 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		offerId string
 	)
 	for _, k := range []string{
-		annotation.BindingHostKey,
-		annotation.TaskIdKey,
-		annotation.SlaveIdKey,
-		annotation.OfferIdKey,
+		mesosmeta.BindingHostKey,
+		mesosmeta.TaskIdKey,
+		mesosmeta.SlaveIdKey,
+		mesosmeta.OfferIdKey,
 	} {
 		v, found := pod.Annotations[k]
 		if !found {
 			return nil, false, fmt.Errorf("incomplete metadata: missing value for pod annotation: %v", k)
 		}
 		switch k {
-		case annotation.BindingHostKey:
+		case mesosmeta.BindingHostKey:
 			t.Spec.AssignedSlave = v
-		case annotation.SlaveIdKey:
+		case mesosmeta.SlaveIdKey:
 			t.Spec.SlaveID = v
-		case annotation.OfferIdKey:
+		case mesosmeta.OfferIdKey:
 			offerId = v
-		case annotation.TaskIdKey:
+		case mesosmeta.TaskIdKey:
 			t.ID = v
-		case annotation.ExecutorIdKey:
+		case mesosmeta.ExecutorIdKey:
 			// this is nowhere near sufficient to re-launch a task, but we really just
 			// want this for tracking
 			t.Spec.Executor = &mesos.ExecutorInfo{ExecutorId: mutil.NewExecutorID(v)}
