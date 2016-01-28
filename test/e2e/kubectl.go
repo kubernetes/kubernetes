@@ -771,11 +771,11 @@ var _ = Describe("Kubectl client", func() {
 
 				By("restricting to a time range")
 				time.Sleep(1500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
-				out = runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=1s")
-				recent := len(strings.Split(out, "\n"))
-				out = runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=24h")
-				older := len(strings.Split(out, "\n"))
-				Expect(recent).To(BeNumerically("<", older))
+				recent_out := runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=1s")
+				recent := len(strings.Split(recent_out, "\n"))
+				older_out := runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=24h")
+				older := len(strings.Split(older_out, "\n"))
+				Expect(recent).To(BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recent_out, older_out)
 			})
 		})
 	})
