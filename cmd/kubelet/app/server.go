@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flock"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -262,6 +263,12 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 // will be ignored.
 func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	var err error
+	if s.LockFilePath != "" {
+		glog.Infof("aquiring lock on %q", s.LockFilePath)
+		if err := flock.Acquire(s.LockFilePath); err != nil {
+			return fmt.Errorf("unable to aquire file lock on %q: %v", s.LockFilePath, err)
+		}
+	}
 	if kcfg == nil {
 		cfg, err := UnsecuredKubeletConfig(s)
 		if err != nil {
