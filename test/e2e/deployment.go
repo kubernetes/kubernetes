@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Deployment", func() {
+var _ = Describe("Deployment [Feature:Deployment]", func() {
 	f := NewFramework("deployment")
 
 	It("deployment should create new pods", func() {
