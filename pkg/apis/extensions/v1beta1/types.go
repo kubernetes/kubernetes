@@ -204,6 +204,10 @@ type DeploymentSpec struct {
 	// The deployment strategy to use to replace existing pods with new ones.
 	Strategy DeploymentStrategy `json:"strategy,omitempty"`
 
+	// The number of old ReplicationControllers to retain to allow rollback.
+	// This is a pointer to distinguish between explicit zero and not specified.
+	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
 	// Key of the selector that is added to existing RCs (and label key that is
 	// added to its pods) to prevent the existing RCs to select new pods (and old
 	// pods being selected by new RC).
