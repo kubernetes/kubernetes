@@ -619,7 +619,9 @@ func IsPodActive(p api.Pod) bool {
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
 	active := []*extensions.ReplicaSet{}
 	for i := range replicaSets {
-		if replicaSets[i].Spec.Replicas > 0 {
+		rs := replicaSets[i]
+
+		if rs != nil && rs.Spec.Replicas > 0 {
 			active = append(active, replicaSets[i])
 		}
 	}
@@ -639,7 +641,6 @@ type ControllersByCreationTimestamp []*api.ReplicationController
 
 func (o ControllersByCreationTimestamp) Len() int      { return len(o) }
 func (o ControllersByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
 func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
@@ -647,15 +648,40 @@ func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-// ReplicaSetsByCreationTimestamp sorts a list of ReplicationSets by creation timestamp, using their names as a tie breaker.
+// ReplicaSetsByCreationTimestamp sorts a list of ReplicaSet by creation timestamp, using their names as a tie breaker.
 type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
 
 func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
 func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
 func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+// ReplicaSetsBySizeOlder sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsBySizeOlder []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeOlder) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeOlder) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeOlder) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
+}
+
+// ReplicaSetsBySizeNewer sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from new to old replica sets.
+type ReplicaSetsBySizeNewer []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeNewer) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeNewer) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(j, i)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
 }
