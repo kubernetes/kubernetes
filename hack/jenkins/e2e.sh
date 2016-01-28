@@ -351,7 +351,8 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-autoscaling)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-autoscaling"}
     : ${E2E_NETWORK:="e2e-autoscaling"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Autoscaling\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:ClusterSizeAutoscaling\]|\[Feature:InitialResources\] \
+                           --ginkgo.skip=\[Flaky\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-autoscaling"}
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}

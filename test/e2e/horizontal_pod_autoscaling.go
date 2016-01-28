@@ -31,7 +31,8 @@ const (
 	subresource    = "scale"
 )
 
-var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Feature:Autoscaling]", func() {
+// These tests take ~20 minutes each.
+var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Slow]", func() {
 	var rc *ResourceConsumer
 	f := NewFramework("horizontal-pod-autoscaling")
 
