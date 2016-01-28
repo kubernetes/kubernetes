@@ -24,6 +24,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -122,10 +123,10 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // - AWS EBS forbids any two pods mounting the same volume ID
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image.
 // TODO: migrate this into some per-volume specific code?
-func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func NoDiskConflict(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
 	for _, v := range pod.Spec.Volumes {
-		for _, ev := range existingPods {
-			if isVolumeConflict(v, ev) {
+		for _, pod := range nodeInfo.Pods {
+			if isVolumeConflict(v, pod) {
 				return false, nil
 			}
 		}
@@ -159,16 +160,16 @@ func NewVolumeZonePredicate(nodeInfo NodeInfo, pvInfo PersistentVolumeInfo, pvcI
 		pvInfo:   pvInfo,
 		pvcInfo:  pvcInfo,
 	}
-	return c.predicate
+	return c.volumeZonePredicate
 }
 
-func (c *VolumeZoneChecker) predicate(pod *api.Pod, existingPods []*api.Pod, nodeID string) (bool, error) {
-	node, err := c.nodeInfo.GetNodeInfo(nodeID)
+func (c *VolumeZoneChecker) volumeZonePredicate(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
+	node, err := c.nodeInfo.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
 	}
 	if node == nil {
-		return false, fmt.Errorf("node not found: %q", nodeID)
+		return false, fmt.Errorf("node not found: %q", nodeName)
 	}
 
 	nodeConstraints := make(map[string]string)
@@ -225,7 +226,7 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, existingPods []*api.Pod, nod
 				}
 				nodeV, _ := nodeConstraints[k]
 				if v != nodeV {
-					glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, nodeID, pvName, k)
+					glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, nodeName, pvName, k)
 					return false, nil
 				}
 			}
@@ -286,15 +287,15 @@ func podName(pod *api.Pod) string {
 }
 
 // PodFitsResources calculates fit based on requested, rather than used resources
-func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	info, err := r.info.GetNodeInfo(node)
+func (r *ResourceFit) PodFitsResources(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
+	info, err := r.info.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
 	}
 
 	allocatable := info.Status.Allocatable
-	if int64(len(existingPods))+1 > allocatable.Pods().Value() {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), node, len(existingPods), allocatable.Pods().Value())
+	if int64(len(nodeInfo.Pods))+1 > allocatable.Pods().Value() {
+		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), nodeName, len(nodeInfo.Pods), allocatable.Pods().Value())
 		return false, ErrExceededMaxPodNumber
 	}
 
@@ -303,17 +304,17 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 		return true, nil
 	}
 
-	pods := append(existingPods, pod)
-	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, allocatable)
-	if len(exceedingCPU) > 0 {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), node)
+	totalMilliCPU := allocatable.Cpu().MilliValue()
+	totalMemory := allocatable.Memory().Value()
+	if totalMilliCPU != 0 && totalMilliCPU < podRequest.milliCPU+nodeInfo.RequestedResource.MilliCPU {
+		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), nodeName)
 		return false, ErrInsufficientFreeCPU
 	}
-	if len(exceedingMemory) > 0 {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Memory", podName(pod), node)
+	if totalMemory != 0 && totalMemory < podRequest.memory+nodeInfo.RequestedResource.Memory {
+		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Memory", podName(pod), nodeName)
 		return false, ErrInsufficientFreeMemory
 	}
-	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.", podName(pod), node, len(pods)-1, allocatable.Pods().Value())
+	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.", podName(pod), nodeName, len(nodeInfo.Pods), allocatable.Pods().Value())
 	return true, nil
 }
 
@@ -343,19 +344,19 @@ type NodeSelector struct {
 	info NodeInfo
 }
 
-func (n *NodeSelector) PodSelectorMatches(pod *api.Pod, existingPods []*api.Pod, nodeID string) (bool, error) {
-	node, err := n.info.GetNodeInfo(nodeID)
+func (n *NodeSelector) PodSelectorMatches(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
+	node, err := n.info.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
 	}
 	return PodMatchesNodeLabels(pod, node), nil
 }
 
-func PodFitsHost(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func PodFitsHost(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
 	if len(pod.Spec.NodeName) == 0 {
 		return true, nil
 	}
-	return pod.Spec.NodeName == node, nil
+	return pod.Spec.NodeName == nodeName, nil
 }
 
 type NodeLabelChecker struct {
@@ -385,9 +386,9 @@ func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) algori
 // Alternately, eliminating nodes that have a certain label, regardless of value, is also useful
 // A node may have a label with "retiring" as key and the date as the value
 // and it may be desirable to avoid scheduling new pods on this node
-func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, existingPods []*api.Pod, nodeID string) (bool, error) {
+func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
 	var exists bool
-	node, err := n.info.GetNodeInfo(nodeID)
+	node, err := n.info.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
 	}
@@ -427,7 +428,7 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // - L is listed in the ServiceAffinity object that is passed into the function
 // - the pod does not have any NodeSelector for L
 // - some other pod from the same service is already scheduled onto a node that has value V for label L
-func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api.Pod, nodeID string) (bool, error) {
+func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
 	var affinitySelector labels.Selector
 
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
@@ -487,7 +488,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 		affinitySelector = labels.Set(affinityLabels).AsSelector()
 	}
 
-	node, err := s.nodeInfo.GetNodeInfo(nodeID)
+	node, err := s.nodeInfo.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
 	}
@@ -496,12 +497,12 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 	return affinitySelector.Matches(labels.Set(node.Labels)), nil
 }
 
-func PodFitsHostPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func PodFitsHostPorts(pod *api.Pod, nodeName string, nodeInfo schedulercache.NodeInfo) (bool, error) {
 	wantPorts := getUsedPorts(pod)
 	if len(wantPorts) == 0 {
 		return true, nil
 	}
-	existingPorts := getUsedPorts(existingPods...)
+	existingPorts := getUsedPorts(nodeInfo.Pods...)
 	for wport := range wantPorts {
 		if wport == 0 {
 			continue
@@ -528,17 +529,27 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 // MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
 // and the values are the list of pods running on that host.
 func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error) {
-	machineToPods := map[string][]*api.Pod{}
-	// TODO: perform more targeted query...
+	panic("")
+}
+
+// CreateNodeNameToInfoMap obtains a list of pods and pivots that list into a map where the keys are node names
+// and the values are the aggregated information for that node.
+func CreateNodeNameToInfoMap(lister algorithm.PodLister) (map[string]*schedulercache.NodeInfo, error) {
+	nodeNameToInfo := make(map[string]*schedulercache.NodeInfo)
 	pods, err := lister.List(labels.Everything())
 	if err != nil {
-		return map[string][]*api.Pod{}, err
+		return nil, err
 	}
-	for _, scheduledPod := range pods {
-		host := scheduledPod.Spec.NodeName
-		machineToPods[host] = append(machineToPods[host], scheduledPod)
+	for _, pod := range pods {
+		nodeName := pod.Spec.NodeName
+		nodeInfo, ok := nodeNameToInfo[nodeName]
+		if !ok {
+			nodeInfo := schedulercache.NewNodeInfo()
+			nodeNameToInfo[nodeName] = nodeInfo
+		}
+		nodeInfo.AddPod(pod)
 	}
-	return machineToPods, nil
+	return nodeNameToInfo, nil
 }
 
 // search two arrays and return true if they have at least one common element; return false otherwise

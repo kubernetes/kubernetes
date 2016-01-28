@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // the unused capacity is calculated on a scale of 0-10
@@ -114,15 +115,10 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) sc
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2
-func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return schedulerapi.HostPriorityList{}, err
-	}
-
+func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	list := schedulerapi.HostPriorityList{}
-	for _, node := range nodes.Items {
-		list = append(list, calculateResourceOccupancy(pod, node, machinesToPods[node.Name]))
+	for nodeName, nodeInfo := range nodeNameToInfo {
+		list = append(list, calculateResourceOccupancy(pod, nodeName, nodeInfo.Pods))
 	}
 	return list, nil
 }
@@ -176,15 +172,10 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machines
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return schedulerapi.HostPriorityList{}, err
-	}
-
+func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	list := schedulerapi.HostPriorityList{}
-	for _, node := range nodes.Items {
-		list = append(list, calculateBalancedResourceAllocation(pod, node, machinesToPods[node.Name]))
+	for nodeName, nodeInfo := range nodeNameToInfo {
+		list = append(list, calculateBalancedResourceAllocation(pod, nodeName, nodeInfo.Pods))
 	}
 	return list, nil
 }
