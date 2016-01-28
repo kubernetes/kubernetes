@@ -162,6 +162,10 @@ swapoff -a
 # we will run provision to update code each time we test, so we do not want to do salt install each time
 if ! which salt-minion >/dev/null 2>&1; then
   # Install Salt
+
+  # Temporary fix until salt-bootstrap merge this
+  # fix https://github.com/saltstack/salt-bootstrap/commit/4d4de1ec7488dc03afc3f1af980ff8b3d07c1c27 to stable
+  export BS_CURL_ARGS="-L"
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
   
   # Edit the Salt minion unit file to do restart always
