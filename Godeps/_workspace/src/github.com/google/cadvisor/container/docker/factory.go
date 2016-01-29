@@ -49,6 +49,8 @@ var dockerCgroupRegexp = regexp.MustCompile(`.+-([a-z0-9]{64})\.scope$`)
 
 var noSystemd = flag.Bool("nosystemd", false, "Explicitly disable systemd support for Docker containers")
 
+var dockerEnvWhitelist = flag.String("docker_env_metadata_whitelist", "", "a comma-separated list of environment variable keys that needs to be collected for docker containers")
+
 // TODO(vmarmol): Export run dir too for newer Dockers.
 // Directory holding Docker container state information.
 func DockerStateDir() string {
@@ -92,6 +94,7 @@ const (
 	devicemapperStorageDriver storageDriver = "devicemapper"
 	aufsStorageDriver         storageDriver = "aufs"
 	overlayStorageDriver      storageDriver = "overlay"
+	zfsStorageDriver          storageDriver = "zfs"
 )
 
 type dockerFactory struct {
@@ -117,6 +120,9 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 	if err != nil {
 		return
 	}
+
+	metadataEnvs := strings.Split(*dockerEnvWhitelist, ",")
+
 	handler, err = newDockerContainerHandler(
 		client,
 		name,
@@ -125,6 +131,7 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		self.storageDriver,
 		&self.cgroupSubsystems,
 		inHostNamespace,
+		metadataEnvs,
 	)
 	return
 }

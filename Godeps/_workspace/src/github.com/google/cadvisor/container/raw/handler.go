@@ -166,6 +166,9 @@ func (self *rawContainerHandler) GetRootNetworkDevices() ([]info.NetInfo, error)
 	return nd, nil
 }
 
+// Nothing to start up.
+func (self *rawContainerHandler) Start() {}
+
 // Nothing to clean up.
 func (self *rawContainerHandler) Cleanup() {}
 

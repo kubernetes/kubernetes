@@ -29,6 +29,7 @@ github.com/daviddengcn/go-colortext | BSD?
 github.com/dgrijalva/jwt-go | spdxMIT
 github.com/docker/docker | Apache-2
 github.com/docker/docker/pkg/symlink | spdxBSD3
+github.com/docker/go-units | Apache-2
 github.com/docker/spdystream | SeeFile
 github.com/elazarl/go-bindata-assetfs | spdxBSD2
 github.com/elazarl/goproxy | BSDWarr
@@ -60,6 +61,7 @@ github.com/kr/pty | spdxMIT
 github.com/matttproud/golang_protobuf_extensions | Apache-2
 github.com/mesos/mesos-go | Apache-2
 github.com/miekg/dns | spdxBSD3
+github.com/mistifyio/go-zfs | Apache-2
 github.com/mitchellh/mapstructure | MITname
 github.com/mvdan/xurls | spdxBSD3
 github.com/mxk/go-flowrate | spdxBSD3
