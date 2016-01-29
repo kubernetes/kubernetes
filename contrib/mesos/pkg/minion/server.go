@@ -177,9 +177,6 @@ func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
 
-	// executorArgs = append(executorArgs, "--housekeeping_interval=" + ms.housekeepingInterval)
-	// executorArgs = append(executorArgs, "--global_housekeeping_interval=" + ms.globalHousekeepingInterval)
-  
 	// run executor and quit minion server when this exits cleanly
 	execDied := make(chan struct{})
 	decorator := func(t *tasks.Task) *tasks.Task {
