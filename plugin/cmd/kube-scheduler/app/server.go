@@ -93,7 +93,7 @@ func Run(s *options.SchedulerServer) error {
 		mux.Handle("/metrics", prometheus.Handler())
 
 		server := &http.Server{
-			Addr:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)),
+			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(s.Port)),
 			Handler: mux,
 		}
 		glog.Fatal(server.ListenAndServe())
