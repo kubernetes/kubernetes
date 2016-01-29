@@ -154,10 +154,10 @@ func IsCIdentifier(value string) []string {
 
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
 func IsValidPortNum(port int) []string {
-	if port < 1 || port > 65535 {
-		return []string{InclusiveRangeError(1, 65535)}
+	if 1 <= port && port <= 65535 {
+		return nil
 	}
-	return nil
+	return []string{InclusiveRangeError(1, 65535)}
 }
 
 // Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
@@ -169,14 +169,20 @@ const (
 	maxGroupID = math.MaxInt32
 )
 
-// IsValidGroupId tests that the argument is a valid gids.
-func IsValidGroupId(gid int64) bool {
-	return minGroupID <= gid && gid <= maxGroupID
+// IsValidGroupId tests that the argument is a valid Unix GID.
+func IsValidGroupId(gid int64) []string {
+	if minGroupID <= gid && gid <= maxGroupID {
+		return nil
+	}
+	return []string{InclusiveRangeError(minGroupID, maxGroupID)}
 }
 
-// IsValidUserId tests that the argument is a valid uids.
-func IsValidUserId(uid int64) bool {
-	return minUserID <= uid && uid <= maxUserID
+// IsValidUserId tests that the argument is a valid Unix UID.
+func IsValidUserId(uid int64) []string {
+	if minUserID <= uid && uid <= maxUserID {
+		return nil
+	}
+	return []string{InclusiveRangeError(minUserID, maxUserID)}
 }
 
 var portNameCharsetRegex = regexp.MustCompile("^[-a-z0-9]+$")

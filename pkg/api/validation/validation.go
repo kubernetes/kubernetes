@@ -19,7 +19,6 @@ package validation
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"os"
 	"path"
@@ -51,7 +50,6 @@ const fieldImmutableErrorMsg string = `field is immutable`
 const isNotIntegerErrorMsg string = `must be an integer`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
-var IdRangeErrorMsg string = validation.InclusiveRangeError(0, math.MaxInt32)
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
@@ -1518,16 +1516,19 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 
 	if securityContext != nil {
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
-		if securityContext.FSGroup != nil && !validation.IsValidGroupId(*securityContext.FSGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), IdRangeErrorMsg))
+		if securityContext.FSGroup != nil {
+			for _, msg := range validation.IsValidGroupId(*securityContext.FSGroup) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))
+			}
 		}
-		if securityContext.RunAsUser != nil && !validation.IsValidUserId(*securityContext.RunAsUser) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *(securityContext.RunAsUser), IdRangeErrorMsg))
+		if securityContext.RunAsUser != nil {
+			for _, msg := range validation.IsValidUserId(*securityContext.RunAsUser) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *(securityContext.RunAsUser), msg))
+			}
 		}
-		for i, gid := range securityContext.SupplementalGroups {
-			if !validation.IsValidGroupId(gid) {
-				supplementalGroup := fmt.Sprintf(`supplementalGroups[%d]`, i)
-				allErrs = append(allErrs, field.Invalid(fldPath.Child(supplementalGroup), gid, IdRangeErrorMsg))
+		for g, gid := range securityContext.SupplementalGroups {
+			for _, msg := range validation.IsValidGroupId(gid) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
 		}
 	}

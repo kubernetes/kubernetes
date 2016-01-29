@@ -157,14 +157,14 @@ func TestIsValidPortNum(t *testing.T) {
 func TestIsValidGroupId(t *testing.T) {
 	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
 	for _, val := range goodValues {
-		if !IsValidGroupId(val) {
-			t.Errorf("expected true for '%d'", val)
+		if msgs := IsValidGroupId(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%d': %v", val, msgs)
 		}
 	}
 
 	badValues := []int64{-1, -1003, 2147483648, 4147483647}
 	for _, val := range badValues {
-		if IsValidGroupId(val) {
+		if msgs := IsValidGroupId(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
 		}
 	}
@@ -173,14 +173,14 @@ func TestIsValidGroupId(t *testing.T) {
 func TestIsValidUserId(t *testing.T) {
 	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
 	for _, val := range goodValues {
-		if !IsValidUserId(val) {
-			t.Errorf("expected true for '%d'", val)
+		if msgs := IsValidUserId(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%d': %v", val, msgs)
 		}
 	}
 
 	badValues := []int64{-1, -1003, 2147483648, 4147483647}
 	for _, val := range badValues {
-		if IsValidUserId(val) {
+		if msgs := IsValidUserId(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
 		}
 	}
