@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/master"
@@ -347,8 +348,9 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	// Anonymous client config
 	clientConfig := client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	// Root client
+	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
 	rootClient := client.NewOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, BearerToken: rootToken})
-
+	rootClientset := clientset.FromUnversionedClient(rootClient)
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
@@ -359,7 +361,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		return nil, false, nil
 	})
 	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClient)
+	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClientset)
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
@@ -411,9 +413,9 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	m = master.New(masterConfig)
 
 	// Start the service account and service account token controllers
-	tokenController := serviceaccountcontroller.NewTokensController(rootClient, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
+	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	tokenController.Run()
-	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClient, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
+	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()

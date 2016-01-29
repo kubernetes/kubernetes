@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/net"
 )
 
+// The ServiceExpansion interface allows manually adding extra methods to the ServiceInterface.
 type ServiceExpansion interface {
 	ProxyGet(scheme, name, port, path string, params map[string]string) unversioned.ResponseWrapper
 }

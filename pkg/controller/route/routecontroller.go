@@ -23,19 +23,19 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 type RouteController struct {
 	routes      cloudprovider.Routes
-	kubeClient  client.Interface
+	kubeClient  clientset.Interface
 	clusterName string
 	clusterCIDR *net.IPNet
 }
 
-func New(routes cloudprovider.Routes, kubeClient client.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
+func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
 	return &RouteController{
 		routes:      routes,
 		kubeClient:  kubeClient,
@@ -59,7 +59,7 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	}
 	// TODO (cjcullen): use pkg/controller/framework.NewInformer to watch this
 	// and reduce the number of lists needed.
-	nodeList, err := rc.kubeClient.Nodes().List(api.ListOptions{})
+	nodeList, err := rc.kubeClient.Legacy().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
