@@ -86,6 +86,9 @@
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
             timeout: 300
+        - 'gke-slow':
+            description: 'Run slow E2E tests on GKE using the latest successful build.'
+            timeout: 300
         - 'gke-ci-reboot':
             description: |
                 Run e2e tests using the following config:<br>

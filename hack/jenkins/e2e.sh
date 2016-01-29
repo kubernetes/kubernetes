@@ -383,9 +383,9 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-slow)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
     : ${E2E_NETWORK:="e2e-slow"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
+    : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-slow"}
     : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
@@ -601,6 +601,17 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
+    ;;
+
+  kubernetes-e2e-gke-slow)
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-slow"}
+    : ${E2E_NETWORK:="e2e-gke-slow"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
+    : ${GINKGO_PARALLEL:="y"}
     ;;
 
   # Run the GCE_PARALLEL_SKIP_TESTS on GKE.
