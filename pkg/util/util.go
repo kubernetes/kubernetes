@@ -238,3 +238,18 @@ func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
 
 	return list, errs, nil
 }
+
+// IntPtr returns a pointer to an int
+func IntPtr(i int) *int {
+	o := i
+	return &o
+}
+
+// IntPtrDerefOr derefrence the int ptr and returns it i not nil,
+// else returns def.
+func IntPtrDerefOr(ptr *int, def int) int {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}

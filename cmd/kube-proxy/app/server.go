@@ -20,6 +20,7 @@ package app
 
 import (
 	"errors"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
@@ -40,6 +41,7 @@ import (
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 
@@ -116,7 +118,7 @@ with the apiserver API to configure the proxy.`,
 // NewProxyServerDefault creates a new ProxyServer object with default parameters.
 func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, error) {
 	protocol := utiliptables.ProtocolIpv4
-	if config.BindAddress.To4() == nil {
+	if net.ParseIP(config.BindAddress).To4() == nil {
 		protocol = utiliptables.ProtocolIpv6
 	}
 
@@ -135,9 +137,9 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
-	if config.OOMScoreAdj != 0 {
+	if config.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(0, config.OOMScoreAdj); err != nil {
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, *config.OOMScoreAdj); err != nil {
 			glog.V(2).Info(err)
 		}
 	}
@@ -182,10 +184,10 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var proxier proxy.ProxyProvider
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
 
-	proxyMode := getProxyMode(config.ProxyMode, client.Nodes(), hostname, iptInterface)
+	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface)
 	if proxyMode == proxyModeIptables {
 		glog.V(2).Info("Using iptables Proxier.")
-		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IptablesSyncPeriod, config.MasqueradeAll)
+		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -202,7 +204,14 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		// set EndpointsConfigHandler to our loadBalancer
 		endpointsHandler = loadBalancer
 
-		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.IptablesSyncPeriod, config.UDPIdleTimeout)
+		proxierUserspace, err := userspace.NewProxier(
+			loadBalancer,
+			net.ParseIP(config.BindAddress),
+			iptInterface,
+			*utilnet.ParsePortRangeOrDie(config.PortRange),
+			config.IPTablesSyncPeriod.Duration,
+			config.UDPIdleTimeout.Duration,
+		)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -259,7 +268,7 @@ func (s *ProxyServer) Run() error {
 	// Start up Healthz service if requested
 	if s.Config.HealthzPort > 0 {
 		go util.Until(func() {
-			err := http.ListenAndServe(s.Config.HealthzBindAddress.String()+":"+strconv.Itoa(s.Config.HealthzPort), nil)
+			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(s.Config.HealthzPort), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
@@ -273,8 +282,8 @@ func (s *ProxyServer) Run() error {
 				return err
 			}
 		}
-		if s.Config.ConntrackTCPTimeoutEstablished > 0 {
-			if err := s.Conntracker.SetTCPEstablishedTimeout(s.Config.ConntrackTCPTimeoutEstablished); err != nil {
+		if s.Config.ConntrackTCPEstablishedTimeout.Duration > 0 {
+			if err := s.Conntracker.SetTCPEstablishedTimeout(int(s.Config.ConntrackTCPEstablishedTimeout.Duration / time.Second)); err != nil {
 				return err
 			}
 		}

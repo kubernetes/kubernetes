@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -37,8 +40,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				temp := int32(qos.KubeProxyOOMScoreAdj)
 				obj.OOMScoreAdj = &temp
 			}
-			if obj.IPTablesSyncePeriodSeconds == 0 {
-				obj.IPTablesSyncePeriodSeconds = 5
+			if obj.IPTablesSyncPeriod.Duration == 0 {
+				obj.IPTablesSyncPeriod = unversioned.Duration{5 * time.Second}
 			}
 		},
 	)
