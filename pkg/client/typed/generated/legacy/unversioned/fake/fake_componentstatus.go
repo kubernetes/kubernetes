@@ -23,54 +23,54 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// FakeComponentStatus implements ComponentStatusInterface
-type FakeComponentStatus struct {
+// FakeComponentStatuses implements ComponentStatusInterface
+type FakeComponentStatuses struct {
 	Fake *FakeLegacy
 }
 
-func (c *FakeComponentStatus) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction("componentstatus", componentStatus), &api.ComponentStatus{})
+		Invokes(core.NewRootCreateAction("componentstatuses", componentStatus), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatus) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction("componentstatus", componentStatus), &api.ComponentStatus{})
+		Invokes(core.NewRootUpdateAction("componentstatuses", componentStatus), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatus) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeComponentStatuses) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction("componentstatus", name), &api.ComponentStatus{})
+		Invokes(core.NewRootDeleteAction("componentstatuses", name), &api.ComponentStatus{})
 	return err
 }
 
-func (c *FakeComponentStatus) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction("events", listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ComponentStatusList{})
 	return err
 }
 
-func (c *FakeComponentStatus) Get(name string) (result *api.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Get(name string) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction("componentstatus", name), &api.ComponentStatus{})
+		Invokes(core.NewRootGetAction("componentstatuses", name), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatus) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
+func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction("componentstatus", opts), &api.ComponentStatusList{})
+		Invokes(core.NewRootListAction("componentstatuses", opts), &api.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -88,8 +88,8 @@ func (c *FakeComponentStatus) List(opts api.ListOptions) (result *api.ComponentS
 	return list, err
 }
 
-// Watch returns a watch.Interface that watches the requested componentStatus.
-func (c *FakeComponentStatus) Watch(opts api.ListOptions) (watch.Interface, error) {
+// Watch returns a watch.Interface that watches the requested componentStatuses.
+func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction("componentstatus", opts))
+		InvokesWatch(core.NewRootWatchAction("componentstatuses", opts))
 }
