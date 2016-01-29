@@ -262,17 +262,18 @@ func setIsolators(app *appctypes.App, c *api.Container, ctx *api.SecurityContext
 		request string
 	}
 
-	resources := make(map[api.ResourceName]resource)
+	// If limit is empty, populate it with request and vice versa.
+	resources := make(map[api.ResourceName]*resource)
 	for name, quantity := range c.Resources.Limits {
-		resources[name] = resource{limit: quantity.String()}
+		resources[name] = &resource{limit: quantity.String(), request: quantity.String()}
 	}
 	for name, quantity := range c.Resources.Requests {
 		r, ok := resources[name]
-		if !ok {
-			r = resource{}
+		if ok {
+			r.request = quantity.String()
+			continue
 		}
-		r.request = quantity.String()
-		resources[name] = r
+		resources[name] = &resource{limit: quantity.String(), request: quantity.String()}
 	}
 
 	for name, res := range resources {
