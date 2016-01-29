@@ -1,26 +1,26 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: monitoring-influxdb-grafana-v3
+  name: monitoring-influxdb-grafana-v2
   namespace: kube-system
   labels: 
     k8s-app: influxGrafana
-    version: v3
+    version: v2
     kubernetes.io/cluster-service: "true"
 spec: 
   replicas: 1
   selector: 
     k8s-app: influxGrafana
-    version: v3
+    version: v2
   template: 
     metadata: 
       labels: 
         k8s-app: influxGrafana
-        version: v3
+        version: v2
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster_influxdb:v0.5
+        - image: gcr.io/google_containers/heapster_influxdb:v0.4
           name: influxdb
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -68,6 +68,7 @@ spec:
           volumeMounts:
           - name: grafana-persistent-storage
             mountPath: /var
+              
       volumes:
       - name: influxdb-persistent-storage
         emptyDir: {}
