@@ -54,9 +54,6 @@ function join_regex_no_empty() {
 # Assumes globals:
 #   $JOB_NAME
 #   $KUBERNETES_PROVIDER
-#   $GCE_DEFAULT_SKIP_TESTS
-#   $GCE_FLAKY_TESTS
-#   $GCE_SLOW_TESTS
 #
 # Args:
 #   $1 old_version:  the version to deploy a cluster at, and old e2e tests to run
@@ -79,17 +76,6 @@ function configure_upgrade_step() {
     exit 1
   }
   local -r step="${BASH_REMATCH[1]}"
-
-  local -r gce_test_args="--ginkgo.skip=$(join_regex_allow_empty \
-        ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-        ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-        ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-        )"
-  local -r gke_test_args="--ginkgo.skip=$(join_regex_allow_empty \
-        ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-        ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-        ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-        )"
 
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
     KUBE_GCE_INSTANCE_PREFIX="$cluster_name"
@@ -149,12 +135,6 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="false"
-
-      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-        GINKGO_TEST_ARGS="${gke_test_args}"
-      else
-        GINKGO_TEST_ARGS="${gce_test_args}"
-      fi
       ;;
 
     step5)
@@ -178,12 +158,6 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="false"
-
-      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-        GINKGO_TEST_ARGS="${gke_test_args}"
-      else
-        GINKGO_TEST_ARGS="${gce_test_args}"
-      fi
       ;;
 
     step7)
@@ -198,12 +172,6 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="true"
-
-      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-        GINKGO_TEST_ARGS="${gke_test_args}"
-      else
-        GINKGO_TEST_ARGS="${gce_test_args}"
-      fi
       ;;
   esac
 }
@@ -263,41 +231,6 @@ fi
 # When 1.2.0-beta.0 comes out, e.g., this will become "ci/latest-1.2"
 CURRENT_RELEASE_PUBLISHED_VERSION="ci/latest-1.1"
 
-# Specialized tests which should be skipped by default for projects.
-GCE_DEFAULT_SKIP_TESTS=(
-    "\[Skipped\]"
-    "\[Feature:.+\]"
-    )
-
-# Tests which kills or restarts components and/or nodes.
-DISRUPTIVE_TESTS=(
-    "\[Disruptive\]"
-)
-
-# The following tests are known to be flaky, and are thus run only in their own
-# -flaky- build variants.
-GCE_FLAKY_TESTS=(
-    "\[Flaky\]"
-    )
-
-# The following tests are known to be slow running (> 2 min), and are
-# thus run only in their own -slow- build variants.  Note that tests
-# can be slow by explicit design (e.g. some soak tests), or slow
-# through poor implementation.  Please indicate which applies in the
-# comments below, and for poorly implemented tests, please quote the
-# issue number tracking speed improvements.
-GCE_SLOW_TESTS=(
-    "\[Slow\]"
-    )
-
-# Tests which are not able to be run in parallel.
-#
-# TODO(ihmccreery) I'd like to get these combined with DISRUPTIVE_TESTS.
-GCE_PARALLEL_SKIP_TESTS=(
-    "\[Serial\]"
-    "\[Disruptive\]"
-)
-
 # Define environment variables based on the Jenkins project name.
 # NOTE: Not all jobs are defined here. The hack/jenkins/e2e.sh in master and
 # release branches defines relevant jobs for that particular version of
@@ -311,13 +244,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jnks-e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${E2E_NETWORK:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${GINKGO_PARALLEL:="y"}
-    # This list should match the list in kubernetes-e2e-gce-parallel.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
     : ${ENABLE_DEPLOYMENTS:=true}
@@ -345,7 +273,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-slow)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
     : ${E2E_NETWORK:="e2e-slow"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
                            --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${GINKGO_PARALLEL:="y"}
@@ -385,7 +313,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
                            --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${GINKGO_PARALLEL:="y"}
@@ -413,11 +341,6 @@ case ${JOB_NAME} in
     : ${E2E_ZONE:="us-west-2a"}
     : ${ZONE:="us-west-2a"}
     : ${E2E_NETWORK:="e2e-aws"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-	  )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
     : ${ENABLE_DEPLOYMENTS:=true}
@@ -433,11 +356,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e-parallel"}
     : ${E2E_NETWORK:="e2e-parallel"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
     NUM_NODES=${NUM_NODES_PARALLEL}
@@ -465,13 +385,11 @@ case ${JOB_NAME} in
     # Clear out any orphaned namespaces in case previous run was interrupted.
     : ${E2E_CLEAN_START:="true"}
     # We should be testing the reliability of a long-running cluster. The
-    # DISRUPTIVE_TESTS kill/restart components or nodes in the cluster,
+    # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          )"}
+    #
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
@@ -503,26 +421,24 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     : ${E2E_OPT:="--check_version_skew=false"}
     # We should be testing the reliability of a long-running cluster. The
-    # DISRUPTIVE_TESTS kill/restart components or nodes in the cluster,
+    # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          )"}
+    #
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     ;;
 
   # Flaky
+  #
+  # TODO(ihmccreery) Partition these in a sane way or get rid of them completely.
 
   # Runs the flaky tests on GCE, sequentially.
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ) --ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
+                           --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
@@ -534,12 +450,9 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="parallel-flaky"}
     : ${E2E_NETWORK:="e2e-parallel-flaky"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ) --ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
@@ -553,9 +466,9 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
+                           --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
     ;;
 
   # Features
@@ -699,12 +612,6 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flannel"}
     : ${E2E_PUBLISH_GREEN_VERSION:="true"}
     : ${E2E_NETWORK:="e2e-gce-flannel"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flannel"}
     : ${PROJECT:="kubernetes-flannel"}
     # Override GCE defaults.
@@ -833,10 +740,6 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
     ;;
@@ -870,10 +773,6 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
     ;;
@@ -890,11 +789,6 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
     ;;
