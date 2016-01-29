@@ -150,7 +150,7 @@ func New(c *Config) (*Client, error) {
 	}
 
 	discoveryConfig := *c
-	discoveryClient, err := NewDiscoveryClient(&discoveryConfig)
+	discoveryClient, err := NewDiscoveryClientForConfig(&discoveryConfig)
 	if err != nil {
 		return nil, err
 	}
