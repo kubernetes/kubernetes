@@ -152,6 +152,8 @@ type SchedulerServer struct {
 	kmPath                         string
 	clusterDNS                     net.IP
 	clusterDomain                  string
+	globalHousekeepingInterval     time.Duration
+	housekeepingInterval           time.Duration
 	kubeletRootDirectory           string
 	kubeletDockerEndpoint          string
 	kubeletPodInfraContainerImage  string
@@ -225,6 +227,10 @@ func NewSchedulerServer() *SchedulerServer {
 		// when kube-proxy is running in a non-root netns (init_net); setting this to a non-zero value will
 		// impact connection tracking for the entire host on which kube-proxy is running. xref (k8s#19182)
 		conntrackMax: 0,
+		
+		// cadvisor housekeeping related config
+		housekeepingInterval: 			1 * time.Second,
+		globalHousekeepingInterval:		1 * time.Minute,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -307,6 +313,10 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.conntrackMax, "conntrack-max", s.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
 	fs.IntVar(&s.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 
+	// add cadvisor housekeeping config
+	fs.DurationVar(&s.housekeepingInterval, "housekeeping_interval", s.housekeepingInterval, "Interval between container housekeepings")
+	fs.DurationVar(&s.globalHousekeepingInterval, "global_housekeeping_interval", s.globalHousekeepingInterval, "Interval between container global housekeepings")
+
 	//TODO(jdef) support this flag once we have a better handle on mesos-dns and k8s DNS integration
 	//fs.StringVar(&s.HADomain, "ha-domain", s.HADomain, "Domain of the HA scheduler service, only used in HA mode. If specified may be used to construct artifact download URIs.")
 }
@@ -351,7 +361,7 @@ func (s *SchedulerServer) serveFrameworkArtifactWithFilename(path string, filena
 }
 
 func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, error) {
-	ci := &mesos.CommandInfo{
+		ci := &mesos.CommandInfo{
 		Shell: proto.Bool(false),
 	}
 
@@ -427,6 +437,10 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
+
+	// adding cadvisor housekeeping config
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--housekeeping_interval=%v", s.housekeepingInterval))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--global_housekeeping_interval=%v", s.globalHousekeepingInterval))
 
 	if s.authPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
