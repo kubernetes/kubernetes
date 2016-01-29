@@ -1,3 +1,24 @@
+-
+    date: 2016-03-10 00:00:00 -0000
+    title: "KubeCon"
+    location: "London, England"
+    venue: "Codenode"
+    speaker: ""
+    url: "https://kubecon.io/" 
+-
+    date: 2016-02-16 00:00:00 -0800
+    title: "Container World 16"
+    location: "Santa Clara, California"
+    venue: "Santa Clara Convention Center"
+    speaker: "Craig McLuckie"
+    url: "http://containerevent.com/"
+-
+    date: 2016-02-02 00:00:00 -0800
+    title: "Kubernetes Seattle Meetup"
+    location: "Seattle, Washington"
+    venue: "Google Seattle"
+    speaker: "Kelsey Hightower"
+    url: "http://www.meetup.com/Seattle-Kubernetes-Meetup/events/228282767/"
 - 
     date: 2015-12-03 18:30:00 +0100
     title: "Docker meets Kubernetes"
