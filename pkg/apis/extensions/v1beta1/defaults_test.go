@@ -34,7 +34,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 	defaultIntOrString := intstr.FromInt(1)
 	defaultLabels := map[string]string{"foo": "bar"}
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
-	defaultTemplate := &v1.PodTemplateSpec{
+	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
 			RestartPolicy:                 v1.RestartPolicyAlways,
@@ -43,6 +43,14 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Labels: defaultLabels,
+		},
+	}
+	templateNoLabel := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
 		},
 	}
 	tests := []struct {
@@ -116,6 +124,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			original: &DaemonSet{},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Template: templateNoLabel,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						Type: RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{
@@ -136,6 +145,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Template: templateNoLabel,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						Type: RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{
@@ -157,6 +167,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Template: templateNoLabel,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						Type: RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{

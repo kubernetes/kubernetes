@@ -960,11 +960,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
-		if daemon.Spec.Template != nil {
-			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
-		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
-		}
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
 		selector, err := extensions.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
 			// this shouldn't happen if LabelSelector passed validation
