@@ -28,28 +28,28 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("kube-ui", func() {
+var _ = Describe("Kubernetes Dashboard", func() {
 	const (
-		uiServiceName = "kube-ui"
+		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName
 		uiNamespace   = api.NamespaceSystem
 
 		serverStartTimeout = 1 * time.Minute
 	)
 
-	f := NewFramework("kube-ui")
+	f := NewFramework(uiServiceName)
 
-	It("should check that the kube-ui instance is alive", func() {
-		By("Checking the kube-ui service exists.")
+	It("should check that the kubernetes-dashboard instance is alive", func() {
+		By("Checking whether the kubernetes-dashboard service exists.")
 		err := waitForService(f.Client, uiNamespace, uiServiceName, true, poll, serviceStartTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Checking to make sure the kube-ui pods are running")
+		By("Checking to make sure the kubernetes-dashboard pods are running")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
 		err = waitForPodsWithLabelRunning(f.Client, uiNamespace, selector)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Checking to make sure we get a response from the kube-ui.")
+		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(poll, serverStartTimeout, func() (bool, error) {
 			var status int
 			// Query against the proxy URL for the kube-ui service.
@@ -63,7 +63,7 @@ var _ = Describe("kube-ui", func() {
 				StatusCode(&status).
 				Error()
 			if status != http.StatusOK {
-				Logf("Unexpected status from kube-ui: %v", status)
+				Logf("Unexpected status from kubernetes-dashboard: %v", status)
 			} else if err != nil {
 				Logf("Request to kube-ui failed: %v", err)
 			}
