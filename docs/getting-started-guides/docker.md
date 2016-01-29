@@ -76,7 +76,9 @@ docker run \
     --privileged=true \
     -d \
     gcr.io/google_containers/hyperkube:v1.1.3 \
-    /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
+    /hyperkube kubelet --containerized --hostname-override="127.0.0.1" \
+                       --address="0.0.0.0" --api-servers=http://localhost:8080 \
+                       --config=/etc/kubernetes/manifests
 ```
 
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
