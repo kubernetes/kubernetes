@@ -34,7 +34,7 @@ func TestFailedRecycling(t *testing.T) {
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data02",
+					Path: "/somepath/data02",
 				},
 			},
 			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,

@@ -90,6 +90,7 @@ func TestRecycler(t *testing.T) {
 }
 
 func TestDeleter(t *testing.T) {
+	// Deleter has a hard-coded regex for "/tmp".
 	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
@@ -147,7 +148,7 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := "/tmp/hostpath/"
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 

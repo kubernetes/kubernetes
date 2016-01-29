@@ -10,5 +10,5 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "/tmp/data02"
+    path: "/somepath/data02"
   persistentVolumeReclaimPolicy: Recycle

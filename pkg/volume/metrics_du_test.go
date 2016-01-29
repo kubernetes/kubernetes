@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 const expectedBlockSize = 4096
@@ -30,7 +32,7 @@ const expectedBlockSize = 4096
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
 func TestMetricsDuGetCapacity(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "metrics_du_test")
+	tmpDir, err := utiltesting.MkTmpdir("metrics_du_test")
 	if err != nil {
 		t.Fatalf("Can't make a tmp dir: %v", err)
 	}

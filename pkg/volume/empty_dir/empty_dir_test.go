@@ -19,7 +19,6 @@ limitations under the License.
 package empty_dir
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -44,7 +44,7 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "emptydirTest")
+	tmpDir, err := utiltesting.MkTmpdir("emptydirTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -119,7 +119,7 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
-	basePath, err := ioutil.TempDir(os.TempDir(), "emptydir_volume_test")
+	basePath, err := utiltesting.MkTmpdir("emptydir_volume_test")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -251,7 +251,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	basePath, err := ioutil.TempDir(os.TempDir(), "emptydirTest")
+	basePath, err := utiltesting.MkTmpdir("emptydirTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir： %v", err)
 	}
@@ -280,7 +280,7 @@ func TestPluginBackCompat(t *testing.T) {
 // TestMetrics tests that MetricProvider methods return sane values.
 func TestMetrics(t *testing.T) {
 	// Create an empty temp directory for the volume
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "empty_dir_test")
+	tmpDir, err := utiltesting.MkTmpdir("empty_dir_test")
 	if err != nil {
 		t.Fatalf("Can't make a tmp dir: %v", err)
 	}

@@ -52,7 +52,7 @@ func TestLabels(t *testing.T) {
 	}
 	container := &api.Container{
 		Name: "test_container",
-		TerminationMessagePath: "/tmp",
+		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
 	pod := &api.Pod{

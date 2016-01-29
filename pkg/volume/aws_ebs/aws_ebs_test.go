@@ -18,7 +18,6 @@ package aws_ebs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -28,11 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -119,7 +119,7 @@ func (fake *fakePDManager) DeleteVolume(cd *awsElasticBlockStoreDeleter) error {
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v")
 	}
@@ -260,7 +260,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	client := testclient.NewSimpleFake(pv, claim)
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func TestBuilderAndCleanerTypeAssert(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
