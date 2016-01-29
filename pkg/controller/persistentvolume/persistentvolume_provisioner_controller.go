@@ -202,7 +202,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *a
 	claim.Annotations[pvProvisioningRequiredAnnotationKey] = pvProvisioningCompletedAnnotationValue
 	_, err = controller.client.UpdatePersistentVolumeClaim(claim)
 	if err != nil {
-		glog.Error("error updating persistent volume claim: %v", err)
+		glog.Errorf("error updating persistent volume claim: %v", err)
 	}
 
 	return nil

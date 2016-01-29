@@ -679,7 +679,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
-	glog.V(2).Info("Checking if openstack load balancer already exists: %s", name)
+	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", name)
 	_, exists, err := lb.GetLoadBalancer(name, region)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
