@@ -21,10 +21,13 @@ import (
 	"strconv"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api"
+
 	"github.com/coreos/go-systemd/dbus"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // fakeRktInterface mocks the rktapi.PublicAPIClient interface for testing purpose.
@@ -141,4 +144,19 @@ func (f *fakeSystemd) RestartUnit(name string, mode string, ch chan<- string) (i
 
 func (f *fakeSystemd) Reload() error {
 	return fmt.Errorf("Not implemented")
+}
+
+// fakeRuntimeHelper implementes kubecontainer.RuntimeHelper interfaces for testing purpose.
+type fakeRuntimeHelper struct {
+	dnsServers  []string
+	dnsSearches []string
+	err         error
+}
+
+func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+
+func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
+	return f.dnsServers, f.dnsSearches, f.err
 }
