@@ -207,7 +207,7 @@
 				}
 				$('html, body').animate({scrollTop: offset}, 0);
 			});
-			$('#archivednotice').prop('href', window.location.href.replace('{{page.collection}}', 'v1.1'));
+			$('#archivednotice').prop('href', window.location.href.replace('{{page.collection}}', 'v1.1').replace('api-reference', 'api-reference/v1'));
 		}
 		/* Load the code samples in a syntax formatted code block */
 		function displaycodesample(targethref) {
