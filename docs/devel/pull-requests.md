@@ -53,7 +53,7 @@ Life of a Pull Request
 
 Unless in the last few weeks of a milestone when we need to reduce churn and stabilize, we aim to be always accepting pull requests.
 
-Either the [on call](https://github.com/kubernetes/kubernetes/wiki/Kubernetes-on-call-rotations) manually or the [github "munger"](https://github.com/kubernetes/contrib/tree/master/mungegithub) submit-queue plugin automatically will manage merging PRs.
+Either the [on call](on-call-rotations.md) manually or the [github "munger"](https://github.com/kubernetes/contrib/tree/master/mungegithub) submit-queue plugin automatically will manage merging PRs.
 
 There are several requirements for the submit-queue to work:
 * Author must have signed CLA ("cla: yes" label added to PR)
