@@ -361,7 +361,7 @@ func (s *SchedulerServer) serveFrameworkArtifactWithFilename(path string, filena
 }
 
 func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, error) {
-		ci := &mesos.CommandInfo{
+	ci := &mesos.CommandInfo{
 		Shell: proto.Bool(false),
 	}
 

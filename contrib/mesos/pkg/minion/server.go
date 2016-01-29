@@ -338,8 +338,8 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&ms.logVerbosity, "v", ms.logVerbosity, "log level for V logs")
 	
 	// hacks to forward selected cadvisor flags to the executor
-	fs.StringVar(&ms.housekeepingInterval, "housekeeping_interval", ms.housekeepingInterval, "Interval between container housekeepings")
-	fs.StringVar(&ms.globalHousekeepingInterval, "global_housekeeping_interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
+	fs.DurationVar(&ms.housekeepingInterval, "housekeeping_interval", ms.housekeepingInterval, "Interval between container housekeepings")
+	fs.DurationVar(&ms.globalHousekeepingInterval, "global_housekeeping_interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
 }
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
