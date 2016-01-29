@@ -32,7 +32,12 @@ const (
 	scaleDownTimeout = 30 * time.Minute
 )
 
-var _ = Describe("Autoscaling [Skipped]", func() {
+// [Feature:ClusterSizeAutoscaling]: Cluster size autoscaling is experimental
+// and require Google Cloud Monitoring to be enabled, so these tests are not
+// run by default.
+//
+// These tests take ~20 minutes to run each.
+var _ = Describe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
 	f := NewFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
