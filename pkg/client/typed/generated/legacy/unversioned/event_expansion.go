@@ -137,3 +137,20 @@ func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, i
 func GetInvolvedObjectNameFieldLabel(version string) string {
 	return "involvedObject.name"
 }
+
+// TODO: This is a temporary arrangement and will be removed once all clients are moved to use the clientset.
+type EventSinkImpl struct {
+	Interface EventInterface
+}
+
+func (e *EventSinkImpl) Create(event *api.Event) (*api.Event, error) {
+	return e.Interface.CreateWithEventNamespace(event)
+}
+
+func (e *EventSinkImpl) Update(event *api.Event) (*api.Event, error) {
+	return e.Interface.UpdateWithEventNamespace(event)
+}
+
+func (e *EventSinkImpl) Patch(event *api.Event, data []byte) (*api.Event, error) {
+	return e.Interface.Patch(event, data)
+}
