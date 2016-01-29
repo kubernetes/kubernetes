@@ -51,9 +51,6 @@
         - 'gce-parallel-flaky':
             description: 'Run E2E tests using Ginkgo''s parallel test runner on GCE using the latest successful build. Limit to known-flaky tests.'
             timeout: 90
-        - 'gce-reboot':
-            description: 'Run E2E reboot tests on GCE using the latest successful build. The reboot tests are currently flaky and causing other tests to fail, so we quarantine them into this project and dedicated test cluster.'
-            timeout: 300
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
             timeout: 210
@@ -81,16 +78,6 @@
             timeout: 300
         - 'gke-slow':
             description: 'Run slow E2E tests on GKE using the latest successful build.'
-            timeout: 300
-        - 'gke-ci-reboot':
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - apiary: staging<br>
-                - borg job: test<br>
-                - client (kubectl): ci/latest.txt<br>
-                - cluster (k8s): ci/latest.txt<br>
-                - tests: ci/latest.txt
             timeout: 300
         - 'gke-flaky':
             description: |
