@@ -24,7 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -41,15 +42,15 @@ type NamespaceController struct {
 }
 
 // NewNamespaceController creates a new NamespaceController
-func NewNamespaceController(kubeClient client.Interface, versions *unversioned.APIVersions, resyncPeriod time.Duration) *NamespaceController {
+func NewNamespaceController(kubeClient clientset.Interface, versions *unversioned.APIVersions, resyncPeriod time.Duration) *NamespaceController {
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Namespaces().List(options)
+				return kubeClient.Legacy().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Namespaces().Watch(options)
+				return kubeClient.Legacy().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
@@ -125,7 +126,7 @@ func finalized(namespace *api.Namespace) bool {
 }
 
 // finalize will finalize the namespace for kubernetes
-func finalizeNamespaceFunc(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+func finalizeNamespaceFunc(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
 	namespaceFinalize := api.Namespace{}
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
@@ -139,7 +140,7 @@ func finalizeNamespaceFunc(kubeClient client.Interface, namespace *api.Namespace
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, api.FinalizerName(value))
 	}
-	namespace, err := kubeClient.Namespaces().Finalize(&namespaceFinalize)
+	namespace, err := kubeClient.Legacy().Namespaces().Finalize(&namespaceFinalize)
 	if err != nil {
 		// it was removed already, so life is good
 		if errors.IsNotFound(err) {
@@ -160,7 +161,7 @@ func (e *contentRemainingError) Error() string {
 // deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
 // of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
 // are guaranteed to be gone.
-func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVersions, namespace string, before unversioned.Time) (estimate int64, err error) {
+func deleteAllContent(kubeClient clientset.Interface, versions *unversioned.APIVersions, namespace string, before unversioned.Time) (estimate int64, err error) {
 	err = deleteServiceAccounts(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
@@ -238,11 +239,11 @@ func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVers
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
-type updateNamespaceFunc func(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error)
+type updateNamespaceFunc func(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error)
 
 // retryOnConflictError retries the specified fn if there was a conflict error
 // TODO RetryOnConflict should be a generic concept in client code
-func retryOnConflictError(kubeClient client.Interface, namespace *api.Namespace, fn updateNamespaceFunc) (result *api.Namespace, err error) {
+func retryOnConflictError(kubeClient clientset.Interface, namespace *api.Namespace, fn updateNamespaceFunc) (result *api.Namespace, err error) {
 	latestNamespace := namespace
 	for {
 		result, err = fn(kubeClient, latestNamespace)
@@ -252,7 +253,7 @@ func retryOnConflictError(kubeClient client.Interface, namespace *api.Namespace,
 		if !errors.IsConflict(err) {
 			return nil, err
 		}
-		latestNamespace, err = kubeClient.Namespaces().Get(latestNamespace.Name)
+		latestNamespace, err = kubeClient.Legacy().Namespaces().Get(latestNamespace.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +262,7 @@ func retryOnConflictError(kubeClient client.Interface, namespace *api.Namespace,
 }
 
 // updateNamespaceStatusFunc will verify that the status of the namespace is correct
-func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+func updateNamespaceStatusFunc(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
 	if namespace.DeletionTimestamp.IsZero() || namespace.Status.Phase == api.NamespaceTerminating {
 		return namespace, nil
 	}
@@ -269,11 +270,11 @@ func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Names
 	newNamespace.ObjectMeta = namespace.ObjectMeta
 	newNamespace.Status = namespace.Status
 	newNamespace.Status.Phase = api.NamespaceTerminating
-	return kubeClient.Namespaces().Status(&newNamespace)
+	return kubeClient.Legacy().Namespaces().UpdateStatus(&newNamespace)
 }
 
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) error {
+func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) error {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -281,7 +282,7 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 	// multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
-	namespace, err := kubeClient.Namespaces().Get(namespace.Name)
+	namespace, err := kubeClient.Legacy().Namespaces().Get(namespace.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -303,7 +304,7 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 
 	// if the namespace is already finalized, delete it
 	if finalized(namespace) {
-		err = kubeClient.Namespaces().Delete(namespace.Name)
+		err = kubeClient.Legacy().Namespaces().Delete(namespace.Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -327,7 +328,7 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 
 	// now check if all finalizers have reported that we delete now
 	if finalized(result) {
-		err = kubeClient.Namespaces().Delete(namespace.Name)
+		err = kubeClient.Legacy().Namespaces().Delete(namespace.Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -336,13 +337,13 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 	return nil
 }
 
-func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(api.ListOptions{})
+func deleteLimitRanges(kubeClient clientset.Interface, ns string) error {
+	items, err := kubeClient.Legacy().LimitRanges(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.LimitRanges(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Legacy().LimitRanges(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -350,13 +351,13 @@ func deleteLimitRanges(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(api.ListOptions{})
+func deleteResourceQuotas(kubeClient clientset.Interface, ns string) error {
+	resourceQuotas, err := kubeClient.Legacy().ResourceQuotas(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range resourceQuotas.Items {
-		err := kubeClient.ResourceQuotas(ns).Delete(resourceQuotas.Items[i].Name)
+		err := kubeClient.Legacy().ResourceQuotas(ns).Delete(resourceQuotas.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -364,13 +365,13 @@ func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ServiceAccounts(ns).List(api.ListOptions{})
+func deleteServiceAccounts(kubeClient clientset.Interface, ns string) error {
+	items, err := kubeClient.Legacy().ServiceAccounts(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.ServiceAccounts(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Legacy().ServiceAccounts(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -378,13 +379,13 @@ func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(api.ListOptions{})
+func deleteServices(kubeClient clientset.Interface, ns string) error {
+	items, err := kubeClient.Legacy().Services(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Services(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Legacy().Services(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -392,13 +393,13 @@ func deleteServices(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(api.ListOptions{})
+func deleteReplicationControllers(kubeClient clientset.Interface, ns string) error {
+	items, err := kubeClient.Legacy().ReplicationControllers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.ReplicationControllers(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Legacy().ReplicationControllers(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -406,8 +407,8 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deletePods(kubeClient client.Interface, ns string, before unversioned.Time) (int64, error) {
-	items, err := kubeClient.Pods(ns).List(api.ListOptions{})
+func deletePods(kubeClient clientset.Interface, ns string, before unversioned.Time) (int64, error) {
+	items, err := kubeClient.Legacy().Pods(ns).List(api.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -424,7 +425,7 @@ func deletePods(kubeClient client.Interface, ns string, before unversioned.Time)
 				estimate = grace
 			}
 		}
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, deleteOptions)
+		err := kubeClient.Legacy().Pods(ns).Delete(items.Items[i].Name, deleteOptions)
 		if err != nil && !errors.IsNotFound(err) {
 			return 0, err
 		}
@@ -435,17 +436,17 @@ func deletePods(kubeClient client.Interface, ns string, before unversioned.Time)
 	return estimate, nil
 }
 
-func deleteEvents(kubeClient client.Interface, ns string) error {
-	return kubeClient.Events(ns).DeleteCollection(nil, api.ListOptions{})
+func deleteEvents(kubeClient clientset.Interface, ns string) error {
+	return kubeClient.Legacy().Events(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(api.ListOptions{})
+func deleteSecrets(kubeClient clientset.Interface, ns string) error {
+	items, err := kubeClient.Legacy().Secrets(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Secrets(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Legacy().Secrets(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -453,13 +454,13 @@ func deleteSecrets(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.PersistentVolumeClaims(ns).List(api.ListOptions{})
+func deletePersistentVolumeClaims(kubeClient clientset.Interface, ns string) error {
+	items, err := kubeClient.Legacy().PersistentVolumeClaims(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.PersistentVolumeClaims(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Legacy().PersistentVolumeClaims(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -467,7 +468,7 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns string) error {
+func deleteHorizontalPodAutoscalers(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
 	items, err := expClient.HorizontalPodAutoscalers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
@@ -481,13 +482,13 @@ func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns str
 	return nil
 }
 
-func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
+func deleteDaemonSets(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
 	items, err := expClient.DaemonSets(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := expClient.DaemonSets(ns).Delete(items.Items[i].Name)
+		err := expClient.DaemonSets(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -495,7 +496,7 @@ func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
 	return nil
 }
 
-func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
+func deleteJobs(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
 	items, err := expClient.Jobs(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
@@ -509,7 +510,7 @@ func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
 	return nil
 }
 
-func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
+func deleteDeployments(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
 	items, err := expClient.Deployments(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
@@ -523,13 +524,13 @@ func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
 	return nil
 }
 
-func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Ingress(ns).List(api.ListOptions{})
+func deleteIngress(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+	items, err := expClient.Ingresses(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := expClient.Ingress(ns).Delete(items.Items[i].Name, nil)
+		err := expClient.Ingresses(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

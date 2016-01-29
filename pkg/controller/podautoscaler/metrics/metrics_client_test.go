@@ -26,8 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -70,16 +71,16 @@ type testCase struct {
 	selector              map[string]string
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
+func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	namespace := "test-namespace"
 	tc.namespace = namespace
 	podNamePrefix := "test-pod"
 	selector := map[string]string{"name": podNamePrefix}
 	tc.selector = selector
 
-	fakeClient := &testclient.Fake{}
+	fakeClient := &fake.Clientset{}
 
-	fakeClient.AddReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &api.PodList{}
 		for i := 0; i < tc.replicas; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
@@ -109,7 +110,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddProxyReactor("services", func(action testclient.Action) (handled bool, ret client.ResponseWrapper, err error) {
+	fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret client.ResponseWrapper, err error) {
 		metrics := heapster.MetricResultList{}
 		var latestTimestamp time.Time
 		for _, reportedMetricPoints := range tc.reportedMetricsPoints {
