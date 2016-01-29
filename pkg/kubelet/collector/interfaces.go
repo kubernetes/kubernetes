@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,40 +17,49 @@ limitations under the License.
 package collector
 
 type Interface interface {
-	// Starts the collector process if necessary, e.g., the builtin cadvisor
-	// Otherwise, does nothing and just returns
+	// Starts the collector process if necessary, e.g. when using the builtin cadvisor.
+	// Otherwise, does nothing and just returns.
 	Start() error
 
-	// Returns the basic machine spec
-	// Currently used to report to k8s master the basic information about a node
-	MachineInfo() (*MachineInfo, error)
+	// Returns the basic node spec, e.g. can be used to report to k8s master the
+	// basic information about a node.
+	NodeInfo() (*NodeInfo, error)
 
-	// Returns the software version of various components of a node, e.g., kernel, container runtime, etc.
-	// Currently used to report back to k8s master the versions of relevant software on a node
+	// Returns the software version of various components of a node, e.g. can be
+	// used to report back to k8s master the versions of relevant software on a node.
 	VersionInfo() (*VersionInfo, error)
 
-	// Returns the file system information of a given label or mount point
-	// Currently used by kubelet to check if there's enough disk space to schedule new pods and
-	// by the image manager to decide if garbage collection should start
-	FsInfo(fslabel string) (*FsInfo, error)
+	// Returns the file system information of a given label or mount point (mount point
+	// is represented in absolute path, i.e. starting with '/', and label is not), e.g.
+	// can be used by kubelet to check if there's enough disk space to schedule new pods
+	// and by the image manager to decide if garbage collection should start.
+	FsInfo(fsLabel string) (*FsInfo, error)
 
-	// Returns a channel for watching requested event types
-	// Currently used by oom watcher to detect oom events.
-	WatchEvents(request *Request) (chan *Event, error)
+	// Returns a channel for watching requested event types, e.g. can be
+	// used by oom watcher to detect oom events.
+	WatchEvents(request *EventRequest) (chan *Event, error)
 
-	// Get detailed metrics information (cpu, memory, disk, network, etc.) about one or more containers
-	// When isRawContainer=true, containerName refers to a raw Linux container; otherwise it refers to a Docker container
-	// When isRawContainer=true and subcontainer=true, returns not only the metrics information of this container, but
-	// also the child containers
-	// Returned value is a map of container name to its metrics data, and this data is in a collector-specific format
-	// Currently used by kubelet to handle /stats/... REST calls
-	ContainerInfo(containerName string, req *ContainerInfoRequest, subcontainers bool, isRawContainer bool) (map[string]interface{}, error)
+	// Get raw metrics of a Docker container
+	// containerID: Docker container ID
+	// numStats: max number of metrics to return
+	// start: start time to query the metrics data, and if omitted, the beginning of time is assumed
+	// end: end time to query the metrics data, and if omitted, the current time is assumed
+	// Returned value is a map of container name to its metrics data, and this data can be in a
+	// collector-specific format, e.g. can be used to handle /stats/... REST calls
+	DockerContainerInfo(containerID string, numStats int, start time.Time, end time.Time) (map[string]interface{}, error)
 
-	// ContainerInfo() returns collector-specific raw data, which should be parsed to retrieve its various components,
-	// e.g., cpu, memory, cpu load, file system, etc., thus the raw data should be cached locally to avoid frequent polls.
-	// These parsing interface functions, e.g., GetContainerCPUInfo(), GetContainerMemoryInfo(), GetContainerNetworkInfo(),
-	// etc., should be defined to retrieve such data in a format defined by Kubernetes. However, as Kubernetes is currently
-	// not using any of these metrics data, these interface functions (along with the corresponding structs) should be
-	// defined and tuned at the time when such code is added.
+	// Get raw metrics of a Linux container
+	// containerName: absolute path of a Linux container
+	// numStats: max number of metrics to return
+	// start: start time to query the metrics data, and if omitted, the beginning of time is assumed
+	// end: end time to query the metrics data, and if omitted, the current time is assumed
+	// subcontainer: if true, returns raw metrics information of this container and its child containers
+	RawContainerInfo(containerName string, numStats int, start time.Time, end time.Time, subcontainers bool) (map[string]interface{}, error)
 
+	// DockerContainerInfo() and RawContainerInfo() return collector-specific raw data, which need to be
+	// parsed to retrieve a particular metric type, e.g. cpu, memory, cpu load, file system. The respective
+	// parsing interface functions, e.g. GetContainerCPUInfo(), GetContainerMemoryInfo(), GetContainerNetworkInfo(),
+	// etc., should be defined to retrieve such data in a format consumeable by Kubernetes. However, as of now
+	// Kubernetes is currently not using any of such metrics data, thus, these interface functions (along with the
+	// corresponding data structs) should be defined and tuned at the time when such code is added.
 }

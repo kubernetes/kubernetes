@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,114 +20,101 @@ import (
 	"time"
 )
 
-// These types are mostly taken directly from cadvisor to minimize the amount of changes
-// we need to do in this iteration, but these need to be cleaned up further to
-// be less cadvisor-specific and more generic to kubernetes
+// TODO: These structs are mostly taken directly from cadvisor to minimize the
+// amount of changes we need to do in this iteration, but these eventually need
+// to be cleaned up further to be less cadvisor-specific and more generic to kubernetes
 
-// Simplified cadvisor.MachineInfo
-type MachineInfo struct {
-	// The number of cores in this machine.
-	NumCores int
+// Basic node information
+type NodeInfo struct {
+	// The number of cores on this node
+	NumCores uint `json:"num_cores"`
 
-	// The amount of memory (in bytes) in this machine
-	MemoryCapacity int64
+	// The amount of memory (in bytes) on this node
+	MemoryCapacity uint64 `json:"memory_capacity"`
 
-	// The machine id
-	MachineID string
+	// Machine ID that uniquely identifies a node across reboots or network changes
+	MachineID string `json:"machine_id"`
 
-	// The system uuid
-	SystemUUID string
+	// System UUID reported by a node
+	SystemUUID string `json:"system_uuid"`
 
-	// The boot id
-	BootID string
+	// The boot ID of a node, which changes upon reboots
+	BootID string `json:"boot_id"`
 }
 
-// Simplified cadvisor.VersionInfo
+// Software version of a node
 type VersionInfo struct {
-	// Kernel version.
-	KernelVersion string
+	// Kernel version
+	KernelVersion string `json:"kernel_version"`
 
-	// OS image being used for collector container, or host image if running on host directly.
-	ContainerOsVersion string
+	// OS image being used for collector container, or host image if running on host directly
+	ContainerOsVersion string `json:"container_os_version"`
 
-	// Docker version.
-	DockerVersion string
+	// Container runtime version, e.g., Docker/Rkt version
+	ContainerRuntimeVersion string `json:"container_runtime_version"`
 
-	// Collector version.
-	CollectorVersion string
+	// Collector version
+	CollectorVersion string `json:"collector_version"`
 }
 
 const (
-	LabelSystemRoot   = "root"
-	LabelDockerImages = "docker-images"
+	// Label of the mount point where container top layer file systems are placed
+	LabelSystemRoot = "root"
+
+	// Label of the mount point where container images are placed
+	LabelImages = "images"
 )
 
-// Same as cadvisor.FsInfo
+// Basic file system information
 type FsInfo struct {
 	// The block device name associated with the filesystem.
-	Device string
+	Device string `json:"device"`
 
 	// Path where the filesystem is mounted.
-	Mountpoint string
+	Mountpoint string `json:"mountpoint"`
 
 	// Filesystem usage in bytes.
-	Capacity uint64
+	Capacity uint64 `json:"capacity"`
 
 	// Bytes available for non-root use.
-	Available uint64
+	Available uint64 `json:"available"`
 
 	// Number of bytes used on this filesystem.
-	Usage uint64
+	Usage uint64 `json:"usage"`
 
 	// Labels associated with this filesystem.
-	Labels []string
+	Labels []string `json:"labels"`
 }
 
 type EventType string
 
-// Simplified cadvisor.Event
+// Event monitored and returned by collector
 type Event struct {
-	// the absolute container name for which the event occurred
-	ContainerName string
+	// The absolute container name for which the event occurred
+	ContainerName string `json:"container_name"`
 
-	// the time at which the event occurred
-	Timestamp time.Time
+	// The time at which the event occurred
+	Timestamp time.Time `json:"timestamp"`
 
-	// the type of event. EventType is an enumerated type
-	EventType EventType
+	// The type of event. EventType is an enumerated type
+	EventType EventType `json:"event_type"`
 }
 
 const (
 	EventOom               EventType = "oom"
-	EventOomKill                     = "oomKill"
-	EventContainerCreation           = "containerCreation"
-	EventContainerDeletion           = "containerDeletion"
+	EventOomKill           EventType = "oomKill"
+	EventContainerCreation EventType = "containerCreation"
+	EventContainerDeletion EventType = "containerDeletion"
 )
 
-// Simplified cadvisor.Request
-type Request struct {
+type EventRequest struct {
 	// EventType is a list of event types wanted
 	EventType map[EventType]bool
 
-	// the absolute container name for which the event occurred
+	// The absolute container name for which the event occurred
 	ContainerName string
 
-	// if IncludeSubcontainers is false, only events occurring in the specific
+	// If IncludeSubcontainers is false, only events occurring in the specific
 	// container, and not the subcontainers, will be returned
 	IncludeSubcontainers bool
-}
-
-// Same as cadvisor.ContainerInfoRequest
-type ContainerInfoRequest struct {
-	// Max number of stats to return. Specify -1 for all stats currently available.
-	// Default: 60
-	NumStats int
-
-	// Start time for which to query information.
-	// If ommitted, the beginning of time is assumed.
-	Start time.Time
-
-	// End time for which to query information.
-	// If ommitted, current time is assumed.
-	End time.Time
 }
