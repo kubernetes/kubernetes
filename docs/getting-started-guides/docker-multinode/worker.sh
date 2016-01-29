@@ -26,9 +26,10 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null  ); then
 fi
 
 # Make sure k8s version env is properly set
-K8S_VERSION=${K8S_VERSION:-"1.1.3"}
+K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.6"}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
+ARCH=${ARCH:-"amd64"}
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
@@ -46,6 +47,7 @@ echo "K8S_VERSION is set to: ${K8S_VERSION}"
 echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
 echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
 echo "MASTER_IP is set to: ${MASTER_IP}"
+echo "ARCH is set to: ${ARCH}"
 
 # Check if a command is valid
 command_exists() {
@@ -126,7 +128,7 @@ start_k8s() {
             --etcd-endpoints=http://${MASTER_IP}:4001 \
             --iface="${FLANNEL_IFACE}")
 
-    sleep 8
+    sleep 10
 
     # Copy flannel env out and source it on the host
     docker -H unix:///var/run/docker-bootstrap.sock \
@@ -150,7 +152,7 @@ start_k8s() {
             ifconfig docker0 down
             yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
             ;;
-        ubuntu|debian)
+        ubuntu|debian) # TODO: today ubuntu uses systemd. Handle that too
             DOCKER_CONF="/etc/default/docker"
             echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             ifconfig docker0 down
@@ -186,7 +188,7 @@ start_k8s() {
         -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
-        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
         /hyperkube kubelet \
             --allow-privileged=true \
             --api-servers=http://${MASTER_IP}:8080 \
@@ -202,7 +204,7 @@ start_k8s() {
         --net=host \
         --privileged \
         --restart=always \
-        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
         /hyperkube proxy \
             --master=http://${MASTER_IP}:8080 \
             --v=2

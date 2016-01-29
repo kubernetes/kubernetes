@@ -58,7 +58,7 @@ Here's a diagram of what the final result will look like:
 
 1. You need to have docker installed on one machine.
 2. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
-   a value such as "1.1.1".
+   a released version of Kubernetes >= "1.2.0-alpha.6"
 
 ### Run it
 
@@ -74,7 +74,7 @@ docker run \
     --pid=host \
     --privileged=true \
     -d \
-    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+    gcr.io/google_containers/hyperkube-amd64:v${K8S_VERSION} \
     /hyperkube kubelet \
         --containerized \
         --hostname-override="127.0.0.1" \
@@ -96,8 +96,11 @@ At this point you should have a running Kubernetes cluster.  You can test this
 by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
 following links) and make it available by editing your PATH environment
 variable.
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/linux/amd64/kubectl))
+([OS X/amd64](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/darwin/amd64/kubectl))
+([OS X/386](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/darwin/386/kubectl))
+([linux/amd64](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/linux/amd64/kubectl))
+([linux/386](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/linux/386/kubectl))
+([linux/arm](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/linux/arm/kubectl))
 
 For example, OS X:
 

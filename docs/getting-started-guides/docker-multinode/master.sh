@@ -26,10 +26,11 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null ); then
 fi
 
 # Make sure k8s version env is properly set
-K8S_VERSION=${K8S_VERSION:-"1.1.3"}
+K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.6"}
 ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
+ARCH=${ARCH:-"amd64"}
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
@@ -47,6 +48,7 @@ echo "ETCD_VERSION is set to: ${ETCD_VERSION}"
 echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
 echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
 echo "MASTER_IP is set to: ${MASTER_IP}"
+echo "ARCH is set to: ${ARCH}"
 
 # Check if a command is valid
 command_exists() {
@@ -57,6 +59,7 @@ lsb_dist=""
 
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
 detect_lsb() {
+    # TODO: remove this when ARM support is fully merged
     case "$(uname -m)" in
         *64)
             ;;
@@ -205,7 +208,7 @@ start_k8s(){
         -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
-        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
         /hyperkube kubelet \
             --address=0.0.0.0 \
             --allow-privileged=true \
