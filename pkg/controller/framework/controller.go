@@ -234,17 +234,23 @@ func NewInformer(
 			for _, d := range obj.(cache.Deltas) {
 				switch d.Type {
 				case cache.Sync, cache.Added, cache.Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
+					old, exists, err := clientState.Get(d.Object)
+					if err != nil {
+						return err
+					}
+					// if old item exist, we do update. Otherwise, we do add.
+					if exists {
 						if err := clientState.Update(d.Object); err != nil {
 							return err
 						}
 						h.OnUpdate(old, d.Object)
-					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
-						}
-						h.OnAdd(d.Object)
+						break
 					}
+
+					if err := clientState.Add(d.Object); err != nil {
+						return err
+					}
+					h.OnAdd(d.Object)
 				case cache.Deleted:
 					if err := clientState.Delete(d.Object); err != nil {
 						return err
