@@ -410,24 +410,6 @@ case ${JOB_NAME} in
     NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
-  # Runs all non-flaky tests on GCE in parallel.
-  kubernetes-e2e-gce-parallel)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
-    : ${E2E_NETWORK:="e2e-parallel"}
-    : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
-    : ${PROJECT:="kubernetes-jenkins"}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    # Override GCE defaults
-    NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
   # Runs all non-flaky tests on AWS in parallel.
   kubernetes-e2e-aws-parallel)
     : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e-parallel"}
@@ -459,15 +441,6 @@ case ${JOB_NAME} in
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     # Override GCE defaults.
     NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
-  # Run the Reboot tests on GCE. (#19681)
-  kubernetes-e2e-gce-reboot)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
-    : ${E2E_NETWORK:="e2e-reboot"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
-    : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
   # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GCE.
@@ -612,21 +585,6 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
                            --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${GINKGO_PARALLEL:="y"}
-    ;;
-
-  # Run the GCE_PARALLEL_SKIP_TESTS on GKE.
-  kubernetes-e2e-gke-ci-reboot)
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
-    : ${E2E_NETWORK:="e2e-gke-ci-reboot"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_allow_empty \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ) --ginkgo.skip=$(join_regex_no_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
     ;;
 
   kubernetes-e2e-gke-flaky)
