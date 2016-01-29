@@ -721,22 +721,6 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	return ports
 }
 
-// MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
-// and the values are the list of pods running on that host.
-func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error) {
-	machineToPods := map[string][]*api.Pod{}
-	// TODO: perform more targeted query...
-	pods, err := lister.List(labels.Everything())
-	if err != nil {
-		return map[string][]*api.Pod{}, err
-	}
-	for _, scheduledPod := range pods {
-		host := scheduledPod.Spec.NodeName
-		machineToPods[host] = append(machineToPods[host], scheduledPod)
-	}
-	return machineToPods, nil
-}
-
 // search two arrays and return true if they have at least one common element; return false otherwise
 func haveSame(a1, a2 []string) bool {
 	for _, val1 := range a1 {
