@@ -21,10 +21,10 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ComponentStatusGetter has a method to return a ComponentStatusInterface.
+// ComponentStatusesGetter has a method to return a ComponentStatusInterface.
 // A group's client should implement this interface.
-type ComponentStatusGetter interface {
-	ComponentStatus() ComponentStatusInterface
+type ComponentStatusesGetter interface {
+	ComponentStatuses() ComponentStatusInterface
 }
 
 // ComponentStatusInterface has methods to work with ComponentStatus resources.
@@ -39,23 +39,23 @@ type ComponentStatusInterface interface {
 	ComponentStatusExpansion
 }
 
-// componentStatus implements ComponentStatusInterface
-type componentStatus struct {
+// componentStatuses implements ComponentStatusInterface
+type componentStatuses struct {
 	client *LegacyClient
 }
 
-// newComponentStatus returns a ComponentStatus
-func newComponentStatus(c *LegacyClient) *componentStatus {
-	return &componentStatus{
+// newComponentStatuses returns a ComponentStatuses
+func newComponentStatuses(c *LegacyClient) *componentStatuses {
+	return &componentStatuses{
 		client: c,
 	}
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
+func (c *componentStatuses) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Post().
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		Body(componentStatus).
 		Do().
 		Into(result)
@@ -63,10 +63,10 @@ func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *
 }
 
 // Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
+func (c *componentStatuses) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Put().
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		Name(componentStatus.Name).
 		Body(componentStatus).
 		Do().
@@ -75,9 +75,9 @@ func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *
 }
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error {
+func (c *componentStatuses) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		Name(name).
 		Body(options).
 		Do().
@@ -85,9 +85,9 @@ func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *componentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -95,32 +95,32 @@ func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptio
 }
 
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err error) {
+func (c *componentStatuses) Get(name string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Get().
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		Name(name).
 		Do().
 		Into(result)
 	return
 }
 
-// List takes label and field selectors, and returns the list of ComponentStatus that match those selectors.
-func (c *componentStatus) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
+// List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
+func (c *componentStatuses) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested componentStatus.
-func (c *componentStatus) Watch(opts api.ListOptions) (watch.Interface, error) {
+// Watch returns a watch.Interface that watches the requested componentStatuses.
+func (c *componentStatuses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Resource("componentstatus").
+		Resource("componentstatuses").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

@@ -23,7 +23,7 @@ import (
 )
 
 type LegacyInterface interface {
-	ComponentStatusGetter
+	ComponentStatusesGetter
 	EndpointsGetter
 	EventsGetter
 	LimitRangesGetter
@@ -45,8 +45,8 @@ type LegacyClient struct {
 	*unversioned.RESTClient
 }
 
-func (c *LegacyClient) ComponentStatus() ComponentStatusInterface {
-	return newComponentStatus(c)
+func (c *LegacyClient) ComponentStatuses() ComponentStatusInterface {
+	return newComponentStatuses(c)
 }
 
 func (c *LegacyClient) Endpoints(namespace string) EndpointsInterface {
