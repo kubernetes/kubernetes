@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	kservice "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -50,7 +50,7 @@ type EndpointController interface {
 }
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(client *client.Client) *endpointController {
+func NewEndpointController(client *clientset.Clientset) *endpointController {
 	e := &endpointController{
 		client: client,
 		queue:  workqueue.New(),
@@ -58,10 +58,10 @@ func NewEndpointController(client *client.Client) *endpointController {
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Services(api.NamespaceAll).List(options)
+				return e.client.Legacy().Services(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Services(api.NamespaceAll).Watch(options)
+				return e.client.Legacy().Services(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Service{},
@@ -78,10 +78,10 @@ func NewEndpointController(client *client.Client) *endpointController {
 	e.podStore.Store, e.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Pods(api.NamespaceAll).List(options)
+				return e.client.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Pods(api.NamespaceAll).Watch(options)
+				return e.client.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -97,7 +97,7 @@ func NewEndpointController(client *client.Client) *endpointController {
 
 // EndpointController manages selector-based service endpoints.
 type endpointController struct {
-	client *client.Client
+	client *clientset.Clientset
 
 	serviceStore cache.StoreToServiceLister
 	podStore     cache.StoreToPodLister
@@ -263,7 +263,7 @@ func (e *endpointController) syncService(key string) {
 			// Don't retry, as the key isn't going to magically become understandable.
 			return
 		}
-		err = e.client.Endpoints(namespace).Delete(name)
+		err = e.client.Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			glog.Errorf("Error deleting endpoint %q: %v", key, err)
 			e.queue.Add(key) // Retry

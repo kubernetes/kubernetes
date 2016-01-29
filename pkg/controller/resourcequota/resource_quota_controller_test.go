@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -173,7 +174,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		},
 	}
 
-	kubeClient := testclient.NewSimpleFake(&podList, &quota)
+	kubeClient := fake.NewSimpleClientset(&podList, &quota)
 
 	ResourceQuotaController := NewResourceQuotaController(kubeClient, controller.StaticResyncPeriodFunc(time.Second))
 	err := ResourceQuotaController.syncResourceQuota(quota)
@@ -230,7 +231,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 		},
 	}
 
-	kubeClient := testclient.NewSimpleFake(&quota)
+	kubeClient := fake.NewSimpleClientset(&quota)
 
 	ResourceQuotaController := NewResourceQuotaController(kubeClient, controller.StaticResyncPeriodFunc(time.Second))
 	err := ResourceQuotaController.syncResourceQuota(quota)
@@ -277,7 +278,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 		},
 	}
 
-	kubeClient := testclient.NewSimpleFake(&api.PodList{}, &quota)
+	kubeClient := fake.NewSimpleClientset(&api.PodList{}, &quota)
 
 	ResourceQuotaController := NewResourceQuotaController(kubeClient, controller.StaticResyncPeriodFunc(time.Second))
 	err := ResourceQuotaController.syncResourceQuota(quota)

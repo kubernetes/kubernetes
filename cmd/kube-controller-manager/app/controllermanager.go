@@ -173,7 +173,7 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig *client.Config, stop <-chan struct{}) error {
-	go endpointcontroller.NewEndpointController(client.NewOrDie(client.AddUserAgent(kubeconfig, "endpoint-controller")), ResyncPeriod(s)).
+	go endpointcontroller.NewEndpointController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "endpoint-controller")), ResyncPeriod(s)).
 		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(
@@ -183,7 +183,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	).Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go gc.New(client.NewOrDie(client.AddUserAgent(kubeconfig, "garbage-collector")), ResyncPeriod(s), s.TerminatedPodGCThreshold).
+		go gc.New(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "garbage-collector")), ResyncPeriod(s), s.TerminatedPodGCThreshold).
 			Run(util.NeverStop)
 	}
 
@@ -192,13 +192,13 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
-	nodeController := nodecontroller.NewNodeController(cloud, client.NewOrDie(client.AddUserAgent(kubeconfig, "node-controller")),
+	nodeController := nodecontroller.NewNodeController(cloud, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "node-controller")),
 		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, &s.ClusterCIDR, s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
-	serviceController := servicecontroller.New(cloud, client.NewOrDie(client.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
+	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
 	if err := serviceController.Run(s.ServiceSyncPeriod, s.NodeSyncPeriod); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
@@ -209,7 +209,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
 		} else {
-			routeController := routecontroller.New(routes, client.NewOrDie(client.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, &s.ClusterCIDR)
+			routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, &s.ClusterCIDR)
 			routeController.Run(s.NodeSyncPeriod)
 		}
 	} else {
@@ -217,7 +217,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(
-		client.NewOrDie(client.AddUserAgent(kubeconfig, "resourcequota-controller")),
+		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "resourcequota-controller")),
 		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -240,7 +240,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
 
-	namespacecontroller.NewNamespaceController(client.NewOrDie(client.AddUserAgent(kubeconfig, "namespace-controller")), versions, s.NamespaceSyncPeriod).Run()
+	namespacecontroller.NewNamespaceController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "namespace-controller")), versions, s.NamespaceSyncPeriod).Run()
 
 	groupVersion := "extensions/v1beta1"
 	resources, found := resourceMap[groupVersion]
@@ -249,7 +249,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
-			hpaClient := client.NewOrDie(client.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
+			hpaClient := clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
 			metricsClient := metrics.NewHeapsterMetricsClient(
 				hpaClient,
 				metrics.DefaultHeapsterNamespace,
@@ -257,7 +257,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
 			)
-			podautoscaler.NewHorizontalController(hpaClient, hpaClient, hpaClient, metricsClient).
+			podautoscaler.NewHorizontalController(hpaClient.Legacy(), hpaClient.Extensions(), hpaClient, metricsClient).
 				Run(s.HorizontalPodAutoscalerSyncPeriod)
 		}
 
@@ -323,7 +323,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			glog.Errorf("Error reading key for service account token controller: %v", err)
 		} else {
 			serviceaccountcontroller.NewTokensController(
-				client.NewOrDie(client.AddUserAgent(kubeconfig, "tokens-controller")),
+				clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "tokens-controller")),
 				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
@@ -333,7 +333,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	}
 
 	serviceaccountcontroller.NewServiceAccountsController(
-		client.NewOrDie(client.AddUserAgent(kubeconfig, "service-account-controller")),
+		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "service-account-controller")),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run()
 
