@@ -17,6 +17,8 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -27,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 )
@@ -53,6 +56,11 @@ func TestRunStop(t *testing.T) {
 }
 
 func TestClaimRace(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	c1 := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name: "c1",
@@ -100,7 +108,7 @@ func TestClaimRace(t *testing.T) {
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data01",
+					Path: fmt.Sprintf("%s/data01", tmpDir),
 				},
 			},
 		},
@@ -113,7 +121,7 @@ func TestClaimRace(t *testing.T) {
 	mockClient := &mockBinderClient{}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	// adds the volume to the index, making the volume available
 	syncVolume(volumeIndex, mockClient, v)
@@ -125,7 +133,7 @@ func TestClaimRace(t *testing.T) {
 	}
 
 	// an initial sync for a claim matches the volume
-	err := syncClaim(volumeIndex, mockClient, c1)
+	err = syncClaim(volumeIndex, mockClient, c1)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -144,6 +152,12 @@ func TestClaimRace(t *testing.T) {
 }
 
 func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	// Tests that binder.syncVolume will also syncClaim if the PV has completed
 	// provisioning but the claim is still Pending.  We want to advance to Bound
 	// without having to wait until the binder's next sync period.
@@ -184,7 +198,7 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data01",
+					Path: fmt.Sprintf("%s/data01", tmpDir),
 				},
 			},
 			ClaimRef: claimRef,
@@ -200,7 +214,7 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	// adds the volume to the index, making the volume available.
 	// pv also completed provisioning, so syncClaim should cause claim's phase to advance to Bound
@@ -250,7 +264,7 @@ func TestExampleObjects(t *testing.T) {
 					},
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{
-							Path: "/tmp/data01",
+							Path: "/somepath/data01",
 						},
 					},
 				},
@@ -265,7 +279,7 @@ func TestExampleObjects(t *testing.T) {
 					},
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{
-							Path: "/tmp/data02",
+							Path: "/somepath/data02",
 						},
 					},
 					PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
@@ -333,6 +347,12 @@ func TestExampleObjects(t *testing.T) {
 }
 
 func TestBindingWithExamples(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	codec := api.Codecs.UniversalDecoder()
 	o := testclient.NewObjects(api.Scheme, codec)
 	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
@@ -370,7 +390,7 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	recycler := &PersistentVolumeRecycler{
 		kubeClient: client,

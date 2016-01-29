@@ -74,7 +74,7 @@ func TestRefreshTunnels(t *testing.T) {
 	assert := assert.New(t)
 
 	// Fail case (no addresses associated with nodes)
-	assert.Error(tunneler.refreshTunnels("test", "/tmp/undefined"))
+	assert.Error(tunneler.refreshTunnels("test", "/somepath/undefined"))
 
 	// TODO: pass case without needing actual connections?
 }

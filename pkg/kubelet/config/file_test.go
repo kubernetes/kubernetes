@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -174,7 +175,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 }
 
 func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := ioutil.TempDir("", "foo")
+	dirName, err := utiltesting.MkTmpdir("file-test")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

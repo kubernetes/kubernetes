@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/mesos/mesos-go/mesosproto"
@@ -288,7 +289,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 // as a zip archive with pod definitions.
 func TestExecutorInitializeStaticPodsSource(t *testing.T) {
 	// create some zip with static pod definition
-	givenPodsDir, err := ioutil.TempDir("/tmp", "executor-givenpods")
+	givenPodsDir, err := utiltesting.MkTmpdir("executor-givenpods")
 	assert.NoError(t, err)
 	defer os.RemoveAll(givenPodsDir)
 
@@ -339,7 +340,7 @@ func TestExecutorInitializeStaticPodsSource(t *testing.T) {
 	expectedStaticPodsNum := 2 // subdirectories are ignored by FileSource, hence only 2
 
 	// temporary directory which is normally located in the executor sandbox
-	staticPodsConfigPath, err := ioutil.TempDir("/tmp", "executor-k8sm-archive")
+	staticPodsConfigPath, err := utiltesting.MkTmpdir("executor-k8sm-archive")
 	assert.NoError(t, err)
 	defer os.RemoveAll(staticPodsConfigPath)
 

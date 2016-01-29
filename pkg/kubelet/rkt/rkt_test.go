@@ -19,6 +19,7 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -755,6 +757,12 @@ func sortAppFields(app *appctypes.App) {
 }
 
 func TestSetApp(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rkt_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	rootUser := int64(0)
 	nonRootUser := int64(42)
 	runAsNonRootTrue := true
@@ -796,7 +804,7 @@ func TestSetApp(t *testing.T) {
 			container: &api.Container{
 				Command:    []string{"/bin/bar"},
 				Args:       []string{"hello", "world"},
-				WorkingDir: "/tmp",
+				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
 					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
 					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
@@ -830,7 +838,7 @@ func TestSetApp(t *testing.T) {
 				User:              "42",
 				Group:             "22",
 				SupplementaryGIDs: []int{1, 2, 3},
-				WorkingDirectory:  "/tmp",
+				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
 					{"env-foo", "bar"},
 					{"env-bar", "foo"},
@@ -857,7 +865,7 @@ func TestSetApp(t *testing.T) {
 			container: &api.Container{
 				Command:    []string{"/bin/bar"},
 				Args:       []string{"hello", "world"},
-				WorkingDir: "/tmp",
+				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
 					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
 					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
@@ -891,7 +899,7 @@ func TestSetApp(t *testing.T) {
 				User:              "42",
 				Group:             "22",
 				SupplementaryGIDs: []int{1, 2, 3},
-				WorkingDirectory:  "/tmp",
+				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
 					{"env-foo", "foo"},
 				},
