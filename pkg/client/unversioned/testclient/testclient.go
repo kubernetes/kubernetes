@@ -337,6 +337,10 @@ func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPar
 	return &FakeThirdPartyResources{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterface {
+	return &FakeReplicaSets{Fake: c, Namespace: namespace}
+}
+
 type FakeDiscovery struct {
 	*Fake
 }
