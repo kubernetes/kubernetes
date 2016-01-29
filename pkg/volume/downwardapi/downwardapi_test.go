@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -39,12 +39,12 @@ func formatMap(m map[string]string) (fmtstr string) {
 	return
 }
 
-func newTestHost(t *testing.T, client client.Interface, basePath string) (string, volume.VolumeHost) {
+func newTestHost(t *testing.T, clientset release_1_1.Interface, basePath string) (string, volume.VolumeHost) {
 	tempDir, err := ioutil.TempDir(basePath, "downwardApi_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -97,7 +97,7 @@ func TestLabels(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -111,7 +111,7 @@ func TestLabels(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	rootDir, host := newTestHost(t, fake, tmpDir)
+	rootDir, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
@@ -188,7 +188,7 @@ func TestAnnotations(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:        testName,
 			Namespace:   testNamespace,
@@ -202,7 +202,7 @@ func TestAnnotations(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -255,7 +255,7 @@ func TestName(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -268,7 +268,7 @@ func TestName(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -322,7 +322,7 @@ func TestNamespace(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -335,7 +335,7 @@ func TestNamespace(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -382,7 +382,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -395,7 +395,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
@@ -472,7 +472,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -485,7 +485,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
@@ -581,7 +581,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 		"a1": "value1",
 		"a2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -595,7 +595,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
@@ -661,7 +661,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		"key2": "value2",
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -675,7 +675,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, fake, tmpDir)
+	_, host := newTestHost(t, clientset, tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {

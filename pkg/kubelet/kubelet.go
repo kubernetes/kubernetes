@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -141,6 +142,7 @@ func NewMainKubelet(
 	nodeName string,
 	dockerClient dockertools.DockerInterface,
 	kubeClient client.Interface,
+	clientset release_1_1.Interface,
 	rootDirectory string,
 	podInfraContainerImage string,
 	resyncInterval time.Duration,
@@ -266,6 +268,7 @@ func NewMainKubelet(
 		nodeName:                       nodeName,
 		dockerClient:                   dockerClient,
 		kubeClient:                     kubeClient,
+		clientset:                      clientset,
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
 		containerRefManager:            containerRefManager,
@@ -460,6 +463,7 @@ type Kubelet struct {
 	dockerClient  dockertools.DockerInterface
 	runtimeCache  kubecontainer.RuntimeCache
 	kubeClient    client.Interface
+	clientset     release_1_1.Interface
 	rootDirectory string
 	podWorkers    PodWorkers
 
