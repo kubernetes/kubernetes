@@ -946,8 +946,9 @@ func waitForEndpoint(c *client.Client, ns, name string) error {
 	return fmt.Errorf("Failed to get entpoints for %s/%s", ns, name)
 }
 
-// Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
-type podResponseChecker struct {
+// Context for checking pods responses by issuing GETs to them (via the API
+// proxy) and verifying that they answer with ther own pod name.
+type podProxyResponseChecker struct {
 	c              *client.Client
 	ns             string
 	label          labels.Selector
@@ -956,8 +957,9 @@ type podResponseChecker struct {
 	pods           *api.PodList
 }
 
-// checkAllResponses issues GETs to all pods in the context and verify they reply with pod name.
-func (r podResponseChecker) checkAllResponses() (done bool, err error) {
+// checkAllResponses issues GETs to all pods in the context and verify they
+// reply with their own pod name.
+func (r podProxyResponseChecker) checkAllResponses() (done bool, err error) {
 	successes := 0
 	options := api.ListOptions{LabelSelector: r.label}
 	currentPods, err := r.c.Pods(r.ns).List(options)
@@ -1042,7 +1044,7 @@ func serverVersionGTE(v semver.Version, c client.ServerVersionInterface) (bool, 
 func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
 	By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	return wait.PollImmediate(poll, podRespondingTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
+	return wait.PollImmediate(poll, podRespondingTimeout, podProxyResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
 }
 
 func serviceResponding(c *client.Client, ns, name string) error {

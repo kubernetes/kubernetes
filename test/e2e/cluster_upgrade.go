@@ -162,7 +162,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 	})
 
 	f := NewFramework("cluster-upgrade")
-	var w *ServerTest
+	var w *ServiceTestFixture
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")
 		w = NewServerTest(f.Client, f.Namespace.Name, svcName)
