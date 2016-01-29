@@ -19,7 +19,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 # Join all args with |
 #   Example: join_regex_allow_empty a b "c d" e  =>  a|b|c d|e
@@ -917,6 +916,7 @@ export KUBE_GCE_MINION_PROJECT=${KUBE_GCE_MINION_PROJECT:-}
 export KUBE_GCE_MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-}
 export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
 export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
+export FAIL_ON_GCP_RESOURCE_LEAK="${FAIL_ON_GCP_RESOURCE_LEAK:-false}"
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
@@ -925,6 +925,7 @@ export KUBE_GKE_NETWORK=${E2E_NETWORK}
 export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
 export CMD_GROUP=${CMD_GROUP:-}
 export MACHINE_TYPE=${MINION_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
+export CLOUDSDK_BUCKET="${CLOUDSDK_BUCKET:-}"
 
 if [[ ! -z "${GKE_API_ENDPOINT:-}" ]]; then
   export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER=${GKE_API_ENDPOINT}
@@ -938,6 +939,7 @@ export KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER=${ENABLE_HORIZONTAL_POD_AUTOSCALER:
 export KUBE_ENABLE_DEPLOYMENTS=${ENABLE_DEPLOYMENTS:-}
 export KUBE_ENABLE_EXPERIMENTAL_API=${ENABLE_EXPERIMENTAL_API:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
+export NUM_NODES="${NUM_NODES:-}"
 export MINION_SIZE=${MINION_SIZE:-}
 export MINION_DISK_SIZE=${MINION_DISK_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
@@ -960,6 +962,7 @@ export E2E_UP="${E2E_UP:-true}"
 export E2E_TEST="${E2E_TEST:-true}"
 export E2E_DOWN="${E2E_DOWN:-true}"
 export E2E_CLEAN_START="${E2E_CLEAN_START:-}"
+export E2E_PUBLISH_GREEN_VERSION="${E2E_PUBLISH_GREEN_VERSION:-false}"
 # Used by hack/ginkgo-e2e.sh to enable ginkgo's parallel test runner.
 export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
 export GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-}"
