@@ -955,3 +955,102 @@ func TestSetApp(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateRunCommand(t *testing.T) {
+	tests := []struct {
+		pod  *api.Pod
+		uuid string
+
+		dnsServers  []string
+		dnsSearches []string
+		err         error
+
+		expect string
+	}{
+		// Case #0, returns error.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{},
+			},
+			"rkt-uuid-foo",
+			[]string{},
+			[]string{},
+			fmt.Errorf("failed to get cluster dns"),
+			"",
+		},
+		// Case #1, returns no dns, with private-net.
+		{
+			&api.Pod{},
+			"rkt-uuid-foo",
+			[]string{},
+			[]string{},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io rkt-uuid-foo",
+		},
+		// Case #2, returns no dns, with host-net.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: true,
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			[]string{},
+			[]string{},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host rkt-uuid-foo",
+		},
+		// Case #3, returns dns, dns searches, with private-net.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: false,
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			[]string{"127.0.0.1"},
+			[]string{"."},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 rkt-uuid-foo",
+		},
+		// Case #4, returns dns, dns searches, with host-network.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: true,
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			[]string{"127.0.0.1"},
+			[]string{"."},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 rkt-uuid-foo",
+		},
+	}
+
+	rkt := &Runtime{
+		rktBinAbsPath: "/bin/rkt/rkt",
+		config: &Config{
+			Path:            "/bin/rkt/rkt",
+			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
+			Dir:             "/var/data",
+			InsecureOptions: "image,ondisk",
+			LocalConfigDir:  "/var/rkt/local/data",
+		},
+	}
+
+	for i, tt := range tests {
+		testCaseHint := fmt.Sprintf("test case #%d", i)
+		rkt.runtimeHelper = &fakeRuntimeHelper{tt.dnsServers, tt.dnsSearches, tt.err}
+
+		result, err := rkt.generateRunCommand(tt.pod, tt.uuid)
+		assert.Equal(t, tt.err, err, testCaseHint)
+		assert.Equal(t, tt.expect, result, testCaseHint)
+	}
+}
