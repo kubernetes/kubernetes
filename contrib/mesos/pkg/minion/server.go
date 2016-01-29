@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
@@ -74,6 +75,8 @@ type MinionServer struct {
 	proxyMode                      string
 	conntrackMax                   int
 	conntrackTCPTimeoutEstablished int
+	globalHousekeepingInterval     time.Duration
+	housekeepingInterval           time.Duration
 }
 
 // NewMinionServer creates the MinionServer struct with default values to be used by hyperkube
@@ -174,6 +177,9 @@ func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
 
+	// executorArgs = append(executorArgs, "--housekeeping_interval=" + ms.housekeepingInterval)
+	// executorArgs = append(executorArgs, "--global_housekeeping_interval=" + ms.globalHousekeepingInterval)
+  
 	// run executor and quit minion server when this exits cleanly
 	execDied := make(chan struct{})
 	decorator := func(t *tasks.Task) *tasks.Task {
@@ -333,6 +339,10 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 
 	// hack to forward log verbosity flag to the executor
 	fs.Int32Var(&ms.logVerbosity, "v", ms.logVerbosity, "log level for V logs")
+	
+	// hacks to forward selected cadvisor flags to the executor
+	fs.StringVar(&ms.housekeepingInterval, "housekeeping_interval", ms.housekeepingInterval, "Interval between container housekeepings")
+	fs.StringVar(&ms.globalHousekeepingInterval, "global_housekeeping_interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
 }
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
