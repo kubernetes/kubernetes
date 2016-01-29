@@ -34,13 +34,12 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 		return err
 	}
 	out.BindAddress = in.BindAddress
-	out.CleanupIPTables = in.CleanupIPTables
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = int32(in.HealthzPort)
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesSyncePeriodSeconds = int32(in.IPTablesSyncePeriodSeconds)
-	out.KubeAPIBurst = int32(in.KubeAPIBurst)
-	out.KubeAPIQPS = int32(in.KubeAPIQPS)
+	if err := s.Convert(&in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, 0); err != nil {
+		return err
+	}
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -53,7 +52,13 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.Mode = ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	out.UDPTimeoutMilliseconds = int32(in.UDPTimeoutMilliseconds)
+	if err := s.Convert(&in.UDPIdleTimeout, &out.UDPIdleTimeout, 0); err != nil {
+		return err
+	}
+	out.ConntrackMax = int32(in.ConntrackMax)
+	if err := s.Convert(&in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, 0); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -69,13 +74,12 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 		return err
 	}
 	out.BindAddress = in.BindAddress
-	out.CleanupIPTables = in.CleanupIPTables
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = int(in.HealthzPort)
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesSyncePeriodSeconds = int(in.IPTablesSyncePeriodSeconds)
-	out.KubeAPIBurst = int(in.KubeAPIBurst)
-	out.KubeAPIQPS = int(in.KubeAPIQPS)
+	if err := s.Convert(&in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, 0); err != nil {
+		return err
+	}
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -88,7 +92,13 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.Mode = componentconfig.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	out.UDPTimeoutMilliseconds = int(in.UDPTimeoutMilliseconds)
+	if err := s.Convert(&in.UDPIdleTimeout, &out.UDPIdleTimeout, 0); err != nil {
+		return err
+	}
+	out.ConntrackMax = int(in.ConntrackMax)
+	if err := s.Convert(&in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, 0); err != nil {
+		return err
+	}
 	return nil
 }
 
