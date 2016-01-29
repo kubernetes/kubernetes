@@ -62,4 +62,6 @@ type Interface interface {
 	// etc., should be defined to retrieve such data in a format consumeable by Kubernetes. However, as of now
 	// Kubernetes is currently not using any of such metrics data, thus, these interface functions (along with the
 	// corresponding data structs) should be defined and tuned at the time when such code is added.
+
+	// TODO: Define parsing interface functions as use cases are more concrete
 }
