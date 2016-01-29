@@ -25,8 +25,8 @@ type FakeLegacy struct {
 	*core.Fake
 }
 
-func (c *FakeLegacy) ComponentStatus() unversioned.ComponentStatusInterface {
-	return &FakeComponentStatus{c}
+func (c *FakeLegacy) ComponentStatuses() unversioned.ComponentStatusInterface {
+	return &FakeComponentStatuses{c}
 }
 
 func (c *FakeLegacy) Endpoints(namespace string) unversioned.EndpointsInterface {
