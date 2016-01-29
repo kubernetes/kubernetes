@@ -31,8 +31,10 @@ const (
 	subresource    = "scale"
 )
 
+// These tests don't seem to be running properly in parallel: issue: #20338.
+//
 // These tests take ~20 minutes each.
-var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Slow]", func() {
+var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow]", func() {
 	var rc *ResourceConsumer
 	f := NewFramework("horizontal-pod-autoscaling")
 
