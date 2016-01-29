@@ -1503,7 +1503,7 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 }
 
 // Simple helper class to avoid too much boilerplate in tests
-type ServerTest struct {
+type ServiceTestFixture struct {
 	ServiceName string
 	Namespace   string
 	Client      *client.Client
@@ -1517,8 +1517,8 @@ type ServerTest struct {
 	image    string
 }
 
-func NewServerTest(client *client.Client, namespace string, serviceName string) *ServerTest {
-	t := &ServerTest{}
+func NewServerTest(client *client.Client, namespace string, serviceName string) *ServiceTestFixture {
+	t := &ServiceTestFixture{}
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
@@ -1536,8 +1536,8 @@ func NewServerTest(client *client.Client, namespace string, serviceName string) 
 	return t
 }
 
-func NewNetcatTest(client *client.Client, namespace string, serviceName string) *ServerTest {
-	t := &ServerTest{}
+func NewNetcatTest(client *client.Client, namespace string, serviceName string) *ServiceTestFixture {
+	t := &ServiceTestFixture{}
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
@@ -1556,7 +1556,7 @@ func NewNetcatTest(client *client.Client, namespace string, serviceName string) 
 }
 
 // Build default config for a service (which can then be changed)
-func (t *ServerTest) BuildServiceSpec() *api.Service {
+func (t *ServiceTestFixture) BuildServiceSpec() *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      t.ServiceName,
@@ -1575,7 +1575,7 @@ func (t *ServerTest) BuildServiceSpec() *api.Service {
 
 // CreateWebserverRC creates rc-backed pods with the well-known webserver
 // configuration and records it for cleanup.
-func (t *ServerTest) CreateWebserverRC(replicas int) *api.ReplicationController {
+func (t *ServiceTestFixture) CreateWebserverRC(replicas int) *api.ReplicationController {
 	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolTCP, t.Labels)
 	rcAct, err := t.createRC(rcSpec)
 	if err != nil {
@@ -1589,7 +1589,7 @@ func (t *ServerTest) CreateWebserverRC(replicas int) *api.ReplicationController 
 
 // CreateNetcatRC creates rc-backed pods with a netcat listener
 // configuration and records it for cleanup.
-func (t *ServerTest) CreateNetcatRC(replicas int) *api.ReplicationController {
+func (t *ServiceTestFixture) CreateNetcatRC(replicas int) *api.ReplicationController {
 	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolUDP, t.Labels)
 	rcSpec.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash"}
 	rcSpec.Spec.Template.Spec.Containers[0].Args = []string{"-c", "echo SUCCESS | nc -q 0 -u -l 0.0.0.0 80"}
@@ -1604,7 +1604,7 @@ func (t *ServerTest) CreateNetcatRC(replicas int) *api.ReplicationController {
 }
 
 // createRC creates a replication controller and records it for cleanup.
-func (t *ServerTest) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
+func (t *ServiceTestFixture) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
 	rc, err := t.Client.ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
@@ -1613,7 +1613,7 @@ func (t *ServerTest) createRC(rc *api.ReplicationController) (*api.ReplicationCo
 }
 
 // Create a service, and record it for cleanup
-func (t *ServerTest) CreateService(service *api.Service) (*api.Service, error) {
+func (t *ServiceTestFixture) CreateService(service *api.Service) (*api.Service, error) {
 	result, err := t.Client.Services(t.Namespace).Create(service)
 	if err == nil {
 		t.services[service.Name] = true
@@ -1622,7 +1622,7 @@ func (t *ServerTest) CreateService(service *api.Service) (*api.Service, error) {
 }
 
 // Delete a service, and remove it from the cleanup list
-func (t *ServerTest) DeleteService(serviceName string) error {
+func (t *ServiceTestFixture) DeleteService(serviceName string) error {
 	err := t.Client.Services(t.Namespace).Delete(serviceName)
 	if err == nil {
 		delete(t.services, serviceName)
@@ -1630,7 +1630,7 @@ func (t *ServerTest) DeleteService(serviceName string) error {
 	return err
 }
 
-func (t *ServerTest) Cleanup() []error {
+func (t *ServiceTestFixture) Cleanup() []error {
 	var errs []error
 	for rcName := range t.rcs {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
