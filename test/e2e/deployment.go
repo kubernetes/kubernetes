@@ -36,10 +36,10 @@ var _ = Describe("Deployment [Feature:Deployment]", func() {
 	It("deployment should create new pods", func() {
 		testNewDeployment(f)
 	})
-	It("RollingUpdateDeployment should delete old pods and create new ones [Flaky]", func() {
+	It("RollingUpdateDeployment should delete old pods and create new ones", func() {
 		testRollingUpdateDeployment(f)
 	})
-	It("RollingUpdateDeployment should scale up and down in the right order [Flaky]", func() {
+	It("RollingUpdateDeployment should scale up and down in the right order", func() {
 		testRollingUpdateDeploymentEvents(f)
 	})
 	It("RecreateDeployment should delete old pods and create new ones", func() {
@@ -48,7 +48,7 @@ var _ = Describe("Deployment [Feature:Deployment]", func() {
 	It("deployment should delete old rcs", func() {
 		testDeploymentCleanUpPolicy(f)
 	})
-	It("deployment should support rollover [Flaky]", func() {
+	It("deployment should support rollover", func() {
 		testRolloverDeployment(f)
 	})
 	It("paused deployment should be ignored by the controller", func() {
