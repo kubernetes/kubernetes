@@ -290,6 +290,29 @@ type KubeletConfiguration struct {
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
 }
 
+type KubeSchedulerConfiguration struct {
+	// port is the port that the scheduler's http service runs on.
+	Port int `json:"port"`
+	// address is the IP address to serve on.
+	Address string `json:"address"`
+	// algorithmProvider is the scheduling algorithm provider to use.
+	AlgorithmProvider string `json:"algorithmProvider"`
+	// policyConfigFile is the filepath to the scheduler policy configuration.
+	PolicyConfigFile string `json:"policyConfigFile"`
+	// enableProfiling enables profiling via web interface.
+	EnableProfiling bool `json:"enableProfiling"`
+	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
+	KubeAPIQPS float32 `json:"kubeAPIQPS"`
+	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
+	KubeAPIBurst int `json:"kubeAPIBurst"`
+	// schedulerName is name of the scheduler, used to select which pods
+	// will be processed by this scheduler, based on pod's annotation with
+	// key 'scheduler.alpha.kubernetes.io/name'.
+	SchedulerName string `json:"schedulerName"`
+	// leaderElection defines the configuration of leader election client.
+	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
+}
+
 // LeaderElectionConfiguration defines the configuration of leader election
 // clients for components that can run with leader election enabled.
 type LeaderElectionConfiguration struct {
