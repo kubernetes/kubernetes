@@ -8,6 +8,7 @@ limit nofile 20000 20000
 kill timeout 30 # wait 30s between SIGTERM and SIGKILL.
 
 exec /usr/local/bin/apiserver \
+     --allow-privileged=true \
      --basic-auth-file=/srv/kubernetes/basic-auth.csv \
      --bind-address=%(api_private_address)s \
      --etcd-servers=%(etcd_servers)s \
