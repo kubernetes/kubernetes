@@ -410,24 +410,6 @@ case ${JOB_NAME} in
     NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
-  # Runs all non-flaky tests on GCE in parallel.
-  kubernetes-e2e-gce-parallel)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
-    : ${E2E_NETWORK:="e2e-parallel"}
-    : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
-    : ${PROJECT:="kubernetes-jenkins"}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    # Override GCE defaults
-    NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
   # Runs all non-flaky tests on AWS in parallel.
   kubernetes-e2e-aws-parallel)
     : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e-parallel"}
