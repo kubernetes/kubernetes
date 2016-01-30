@@ -23,12 +23,14 @@ import (
 
 type cache struct {
 	podLister PodLister
+	modeler   SystemModeler
 }
 
 // New returns a Cache implementation.
-func New(podLister PodLister) Cache {
+func New(podLister PodLister, modeler SystemModeler) Cache {
 	return &cache{
 		podLister: podLister,
+		modeler:   modeler,
 	}
 }
 
@@ -46,4 +48,32 @@ func (c *cache) GetNodeNameToInfoMap() map[string]*NodeInfo {
 
 func (c *cache) List(selector labels.Selector) []*api.Pod {
 	return mustListPods(c.podLister)
+}
+
+func (c *cache) AssumePodIfBindSucceed(pod *api.Pod, bind func() bool) error {
+	c.modeler.LockedAction(func() {
+		if !bind() {
+			return
+		}
+		c.modeler.AssumePod(pod)
+	})
+	return nil
+}
+
+func (c *cache) AddPod(pod *api.Pod) error {
+	c.modeler.LockedAction(func() {
+		c.modeler.ForgetPod(pod)
+	})
+	return nil
+}
+
+func (c *cache) UpdatePod(oldPod, newPod *api.Pod) error {
+	return nil
+}
+
+func (c *cache) RemovePod(pod *api.Pod) error {
+	c.modeler.LockedAction(func() {
+		c.modeler.ForgetPod(pod)
+	})
+	return nil
 }
