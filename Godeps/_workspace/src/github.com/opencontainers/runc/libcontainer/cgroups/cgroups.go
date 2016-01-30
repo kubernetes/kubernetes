@@ -15,6 +15,9 @@ type Manager interface {
 	// Returns the PIDs inside the cgroup set
 	GetPids() ([]int, error)
 
+	// Returns the PIDs inside the cgroup set & all sub-cgroups
+	GetAllPids() ([]int, error)
+
 	// Returns statistics for the cgroup set
 	GetStats() (*Stats, error)
 

@@ -231,10 +231,14 @@ func ReserveLabel(scon string) {
 	}
 }
 
+func selinuxEnforcePath() string {
+	return fmt.Sprintf("%s/enforce", selinuxPath)
+}
+
 func SelinuxGetEnforce() int {
 	var enforce int
 
-	enforceS, err := readCon(fmt.Sprintf("%s/enforce", selinuxPath))
+	enforceS, err := readCon(selinuxEnforcePath())
 	if err != nil {
 		return -1
 	}
@@ -244,6 +248,10 @@ func SelinuxGetEnforce() int {
 		return -1
 	}
 	return enforce
+}
+
+func SelinuxSetEnforce(mode int) error {
+	return writeCon(selinuxEnforcePath(), fmt.Sprintf("%d", mode))
 }
 
 func SelinuxGetEnforceMode() int {
