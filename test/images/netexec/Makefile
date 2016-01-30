@@ -1,6 +1,6 @@
 .PHONY: all netexec image push clean
 
-TAG = 1.3.1
+TAG = 1.4
 PREFIX = gcr.io/google_containers
 
 
