@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -31,7 +32,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -427,16 +427,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
-	newRC, err := dc.getNewRC(deployment)
+	newRC, oldRCs, err := dc.getNewRCAndOldRCs(deployment)
 	if err != nil {
 		return err
 	}
-
-	oldRCs, err := dc.getOldRCs(deployment)
-	if err != nil {
-		return err
-	}
-
 	allRCs := append(oldRCs, newRC)
 
 	// scale down old rcs
@@ -471,16 +465,10 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 }
 
 func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extensions.Deployment) error {
-	newRC, err := dc.getNewRC(deployment)
+	newRC, oldRCs, err := dc.getNewRCAndOldRCs(deployment)
 	if err != nil {
 		return err
 	}
-
-	oldRCs, err := dc.getOldRCs(deployment)
-	if err != nil {
-		return err
-	}
-
 	allRCs := append(oldRCs, newRC)
 
 	// Scale up, if we can.
@@ -526,26 +514,85 @@ func (dc *DeploymentController) syncDeploymentStatus(allRCs []*api.ReplicationCo
 	return nil
 }
 
-func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, error) {
+func (dc *DeploymentController) getNewRCAndOldRCs(deployment extensions.Deployment) (*api.ReplicationController, []*api.ReplicationController, error) {
+	oldRCs, allOldRCs, err := dc.getOldRCs(deployment)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	maxOldV := maxRevision(allOldRCs)
+
+	// Get new RC with the updated revision number
+	newRC, err := dc.getNewRC(deployment, maxOldV)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Sync deployment's revision number with new RC
+	if newRC.Annotations != nil && len(newRC.Annotations[deploymentutil.RevisionAnnotation]) > 0 &&
+		(deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != newRC.Annotations[deploymentutil.RevisionAnnotation]) {
+		if err = dc.updateDeploymentRevision(deployment, newRC.Annotations[deploymentutil.RevisionAnnotation]); err != nil {
+			glog.V(4).Infof("Error: %v. Unable to update deployment revision, will retry later.", err)
+		}
+	}
+	return newRC, oldRCs, nil
+}
+
+func revision(rc *api.ReplicationController) (int, error) {
+	v, ok := rc.Annotations[deploymentutil.RevisionAnnotation]
+	if !ok {
+		return 0, nil
+	}
+	return strconv.Atoi(v)
+}
+
+func maxRevision(allRCs []*api.ReplicationController) int {
+	max := 0
+	for _, rc := range allRCs {
+		if v, err := revision(rc); err != nil {
+			// Skip the RCs when it failed to parse their revision information
+			glog.V(4).Infof("Error: %v. Couldn't parse revision for rc %#v, deployment controller will skip it when reconciling revisions.", err, rc)
+		} else if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	return deploymentutil.GetOldRCsFromLists(deployment, dc.client,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			podList, err := dc.podStore.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector))
+			podList, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
 			return &podList, err
 		},
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			return dc.rcStore.ReplicationControllers(namespace).List()
+			return dc.rcStore.ReplicationControllers(namespace).List(options.LabelSelector)
 		})
 }
 
 // Returns an RC that matches the intent of the given deployment.
 // It creates a new RC if required.
-func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api.ReplicationController, error) {
+// The revision of the new RC will be updated to maxOldRevision + 1
+func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOldRevision int) (*api.ReplicationController, error) {
+	// Calculate revision number for this new RC
+	newRevision := strconv.Itoa(maxOldRevision + 1)
+
 	existingNewRC, err := deploymentutil.GetNewRCFromList(deployment, dc.client,
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			return dc.rcStore.ReplicationControllers(namespace).List()
+			return dc.rcStore.ReplicationControllers(namespace).List(options.LabelSelector)
 		})
-	if err != nil || existingNewRC != nil {
-		return existingNewRC, err
+	if err != nil {
+		return nil, err
+	} else if existingNewRC != nil {
+		if existingNewRC.Annotations == nil {
+			existingNewRC.Annotations = make(map[string]string)
+		}
+		if existingNewRC.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
+			existingNewRC.Annotations[deploymentutil.RevisionAnnotation] = newRevision
+			glog.V(4).Infof("update existingNewRC's revision to %s - %+v\n", newRevision, existingNewRC)
+			return dc.client.ReplicationControllers(deployment.ObjectMeta.Namespace).Update(existingNewRC)
+		}
+		return existingNewRC, nil
 	}
 	// Check the rc expectations of deployment before creating a new rc
 	dKey, err := controller.KeyFunc(&deployment)
@@ -569,11 +616,13 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 		return nil, fmt.Errorf("couldn't get key for deployment controller %#v: %v", deployment, err)
 	}
 	dc.rcExpectations.ExpectCreations(dKey, 1)
+
 	// Create new RC
 	newRC := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: deployment.Name + "-",
 			Namespace:    namespace,
+			Annotations:  map[string]string{deploymentutil.RevisionAnnotation: newRevision},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 0,
@@ -586,7 +635,21 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 		dc.rcExpectations.DeleteExpectations(dKey)
 		return nil, fmt.Errorf("error creating replication controller: %v", err)
 	}
+
+	if err = dc.updateDeploymentRevision(deployment, newRevision); err != nil {
+		return createdRC, err
+	}
+
 	return createdRC, nil
+}
+
+func (dc *DeploymentController) updateDeploymentRevision(deployment extensions.Deployment, revision string) error {
+	if deployment.Annotations == nil {
+		deployment.Annotations = make(map[string]string)
+	}
+	deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
+	_, err := dc.updateDeployment(&deployment)
+	return err
 }
 
 func (dc *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) (bool, error) {

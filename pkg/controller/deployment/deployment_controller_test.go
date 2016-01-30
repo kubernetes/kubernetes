@@ -487,6 +487,7 @@ func TestSyncDeploymentCreatesRC(t *testing.T) {
 	opt := newListOptions()
 
 	f.expectCreateRCAction(rc)
+	f.expectUpdateDeploymentAction(d)
 	f.expectUpdateRCAction(updatedRC)
 	f.expectListPodAction(rc.Namespace, opt)
 	f.expectUpdateDeploymentAction(d)

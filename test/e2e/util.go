@@ -1972,7 +1972,7 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 		if err != nil {
 			return false, err
 		}
-		oldRCs, err := deploymentutil.GetOldRCs(*deployment, c)
+		oldRCs, _, err := deploymentutil.GetOldRCs(*deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -2024,7 +2024,7 @@ func waitForDeploymentOldRCsNum(c *client.Client, ns, deploymentName string, des
 		if err != nil {
 			return false, err
 		}
-		oldRCs, err := deploymentutil.GetOldRCs(*deployment, c)
+		oldRCs, _, err := deploymentutil.GetOldRCs(*deployment, c)
 		if err != nil {
 			return false, err
 		}
