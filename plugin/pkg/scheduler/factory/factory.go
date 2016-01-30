@@ -100,7 +100,8 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 	c.modeler = modeler
 	schedulerCache := schedulercache.New(modeler.PodLister())
 	c.schedulerCache = schedulerCache
-	c.PodLister = modeler.PodLister()
+
+	c.PodLister = &schedulercache.CacheToPodLister{Cache: schedulerCache}
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
