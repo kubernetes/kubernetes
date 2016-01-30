@@ -408,6 +408,10 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 				Logf("Index value out of range: %d", index)
 				continue
 			}
+			if words[1] != taintName {
+				Logf("Elasticsearch query return unexpected log line: %s", msg)
+				continue
+			}
 			// Record the observation of a log line from node n at the given index.
 			observed[n][index]++
 		}
