@@ -976,7 +976,13 @@ func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) (result kubecontainer.PodSyncResult) {
+	var err error
+	defer func() {
+		if err != nil {
+			result.Fail(err)
+		}
+	}()
 	// TODO: (random-liu) Stop using running pod in SyncPod()
 	// TODO: (random-liu) Rename podStatus to apiPodStatus, rename internalPodStatus to podStatus, and use new pod status as much as possible,
 	// we may stop using apiPodStatus someday.
@@ -1031,15 +1037,15 @@ func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStat
 	if restartPod {
 		// Kill the pod only if the pod is actually running.
 		if len(runningPod.Containers) > 0 {
-			if err := r.KillPod(pod, runningPod); err != nil {
-				return err
+			if err = r.KillPod(pod, runningPod); err != nil {
+				return
 			}
 		}
-		if err := r.RunPod(pod, pullSecrets); err != nil {
-			return err
+		if err = r.RunPod(pod, pullSecrets); err != nil {
+			return
 		}
 	}
-	return nil
+	return
 }
 
 // GarbageCollect collects the pods/containers.
