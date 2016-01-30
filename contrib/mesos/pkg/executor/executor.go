@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -545,6 +546,9 @@ func (k *Executor) killPodTask(driver bindings.ExecutorDriver, taskID string) {
 	err := k.kubeAPI.killPod(pod.Namespace, pod.Name)
 	if err != nil {
 		log.V(1).Infof("failed to delete task %v pod %v/%v from apiserver: %+v", taskID, pod.Namespace, pod.Name, err)
+		if apierrors.IsNotFound(err) {
+			k.sendStatus(driver, newStatus(&mesos.TaskID{Value: &taskID}, mesos.TaskState_TASK_LOST, "kill-pod-task"))
+		}
 	}
 }
 
