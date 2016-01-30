@@ -46,8 +46,8 @@ type Manager interface {
 	RemovePod(pod *api.Pod)
 
 	// CleanupPods handles cleaning up pods which should no longer be running.
-	// It takes a list of "active pods" which should not be cleaned up.
-	CleanupPods(activePods []*api.Pod)
+	// It takes a set of "active pods" which should not be cleaned up.
+	CleanupPods(activePods sets.String)
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
@@ -177,17 +177,12 @@ func (m *manager) RemovePod(pod *api.Pod) {
 	}
 }
 
-func (m *manager) CleanupPods(activePods []*api.Pod) {
-	desiredPods := make(map[types.UID]sets.Empty)
-	for _, pod := range activePods {
-		desiredPods[pod.UID] = sets.Empty{}
-	}
-
+func (m *manager) CleanupPods(activePods sets.String) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
 	for key, worker := range m.workers {
-		if _, ok := desiredPods[key.podUID]; !ok {
+		if !activePods.Has(string(key.podUID)) {
 			worker.stop()
 		}
 	}

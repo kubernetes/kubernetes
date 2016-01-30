@@ -28,6 +28,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func newPod(uid, name string) *api.Pod {
@@ -128,9 +129,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
 
-	desiredPods := map[types.UID]empty{}
-	desiredPods[types.UID(2)] = empty{}
-	desiredPods[types.UID(14)] = empty{}
+	desiredPods := sets.NewString(string(types.UID(2)), string(types.UID(14)))
 	podWorkers.ForgetNonExistingPodWorkers(desiredPods)
 	if len(podWorkers.podUpdates) != 2 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
@@ -142,7 +141,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("No updates channel for pod 14")
 	}
 
-	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]empty{})
+	podWorkers.ForgetNonExistingPodWorkers(sets.NewString())
 	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}

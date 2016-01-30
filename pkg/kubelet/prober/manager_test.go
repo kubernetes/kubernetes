@@ -28,7 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -157,7 +159,7 @@ func TestCleanupPods(t *testing.T) {
 	m.AddPod(&podToCleanup)
 	m.AddPod(&podToKeep)
 
-	m.CleanupPods([]*api.Pod{&podToKeep})
+	m.CleanupPods(sets.NewString(string(podToKeep.UID)))
 
 	removedProbes := []probeKey{
 		{"pod_cleanup", "prober1", readiness},
