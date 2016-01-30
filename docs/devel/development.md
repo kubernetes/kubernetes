@@ -374,6 +374,15 @@ See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
 
 [Instructions here](flaky-tests.md)
 
+## Benchmarking
+
+To run benchmark tests, you'll typically use something like:
+
+    $ godep go test ./pkg/apiserver -benchmem -run=XXX -bench=BenchmarkWatch
+
+The `-run=XXX` prevents normal unit tests for running, while `-bench` is a regexp for selecting which benchmarks to run.
+See `go test -h` for more instructions on generating profiles from benchmarks.
+
 ## Regenerating the CLI documentation
 
 ```sh
