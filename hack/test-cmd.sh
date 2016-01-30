@@ -844,6 +844,12 @@ __EOF__
   # Post-condition: redis-master and redis-slave services are created
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
 
+  ### Custom columns can be specified
+  # Pre-condition: generate output using custom columns
+  output_message=$(kubectl get services -o=custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion 2>&1 "${kube_flags[@]}")
+  # Post-condition: should contain name column
+  kube::test::if_has_string "${output_message}" 'redis-master'
+
   ### Delete multiple services at once
   # Pre-condition: redis-master and redis-slave services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
