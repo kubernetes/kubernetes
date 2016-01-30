@@ -59,7 +59,7 @@ func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, ge
 	// TODO: Right now we list all RCs and then filter. We should add an API for this.
 	oldRCs := map[string]api.ReplicationController{}
 	allOldRCs := map[string]api.ReplicationController{}
-	rcList, err := getRcList(namespace, api.ListOptions{})
+	rcList, err := getRcList(namespace, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
@@ -105,7 +105,7 @@ func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.Replic
 // Returns nil if the new RC doesnt exist yet.
 func GetNewRCFromList(deployment extensions.Deployment, c client.Interface, getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
-	rcList, err := getRcList(namespace, api.ListOptions{})
+	rcList, err := getRcList(namespace, api.ListOptions{LabelSelector: labels.SelectorFromSet(deployment.Spec.Selector)})
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}

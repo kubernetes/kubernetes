@@ -32,7 +32,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -563,11 +562,11 @@ func maxRevision(allRCs []*api.ReplicationController) int {
 func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	return deploymentutil.GetOldRCsFromLists(deployment, dc.client,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			podList, err := dc.podStore.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector))
+			podList, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
 			return &podList, err
 		},
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			return dc.rcStore.ReplicationControllers(namespace).List()
+			return dc.rcStore.ReplicationControllers(namespace).List(options.LabelSelector)
 		})
 }
 
@@ -580,7 +579,7 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 
 	existingNewRC, err := deploymentutil.GetNewRCFromList(deployment, dc.client,
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			return dc.rcStore.ReplicationControllers(namespace).List()
+			return dc.rcStore.ReplicationControllers(namespace).List(options.LabelSelector)
 		})
 	if err != nil {
 		return nil, err

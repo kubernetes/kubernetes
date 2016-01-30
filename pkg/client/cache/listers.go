@@ -170,11 +170,13 @@ type storeReplicationControllersNamespacer struct {
 	namespace string
 }
 
-func (s storeReplicationControllersNamespacer) List() (controllers []api.ReplicationController, err error) {
+func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (controllers []api.ReplicationController, err error) {
 	for _, c := range s.store.List() {
 		rc := *(c.(*api.ReplicationController))
 		if s.namespace == api.NamespaceAll || s.namespace == rc.Namespace {
-			controllers = append(controllers, rc)
+			if selector.Matches(labels.Set(rc.Labels)) {
+				controllers = append(controllers, rc)
+			}
 		}
 	}
 	return
