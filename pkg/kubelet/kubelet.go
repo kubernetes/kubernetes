@@ -2193,6 +2193,10 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 // new pod. The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
+//
+// This needs to be kept in sync with the scheduler's and daemonset's fit predicates,
+// otherwise there will inevitably be pod delete create loops. This will be fixed
+// once we can extract these predicates into a common library. (#12744)
 func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, string) {
 	if hasHostPortConflicts(pods) {
 		return false, "HostPortConflict", "cannot start the pod due to host port conflict."
