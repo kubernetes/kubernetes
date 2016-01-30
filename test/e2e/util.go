@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -355,6 +356,16 @@ func podRunningReady(p *api.Pod) (bool, error) {
 	return true, nil
 }
 
+// podNotReady checks whether pod p's has a ready condition of status false.
+func podNotReady(p *api.Pod) (bool, error) {
+	// Check the ready condition is false.
+	if podReady(p) {
+		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
+			p.ObjectMeta.Name, p.Spec.NodeName, api.PodReady, api.ConditionFalse, p.Status.Conditions)
+	}
+	return true, nil
+}
+
 // check if a Pod is controlled by a Replication Controller in the List
 func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api.Pod) bool {
 	for _, rc := range rcs.Items {
@@ -544,6 +555,33 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, timeout tim
 			podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
+}
+
+// waitForMatchPodsCondition finds match pods based on the input ListOptions.
+// waits and checks if all match pods are in the given podCondition
+func waitForMatchPodsCondition(c *client.Client, opts api.ListOptions, desc string, timeout time.Duration, condition podCondition) error {
+	Logf("Waiting up to %v for matching pods' status to be %s", timeout, desc)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		pods, err := c.Pods(api.NamespaceAll).List(opts)
+		if err != nil {
+			return err
+		}
+		conditionNotMatch := []string{}
+		for _, pod := range pods.Items {
+			done, err := condition(&pod)
+			if done && err != nil {
+				return fmt.Errorf("Unexpected error: %v", err)
+			}
+			if !done {
+				conditionNotMatch = append(conditionNotMatch, format.Pod(&pod))
+			}
+		}
+		if len(conditionNotMatch) <= 0 {
+			return err
+		}
+		Logf("%d pods are not %s", len(conditionNotMatch), desc)
+	}
+	return fmt.Errorf("gave up waiting for matching pods to be '%s' after %v", desc, timeout)
 }
 
 // waitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
