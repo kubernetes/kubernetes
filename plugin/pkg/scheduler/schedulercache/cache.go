@@ -16,7 +16,10 @@ limitations under the License.
 
 package schedulercache
 
-import "k8s.io/kubernetes/pkg/labels"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
+)
 
 type cache struct {
 	podLister PodLister
@@ -29,10 +32,18 @@ func New(podLister PodLister) Cache {
 	}
 }
 
-func (c *cache) GetNodeNameToInfoMap() map[string]*NodeInfo {
-	pods, err := c.podLister.List(labels.Everything())
+func mustListPods(podLister PodLister) []*api.Pod {
+	pods, err := podLister.List(labels.Everything())
 	if err != nil {
 		panic("local cache shouldn't have any List error")
 	}
-	return CreateNodeNameToInfoMap(pods)
+	return pods
+}
+
+func (c *cache) GetNodeNameToInfoMap() map[string]*NodeInfo {
+	return CreateNodeNameToInfoMap(mustListPods(c.podLister))
+}
+
+func (c *cache) List(selector labels.Selector) []*api.Pod {
+	return mustListPods(c.podLister)
 }
