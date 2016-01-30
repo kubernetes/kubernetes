@@ -331,16 +331,17 @@ case ${JOB_NAME} in
     ;;
 
   # AWS
-  #
-  # TODO(ihmccreery) configure these like GCE and GKE
 
-  # Runs all non-flaky, non-slow tests on AWS, sequentially.
+  # Runs all non-slow, non-serial, non-flaky, tests on AWS in parallel.
   kubernetes-e2e-aws)
     : ${E2E_PUBLISH_GREEN_VERSION:=true}
     : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e"}
     : ${E2E_ZONE:="us-west-2a"}
     : ${ZONE:="us-west-2a"}
     : ${E2E_NETWORK:="e2e-aws"}
+    : ${GINKGO_PARALLEL:="y"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
     : ${ENABLE_DEPLOYMENTS:=true}
@@ -349,16 +350,6 @@ case ${JOB_NAME} in
     : ${KUBE_SSH_USER:='ubuntu'}
     # This is needed to be able to create PD from the e2e test
     : ${AWS_SHARED_CREDENTIALS_FILE:='/var/lib/jenkins/.aws/credentials'}
-    ;;
-
-  # Runs all non-flaky tests on AWS in parallel.
-  kubernetes-e2e-aws-parallel)
-    : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e-parallel"}
-    : ${E2E_NETWORK:="e2e-parallel"}
-    : ${GINKGO_PARALLEL:="y"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
-    : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
     NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
