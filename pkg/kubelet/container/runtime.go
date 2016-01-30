@@ -83,9 +83,6 @@ type Runtime interface {
 	// exists to determine the reason). We should try generalizing the logic
 	// for all container runtimes in kubelet and remove this funciton.
 	ConvertPodStatusToAPIPodStatus(*api.Pod, *PodStatus) (*api.PodStatus, error)
-	// Return both PodStatus and api.PodStatus, this is just a temporary function.
-	// TODO(random-liu): Remove this method later
-	GetPodStatusAndAPIPodStatus(*api.Pod) (*PodStatus, *api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
