@@ -863,8 +863,8 @@ func TestSetApp(t *testing.T) {
 		// app should be changed. (env, mounts, ports, are overrided).
 		{
 			container: &api.Container{
-				Command:    []string{"/bin/bar"},
-				Args:       []string{"hello", "world"},
+				Command:    []string{"/bin/bar", "$(env-foo)"},
+				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
 					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
@@ -874,6 +874,7 @@ func TestSetApp(t *testing.T) {
 			opts: &kubecontainer.RunContainerOptions{
 				Envs: []kubecontainer.EnvVar{
 					{Name: "env-foo", Value: "foo"},
+					{Name: "env-bar", Value: "bar"},
 				},
 				Mounts: []kubecontainer.Mount{
 					{Name: "mnt-foo", ContainerPath: "/mnt-bar", ReadOnly: true},
@@ -895,13 +896,14 @@ func TestSetApp(t *testing.T) {
 				FSGroup:            &fsgid,
 			},
 			expect: &appctypes.App{
-				Exec:              appctypes.Exec{"/bin/bar", "hello", "world"},
+				Exec:              appctypes.Exec{"/bin/bar", "foo", "hello", "world", "bar"},
 				User:              "42",
 				Group:             "22",
 				SupplementaryGIDs: []int{1, 2, 3},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
 					{"env-foo", "foo"},
+					{"env-bar", "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-bar", ReadOnly: true},
