@@ -27,10 +27,22 @@ type Cache interface {
 	// GetNodeNameToInfoMap returns a map of node names to node info. The node info contains
 	// aggregated information of pods scheduled (including assumed to be) on this node.
 	GetNodeNameToInfoMap() map[string]*NodeInfo
+
+	// List lists all pods added (including assumed) in this cache
+	List(labels.Selector) []*api.Pod
 }
 
 // PodLister is a clone of algorithm.PodLister. There is important cycle issue if we use that one.
 // TODO: move algorithm.PodLister into a separate standalone package.
 type PodLister interface {
 	List(labels.Selector) ([]*api.Pod, error)
+}
+
+// CacheToPodLister make a Cache have the List method required by algorithm.PodLister
+type CacheToPodLister struct {
+	Cache Cache
+}
+
+func (c2p *CacheToPodLister) List(selector labels.Selector) ([]*api.Pod, error) {
+	return c2p.Cache.List(selector), nil
 }
