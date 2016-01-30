@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/util"
@@ -141,7 +140,7 @@ func TestDecode(t *testing.T) {
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: conversion.NewNotRegisteredErr(unversioned.GroupVersionKind{}, nil)},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErr(unversioned.GroupVersionKind{}, nil)},
 			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",
