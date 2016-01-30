@@ -32,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
@@ -201,7 +200,6 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
 	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.20"}
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
 		cl,
@@ -234,7 +232,6 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// have a place they can schedule.
 	testRootDir = integration.MakeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.20"}
 
 	kcfg = kubeletapp.SimpleKubelet(
 		cl,

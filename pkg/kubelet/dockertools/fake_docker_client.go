@@ -57,7 +57,7 @@ type FakeDockerClient struct {
 
 func NewFakeDockerClient() *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:   docker.Env{"Version=1.1.3", "ApiVersion=1.15"},
+		VersionInfo:   docker.Env{"Version=1.8.1", "ApiVersion=1.20"},
 		Errors:        make(map[string]error),
 		RemovedImages: sets.String{},
 		ContainerMap:  make(map[string]*docker.Container),
