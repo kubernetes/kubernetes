@@ -52,7 +52,7 @@ func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
 // List takes a selector, and returns the list of ReplicaSets that match that selector.
 func (c *replicaSets) List(opts api.ListOptions) (result *extensions.ReplicaSetList, err error) {
 	result = &extensions.ReplicaSetList{}
-	err = c.client.Get().Namespace(c.ns).Resource("replicasets").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource("replicasets").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -95,6 +95,6 @@ func (c *replicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

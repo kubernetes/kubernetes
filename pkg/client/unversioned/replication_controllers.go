@@ -51,7 +51,7 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 // List takes a selector, and returns the list of replication controllers that match that selector.
 func (c *replicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -94,6 +94,6 @@ func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, e
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationControllers").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

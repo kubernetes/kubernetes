@@ -46,7 +46,7 @@ func (c *componentStatuses) List(opts api.ListOptions) (result *api.ComponentSta
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentStatuses").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 

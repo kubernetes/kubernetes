@@ -101,7 +101,7 @@ func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -123,7 +123,7 @@ func (c *nodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
 	result = &api.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -134,6 +134,6 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("nodes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

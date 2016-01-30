@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/metrics"
-	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -425,18 +424,13 @@ func (r *Request) Param(paramName, s string) *Request {
 }
 
 // VersionedParams will take the provided object, serialize it to a map[string][]string using the
-// implicit RESTClient API version and the provided object convertor, and then add those as parameters
+// implicit RESTClient API version and the default parameter codec, and then add those as parameters
 // to the request. Use this to provide versioned query parameters from client libraries.
-func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectConvertor) *Request {
+func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
 	if r.err != nil {
 		return r
 	}
-	versioned, err := convertor.ConvertToVersion(obj, r.content.GroupVersion.String())
-	if err != nil {
-		r.err = err
-		return r
-	}
-	params, err := queryparams.Convert(versioned)
+	params, err := codec.EncodeParameters(obj, *r.content.GroupVersion)
 	if err != nil {
 		r.err = err
 		return r
