@@ -59,12 +59,16 @@ func New() *Generator {
 		Common:      common,
 		OutputBase:  sourceTree,
 		ProtoImport: []string{defaultProtoImport},
-		Packages: `+k8s.io/kubernetes/pkg/util/intstr,` +
-			`+k8s.io/kubernetes/pkg/api/resource,` +
-			`+k8s.io/kubernetes/pkg/runtime,` +
-			`k8s.io/kubernetes/pkg/api/unversioned,` +
-			`k8s.io/kubernetes/pkg/api/v1,` +
+		Packages: strings.Join([]string{
+			`+k8s.io/kubernetes/pkg/util/intstr`,
+			`+k8s.io/kubernetes/pkg/api/resource`,
+			`+k8s.io/kubernetes/pkg/runtime`,
+			`k8s.io/kubernetes/pkg/api/unversioned`,
+			`k8s.io/kubernetes/pkg/api/v1`,
 			`k8s.io/kubernetes/pkg/apis/extensions/v1beta1`,
+			`k8s.io/kubernetes/pkg/apis/autoscaling/v1`,
+			`k8s.io/kubernetes/pkg/apis/batch/v1`,
+		}, ","),
 		DropEmbeddedFields: "k8s.io/kubernetes/pkg/api/unversioned.TypeMeta",
 	}
 }

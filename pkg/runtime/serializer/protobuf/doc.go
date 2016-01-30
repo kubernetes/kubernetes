@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package protobuf implements ProtoBuf serialization and deserialization.
+// Package protobuf provides a Kubernetes serializer for the protobuf format.
 package protobuf
