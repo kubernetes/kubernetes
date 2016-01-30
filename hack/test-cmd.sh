@@ -1343,6 +1343,16 @@ __EOF__
     [[ "$(grep "Watch for changes to the described resources" "${file}")" ]]
   fi
 
+  #####################
+  # Kubectl --sort-by #
+  #####################
+
+  ### sort-by should not panic if no pod exists
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl get pods --sort-by="{metadata.name}"
+
   kube::test::clear_all
 }
 

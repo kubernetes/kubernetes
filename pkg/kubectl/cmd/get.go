@@ -243,7 +243,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	sorting, err := cmd.Flags().GetString("sort-by")
 	var sorter *kubectl.RuntimeSort
-	if err == nil && len(sorting) > 0 {
+	if err == nil && len(sorting) > 0 && len(objs) > 1 {
 		// TODO: questionable
 		if sorter, err = kubectl.SortObjects(f.Decoder(true), objs, sorting); err != nil {
 			return err
