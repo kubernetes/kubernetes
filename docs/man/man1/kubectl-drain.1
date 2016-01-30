@@ -19,8 +19,8 @@ Drain node in preparation for maintenance.
 The given node will be marked unschedulable to prevent new pods from arriving.
 Then drain deletes all pods except mirror pods (which cannot be deleted through
 the API server).  If there are any pods that are neither mirror pods nor
-managed by a ReplicationController or DaemonSet, then drain will not delete any
-pods unless you use \-\-force.
+managed by a ReplicationController, Job, or DaemonSet, then drain will not
+delete any pods unless you use \-\-force.
 
 .PP
 When you are ready to put the node back into service, use kubectl uncordon, which
@@ -30,7 +30,7 @@ will make the node schedulable again.
 .SH OPTIONS
 .PP
 \fB\-\-force\fP=false
-    Continue even if there are pods not managed by a ReplicationController or DaemonSet.
+    Continue even if there are pods not managed by a ReplicationController, Job, or DaemonSet.
 
 .PP
 \fB\-\-grace\-period\fP=\-1
@@ -136,10 +136,10 @@ will make the node schedulable again.
 .RS
 
 .nf
-# Drain node "foo", even if there are pods not managed by a ReplicationController or DaemonSet on it.
+# Drain node "foo", even if there are pods not managed by a ReplicationController, Job, or DaemonSet on it.
 $ kubectl drain foo \-\-force
 
-# As above, but abort if there are pods not managed by a ReplicationController or DaemonSet, and use a grace period of 15 minutes.
+# As above, but abort if there are pods not managed by a ReplicationController, Job, or DaemonSet, and use a grace period of 15 minutes.
 $ kubectl drain foo \-\-grace\-period=900
 
 
