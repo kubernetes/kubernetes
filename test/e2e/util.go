@@ -744,13 +744,13 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 	return nil
 }
 
-// Waits default ammount of time (podStartTimeout) for the specified pod to become running.
+// Waits default amount of time (podStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
 	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, podStartTimeout)
 }
 
-// Waits an extended ammount of time (slowPodStartTimeout) for the specified pod to become running.
+// Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func waitForPodRunningInNamespaceSlow(c *client.Client, podName string, namespace string) error {
 	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
@@ -2340,7 +2340,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 // in namespace ns are running and ready, using c and waiting at most timeout.
 func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeout time.Duration) bool {
 	np, desc := len(podNames), "running and ready"
-	Logf("Waiting up to %v for the following %d pods to be %s: %s", timeout, np, desc, podNames)
+	Logf("Waiting up to %v for %d pods to be %s: %s", timeout, np, desc, podNames)
 	result := make(chan bool, len(podNames))
 	for ix := range podNames {
 		// Launch off pod readiness checkers.
