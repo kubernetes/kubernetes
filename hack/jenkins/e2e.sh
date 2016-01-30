@@ -364,6 +364,33 @@ case ${JOB_NAME} in
     ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
     ;;
 
+  # Runs only the ingress tests on GCE.
+  kubernetes-e2e-gce-ingress)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-ingress"}
+    : ${E2E_NETWORK:="e2e-ingress"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Ingress\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-ingress"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    # TODO: Move this into a different project. Currently, since this test
+    # shares resources with various other networking tests, so it's easier
+    # to zero in on the source of a leak if it's run in isolation.
+    : ${PROJECT:="kubernetes-flannel"}
+    ;;
+
+   # Runs only the ingress tests on GKE.
+   kubernetes-e2e-gke-ingress)
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-ingress"}
+    : ${E2E_NETWORK:="e2e-gke-ingress"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Ingress\]"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gke-ingress"}
+    # TODO: Move this into a different project. Currently, since this test
+    # shares resources with various other networking tests, it's easier to
+    # zero in on the source of a leak if it's run in isolation.
+    : ${PROJECT:="kubernetes-flannel"}
+    ;;
+
   # Runs the flaky tests on GCE, sequentially.
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
