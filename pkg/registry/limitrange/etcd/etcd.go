@@ -37,7 +37,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 	newListFunc := func() runtime.Object { return &api.LimitRangeList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.LimitRange{}, prefix, true, newListFunc)
+		s, 100, &api.LimitRange{}, prefix, limitrange.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.LimitRange{} },
