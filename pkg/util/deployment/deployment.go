@@ -28,8 +28,13 @@ import (
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
+const (
+	// The revision annotation of a deployment's replication controllers which records its rollout sequence
+	RevisionAnnotation = "deployment.kubernetes.io/revision"
+)
+
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.
-func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
+func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	return GetOldRCsFromLists(deployment, c,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
 			return c.Pods(namespace).List(options)
@@ -41,32 +46,34 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 }
 
 // GetOldRCsFromLists returns the old RCs targeted by the given Deployment; get PodList and RCList with input functions.
-func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, error) {
+func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
 	selector := labels.SelectorFromSet(deployment.Spec.Selector)
 	options := api.ListOptions{LabelSelector: selector}
 	podList, err := getPodList(namespace, options)
 	if err != nil {
-		return nil, fmt.Errorf("error listing pods: %v", err)
+		return nil, nil, fmt.Errorf("error listing pods: %v", err)
 	}
 	// 2. Find the corresponding RCs for pods in podList.
 	// TODO: Right now we list all RCs and then filter. We should add an API for this.
 	oldRCs := map[string]api.ReplicationController{}
-	rcList, err := getRcList(namespace, api.ListOptions{})
+	allOldRCs := map[string]api.ReplicationController{}
+	rcList, err := getRcList(namespace, options)
 	if err != nil {
-		return nil, fmt.Errorf("error listing replication controllers: %v", err)
+		return nil, nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
 	newRCTemplate := GetNewRCTemplate(deployment)
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rc := range rcList {
 			rcLabelsSelector := labels.SelectorFromSet(rc.Spec.Selector)
+			// Filter out RC that has the same pod template spec as the deployment - that is the new RC.
+			if api.Semantic.DeepEqual(rc.Spec.Template, &newRCTemplate) {
+				continue
+			}
+			allOldRCs[rc.ObjectMeta.Name] = rc
 			if rcLabelsSelector.Matches(podLabelsSelector) {
-				// Filter out RC that has the same pod template spec as the deployment - that is the new RC.
-				if api.Semantic.DeepEqual(rc.Spec.Template, &newRCTemplate) {
-					continue
-				}
 				oldRCs[rc.ObjectMeta.Name] = rc
 			}
 		}
@@ -76,7 +83,12 @@ func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, ge
 		value := oldRCs[key]
 		requiredRCs = append(requiredRCs, &value)
 	}
-	return requiredRCs, nil
+	allRCs := []*api.ReplicationController{}
+	for key := range allOldRCs {
+		value := allOldRCs[key]
+		allRCs = append(allRCs, &value)
+	}
+	return requiredRCs, allRCs, nil
 }
 
 // GetNewRC returns an RC that matches the intent of the given deployment; get RCList from client interface.
@@ -93,7 +105,7 @@ func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.Replic
 // Returns nil if the new RC doesnt exist yet.
 func GetNewRCFromList(deployment extensions.Deployment, c client.Interface, getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
-	rcList, err := getRcList(namespace, api.ListOptions{})
+	rcList, err := getRcList(namespace, api.ListOptions{LabelSelector: labels.SelectorFromSet(deployment.Spec.Selector)})
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
