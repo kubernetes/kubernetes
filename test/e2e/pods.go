@@ -846,7 +846,7 @@ var _ = Describe("Pods", func() {
 		}
 	})
 
-	It("should have their auto-restart back-off timer reset on image update", func() {
+	It("should have their auto-restart back-off timer reset on image update [Slow]", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
 		podClient := framework.Client.Pods(framework.Namespace.Name)
