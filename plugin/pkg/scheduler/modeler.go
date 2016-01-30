@@ -30,11 +30,6 @@ import (
 	"github.com/golang/glog"
 )
 
-var (
-	_ = SystemModeler(&FakeModeler{})
-	_ = SystemModeler(&SimpleModeler{})
-)
-
 // ExtendedPodLister: SimpleModeler needs to be able to check for a pod's
 // existence in addition to listing the pods.
 type ExtendedPodLister interface {
