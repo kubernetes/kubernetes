@@ -19,11 +19,12 @@ package deployment
 import (
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -457,6 +459,11 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
 
+	if deployment.Spec.RevisionHistoryLimit != nil {
+		// Cleanup old RCs
+		dc.cleanupOldRcs(oldRCs, deployment)
+	}
+
 	// Sync deployment status
 	return dc.syncDeploymentStatus(allRCs, newRC, deployment)
 
@@ -494,6 +501,11 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 	if scaledDown {
 		// Update DeploymentStatus
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
+	}
+
+	if deployment.Spec.RevisionHistoryLimit != nil {
+		// Cleanup old RCs
+		dc.cleanupOldRcs(oldRCs, deployment)
 	}
 
 	// Sync deployment status
@@ -704,6 +716,31 @@ func (dc *DeploymentController) scaleUpNewRCForRecreate(newRC *api.ReplicationCo
 	}
 	_, err := dc.scaleRCAndRecordEvent(newRC, deployment.Spec.Replicas, deployment)
 	return true, err
+}
+
+func (dc *DeploymentController) cleanupOldRcs(oldRCs []*api.ReplicationController, deployment extensions.Deployment) error {
+	diff := len(oldRCs) - *deployment.Spec.RevisionHistoryLimit
+	if diff <= 0 {
+		return nil
+	}
+
+	sort.Sort(controller.ControllersByCreationTimestamp(oldRCs))
+
+	var errList []error
+	// TODO: This should be parallelized.
+	for i := 0; i < diff; i++ {
+		controller := oldRCs[i]
+		// Avoid delete rc with non-zero replica counts
+		if controller.Spec.Replicas != 0 || controller.Generation > controller.Status.ObservedGeneration {
+			continue
+		}
+		if err := dc.client.ReplicationControllers(controller.Namespace).Delete(controller.Name); err != nil && !errors.IsNotFound(err) {
+			glog.V(2).Infof("Failed deleting old rc %v for deployment %v: %v", controller.Name, deployment.Name, err)
+			errList = append(errList, err)
+		}
+	}
+
+	return utilerrors.NewAggregate(errList)
 }
 
 func (dc *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {

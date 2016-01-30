@@ -45,6 +45,9 @@ var _ = Describe("Deployment [Feature:Deployment]", func() {
 	It("RecreateDeployment should delete old pods and create new ones", func() {
 		testRecreateDeployment(f)
 	})
+	It("deployment should delete old rcs", func() {
+		testDeploymentCleanUpPolicy(f)
+	})
 	It("deployment should support rollover [Flaky]", func() {
 		testRolloverDeployment(f)
 	})
@@ -78,7 +81,7 @@ func newRC(rcName string, replicas int, rcPodLabels map[string]string, imageName
 	}
 }
 
-func newDeployment(deploymentName string, replicas int, podLabels map[string]string, imageName string, image string, strategyType extensions.DeploymentStrategyType) *extensions.Deployment {
+func newDeployment(deploymentName string, replicas int, podLabels map[string]string, imageName string, image string, strategyType extensions.DeploymentStrategyType, revisionHistoryLimit *int) *extensions.Deployment {
 	return &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
@@ -89,7 +92,8 @@ func newDeployment(deploymentName string, replicas int, podLabels map[string]str
 			Strategy: extensions.DeploymentStrategy{
 				Type: strategyType,
 			},
-			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
+			RevisionHistoryLimit: revisionHistoryLimit,
+			UniqueLabelKey:       extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,
@@ -114,7 +118,7 @@ func testNewDeployment(f *Framework) {
 	podLabels := map[string]string{"name": "nginx"}
 	replicas := 1
 	Logf("Creating simple deployment %s", deploymentName)
-	_, err := c.Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType))
+	_, err := c.Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -171,7 +175,7 @@ func testRollingUpdateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType))
+	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -215,7 +219,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment-2"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType))
+	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -276,7 +280,7 @@ func testRecreateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment-3"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RecreateDeploymentStrategyType))
+	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RecreateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -314,6 +318,50 @@ func testRecreateDeployment(f *Framework) {
 	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up rc %s to 3", newRC.Name)))
 }
 
+// testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
+func testDeploymentCleanUpPolicy(f *Framework) {
+	ns := f.Namespace.Name
+	c := f.Client
+	// Create nginx pods.
+	deploymentPodLabels := map[string]string{"name": "cleanup-pod"}
+	rcPodLabels := map[string]string{
+		"name": "cleanup-pod",
+		"pod":  "nginx",
+	}
+	rcName := "nginx-controller"
+	replicas := 1
+	revisionHistoryLimit := new(int)
+	*revisionHistoryLimit = 0
+	_, err := c.ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	Expect(err).NotTo(HaveOccurred())
+
+	// Verify that the required pods have come up.
+	err = verifyPods(c, ns, "cleanup-pod", false, 1)
+	if err != nil {
+		Logf("error in waiting for pods to come up: %s", err)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Create a deployment to delete nginx pods and instead bring up redis pods.
+	deploymentName := "redis-deployment"
+	Logf("Creating deployment %s", deploymentName)
+	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, revisionHistoryLimit))
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
+		Logf("deleting deployment %s", deploymentName)
+		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+	}()
+
+	err = waitForDeploymentOldRCsNum(c, ns, deploymentName, *revisionHistoryLimit)
+	Expect(err).NotTo(HaveOccurred())
+}
+
 // testRolloverDeployment tests that deployment supports rollover.
 // i.e. we can change desired state and kick off rolling update, then change desired state again before it finishes.
 func testRolloverDeployment(f *Framework) {
@@ -348,7 +396,7 @@ func testRolloverDeployment(f *Framework) {
 	deploymentMinReadySeconds := 5
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	Logf("Creating deployment %s", deploymentName)
-	newDeployment := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
+	newDeployment := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
 	newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
 		MaxUnavailable:  intstr.FromInt(1),
 		MaxSurge:        intstr.FromInt(1),
@@ -401,7 +449,7 @@ func testPausedDeployment(f *Framework) {
 	c := f.Client
 	deploymentName := "nginx"
 	podLabels := map[string]string{"name": "nginx"}
-	d := newDeployment(deploymentName, 1, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType)
+	d := newDeployment(deploymentName, 1, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
 	d.Spec.Paused = true
 	Logf("Creating paused deployment %s", deploymentName)
 	_, err := c.Deployments(ns).Create(d)

@@ -1147,6 +1147,12 @@ func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *
 	if err := deepCopy_v1beta1_DeploymentStrategy(in.Strategy, &out.Strategy, c); err != nil {
 		return err
 	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
+	} else {
+		out.RevisionHistoryLimit = nil
+	}
 	if in.UniqueLabelKey != nil {
 		out.UniqueLabelKey = new(string)
 		*out.UniqueLabelKey = *in.UniqueLabelKey
