@@ -167,6 +167,11 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 	params["env"] = cmdutil.GetFlagStringSlice(cmd, "env")
 
+	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
+	if err != nil {
+		return err
+	}
+
 	if cmdutil.GetFlagBool(cmd, "expose") {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
 		if len(serviceGenerator) == 0 {
@@ -175,11 +180,6 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err := generateService(f, cmd, args, serviceGenerator, params, namespace, cmdOut); err != nil {
 			return err
 		}
-	}
-
-	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
-	if err != nil {
-		return err
 	}
 
 	attachFlag := cmd.Flags().Lookup("attach")
