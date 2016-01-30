@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api/validation"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -72,6 +73,7 @@ type ConfigFactory struct {
 
 	scheduledPodPopulator *framework.Controller
 	modeler               scheduler.SystemModeler
+	schedulerCache        schedulercache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's annotation key:
@@ -96,6 +98,8 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 	}
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{Store: c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
+	schedulerCache := schedulercache.New(modeler.PodLister())
+	c.schedulerCache = schedulerCache
 	c.PodLister = modeler.PodLister()
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
@@ -231,7 +235,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, extenders, f.PodLister, r)
+	algo := scheduler.NewGenericScheduler(f.schedulerCache, predicateFuncs, priorityConfigs, extenders, f.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
