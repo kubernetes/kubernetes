@@ -110,7 +110,7 @@ Updated: 8/27/2015
   * However, affordances are made for simple parsing of `get` output
 * Only errors should be directed to stderr
 * `get` commands should output one row per resource, and one resource per row
-  * Column titles and values should not contain spaces in order to facilitate commands that break lines into fields: cut, awk, etc.
+  * Column titles and values should not contain spaces in order to facilitate commands that break lines into fields: cut, awk, etc. Instead, use `-` as the word separator.
   * By default, `get` output should fit within about 80 columns
     * Eventually we could perhaps auto-detect width
     * `-o wide` may be used to display additional columns

@@ -397,7 +397,7 @@ var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
 var jobColumns = []string{"JOB", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "SUCCESSFUL"}
-var serviceColumns = []string{"NAME", "CLUSTER_IP", "EXTERNAL_IP", "PORT(S)", "SELECTOR", "AGE"}
+var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "SELECTOR", "AGE"}
 var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
@@ -414,7 +414,7 @@ var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
-var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
+var deploymentColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 var configMapColumns = []string{"NAME", "DATA", "AGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
@@ -1383,9 +1383,12 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, options Pri
 		}
 	}
 
-	updatedReplicas := fmt.Sprintf("%d/%d", deployment.Status.UpdatedReplicas, deployment.Spec.Replicas)
+	desiredReplicas := deployment.Spec.Replicas
+	currentReplicas := deployment.Status.Replicas
+	updatedReplicas := deployment.Status.UpdatedReplicas
+	availableReplicas := deployment.Status.AvailableReplicas
 	age := translateTimestamp(deployment.CreationTimestamp)
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", deployment.Name, updatedReplicas, age); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s", deployment.Name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(deployment.Labels, options.ColumnLabels))

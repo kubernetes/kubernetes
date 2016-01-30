@@ -1249,11 +1249,13 @@ func TestPrintDeployment(t *testing.T) {
 					},
 				},
 				Status: extensions.DeploymentStatus{
-					Replicas:        10,
-					UpdatedReplicas: 2,
+					Replicas:            10,
+					UpdatedReplicas:     2,
+					AvailableReplicas:   1,
+					UnavailableReplicas: 4,
 				},
 			},
-			"test1\t2/5\t0s\n",
+			"test1\t5\t10\t2\t1\t0s\n",
 		},
 	}
 
