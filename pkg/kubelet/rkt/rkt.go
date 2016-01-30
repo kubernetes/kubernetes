@@ -1455,14 +1455,3 @@ func (r *Runtime) ConvertPodStatusToAPIPodStatus(pod *api.Pod, status *kubeconta
 
 	return apiPodStatus, nil
 }
-
-// TODO(yifan): Delete this function when the logic is moved to kubelet.
-func (r *Runtime) GetPodStatusAndAPIPodStatus(pod *api.Pod) (*kubecontainer.PodStatus, *api.PodStatus, error) {
-	// Get the pod status.
-	podStatus, err := r.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		return nil, nil, err
-	}
-	apiPodStatus, err := r.ConvertPodStatusToAPIPodStatus(pod, podStatus)
-	return podStatus, apiPodStatus, err
-}

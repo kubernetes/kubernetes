@@ -263,17 +263,6 @@ func (f *FakeRuntime) ConvertPodStatusToAPIPodStatus(_ *api.Pod, _ *PodStatus) (
 	return &status, f.Err
 }
 
-func (f *FakeRuntime) GetPodStatusAndAPIPodStatus(_ *api.Pod) (*PodStatus, *api.PodStatus, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	// This is only a temporary function, it should be logged as GetAPIPodStatus
-	f.CalledFunctions = append(f.CalledFunctions, "GetAPIPodStatus")
-	apiPodStatus := f.APIPodStatus
-	podStatus := f.PodStatus
-	return &podStatus, &apiPodStatus, f.Err
-}
-
 func (f *FakeRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	f.Lock()
 	defer f.Unlock()

@@ -2166,14 +2166,3 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 	podStatus.ContainerStatuses = containerStatuses
 	return podStatus, nil
 }
-
-func (dm *DockerManager) GetPodStatusAndAPIPodStatus(pod *api.Pod) (*kubecontainer.PodStatus, *api.PodStatus, error) {
-	// Get the pod status.
-	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		return nil, nil, err
-	}
-	var apiPodStatus *api.PodStatus
-	apiPodStatus, err = dm.ConvertPodStatusToAPIPodStatus(pod, podStatus)
-	return podStatus, apiPodStatus, err
-}
