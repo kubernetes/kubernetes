@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 )
@@ -43,12 +44,12 @@ type Scheduler struct {
 }
 
 type Config struct {
-	// It is expected that changes made via modeler will be observed
+	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
-	Modeler    SystemModeler
-	NodeLister algorithm.NodeLister
-	Algorithm  algorithm.ScheduleAlgorithm
-	Binder     Binder
+	SchedulerCache schedulercache.Cache
+	NodeLister     algorithm.NodeLister
+	Algorithm      algorithm.ScheduleAlgorithm
+	Binder         Binder
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -103,24 +104,25 @@ func (s *Scheduler) scheduleOne() {
 		},
 	}
 
-	// We want to add the pod to the model if and only if the bind succeeds,
-	// but we don't want to race with any deletions, which happen asynchronously.
-	s.config.Modeler.LockedAction(func() {
+	bindAction := func() bool {
 		bindingStart := time.Now()
 		err := s.config.Binder.Bind(b)
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %+v", err)
 			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
-			return
+			return false
 		}
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		s.config.Recorder.Eventf(pod, api.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
-		// tell the model to assume that this binding took effect.
-		assumed := *pod
-		assumed.Spec.NodeName = dest
-		s.config.Modeler.AssumePod(&assumed)
-	})
+		return true
+	}
+
+	assumed := *pod
+	assumed.Spec.NodeName = dest
+	// We want to assume the pod if and only if the bind succeeds,
+	// but we don't want to race with any deletions, which happen asynchronously.
+	s.config.SchedulerCache.AssumePodIfBindSucceed(&assumed, bindAction)
 
 	metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 }
