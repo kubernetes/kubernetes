@@ -62,10 +62,11 @@ function startApiServer() {
 
 function killApiServer() {
   kube::log::status "Killing api server"
-  [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
-
-  wait ${APISERVER_PID} || true
-  kube::log::status "api server exited"
+  if [[ -n ${APISERVER_PID-} ]]; then
+    kill ${APISERVER_PID} 1>&2 2>/dev/null
+    wait ${APISERVER_PID} || true
+    kube::log::status "api server exited"
+  fi
   unset APISERVER_PID
 }
 
