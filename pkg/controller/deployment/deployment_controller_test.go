@@ -85,8 +85,8 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
-		newRc := rc("foo-v2", test.newReplicas)
-		oldRc := rc("foo-v2", test.oldReplicas)
+		newRc := rc("foo-v2", test.newReplicas, nil)
+		oldRc := rc("foo-v2", test.oldReplicas, nil)
 		allRcs := []*api.ReplicationController{newRc, oldRc}
 		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
 		fake := &testclient.Fake{}
@@ -162,7 +162,7 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
-		oldRc := rc("foo-v2", test.oldReplicas)
+		oldRc := rc("foo-v2", test.oldReplicas, nil)
 		allRcs := []*api.ReplicationController{oldRc}
 		oldRcs := []*api.ReplicationController{oldRc}
 		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
@@ -233,13 +233,76 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 	}
 }
 
-func rc(name string, replicas int) *api.ReplicationController {
+func TestDeploymentController_cleanupOldRCs(t *testing.T) {
+	selector := map[string]string{"foo": "bar"}
+
+	tests := []struct {
+		oldRCs               []*api.ReplicationController
+		revisionHistoryLimit int
+		expectedDeletions    int
+	}{
+		{
+			oldRCs: []*api.ReplicationController{
+				rc("foo-1", 0, selector),
+				rc("foo-2", 0, selector),
+				rc("foo-3", 0, selector),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletions:    2,
+		},
+		{
+			oldRCs: []*api.ReplicationController{
+				rc("foo-1", 0, selector),
+				rc("foo-2", 0, selector),
+			},
+			revisionHistoryLimit: 0,
+			expectedDeletions:    2,
+		},
+		{
+			oldRCs: []*api.ReplicationController{
+				rc("foo-1", 1, selector),
+				rc("foo-2", 1, selector),
+			},
+			revisionHistoryLimit: 0,
+			expectedDeletions:    0,
+		},
+	}
+
+	for i, test := range tests {
+		fake := &testclient.Fake{}
+		controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
+
+		controller.eventRecorder = &record.FakeRecorder{}
+		controller.rcStoreSynced = alwaysReady
+		controller.podStoreSynced = alwaysReady
+		for _, rc := range test.oldRCs {
+			controller.rcStore.Add(rc)
+		}
+
+		d := newDeployment(1, &tests[i].revisionHistoryLimit)
+		controller.cleanupOldRcs(test.oldRCs, *d)
+
+		gotDeletions := 0
+		for _, action := range fake.Actions() {
+			if "delete" == action.GetVerb() {
+				gotDeletions++
+			}
+		}
+		if gotDeletions != test.expectedDeletions {
+			t.Errorf("expect %v old rcs been deleted, but got %v", test.expectedDeletions, gotDeletions)
+			continue
+		}
+	}
+}
+
+func rc(name string, replicas int, selector map[string]string) *api.ReplicationController {
 	return &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
+			Selector: selector,
 			Template: &api.PodTemplateSpec{},
 		},
 	}
@@ -265,7 +328,7 @@ func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOr
 
 var alwaysReady = func() bool { return true }
 
-func newDeployment(replicas int) *exp.Deployment {
+func newDeployment(replicas int, revisionHistoryLimit *int) *exp.Deployment {
 	d := exp.Deployment{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
@@ -296,6 +359,7 @@ func newDeployment(replicas int) *exp.Deployment {
 					},
 				},
 			},
+			RevisionHistoryLimit: revisionHistoryLimit,
 		},
 	}
 	return &d
@@ -413,7 +477,7 @@ func (f *fixture) run(deploymentName string) {
 func TestSyncDeploymentCreatesRC(t *testing.T) {
 	f := newFixture(t)
 
-	d := newDeployment(1)
+	d := newDeployment(1, nil)
 	f.dStore = append(f.dStore, d)
 
 	// expect that one rc with zero replicas is created

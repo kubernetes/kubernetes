@@ -1978,6 +1978,22 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 	})
 }
 
+// Waits for the deployment to clean up old rcs.
+func waitForDeploymentOldRCsNum(c *client.Client, ns, deploymentName string, desiredRCNum int) error {
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		oldRCs, err := deploymentutil.GetOldRCs(*deployment, c)
+		if err != nil {
+			return false, err
+		}
+		return len(oldRCs) == desiredRCNum, nil
+	})
+}
+
 func logRCsOfDeployment(deploymentName string, oldRCs []*api.ReplicationController, newRC *api.ReplicationController) {
 	for i := range oldRCs {
 		Logf("Old RCs (%d/%d) of deployment %s: %+v", i+1, len(oldRCs), deploymentName, oldRCs[i])

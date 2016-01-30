@@ -260,6 +260,10 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = int32(*in.RevisionHistoryLimit)
+	}
 	out.UniqueLabelKey = new(string)
 	*out.UniqueLabelKey = in.UniqueLabelKey
 	out.Paused = in.Paused
@@ -286,6 +290,10 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
+	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int)
+		*out.RevisionHistoryLimit = int(*in.RevisionHistoryLimit)
 	}
 	if in.UniqueLabelKey != nil {
 		out.UniqueLabelKey = *in.UniqueLabelKey
