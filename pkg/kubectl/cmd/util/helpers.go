@@ -125,7 +125,10 @@ func checkErr(err error, handleErr func(string)) {
 
 	msg, ok := StandardErrorMessage(err)
 	if !ok {
-		msg = fmt.Sprintf("error: %s", err.Error())
+		msg = err.Error()
+		if !strings.HasPrefix(msg, "error: ") {
+			msg = fmt.Sprintf("error: %s", msg)
+		}
 	}
 	handleErr(msg)
 }
