@@ -1684,14 +1684,7 @@ func deepCopy_v1beta1_ScaleSpec(in ScaleSpec, out *ScaleSpec, c *conversion.Clon
 
 func deepCopy_v1beta1_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	return nil
 }
 

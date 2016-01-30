@@ -75,6 +75,21 @@ func validNewDeployment() *extensions.Deployment {
 
 var validDeployment = *validNewDeployment()
 
+func validNewScale() *extensions.Scale {
+	return &extensions.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: extensions.ScaleSpec{
+			Replicas: validDeployment.Spec.Replicas,
+		},
+		Status: extensions.ScaleStatus{
+			Replicas: validDeployment.Status.Replicas,
+			Selector: labels.SelectorFromSet(validDeployment.Spec.Selector).String(),
+		},
+	}
+}
+
+var validScale = *validNewScale()
+
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
