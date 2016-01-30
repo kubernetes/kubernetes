@@ -60,7 +60,7 @@ func (c *namespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
 	err := c.r.Get().
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().Into(result)
 	return result, err
 }
@@ -115,6 +115,6 @@ func (c *namespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

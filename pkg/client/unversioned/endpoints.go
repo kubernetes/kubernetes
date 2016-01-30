@@ -62,7 +62,7 @@ func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err e
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -86,7 +86,7 @@ func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 

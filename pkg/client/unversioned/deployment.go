@@ -55,7 +55,7 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *deployments) List(opts api.ListOptions) (result *extensions.DeploymentList, err error) {
 	result = &extensions.DeploymentList{}
-	err = c.client.Get().Namespace(c.ns).Resource("deployments").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource("deployments").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -97,6 +97,6 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

@@ -55,7 +55,7 @@ func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizon
 // List takes label and field selectors, and returns the list of horizontalPodAutoscalers that match those selectors.
 func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
 	result = &extensions.HorizontalPodAutoscalerList{}
-	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -98,6 +98,6 @@ func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface,
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("horizontalPodAutoscalers").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

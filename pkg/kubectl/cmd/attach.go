@@ -219,7 +219,7 @@ func (p *AttachOptions) Run() error {
 		Stdout:    p.Out != nil,
 		Stderr:    p.Err != nil,
 		TTY:       tty,
-	}, api.Scheme)
+	}, api.ParameterCodec)
 
 	err = p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
 	if err != nil {
