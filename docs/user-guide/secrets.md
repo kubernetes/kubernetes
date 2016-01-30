@@ -57,6 +57,7 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
   - [Use cases](#use-cases)
     - [Use-Case: Pod with ssh keys](#use-case-pod-with-ssh-keys)
     - [Use-Case: Pods with prod / test credentials](#use-case-pods-with-prod--test-credentials)
+    - [Use-case: Dotfiles in secret volume](#use-case-dotfiles-in-secret-volume)
     - [Use-case: Secret visible to one container in a pod](#use-case-secret-visible-to-one-container-in-a-pod)
   - [Security Properties](#security-properties)
     - [Protections](#protections)
@@ -472,6 +473,67 @@ one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
   ]
 }
 ```
+
+### Use-case: Dotfiles in secret volume
+
+In order to make piece of data 'hidden' (ie, in a file whose name begins with a dot character), simply
+make that key begin with a dot.  For example, when the following secret secret is mounted into a volume:
+
+```json
+{
+  "kind": "Secret",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "dotfile-secret"
+  },
+  "data": {
+    ".secret-file": "dmFsdWUtMg0KDQo=",
+  }
+}
+
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "secret-dotfiles-pod",
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "secret-volume",
+        "secret": {
+          "secretName": "dotfile-secret"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "dotfile-test-container",
+        "image": "gcr.io/google_containers/busybox",
+        "command": "ls -l /etc/secret-volume"
+        "volumeMounts": [
+          {
+            "name": "secret-volume",
+            "readOnly": true,
+            "mountPath": "/etc/secret-volume"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+
+The `secret-volume` will contain a single file, called `.secret-file`, and
+the `dotfile-test-container` will have this file present at the path
+`/etc/secret-volume/.secret-file`.
+
+**NOTE**
+
+Files beginning with dot characters are hidden from the output of  `ls -l`;
+you must use `ls -la` to see them when listing directory contents.
+
 
 ### Use-case: Secret visible to one container in a pod
 
