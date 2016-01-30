@@ -1999,10 +1999,16 @@ func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&cfg.ObjectMeta, true, ValidateConfigMapName, field.NewPath("metadata"))...)
 
-	for key := range cfg.Data {
+	totalSize := 0
+
+	for key, value := range cfg.Data {
 		if !IsSecretKey(key) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
 		}
+		totalSize += len(value)
+	}
+	if totalSize > api.MaxSecretSize {
+		allErrs = append(allErrs, field.TooLong(field.NewPath("data"), "", api.MaxSecretSize))
 	}
 
 	return allErrs
