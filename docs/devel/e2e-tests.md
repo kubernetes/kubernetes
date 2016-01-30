@@ -141,6 +141,10 @@ We also run non-default tests if the tests exercise general-availability ("GA") 
 
 Many `[Feature:.+]` tests we don't run in CI.  These tests are for features that are experimental (often in the `experimental` API), and aren't enabled by default.
 
+### The PR-builder
+
+We also run a battery of tests against every PR before we merge it.  These tests are equivalent to `kubernetes-gce`: it runs all non-`[Slow]`, non-`[Serial]`, non-`[Disruptive]`, non-`[Flaky]`, non-`[Feature:.+]` tests in parallel.  These tests are considered "smoke tests" to give a decent signal that the PR doesn't break most functionality.  Results for you PR can be found at [pr-test.k8s.io](pr-test.k8s.io), e.g. [pr-test.k8s.io/20354](pr-test.k8s.io/20354) for #20354.
+
 ### Adding a test to CI
 
 As mentioned above, prior to adding a new test, it is a good idea to perform a `-ginkgo.dryRun=true` on the system, in order to see if a behavior is already being tested, or to determine if it may be possible to augment an existing set of tests for a specific use case.
