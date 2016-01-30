@@ -262,6 +262,7 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 
 	go func() {
 		// NOTE: events should be a non-blocking operation
+		defer util.HandleCrash()
 		recorder.Action(watch.Added, event)
 	}()
 }
