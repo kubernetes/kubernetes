@@ -61,7 +61,7 @@ Code conventions
 Testing conventions
   - All new packages and most new significant functionality must come with unit tests
   - Table-driven tests are preferred for testing multiple scenarios/inputs; for example, see [TestNamespaceAuthorization](../../test/integration/auth_test.go)
-  - Significant features should come with integration (test/integration) and/or end-to-end (test/e2e) tests
+  - Significant features should come with integration (test/integration) and/or [end-to-end (test/e2e) tests](e2e-tests.md)
     - Including new kubectl commands and major features of existing commands
   - Unit tests must pass on OS X and Windows platforms - if you use Linux specific features, your test case must either be skipped on windows or compiled out (skipped is better when running Linux specific commands, compiled out is required when your code does not compile on Windows).
 
