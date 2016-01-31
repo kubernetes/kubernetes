@@ -84,7 +84,6 @@ github.com/Sirupsen/logrus | MITname
 github.com/skynetservices/skydns | MITname
 github.com/spf13/cobra | Apache-2
 github.com/spf13/pflag | spdxBSD3
-github.com/ssoroka/ttime | UNKNOWN
 github.com/stretchr/objx | MIT?
 github.com/stretchr/testify | MIT?
 github.com/syndtr/gocapability | spdxBSD2
