@@ -103,9 +103,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Node",
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name":
-				return label, value, nil
-			case "spec.unschedulable":
+			case "metadata.name",
+				"spec.unschedulable",
+				"status.conditionReady",
+				"status.conditionOutOfDisk":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)

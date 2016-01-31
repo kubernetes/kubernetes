@@ -19,7 +19,6 @@ package cache
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
@@ -110,32 +109,6 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 		machines.Items = append(machines.Items, *(m.(*api.Node)))
 	}
 	return machines, nil
-}
-
-// NodeCondition returns a storeToNodeConditionLister
-func (s *StoreToNodeLister) NodeCondition(predicate NodeConditionPredicate) storeToNodeConditionLister {
-	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
-	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
-	return storeToNodeConditionLister{s.Store, predicate}
-}
-
-// storeToNodeConditionLister filters and returns nodes matching the given type and status from the store.
-type storeToNodeConditionLister struct {
-	store     Store
-	predicate NodeConditionPredicate
-}
-
-// List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
-func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
-	for _, m := range s.store.List() {
-		node := *m.(*api.Node)
-		if s.predicate(node) {
-			nodes.Items = append(nodes.Items, node)
-		} else {
-			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
-		}
-	}
-	return
 }
 
 // StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.

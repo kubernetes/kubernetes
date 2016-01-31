@@ -139,7 +139,8 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		go s.watchServices(serviceQueue)
 	}
 
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, fields.Everything())
+	selector := fields.ParseSelectorOrDie("spec.unschedulable==" + "false" + ",status.conditionReady==" + string(api.ConditionTrue))
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, selector)
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go s.nodeSyncLoop(nodeSyncPeriod)
 	return nil
@@ -598,37 +599,13 @@ func hostsFromNodeList(list *api.NodeList) []string {
 	return result
 }
 
-func getNodeConditionPredicate() cache.NodeConditionPredicate {
-	return func(node api.Node) bool {
-		// We add the master to the node list, but its unschedulable.  So we use this to filter
-		// the master.
-		// TODO: Use a node annotation to indicate the master
-		if node.Spec.Unschedulable {
-			return false
-		}
-		// If we have no info, don't accept
-		if len(node.Status.Conditions) == 0 {
-			return false
-		}
-		for _, cond := range node.Status.Conditions {
-			// We consider the node for load balancing only when its NodeReady condition status
-			// is ConditionTrue
-			if cond.Type == api.NodeReady && cond.Status != api.ConditionTrue {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			}
-		}
-		return true
-	}
-}
-
 // nodeSyncLoop handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
 func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	var prevHosts []string
 	var servicesToUpdate []*cachedService
 	for range time.Tick(period) {
-		nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
+		nodes, err := s.nodeLister.List()
 		if err != nil {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
 			continue
