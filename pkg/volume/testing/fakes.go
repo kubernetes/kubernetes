@@ -33,19 +33,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
 	rootDir    string
 	kubeClient clientset.Interface
-	pluginMgr  VolumePluginMgr
+	pluginMgr  volume.VolumePluginMgr
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	writer     io.Writer
 }
 
-func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
+func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []volume.VolumePlugin) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil}
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
@@ -81,7 +82,7 @@ func (f *fakeVolumeHost) GetWriter() io.Writer {
 	return f.writer
 }
 
-func (f *fakeVolumeHost) NewWrapperBuilder(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
+func (f *fakeVolumeHost) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -94,7 +95,7 @@ func (f *fakeVolumeHost) NewWrapperBuilder(volName string, spec Spec, pod *api.P
 	return plug.NewBuilder(&spec, pod, opts)
 }
 
-func (f *fakeVolumeHost) NewWrapperCleaner(volName string, spec Spec, podUID types.UID) (Cleaner, error) {
+func (f *fakeVolumeHost) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -112,9 +113,9 @@ func (f *fakeVolumeHost) GetHostName() string {
 	return "fakeHostName"
 }
 
-func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
-		return []VolumePlugin{
+		return []volume.VolumePlugin{
 			&FakeVolumePlugin{
 				PluginName: "fake-plugin",
 				Host:       nil,
@@ -122,7 +123,7 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 			},
 		}
 	}
-	return []VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
+	return []volume.VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
 }
 
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
@@ -131,20 +132,20 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 //   volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
 	PluginName             string
-	Host                   VolumeHost
-	Config                 VolumeConfig
-	LastProvisionerOptions VolumeOptions
+	Host                   volume.VolumeHost
+	Config                 volume.VolumeConfig
+	LastProvisionerOptions volume.VolumeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
 }
 
-var _ VolumePlugin = &FakeVolumePlugin{}
-var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
-var _ DeletableVolumePlugin = &FakeVolumePlugin{}
-var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
-var _ AttachableVolumePlugin = &FakeVolumePlugin{}
+var _ volume.VolumePlugin = &FakeVolumePlugin{}
+var _ volume.RecyclableVolumePlugin = &FakeVolumePlugin{}
+var _ volume.DeletableVolumePlugin = &FakeVolumePlugin{}
+var _ volume.ProvisionableVolumePlugin = &FakeVolumePlugin{}
+var _ volume.AttachableVolumePlugin = &FakeVolumePlugin{}
 
-func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
+func (plugin *FakeVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.Host = host
 	return nil
 }
@@ -153,38 +154,38 @@ func (plugin *FakeVolumePlugin) Name() string {
 	return plugin.PluginName
 }
 
-func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
+func (plugin *FakeVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	// TODO: maybe pattern-match on spec.Name() to decide?
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
-	return &FakeVolume{pod.UID, spec.Name(), plugin, MetricsNil{}}, nil
+func (plugin *FakeVolumePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+	return &FakeVolume{pod.UID, spec.Name(), plugin, volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
-	return &FakeVolume{podUID, volName, plugin, MetricsNil{}}, nil
+func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+	return &FakeVolume{podUID, volName, plugin, volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewAttacher(spec *Spec) (Attacher, error) {
+func (plugin *FakeVolumePlugin) NewAttacher(spec *volume.Spec) (volume.Attacher, error) {
 	plugin.NewAttacherCallCount = plugin.NewAttacherCallCount + 1
 	return &FakeVolume{}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewDetacher(name string, podUID types.UID) (Detacher, error) {
+func (plugin *FakeVolumePlugin) NewDetacher(name string, podUID types.UID) (volume.Detacher, error) {
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
 	return &FakeVolume{}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
-	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
+func (plugin *FakeVolumePlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	return &fakeRecycler{"/attributesTransferredFromSpec", volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
-	return &FakeDeleter{"/attributesTransferredFromSpec", MetricsNil{}}, nil
+func (plugin *FakeVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return &FakeDeleter{"/attributesTransferredFromSpec", volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewProvisioner(options VolumeOptions) (Provisioner, error) {
+func (plugin *FakeVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	plugin.LastProvisionerOptions = options
 	return &FakeProvisioner{options, plugin.Host}, nil
 }
@@ -197,11 +198,11 @@ type FakeVolume struct {
 	PodUID  types.UID
 	VolName string
 	Plugin  *FakeVolumePlugin
-	MetricsNil
+	volume.MetricsNil
 }
 
-func (_ *FakeVolume) GetAttributes() Attributes {
-	return Attributes{
+func (_ *FakeVolume) GetAttributes() volume.Attributes {
+	return volume.Attributes{
 		ReadOnly:        false,
 		Managed:         true,
 		SupportsSELinux: true,
@@ -238,7 +239,7 @@ func (fv *FakeVolume) Detach() error {
 
 type fakeRecycler struct {
 	path string
-	MetricsNil
+	volume.MetricsNil
 }
 
 func (fr *fakeRecycler) Recycle() error {
@@ -250,7 +251,7 @@ func (fr *fakeRecycler) GetPath() string {
 	return fr.path
 }
 
-func NewFakeRecycler(spec *Spec, host VolumeHost, config VolumeConfig) (Recycler, error) {
+func NewFakeRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("fakeRecycler only supports spec.PersistentVolume.Spec.HostPath")
 	}
@@ -261,7 +262,7 @@ func NewFakeRecycler(spec *Spec, host VolumeHost, config VolumeConfig) (Recycler
 
 type FakeDeleter struct {
 	path string
-	MetricsNil
+	volume.MetricsNil
 }
 
 func (fd *FakeDeleter) Delete() error {
@@ -274,8 +275,8 @@ func (fd *FakeDeleter) GetPath() string {
 }
 
 type FakeProvisioner struct {
-	Options VolumeOptions
-	Host    VolumeHost
+	Options volume.VolumeOptions
+	Host    volume.VolumeHost
 }
 
 func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {

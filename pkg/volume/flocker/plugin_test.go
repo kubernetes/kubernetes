@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 const pluginName = "kubernetes.io/flocker"
@@ -34,7 +35,7 @@ func newInitializedVolumePlugMgr(t *testing.T) (volume.VolumePluginMgr, string) 
 	plugMgr := volume.VolumePluginMgr{}
 	dir, err := utiltesting.MkTmpdir("flocker")
 	assert.NoError(t, err)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(dir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetesting.NewFakeVolumeHost(dir, nil, nil))
 	return plugMgr, dir
 }
 

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 const execScriptTempl1 = `#!/bin/bash
@@ -180,7 +181,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volumetesting.NewFakeVolumeHost("fake", nil, nil))
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -208,7 +209,7 @@ func TestGetAccessModes(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volumetesting.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plugin, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
@@ -231,7 +232,7 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec, tmpDir string) {
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volumetesting.NewFakeVolumeHost(tmpDir, nil, nil))
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -310,7 +311,7 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeMounter", tmpDir, execScriptTempl2, nil)
-	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volumetesting.NewFakeVolumeHost(tmpDir, nil, nil))
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeMounter")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")

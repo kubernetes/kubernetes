@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
+	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func init() {
@@ -480,7 +481,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 func TestMountExternalVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	plug := &volumetesting.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
 	pod := api.Pod{
@@ -519,7 +520,7 @@ func TestMountExternalVolumes(t *testing.T) {
 func TestGetPodVolumesFromDisk(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	plug := &volumetesting.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
 	volsOnDisk := []struct {
@@ -533,7 +534,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 
 	expectedPaths := []string{}
 	for i := range volsOnDisk {
-		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
+		fv := volumetesting.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
 		fv.SetUp(nil)
 		expectedPaths = append(expectedPaths, fv.GetPath())
 	}
@@ -564,7 +565,7 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	plug := &volumetesting.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
 	// create a volume "on disk"
@@ -577,7 +578,7 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 
 	pathsOnDisk := []string{}
 	for i := range volsOnDisk {
-		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
+		fv := volumetesting.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
 		fv.SetUp(nil)
 		pathsOnDisk = append(pathsOnDisk, fv.GetPath())
 	}

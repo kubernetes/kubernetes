@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 const expectedBlockSize = 4096
@@ -39,7 +40,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	metrics := NewMetricsDu(tmpDir)
 
-	expectedEmptyDirUsage, err := FindEmptyDirectoryUsageOnTmpfs()
+	expectedEmptyDirUsage, err := volumetesting.FindEmptyDirectoryUsageOnTmpfs()
 	if err != nil {
 		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
 	}
