@@ -266,6 +266,7 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	}
 	out.UniqueLabelKey = new(string)
 	*out.UniqueLabelKey = in.UniqueLabelKey
+	out.MinReadySeconds = int32(in.MinReadySeconds)
 	out.Paused = in.Paused
 	if in.RollbackTo != nil {
 		out.RollbackTo = new(RollbackConfig)
@@ -304,6 +305,7 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if in.UniqueLabelKey != nil {
 		out.UniqueLabelKey = *in.UniqueLabelKey
 	}
+	out.MinReadySeconds = int(in.MinReadySeconds)
 	out.Paused = in.Paused
 	if in.RollbackTo != nil {
 		out.RollbackTo = new(extensions.RollbackConfig)
@@ -362,7 +364,6 @@ func Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployme
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = int32(in.MinReadySeconds)
 	return nil
 }
 
@@ -376,7 +377,6 @@ func Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = int(in.MinReadySeconds)
 	return nil
 }
 

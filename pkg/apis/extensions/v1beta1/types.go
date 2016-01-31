@@ -228,6 +228,11 @@ type DeploymentSpec struct {
 	// The deployment strategy to use to replace existing pods with new ones.
 	Strategy DeploymentStrategy `json:"strategy,omitempty"`
 
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+
 	// The number of old ReplicationControllers to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
@@ -322,11 +327,6 @@ type RollingUpdateDeployment struct {
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of desired pods.
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
-
-	// Minimum number of seconds for which a newly created pod should be ready
-	// without any of its container crashing, for it to be considered available.
-	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.

@@ -2727,6 +2727,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
+	out.MinReadySeconds = int32(in.MinReadySeconds)
 	if in.RevisionHistoryLimit != nil {
 		out.RevisionHistoryLimit = new(int32)
 		*out.RevisionHistoryLimit = int32(*in.RevisionHistoryLimit)
@@ -3430,7 +3431,6 @@ func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDepl
 	if err := s.Convert(&in.MaxSurge, &out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = int32(in.MinReadySeconds)
 	return nil
 }
 
@@ -3902,6 +3902,7 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	if err := s.Convert(&in.Strategy, &out.Strategy, 0); err != nil {
 		return err
 	}
+	out.MinReadySeconds = int(in.MinReadySeconds)
 	if in.RevisionHistoryLimit != nil {
 		out.RevisionHistoryLimit = new(int)
 		*out.RevisionHistoryLimit = int(*in.RevisionHistoryLimit)
@@ -4608,7 +4609,6 @@ func autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDepl
 	}
 	// in.MaxUnavailable has no peer in out
 	// in.MaxSurge has no peer in out
-	out.MinReadySeconds = int(in.MinReadySeconds)
 	return nil
 }
 

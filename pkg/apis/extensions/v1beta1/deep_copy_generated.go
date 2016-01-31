@@ -1167,6 +1167,7 @@ func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *
 	if err := deepCopy_v1beta1_DeploymentStrategy(in.Strategy, &out.Strategy, c); err != nil {
 		return err
 	}
+	out.MinReadySeconds = in.MinReadySeconds
 	if in.RevisionHistoryLimit != nil {
 		out.RevisionHistoryLimit = new(int32)
 		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
@@ -1696,7 +1697,6 @@ func deepCopy_v1beta1_RollingUpdateDeployment(in RollingUpdateDeployment, out *R
 	} else {
 		out.MaxSurge = nil
 	}
-	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
