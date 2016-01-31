@@ -27,3 +27,5 @@ type JobExpansion interface{}
 type ScaleExpansion interface{}
 
 type ThirdPartyResourceExpansion interface{}
+
+type ReplicaSetExpansion interface{}
