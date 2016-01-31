@@ -23,9 +23,11 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -56,6 +58,9 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid"
+	frameworkidEtcd "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid/etcd"
+	frameworkidZk "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid/zk"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
@@ -74,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	// lock to this API version, compilation will fail when this becomes unsupported
@@ -117,6 +121,7 @@ type SchedulerServer struct {
 	checkpoint            bool
 	failoverTimeout       float64
 	generateTaskDiscovery bool
+	frameworkStoreURI     string
 
 	executorLogV                   int
 	executorBindall                bool
@@ -184,9 +189,10 @@ type schedulerProcessInterface interface {
 // NewSchedulerServer creates a new SchedulerServer with default parameters
 func NewSchedulerServer() *SchedulerServer {
 	s := SchedulerServer{
-		port:            ports.SchedulerPort,
-		address:         net.ParseIP("127.0.0.1"),
-		failoverTimeout: time.Duration((1 << 62) - 1).Seconds(),
+		port:              ports.SchedulerPort,
+		address:           net.ParseIP("127.0.0.1"),
+		failoverTimeout:   time.Duration((1 << 62) - 1).Seconds(),
+		frameworkStoreURI: "etcd://",
 
 		runProxy:                 true,
 		executorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
@@ -272,6 +278,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.graceful, "graceful", s.graceful, "Indicator of a graceful failover, intended for internal use only.")
 	fs.BoolVar(&s.ha, "ha", s.ha, "Run the scheduler in high availability mode with leader election. All peers should be configured exactly the same.")
 	fs.StringVar(&s.frameworkName, "framework-name", s.frameworkName, "The framework name to register with Mesos.")
+	fs.StringVar(&s.frameworkStoreURI, "framework-store-uri", s.frameworkStoreURI, "Where the framework should store metadata, either in Zookeeper (zk://host:port/path) or in etcd (etcd://path).")
 	fs.StringVar(&s.frameworkWebURI, "framework-weburi", s.frameworkWebURI, "A URI that points to a web-based interface for interacting with the framework.")
 	fs.StringVar(&s.advertisedAddress, "advertised-address", s.advertisedAddress, "host:port address that is advertised to clients. May be used to construct artifact download URIs.")
 	fs.IPVar(&s.serviceAddress, "service-address", s.serviceAddress, "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
@@ -593,7 +600,7 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 	if s.ha {
 		validation := ha.ValidationFunc(validateLeadershipTransition)
 		srv := ha.NewCandidate(schedulerProcess, driverFactory, validation)
-		path := fmt.Sprintf(meta.DefaultElectionFormat, s.frameworkName)
+		path := meta.ElectionPath(s.frameworkName)
 		log.Infof("registering for election at %v with id %v", path, eid.GetValue())
 		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, eid.GetValue(), srv, nil)
 	} else {
@@ -746,7 +753,10 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	pr := podtask.NewDefaultProcurement(eiPrototype, eiRegistry)
 	fcfs := podschedulers.NewFCFSPodScheduler(pr, lookupNode)
-
+	frameworkIDStorage, err := s.frameworkIDStorage(keysAPI)
+	if err != nil {
+		log.Fatalf("cannot init framework ID storage: %v", err)
+	}
 	framework := framework.New(framework.Config{
 		SchedulerConfig:   *sc,
 		Client:            client,
@@ -754,16 +764,9 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		ReconcileInterval: s.reconcileInterval,
 		ReconcileCooldown: s.reconcileCooldown,
 		LookupNode:        lookupNode,
-		StoreFrameworkId: func(id string) {
-			// TODO(jdef): port FrameworkId store to generic Kubernetes config store as soon as available
-			_, err := keysAPI.Set(context.TODO(), meta.FrameworkIDKey, id, &etcd.SetOptions{TTL: time.Duration(s.failoverTimeout) * time.Second})
-			if err != nil {
-				log.Errorf("failed to renew frameworkId TTL: %v", err)
-			}
-		},
-		ExecutorId: eiPrototype.GetExecutorId(),
+		StoreFrameworkId:  frameworkIDStorage.Set,
+		ExecutorId:        eiPrototype.GetExecutorId(),
 	})
-
 	masterUri := s.mesosMaster
 	info, cred, err := s.buildFrameworkInfo()
 	if err != nil {
@@ -819,18 +822,33 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		if err = framework.Init(sched, schedulerProcess.Master(), s.mux); err != nil {
 			return nil, fmt.Errorf("failed to initialize pod scheduler: %v", err)
 		}
+
 		log.V(1).Infoln("deferred init complete")
-		// defer obtaining framework ID to prevent multiple schedulers
-		// from overwriting each other's framework IDs
-		dconfig.Framework.Id, err = s.fetchFrameworkID(keysAPI)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch framework ID from etcd: %v", err)
+		if s.failoverTimeout > 0 {
+			// defer obtaining framework ID to prevent multiple schedulers
+			// from overwriting each other's framework IDs
+			var frameworkID string
+			frameworkID, err = frameworkIDStorage.Get(context.TODO())
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch framework ID from storage: %v", err)
+			}
+			if frameworkID != "" {
+				log.Infof("configuring FrameworkInfo with ID found in storage: %q", frameworkID)
+				dconfig.Framework.Id = &mesos.FrameworkID{Value: &frameworkID}
+			} else {
+				log.V(1).Infof("did not find framework ID in storage")
+			}
+		} else {
+			// TODO(jdef) this is a hack, really for development, to simplify clean up of old framework IDs
+			frameworkIDStorage.Remove(context.TODO())
 		}
+
 		log.V(1).Infoln("constructing mesos scheduler driver")
 		drv, err = bindings.NewMesosSchedulerDriver(*dconfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct scheduler driver: %v", err)
 		}
+
 		log.V(1).Infoln("constructed mesos scheduler driver:", drv)
 		s.setDriver(drv)
 		return drv, nil
@@ -944,29 +962,6 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 	return
 }
 
-func (s *SchedulerServer) fetchFrameworkID(client etcd.KeysAPI) (*mesos.FrameworkID, error) {
-	if s.failoverTimeout > 0 {
-		if response, err := client.Get(context.TODO(), meta.FrameworkIDKey, nil); err != nil {
-			if !etcdutil.IsEtcdNotFound(err) {
-				return nil, fmt.Errorf("unexpected failure attempting to load framework ID from etcd: %v", err)
-			}
-			log.V(1).Infof("did not find framework ID in etcd")
-		} else if response.Node.Value != "" {
-			log.Infof("configuring FrameworkInfo with Id found in etcd: '%s'", response.Node.Value)
-			return mutil.NewFrameworkID(response.Node.Value), nil
-		}
-	} else {
-		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
-		if _, err := client.Delete(context.TODO(), meta.FrameworkIDKey, &etcd.DeleteOptions{Recursive: true}); err != nil {
-			if !etcdutil.IsEtcdNotFound(err) {
-				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)
-			}
-			log.V(1).Infof("nothing to delete: did not find framework ID in etcd")
-		}
-	}
-	return nil, nil
-}
-
 func (s *SchedulerServer) getUsername() (username string, err error) {
 	username = s.mesosUser
 	if username == "" {
@@ -978,4 +973,25 @@ func (s *SchedulerServer) getUsername() (username string, err error) {
 		}
 	}
 	return
+}
+
+func (s *SchedulerServer) frameworkIDStorage(keysAPI etcd.KeysAPI) (frameworkid.Storage, error) {
+	u, err := url.Parse(s.frameworkStoreURI)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse framework store URI: %v", err)
+	}
+
+	switch u.Scheme {
+	case "etcd":
+		idpath := meta.StoreChroot
+		if u.Path != "" {
+			idpath = path.Join("/", u.Path)
+		}
+		idpath = path.Join(idpath, s.frameworkName, "frameworkid")
+		return frameworkidEtcd.Store(keysAPI, idpath, time.Duration(s.failoverTimeout)*time.Second), nil
+	case "zk":
+		return frameworkidZk.Store(s.frameworkStoreURI, s.frameworkName), nil
+	default:
+		return nil, fmt.Errorf("unsupported framework storage scheme: %q", u.Scheme)
+	}
 }
