@@ -74,7 +74,7 @@ it is still useful to use containers for deployment and management, so we create
 You can specify the version on every node before install:
 
 ```sh
-export K8S_VERSION=<your_k8s_version (e.g. 1.1.3)>
+export K8S_VERSION=<your_k8s_version (e.g. 1.2.0-alpha.6)>
 export ETCD_VERSION=<your_etcd_version (e.g. 2.2.1)>
 export FLANNEL_VERSION=<your_flannel_version (e.g. 0.5.5)>
 export FLANNEL_IFACE=<flannel_interface (defaults to eth0)>
