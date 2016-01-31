@@ -2678,6 +2678,32 @@ func Convert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensions.
 	return autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in, out, s)
 }
 
+func autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in *extensions.DeploymentRollback, out *DeploymentRollback, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DeploymentRollback))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	if in.UpdatedAnnotations != nil {
+		out.UpdatedAnnotations = make(map[string]string)
+		for key, val := range in.UpdatedAnnotations {
+			out.UpdatedAnnotations[key] = val
+		}
+	} else {
+		out.UpdatedAnnotations = nil
+	}
+	if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in *extensions.DeploymentRollback, out *DeploymentRollback, s conversion.Scope) error {
+	return autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in, out, s)
+}
+
 func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DeploymentSpec))(in)
@@ -2709,6 +2735,15 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 		return err
 	}
 	out.Paused = in.Paused
+	// unable to generate simple pointer conversion for extensions.RollbackConfig -> v1beta1.RollbackConfig
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(RollbackConfig)
+		if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in.RollbackTo, out.RollbackTo, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -3360,6 +3395,18 @@ func Convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControl
 	return autoConvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in, out, s)
 }
 
+func autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensions.RollbackConfig, out *RollbackConfig, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.RollbackConfig))(in)
+	}
+	out.Revision = in.Revision
+	return nil
+}
+
+func Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensions.RollbackConfig, out *RollbackConfig, s conversion.Scope) error {
+	return autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in, out, s)
+}
+
 func autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.RollingUpdateDaemonSet))(in)
@@ -3806,6 +3853,32 @@ func Convert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *DeploymentL
 	return autoConvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in, out, s)
 }
 
+func autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in *DeploymentRollback, out *extensions.DeploymentRollback, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DeploymentRollback))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	if in.UpdatedAnnotations != nil {
+		out.UpdatedAnnotations = make(map[string]string)
+		for key, val := range in.UpdatedAnnotations {
+			out.UpdatedAnnotations[key] = val
+		}
+	} else {
+		out.UpdatedAnnotations = nil
+	}
+	if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in *DeploymentRollback, out *extensions.DeploymentRollback, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in, out, s)
+}
+
 func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentSpec))(in)
@@ -3833,6 +3906,15 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	}
 	// in.UniqueLabelKey has no peer in out
 	out.Paused = in.Paused
+	// unable to generate simple pointer conversion for v1beta1.RollbackConfig -> extensions.RollbackConfig
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(extensions.RollbackConfig)
+		if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(in.RollbackTo, out.RollbackTo, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -4493,6 +4575,18 @@ func Convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControl
 	return autoConvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in, out, s)
 }
 
+func autoConvert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(in *RollbackConfig, out *extensions.RollbackConfig, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*RollbackConfig))(in)
+	}
+	out.Revision = in.Revision
+	return nil
+}
+
+func Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(in *RollbackConfig, out *extensions.RollbackConfig, s conversion.Scope) error {
+	return autoConvert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(in, out, s)
+}
+
 func autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RollingUpdateDaemonSet))(in)
@@ -4742,6 +4836,7 @@ func init() {
 		autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy,
 		autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet,
 		autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList,
+		autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback,
 		autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
 		autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
 		autoConvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
@@ -4772,6 +4867,7 @@ func init() {
 		autoConvert_extensions_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus,
 		autoConvert_extensions_ReplicaSet_To_v1beta1_ReplicaSet,
 		autoConvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy,
+		autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig,
 		autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
 		autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
@@ -4837,6 +4933,7 @@ func init() {
 		autoConvert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
 		autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet,
 		autoConvert_v1beta1_DeploymentList_To_extensions_DeploymentList,
+		autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback,
 		autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
 		autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus,
 		autoConvert_v1beta1_Deployment_To_extensions_Deployment,
@@ -4867,6 +4964,7 @@ func init() {
 		autoConvert_v1beta1_ReplicaSetStatus_To_extensions_ReplicaSetStatus,
 		autoConvert_v1beta1_ReplicaSet_To_extensions_ReplicaSet,
 		autoConvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy,
+		autoConvert_v1beta1_RollbackConfig_To_extensions_RollbackConfig,
 		autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec,

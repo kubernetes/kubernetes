@@ -236,6 +236,24 @@ type DeploymentSpec struct {
 	// Indicates that the deployment is paused and will not be processed by the
 	// deployment controller.
 	Paused bool `json:"paused,omitempty"`
+	// The config this deployment is rolling back to. Will be cleared after rollback is done.
+	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty"`
+}
+
+// DeploymentRollback stores the information required to rollback a deployment.
+type DeploymentRollback struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Required: This must match the Name of a deployment.
+	Name string `json:"name"`
+	// The annotations to be updated to a deployment
+	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty"`
+	// The config of this deployment rollback.
+	RollbackTo RollbackConfig `json:"rollbackTo"`
+}
+
+type RollbackConfig struct {
+	// The revision to rollback to. If set to 0, rollbck to the last revision.
+	Revision int64 `json:"revision,omitempty"`
 }
 
 const (
