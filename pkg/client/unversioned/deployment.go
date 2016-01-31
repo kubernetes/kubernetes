@@ -36,6 +36,7 @@ type DeploymentInterface interface {
 	Update(*extensions.Deployment) (*extensions.Deployment, error)
 	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Rollback(*extensions.DeploymentRollback) error
 }
 
 // deployments implements DeploymentInterface
@@ -99,4 +100,9 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("deployments").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Rollback applied the provided DeploymentRollback to the named deployment in the current namespace.
+func (c *deployments) Rollback(deploymentRollback *extensions.DeploymentRollback) error {
+	return c.client.Post().Namespace(c.ns).Resource("deployments").Name(deploymentRollback.Name).SubResource("rollback").Body(deploymentRollback).Do().Error()
 }
