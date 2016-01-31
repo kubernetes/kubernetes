@@ -290,7 +290,6 @@ func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDepl
 	}
 	// Validate that MaxUnavailable is not more than 100%.
 	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rollingUpdate.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	return allErrs
 }
 
@@ -322,6 +321,7 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecForRC(&spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	if spec.RevisionHistoryLimit != nil {
 		// zero is a valid RevisionHistoryLimit
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.RevisionHistoryLimit), fldPath.Child("revisionHistoryLimit"))...)
