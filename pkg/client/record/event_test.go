@@ -348,7 +348,7 @@ func TestEventf(t *testing.T) {
 	eventBroadcaster := NewBroadcaster()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	clock := &util.FakeClock{time.Now()}
+	clock := util.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
@@ -559,7 +559,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	eventBroadcaster := NewBroadcaster()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	clock := &util.FakeClock{time.Now()}
+	clock := util.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for index, item := range table {
@@ -846,7 +846,7 @@ func TestMultiSinkCache(t *testing.T) {
 	}
 
 	eventBroadcaster := NewBroadcaster()
-	clock := &util.FakeClock{time.Now()}
+	clock := util.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)

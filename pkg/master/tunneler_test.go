@@ -37,32 +37,32 @@ func TestSecondsSinceSync(t *testing.T) {
 	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
 
 	// Nano Second. No difference.
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
 	assert.Equal(int64(0), tunneler.SecondsSinceSync())
 
 	// Second
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
 	assert.Equal(int64(1), tunneler.SecondsSinceSync())
 
 	// Minute
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
 	assert.Equal(int64(60), tunneler.SecondsSinceSync())
 
 	// Hour
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
 	assert.Equal(int64(3600), tunneler.SecondsSinceSync())
 
 	// Day
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(86400), tunneler.SecondsSinceSync())
 
 	// Month
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(2678400), tunneler.SecondsSinceSync())
 
 	// Future Month. Should be -Month.
 	tunneler.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
 }
 
@@ -89,12 +89,12 @@ func TestIsTunnelSyncHealthy(t *testing.T) {
 
 	// Pass case: 540 second lag
 	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 9, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 9, 1, 1, time.UTC))
 	err := master.IsTunnelSyncHealthy(nil)
 	assert.NoError(err, "IsTunnelSyncHealthy() should not have returned an error.")
 
 	// Fail case: 720 second lag
-	tunneler.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 12, 1, 1, time.UTC)}
+	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 12, 1, 1, time.UTC))
 	err = master.IsTunnelSyncHealthy(nil)
 	assert.Error(err, "IsTunnelSyncHealthy() should have returned an error.")
 }
