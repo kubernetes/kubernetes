@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
@@ -248,6 +248,6 @@ func (c *mockControllerClient) UpdatePersistentVolumeClaimStatus(claim *api.Pers
 	return claim, nil
 }
 
-func (c *mockControllerClient) GetKubeClient() client.Interface {
+func (c *mockControllerClient) GetKubeClient() clientset.Interface {
 	return nil
 }

@@ -830,6 +830,8 @@ const (
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
 
+// +genclient=true
+
 // ReplicaSet represents the configuration of a replica set.
 type ReplicaSet struct {
 	unversioned.TypeMeta `json:",inline"`

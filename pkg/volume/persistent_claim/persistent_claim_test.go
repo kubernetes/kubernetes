@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -35,12 +35,12 @@ import (
 
 // newTestHost returns the temp directory and the VolumeHost created.
 // Please be sure to cleanup the temp directory once done!
-func newTestHost(t *testing.T, fakeKubeClient client.Interface) (string, volume.VolumeHost) {
+func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := utiltesting.MkTmpdir("persistent_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, fakeKubeClient, testProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, testProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -237,7 +237,7 @@ func TestNewBuilder(t *testing.T) {
 	}
 
 	for _, item := range tests {
-		client := testclient.NewSimpleFake(item.pv, item.claim)
+		client := fake.NewSimpleClientset(item.pv, item.claim)
 
 		plugMgr := volume.VolumePluginMgr{}
 		tempDir, vh := newTestHost(t, client)
@@ -290,7 +290,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 			ClaimName: "claimC",
 		},
 	}
-	client := testclient.NewSimpleFake(pv, claim)
+	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
 	tempDir, vh := newTestHost(t, client)

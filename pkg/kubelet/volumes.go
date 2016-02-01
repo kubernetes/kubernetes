@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -54,8 +54,8 @@ func (vh *volumeHost) GetPodPluginDir(podUID types.UID, pluginName string) strin
 	return vh.kubelet.getPodPluginDir(podUID, pluginName)
 }
 
-func (vh *volumeHost) GetKubeClient() client.Interface {
-	return vh.kubelet.kubeClient
+func (vh *volumeHost) GetKubeClient() clientset.Interface {
+	return vh.kubelet.clientset
 }
 
 func (vh *volumeHost) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {

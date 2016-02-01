@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -1965,10 +1966,10 @@ func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
 
 // Waits for the deployment to reach desired state.
 // Returns an error if minAvailable or maxCreated is broken at any times.
-func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int) error {
+func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int) error {
 	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
 
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
 		}
@@ -2017,10 +2018,10 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 }
 
 // Waits for the deployment to clean up old rcs.
-func waitForDeploymentOldRCsNum(c *client.Client, ns, deploymentName string, desiredRCNum int) error {
+func waitForDeploymentOldRCsNum(c *clientset.Clientset, ns, deploymentName string, desiredRCNum int) error {
 	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
 
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
 		}

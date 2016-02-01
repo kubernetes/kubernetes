@@ -45,6 +45,10 @@ func (c *FakeExtensions) Jobs(namespace string) unversioned.JobInterface {
 	return &FakeJobs{c, namespace}
 }
 
+func (c *FakeExtensions) ReplicaSets(namespace string) unversioned.ReplicaSetInterface {
+	return &FakeReplicaSets{c, namespace}
+}
+
 func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {
 	return &FakeScales{c, namespace}
 }

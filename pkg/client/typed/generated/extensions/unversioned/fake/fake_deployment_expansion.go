@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package fake
 
-type DaemonSetExpansion interface{}
+import (
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type HorizontalPodAutoscalerExpansion interface{}
+func (c *FakeDeployments) Rollback(deploymentRollback *extensions.DeploymentRollback) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = "deployments"
+	action.Subresource = "rollback"
+	action.Object = deploymentRollback
 
-type IngressExpansion interface{}
-
-type JobExpansion interface{}
-
-type ScaleExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
-
-type ReplicaSetExpansion interface{}
+	_, err := c.Fake.Invokes(action, deploymentRollback)
+	return err
+}
