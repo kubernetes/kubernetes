@@ -28,6 +28,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/tasksreconciler"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
@@ -71,7 +73,7 @@ type framework struct {
 	failoverTimeout   float64 // in seconds
 	reconcileInterval int64
 	nodeRegistrator   node.Registrator
-	storeFrameworkId  func(id string)
+	storeFrameworkId  frameworkid.StoreFunc
 	lookupNode        node.LookupFunc
 	executorId        *mesos.ExecutorID
 
@@ -97,7 +99,7 @@ type Config struct {
 	SchedulerConfig   schedcfg.Config
 	ExecutorId        *mesos.ExecutorID
 	Client            *client.Client
-	StoreFrameworkId  func(id string)
+	StoreFrameworkId  frameworkid.StoreFunc
 	FailoverTimeout   float64
 	ReconcileInterval int64
 	ReconcileCooldown time.Duration
@@ -334,9 +336,41 @@ func (k *framework) onInitialRegistration(driver bindings.SchedulerDriver) {
 		if k.failoverTimeout < k.schedulerConfig.FrameworkIdRefreshInterval.Duration.Seconds() {
 			refreshInterval = time.Duration(math.Max(1, k.failoverTimeout/2)) * time.Second
 		}
+
+		// wait until we've written the framework ID at least once before proceeding
+		firstStore := make(chan struct{})
 		go runtime.Until(func() {
-			k.storeFrameworkId(k.frameworkId.GetValue())
+			// only close firstStore once
+			select {
+			case <-firstStore:
+			default:
+				defer close(firstStore)
+			}
+			err := k.storeFrameworkId(context.TODO(), k.frameworkId.GetValue())
+			if err != nil {
+				log.Errorf("failed to store framework ID: %v", err)
+				if err == frameworkid.ErrMismatch {
+					// we detected a framework ID in storage that doesn't match what we're trying
+					// to save. this is a dangerous state:
+					// (1) perhaps we failed to initially recover the framework ID and so mesos
+					// issued us a new one. now that we're trying to save it there's a mismatch.
+					// (2) we've somehow bungled the framework ID and we're out of alignment with
+					// what mesos is expecting.
+					// (3) multiple schedulers were launched at the same time, and both have
+					// registered with mesos (because when they each checked, there was no ID in
+					// storage, so they asked for a new one). one of them has already written the
+					// ID to storage -- we lose.
+					log.Error("aborting due to framework ID mismatch")
+					driver.Abort()
+				}
+			}
 		}, refreshInterval, k.terminate)
+
+		// wait for the first store attempt of the framework ID
+		select {
+		case <-firstStore:
+		case <-k.terminate:
+		}
 	}
 
 	r1 := k.makeTaskRegistryReconciler()
