@@ -111,6 +111,7 @@ file-suffix
 file_content_in_loop
 forward-services
 framework-name
+framework-store-uri
 framework-weburi
 from-file
 from-literal
