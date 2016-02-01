@@ -27,7 +27,6 @@ import (
 )
 
 const (
-	timeout       = 1 * time.Minute
 	maxRetries    = 6
 	sleepDuration = 10 * time.Second
 )
