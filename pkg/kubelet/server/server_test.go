@@ -1699,7 +1699,9 @@ func TestPortForwardStreamReceived(t *testing.T) {
 		if len(test.streamType) > 0 {
 			stream.headers.Set("streamType", test.streamType)
 		}
-		err := f(stream)
+		replySent := make(chan struct{})
+		err := f(stream, replySent)
+		close(replySent)
 		if len(test.expectedError) > 0 {
 			if err == nil {
 				t.Errorf("%s: expected err=%q, but it was nil", name, test.expectedError)
