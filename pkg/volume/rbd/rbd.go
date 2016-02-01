@@ -29,17 +29,20 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&rbdPlugin{nil, exec.New()}}
+func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&rbdPlugin{nil, exec.New(), newRecycler,volumeConfig}}
 }
 
 type rbdPlugin struct {
 	host volume.VolumeHost
 	exe  exec.Interface
+	newRecyclerFunc func(*volume.Spec, volume.VolumeHost, volume.VolumeConfig) (volume.Recycler, error)
+	config volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &rbdPlugin{}
 var _ volume.PersistentVolumePlugin = &rbdPlugin{}
+var _ volume.RecyclableVolumePlugin = &rbdPlugin{}
 
 const (
 	rbdPluginName = "kubernetes.io/rbd"
@@ -98,6 +101,8 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
 }
+
+
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
 	// rbd volumes used directly in a pod have a ReadOnly flag set by the pod author.
@@ -173,6 +178,7 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
+	newRecyclerFunc func(spec *volume.Spec) (volume.Recycler, error)
 	volume.MetricsNil
 }
 
@@ -235,3 +241,42 @@ func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, err
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
 }
+
+type rbdRecycler struct {
+	name    string
+	spec  *volume.Spec
+	config  volume.VolumeConfig
+	host  volume.VolumeHost
+	timeout int64
+	volume.MetricsNil
+}
+
+func (r *rbdPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	return r.newRecyclerFunc(spec, r.host, r.config)
+}
+
+func newRecycler(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error){
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.RBD == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.rbd is nil")
+	}
+	
+	return &rbdRecycler{
+		name:   spec.Name(),
+		spec:	spec,
+		host:	host,
+		config: volumeConfig,
+		timeout: volume.CalculateTimeoutForVolume(volumeConfig.RecyclerMinimumTimeout, volumeConfig.RecyclerTimeoutIncrement, spec.PersistentVolume),
+	}, nil
+}
+
+func (r *rbdRecycler) GetPath() string {
+	return ""
+}
+
+func (r *rbdRecycler) Recycle() error {
+	pod := r.config.RecyclerPodTemplate
+	pod.GenerateName = "pv-recycler-rbd-"
+	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{RBD:r.spec.PersistentVolume.Spec.RBD}
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(pod, r.host.GetKubeClient())
+}
+
