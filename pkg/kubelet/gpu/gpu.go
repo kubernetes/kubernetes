@@ -9,7 +9,15 @@ import (
 func ProbeGPUPlugins() []gpuTypes.GPUPlugin {
 	glog.Infof("Hans: ProbeGPUPlugins")
 	allPlugins := []gpuTypes.GPUPlugin{}
-	allPlugins = append(allPlugins, cuda.ProbeGPUPlugin())
+
+	// add cuda plugin
+	cudaPlugin := cuda.ProbeGPUPlugin()
+	// if err := cudaPlugin.Init(); err == nil {
+	err := cudaPlugin.Init()
+	glog.Infof("Hans: ProbeGPUPlugins: Init error: %q", err)
+	if err == nil {
+		allPlugins = append(allPlugins, cuda.ProbeGPUPlugin())
+	}
 	glog.Infof("Hans: ProbeGPUPlugins: allPlugins: %+v, len: %d", allPlugins, len(allPlugins))
 
 	return allPlugins

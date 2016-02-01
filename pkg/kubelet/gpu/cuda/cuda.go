@@ -24,6 +24,10 @@ func ProbeGPUPlugin() gpuTypes.GPUPlugin {
 	}
 }
 
+func (cuda *Cuda) Init() error {
+	return nvidia.Init()
+}
+
 func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 	glog.Infof("Hans: cuda.Detect()")
 	gpuDevices := gpuTypes.GPUDevices{}

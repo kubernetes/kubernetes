@@ -29,6 +29,7 @@ type GPUDevices struct {
 
 // GPUInterface is an abstract interface for gpu related operatons.
 type GPUPlugin interface {
+	Init() error
 	// detect the gpu hardware and the corresponding environment
 	Detect() (*GPUDevices, error)
 	// // parepare the overall environment
