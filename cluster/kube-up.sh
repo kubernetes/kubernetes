@@ -25,6 +25,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+EXIT_ON_WEAK_ERROR="${EXIT_ON_WEAK_ERROR:-true}"
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
@@ -47,7 +48,18 @@ echo "... calling kube-up" >&2
 kube-up
 
 echo "... calling validate-cluster" >&2
-validate-cluster
+if [[ "${EXIT_ON_WEAK_ERROR}" == "true" ]]; then
+	validate-cluster
+else
+	if ! validate-cluster; then
+		local validate_result="$?"
+		if [[ "${validate_result}" == "1" ]]; then
+			exit 1
+		elif [[ "${validate_result}" == "2" ]]; then
+			echo "...ignoring non-fatal errors in validate-cluster" >&2
+		fi
+	fi
+fi
 
 echo -e "Done, listing cluster services:\n" >&2
 "${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
