@@ -78,11 +78,11 @@ const (
 	k8sRktNameAnno         = "rkt.kubernetes.io/name"
 	k8sRktNamespaceAnno    = "rkt.kubernetes.io/namespace"
 	//TODO: remove the creation time annotation once this is closed: https://github.com/coreos/rkt/issues/1789
-	k8sRktCreationTimeAnno  = "rkt.kubernetes.io/created"
-	k8sRktContainerHashAnno = "rkt.kubernetes.io/containerhash"
-	k8sRktRestartCountAnno  = "rkt.kubernetes.io/restartcount"
-
-	dockerPrefix = "docker://"
+	k8sRktCreationTimeAnno           = "rkt.kubernetes.io/created"
+	k8sRktContainerHashAnno          = "rkt.kubernetes.io/containerhash"
+	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restartcount"
+	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/terminationMessagePath"
+	dockerPrefix                     = "docker://"
 
 	authDir            = "auth.d"
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
@@ -450,7 +450,6 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 
 // makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
 func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appcschema.PodManifest, error) {
-	var globalPortMappings []kubecontainer.PortMapping
 	manifest := appcschema.BlankPodManifest()
 
 	listResp, err := r.apisvc.ListPods(context.Background(), &rktapi.ListPodsRequest{
@@ -490,12 +489,10 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktRestartCountAnno), strconv.Itoa(restartCount))
 
 	for _, c := range pod.Spec.Containers {
-		app, portMappings, err := r.newAppcRuntimeApp(pod, c, pullSecrets)
+		err := r.newAppcRuntimeApp(pod, c, pullSecrets, manifest)
 		if err != nil {
 			return nil, err
 		}
-		manifest.Apps = append(manifest.Apps, *app)
-		globalPortMappings = append(globalPortMappings, portMappings...)
 	}
 
 	volumeMap, ok := r.volumeGetter.GetVolumes(pod.UID)
@@ -512,24 +509,52 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 		})
 	}
 
-	// Set global ports.
-	for _, port := range globalPortMappings {
-		manifest.Ports = append(manifest.Ports, appctypes.ExposedPort{
-			Name:     convertToACName(port.Name),
-			HostPort: uint(port.HostPort),
-		})
-	}
 	// TODO(yifan): Set pod-level isolators once it's supported in kubernetes.
 	return manifest, nil
 }
 
-func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets []api.Secret) (*appcschema.RuntimeApp, []kubecontainer.PortMapping, error) {
+func makeContainerLogMount(opts *kubecontainer.RunContainerOptions, container *api.Container) (*kubecontainer.Mount, error) {
+	if opts.PodContainerDir == "" || container.TerminationMessagePath == "" {
+		return nil, nil
+	}
+
+	// In docker runtime, the container log path contains the container ID.
+	// However, for rkt runtime, we cannot get the container ID before the
+	// the container is launched, so here we generate a random uuid to enable
+	// us to map a container's termination message path to an unique log file
+	// on the disk.
+	randomUID := util.NewUUID()
+	containerLogPath := path.Join(opts.PodContainerDir, string(randomUID))
+	fs, err := os.Create(containerLogPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := fs.Close(); err != nil {
+		return nil, err
+	}
+
+	mnt := &kubecontainer.Mount{
+		// Use a random name for the termination message mount, so that
+		// when a container restarts, it will not overwrite the old termination
+		// message.
+		Name:          fmt.Sprintf("termination-message-%s", randomUID),
+		ContainerPath: container.TerminationMessagePath,
+		HostPath:      containerLogPath,
+		ReadOnly:      false,
+	}
+	opts.Mounts = append(opts.Mounts, *mnt)
+
+	return mnt, nil
+}
+
+func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets []api.Secret, manifest *appcschema.PodManifest) error {
 	if err, _ := r.imagePuller.PullImage(pod, &c, pullSecrets); err != nil {
-		return nil, nil, err
+		return nil
 	}
 	imgManifest, err := r.getImageManifest(c.Image)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	if imgManifest.App == nil {
@@ -538,24 +563,30 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 
 	imageID, err := r.getImageID(c.Image)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 	hash, err := appctypes.NewHash(imageID)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	opts, err := r.generator.GenerateRunContainerOptions(pod, &c)
 	if err != nil {
-		return nil, nil, err
+		return err
+	}
+
+	// create the container log file and make a mount pair.
+	mnt, err := makeContainerLogMount(opts, &c)
+	if err != nil {
+		return err
 	}
 
 	ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
 	if err := setApp(imgManifest.App, &c, opts, ctx, pod.Spec.SecurityContext); err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	return &appcschema.RuntimeApp{
+	ra := appcschema.RuntimeApp{
 		Name:  convertToACName(c.Name),
 		Image: appcschema.RuntimeImage{ID: *hash},
 		App:   imgManifest.App,
@@ -565,7 +596,32 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 				Value: strconv.FormatUint(kubecontainer.HashContainer(&c), 10),
 			},
 		},
-	}, opts.PortMappings, nil
+	}
+
+	if mnt != nil {
+		ra.Annotations = append(ra.Annotations, appctypes.Annotation{
+			Name:  *appctypes.MustACIdentifier(k8sRktTerminationMessagePathAnno),
+			Value: mnt.HostPath,
+		})
+
+		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
+			Name:   convertToACName(mnt.Name),
+			Kind:   "host",
+			Source: mnt.HostPath,
+		})
+	}
+
+	manifest.Apps = append(manifest.Apps, ra)
+
+	// Set global ports.
+	for _, port := range opts.PortMappings {
+		manifest.Ports = append(manifest.Ports, appctypes.ExposedPort{
+			Name:     convertToACName(port.Name),
+			HostPort: uint(port.HostPort),
+		})
+	}
+
+	return nil
 }
 
 func runningKubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
@@ -1299,6 +1355,24 @@ func populateContainerStatus(pod rktapi.Pod, app rktapi.App, runtimeApp appcsche
 		return nil, err
 	}
 
+	var reason, message string
+	if app.State == rktapi.AppState_APP_STATE_EXITED {
+		if app.ExitCode == 0 {
+			reason = "Completed"
+		} else {
+			reason = "Error"
+		}
+	}
+
+	terminationMessagePath, ok := runtimeApp.Annotations.Get(k8sRktTerminationMessagePathAnno)
+	if ok {
+		if data, err := ioutil.ReadFile(terminationMessagePath); err != nil {
+			message = fmt.Sprintf("Error on reading termination-log %s: %v", terminationMessagePath, err)
+		} else {
+			message = string(data)
+		}
+	}
+
 	return &kubecontainer.ContainerStatus{
 		ID:    buildContainerID(&containerID{uuid: pod.Id, appName: app.Name}),
 		Name:  app.Name,
@@ -1314,7 +1388,8 @@ func populateContainerStatus(pod rktapi.Pod, app rktapi.App, runtimeApp appcsche
 		// change once apps don't share the same lifecycle.
 		// See https://github.com/appc/spec/pull/547.
 		RestartCount: restartCount,
-		// TODO(yifan): Add reason and message field.
+		Reason:       reason,
+		Message:      message,
 	}, nil
 }
 
@@ -1383,10 +1458,7 @@ func (s sortByRestartCount) Less(i, j int) bool { return s[i].RestartCount < s[j
 
 // TODO(yifan): Delete this function when the logic is moved to kubelet.
 func (r *Runtime) ConvertPodStatusToAPIPodStatus(pod *api.Pod, status *kubecontainer.PodStatus) (*api.PodStatus, error) {
-	apiPodStatus := &api.PodStatus{
-		// TODO(yifan): Add reason and message field.
-		PodIP: status.IP,
-	}
+	apiPodStatus := &api.PodStatus{PodIP: status.IP}
 
 	// Sort in the reverse order of the restart count because the
 	// lastest one will have the largest restart count.
@@ -1410,7 +1482,9 @@ func (r *Runtime) ConvertPodStatusToAPIPodStatus(pod *api.Pod, status *kubeconta
 			st.Terminated = &api.ContainerStateTerminated{
 				ExitCode:  c.ExitCode,
 				StartedAt: unversioned.NewTime(c.StartedAt),
-				// TODO(yifan): Add reason, message, finishedAt, signal.
+				Reason:    c.Reason,
+				Message:   c.Message,
+				// TODO(yifan): Add finishedAt, signal.
 				ContainerID: c.ID.String(),
 			}
 		default:
