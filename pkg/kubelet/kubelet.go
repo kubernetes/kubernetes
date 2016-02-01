@@ -374,9 +374,9 @@ func NewMainKubelet(
 		)
 	case "rkt":
 		conf := &rkt.Config{
-			Path:               rktPath,
-			Stage1Image:        rktStage1Image,
-			InsecureSkipVerify: true,
+			Path:            rktPath,
+			Stage1Image:     rktStage1Image,
+			InsecureOptions: "image,ondisk",
 		}
 		rktRuntime, err := rkt.New(
 			conf,
