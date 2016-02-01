@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -86,12 +86,12 @@ func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interfac
 		}
 	}
 
-	scaler := extensions.HorizontalPodAutoscaler{
+	scaler := autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
-		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: extensions.SubresourceReference{
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleRef: autoscaling.SubresourceReference{
 				Kind:        params["scaleRef-kind"],
 				Name:        params["scaleRef-name"],
 				APIVersion:  params["scaleRef-apiVersion"],
@@ -104,7 +104,7 @@ func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interfac
 		scaler.Spec.MinReplicas = &min
 	}
 	if cpu >= 0 {
-		scaler.Spec.CPUUtilization = &extensions.CPUTargetUtilization{cpu}
+		scaler.Spec.CPUUtilization = &autoscaling.CPUTargetUtilization{cpu}
 	}
 	return &scaler, nil
 }

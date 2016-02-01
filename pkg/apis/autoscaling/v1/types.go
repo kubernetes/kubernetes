@@ -14,49 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-This file (together with pkg/apis/extensions/v1beta1/types.go) contain the experimental
-types in kubernetes. These API objects are experimental, meaning that the
-APIs may be broken at any time by the kubernetes team.
-
-DISCLAIMER: The implementation of the experimental API group itself is
-a temporary one meant as a stopgap solution until kubernetes has proper
-support for multiple API groups. The transition may require changes
-beyond registration differences. In other words, experimental API group
-support is experimental.
-*/
-
-package extensions
+package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 }
 
 // represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
-	Replicas int `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 
 	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
-// +genclient=true,noMethods=true
-
 // represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	Spec ScaleSpec `json:"spec,omitempty"`
@@ -70,30 +55,80 @@ type ReplicationControllerDummy struct {
 	unversioned.TypeMeta `json:",inline"`
 }
 
-// Alpha-level support for Custom Metrics in HPA (as annotations).
-type CustomMetricTarget struct {
-	// Custom Metric name.
-	Name string `json:"name"`
-	// Custom Metric value (average).
-	TargetValue resource.Quantity `json:"value"`
+// SubresourceReference contains enough information to let you inspect or modify the referred subresource.
+type SubresourceReference struct {
+	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+	Kind string `json:"kind,omitempty"`
+	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	Name string `json:"name,omitempty"`
+	// API version of the referent
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Subresource name of the referent
+	Subresource string `json:"subresource,omitempty"`
 }
 
-type CustomMetricTargetList struct {
-	Items []CustomMetricTarget `json:"items"`
+type CPUTargetUtilization struct {
+	// fraction of the requested CPU that should be utilized/used,
+	// e.g. 70 means that 70% of the requested CPU should be in use.
+	TargetPercentage int32 `json:"targetPercentage"`
 }
 
-type CustomMetricCurrentStatus struct {
-	// Custom Metric name.
-	Name string `json:"name"`
-	// Custom Metric value (average).
-	CurrentValue resource.Quantity `json:"value"`
+// specification of a horizontal pod autoscaler.
+type HorizontalPodAutoscalerSpec struct {
+	// reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status,
+	// and will set the desired number of pods by modifying its spec.
+	ScaleRef SubresourceReference `json:"scaleRef"`
+	// lower limit for the number of pods that can be set by the autoscaler, default 1.
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
+	MaxReplicas int32 `json:"maxReplicas"`
+	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
+	// if not specified it defaults to the target CPU utilization at 80% of the requested resources.
+	CPUUtilization *CPUTargetUtilization `json:"cpuUtilization,omitempty"`
 }
 
-type CustomMetricCurrentStatusList struct {
-	Items []CustomMetricCurrentStatus `json:"items"`
+// current status of a horizontal pod autoscaler
+type HorizontalPodAutoscalerStatus struct {
+	// most recent generation observed by this autoscaler.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+
+	// last time the HorizontalPodAutoscaler scaled the number of pods;
+	// used by the autoscaler to control how often the number of pods is changed.
+	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
+
+	// current number of replicas of pods managed by this autoscaler.
+	CurrentReplicas int32 `json:"currentReplicas"`
+
+	// desired number of replicas of pods managed by this autoscaler.
+	DesiredReplicas int32 `json:"desiredReplicas"`
+
+	// current average CPU utilization over all pods, represented as a percentage of requested CPU,
+	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
+	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
-// +genclient=true
+// configuration of a horizontal pod autoscaler.
+type HorizontalPodAutoscaler struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
+
+	// current information about the autoscaler.
+	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
+}
+
+// list of horizontal pod autoscaler objects.
+type HorizontalPodAutoscalerList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// list of horizontal pod autoscaler objects.
+	Items []HorizontalPodAutoscaler `json:"items"`
+}
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -101,7 +136,7 @@ type ThirdPartyResource struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Description is the description of this object.
 	Description string `json:"description,omitempty"`
@@ -110,18 +145,18 @@ type ThirdPartyResource struct {
 	Versions []APIVersion `json:"versions,omitempty"`
 }
 
+// ThirdPartyResourceList is a list of ThirdPartyResources.
 type ThirdPartyResourceList struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Standard list metadata.
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of horizontal pod autoscalers.
+	// Items is the list of ThirdPartyResources.
 	Items []ThirdPartyResource `json:"items"`
 }
 
 // An APIVersion represents a single concrete version of an object model.
-// TODO: we should consider merge this struct with GroupVersion in unversioned.go
 type APIVersion struct {
 	// Name of this version (e.g. 'v1').
 	Name string `json:"name,omitempty"`
@@ -134,17 +169,17 @@ type APIVersion struct {
 type ThirdPartyResourceData struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata.
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Data is the raw JSON data for this data.
 	Data []byte `json:"data,omitempty"`
 }
 
-// +genclient=true
-
+// Deployment enables declarative updates for Pods and ReplicationControllers.
 type Deployment struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
+	// Standard object metadata.
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the Deployment.
 	Spec DeploymentSpec `json:"spec,omitempty"`
@@ -153,24 +188,21 @@ type Deployment struct {
 	Status DeploymentStatus `json:"status,omitempty"`
 }
 
+// DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
-	Replicas int `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be the ones affected by this deployment.
 	Selector map[string]string `json:"selector,omitempty"`
 
 	// Template describes the pods that will be created.
-	Template api.PodTemplateSpec `json:"template"`
+	Template v1.PodTemplateSpec `json:"template"`
 
 	// The deployment strategy to use to replace existing pods with new ones.
 	Strategy DeploymentStrategy `json:"strategy,omitempty"`
-
-	// The number of old ReplicationControllers to retain to allow rollback.
-	// This is a pointer to distinguish between explicit zero and not specified.
-	RevisionHistoryLimit *int `json:"revisionHistoryLimit,omitempty"`
 
 	// Key of the selector that is added to existing RCs (and label key that is
 	// added to its pods) to prevent the existing RCs to select new pods (and old
@@ -180,29 +212,11 @@ type DeploymentSpec struct {
 	// DefaultDeploymentUniqueLabelKey("deployment.kubernetes.io/podTemplateHash").
 	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
 	// No label is added if this is set to empty string.
-	UniqueLabelKey string `json:"uniqueLabelKey,omitempty"`
+	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
 
 	// Indicates that the deployment is paused and will not be processed by the
 	// deployment controller.
 	Paused bool `json:"paused,omitempty"`
-	// The config this deployment is rolling back to. Will be cleared after rollback is done.
-	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty"`
-}
-
-// DeploymentRollback stores the information required to rollback a deployment.
-type DeploymentRollback struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Required: This must match the Name of a deployment.
-	Name string `json:"name"`
-	// The annotations to be updated to a deployment
-	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty"`
-	// The config of this deployment rollback.
-	RollbackTo RollbackConfig `json:"rollbackTo"`
-}
-
-type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollbck to the last revision.
-	Revision int64 `json:"revision,omitempty"`
 }
 
 const (
@@ -213,6 +227,7 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "deployment.kubernetes.io/podTemplateHash"
 )
 
+// DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	Type DeploymentStrategyType `json:"type,omitempty"`
@@ -238,54 +253,58 @@ const (
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
 	// The maximum number of pods that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding up.
 	// This can not be 0 if MaxSurge is 0.
 	// By default, a fixed value of 1 is used.
-	// Example: when this is set to 30%, the old RC can be scaled down by 30%
+	// Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods
 	// immediately when the rolling update starts. Once new pods are ready, old RC
 	// can be scaled down further, followed by scaling up the new RC, ensuring
-	// that at least 70% of original number of pods are available at all times
-	// during the update.
-	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	// that the total number of pods available at all times during the update is at
+	// least 70% of desired pods.
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// The maximum number of pods that can be scheduled above the original number of
+	// The maximum number of pods that can be scheduled above the desired number of
 	// pods.
-	// Value can be an absolute number (ex: 5) or a percentage of total pods at
-	// the start of the update (ex: 10%). This can not be 0 if MaxUnavailable is 0.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// This can not be 0 if MaxUnavailable is 0.
 	// Absolute number is calculated from percentage by rounding up.
 	// By default, a value of 1 is used.
-	// Example: when this is set to 30%, the new RC can be scaled up by 30%
-	// immediately when the rolling update starts. Once old pods have been killed,
+	// Example: when this is set to 30%, the new RC can be scaled up immediately when
+	// the rolling update starts, such that the total number of old and new pods do not exceed
+	// 130% of desired pods. Once old pods have been killed,
 	// new RC can be scaled up further, ensuring that total number of pods running
-	// at any time during the update is atmost 130% of original pods.
-	MaxSurge intstr.IntOrString `json:"maxSurge,omitempty"`
+	// at any time during the update is atmost 130% of desired pods.
+	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	MinReadySeconds int `json:"minReadySeconds,omitempty"`
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
 
+// DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
 	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
-	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
-	AvailableReplicas int `json:"availableReplicas,omitempty"`
+	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
 
 	// Total number of unavailable pods targeted by this deployment.
-	UnavailableReplicas int `json:"unavailableReplicas,omitempty"`
+	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
 }
 
+// DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of deployments.
+	// Items is the list of Deployments.
 	Items []Deployment `json:"items"`
 }
 
@@ -323,13 +342,13 @@ type RollingUpdateDaemonSet struct {
 	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
 	// 70% of original number of DaemonSet pods are available at all times
 	// during the update.
-	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// Minimum number of seconds for which a newly created DaemonSet pod should
 	// be ready without any of its container crashing, for it to be considered
 	// available. Defaults to 0 (pod will be considered available as soon as it
 	// is ready).
-	MinReadySeconds int `json:"minReadySeconds,omitempty"`
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -345,7 +364,7 @@ type DaemonSetSpec struct {
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
-	Template api.PodTemplateSpec `json:"template"`
+	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 
 	// Update strategy to replace existing DaemonSet pods with new pods.
 	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
@@ -357,7 +376,7 @@ type DaemonSetSpec struct {
 	// DefaultDaemonSetUniqueLabelKey("daemonset.kubernetes.io/podTemplateHash").
 	// Value of this key is hash of DaemonSetSpec.PodTemplateSpec.
 	// No label is added if this is set to empty string.
-	UniqueLabelKey string `json:"uniqueLabelKey,omitempty"`
+	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
 }
 
 const (
@@ -371,25 +390,26 @@ const (
 type DaemonSetStatus struct {
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
-	CurrentNumberScheduled int `json:"currentNumberScheduled"`
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
+	CurrentNumberScheduled int32 `json:"currentNumberScheduled"`
 
 	// NumberMisscheduled is the number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
-	NumberMisscheduled int `json:"numberMisscheduled"`
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
+	NumberMisscheduled int32 `json:"numberMisscheduled"`
 
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
-	DesiredNumberScheduled int `json:"desiredNumberScheduled"`
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
+	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
 }
-
-// +genclient=true
 
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired behavior of this daemon set.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -414,23 +434,23 @@ type DaemonSetList struct {
 	Items []DaemonSet `json:"items"`
 }
 
+// ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
 type ThirdPartyResourceDataList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
-	// Items is a list of third party objects
+
+	// Items is the list of ThirdpartyResourceData.
 	Items []ThirdPartyResourceData `json:"items"`
 }
-
-// +genclient=true
 
 // Job represents the configuration of a single job.
 type Job struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is a structure defining the expected behavior of a job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -459,28 +479,35 @@ type JobSpec struct {
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
-	Parallelism *int `json:"parallelism,omitempty"`
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	Parallelism *int32 `json:"parallelism,omitempty"`
 
 	// Completions specifies the desired number of successfully finished pods the
-	// job should be run with.  When unset, any pod exiting signals the job to complete.
-	Completions *int `json:"completions,omitempty"`
+	// job should be run with.  Setting to nil means that the success of any
+	// pod signals the success of all pods, and allows parallelism to have any positive
+	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
+	// pod signals the success of the job.
+	Completions *int32 `json:"completions,omitempty"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	Template api.PodTemplateSpec `json:"template"`
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	Template v1.PodTemplateSpec `json:"template"`
 }
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
@@ -494,13 +521,13 @@ type JobStatus struct {
 	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
 
 	// Active is the number of actively running pods.
-	Active int `json:"active,omitempty"`
+	Active int32 `json:"active,omitempty"`
 
 	// Succeeded is the number of pods which reached Phase Succeeded.
-	Succeeded int `json:"succeeded,omitempty"`
+	Succeeded int32 `json:"succeeded,omitempty"`
 
 	// Failed is the number of pods which reached Phase Failed.
-	Failed int `json:"failed,omitempty"`
+	Failed int32 `json:"failed,omitempty"`
 }
 
 type JobConditionType string
@@ -518,7 +545,7 @@ type JobCondition struct {
 	// Type of job condition, Complete or Failed.
 	Type JobConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
-	Status api.ConditionStatus `json:"status"`
+	Status v1.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
 	// Last time the condition transit from one status to another.
@@ -529,8 +556,6 @@ type JobCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +genclient=true
-
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
@@ -539,7 +564,7 @@ type Ingress struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the Ingress.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -577,7 +602,7 @@ type IngressSpec struct {
 // IngressStatus describe the current state of the Ingress.
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
-	LoadBalancer api.LoadBalancerStatus `json:"loadBalancer,omitempty"`
+	LoadBalancer v1.LoadBalancerStatus `json:"loadBalancer,omitempty"`
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
@@ -684,10 +709,10 @@ type NodeUtilization struct {
 // Configuration of the Cluster Autoscaler
 type ClusterAutoscalerSpec struct {
 	// Minimum number of nodes that the cluster should have.
-	MinNodes int `json:"minNodes"`
+	MinNodes int32 `json:"minNodes"`
 
 	// Maximum number of nodes that the cluster should have.
-	MaxNodes int `json:"maxNodes"`
+	MaxNodes int32 `json:"maxNodes"`
 
 	// Target average utilization of the cluster nodes. New nodes will be added if one of the
 	// targets is exceeded. Cluster size will be decreased if the current utilization is too low
@@ -701,7 +726,7 @@ type ClusterAutoscaler struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// For now (experimental api) it is required that the name is set to "ClusterAutoscaler" and namespace is "default".
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired behavior of this daemon set.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -716,6 +741,35 @@ type ClusterAutoscalerList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []ClusterAutoscaler `json:"items"`
+}
+
+// ExportOptions is the query options to the standard REST get call.
+type ExportOptions struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Should this value be exported.  Export strips fields that a user can not specify.
+	Export bool `json:"export"`
+	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
+	Exact bool `json:"exact"`
+}
+
+// ListOptions is the query options to a standard REST list call.
+type ListOptions struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	LabelSelector string `json:"labelSelector,omitempty"`
+	// A selector to restrict the list of returned objects by their fields.
+	// Defaults to everything.
+	FieldSelector string `json:"fieldSelector,omitempty"`
+	// Watch for changes to the described resources and return them as a stream of
+	// add, update, and remove notifications. Specify resourceVersion.
+	Watch bool `json:"watch,omitempty"`
+	// When specified with a watch call, shows changes that occur after that particular version of a resource.
+	// Defaults to changes from the beginning of history.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+	// Timeout for the list/watch call.
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
 }
 
 // A label selector is a label query over a set of resources. The result of matchLabels and
@@ -755,52 +809,65 @@ const (
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
 
-// +genclient=true
-
-// ReplicaSet represents the configuration of a replica set.
+// ReplicaSet represents the configuration of a ReplicaSet.
 type ReplicaSet struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
 
-	// Spec defines the desired behavior of this ReplicaSet.
+	// If the Labels of a ReplicaSet are empty, they are defaulted to
+	// be the same as the Pod(s) that the ReplicaSet manages.
+	// Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the specification of the desired behavior of the ReplicaSet.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Spec ReplicaSetSpec `json:"spec,omitempty"`
 
-	// Status is the current status of this ReplicaSet. This data may be
-	// out of date by some window of time.
+	// Status is the most recently observed status of the ReplicaSet.
+	// This data may be out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Status ReplicaSetStatus `json:"status,omitempty"`
 }
 
 // ReplicaSetList is a collection of ReplicaSets.
 type ReplicaSetList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
+	// List of ReplicaSets.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md
 	Items []ReplicaSet `json:"items"`
 }
 
 // ReplicaSetSpec is the specification of a ReplicaSet.
-// As the internal representation of a ReplicaSet, it must have
-// a Template set.
 type ReplicaSetSpec struct {
 	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas"`
+	// This is a pointer to distinguish between explicit zero and unspecified.
+	// Defaults to 1.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the replica count.
-	// Must match in order to be controlled.
-	// If empty, defaulted to labels on pod template.
+	// If the selector is empty, it is defaulted to the labels present on the pod template.
+	// Label keys and values that must match in order to be controlled by this replica set.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	Template *api.PodTemplateSpec `json:"template,omitempty"`
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	// Replicas is the number of actual replicas.
-	Replicas int `json:"replicas"`
+	// Replicas is the most recently oberved number of replicas.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	Replicas int32 `json:"replicas"`
 
-	// ObservedGeneration is the most recent generation observed by the controller.
+	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }

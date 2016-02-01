@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -125,20 +125,20 @@ func scaleDown(name, kind string, rc *ResourceConsumer, f *Framework) {
 }
 
 func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int) {
-	hpa := &extensions.HorizontalPodAutoscaler{
+	hpa := &autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.framework.Namespace.Name,
 		},
-		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: extensions.SubresourceReference{
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleRef: autoscaling.SubresourceReference{
 				Kind:        rc.kind,
 				Name:        rc.name,
 				Subresource: subresource,
 			},
 			MinReplicas:    &minReplicas,
 			MaxReplicas:    maxRepl,
-			CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: cpu},
+			CPUUtilization: &autoscaling.CPUTargetUtilization{TargetPercentage: cpu},
 		},
 	}
 	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)

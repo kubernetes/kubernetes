@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -1403,7 +1404,7 @@ func printDeploymentList(list *extensions.DeploymentList, w io.Writer, options P
 	return nil
 }
 
-func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.Writer, options PrintOptions) error {
+func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io.Writer, options PrintOptions) error {
 	namespace := hpa.Namespace
 	name := hpa.Name
 	reference := fmt.Sprintf("%s/%s/%s",
@@ -1444,7 +1445,7 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 	return err
 }
 
-func printHorizontalPodAutoscalerList(list *extensions.HorizontalPodAutoscalerList, w io.Writer, options PrintOptions) error {
+func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerList, w io.Writer, options PrintOptions) error {
 	for i := range list.Items {
 		if err := printHorizontalPodAutoscaler(&list.Items[i], w, options); err != nil {
 			return err

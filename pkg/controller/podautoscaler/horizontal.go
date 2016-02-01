@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -69,7 +70,7 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa autoscaling.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
 	if hpa.Spec.CPUUtilization == nil {
 		// If CPUTarget is not specified than we should return some default values.
 		// Since we always take maximum number of replicas from all policies it is safe
@@ -93,7 +94,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 	}
 }
 
-func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
+func (a *HorizontalController) reconcileAutoscaler(hpa autoscaling.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Namespace, hpa.Spec.ScaleRef.Name)
 
 	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
@@ -155,7 +156,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		desiredReplicas = currentReplicas
 	}
 
-	hpa.Status = extensions.HorizontalPodAutoscalerStatus{
+	hpa.Status = autoscaling.HorizontalPodAutoscalerStatus{
 		CurrentReplicas:                 currentReplicas,
 		DesiredReplicas:                 desiredReplicas,
 		CurrentCPUUtilizationPercentage: currentUtilization,

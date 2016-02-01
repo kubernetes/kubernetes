@@ -19,6 +19,7 @@ package extensions
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -52,8 +53,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&Deployment{},
 		&DeploymentList{},
 		&DeploymentRollback{},
-		&HorizontalPodAutoscaler{},
-		&HorizontalPodAutoscalerList{},
+		&autoscaling.HorizontalPodAutoscaler{},
+		&autoscaling.HorizontalPodAutoscalerList{},
 		&Job{},
 		&JobList{},
 		&ReplicationControllerDummy{},
@@ -78,8 +79,6 @@ func (obj *ClusterAutoscalerList) GetObjectKind() unversioned.ObjectKind       {
 func (obj *Deployment) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *DeploymentList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
 func (obj *DeploymentRollback) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
-func (obj *HorizontalPodAutoscaler) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *HorizontalPodAutoscalerList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *Job) GetObjectKind() unversioned.ObjectKind                         { return &obj.TypeMeta }
 func (obj *JobList) GetObjectKind() unversioned.ObjectKind                     { return &obj.TypeMeta }
 func (obj *ReplicationControllerDummy) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }
