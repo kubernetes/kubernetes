@@ -144,7 +144,7 @@ func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predica
 					failedPredicateMap[node.Name] = sets.String{}
 				}
 				if re, ok := err.(*predicates.InsufficientResourceError); ok {
-					failedPredicateMap[node.Name].Insert(re.ResourceName)
+					failedPredicateMap[node.Name].Insert(re.Error())
 					break
 				}
 				failedPredicateMap[node.Name].Insert(name)

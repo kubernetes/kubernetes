@@ -254,6 +254,18 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 	return result
 }
 
+func getTotalResourceRequest(pods []*api.Pod) resourceRequest {
+	result := resourceRequest{}
+	for _, pod := range pods {
+		for _, container := range pod.Spec.Containers {
+			requests := container.Resources.Requests
+			result.memory += requests.Memory().Value()
+			result.milliCPU += requests.Cpu().MilliValue()
+		}
+	}
+	return result
+}
+
 func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory []*api.Pod) {
 	totalMilliCPU := allocatable.Cpu().MilliValue()
 	totalMemory := allocatable.Memory().Value()
@@ -294,8 +306,8 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 
 	allocatable := info.Status.Allocatable
 	if int64(len(existingPods))+1 > allocatable.Pods().Value() {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), node, len(existingPods), allocatable.Pods().Value())
-		return false, ErrExceededMaxPodNumber
+		return false, newInsufficientResourceError(podCountResourceName, 1,
+			int64(len(existingPods)), allocatable.Pods().Value())
 	}
 
 	podRequest := getResourceRequest(pod)
@@ -306,12 +318,12 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	pods := append(existingPods, pod)
 	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, allocatable)
 	if len(exceedingCPU) > 0 {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), node)
-		return false, ErrInsufficientFreeCPU
+		return false, newInsufficientResourceError(cpuResourceName, podRequest.milliCPU,
+			getTotalResourceRequest(existingPods).milliCPU, allocatable.Cpu().MilliValue())
 	}
 	if len(exceedingMemory) > 0 {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Memory", podName(pod), node)
-		return false, ErrInsufficientFreeMemory
+		return false, newInsufficientResourceError(memoryResoureceName, podRequest.memory,
+			getTotalResourceRequest(existingPods).memory, allocatable.Memory().Value())
 	}
 	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.", podName(pod), node, len(pods)-1, allocatable.Pods().Value())
 	return true, nil

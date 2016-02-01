@@ -82,7 +82,6 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 }
 
 func TestPodFitsResources(t *testing.T) {
-
 	enoughPodsTests := []struct {
 		pod          *api.Pod
 		existingPods []*api.Pod
@@ -106,7 +105,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "too many resources fails",
-			wErr: ErrInsufficientFreeCPU,
+			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -124,7 +123,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "one resources fits",
-			wErr: ErrInsufficientFreeMemory,
+			wErr: newInsufficientResourceError(memoryResoureceName, 2, 19, 20),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -163,8 +162,8 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: false,
-			test: "even without specified resources predicate fails when there's no available ips",
-			wErr: ErrExceededMaxPodNumber,
+			test: "even without specified resources predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -172,8 +171,8 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
 			},
 			fits: false,
-			test: "even if both resources fit predicate fails when there's no available ips",
-			wErr: ErrExceededMaxPodNumber,
+			test: "even if both resources fit predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -181,8 +180,8 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: false,
-			test: "even for equal edge case predicate fails when there's no available ips",
-			wErr: ErrExceededMaxPodNumber,
+			test: "even for equal edge case predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 	}
 	for _, test := range notEnoughPodsTests {
