@@ -239,13 +239,13 @@ type ResourceFit struct {
 	info NodeInfo
 }
 
-type resourceRequest struct {
+type ResourceRequest struct {
 	milliCPU int64
 	memory   int64
 }
 
-func getResourceRequest(pod *api.Pod) resourceRequest {
-	result := resourceRequest{}
+func GetResourceRequest(pod *api.Pod) ResourceRequest {
+	result := ResourceRequest{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
 		result.memory += requests.Memory().Value()
@@ -272,7 +272,7 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceLi
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
 	for _, pod := range pods {
-		podRequest := getResourceRequest(pod)
+		podRequest := GetResourceRequest(pod)
 		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
 		if !fitsCPU {
@@ -310,7 +310,7 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 			int64(len(existingPods)), allocatable.Pods().Value())
 	}
 
-	podRequest := getResourceRequest(pod)
+	podRequest := GetResourceRequest(pod)
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
 		return true, nil
 	}
@@ -509,11 +509,11 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 }
 
 func PodFitsHostPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	wantPorts := getUsedPorts(pod)
+	wantPorts := GetUsedPorts(pod)
 	if len(wantPorts) == 0 {
 		return true, nil
 	}
-	existingPorts := getUsedPorts(existingPods...)
+	existingPorts := GetUsedPorts(existingPods...)
 	for wport := range wantPorts {
 		if wport == 0 {
 			continue
@@ -525,7 +525,7 @@ func PodFitsHostPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool,
 	return true, nil
 }
 
-func getUsedPorts(pods ...*api.Pod) map[int]bool {
+func GetUsedPorts(pods ...*api.Pod) map[int]bool {
 	ports := make(map[int]bool)
 	for _, pod := range pods {
 		for _, container := range pod.Spec.Containers {

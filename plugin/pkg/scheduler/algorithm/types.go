@@ -30,3 +30,5 @@ type PriorityConfig struct {
 	Function PriorityFunction
 	Weight   int
 }
+
+type GetEquivalencePodFunc func(pod *api.Pod) interface{}

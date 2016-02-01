@@ -190,6 +190,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	algo := NewGenericScheduler(
 		map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts},
 		[]algorithm.PriorityConfig{},
+		nil,
 		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))

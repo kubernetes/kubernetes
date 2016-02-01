@@ -62,7 +62,7 @@ func makeAllocatableResources(milliCPU int64, memory int64, pods int64) api.Reso
 	}
 }
 
-func newResourcePod(usage ...resourceRequest) *api.Pod {
+func newResourcePod(usage ...ResourceRequest) *api.Pod {
 	containers := []api.Container{}
 	for _, req := range usage {
 		containers = append(containers, api.Container{
@@ -92,43 +92,43 @@ func TestPodFitsResources(t *testing.T) {
 		{
 			pod: &api.Pod{},
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
+				newResourcePod(ResourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: true,
 			test: "no resources requested always fits",
 			wErr: nil,
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourcePod(ResourceRequest{milliCPU: 1, memory: 1}),
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
+				newResourcePod(ResourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: false,
 			test: "too many resources fails",
 			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourcePod(ResourceRequest{milliCPU: 1, memory: 1}),
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
+				newResourcePod(ResourceRequest{milliCPU: 5, memory: 5}),
 			},
 			fits: true,
 			test: "both resources fit",
 			wErr: nil,
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
+			pod: newResourcePod(ResourceRequest{milliCPU: 1, memory: 2}),
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
+				newResourcePod(ResourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: false,
 			test: "one resources fits",
 			wErr: newInsufficientResourceError(memoryResoureceName, 2, 19, 20),
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
+			pod: newResourcePod(ResourceRequest{milliCPU: 5, memory: 1}),
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
+				newResourcePod(ResourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: true,
 			test: "equal edge case",
@@ -159,25 +159,25 @@ func TestPodFitsResources(t *testing.T) {
 		{
 			pod: &api.Pod{},
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
+				newResourcePod(ResourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: false,
 			test: "even without specified resources predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourcePod(ResourceRequest{milliCPU: 1, memory: 1}),
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
+				newResourcePod(ResourceRequest{milliCPU: 5, memory: 5}),
 			},
 			fits: false,
 			test: "even if both resources fit predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
+			pod: newResourcePod(ResourceRequest{milliCPU: 5, memory: 1}),
 			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
+				newResourcePod(ResourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: false,
 			test: "even for equal edge case predicate fails when there's no space for additional pod",
@@ -347,7 +347,7 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ports := getUsedPorts(test.pods...)
+		ports := GetUsedPorts(test.pods...)
 		if !reflect.DeepEqual(test.ports, ports) {
 			t.Errorf("expect %v, got %v", test.ports, ports)
 		}

@@ -56,6 +56,7 @@ type PriorityConfigFactory struct {
 
 var (
 	schedulerFactoryMutex sync.Mutex
+	getEquivalencePodFunc algorithm.GetEquivalencePodFunc = nil
 
 	// maps that hold registered algorithm types
 	fitPredicateMap      = make(map[string]FitPredicateFactory)
@@ -199,6 +200,11 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
+}
+
+func RegisterGetEquivalencePodFunction(equivalenceFunc algorithm.GetEquivalencePodFunc) {
+	glog.Info("Register getEquivalencePodFunc.")
+	getEquivalencePodFunc = equivalenceFunc
 }
 
 // This check is useful for testing providers.
