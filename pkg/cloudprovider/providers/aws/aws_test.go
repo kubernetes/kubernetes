@@ -25,7 +25,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/route53"
 
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -117,6 +119,7 @@ type FakeAWSServices struct {
 	ec2      *FakeEC2
 	elb      *FakeELB
 	asg      *FakeASG
+	r53      *FakeR53
 	metadata *FakeMetadata
 }
 
@@ -126,6 +129,7 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.ec2 = &FakeEC2{aws: s}
 	s.elb = &FakeELB{aws: s}
 	s.asg = &FakeASG{aws: s}
+	s.r53 = &FakeR53{aws: s}
 	s.metadata = &FakeMetadata{aws: s}
 
 	s.networkInterfacesMacs = []string{"aa:bb:cc:dd:ee:00", "aa:bb:cc:dd:ee:01"}
@@ -168,6 +172,10 @@ func (s *FakeAWSServices) LoadBalancing(region string) (ELB, error) {
 
 func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 	return s.asg, nil
+}
+
+func (s *FakeAWSServices) Route53(region string) (R53, error) {
+	return s.r53, nil
 }
 
 func (s *FakeAWSServices) Metadata() (EC2Metadata, error) {
@@ -455,6 +463,7 @@ func (ec2 *FakeELB) DescribeLoadBalancers(input *elb.DescribeLoadBalancersInput)
 	args := ec2.Called(input)
 	return args.Get(0).(*elb.DescribeLoadBalancersOutput), nil
 }
+
 func (ec2 *FakeELB) RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {
 	panic("Not implemented")
 }
@@ -497,6 +506,50 @@ func (a *FakeASG) UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInpu
 
 func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
 	panic("Not implemented")
+}
+
+type FakeR53 struct {
+	aws *FakeAWSServices
+}
+
+const FakeHostedZoneName = "k8s.api.com"
+const FakeElbHostname = "abcde012345.internal"
+const FakeHostedZoneId = "FAKEZONEID"
+const FakeClusterName = "mycluster"
+const FakeServiceName = "myservice"
+const FakeNamespace = "mynamespace"
+
+func (r53 *FakeR53) ChangeResourceRecordSets(input *route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error) {
+	if *input.HostedZoneId != FakeHostedZoneId {
+		return nil, fmt.Errorf("hosted zone id didn't match expected %v: %v", FakeHostedZoneId, input.String())
+	}
+
+	expectedCname := fmt.Sprintf("%v-%v-%v.%v.", FakeServiceName, FakeNamespace, FakeClusterName, FakeHostedZoneName)
+	change := input.ChangeBatch.Changes[0]
+	if *change.ResourceRecordSet.Name != expectedCname {
+		return nil, fmt.Errorf("cname didn't match expected %v: %v", expectedCname, input.String())
+	}
+
+	if *change.ResourceRecordSet.ResourceRecords[0].Value != FakeElbHostname {
+		return nil, fmt.Errorf("cname value didn't match expected %v: %v", FakeElbHostname, input.String())
+	}
+
+	if *change.Action != "UPSERT" && *change.Action != "DELETE" {
+		return nil, fmt.Errorf("action wasn't upsert or delete: %v", input.String())
+	}
+
+	output := route53.ChangeResourceRecordSetsOutput{}
+	return &output, nil
+}
+
+func (r53 *FakeR53) ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error) {
+	if *input.DNSName == FakeHostedZoneName+"." {
+		return &route53.ListHostedZonesByNameOutput{DNSName: input.DNSName, HostedZones: []*route53.HostedZone{{
+			Id:   aws.String(FakeHostedZoneId),
+			Name: input.DNSName,
+		}}}, nil
+	}
+	return nil, fmt.Errorf("unrecognized hostzone name %v", input.String())
 }
 
 func mockInstancesResp(selfInstance *ec2.Instance, instances []*ec2.Instance) (*AWSCloud, *FakeAWSServices) {
@@ -1198,4 +1251,82 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
 	c.EnsureLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{}, map[string]string{})
+}
+
+func TestUpdateLoadBalancerCname(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	config := fmt.Sprintf("[global]\nKubernetesClusterTag = %v", FakeClusterName)
+	c, err := newAWSCloud(strings.NewReader(config), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	elbHostname := aws.String(FakeElbHostname)
+	service := api.Service{ObjectMeta: api.ObjectMeta{
+		Name:      FakeServiceName,
+		Namespace: FakeNamespace,
+		Labels:    map[string]string{LabelLoadBalancerCnameZone: FakeHostedZoneName},
+	}}
+
+	err = c.addLoadBalancerCnameEntry(&service, elbHostname)
+	if err != nil {
+		t.Errorf("Error adding dns entry: %v", err)
+	}
+
+	err = c.removeLoadBalancerCnameEntry(&service, elbHostname)
+	if err != nil {
+		t.Errorf("Error adding dns entry: %v", err)
+	}
+}
+
+func containsIngress(ingresses []api.LoadBalancerIngress, ingress api.LoadBalancerIngress) bool {
+	for _, i := range ingresses {
+		if i == ingress {
+			return true
+		}
+	}
+
+	return false
+}
+
+func TestGetTCPLoadBalancer(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	config := fmt.Sprintf("[global]\nKubernetesClusterTag = %v", FakeClusterName)
+	c, err := newAWSCloud(strings.NewReader(config), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	awsServices.elb.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String("a")}}).Return(
+		&elb.DescribeLoadBalancersOutput{LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{
+			DNSName: aws.String(FakeElbHostname),
+		}}},
+	)
+
+	service := api.Service{ObjectMeta: api.ObjectMeta{
+		Name:      FakeServiceName,
+		Namespace: FakeNamespace,
+		Labels:    map[string]string{LabelLoadBalancerCnameZone: FakeHostedZoneName},
+	}}
+
+	lbStatus, exists, err := c.GetLoadBalancer(&service)
+
+	if err != nil {
+		t.Errorf("Failed to retrieve load balancer information: %v", err)
+	}
+
+	if !exists {
+		t.Error("Expected load balancer to exist")
+	}
+
+	dnsIngress := api.LoadBalancerIngress{Hostname: FakeElbHostname}
+	assert.Contains(t, lbStatus.Ingress, dnsIngress)
+
+	expectedCname := fmt.Sprintf("%v-%v-%v.%v", FakeServiceName, FakeNamespace, FakeClusterName, FakeHostedZoneName)
+	cnameIngress := api.LoadBalancerIngress{Hostname: expectedCname}
+	if !containsIngress(lbStatus.Ingress, cnameIngress) {
+		t.Errorf("ELB cname ingress %v was not in list of ingresses %v", expectedCname, lbStatus.Ingress)
+	}
 }
