@@ -153,6 +153,20 @@ func (controller *PersistentVolumeProvisionerController) handleUpdateClaim(oldOb
 }
 
 func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *api.PersistentVolumeClaim) error {
+	glog.V(5).Infof("Synchronizing PersistentVolumeClaim[%s] for dynamic provisioning", claim.Name)
+
+	// The claim may have been modified by parallel call to reconcileClaim, load
+	// the current version.
+	newClaim, err := controller.client.GetPersistentVolumeClaim(claim.Namespace, claim.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot reload claim %s/%s: %v", claim.Namespace, claim.Name, err)
+	}
+	claim = newClaim
+	err = controller.claimStore.Update(claim)
+	if err != nil {
+		return fmt.Errorf("Cannot update claim %s/%s: %v", claim.Namespace, claim.Name, err)
+	}
+
 	if controller.provisioner == nil {
 		return fmt.Errorf("No provisioner configured for controller")
 	}
