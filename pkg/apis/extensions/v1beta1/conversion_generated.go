@@ -83,6 +83,7 @@ func autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in *api.CephFSV
 	} else {
 		out.Monitors = nil
 	}
+	out.Path = in.Path
 	out.User = in.User
 	out.SecretFile = in.SecretFile
 	// unable to generate simple pointer conversion for api.LocalObjectReference -> v1.LocalObjectReference
@@ -1294,6 +1295,7 @@ func autoConvert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource(in *v1.CephFSVo
 	} else {
 		out.Monitors = nil
 	}
+	out.Path = in.Path
 	out.User = in.User
 	out.SecretFile = in.SecretFile
 	// unable to generate simple pointer conversion for v1.LocalObjectReference -> api.LocalObjectReference

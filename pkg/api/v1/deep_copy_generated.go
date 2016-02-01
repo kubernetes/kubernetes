@@ -115,6 +115,7 @@ func deepCopy_v1_CephFSVolumeSource(in CephFSVolumeSource, out *CephFSVolumeSour
 	} else {
 		out.Monitors = nil
 	}
+	out.Path = in.Path
 	out.User = in.User
 	out.SecretFile = in.SecretFile
 	if in.SecretRef != nil {
