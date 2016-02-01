@@ -33,6 +33,7 @@ type ServiceInterface interface {
 	Get(name string) (*api.Service, error)
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
+	UpdateStatus(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	ProxyGet(scheme, name, port, path string, params map[string]string) ResponseWrapper
@@ -79,6 +80,13 @@ func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	return
+}
+
+// UpdateStatus takes a Service object with the new status and applies it as an update to the existing Service.
+func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.r.Put().Namespace(c.ns).Resource("services").Name(service.Name).SubResource("status").Body(service).Do().Into(result)
 	return
 }
 

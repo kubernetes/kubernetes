@@ -65,6 +65,15 @@ func (c *FakeServices) Update(service *api.Service) (*api.Service, error) {
 	return obj.(*api.Service), err
 }
 
+func (c *FakeServices) UpdateStatus(service *api.Service) (result *api.Service, err error) {
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("services", "status", c.Namespace, service), service)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.Service), err
+}
+
 func (c *FakeServices) Delete(name string) error {
 	_, err := c.Fake.Invokes(NewDeleteAction("services", c.Namespace, name), &api.Service{})
 	return err
