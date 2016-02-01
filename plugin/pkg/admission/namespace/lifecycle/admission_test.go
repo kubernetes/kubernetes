@@ -24,6 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -43,8 +45,8 @@ func TestAdmission(t *testing.T) {
 
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	store.Add(namespaceObj)
-	mockClient := testclient.NewSimpleFake()
-	mockClient.PrependReactor("get", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+	mockClient := fake.NewSimpleClientset()
+	mockClient.PrependReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		namespaceLock.RLock()
 		defer namespaceLock.RUnlock()
 		if getAction, ok := action.(testclient.GetAction); ok && getAction.GetName() == namespaceObj.Name {
@@ -52,7 +54,7 @@ func TestAdmission(t *testing.T) {
 		}
 		return true, nil, fmt.Errorf("No result for action %v", action)
 	})
-	mockClient.PrependReactor("list", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+	mockClient.PrependReactor("list", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		namespaceLock.RLock()
 		defer namespaceLock.RUnlock()
 		return true, &api.NamespaceList{Items: []api.Namespace{*namespaceObj}}, nil

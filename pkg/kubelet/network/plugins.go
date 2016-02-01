@@ -21,10 +21,11 @@ import (
 	"net"
 	"strings"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -72,7 +73,7 @@ type Host interface {
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 
 	// GetKubeClient returns a client interface
-	GetKubeClient() client.Interface
+	GetKubeClient() clientset.Interface
 
 	// GetContainerRuntime returns the container runtime that implements the containers (e.g. docker/rkt)
 	GetRuntime() kubecontainer.Runtime
