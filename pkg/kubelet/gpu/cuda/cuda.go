@@ -18,12 +18,14 @@ type Cuda struct {
 }
 
 func ProbeGPUPlugin() gpuTypes.GPUPlugin {
+	glog.Infof("Hans: cuda.ProbeGPUPlugin()")
 	return &Cuda{
 		commonInfo: gpuTypes.GPUCommonInfo{Name: CudaName},
 	}
 }
 
 func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
+	glog.Infof("Hans: cuda.Detect()")
 	gpuDevices := gpuTypes.GPUDevices{}
 
 	cudaDevices, err := nvidia.LookupDevices()
@@ -54,6 +56,7 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 
 	gpuDevices.GPUPlatform.Name = cuda.commonInfo.Name
 
+	glog.Infof("Hans: cuda.Detect(): gpuDevices:%+v", gpuDevices)
 	return &gpuDevices, nil
 }
 

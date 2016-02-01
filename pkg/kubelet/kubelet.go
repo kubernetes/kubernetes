@@ -338,7 +338,9 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	gpuPlugins := gpu.ProbeGPUPlugins()
+	klet.gpuPlugins = gpu.ProbeGPUPlugins()
+	glog.Infof("Hans: NewMainKubelet: gpu init: gpuPlugins:%+v", klet.gpuPlugins)
+	glog.Infof("Hans: NewMainKubelet: gpu init: len(gpuPlugins):%d", len(klet.gpuPlugins))
 
 	procFs := procfs.NewProcFS()
 	imageBackOff := util.NewBackOff(backOffPeriod, MaxContainerBackOff)
@@ -355,7 +357,7 @@ func NewMainKubelet(
 			klet.livenessManager,
 			containerRefManager,
 			machineInfo,
-			gpuPlugins,
+			klet.gpuPlugins,
 			podInfraContainerImage,
 			pullQPS,
 			pullBurst,
@@ -2734,8 +2736,10 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 }
 
 func (kl *Kubelet) setNodeStatusGPUInfo(node *api.Node) {
+	glog.Infof("Hans: setNodeStatusGPUInfo: gpuPlugins:%+v", kl.gpuPlugins)
 	gpuNum := 0
 	for _, gpuPlugin := range kl.gpuPlugins {
+		glog.Infof("Hans: setNodeStatusGPUInfo: forloop")
 		gpuDevices, err := gpuPlugin.Detect()
 		if err == nil {
 			gpuNum += len(gpuDevices.Devices)
