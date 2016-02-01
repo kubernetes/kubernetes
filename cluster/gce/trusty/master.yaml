@@ -10,7 +10,7 @@ Content-Disposition: attachment; filename="kube-env.conf"
 
 #upstart-job
 
-description "Prepare kube node environment"
+description "Prepare kube master environment"
 
 start on cloud-config
 
@@ -31,13 +31,15 @@ script
 	config_ip_firewall
 	echo "Downloading kube-env file"
 	download_kube_env
-	echo "Creating required directories"
 	. /etc/kube-env
+	echo "Creating required directories"
 	create_dirs
-	echo "Creating kubelet kubeconfig file"
-	create_kubelet_kubeconfig
-	echo "Creating kube-proxy kubeconfig file"
-	create_kubeproxy_kubeconfig
+	echo "Mount master PD"
+	mount_master_pd
+	echo "Creating kuberntes master auth file"
+	create_master_auth
+	echo "Creating master instance kubelet auth file"
+  create_master_kubelet_auth
 end script
 
 --====================================
@@ -84,7 +86,7 @@ end script
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="kube-install-minion.conf"
+Content-Disposition: attachment; filename="kube-install-master.conf"
 
 #upstart-job
 
@@ -111,7 +113,7 @@ Content-Disposition: attachment; filename="kubelet.conf"
 
 description "Run kubelet service"
 
-start on stopped kube-install-minion and stopped kube-install-packages
+start on stopped kube-install-packages and stopped kube-install-master
 
 respawn
 
@@ -119,24 +121,37 @@ script
 	set -o errexit
 	set -o nounset
 
+	echo "Start kubelet upstart job"
+
 	. /etc/kube-env
-	ARGS="--v=2"
-	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-		ARGS="${KUBELET_TEST_ARGS}"
-	fi
 	BINARY_PATH="/usr/bin/kubelet"
 	if [ "${TEST_CLUSTER:-}" = "true" ]; then
 		BINARY_PATH="/usr/local/bin/kubelet"
 	fi
+	# Assemble command line flags based on env variables.
+	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+		ARGS="${KUBELET_TEST_ARGS}"
+	fi
+	if [ ! -z "${KUBELET_APISERVER:-}" ] && [ ! -z "${KUBELET_CERT:-}" ] && [ ! -z "${KUBELET_KEY:-}" ]; then
+		ARGS="${ARGS} --api-servers=https://${KUBELET_APISERVER}"
+		ARGS="${ARGS} --register-schedulable=false --reconcile-cidr=false"
+		ARGS="${ARGS} --pod-cidr=10.123.45.0/30"
+	else
+		ARGS="${ARGS} --pod-cidr=${MASTER_IP_RANGE}"
+	fi
+	if [ "${ENABLE_MANIFEST_URL:-}" = "true" ]; then
+		ARGS="${ARGS} --manifest-url=${MANIFEST_URL} --manifest-url-header=${MANIFEST_URL_HEADER}"
+	fi
+	
 	${BINARY_PATH} \
-		--api-servers=https://${KUBERNETES_MASTER_NAME} \
-		--enable-debugging-handlers=true \
+		--enable-debugging-handlers=false \
 		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
 		--allow-privileged=true \
 		--cluster-dns=${DNS_SERVER_IP} \
 		--cluster-domain=${DNS_DOMAIN} \
-		--configure-cbr0=true \
+		--configure-cbr0=${ALLOCATE_NODE_CIDRS} \
 		--cgroup-root=/ \
 		--system-container=/system \
 		--nosystemd=true \
@@ -174,11 +189,11 @@ end script
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="kube-proxy.conf"
+Content-Disposition: attachment; filename="kube-master-components.conf"
 
 #upstart-job
 
-description "Start kube-proxy static pod"
+description "Start kube-master components and addons pods"
 
 start on stopped kube-docker
 
@@ -188,87 +203,29 @@ script
 
 	. /etc/kube-configure.sh
 	. /etc/kube-env
-	prepare_log_file "/var/log/kube-proxy.log"
-	# Load the docker image from file /run/kube-docker-files/kube-proxy.tar.
-	echo "Try to load docker image file kube-proxy.tar"
-	timeout 30 docker load -i /run/kube-docker-files/kube-proxy.tar
-	# Copy the manifest to /tmp to manipulate
-	tmp_file="/tmp/kube-proxy.manifest"
-	cp -f /run/kube-manifests/kubernetes/kube-proxy.manifest ${tmp_file}
-	# Remove the lines of salt configuration and replace variables with values.
-	# NOTE: Changes to variable names in cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
-	# may break this upstart job.
-	sed -i "/^ *{%/d" ${tmp_file}
-	kubeconfig="--kubeconfig=\/var\/lib\/kube-proxy\/kubeconfig"
-	kube_docker_registry="gcr.io\/google_containers"
-	if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
-		kube_docker_registry=${KUBE_DOCKER_REGISTRY}
-	fi
-	kube_proxy_docker_tag=$(cat /run/kube-docker-files/kube-proxy.docker_tag)
-	test_args=""
-	log_level="--v=2"
-	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
-		test_args="${KUBEPROXY_TEST_ARGS}"
-		# test_args should already contain log level setting.
-		log_level=""
-	fi
-	api_servers="--master=https:\/\/${KUBERNETES_MASTER_NAME}"
-	sed -i -e "s/{{kubeconfig}}/${kubeconfig}/g" ${tmp_file}
-	sed -i -e "s/{{pillar\['kube_docker_registry'\]}}/${kube_docker_registry}/g" ${tmp_file}
-	sed -i -e "s/{{pillar\['kube-proxy_docker_tag'\]}}/${kube_proxy_docker_tag}/g" ${tmp_file}
-	sed -i -e "s/{{test_args}}/${test_args}/g" ${tmp_file}
-	sed -i -e "s/{{log_level}}/${log_level}/g" ${tmp_file}
-	sed -i -e "s/{{api_servers_with_port}}/${api_servers}/g" ${tmp_file}
-
-	mv -f ${tmp_file} /etc/kubernetes/manifests/
+	start_etcd_servers
+	compute_master_manifest_variables
+	start_kube_apiserver
+	start_kube_controller_manager
+	start_kube_scheduler
+	start_kube_addons
 end script
 
 --====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="kube-addons.conf"
+Content-Disposition: attachment; filename="kube-master-health-monitoring.conf"
 
 #upstart-job
 
-description "Install kubelet add-on manifest files"
+description "Kubenetes master health monitoring"
 
 start on stopped kube-docker
 
 script
 	set -o errexit
 	set -o nounset
-
-	# Kube-system pod manifest files are located at /run/kube-manifests/kubernetes.
-	. /etc/kube-configure.sh
-	. /etc/kube-env
-	# Fluentd
-	start_fluentd
-	# Kube-registry-proxy
-	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
-		cp /run/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
-	fi
-end script
-
---====================================
-MIME-Version: 1.0
-Content-Type: text/upstart-job; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="kube-node-health-monitoring.conf"
-
-description "Kubenetes node health monitoring"
-
-# The termination of kube-proxy upstart job indicates that kubelet and docker are ready.
-start on stopped kube-proxy
-
-respawn
-
-script
-	set -o nounset
-
-	# Wait for a minute to let docker, kubelet, and kube-proxy processes finish initialization.
-	# TODO(andyzheng0831): replace it with a more reliable method if possible.
-	sleep 60
 
 	. /etc/kube-configure.sh
 	. /etc/kube-env
