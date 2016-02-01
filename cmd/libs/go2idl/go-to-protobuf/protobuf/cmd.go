@@ -64,6 +64,7 @@ func New() *Generator {
 			`+k8s.io/kubernetes/pkg/runtime,` +
 			`k8s.io/kubernetes/pkg/api/unversioned,` +
 			`k8s.io/kubernetes/pkg/api/v1,` +
+			`k8s.io/kubernetes/pkg/apis/autoscaling/v1,` +
 			`k8s.io/kubernetes/pkg/apis/extensions/v1beta1`,
 		DropEmbeddedFields: "k8s.io/kubernetes/pkg/api/unversioned.TypeMeta",
 	}

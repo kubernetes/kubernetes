@@ -33,7 +33,7 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.0."* ]]; the
   exit 0
 fi
 
-APIROOTS=${APIROOTS:-pkg/api pkg/apis/extensions pkg/apis/metrics pkg/runtime pkg/util/intstr}
+APIROOTS=${APIROOTS:-pkg/api pkg/apis/autoscaling pkg/apis/extensions pkg/apis/metrics pkg/runtime pkg/util/intstr}
 _tmp="${KUBE_ROOT}/_tmp"
 
 cleanup() {
