@@ -47,8 +47,6 @@ done
 move_docker=""
 move_kubelet=""
 
-apt-get update
-
 docker_storage=${DOCKER_STORAGE:-aufs}
 
 # Format the ephemeral disks
@@ -66,7 +64,7 @@ else
   done
 
   if [[ ${docker_storage} == "btrfs" ]]; then
-    apt-get install --yes btrfs-tools
+    apt-get-install btrfs-tools
 
     if [[ ${#block_devices[@]} == 1 ]]; then
       echo "One ephemeral block device found; formatting with btrfs"
@@ -102,7 +100,7 @@ else
     # In devicemapper mode, Docker can use LVM directly
     # Also, fewer code paths are good
     echo "Using LVM2 and ext4"
-    apt-get install --yes lvm2
+    apt-get-install lvm2
 
     # Don't output spurious "File descriptor X leaked on vgcreate invocation."
     # Known bug: e.g. Ubuntu #591823
@@ -165,10 +163,10 @@ if [[ ${docker_storage} == "btrfs" ]]; then
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
   # Install aufs kernel module
   # Fix issue #14162 with extra-virtual
-  apt-get install --yes linux-image-extra-$(uname -r) linux-image-extra-virtual
+  apt-get-install linux-image-extra-$(uname -r) linux-image-extra-virtual
 
   # Install aufs tools
-  apt-get install --yes aufs-tools
+  apt-get-install aufs-tools
 
   DOCKER_OPTS="${DOCKER_OPTS} -s aufs"
 elif [[ ${docker_storage} == "devicemapper" ]]; then
