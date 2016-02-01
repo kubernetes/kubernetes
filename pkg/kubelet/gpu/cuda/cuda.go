@@ -48,6 +48,8 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 		gpuDevs = append(gpuDevs, dev)
 	}
 
+	gpuDevices.Devices = gpuDevs
+
 	driverVersion, err := nvml.GetDriverVersion()
 	if err == nil {
 		gpuDevices.GPUPlatform.DriverVersion = driverVersion

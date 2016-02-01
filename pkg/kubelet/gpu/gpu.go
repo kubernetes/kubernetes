@@ -12,12 +12,13 @@ func ProbeGPUPlugins() []gpuTypes.GPUPlugin {
 
 	// add cuda plugin
 	cudaPlugin := cuda.ProbeGPUPlugin()
-	// if err := cudaPlugin.Init(); err == nil {
-	err := cudaPlugin.Init()
-	glog.Infof("Hans: ProbeGPUPlugins: Init error: %q", err)
-	if err == nil {
+
+	if err := cudaPlugin.Init(); err == nil {
 		allPlugins = append(allPlugins, cuda.ProbeGPUPlugin())
+	} else {
+		glog.Infof("Init cuda Plugin failed: %q", err)
 	}
+
 	glog.Infof("Hans: ProbeGPUPlugins: allPlugins: %+v, len: %d", allPlugins, len(allPlugins))
 
 	return allPlugins
