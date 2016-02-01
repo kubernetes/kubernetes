@@ -320,6 +320,7 @@ func (s *Connection) Serve(newHandler StreamHandler) {
 		partitionRoundRobin int
 		goAwayFrame         *spdy.GoAwayFrame
 	)
+Loop:
 	for {
 		readFrame, err := s.framer.ReadFrame()
 		if err != nil {
@@ -362,7 +363,7 @@ func (s *Connection) Serve(newHandler StreamHandler) {
 		case *spdy.GoAwayFrame:
 			// hold on to the go away frame and exit the loop
 			goAwayFrame = frame
-			break
+			break Loop
 		default:
 			priority = 7
 			partition = partitionRoundRobin
