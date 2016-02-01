@@ -1262,11 +1262,13 @@ function test-setup {
     "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
-  do sleep 5
+  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null; do
+    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-http-alt in ${PROJECT}" >&2
+      exit 1
+    fi
+    sleep 5
   done
-  # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
@@ -1279,11 +1281,13 @@ function test-setup {
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
-  do sleep 5
+  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null; do
+    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-nodeports in ${PROJECT}" >&2
+      exit 1
+    fi
+    sleep 5
   done
-  # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
