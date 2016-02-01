@@ -590,6 +590,8 @@ type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
 	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
 	Monitors []string `json:"monitors"`
+	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	Path string `json:"path,omitempty"`
 	// Optional: User is the rados user name, default is admin
 	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
 	User string `json:"user,omitempty"`
