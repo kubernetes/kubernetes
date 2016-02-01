@@ -23,6 +23,7 @@ ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
 
 SYSTEM_NAMESPACE=kube-system
 token_dir=${TOKEN_DIR:-/srv/kubernetes}
+trusty_master=${TRUSTY_MASTER:-false}
 
 function ensure_python() {
   if ! python --version > /dev/null 2>&1; then    
@@ -162,8 +163,11 @@ function load-docker-images() {
 # managed result is of that. Start everything below that directory.
 echo "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
-# Load any images that we may need
-load-docker-images /srv/salt/kube-addons-images
+# Load any images that we may need. This is not needed for trusty master and
+# the way it restarts docker daemon does not work for trusty.
+if [[ "${trusty_master}" == "false" ]]; then
+  load-docker-images /srv/salt/kube-addons-images
+fi
 
 ensure_python
 
