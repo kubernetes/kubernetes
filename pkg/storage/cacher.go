@@ -313,7 +313,10 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 	}
 	filterFunc := filterFunction(key, c.keyFunc, filter)
 
-	objs, readResourceVersion := c.watchCache.WaitUntilFreshAndList(listRV)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV)
+	if err != nil {
+		return fmt.Errorf("failed to wait for fresh list: %v", err)
+	}
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
