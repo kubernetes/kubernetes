@@ -823,6 +823,17 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "ENV_VAR_1",
+			ValueFrom: &api.EnvVarSource{
+				ConfigMapKeyRef: &api.ConfigMapKeySelector{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "some-config-map",
+					},
+					Key: "some-key",
+				},
+			},
+		},
 	}
 	if errs := validateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -858,7 +869,7 @@ func TestValidateEnv(t *testing.T) {
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
 		},
 		{
-			name: "FieldRef and SecretKeyRef specified",
+			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 			envs: []api.EnvVar{{
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
@@ -875,6 +886,50 @@ func TestValidateEnv(t *testing.T) {
 				},
 			}},
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not have more than one field specified at a time",
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.configMapKeyRef set",
+			envs: []api.EnvVar{{
+				Name: "some_var_name",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "some-config-map",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					SecretKeyRef: &api.SecretKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "a-secret",
+						},
+						Key: "a-key",
+					},
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "some-config-map",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
 		},
 		{
 			name: "missing FieldPath on ObjectFieldSelector",
