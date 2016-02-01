@@ -34,6 +34,19 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
 
+type streamAndReply struct {
+	httpstream.Stream
+	replySent <-chan struct{}
+}
+
+func waitStreamReply(replySent <-chan struct{}, notify chan<- struct{}, stop <-chan struct{}) {
+	select {
+	case <-replySent:
+		notify <- struct{}{}
+	case <-stop:
+	}
+}
+
 func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, errorData string, tty bool, messageCount int) http.HandlerFunc {
 	// error + stdin + stdout
 	expectedStreams := 3
@@ -50,11 +63,11 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 		if protocol != StreamProtocolV2Name {
 			t.Fatalf("unexpected protocol: %s", protocol)
 		}
-		streamCh := make(chan httpstream.Stream)
+		streamCh := make(chan streamAndReply)
 
 		upgrader := spdy.NewResponseUpgrader()
-		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream) error {
-			streamCh <- stream
+		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
+			streamCh <- streamAndReply{Stream: stream, replySent: replySent}
 			return nil
 		})
 		// from this point on, we can no longer call methods on w
@@ -68,6 +81,9 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 
 		var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 		receivedStreams := 0
+		replyChan := make(chan struct{})
+		stop := make(chan struct{})
+		defer close(stop)
 	WaitForStreams:
 		for {
 			select {
@@ -76,20 +92,25 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 				switch streamType {
 				case api.StreamTypeError:
 					errorStream = stream
-					receivedStreams++
+					go waitStreamReply(stream.replySent, replyChan, stop)
 				case api.StreamTypeStdin:
 					stdinStream = stream
-					receivedStreams++
+					go waitStreamReply(stream.replySent, replyChan, stop)
 				case api.StreamTypeStdout:
 					stdoutStream = stream
-					receivedStreams++
+					go waitStreamReply(stream.replySent, replyChan, stop)
 				case api.StreamTypeStderr:
 					stderrStream = stream
-					receivedStreams++
+					go waitStreamReply(stream.replySent, replyChan, stop)
 				default:
 					t.Errorf("%d: unexpected stream type: %q", i, streamType)
 				}
 
+				if receivedStreams == expectedStreams {
+					break WaitForStreams
+				}
+			case <-replyChan:
+				receivedStreams++
 				if receivedStreams == expectedStreams {
 					break WaitForStreams
 				}
