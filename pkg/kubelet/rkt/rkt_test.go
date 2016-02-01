@@ -62,7 +62,7 @@ func makeRktPod(rktPodState rktapi.PodState,
 	rktPodID, podUID, podName, podNamespace,
 	podIP, podCreationTs, podRestartCount string,
 	appNames, imgIDs, imgNames, containerHashes []string,
-	appStates []rktapi.AppState) *rktapi.Pod {
+	appStates []rktapi.AppState, exitcodes []int32) *rktapi.Pod {
 
 	podManifest := &appcschema.PodManifest{
 		ACKind:    appcschema.PodManifestKind,
@@ -125,6 +125,7 @@ func makeRktPod(rktPodState rktapi.PodState,
 					},
 				),
 			},
+			ExitCode: exitcodes[i],
 		}
 		podManifest.Apps = append(podManifest.Apps, appcschema.RuntimeApp{
 			Name:  *appctypes.MustACName(appNames[i]),
@@ -355,6 +356,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			[]*kubecontainer.Pod{
@@ -394,6 +396,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4003", "43", "guestbook", "default",
@@ -403,6 +406,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-11", "img-name-22"},
 					[]string{"10011", "10022"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			[]*kubecontainer.Pod{
@@ -542,6 +546,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			&kubecontainer.PodStatus{
@@ -571,6 +576,7 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
+						Reason:       "Completed",
 					},
 				},
 			},
@@ -586,6 +592,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING, // The latest pod is running.
 					"uuid-4003", "42", "guestbook", "default",
@@ -595,6 +602,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 1},
 				),
 			},
 			&kubecontainer.PodStatus{
@@ -625,6 +633,7 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
+						Reason:       "Completed",
 					},
 					{
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-1"),
@@ -647,6 +656,8 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 10,
+						ExitCode:     1,
+						Reason:       "Error",
 					},
 				},
 			},
@@ -863,6 +874,7 @@ func TestSetApp(t *testing.T) {
 		// app should be changed. (env, mounts, ports, are overrided).
 		{
 			container: &api.Container{
+				Name:       "hello-world",
 				Command:    []string{"/bin/bar", "$(env-foo)"},
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
