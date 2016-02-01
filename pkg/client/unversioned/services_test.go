@@ -167,6 +167,51 @@ func TestDeleteService(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestUpdateServiceStatus(t *testing.T) {
+	ns := api.NamespaceDefault
+	lbStatus := api.LoadBalancerStatus{
+		Ingress: []api.LoadBalancerIngress{
+			{IP: "127.0.0.1"},
+		},
+	}
+	requestService := &api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Status: api.ServiceStatus{
+			LoadBalancer: lbStatus,
+		},
+	}
+	c := &simple.Client{
+		Request: simple.Request{
+			Method: "PUT",
+			Path:   testapi.Default.ResourcePath("services", ns, "foo") + "/status",
+			Query:  simple.BuildQueryValues(nil),
+		},
+		Response: simple.Response{
+			StatusCode: 200,
+			Body: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
+				},
+				Spec: api.ServiceSpec{},
+				Status: api.ServiceStatus{
+					LoadBalancer: lbStatus,
+				},
+			},
+		},
+	}
+	receivedService, err := c.Setup(t).Services(ns).UpdateStatus(requestService)
+	defer c.Close()
+	c.Validate(t, receivedService, err)
+}
+
 func TestServiceProxyGet(t *testing.T) {
 	body := "OK"
 	ns := api.NamespaceDefault
