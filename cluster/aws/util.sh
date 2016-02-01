@@ -535,8 +535,6 @@ function create-dhcp-option-set () {
 
 # Verify prereqs
 function verify-prereqs {
-  build-runtime-config
-
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
@@ -909,6 +907,9 @@ function kube-up {
 
 # Starts the master node
 function start-master() {
+  # Ensure RUNTIME_CONFIG is populated
+  build-runtime-config
+
   # Get or create master persistent volume
   ensure-master-pd
 
@@ -1088,6 +1089,9 @@ function start-master() {
 
 # Creates an ASG for the minion nodes
 function start-minions() {
+  # Minions don't currently use runtime config, but call it anyway for sanity
+  build-runtime-config
+
   echo "Creating minion configuration"
   generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
   local public_ip_option
