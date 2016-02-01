@@ -1643,6 +1643,8 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
+	// GPU, in cards. (500m = .5 cards)
+	ResourceGPU ResourceName = "gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods
 )
 

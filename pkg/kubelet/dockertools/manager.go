@@ -39,7 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools/gpu"
+	// "k8s.io/kubernetes/pkg/kubelet/gpu"
+	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu/types"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -91,6 +92,7 @@ type DockerManager struct {
 	containerRefManager *kubecontainer.RefManager
 	os                  kubecontainer.OSInterface
 	machineInfo         *cadvisorapi.MachineInfo
+	gpuPlugins          []gpuTypes.GPUPlugin
 
 	// The image name of the pod infra container.
 	podInfraContainerImage string
@@ -151,6 +153,7 @@ func NewDockerManager(
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
+	gpuPlugins []gpuTypes.GPUPlugin,
 	podInfraContainerImage string,
 	qps float32,
 	burst int,
@@ -204,6 +207,7 @@ func NewDockerManager(
 		containerRefManager:    containerRefManager,
 		os:                     osInterface,
 		machineInfo:            machineInfo,
+		gpuPlugins:             gpuPlugins,
 		podInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
 		dockerPuller:           newDockerPuller(client, qps, burst),
@@ -746,12 +750,6 @@ func (dm *DockerManager) runContainer(
 		Memory:     memoryLimit,
 		MemorySwap: -1,
 		CPUShares:  cpuShares,
-	}
-
-	var gpuDevice gpu.GPUDevice
-	gooderr := gpu.Detect(&gpuDevice) 
-	if gooderr  != nil {
-		securityContextProvider.ModifyHostConfig(pod, container, hc)
 	}
 
 	if dm.cpuCFSQuota {
