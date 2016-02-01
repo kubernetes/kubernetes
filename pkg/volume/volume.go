@@ -18,11 +18,11 @@ package volume
 
 import (
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-
 	"os"
 	"path"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // Volume represents a directory used by pods or hosts on a node.

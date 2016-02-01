@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -40,12 +40,12 @@ func formatMap(m map[string]string) (fmtstr string) {
 	return
 }
 
-func newTestHost(t *testing.T, client client.Interface) (string, volume.VolumeHost) {
+func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := utiltesting.MkTmpdir("downwardApi_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -94,7 +94,7 @@ func TestLabels(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -103,7 +103,7 @@ func TestLabels(t *testing.T) {
 	})
 
 	pluginMgr := volume.VolumePluginMgr{}
-	rootDir, host := newTestHost(t, fake)
+	rootDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(rootDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -181,7 +181,7 @@ func TestAnnotations(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:        testName,
 			Namespace:   testNamespace,
@@ -190,7 +190,7 @@ func TestAnnotations(t *testing.T) {
 	})
 
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -244,7 +244,7 @@ func TestName(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -252,7 +252,7 @@ func TestName(t *testing.T) {
 	})
 
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -307,7 +307,7 @@ func TestNamespace(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -315,7 +315,7 @@ func TestNamespace(t *testing.T) {
 	})
 
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -363,7 +363,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -371,7 +371,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		},
 	})
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -449,7 +449,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -457,7 +457,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		},
 	})
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -554,7 +554,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 		"a1": "value1",
 		"a2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -563,7 +563,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	})
 
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
@@ -630,7 +630,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		"key2": "value2",
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -639,7 +639,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	})
 
 	pluginMgr := volume.VolumePluginMgr{}
-	tmpDir, host := newTestHost(t, fake)
+	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)

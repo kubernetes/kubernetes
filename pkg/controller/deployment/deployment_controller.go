@@ -29,8 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -56,8 +57,7 @@ const (
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running rcs and pods.
 type DeploymentController struct {
-	client        client.Interface
-	expClient     client.ExtensionsInterface
+	client        clientset.Interface
 	eventRecorder record.EventRecorder
 
 	// To allow injection of syncDeployment for testing.
@@ -94,14 +94,14 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(client client.Interface, resyncPeriod controller.ResyncPeriodFunc) *DeploymentController {
+func NewDeploymentController(client clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(client.Events(""))
+	// TODO: remove the wrapper when every clients have moved to use the clientset.
+	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{client.Legacy().Events("")})
 
 	dc := &DeploymentController{
 		client:          client,
-		expClient:       client.Extensions(),
 		eventRecorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),
 		queue:           workqueue.New(),
 		podExpectations: controller.NewControllerExpectations(),
@@ -111,10 +111,10 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 	dc.dStore.Store, dc.dController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dc.expClient.Deployments(api.NamespaceAll).List(options)
+				return dc.client.Extensions().Deployments(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.expClient.Deployments(api.NamespaceAll).Watch(options)
+				return dc.client.Extensions().Deployments(api.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.Deployment{},
@@ -143,10 +143,10 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 	dc.rcStore.Store, dc.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dc.client.ReplicationControllers(api.NamespaceAll).List(options)
+				return dc.client.Legacy().ReplicationControllers(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.ReplicationControllers(api.NamespaceAll).Watch(options)
+				return dc.client.Legacy().ReplicationControllers(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ReplicationController{},
@@ -161,10 +161,10 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 	dc.podStore.Store, dc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dc.client.Pods(api.NamespaceAll).List(options)
+				return dc.client.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.Pods(api.NamespaceAll).Watch(options)
+				return dc.client.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -688,7 +688,7 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 		if existingNewRC.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
 			existingNewRC.Annotations[deploymentutil.RevisionAnnotation] = newRevision
 			glog.V(4).Infof("update existingNewRC %s revision to %s - %+v\n", existingNewRC.Name, newRevision)
-			return dc.client.ReplicationControllers(deployment.ObjectMeta.Namespace).Update(existingNewRC)
+			return dc.client.Legacy().ReplicationControllers(deployment.ObjectMeta.Namespace).Update(existingNewRC)
 		}
 		return existingNewRC, nil
 	}
@@ -728,7 +728,7 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 			Template: &newRCTemplate,
 		},
 	}
-	createdRC, err := dc.client.ReplicationControllers(namespace).Create(&newRC)
+	createdRC, err := dc.client.Legacy().ReplicationControllers(namespace).Create(&newRC)
 	if err != nil {
 		dc.rcExpectations.DeleteExpectations(dKey)
 		return nil, fmt.Errorf("error creating replication controller: %v", err)
@@ -752,7 +752,7 @@ func (dc *DeploymentController) updateRCRevision(rc api.ReplicationController, r
 		rc.Annotations = make(map[string]string)
 	}
 	rc.Annotations[deploymentutil.RevisionAnnotation] = revision
-	_, err := dc.client.ReplicationControllers(rc.ObjectMeta.Namespace).Update(&rc)
+	_, err := dc.client.Legacy().ReplicationControllers(rc.ObjectMeta.Namespace).Update(&rc)
 	return err
 }
 
@@ -901,7 +901,7 @@ func (dc *DeploymentController) cleanupOldRcs(oldRCs []*api.ReplicationControlle
 		if controller.Spec.Replicas != 0 || controller.Generation > controller.Status.ObservedGeneration {
 			continue
 		}
-		if err := dc.client.ReplicationControllers(controller.Namespace).Delete(controller.Name); err != nil && !errors.IsNotFound(err) {
+		if err := dc.client.Legacy().ReplicationControllers(controller.Namespace).Delete(controller.Name, nil); err != nil && !errors.IsNotFound(err) {
 			glog.V(2).Infof("Failed deleting old rc %v for deployment %v: %v", controller.Name, deployment.Name, err)
 			errList = append(errList, err)
 		}
@@ -923,7 +923,7 @@ func (dc *DeploymentController) updateDeploymentStatus(allRCs []*api.Replication
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
 	}
-	_, err = dc.expClient.Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
+	_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
 	return err
 }
 
@@ -958,12 +958,12 @@ func (dc *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationControl
 func (dc *DeploymentController) scaleRC(rc *api.ReplicationController, newScale int) (*api.ReplicationController, error) {
 	// TODO: Using client for now, update to use store when it is ready.
 	rc.Spec.Replicas = newScale
-	return dc.client.ReplicationControllers(rc.ObjectMeta.Namespace).Update(rc)
+	return dc.client.Legacy().ReplicationControllers(rc.ObjectMeta.Namespace).Update(rc)
 }
 
 func (dc *DeploymentController) updateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	// TODO: Using client for now, update to use store when it is ready.
-	return dc.expClient.Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
+	return dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
 }
 
 func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deployment, rc *api.ReplicationController) (d *extensions.Deployment, performedRollback bool, err error) {

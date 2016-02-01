@@ -16,16 +16,13 @@ limitations under the License.
 
 package unversioned
 
-type DaemonSetExpansion interface{}
+import "k8s.io/kubernetes/pkg/apis/extensions"
 
-type HorizontalPodAutoscalerExpansion interface{}
+type DeploymentExpansion interface {
+	Rollback(*extensions.DeploymentRollback) error
+}
 
-type IngressExpansion interface{}
-
-type JobExpansion interface{}
-
-type ScaleExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
-
-type ReplicaSetExpansion interface{}
+// Rollback applied the provided DeploymentRollback to the named deployment in the current namespace.
+func (c *deployments) Rollback(deploymentRollback *extensions.DeploymentRollback) error {
+	return c.client.Post().Namespace(c.ns).Resource("deployments").Name(deploymentRollback.Name).SubResource("rollback").Body(deploymentRollback).Do().Error()
+}

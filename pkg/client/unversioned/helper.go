@@ -620,3 +620,9 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 	}
 	return nil, nil
 }
+
+func AddUserAgent(config *Config, userAgent string) *Config {
+	fullUserAgent := DefaultKubernetesUserAgent() + "/" + userAgent
+	config.UserAgent = fullUserAgent
+	return config
+}
