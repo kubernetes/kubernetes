@@ -80,11 +80,47 @@ func RegisterVersions(availableVersions []unversioned.GroupVersion) {
 // RegisterGroup adds the given group to the list of registered groups.
 func RegisterGroup(groupMeta apimachinery.GroupMeta) error {
 	groupName := groupMeta.GroupVersion.Group
-	if _, found := groupMetaMap[groupName]; found {
-		return fmt.Errorf("group %v is already registered", groupMetaMap)
+	if existing, found := groupMetaMap[groupName]; found {
+		mergedGroupMeta := mergeGroupMeta(*existing, groupMeta)
+		groupMetaMap[groupName] = &mergedGroupMeta
+		return nil
+		// return fmt.Errorf("group %v is already registered", groupMetaMap)
 	}
 	groupMetaMap[groupName] = &groupMeta
 	return nil
+}
+
+// mergeGroupMeta takes an lhs and an rhs GroupMeta, then builds a resulting GroupMeta that contains the
+// merged information.  Order of merging matters: lhs wins.
+func mergeGroupMeta(lhs, rhs apimachinery.GroupMeta) apimachinery.GroupMeta {
+	merged := apimachinery.GroupMeta{}
+
+	merged.GroupVersion = lhs.GroupVersion
+	merged.SelfLinker = lhs.SelfLinker
+
+	knownGVs := sets.String{}
+	for _, lhsGV := range lhs.GroupVersions {
+		knownGVs.Insert(lhsGV.String())
+		merged.GroupVersions = append(merged.GroupVersions, lhsGV)
+	}
+	for _, rhsGV := range lhs.GroupVersions {
+		if knownGVs.Has(rhsGV.String()) {
+			continue
+		}
+		merged.GroupVersions = append(merged.GroupVersions, rhsGV)
+	}
+
+	merged.RESTMapper = meta.MultiRESTMapper(append([]meta.RESTMapper{}, lhs.RESTMapper, rhs.RESTMapper))
+
+	merged.InterfacesFor = func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+		if ret, err := lhs.InterfacesFor(version); err == nil {
+			return ret, nil
+		}
+
+		return rhs.InterfacesFor(version)
+	}
+
+	return merged
 }
 
 // EnableVersions adds the versions for the given group to the list of enabled versions.
