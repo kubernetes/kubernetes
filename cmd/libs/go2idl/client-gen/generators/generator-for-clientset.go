@@ -97,16 +97,22 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	}
 
 	m := map[string]interface{}{
-		"allGroups":                  allGroups,
-		"Config":                     c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
-		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
+		"allGroups":                        allGroups,
+		"Config":                           c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
+		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
+		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
+		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryInterface"}),
+		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryClient"}),
+		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfig"}),
+		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfigOrDie"}),
+		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClient"}),
 	}
 	sw.Do(clientsetInterfaceTemplate, m)
 	sw.Do(clientsetTemplate, m)
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
 	}
+	sw.Do(getDiscoveryTemplate, m)
 	sw.Do(newClientsetForConfigTemplate, m)
 	sw.Do(newClientsetForConfigOrDieTemplate, m)
 	sw.Do(newClientsetForRESTClientTemplate, m)
@@ -116,6 +122,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 var clientsetInterfaceTemplate = `
 type Interface interface {
+	Discovery() $.DiscoveryInterface|raw$
     $range .allGroups$$.Group$() $.PackageName$.$.Group$Interface
     $end$
 }
@@ -125,6 +132,7 @@ var clientsetTemplate = `
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*$.DiscoveryClient|raw$
     $range .allGroups$*$.PackageName$.$.Group$Client
     $end$
 }
@@ -134,6 +142,12 @@ var clientsetInterfaceImplTemplate = `
 // $.Group$ retrieves the $.Group$Client
 func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
 	return c.$.Group$Client
+}
+`
+var getDiscoveryTemplate = `
+// Discovery retrieves the DiscoveryClient
+func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
+	return c.DiscoveryClient
 }
 `
 
@@ -147,6 +161,10 @@ $range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig
 		return nil, err
 	}
 $end$
+	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(c)
+	if err!=nil {
+		return nil, err
+	}
 	return &clientset, nil
 }
 `
@@ -158,6 +176,7 @@ func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
 	var clientset Clientset
 $range .allGroups$    clientset.$.Group$Client =$.PackageName$.NewForConfigOrDie(c)
 $end$
+	clientset.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
 	return &clientset
 }
 `
@@ -168,7 +187,7 @@ func New(c *$.RESTClient|raw$) *Clientset {
 	var clientset Clientset
 $range .allGroups$    clientset.$.Group$Client =$.PackageName$.New(c)
 $end$
-
+	clientset.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &clientset
 }
 `
