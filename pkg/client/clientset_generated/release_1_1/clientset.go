@@ -17,6 +17,7 @@ limitations under the License.
 package release_1_1
 
 import (
+	"github.com/golang/glog"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
@@ -57,18 +58,18 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	var err error
 	clientset.LegacyClient, err = legacy_unversioned.NewForConfig(c)
 	if err != nil {
-		return nil, err
+		return &clientset, err
 	}
 	clientset.ExtensionsClient, err = extensions_unversioned.NewForConfig(c)
 	if err != nil {
-		return nil, err
+		return &clientset, err
 	}
 
 	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
 	if err != nil {
-		return nil, err
+		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
-	return &clientset, nil
+	return &clientset, err
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and

@@ -74,6 +74,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		typedClientPath := filepath.Join(g.typedClientPath, group, version)
 		imports = append(imports, g.imports.ImportLines()...)
 		imports = append(imports, fmt.Sprintf("%s_%s \"%s\"", group, version, typedClientPath))
+		imports = append(imports, "github.com/golang/glog")
 	}
 	return
 }
@@ -158,14 +159,14 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	var err error
 $range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(c)
 	if err!=nil {
-		return nil, err
+		return &clientset, err
 	}
 $end$
 	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(c)
 	if err!=nil {
-		return nil, err
+		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
-	return &clientset, nil
+	return &clientset, err
 }
 `
 

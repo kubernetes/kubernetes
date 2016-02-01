@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -266,13 +267,13 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
 		if err == nil {
-			kcfg.KubeClient, err = client.New(clientConfig)
+			kcfg.KubeClient, err = clientset.NewForConfig(clientConfig)
 
 			// make a separate client for events
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = s.EventRecordQPS
 			eventClientConfig.Burst = s.EventBurst
-			kcfg.EventClient, err = client.New(&eventClientConfig)
+			kcfg.EventClient, err = clientset.NewForConfig(&eventClientConfig)
 		}
 		if err != nil && len(s.APIServerList) > 0 {
 			glog.Warningf("No API client: %v", err)
@@ -452,7 +453,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *client.Config) {
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
 // Under the hood it calls RunKubelet (below)
-func SimpleKubelet(client *client.Client,
+func SimpleKubelet(client *clientset.Clientset,
 	dockerClient dockertools.DockerInterface,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
@@ -563,7 +564,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(kcfg.EventClient.Events(""))
+		eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kcfg.EventClient.Events("")})
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
@@ -666,7 +667,7 @@ type KubeletConfig struct {
 	DockerExecHandler              dockertools.ExecHandler
 	EnableDebuggingHandlers        bool
 	EnableServer                   bool
-	EventClient                    *client.Client
+	EventClient                    *clientset.Clientset
 	EventBurst                     int
 	EventRecordQPS                 float32
 	FileCheckFrequency             time.Duration
@@ -677,7 +678,7 @@ type KubeletConfig struct {
 	HostIPCSources                 []string
 	HTTPCheckFrequency             time.Duration
 	ImageGCPolicy                  kubelet.ImageGCPolicy
-	KubeClient                     *client.Client
+	KubeClient                     *clientset.Clientset
 	ManifestURL                    string
 	ManifestURLHeader              http.Header
 	MasterServiceNamespace         string
@@ -733,12 +734,10 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
 	// a nil pointer to it when what we really want is a nil interface.
-	var kubeClient client.Interface
-	var c clientset.Interface
+	var kubeClient clientset.Interface
 	if kc.KubeClient != nil {
 		kubeClient = kc.KubeClient
 		// TODO: remove this when we've refactored kubelet to only use clientset.
-		c = clientset.FromUnversionedClient(kc.KubeClient)
 	}
 
 	gcPolicy := kubecontainer.ContainerGCPolicy{
@@ -760,7 +759,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.NodeName,
 		kc.DockerClient,
 		kubeClient,
-		c,
 		kc.RootDirectory,
 		kc.PodInfraContainerImage,
 		kc.SyncFrequency,

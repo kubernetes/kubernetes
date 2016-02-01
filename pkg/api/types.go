@@ -2150,6 +2150,8 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
+// +genclient=true
+
 // ConfigMap holds configuration data for components or applications to consume.
 type ConfigMap struct {
 	unversioned.TypeMeta `json:",inline"`

@@ -37,3 +37,5 @@ type ResourceQuotaExpansion interface{}
 type SecretExpansion interface{}
 
 type ServiceAccountExpansion interface{}
+
+type ConfigMapExpansion interface{}

@@ -153,7 +153,7 @@ func (s *CMServer) Run(_ []string) error {
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
-	nodeStatusUpdaterController := node.NewStatusUpdater(client.NewOrDie(client.AddUserAgent(kubeconfig, "node-status-controller")), s.NodeMonitorPeriod, time.Now)
+	nodeStatusUpdaterController := node.NewStatusUpdater(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "node-status-controller")), s.NodeMonitorPeriod, time.Now)
 	if err := nodeStatusUpdaterController.Run(util.NeverStop); err != nil {
 		glog.Fatalf("Failed to start node status update controller: %v", err)
 	}

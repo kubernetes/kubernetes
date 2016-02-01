@@ -205,7 +205,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker1,
 		"localhost",
 		testRootDir,
@@ -237,7 +237,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 
 	kcfg = kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker2,
 		"127.0.0.1",
 		testRootDir,
