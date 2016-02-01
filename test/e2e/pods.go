@@ -68,14 +68,14 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 	// 'Terminated' which can cause indefinite blocking.)
 	expectNoError(waitForPodNotPending(c, ns, podDescr.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
-	By(fmt.Sprintf("Started pod %s in namespace %s", podDescr.Name, ns))
+	Logf("Started pod %s in namespace %s", podDescr.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := c.Pods(ns).Get(podDescr.Name)
 	expectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", podDescr.Name, ns))
 	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
+	Logf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
 	deadline := time.Now().Add(timeout)
@@ -86,8 +86,8 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
 		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
 		if restartCount != lastRestartCount {
-			By(fmt.Sprintf("Restart count of pod %s/%s is now %d (%v elapsed)",
-				ns, podDescr.Name, restartCount, time.Since(start)))
+			Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
+				ns, podDescr.Name, restartCount, time.Since(start))
 			if restartCount < lastRestartCount {
 				Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
 					ns, podDescr.Name, lastRestartCount, restartCount)
