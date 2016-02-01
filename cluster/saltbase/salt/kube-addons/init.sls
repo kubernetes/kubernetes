@@ -212,3 +212,7 @@ kube-addons:
 {% else %}
       - file: /etc/init.d/kube-addons
 {% endif %}
+{% if pillar.get('is_systemd') %}
+    - provider:
+      - service: systemd
+{%- endif %}
