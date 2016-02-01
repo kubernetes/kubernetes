@@ -282,6 +282,12 @@ type ContainerStatus struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+	// The container image creation time from Docker
+	ImageCreationTime time.Time
+	// The container image size from Docker
+	ImageSize int64
+	// The container image virtual size from Docker
+	ImageVirtualSize int64
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.
