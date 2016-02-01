@@ -63,7 +63,7 @@ const (
 //    choose that node to be node with index 1.
 // 7. Observe that the pod in pending status schedules on that node.
 //
-// Flaky issue #17687
+// Flaky issue #20015.  We have no clear path for how to test this functionality in a non-flaky way.
 var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 	var c *client.Client
 	var unfilledNodeName, recoveredNodeName string
