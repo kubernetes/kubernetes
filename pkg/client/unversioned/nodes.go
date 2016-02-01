@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -81,20 +79,12 @@ func (c *nodes) Delete(name string) error {
 // Update updates an existing node.
 func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 	result := &api.Node{}
-	if len(node.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
-		return nil, err
-	}
 	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
 	return result, err
 }
 
 func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 	result := &api.Node{}
-	if len(node.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
-		return nil, err
-	}
 	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
 	return result, err
 }

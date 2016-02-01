@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -77,10 +75,6 @@ func (c *persistentVolumeClaims) Create(claim *api.PersistentVolumeClaim) (resul
 
 func (c *persistentVolumeClaims) Update(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
-	if len(claim.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", claim)
-		return
-	}
 	err = c.client.Put().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(claim.Name).Body(claim).Do().Into(result)
 	return
 }

@@ -86,9 +86,6 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 // created with the "" namespace. Update also requires the ResourceVersion to be set in the event
 // object.
 func (e *events) Update(event *api.Event) (*api.Event, error) {
-	if len(event.ResourceVersion) == 0 {
-		return nil, fmt.Errorf("invalid event update object, missing resource version: %#v", event)
-	}
 	result := &api.Event{}
 	err := e.client.Put().
 		Namespace(event.Namespace).
