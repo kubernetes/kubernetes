@@ -887,8 +887,8 @@ func TestSetApp(t *testing.T) {
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
-					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+					Limits:   api.ResourceList{"cpu": resource.MustParse("50m")},
+					Requests: api.ResourceList{"memory": resource.MustParse("5M")},
 				},
 			},
 			opts: &kubecontainer.RunContainerOptions{
@@ -934,8 +934,8 @@ func TestSetApp(t *testing.T) {
 				Isolators: []appctypes.Isolator{
 					generateCapRetainIsolator(t, "CAP_SYS_CHROOT", "CAP_SYS_BOOT"),
 					generateCapRevokeIsolator(t, "CAP_SETUID", "CAP_SETGID"),
-					generateCPUIsolator(t, "5m", "50m"),
-					generateMemoryIsolator(t, "5M", "50M"),
+					generateCPUIsolator(t, "50m", "50m"),
+					generateMemoryIsolator(t, "5M", "5M"),
 				},
 			},
 		},
