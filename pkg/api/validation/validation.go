@@ -1393,7 +1393,6 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image`"))
 	}
 
-	newPod.Status = oldPod.Status
 	return allErrs
 }
 
