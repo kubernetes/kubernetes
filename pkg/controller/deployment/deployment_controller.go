@@ -452,7 +452,7 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 		}
 	}
 	for _, rc := range allRCs {
-		v, err := revision(rc)
+		v, err := deploymentutil.Revision(rc)
 		if err != nil {
 			glog.V(4).Infof("Unable to extract revision from deployment's rc %q: %v", rc.Name, err)
 			continue
@@ -618,18 +618,10 @@ func (dc *DeploymentController) getNewRCAndAllOldRCs(deployment extensions.Deplo
 	return dc.getNewRCAndMaybeFilteredOldRCs(deployment, false)
 }
 
-func revision(rc *api.ReplicationController) (int64, error) {
-	v, ok := rc.Annotations[deploymentutil.RevisionAnnotation]
-	if !ok {
-		return 0, nil
-	}
-	return strconv.ParseInt(v, 10, 64)
-}
-
 func maxRevision(allRCs []*api.ReplicationController) int64 {
 	max := int64(0)
 	for _, rc := range allRCs {
-		if v, err := revision(rc); err != nil {
+		if v, err := deploymentutil.Revision(rc); err != nil {
 			// Skip the RCs when it failed to parse their revision information
 			glog.V(4).Infof("Error: %v. Couldn't parse revision for rc %#v, deployment controller will skip it when reconciling revisions.", err, rc)
 		} else if v > max {
@@ -643,7 +635,7 @@ func maxRevision(allRCs []*api.ReplicationController) int64 {
 func lastRevision(allRCs []*api.ReplicationController) int64 {
 	max, secMax := int64(0), int64(0)
 	for _, rc := range allRCs {
-		if v, err := revision(rc); err != nil {
+		if v, err := deploymentutil.Revision(rc); err != nil {
 			// Skip the RCs when it failed to parse their revision information
 			glog.V(4).Infof("Error: %v. Couldn't parse revision for rc %#v, deployment controller will skip it when reconciling revisions.", err, rc)
 		} else if v >= max {

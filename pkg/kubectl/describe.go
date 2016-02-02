@@ -885,6 +885,20 @@ func describeReplicationController(controller *api.ReplicationController, events
 	})
 }
 
+func DescribePodTemplate(template *api.PodTemplateSpec) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		if template == nil {
+			fmt.Fprintf(out, "<no template>")
+			return nil
+		}
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(template.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(template.Annotations))
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&template.Spec))
+		describeVolumes(template.Spec.Volumes, out)
+		return nil
+	})
+}
+
 // JobDescriber generates information about a job and the pods it has created.
 type JobDescriber struct {
 	client *client.Client
