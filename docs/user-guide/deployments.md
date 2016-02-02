@@ -39,7 +39,6 @@ Documentation for other releases can be found at
 
 - [Deployments](#deployments)
   - [What is a _Deployment_?](#what-is-a-deployment)
-  - [Enabling Deployments on a Kubernetes cluster](#enabling-deployments-on-a-kubernetes-cluster)
   - [Creating a Deployment](#creating-a-deployment)
   - [Updating a Deployment](#updating-a-deployment)
     - [Multiple Updates](#multiple-updates)
