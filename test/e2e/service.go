@@ -569,6 +569,7 @@ var _ = Describe("Services", func() {
 		By("checking the old NodePort is closed")
 		testNotReachable(ip, nodePort1)
 
+		servicePort := 80
 		By("hitting the pod through the service's LoadBalancer")
 		i := 1
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(3 * time.Second) {
@@ -576,7 +577,7 @@ var _ = Describe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ingress2 := service.Status.LoadBalancer.Ingress[0]
-			if testLoadBalancerReachable(ingress2, 80) {
+			if testLoadBalancerReachable(ingress2, servicePort) {
 				break
 			}
 
@@ -596,36 +597,8 @@ var _ = Describe("Services", func() {
 			Failf("Failed to reach load balancer at original ingress after updating its port: %+v", service)
 		}
 
-		By("changing service " + serviceName + " back to type=ClusterIP")
-		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
-			s.Spec.Type = api.ServiceTypeClusterIP
-			s.Spec.Ports[0].NodePort = 0
-		})
-		Expect(err).NotTo(HaveOccurred())
+		removeExternalLoadBalancer(f, service)
 
-		// Updating the service type shouldn't change the Status immediately. The status should be
-		// updated after waitForLoadBalancerDestroy.
-		if len(service.Status.LoadBalancer.Ingress) == 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
-		}
-		if service.Spec.Type != api.ServiceTypeClusterIP {
-			Failf("got unexpected Spec.Type for back-to-ClusterIP service: %v", service)
-		}
-		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for back-to-ClusterIP service: %v", service)
-		}
-		port = service.Spec.Ports[0]
-		if port.NodePort != 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for back-to-ClusterIP service: %v", service)
-		}
-
-		// Wait for the load balancer to be destroyed asynchronously
-		service, err = waitForLoadBalancerDestroy(f.Client, serviceName, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
-
-		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for back-to-ClusterIP service: %v", service)
-		}
 		By("checking the NodePort is closed")
 		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort2)
@@ -868,6 +841,9 @@ var _ = Describe("Services", func() {
 		for _, svc := range svcs {
 			namespace := svc.Namespace
 			lbip := svc.Spec.LoadBalancerIP
+			// This isn't actually part of the test, but it has the net effect of deleting the target pool and forwarding
+			// rule, so that we don't leak them
+			defer removeExternalLoadBalancer(f, svc)
 
 			// Wait for the load balancer to be created asynchronously, which is
 			// currently indicated by ingress point(s) being added to the status.
@@ -962,11 +938,15 @@ func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string)
 	return service, fmt.Errorf("service %s in namespace %s doesn't have a LoadBalancer ingress point after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
-func waitForLoadBalancerDestroy(c *client.Client, serviceName, namespace string) (*api.Service, error) {
+func waitForLoadBalancerDestroy(c *client.Client, serviceIP, servicePort, serviceName, namespace string) (*api.Service, error) {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-	// TODO: this should actually test that the LB was released at the cloud provider
 	const timeout = 10 * time.Minute
 	var service *api.Service
+	defer func() {
+		if err := EnsureLoadBalancerResourcesDeleted(serviceIP, servicePort); err != nil {
+			Logf("Failed to delete cloud resources for service: %s %s (%v)", serviceIP, servicePort, err)
+		}
+	}()
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have no LoadBalancer ingress points", timeout, serviceName, namespace))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		service, err := c.Services(namespace).Get(serviceName)
@@ -979,6 +959,7 @@ func waitForLoadBalancerDestroy(c *client.Client, serviceName, namespace string)
 		}
 		Logf("Waiting for service %s in namespace %s to have no LoadBalancer ingress points (%v)", serviceName, namespace, time.Since(start))
 	}
+
 	return service, fmt.Errorf("service %s in namespace %s still has LoadBalancer ingress points after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
@@ -1676,4 +1657,36 @@ func (t *ServerTest) Cleanup() []error {
 	}
 
 	return errs
+}
+
+func removeExternalLoadBalancer(f *Framework, svc *api.Service) {
+	By("changing service " + svc.Name + " back to type=ClusterIP")
+	service, err := updateService(f.Client, f.Namespace.Name, svc.Name, func(s *api.Service) {
+		s.Spec.Type = api.ServiceTypeClusterIP
+		s.Spec.Ports[0].NodePort = 0
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Updating the service type shouldn't change the Status immediately. The status should be
+	// updated after waitForLoadBalancerDestroy.
+	if len(service.Status.LoadBalancer.Ingress) == 0 {
+		Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+	}
+	if service.Spec.Type != api.ServiceTypeClusterIP {
+		Failf("got unexpected Spec.Type for back-to-ClusterIP service: %v", service)
+	}
+	if len(service.Spec.Ports) != 1 {
+		Failf("got unexpected len(Spec.Ports) for back-to-ClusterIP service: %v", service)
+	}
+	if service.Spec.Ports[0].NodePort != 0 {
+		Failf("got unexpected Spec.Ports[0].nodePort for back-to-ClusterIP service: %v", service)
+	}
+
+	// Wait for the load balancer to be destroyed asynchronously
+	service, err = waitForLoadBalancerDestroy(f.Client, svc.Status.LoadBalancer.Ingress[0].IP, strconv.Itoa(svc.Spec.Ports[0].Port), svc.Name, f.Namespace.Name)
+	Expect(err).NotTo(HaveOccurred())
+
+	if len(service.Status.LoadBalancer.Ingress) != 0 {
+		Failf("got unexpected len(Status.LoadBalancer.Ingress) for back-to-ClusterIP service: %v", service)
+	}
 }
