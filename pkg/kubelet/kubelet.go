@@ -447,7 +447,7 @@ func NewMainKubelet(
 	klet.runtimeCache = runtimeCache
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue()
-	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+	klet.podWorkers = newPodWorkers(klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
@@ -1571,9 +1571,16 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 	return nameservers, searches, nil
 }
 
-// Kill all running containers in a pod (includes the pod infra container).
-func (kl *Kubelet) killPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
-	return kl.containerRuntime.KillPod(pod, runningPod)
+// One of the following aruguements must be non-nil: runningPod, status.
+// TODO: Modify containerRuntime.KillPod() to accept the right arguements.
+func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus) error {
+	var p kubecontainer.Pod
+	if runningPod != nil {
+		p = *runningPod
+	} else if status != nil {
+		p = kubecontainer.ConvertPodStatusToRunningPod(status)
+	}
+	return kl.containerRuntime.KillPod(pod, p)
 }
 
 type empty struct{}
@@ -1593,8 +1600,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-// TODO: Remove runningPod from the arguments.
-func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
+func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecontainer.PodStatus, updateType kubetypes.SyncPodType) error {
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
 		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
@@ -1610,29 +1616,21 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}
 
-	// Query the container runtime (or cache) to retrieve the pod status, and
-	// update it in the status manager.
-	podStatus, statusErr := kl.getRuntimePodStatus(pod)
-	apiPodStatus, err := kl.generatePodStatus(pod, podStatus, statusErr)
+	apiPodStatus, err := kl.generatePodStatus(pod, podStatus)
 	if err != nil {
 		return err
 	}
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
-	// TODO: The logic seems wrong since the pod phase can become pending when
-	// the container runtime is temporarily not available.
-	if statusErr == nil && !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
+	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
 		!firstSeenTime.IsZero() {
 		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 	}
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
-	if statusErr != nil {
-		return statusErr
-	}
 
 	// Kill pods we can't run.
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
-		if err := kl.killPod(pod, runningPod); err != nil {
+		if err := kl.killPod(pod, nil, podStatus); err != nil {
 			utilruntime.HandleError(err)
 		}
 		return err
@@ -2098,7 +2096,7 @@ func (kl *Kubelet) podKiller() {
 					ch <- pod.ID
 				}()
 				glog.V(2).Infof("Killing unwanted pod %q", pod.Name)
-				err := kl.killPod(nil, *pod)
+				err := kl.killPod(nil, pod, nil)
 				if err != nil {
 					glog.Errorf("Failed killing the pod %q: %v", pod.Name, err)
 				}
@@ -3090,7 +3088,7 @@ func (kl *Kubelet) getRuntimePodStatus(pod *api.Pod) (*kubecontainer.PodStatus, 
 	return kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 }
 
-func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus, statusErr error) (api.PodStatus, error) {
+func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) (api.PodStatus, error) {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
@@ -3102,16 +3100,6 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodS
 			Message: "Pod was active on the node longer than specified deadline"}, nil
 	}
 
-	if statusErr != nil {
-		// TODO: Re-evaluate whether we should set the status to "Pending".
-		glog.Infof("Query container info for pod %q failed with error (%v)", format.Pod(pod), statusErr)
-		return api.PodStatus{
-			Phase:   api.PodPending,
-			Reason:  "GeneralError",
-			Message: fmt.Sprintf("Query container info failed with error (%v)", statusErr),
-		}, nil
-	}
-	// Convert the internal PodStatus to api.PodStatus.
 	s := kl.convertStatusToAPIStatus(pod, podStatus)
 
 	// Assume info is ready to process
