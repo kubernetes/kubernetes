@@ -3,17 +3,28 @@
 
 .SH NAME
 .PP
-kubectl rollout \- rollout manages a deployment
+kubectl rollout resume \- Resume a paused resource
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl rollout\fP [OPTIONS]
+\fBkubectl rollout resume\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-rollout manages a deployment using subcommands
+Resume a paused resource
+
+.PP
+Paused resources will not be reconciled by a controller. By resuming a
+resource, we allow it to be reconciled again.
+Currently only deployments support being resumed.
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to get from a server.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -110,9 +121,21 @@ rollout manages a deployment using subcommands
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Resume an already paused deployment
+$ kubectl rollout resume deployment/nginx
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP, \fBkubectl\-rollout\-history(1)\fP, \fBkubectl\-rollout\-pause(1)\fP, \fBkubectl\-rollout\-resume(1)\fP,
+\fBkubectl\-rollout(1)\fP,
 
 
 .SH HISTORY
