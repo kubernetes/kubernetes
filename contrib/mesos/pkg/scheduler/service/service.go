@@ -18,7 +18,6 @@ package service
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -947,16 +946,15 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 
 	if s.mesosAuthPrincipal != "" {
 		info.Principal = proto.String(s.mesosAuthPrincipal)
-		if s.mesosAuthSecretFile == "" {
-			return nil, nil, errors.New("authentication principal specified without the required credentials file")
-		}
-		secret, err := ioutil.ReadFile(s.mesosAuthSecretFile)
-		if err != nil {
-			return nil, nil, err
-		}
 		cred = &mesos.Credential{
 			Principal: proto.String(s.mesosAuthPrincipal),
-			Secret:    secret,
+		}
+		if s.mesosAuthSecretFile != "" {
+			secret, err := ioutil.ReadFile(s.mesosAuthSecretFile)
+			if err != nil {
+				return nil, nil, err
+			}
+			cred.Secret = proto.String(string(secret))
 		}
 	}
 	return

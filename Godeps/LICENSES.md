@@ -73,6 +73,7 @@ github.com/onsi/ginkgo | spdxMIT
 github.com/onsi/gomega | spdxMIT
 github.com/opencontainers/runc | Apache-2
 github.com/pborman/uuid | spdxBSD3
+github.com/pmezard/go-difflib | BSD3
 github.com/prometheus/client_golang | Apache-2
 github.com/prometheus/client_model | Apache-2
 github.com/prometheus/common/expfmt | Apache-2
@@ -89,7 +90,7 @@ github.com/skynetservices/skydns | MITname
 github.com/spf13/cobra | Apache-2
 github.com/spf13/pflag | spdxBSD3
 github.com/stretchr/objx | MIT?
-github.com/stretchr/testify | MIT?
+github.com/stretchr/testify | spdxMIT
 github.com/syndtr/gocapability | spdxBSD2
 github.com/ugorji/go | MITname
 github.com/vishvananda/netlink | Apache-2
