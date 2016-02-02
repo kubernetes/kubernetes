@@ -56,6 +56,10 @@ type GroupVersionResource struct {
 	Resource string
 }
 
+func (gvr GroupVersionResource) IsEmpty() bool {
+	return len(gvr.Group) == 0 && len(gvr.Version) == 0 && len(gvr.Resource) == 0
+}
+
 func (gvr GroupVersionResource) GroupResource() GroupResource {
 	return GroupResource{Group: gvr.Group, Resource: gvr.Resource}
 }
