@@ -54,6 +54,7 @@ func TestNew(t *testing.T) {
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
+	config.Serializer = api.Codecs
 
 	s := New(&config)
 

@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package apiserver
 
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -44,11 +45,12 @@ func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta)
 	return &storageDestinations, nil
 }
 
-func main() {
+func Run() {
 	config := genericapiserver.Config{
 		EnableIndex:    true,
 		APIPrefix:      "/api",
 		APIGroupPrefix: "/apis",
+		Serializer:     api.Codecs,
 	}
 	s := genericapiserver.New(&config)
 
@@ -70,6 +72,8 @@ func main() {
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			groupVersion.Version: restStorageMap,
 		},
+		Scheme:               api.Scheme,
+		NegotiatedSerializer: api.Codecs,
 	}
 	if err := s.InstallAPIGroups([]genericapiserver.APIGroupInfo{apiGroupInfo}); err != nil {
 		glog.Fatalf("Error in installing API: %v", err)

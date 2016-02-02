@@ -379,6 +379,9 @@ func setDefaults(c *Config) {
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
 func New(c *Config) *GenericAPIServer {
+	if c.Serializer == nil {
+		glog.Fatalf("Genericapiserver.New() called with config.Serializer == nil")
+	}
 	setDefaults(c)
 
 	s := &GenericAPIServer{

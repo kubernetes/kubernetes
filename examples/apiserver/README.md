@@ -39,6 +39,12 @@ API objects. Some relevant issues:
 
 This code here is to examplify what it takes to write your own API server.
 
+To start this example api server, run:
+
+```
+$ go run examples/apiserver/server/main.go
+```
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/apiserver/README.md?pixel)]()
