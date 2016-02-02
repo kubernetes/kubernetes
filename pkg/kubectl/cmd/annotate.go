@@ -46,8 +46,8 @@ type AnnotateOptions struct {
 	all             bool
 	resourceVersion string
 
-	changeCause string
-	recordFlag  bool
+	changeCause       string
+	recordChangeCause bool
 
 	f   *cmdutil.Factory
 	out io.Writer
@@ -155,7 +155,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 		return err
 	}
 
-	o.recordFlag = cmdutil.GetRecordFlag(cmd)
+	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
 	o.changeCause = f.Command()
 
 	mapper, typer := f.Object()
@@ -207,7 +207,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return err
 		}
 		// If we should record change-cause, add it to new annotations
-		if cmdutil.ContainsChangeCause(info) || o.recordFlag {
+		if cmdutil.ContainsChangeCause(info) || o.recordChangeCause {
 			o.newAnnotations[kubectl.ChangeCauseAnnotation] = o.changeCause
 		}
 		if err := o.updateAnnotations(obj); err != nil {

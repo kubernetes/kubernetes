@@ -79,19 +79,14 @@ func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, 
 	for _, rc := range allRCs {
 		v, err := deploymentutil.Revision(rc)
 		if err != nil {
-			return historyInfo, fmt.Errorf("failed to retrieve revision out of RC %s from deployment %s: %v", rc.Name, name, err)
+			continue
 		}
 		historyInfo.RevisionToTemplate[v] = rc.Spec.Template
-		changeCause, err := getChangeCause(rc)
-		if err != nil {
-			return historyInfo, fmt.Errorf("failed to retrieve change-cause out of RC %s from deployment %s: %v", rc.Name, name, err)
+		changeCause := getChangeCause(rc)
+		if historyInfo.RevisionToTemplate[v].Annotations == nil {
+			historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)
 		}
-		if len(changeCause) > 0 {
-			if historyInfo.RevisionToTemplate[v].Annotations == nil {
-				historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)
-			}
-			historyInfo.RevisionToTemplate[v].Annotations[ChangeCauseAnnotation] = changeCause
-		}
+		historyInfo.RevisionToTemplate[v].Annotations[ChangeCauseAnnotation] = changeCause
 	}
 	return historyInfo, nil
 }
@@ -130,10 +125,10 @@ func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string
 }
 
 // getChangeCause returns the change-cause annotation of the input object
-func getChangeCause(obj runtime.Object) (string, error) {
+func getChangeCause(obj runtime.Object) string {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return "", err
+		return ""
 	}
-	return meta.Annotations[ChangeCauseAnnotation], nil
+	return meta.Annotations[ChangeCauseAnnotation]
 }
