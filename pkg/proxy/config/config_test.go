@@ -19,7 +19,6 @@ package config_test
 import (
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -49,29 +48,35 @@ func (s sortedServices) Less(i, j int) bool {
 }
 
 type ServiceHandlerMock struct {
-	services []api.Service
-	updated  sync.WaitGroup
+	updated chan []api.Service
+	waits   int
 }
 
 func NewServiceHandlerMock() *ServiceHandlerMock {
-	return &ServiceHandlerMock{services: make([]api.Service, 0)}
+	return &ServiceHandlerMock{updated: make(chan []api.Service, 5)}
 }
 
 func (h *ServiceHandlerMock) OnServiceUpdate(services []api.Service) {
 	sort.Sort(sortedServices(services))
-	h.services = services
-	h.updated.Done()
+	h.updated <- services
 }
 
 func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []api.Service) {
-	h.updated.Wait()
-	if !reflect.DeepEqual(h.services, expectedServices) {
-		t.Errorf("Expected %#v, Got %#v", expectedServices, h.services)
+	// We might get 1 or more updates for N service updates, because we
+	// over write older snapshots of services from the producer go-routine
+	// if the consumer falls behind. Unittests will hard timeout in 5m.
+	var services []api.Service
+	for ; h.waits > 0; h.waits = h.waits - 1 {
+		services = <-h.updated
+		if reflect.DeepEqual(services, expectedServices) {
+			return
+		}
 	}
+	t.Errorf("Expected %#v, Got %#v", expectedServices, services)
 }
 
 func (h *ServiceHandlerMock) Wait(waits int) {
-	h.updated.Add(waits)
+	h.waits = waits
 }
 
 type sortedEndpoints []api.Endpoints
@@ -87,29 +92,35 @@ func (s sortedEndpoints) Less(i, j int) bool {
 }
 
 type EndpointsHandlerMock struct {
-	endpoints []api.Endpoints
-	updated   sync.WaitGroup
+	updated chan []api.Endpoints
+	waits   int
 }
 
 func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	return &EndpointsHandlerMock{endpoints: make([]api.Endpoints, 0)}
+	return &EndpointsHandlerMock{updated: make(chan []api.Endpoints, 5)}
 }
 
 func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []api.Endpoints) {
 	sort.Sort(sortedEndpoints(endpoints))
-	h.endpoints = endpoints
-	h.updated.Done()
+	h.updated <- endpoints
 }
 
 func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []api.Endpoints) {
-	h.updated.Wait()
-	if !reflect.DeepEqual(h.endpoints, expectedEndpoints) {
-		t.Errorf("Expected %#v, Got %#v", expectedEndpoints, h.endpoints)
+	// We might get 1 or more updates for N endpoint updates, because we
+	// over write older snapshots of endpoints from the producer go-routine
+	// if the consumer falls behind. Unittests will hard timeout in 5m.
+	var endpoints []api.Endpoints
+	for ; h.waits > 0; h.waits = h.waits - 1 {
+		endpoints := <-h.updated
+		if reflect.DeepEqual(endpoints, expectedEndpoints) {
+			return
+		}
 	}
+	t.Errorf("Expected %#v, Got %#v", expectedEndpoints, endpoints)
 }
 
 func (h *EndpointsHandlerMock) Wait(waits int) {
-	h.updated.Add(waits)
+	h.waits = waits
 }
 
 func CreateServiceUpdate(op Operation, services ...api.Service) ServiceUpdate {
