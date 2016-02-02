@@ -96,6 +96,10 @@ type Factory struct {
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
+	PauseObject func(object runtime.Object) (bool, error)
+	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
+	ResumeObject func(object runtime.Object) (bool, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version.
@@ -298,6 +302,50 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, err
 				}
 				return nil, fmt.Errorf("cannot get the logs from %v", gvk)
+			}
+		},
+		PauseObject: func(object runtime.Object) (bool, error) {
+			c, err := clients.ClientForVersion(nil)
+			if err != nil {
+				return false, err
+			}
+
+			switch t := object.(type) {
+			case *extensions.Deployment:
+				if t.Spec.Paused {
+					return true, nil
+				}
+				t.Spec.Paused = true
+				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
+				return false, err
+			default:
+				gvk, err := api.Scheme.ObjectKind(object)
+				if err != nil {
+					return false, err
+				}
+				return false, fmt.Errorf("cannot pause %v", gvk)
+			}
+		},
+		ResumeObject: func(object runtime.Object) (bool, error) {
+			c, err := clients.ClientForVersion(nil)
+			if err != nil {
+				return false, err
+			}
+
+			switch t := object.(type) {
+			case *extensions.Deployment:
+				if !t.Spec.Paused {
+					return true, nil
+				}
+				t.Spec.Paused = false
+				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
+				return false, err
+			default:
+				gvk, err := api.Scheme.ObjectKind(object)
+				if err != nil {
+					return false, err
+				}
+				return false, fmt.Errorf("cannot resume %v", gvk)
 			}
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
