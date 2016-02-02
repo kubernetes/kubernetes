@@ -117,6 +117,8 @@ until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}
   sleep 1
 done
 
+password=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
+
 gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
   --command="sudo mkdir /srv/kubernetes -p && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
@@ -127,7 +129,7 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo admin,admin,admin > /srv/kubernetes/basic_auth.csv\""
+    sudo bash -c \"echo ${password},admin,admin > /srv/kubernetes/basic_auth.csv\""
 
 if [ "${RUN_FROM_DISTRO}" == "false" ]; then
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
@@ -220,3 +222,4 @@ until [[ "$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get
   sleep 1
 done
 echo ""
+echo "Password to kubemark master: ${password}"
