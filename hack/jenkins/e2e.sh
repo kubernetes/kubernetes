@@ -250,7 +250,7 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
   if [[ "${PERFORMANCE:-}" == "true" ]]; then
     : ${MASTER_SIZE:="m3.xlarge"}
     : ${NUM_NODES:="100"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Performance\]"}
   else
     : ${MASTER_SIZE:="m3.medium"}
     : ${NODE_SIZE:="m3.medium"}
@@ -467,7 +467,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-scalability)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability"}
     : ${E2E_NETWORK:="e2e-scalability"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\] \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Performance\] \
         --gather-resource-usage=true \
         --gather-metrics-at-teardown=true \
         --gather-logs-sizes=true \
