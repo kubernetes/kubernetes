@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -39,7 +40,7 @@ const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 var accessor = meta.NewAccessor()
 
 // availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
+var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion}
 
 func init() {
 	registered.RegisterVersions(availableVersions)
@@ -101,6 +102,11 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 // string, or an error if the version is not known.
 func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
+	case v1.SchemeGroupVersion:
+		return &meta.VersionInterfaces{
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
 	case v1beta1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			ObjectConvertor:  api.Scheme,
@@ -122,6 +128,8 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 			continue
 		}
 		switch v {
+		case v1.SchemeGroupVersion:
+			v1.AddToScheme(api.Scheme)
 		case v1beta1.SchemeGroupVersion:
 			v1beta1.AddToScheme(api.Scheme)
 		}
