@@ -19,6 +19,7 @@ package parser
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -29,6 +30,8 @@ import (
 	"k8s.io/kubernetes/third_party/golang/go/parser"
 	"k8s.io/kubernetes/third_party/golang/go/token"
 	tc "k8s.io/kubernetes/third_party/golang/go/types"
+
+	"github.com/golang/glog"
 )
 
 // Builder lets you add all the go files in all the packages that you care
@@ -158,6 +161,35 @@ func (b *Builder) AddDir(dir string) error {
 	return b.addDir(dir, true)
 }
 
+// AddDirRecursive is just like AddDir, but it also recursively adds
+// subdirectories; it returns an error only if the path couldn't be resolved;
+// any directories recursed into without go source are ignored.
+func (b *Builder) AddDirRecursive(dir string) error {
+	// First, find it, so we know what path to use.
+	pkg, err := b.context.Import(dir, ".", build.FindOnly)
+	if err != nil {
+		return fmt.Errorf("unable to *find* %q: %v", dir, err)
+	}
+
+	if err := b.addDir(dir, true); err != nil {
+		glog.Warningf("Ignoring directory %v: %v", dir, err)
+	}
+
+	prefix := strings.TrimSuffix(pkg.Dir, strings.TrimSuffix(dir, "/"))
+	filepath.Walk(pkg.Dir, func(path string, info os.FileInfo, err error) error {
+		if info != nil && info.IsDir() {
+			trimmed := strings.TrimPrefix(path, prefix)
+			if trimmed != "" {
+				if err := b.addDir(trimmed, true); err != nil {
+					glog.Warningf("Ignoring child directory %v: %v", trimmed, err)
+				}
+			}
+		}
+		return nil
+	})
+	return nil
+}
+
 // The implementation of AddDir. A flag indicates whether this directory was
 // user-requested or just from following the import graph.
 func (b *Builder) addDir(dir string, userRequested bool) error {
@@ -202,7 +234,6 @@ func (b *Builder) importer(imports map[string]*tc.Package, path string) (*tc.Pac
 		// Ignore errors in paths that we're importing solely because
 		// they're referenced by other packages.
 		ignoreError = true
-		// fmt.Printf("trying to import %q\n", path)
 		if err := b.addDir(path, false); err != nil {
 			return nil, err
 		}
@@ -286,8 +317,8 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 
 	u := types.Universe{}
 
-	for pkgName, pkg := range b.pkgs {
-		if !b.userRequested[pkgName] {
+	for pkgPath, pkg := range b.pkgs {
+		if !b.userRequested[pkgPath] {
 			// Since walkType is recursive, all types that the
 			// packages they asked for depend on will be included.
 			// But we don't need to include all types in all
@@ -318,9 +349,10 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 				b.addVariable(u, nil, tv)
 			}
 		}
-		for p := range b.importGraph[pkgName] {
-			u.AddImports(pkgName, p)
+		for p := range b.importGraph[pkgPath] {
+			u.AddImports(pkgPath, p)
 		}
+		u.Package(pkgPath).Name = pkg.Name()
 	}
 	return u, nil
 }
@@ -349,6 +381,10 @@ func tcNameToName(in string) types.Name {
 	// Detect anonymous type names. (These may have '.' characters because
 	// embedded types may have packages, so we detect them specially.)
 	if strings.HasPrefix(in, "struct{") ||
+		strings.HasPrefix(in, "<-chan") ||
+		strings.HasPrefix(in, "chan<-") ||
+		strings.HasPrefix(in, "chan ") ||
+		strings.HasPrefix(in, "func(") ||
 		strings.HasPrefix(in, "*") ||
 		strings.HasPrefix(in, "map[") ||
 		strings.HasPrefix(in, "[") {
