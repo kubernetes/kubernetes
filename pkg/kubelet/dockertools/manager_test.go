@@ -1028,7 +1028,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 			api.RestartPolicyNever,
 			[]string{
 				// Check the pod infra container.
-				"inspect_container", "inspect_container",
+				"inspect_container", "inspect_container", "inspect_container",
 				// Stop the last pod infra container.
 				"stop",
 			},
@@ -1045,10 +1045,10 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 		verifyCalls(t, fakeDocker, tt.calls)
 
 		if err := fakeDocker.AssertCreated(tt.created); err != nil {
-			t.Errorf("%d: %v", i, err)
+			t.Errorf("case [%d]: %v", i, err)
 		}
 		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
-			t.Errorf("%d: %v", i, err)
+			t.Errorf("case [%d]: %v", i, err)
 		}
 	}
 }
