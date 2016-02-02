@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
@@ -436,7 +437,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(rsKey)
-	selector, err := extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		glog.Errorf("Error converting pod selector to selector: %v", err)
 		return err

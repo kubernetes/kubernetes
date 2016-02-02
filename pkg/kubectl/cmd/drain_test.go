@@ -242,7 +242,7 @@ func TestDrain(t *testing.T) {
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/daemonsets/ds",
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &extensions.LabelSelector{MatchLabels: labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 		},
 	}
 
@@ -270,7 +270,7 @@ func TestDrain(t *testing.T) {
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
 		},
 		Spec: extensions.JobSpec{
-			Selector: &extensions.LabelSelector{MatchLabels: labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 		},
 	}
 
