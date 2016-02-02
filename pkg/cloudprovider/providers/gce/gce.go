@@ -87,6 +87,11 @@ func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
 }
 
+// Raw access to the underlying GCE service, probably should only be used for e2e tests
+func (g *GCECloud) GetComputeService() *compute.Service {
+	return g.service
+}
+
 func getProjectAndZone() (string, string, error) {
 	result, err := metadata.Get("instance/zone")
 	if err != nil {

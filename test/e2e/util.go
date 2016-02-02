@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -2798,4 +2799,39 @@ func getPodLogsInternal(c *client.Client, namespace, podName, containerName stri
 		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q.", string(logs))
 	}
 	return string(logs), err
+}
+
+// EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
+// are actually cleaned up.  Currently only implemented for GCE/GKE.
+func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		return ensureGCELoadBalancerResourcesDeleted(ip, portRange)
+	}
+	return nil
+}
+
+func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
+	gceCloud, ok := testContext.CloudConfig.Provider.(*gcecloud.GCECloud)
+	project := testContext.CloudConfig.ProjectID
+	zone := testContext.CloudConfig.Zone
+
+	if !ok {
+		return fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", testContext.CloudConfig.Provider)
+	}
+
+	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
+		service := gceCloud.GetComputeService()
+		list, err := service.ForwardingRules.List(project, zone).Do()
+		if err != nil {
+			return false, err
+		}
+		for ix := range list.Items {
+			item := list.Items[ix]
+			if item.PortRange == portRange && item.IPAddress == ip {
+				Logf("found a load balancer: %v", item)
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 }
