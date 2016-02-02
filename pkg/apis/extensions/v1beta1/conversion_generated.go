@@ -2591,7 +2591,7 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
-	if err := s.Convert(&in.UniqueLabelKey, &out.UniqueLabelKey, 0); err != nil {
+	if err := api.Convert_string_To_string_ref(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
 		return err
 	}
 	return nil
@@ -2731,7 +2731,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	} else {
 		out.RevisionHistoryLimit = nil
 	}
-	if err := s.Convert(&in.UniqueLabelKey, &out.UniqueLabelKey, 0); err != nil {
+	if err := api.Convert_string_To_string_ref(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
 		return err
 	}
 	out.Paused = in.Paused
@@ -3768,7 +3768,9 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
-	// in.UniqueLabelKey has no peer in out
+	if err := api.Convert_string_ref_To_string(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -3904,7 +3906,9 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	} else {
 		out.RevisionHistoryLimit = nil
 	}
-	// in.UniqueLabelKey has no peer in out
+	if err := api.Convert_string_ref_To_string(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
+		return err
+	}
 	out.Paused = in.Paused
 	// unable to generate simple pointer conversion for v1beta1.RollbackConfig -> extensions.RollbackConfig
 	if in.RollbackTo != nil {

@@ -43,10 +43,52 @@ func init() {
 		Convert_unversioned_Time_To_unversioned_Time,
 		Convert_string_To_labels_Selector,
 		Convert_string_To_fields_Selector,
+		Convert_bool_ref_To_bool,
+		Convert_bool_To_bool_ref,
+		Convert_string_ref_To_string,
+		Convert_string_To_string_ref,
 		Convert_labels_Selector_To_string,
 		Convert_fields_Selector_To_string,
 		Convert_resource_Quantity_To_resource_Quantity,
 	)
+}
+
+func Convert_string_ref_To_string(in **string, out *string, s conversion.Scope) error {
+	if *in == nil {
+		*out = ""
+		return nil
+	}
+	*out = **in
+	return nil
+}
+
+func Convert_string_To_string_ref(in *string, out **string, s conversion.Scope) error {
+	if in == nil {
+		stringVar := ""
+		*out = &stringVar
+		return nil
+	}
+	*out = in
+	return nil
+}
+
+func Convert_bool_ref_To_bool(in **bool, out *bool, s conversion.Scope) error {
+	if *in == nil {
+		*out = false
+		return nil
+	}
+	*out = **in
+	return nil
+}
+
+func Convert_bool_To_bool_ref(in *bool, out **bool, s conversion.Scope) error {
+	if in == nil {
+		boolVar := false
+		*out = &boolVar
+		return nil
+	}
+	*out = in
+	return nil
 }
 
 func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
