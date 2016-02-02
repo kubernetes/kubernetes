@@ -1555,21 +1555,28 @@ func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, 
 func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int64) (*compute.NamedPort, error) {
 	for _, np := range ig.NamedPorts {
 		if np.Port == port {
-			glog.Infof("Instance group %v already has named port %+v", ig.Name, np)
+			glog.V(3).Infof("Instance group %v already has named port %+v", ig.Name, np)
 			return np, nil
 		}
 	}
 	glog.Infof("Adding port %v to instance group %v with %d ports", port, ig.Name, len(ig.NamedPorts))
 	namedPort := compute.NamedPort{Name: fmt.Sprintf("port%v", port), Port: port}
 	ig.NamedPorts = append(ig.NamedPorts, &namedPort)
+
+	// setNamedPorts is a zonal endpoint, meaning we invoke it by re-creating a URL like:
+	// {project}/zones/{zone}/instanceGroups/{instanceGroup}/setNamedPorts, so the "zone"
+	// parameter given to SetNamedPorts must not be the entire zone URL.
+	zoneURLParts := strings.Split(ig.Zone, "/")
+	zone := zoneURLParts[len(zoneURLParts)-1]
+
 	op, err := gce.service.InstanceGroups.SetNamedPorts(
-		gce.projectID, ig.Zone, ig.Name,
+		gce.projectID, zone, ig.Name,
 		&compute.InstanceGroupsSetNamedPortsRequest{
 			NamedPorts: ig.NamedPorts}).Do()
 	if err != nil {
 		return nil, err
 	}
-	if err = gce.waitForZoneOp(op, ig.Zone); err != nil {
+	if err = gce.waitForZoneOp(op, zone); err != nil {
 		return nil, err
 	}
 	return &namedPort, nil
