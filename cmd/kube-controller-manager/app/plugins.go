@@ -83,7 +83,7 @@ func ProbeRecyclableVolumePlugins(flags options.VolumeConfigFlags) []volume.Volu
 	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathRBD, &rbdConfig); err != nil {
 		glog.Fatalf("Could not create RBD recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathRBD, err)
 	}
-	
+
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins(rbdConfig)...)
 
 	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, &nfsConfig); err != nil {
