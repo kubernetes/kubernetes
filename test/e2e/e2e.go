@@ -221,7 +221,7 @@ func RunE2ETests(t *testing.T) {
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
 		// TODO(ihmccreery) Remove [Skipped] once all [Skipped] labels have been reclassified.
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Skipped\]|\[Feature:.+\]`
+		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]|\[Skipped\]`
 	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
