@@ -62,6 +62,7 @@ type testCase struct {
 	CPUTarget           int
 	reportedLevels      []uint64
 	reportedCPURequests []resource.Quantity
+	cmTarget            *extensions.CustomMetricTargetList
 	scaleUpdated        bool
 	eventCreated        bool
 	verifyEvents        bool
@@ -100,6 +101,14 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		}
 		if tc.CPUTarget > 0.0 {
 			obj.Items[0].Spec.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: tc.CPUTarget}
+		}
+		if tc.cmTarget != nil {
+			b, err := json.Marshal(tc.cmTarget)
+			if err != nil {
+				t.Fatalf("Failed to marshal cm: %v", err)
+			}
+			obj.Items[0].Annotations = make(map[string]string)
+			obj.Items[0].Annotations[HpaCustomMetricsDefinitionAnnotationName] = string(b)
 		}
 		return true, obj, nil
 	})
@@ -229,6 +238,25 @@ func TestScaleUp(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpCM(t *testing.T) {
+	tc := testCase{
+		minReplicas:     2,
+		maxReplicas:     6,
+		initialReplicas: 3,
+		desiredReplicas: 4,
+		CPUTarget:       0,
+		cmTarget: &extensions.CustomMetricTargetList{
+			Items: []extensions.CustomMetricTarget{{
+				Name:        "qps",
+				TargetValue: resource.MustParse("15.0"),
+			}},
+		},
+		reportedLevels:      []uint64{20, 10, 30},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
 func TestScaleDown(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
@@ -242,6 +270,24 @@ func TestScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleDownCM(t *testing.T) {
+	tc := testCase{
+		minReplicas:     2,
+		maxReplicas:     6,
+		initialReplicas: 5,
+		desiredReplicas: 3,
+		CPUTarget:       0,
+		cmTarget: &extensions.CustomMetricTargetList{
+			Items: []extensions.CustomMetricTarget{{
+				Name:        "qps",
+				TargetValue: resource.MustParse("20"),
+			}}},
+		reportedLevels:      []uint64{12, 12, 12, 12, 12},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
 func TestTolerance(t *testing.T) {
 	tc := testCase{
 		minReplicas:         1,
@@ -250,6 +296,23 @@ func TestTolerance(t *testing.T) {
 		desiredReplicas:     3,
 		CPUTarget:           100,
 		reportedLevels:      []uint64{1010, 1030, 1020},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+	}
+	tc.runTest(t)
+}
+
+func TestToleranceCM(t *testing.T) {
+	tc := testCase{
+		minReplicas:     1,
+		maxReplicas:     5,
+		initialReplicas: 3,
+		desiredReplicas: 3,
+		cmTarget: &extensions.CustomMetricTargetList{
+			Items: []extensions.CustomMetricTarget{{
+				Name:        "qps",
+				TargetValue: resource.MustParse("20"),
+			}}},
+		reportedLevels:      []uint64{20, 21, 21},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 	}
 	tc.runTest(t)
