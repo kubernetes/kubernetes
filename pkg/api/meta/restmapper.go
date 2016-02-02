@@ -165,18 +165,33 @@ func KindToResource(kind unversioned.GroupVersionKind) ( /*plural*/ unversioned.
 
 // ResourceSingularizer implements RESTMapper
 // It converts a resource name from plural to singular (e.g., from pods to pod)
-// It must have exactly one match and it must match case perfectly.  This is congruent with old functionality
 func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, error) {
 	partialResource := unversioned.GroupVersionResource{Resource: resourceType}
-	resource, err := m.ResourceFor(partialResource)
+	resources, err := m.ResourcesFor(partialResource)
 	if err != nil {
 		return resourceType, err
 	}
 
-	singular, ok := m.pluralToSingular[resource]
-	if !ok {
-		return resourceType, fmt.Errorf("no singular of resource %v has been defined", resource)
+	singular := unversioned.GroupVersionResource{}
+	for _, curr := range resources {
+		currSingular, ok := m.pluralToSingular[curr]
+		if !ok {
+			continue
+		}
+		if singular.IsEmpty() {
+			singular = currSingular
+			continue
+		}
+
+		if currSingular.Resource != singular.Resource {
+			return resourceType, fmt.Errorf("multiple possibile singular resources (%v) found for %v", resources, resourceType)
+		}
 	}
+
+	if singular.IsEmpty() {
+		return resourceType, fmt.Errorf("no singular of resource %v has been defined", resourceType)
+	}
+
 	return singular.Resource, nil
 }
 
