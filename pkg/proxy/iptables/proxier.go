@@ -279,6 +279,10 @@ func (proxier *Proxier) SyncLoop() {
 // OnServiceUpdate tracks the active set of service proxies.
 // They will be synchronized using syncProxyRules()
 func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("OnServiceUpdate took %v for %d services", time.Since(start), len(allServices))
+	}()
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedServiceUpdate = true
@@ -316,7 +320,6 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 				glog.V(3).Infof("Something changed for service %q: removing it", serviceName)
 				delete(proxier.serviceMap, serviceName)
 			}
-
 			serviceIP := net.ParseIP(service.Spec.ClusterIP)
 			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
 			info = newServiceInfo(serviceName)
@@ -347,6 +350,11 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 
 // OnEndpointsUpdate takes in a slice of updated endpoints.
 func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("OnEndpointsUpdate took %v for %d endpoints", time.Since(start), len(allEndpoints))
+	}()
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
@@ -451,6 +459,10 @@ func servicePortEndpointChainName(s proxy.ServicePortName, protocol string, endp
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+	}()
 	// don't sync rules till we've received services and endpoints
 	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
