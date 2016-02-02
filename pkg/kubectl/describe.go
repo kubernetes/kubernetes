@@ -1433,7 +1433,7 @@ type HorizontalPodAutoscalerDescriber struct {
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (string, error) {
-	hpa, err := d.client.Extensions().HorizontalPodAutoscalers(namespace).Get(name)
+	hpa, err := d.client.Autoscaling().HorizontalPodAutoscalers(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}

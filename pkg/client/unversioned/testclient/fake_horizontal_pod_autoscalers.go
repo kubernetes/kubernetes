@@ -26,7 +26,7 @@ import (
 // FakeHorizontalPodAutoscalers implements HorizontalPodAutoscalerInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakeHorizontalPodAutoscalers struct {
-	Fake      *FakeExperimental
+	Fake      *FakeAutoscaling
 	Namespace string
 }
 

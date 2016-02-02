@@ -27,7 +27,6 @@ import (
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
 type ExtensionsInterface interface {
-	HorizontalPodAutoscalersNamespacer
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
@@ -42,10 +41,6 @@ type ExtensionsInterface interface {
 // incompatible ways at any time.
 type ExtensionsClient struct {
 	*RESTClient
-}
-
-func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
-	return newHorizontalPodAutoscalers(c, namespace)
 }
 
 func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {

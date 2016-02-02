@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -107,7 +108,7 @@ func expandResourceShortcut(resource unversioned.GroupVersionResource) unversion
 		"ds":     extensions.SchemeGroupVersion.WithResource("daemonsets"),
 		"ep":     api.SchemeGroupVersion.WithResource("endpoints"),
 		"ev":     api.SchemeGroupVersion.WithResource("events"),
-		"hpa":    extensions.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
+		"hpa":    autoscaling.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
 		"ing":    extensions.SchemeGroupVersion.WithResource("ingresses"),
 		"limits": api.SchemeGroupVersion.WithResource("limitranges"),
 		"no":     api.SchemeGroupVersion.WithResource("nodes"),

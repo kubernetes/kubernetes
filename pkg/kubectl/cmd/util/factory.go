@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -120,7 +121,7 @@ const (
 	RunPodV1GeneratorName                       = "run-pod/v1"
 	ServiceV1GeneratorName                      = "service/v1"
 	ServiceV2GeneratorName                      = "service/v2"
-	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
+	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	NamespaceV1GeneratorName                    = "namespace/v1"
@@ -142,7 +143,7 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		JobV1Beta1GeneratorName:        kubectl.JobV1Beta1{},
 	}
 	generators["autoscale"] = map[string]kubectl.Generator{
-		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
+		HorizontalPodAutoscalerV1GeneratorName: kubectl.HorizontalPodAutoscalerV1{},
 	}
 	generators["namespace"] = map[string]kubectl.Generator{
 		NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},
@@ -201,6 +202,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch mapping.GroupVersionKind.Group {
 			case api.GroupName:
 				return client.RESTClient, nil
+			case autoscaling.GroupName:
+				return client.AutoscalingClient.RESTClient, nil
 			case extensions.GroupName:
 				return client.ExtensionsClient.RESTClient, nil
 			}
@@ -553,6 +556,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	}
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
+	}
+	if gvk.Group == autoscaling.GroupName {
+		if c.c.AutoscalingClient == nil {
+			return errors.New("unable to validate: no experimental client")
+		}
+		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
 	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {

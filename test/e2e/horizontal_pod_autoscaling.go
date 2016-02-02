@@ -141,6 +141,6 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			CPUUtilization: &autoscaling.CPUTargetUtilization{TargetPercentage: cpu},
 		},
 	}
-	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	_, errHPA := rc.framework.Client.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	expectNoError(errHPA)
 }

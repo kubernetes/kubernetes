@@ -197,17 +197,25 @@ func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVers
 	if err != nil {
 		return estimate, err
 	}
+
+	if containsVersion(versions, "autoscaling/v1") {
+		resources, err := kubeClient.Discovery().ServerResourcesForGroupVersion("autoscaling/v1")
+		if err != nil {
+			return estimate, err
+		}
+		if containsResource(resources, "horizontalpodautoscalers") {
+			err = deleteHorizontalPodAutoscalers(kubeClient.Autoscaling(), namespace)
+			if err != nil {
+				return estimate, err
+			}
+		}
+	}
+
 	// If experimental mode, delete all experimental resources for the namespace.
 	if containsVersion(versions, "extensions/v1beta1") {
 		resources, err := kubeClient.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
 		if err != nil {
 			return estimate, err
-		}
-		if containsResource(resources, "horizontalpodautoscalers") {
-			err = deleteHorizontalPodAutoscalers(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
 		}
 		if containsResource(resources, "ingresses") {
 			err = deleteIngress(kubeClient.Extensions(), namespace)
@@ -467,13 +475,13 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.HorizontalPodAutoscalers(ns).List(api.ListOptions{})
+func deleteHorizontalPodAutoscalers(autoscalingClient client.AutoscalingInterface, ns string) error {
+	items, err := autoscalingClient.HorizontalPodAutoscalers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := expClient.HorizontalPodAutoscalers(ns).Delete(items.Items[i].Name, nil)
+		err := autoscalingClient.HorizontalPodAutoscalers(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

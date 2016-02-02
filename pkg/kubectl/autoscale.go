@@ -29,9 +29,9 @@ const (
 	scaleSubResource = "scale"
 )
 
-type HorizontalPodAutoscalerV1Beta1 struct{}
+type HorizontalPodAutoscalerV1 struct{}
 
-func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
+func (HorizontalPodAutoscalerV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"default-name", true},
 		{"name", false},
@@ -45,7 +45,7 @@ func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
 	}
 }
 
-func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+func (HorizontalPodAutoscalerV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)

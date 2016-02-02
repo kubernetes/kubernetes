@@ -270,6 +270,10 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
+func (c *Fake) Autoscaling() client.AutoscalingInterface {
+	return &FakeAutoscaling{c}
+}
+
 func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
@@ -300,6 +304,19 @@ func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDecl
 	return &swagger.ApiDeclaration{}, nil
 }
 
+// NewSimpleFakeAutoscaling returns a client that will respond with the provided objects
+func NewSimpleFakeAutoscaling(objects ...runtime.Object) *FakeAutoscaling {
+	return &FakeAutoscaling{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeAutoscaling struct {
+	*Fake
+}
+
+func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
+	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
+}
+
 // NewSimpleFakeExp returns a client that will respond with the provided objects
 func NewSimpleFakeExp(objects ...runtime.Object) *FakeExperimental {
 	return &FakeExperimental{Fake: NewSimpleFake(objects...)}
@@ -311,10 +328,6 @@ type FakeExperimental struct {
 
 func (c *FakeExperimental) DaemonSets(namespace string) client.DaemonSetInterface {
 	return &FakeDaemonSets{Fake: c, Namespace: namespace}
-}
-
-func (c *FakeExperimental) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
-	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterface {
