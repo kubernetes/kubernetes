@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -964,7 +965,7 @@ func main() {
 	addFlags(pflag.CommandLine)
 
 	util.InitFlags()
-	util.ReallyCrash = true
+	utilruntime.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
 

@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
@@ -64,7 +65,7 @@ import (
 )
 
 func init() {
-	util.ReallyCrash = true
+	utilruntime.ReallyCrash = true
 }
 
 const testKubeletHostname = "127.0.0.1"
@@ -149,10 +150,11 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
+	kubelet.podCache = kubecontainer.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn:    kubelet.syncPod,
-		runtimeCache: kubelet.runtimeCache,
-		t:            t,
+		syncPodFn: kubelet.syncPod,
+		cache:     kubelet.podCache,
+		t:         t,
 	}
 
 	kubelet.probeManager = prober.FakeManager{}
@@ -2399,33 +2401,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 }
 
-func TestValidatePodStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	testCases := []struct {
-		podPhase api.PodPhase
-		success  bool
-	}{
-		{api.PodRunning, true},
-		{api.PodSucceeded, true},
-		{api.PodFailed, true},
-		{api.PodPending, false},
-		{api.PodUnknown, false},
-	}
-
-	for i, tc := range testCases {
-		err := kubelet.validatePodPhase(&api.PodStatus{Phase: tc.podPhase})
-		if tc.success {
-			if err != nil {
-				t.Errorf("[case %d]: unexpected failure - %v", i, err)
-			}
-		} else if err == nil {
-			t.Errorf("[case %d]: unexpected success", i)
-		}
-	}
-}
-
-func TestValidateContainerStatus(t *testing.T) {
+func TestValidateContainerLogStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	containerName := "x"
@@ -2442,6 +2418,17 @@ func TestValidateContainerStatus(t *testing.T) {
 					},
 					LastTerminationState: api.ContainerState{
 						Terminated: &api.ContainerStateTerminated{},
+					},
+				},
+			},
+			success: true,
+		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Running: &api.ContainerStateRunning{},
 					},
 				},
 			},
@@ -2469,10 +2456,28 @@ func TestValidateContainerStatus(t *testing.T) {
 			},
 			success: false,
 		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name:  containerName,
+					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePull"}},
+				},
+			},
+			success: false,
+		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name:  containerName,
+					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePullBackOff"}},
+				},
+			},
+			success: false,
+		},
 	}
 
 	for i, tc := range testCases {
-		_, err := kubelet.validateContainerStatus(&api.PodStatus{
+		_, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 			ContainerStatuses: tc.statuses,
 		}, containerName, false)
 		if tc.success {
@@ -2483,20 +2488,30 @@ func TestValidateContainerStatus(t *testing.T) {
 			t.Errorf("[case %d]: unexpected success", i)
 		}
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
 	}, "blah", false); err == nil {
 		t.Errorf("expected error with invalid container name")
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
 	}, containerName, true); err != nil {
 		t.Errorf("unexpected error with for previous terminated container - %v", err)
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
+		ContainerStatuses: testCases[0].statuses,
+	}, containerName, false); err != nil {
+		t.Errorf("unexpected error with for most recent container - %v", err)
+	}
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[1].statuses,
 	}, containerName, true); err == nil {
 		t.Errorf("expected error with for previous terminated container")
+	}
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
+		ContainerStatuses: testCases[1].statuses,
+	}, containerName, false); err != nil {
+		t.Errorf("unexpected error with for most recent container")
 	}
 }
 
@@ -3376,7 +3391,7 @@ func TestCreateMirrorPod(t *testing.T) {
 		}
 		pods := []*api.Pod{pod}
 		kl.podManager.SetPods(pods)
-		err := kl.syncPod(pod, nil, container.Pod{}, updateType)
+		err := kl.syncPod(pod, nil, &container.PodStatus{}, updateType)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -3434,14 +3449,14 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kl.syncPod(pod, mirrorPod, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
-	if creates != 0 || deletes != 1 {
-		t.Errorf("expected 0 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
+	if creates != 1 || deletes != 1 {
+		t.Errorf("expected 1 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
 	}
 }
 
@@ -3600,7 +3615,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3633,7 +3648,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3660,7 +3675,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3686,7 +3701,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}

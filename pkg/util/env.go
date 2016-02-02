@@ -14,15 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flocker
+package util
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
-// getenvOrDefault returns the value of the enviroment variable if it's set,
-// otherwise it return the default value provided.
-func getenvOrFallback(key, defaultValue string) string {
+func GetEnvAsStringOrFallback(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return defaultValue
+}
+
+func GetEnvAsIntOrFallback(key string, defaultValue int) (int, error) {
+	if v := os.Getenv(key); v != "" {
+		value, err := strconv.Atoi(v)
+		if err != nil {
+			return defaultValue, err
+		}
+		return value, nil
+	}
+	return defaultValue, nil
+}
+
+func GetEnvAsFloat64OrFallback(key string, defaultValue float64) (float64, error) {
+	if v := os.Getenv(key); v != "" {
+		value, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return defaultValue, err
+		}
+		return value, nil
+	}
+	return defaultValue, nil
 }

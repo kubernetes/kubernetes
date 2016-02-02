@@ -68,7 +68,7 @@ There are other forms of topological affinity and anti-affinity. For example,
 you can use [node affinity](nodeaffinity.md) to require (prefer)
 that a set of pods all be scheduled in some specific zone Z. Node affinity is not
 capable of expressing inter-pod dependencies, and conversely the API
-we descibe in this document is not capable of expressing node affinity rules.
+we describe in this document is not capable of expressing node affinity rules.
 For simplicity, we will use the terms "affinity" and "anti-affinity" to mean
 "inter-pod topological affinity" and "inter-pod topological anti-affinity," respectively,
 in the remainder of this document.
@@ -492,7 +492,7 @@ The design we have described says that the symmetry property for RequiredDuringS
 is weaker: if a pod P says it can only schedule onto nodes running pod Q, this
 does not mean Q can only run on a node that is running P, but the scheduler will try
 to schedule Q onto a node that is running P (i.e. treats the reverse direction as
-preferred). This raises the same scheduling quality concern as we menioned at the
+preferred). This raises the same scheduling quality concern as we mentioned at the
 end of the Denial of Service section above, and can be addressed in similar ways.
 
 The nature of affinity (as opposed to anti-affinity) means that there is no issue of
@@ -538,7 +538,7 @@ Do so in a way that addresses the "determining which pod(s) to kill" issue.
 We assume Kubelet publishes labels describing the node's membership in all of the relevant scheduling
 domains (e.g. node name, rack name, availability zone name, etc.). See #9044.
 
-## Backward compatiblity
+## Backward compatibility
 
 Old versions of the scheduler will ignore `Affinity`.
 
@@ -546,7 +546,7 @@ Users should not start using `Affinity` until the full implementation has
 been in Kubelet and the master for enough binary versions that we feel
 comfortable that we will not need to roll back either Kubelet or
 master to a version that does not support them. Longer-term we will
-use a programatic approach to enforcing this (#4855).
+use a programmatic approach to enforcing this (#4855).
 
 ## Extensibility
 

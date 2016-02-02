@@ -22,18 +22,25 @@ import (
 )
 
 type Interface interface {
+	Discovery() unversioned.DiscoveryInterface
 	Testgroup() testgroup_unversioned.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*unversioned.DiscoveryClient
 	*testgroup_unversioned.TestgroupClient
 }
 
 // Testgroup retrieves the TestgroupClient
 func (c *Clientset) Testgroup() testgroup_unversioned.TestgroupInterface {
 	return c.TestgroupClient
+}
+
+// Discovery retrieves the DiscoveryClient
+func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+	return c.DiscoveryClient
 }
 
 // NewForConfig creates a new Clientset for the given config.
@@ -45,6 +52,10 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 		return nil, err
 	}
 
+	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	if err != nil {
+		return nil, err
+	}
 	return &clientset, nil
 }
 
@@ -54,6 +65,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = testgroup_unversioned.NewForConfigOrDie(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
@@ -62,5 +74,6 @@ func New(c *unversioned.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = testgroup_unversioned.New(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset
 }

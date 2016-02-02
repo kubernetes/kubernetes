@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -169,7 +170,7 @@ type LeaderElectionRecord struct {
 // Run starts the leader election loop
 func (le *LeaderElector) Run() {
 	defer func() {
-		util.HandleCrash()
+		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
 	le.acquire()

@@ -73,7 +73,7 @@ func NewKubeletServer() *KubeletServer {
 			CgroupRoot:                  "",
 			ConfigureCBR0:               false,
 			ContainerRuntime:            "docker",
-			CPUCFSQuota:                 false,
+			CPUCFSQuota:                 true,
 			DockerExecHandlerName:       "native",
 			EventBurst:                  10,
 			EventRecordQPS:              5.0,

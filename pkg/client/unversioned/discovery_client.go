@@ -214,13 +214,29 @@ func setDiscoveryDefaults(config *Config) error {
 	return nil
 }
 
-// NewDiscoveryClient creates a new DiscoveryClient for the given config. This client
+// NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. This client
 // can be used to discover supported resources in the API server.
-func NewDiscoveryClient(c *Config) (*DiscoveryClient, error) {
+func NewDiscoveryClientForConfig(c *Config) (*DiscoveryClient, error) {
 	config := *c
 	if err := setDiscoveryDefaults(&config); err != nil {
 		return nil, err
 	}
 	client, err := UnversionedRESTClientFor(&config)
 	return &DiscoveryClient{client}, err
+}
+
+// NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. If
+// there is an error, it panics.
+func NewDiscoveryClientForConfigOrDie(c *Config) *DiscoveryClient {
+	client, err := NewDiscoveryClientForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return client
+
+}
+
+// New creates a new DiscoveryClient for the given RESTClient.
+func NewDiscoveryClient(c *RESTClient) *DiscoveryClient {
+	return &DiscoveryClient{c}
 }

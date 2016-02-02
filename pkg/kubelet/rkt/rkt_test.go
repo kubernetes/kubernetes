@@ -718,8 +718,6 @@ func generateMemoryIsolator(t *testing.T, request, limit string) appctypes.Isola
 func baseApp(t *testing.T) *appctypes.App {
 	return &appctypes.App{
 		Exec:              appctypes.Exec{"/bin/foo"},
-		User:              "0",
-		Group:             "22",
 		SupplementaryGIDs: []int{4, 5, 6},
 		WorkingDirectory:  "/foo",
 		Environment: []appctypes.EnvironmentVariable{
@@ -738,6 +736,12 @@ func baseApp(t *testing.T) *appctypes.App {
 			generateMemoryIsolator(t, "10M", "20M"),
 		},
 	}
+}
+
+func baseAppWithRootUserGroup(t *testing.T) *appctypes.App {
+	app := baseApp(t)
+	app.User, app.Group = "0", "0"
+	return app
 }
 
 type envByName []appctypes.EnvironmentVariable
@@ -791,13 +795,13 @@ func TestSetApp(t *testing.T) {
 		expect    *appctypes.App
 		err       error
 	}{
-		// Nothing should change.
+		// Nothing should change, but the "User" and "Group" should be filled.
 		{
 			container: &api.Container{},
 			opts:      &kubecontainer.RunContainerOptions{},
 			ctx:       nil,
 			podCtx:    nil,
-			expect:    baseApp(t),
+			expect:    baseAppWithRootUserGroup(t),
 			err:       nil,
 		},
 
@@ -851,7 +855,7 @@ func TestSetApp(t *testing.T) {
 			expect: &appctypes.App{
 				Exec:              appctypes.Exec{"/bin/bar", "hello", "world"},
 				User:              "42",
-				Group:             "22",
+				Group:             "0",
 				SupplementaryGIDs: []int{1, 2, 3},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
@@ -914,7 +918,7 @@ func TestSetApp(t *testing.T) {
 			expect: &appctypes.App{
 				Exec:              appctypes.Exec{"/bin/bar", "foo", "hello", "world", "bar"},
 				User:              "42",
-				Group:             "22",
+				Group:             "0",
 				SupplementaryGIDs: []int{1, 2, 3},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{

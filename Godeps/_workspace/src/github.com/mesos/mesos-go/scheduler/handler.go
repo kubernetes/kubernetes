@@ -18,7 +18,7 @@ func (h *CredentialHandler) Handle(callbacks ...callback.Interface) error {
 		case *callback.Name:
 			cb.Set(h.credential.GetPrincipal())
 		case *callback.Password:
-			cb.Set(h.credential.GetSecret())
+			cb.Set(([]byte)(h.credential.GetSecret()))
 		case *callback.Interprocess:
 			cb.Set(*(h.pid), *(h.client))
 		default:

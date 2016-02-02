@@ -23,6 +23,7 @@ import (
 )
 
 type Interface interface {
+	Discovery() unversioned.DiscoveryInterface
 	Legacy() legacy_unversioned.LegacyInterface
 	Extensions() extensions_unversioned.ExtensionsInterface
 }
@@ -30,6 +31,7 @@ type Interface interface {
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*unversioned.DiscoveryClient
 	*legacy_unversioned.LegacyClient
 	*extensions_unversioned.ExtensionsClient
 }
@@ -42,6 +44,11 @@ func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
 	return c.ExtensionsClient
+}
+
+// Discovery retrieves the DiscoveryClient
+func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+	return c.DiscoveryClient
 }
 
 // NewForConfig creates a new Clientset for the given config.
@@ -57,6 +64,10 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 		return nil, err
 	}
 
+	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	if err != nil {
+		return nil, err
+	}
 	return &clientset, nil
 }
 
@@ -67,6 +78,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	clientset.LegacyClient = legacy_unversioned.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = extensions_unversioned.NewForConfigOrDie(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
@@ -76,5 +88,6 @@ func New(c *unversioned.RESTClient) *Clientset {
 	clientset.LegacyClient = legacy_unversioned.New(c)
 	clientset.ExtensionsClient = extensions_unversioned.New(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset
 }

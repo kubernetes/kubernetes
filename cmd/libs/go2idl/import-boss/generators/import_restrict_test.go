@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flocker
+package generators
 
 import (
-	"os"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestGetenvOrFallback(t *testing.T) {
-	const expected = "foo"
-
-	assert := assert.New(t)
-
-	key := "FLOCKER_SET_VAR"
-	os.Setenv(key, expected)
-	assert.Equal(expected, getenvOrFallback(key, "~"+expected))
-
-	key = "FLOCKER_UNSET_VAR"
-	assert.Equal(expected, getenvOrFallback(key, expected))
+func TestRemoveLastDir(t *testing.T) {
+	table := map[string]struct{ newPath, removedDir string }{
+		"a/b/c": {"a/c", "b"},
+	}
+	for input, expect := range table {
+		gotPath, gotRemoved := removeLastDir(input)
+		if e, a := expect.newPath, gotPath; e != a {
+			t.Errorf("%v: wanted %v, got %v", input, e, a)
+		}
+		if e, a := expect.removedDir, gotRemoved; e != a {
+			t.Errorf("%v: wanted %v, got %v", input, e, a)
+		}
+	}
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -50,55 +49,6 @@ func TestUntilReturnsImmediately(t *testing.T) {
 	}, 30*time.Second, ch)
 	if now.Add(25 * time.Second).Before(time.Now()) {
 		t.Errorf("Until did not return immediately when the stop chan was closed inside the func")
-	}
-}
-
-func TestHandleCrash(t *testing.T) {
-	count := 0
-	expect := 10
-	for i := 0; i < expect; i = i + 1 {
-		defer HandleCrash()
-		if i%2 == 0 {
-			panic("Test Panic")
-		}
-		count = count + 1
-	}
-	if count != expect {
-		t.Errorf("Expected %d iterations, found %d", expect, count)
-	}
-}
-
-func TestCustomHandleCrash(t *testing.T) {
-	old := PanicHandlers
-	defer func() { PanicHandlers = old }()
-	var result interface{}
-	PanicHandlers = []func(interface{}){
-		func(r interface{}) {
-			result = r
-		},
-	}
-	func() {
-		defer HandleCrash()
-		panic("test")
-	}()
-	if result != "test" {
-		t.Errorf("did not receive custom handler")
-	}
-}
-
-func TestCustomHandleError(t *testing.T) {
-	old := ErrorHandlers
-	defer func() { ErrorHandlers = old }()
-	var result error
-	ErrorHandlers = []func(error){
-		func(err error) {
-			result = err
-		},
-	}
-	err := fmt.Errorf("test")
-	HandleError(err)
-	if result != err {
-		t.Errorf("did not receive custom handler")
 	}
 }
 
