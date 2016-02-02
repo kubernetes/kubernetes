@@ -78,6 +78,11 @@ const (
 	minimumGracePeriodInSeconds = 2
 
 	DockerNetnsFmt = "/proc/%v/ns/net"
+
+	// String used to detect docker host mode for various namespaces (e.g.
+	// networking). Must match the value returned by docker inspect -f
+	// '{{.HostConfig.NetworkMode}}'.
+	namespaceModeHost = "host"
 )
 
 // DockerManager implements the Runtime interface.
@@ -925,8 +930,8 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 	if dockerPodInfraContainer.HostConfig != nil {
 		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
 	}
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
-		if networkMode != "host" {
+	if usesHostNetwork(pod) {
+		if networkMode != namespaceModeHost {
 			glog.V(4).Infof("host: %v, %v", pod.Spec.SecurityContext.HostNetwork, networkMode)
 			return true, nil
 		}
@@ -944,6 +949,11 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
 	return podInfraContainerStatus.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
+}
+
+// pod must not be nil
+func usesHostNetwork(pod *api.Pod) bool {
+	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
 }
 
 // dockerVersion implementes kubecontainer.Version interface by implementing
@@ -1336,12 +1346,19 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 		result.AddSyncResult(containerResult)
 	}
 	if networkContainer != nil {
-		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
-		result.AddSyncResult(teardownNetworkResult)
-		if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.DockerID(networkContainer.ID.ID)); err != nil {
-			message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
-			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
-			glog.Error(message)
+		ins, err := dm.client.InspectContainer(networkContainer.ID.ID)
+		if err != nil {
+			glog.Errorf("Error inspecting container %v: %v", networkContainer.ID.ID, err)
+			return
+		}
+		if ins.HostConfig != nil && ins.HostConfig.NetworkMode != namespaceModeHost {
+			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
+			result.AddSyncResult(teardownNetworkResult)
+			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.DockerID(networkContainer.ID.ID)); err != nil {
+				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
+				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
+				glog.Error(message)
+			}
 		}
 		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainer.Name)
 		result.AddSyncResult(killContainerResult)
@@ -1522,8 +1539,8 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	}
 
 	utsMode := ""
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
-		utsMode = "host"
+	if usesHostNetwork(pod) {
+		utsMode = namespaceModeHost
 	}
 	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount)
 	if err != nil {
@@ -1586,7 +1603,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// This resolv.conf file is shared by all containers of the same pod, and needs to be modified only once per pod.
 	// we modify it when the pause container is created since it is the first container created in the pod since it holds
 	// the networking namespace.
-	if container.Name == PodInfraContainerName && utsMode != "host" {
+	if container.Name == PodInfraContainerName && utsMode != namespaceModeHost {
 		err = addNDotsOption(containerInfo.ResolvConfPath)
 		if err != nil {
 			return kubecontainer.ContainerID{}, fmt.Errorf("addNDotsOption: %v", err)
@@ -1641,8 +1658,8 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 		netNamespace = "none"
 	}
 
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
-		netNamespace = "host"
+	if usesHostNetwork(pod) {
+		netNamespace = namespaceModeHost
 	} else {
 		// Docker only exports ports from the pod infra container.  Let's
 		// collect all of the relevant ports and export them.
@@ -1892,24 +1909,26 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
-		// Call the networking plugin
-		err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
-		if err != nil {
-			// TODO: (random-liu) There shouldn't be "Skipping pod" in sync result message
-			message := fmt.Sprintf("Failed to setup network for pod %q using network plugins %q: %v; Skipping pod", format.Pod(pod), dm.networkPlugin.Name(), err)
-			setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, message)
-			glog.Error(message)
+		if !usesHostNetwork(pod) {
+			// Call the networking plugin
+			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
+			if err != nil {
+				// TODO: (random-liu) There shouldn't be "Skipping pod" in sync result message
+				message := fmt.Sprintf("Failed to setup network for pod %q using network plugins %q: %v; Skipping pod", format.Pod(pod), dm.networkPlugin.Name(), err)
+				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, message)
+				glog.Error(message)
 
-			// Delete infra container
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, PodInfraContainerName)
-			result.AddSyncResult(killContainerResult)
-			if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
-				ID:   string(podInfraContainerID),
-				Type: "docker"}, nil, pod, message); delErr != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, delErr.Error())
-				glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
+				// Delete infra container
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, PodInfraContainerName)
+				result.AddSyncResult(killContainerResult)
+				if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
+					ID:   string(podInfraContainerID),
+					Type: "docker"}, nil, pod, message); delErr != nil {
+					killContainerResult.Fail(kubecontainer.ErrKillContainer, delErr.Error())
+					glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
+				}
+				return
 			}
-			return
 		}
 
 		// Setup the host interface unless the pod is on the host's network (FIXME: move to networkPlugin when ready)
@@ -1920,7 +1939,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			result.Fail(err)
 			return
 		}
-		if !(pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork) {
+		if !usesHostNetwork(pod) {
 			if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
 				glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
 			}
@@ -2085,7 +2104,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 func getPidMode(pod *api.Pod) string {
 	pidMode := ""
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		pidMode = "host"
+		pidMode = namespaceModeHost
 	}
 	return pidMode
 }
@@ -2094,13 +2113,13 @@ func getPidMode(pod *api.Pod) string {
 func getIPCMode(pod *api.Pod) string {
 	ipcMode := ""
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		ipcMode = "host"
+		ipcMode = namespaceModeHost
 	}
 	return ipcMode
 }
 
-// GetNetNs returns the network namespace path for the given container
-func (dm *DockerManager) GetNetNs(containerID kubecontainer.ContainerID) (string, error) {
+// GetNetNS returns the network namespace path for the given container
+func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
 	inspectResult, err := dm.client.InspectContainer(containerID.ID)
 	if err != nil {
 		glog.Errorf("Error inspecting container: '%v'", err)

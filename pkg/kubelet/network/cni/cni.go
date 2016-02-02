@@ -106,7 +106,7 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	netns, err := runtime.GetNetNs(id.ContainerID())
+	netns, err := runtime.GetNetNS(id.ContainerID())
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	netns, err := runtime.GetNetNs(id.ContainerID())
+	netns, err := runtime.GetNetNS(id.ContainerID())
 	if err != nil {
 		return err
 	}
