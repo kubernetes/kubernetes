@@ -8578,12 +8578,15 @@ func (x *RBDVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep553, yyq553, yy2arr553
 			const yyr553 bool = false
 			yyq553[2] = x.FSType != ""
+			yyq553[3] = x.RBDPool != ""
+			yyq553[4] = x.RadosUser != ""
+			yyq553[5] = x.Keyring != ""
 			yyq553[7] = x.ReadOnly != false
 			var yynn553 int
 			if yyr553 || yy2arr553 {
 				r.EncodeArrayStart(8)
 			} else {
-				yynn553 = 6
+				yynn553 = 3
 				for _, b := range yyq553 {
 					if b {
 						yynn553++
@@ -8665,59 +8668,77 @@ func (x *RBDVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr553 || yy2arr553 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym564 := z.EncBinary()
-				_ = yym564
-				if false {
+				if yyq553[3] {
+					yym564 := z.EncBinary()
+					_ = yym564
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.RBDPool))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.RBDPool))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("pool"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym565 := z.EncBinary()
-				_ = yym565
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.RBDPool))
+				if yyq553[3] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("pool"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym565 := z.EncBinary()
+					_ = yym565
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.RBDPool))
+					}
 				}
 			}
 			if yyr553 || yy2arr553 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym567 := z.EncBinary()
-				_ = yym567
-				if false {
+				if yyq553[4] {
+					yym567 := z.EncBinary()
+					_ = yym567
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.RadosUser))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.RadosUser))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("user"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym568 := z.EncBinary()
-				_ = yym568
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.RadosUser))
+				if yyq553[4] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("user"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym568 := z.EncBinary()
+					_ = yym568
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.RadosUser))
+					}
 				}
 			}
 			if yyr553 || yy2arr553 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym570 := z.EncBinary()
-				_ = yym570
-				if false {
+				if yyq553[5] {
+					yym570 := z.EncBinary()
+					_ = yym570
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Keyring))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.Keyring))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("keyring"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym571 := z.EncBinary()
-				_ = yym571
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.Keyring))
+				if yyq553[5] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("keyring"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym571 := z.EncBinary()
+					_ = yym571
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Keyring))
+					}
 				}
 			}
 			if yyr553 || yy2arr553 {
