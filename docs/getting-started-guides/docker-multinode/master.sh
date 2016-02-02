@@ -26,9 +26,10 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null ); then
 fi
 
 # Make sure k8s version env is properly set
-K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.6"}
+K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.7"}
 ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
+FLANNEL_IPMASQ=${FLANNEL_IPMASQ:-"true"}
 FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
 ARCH=${ARCH:-"amd64"}
 
@@ -47,6 +48,7 @@ echo "K8S_VERSION is set to: ${K8S_VERSION}"
 echo "ETCD_VERSION is set to: ${ETCD_VERSION}"
 echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
 echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
+echo "FLANNEL_IPMASQ is set to: ${FLANNEL_IPMASQ}"
 echo "MASTER_IP is set to: ${MASTER_IP}"
 echo "ARCH is set to: ${ARCH}"
 
@@ -120,10 +122,10 @@ DOCKER_CONF=""
 start_k8s(){
     # Start etcd 
     docker -H unix:///var/run/docker-bootstrap.sock run \
-        --restart=always \
+        --restart=on-failure \
         --net=host \
         -d \
-        gcr.io/google_containers/etcd:${ETCD_VERSION} \
+        gcr.io/google_containers/etcd-${ARCH}:${ETCD_VERSION} \
         /usr/local/bin/etcd \
             --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
             --advertise-client-urls=http://${MASTER_IP}:4001 \
@@ -139,14 +141,14 @@ start_k8s(){
 
     # iface may change to a private network interface, eth0 is for default
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
-        --restart=always \
+        --restart=on-failure \
         -d \
         --net=host \
         --privileged \
         -v /dev/net:/dev/net \
         quay.io/coreos/flannel:${FLANNEL_VERSION} \
         /opt/bin/flanneld \
-            --ip-masq \
+            --ip-masq="${FLANNEL_IPMASQ}" \
             --iface="${FLANNEL_IFACE}")
 
     sleep 8
@@ -200,7 +202,7 @@ start_k8s(){
         --net=host \
         --pid=host \
         --privileged \
-        --restart=always \
+        --restart=on-failure \
         -d \
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw \
