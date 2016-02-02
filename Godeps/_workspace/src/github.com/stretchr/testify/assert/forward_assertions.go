@@ -81,7 +81,7 @@ func (a *Assertions) Nil(object interface{}, msgAndArgs ...interface{}) bool {
 // Empty asserts that the specified object is empty.  I.e. nil, "", false, 0 or a
 // slice with len == 0.
 //
-// assert.Empty(obj)
+//  assert.Empty(obj)
 //
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) Empty(object interface{}, msgAndArgs ...interface{}) bool {
@@ -91,9 +91,9 @@ func (a *Assertions) Empty(object interface{}, msgAndArgs ...interface{}) bool {
 // NotEmpty asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or a
 // slice with len == 0.
 //
-// if assert.NotEmpty(obj) {
-//   assert.Equal("two", obj[1])
-// }
+//  if assert.NotEmpty(obj) {
+//    assert.Equal("two", obj[1])
+//  }
 //
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) NotEmpty(object interface{}, msgAndArgs ...interface{}) bool {
@@ -119,7 +119,7 @@ func (a *Assertions) True(value bool, msgAndArgs ...interface{}) bool {
 	return True(a.t, value, msgAndArgs...)
 }
 
-// False asserts that the specified value is true.
+// False asserts that the specified value is false.
 //
 //    assert.False(myBool, "myBool should be false")
 //
@@ -262,4 +262,23 @@ func (a *Assertions) Regexp(rx interface{}, str interface{}, msgAndArgs ...inter
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) NotRegexp(rx interface{}, str interface{}, msgAndArgs ...interface{}) bool {
 	return NotRegexp(a.t, rx, str, msgAndArgs...)
+}
+
+// Zero asserts that i is the zero value for its type and returns the truth.
+func (a *Assertions) Zero(i interface{}, msgAndArgs ...interface{}) bool {
+	return Zero(a.t, i, msgAndArgs...)
+}
+
+// NotZero asserts that i is not the zero value for its type and returns the truth.
+func (a *Assertions) NotZero(i interface{}, msgAndArgs ...interface{}) bool {
+	return NotZero(a.t, i, msgAndArgs...)
+}
+
+// JSONEq asserts that two JSON strings are equivalent.
+//
+//  assert.JSONEq(t, `{"hello": "world", "foo": "bar"}`, `{"foo": "bar", "hello": "world"}`)
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) JSONEq(expected string, actual string, msgAndArgs ...interface{}) bool {
+	return JSONEq(a.t, expected, actual, msgAndArgs...)
 }

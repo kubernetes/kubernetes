@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package mesosproto;
+package mesosproto.scheduler;
 
-import "mesos.proto";
+import "github.com/mesos/mesos-go/mesosproto/mesos.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
+option go_package = "scheduler";
 option (gogoproto.gostring_all) = true;
 option (gogoproto.equal_all) = true;
 option (gogoproto.verbose_equal_all) = true;
@@ -68,17 +69,19 @@ message Event {
 
     // This value will be set if the master is sending heartbeats. See
     // the comment above on 'HEARTBEAT' for more details.
-    // TODO(vinod): Implement heartbeats in the master once the master
-    // can send HTTP events.
     optional double heartbeat_interval_seconds = 2;
   }
 
   // Received whenever there are new resources that are offered to the
-  // scheduler. Each offer corresponds to a set of resources on a
-  // slave. Until the scheduler accepts or declines an offer the
-  // resources are considered allocated to the scheduler.
+  // scheduler or resources requested back from the scheduler. Each
+  // offer corresponds to a set of resources on a slave. Until the
+  // scheduler accepts or declines an offer the resources are
+  // considered allocated to the scheduler. Accepting or Declining an
+  // inverse offer informs the allocator of the scheduler's ability to
+  // release the resources without violating an SLA.
   message Offers {
     repeated Offer offers = 1;
+    repeated InverseOffer inverse_offers = 2;
   }
 
   // Received when a particular offer is no longer valid (e.g., the
@@ -179,6 +182,7 @@ message Call {
     RECONCILE = 9;   // See 'Reconcile' below.
     MESSAGE = 10;    // See 'Message' below.
     REQUEST = 11;    // See 'Request' below.
+    SUPPRESS = 12;    // Inform master to stop sending offers to the framework.
 
     // TODO(benh): Consider adding an 'ACTIVATE' and 'DEACTIVATE' for
     // already subscribed frameworks as a way of stopping offers from

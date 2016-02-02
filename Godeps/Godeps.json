@@ -762,43 +762,43 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/scheduler",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Comment": "v0.0.2-5-ged907b1",
-			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
+			"Comment": "before-0.26-protos-14-g4a7554a",
+			"Rev": "4a7554aad396c70d19c9fc3469980547c9f117ae"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
@@ -840,6 +840,10 @@
 		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
+		},
+		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
@@ -908,18 +912,18 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Comment": "v1.0-17-g089c718",
-			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Comment": "v1.0-17-g089c718",
-			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Comment": "v1.0-17-g089c718",
-			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
