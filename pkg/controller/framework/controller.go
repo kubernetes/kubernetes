@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Config contains all the settings for a Controller.
@@ -94,7 +94,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	r.RunUntil(stopCh)
 
-	util.Until(c.processLoop, time.Second, stopCh)
+	wait.Until(c.processLoop, time.Second, stopCh)
 }
 
 // Returns true once this controller has completed an initial resource listing

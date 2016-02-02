@@ -45,6 +45,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -274,12 +275,12 @@ func (s *ProxyServer) Run() error {
 		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		go util.Until(func() {
+		go wait.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(s.Config.HealthzPort), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second, util.NeverStop)
+		}, 5*time.Second, wait.NeverStop)
 	}
 
 	// Tune conntrack, if requested

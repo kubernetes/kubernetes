@@ -175,17 +175,17 @@ func Run(s *options.CMServer) error {
 
 func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig *client.Config, stop <-chan struct{}) error {
 	go endpointcontroller.NewEndpointController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "endpoint-controller")), ResyncPeriod(s)).
-		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+		Run(s.ConcurrentEndpointSyncs, wait.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(
 		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replication-controller")),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
-	).Run(s.ConcurrentRCSyncs, util.NeverStop)
+	).Run(s.ConcurrentRCSyncs, wait.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
 		go gc.New(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "garbage-collector")), ResyncPeriod(s), s.TerminatedPodGCThreshold).
-			Run(util.NeverStop)
+			Run(wait.NeverStop)
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
@@ -219,7 +219,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	go resourcequotacontroller.NewResourceQuotaController(
 		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "resourcequota-controller")),
-		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
+		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -265,25 +265,25 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
 			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "daemon-set-controller")), ResyncPeriod(s)).
-				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+				Run(s.ConcurrentDSCSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
 			go job.NewJobController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "job-controller")), ResyncPeriod(s)).
-				Run(s.ConcurrentJobSyncs, util.NeverStop)
+				Run(s.ConcurrentJobSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
 			go deployment.NewDeploymentController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "deployment-controller")), ResyncPeriod(s)).
-				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
+				Run(s.ConcurrentDeploymentSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "replicasets") {
 			glog.Infof("Starting ReplicaSet controller")
 			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas).
-				Run(s.ConcurrentRSSyncs, util.NeverStop)
+				Run(s.ConcurrentRSSyncs, wait.NeverStop)
 		}
 	}
 

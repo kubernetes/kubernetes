@@ -506,12 +506,12 @@ func (config *KubeProxyTestConfig) deleteNetProxyPod() {
 	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
 	config.endpointPods = config.endpointPods[1:]
 	// wait for pod being deleted.
-	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, util.ForeverTestTimeout)
+	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
 	// wait for endpoint being removed.
-	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, util.ForeverTestTimeout)
+	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}

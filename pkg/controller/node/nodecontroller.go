@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -215,16 +216,16 @@ func NewNodeController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
-	go nc.nodeController.Run(util.NeverStop)
-	go nc.podController.Run(util.NeverStop)
-	go nc.daemonSetController.Run(util.NeverStop)
+	go nc.nodeController.Run(wait.NeverStop)
+	go nc.podController.Run(wait.NeverStop)
+	go nc.daemonSetController.Run(wait.NeverStop)
 
 	// Incorporate the results of node status pushed from kubelet to master.
-	go util.Until(func() {
+	go wait.Until(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
-	}, nc.nodeMonitorPeriod, util.NeverStop)
+	}, nc.nodeMonitorPeriod, wait.NeverStop)
 
 	// Managing eviction of nodes:
 	// 1. when we delete pods off a node, if the node was not empty at the time we then
@@ -238,7 +239,7 @@ func (nc *NodeController) Run(period time.Duration) {
 	//    b. If there are no pods left terminating, exit
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
-	go util.Until(func() {
+	go wait.Until(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		nc.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
@@ -253,11 +254,11 @@ func (nc *NodeController) Run(period time.Duration) {
 			}
 			return true, 0
 		})
-	}, nodeEvictionPeriod, util.NeverStop)
+	}, nodeEvictionPeriod, wait.NeverStop)
 
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
-	go util.Until(func() {
+	go wait.Until(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		nc.terminationEvictor.Try(func(value TimedValue) (bool, time.Duration) {
@@ -280,7 +281,7 @@ func (nc *NodeController) Run(period time.Duration) {
 			}
 			return false, remaining
 		})
-	}, nodeEvictionPeriod, util.NeverStop)
+	}, nodeEvictionPeriod, wait.NeverStop)
 }
 
 // Generates num pod CIDRs that could be assigned to nodes.

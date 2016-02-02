@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -319,7 +320,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 		},
 	}
 	r := cache.NewReflector(lw, &api.Pod{}, store, 0)
-	r.ListAndWatch(util.NeverStop)
+	r.ListAndWatch(wait.NeverStop)
 
 	{
 		_, version, err := store.WaitUntilFreshAndList(10)

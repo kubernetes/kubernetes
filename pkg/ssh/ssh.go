@@ -39,7 +39,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
-	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -297,7 +296,7 @@ func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan ch
 		healthCheckURL: healthCheckURL,
 	}
 	healthCheckPoll := 1 * time.Minute
-	go util.Until(func() {
+	go wait.Until(func() {
 		l.tunnelsLock.Lock()
 		defer l.tunnelsLock.Unlock()
 		// Healthcheck each tunnel every minute
