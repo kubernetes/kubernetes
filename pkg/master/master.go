@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -197,12 +198,60 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
+
+	// Install autoscaling unless disabled.
+	var autoscalerStorage, autoscalerStatusStorage rest.Storage
+	if !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable {
+		autoscalerStorage, autoscalerStatusStorage = horizontalpodautoscaleretcd.NewREST(
+			c.StorageDestinations.Get(autoscaling.GroupName, "horizontalpodautoscalers"), m.StorageDecorator())
+
+		autoscalingResources := map[string]rest.Storage{
+			"horizontalpodautoscalers": autoscalerStorage,
+			"horizontalpodautoscalers/status": autoscalerStatusStorage,
+		}
+
+		autoscalingGroupMeta := registered.GroupOrDie(autoscaling.GroupName)
+		// Update the prefered version as per StorageVersions in the config.
+		storageVersion, found := c.StorageVersions[autoscalingGroupMeta.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find storage version of group %v", autoscalingGroupMeta.GroupVersion.Group)
+		}
+		preferedGroupVersion, err := unversioned.ParseGroupVersion(storageVersion)
+		if err != nil {
+			glog.Fatalf("Error in parsing group version %s: %v", storageVersion, err)
+		}
+		autoscalingGroupMeta.GroupVersion = preferedGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *autoscalingGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": autoscalingResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		autoscalingGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: autoscalingGroupMeta.GroupVersion.String(),
+			Version:      autoscalingGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             autoscalingGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
+			PreferredVersion: autoscalingGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+
 	// Install extensions unless disabled.
 	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
 		m.thirdPartyResources = map[string]thirdPartyEntry{}
 
-		extensionResources := m.getExtensionResources(c)
+		extensionResources := m.getExtensionResources(c, autoscalerStorage, autoscalerStatusStorage)
 		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 		// Update the prefered version as per StorageVersions in the config.
 		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
@@ -238,6 +287,7 @@ func (m *Master) InstallAPIs(c *Config) {
 		}
 		allGroups = append(allGroups, group)
 	}
+
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
@@ -570,7 +620,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 }
 
 // getExperimentalResources returns the resources for extenstions api
-func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
+func (m *Master) getExtensionResources(c *Config, autoscalerStorage, autoscalerStatusStorage rest.Storage) map[string]rest.Storage {
 	// All resources except these are disabled by default.
 	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
@@ -588,8 +638,8 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	}
 
 	storage := map[string]rest.Storage{}
-	if isEnabled("horizontalpodautoscalers") {
-		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
+	// Install only when appriopriate storages are provided.
+	if isEnabled("horizontalpodautoscalers") && autoscalerStorage != nil && autoscalerStatusStorage != nil {
 		storage["horizontalpodautoscalers"] = autoscalerStorage
 		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
 		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
@@ -266,6 +267,23 @@ func Run(s *options.APIServer) error {
 	}
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
+	// autoscaling group
+	if !apiGroupVersionOverrides["autoscaling/v1b"].Disable {
+		autoGroup, err := registered.Group(autoscaling.GroupName)
+		if err != nil {
+			glog.Fatalf("Autoscaling API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		}
+		if _, found := storageVersions[autoGroup.GroupVersion.Group]; !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", autoGroup.GroupVersion.Group, storageVersions)
+		}
+		autoscalingEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[autoGroup.GroupVersion.Group], s.EtcdPathPrefix)
+		if err != nil {
+			glog.Fatalf("Invalid autoscaling storage version or misconfigured etcd: %v", err)
+		}
+		storageDestinations.AddAPIGroup(autoscaling.GroupName, autoscalingEtcdStorage)
+	}
+
+	// extensions group
 	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		expGroup, err := registered.Group(extensions.GroupName)
 		if err != nil {
@@ -426,33 +444,24 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 	}
 	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
 
-	// "api/v1={true|false} allows users to enable/disable v1 API.
-	// This takes preference over api/all and api/legacy, if specified.
-	disableV1 := disableAllAPIs
-	v1GroupVersion := "api/v1"
-	disableV1 = !getRuntimeConfigValue(s, v1GroupVersion, !disableV1)
 	apiGroupVersionOverrides := map[string]genericapiserver.APIGroupVersionOverride{}
-	if disableV1 {
-		apiGroupVersionOverrides[v1GroupVersion] = genericapiserver.APIGroupVersionOverride{
-			Disable: true,
-		}
-	}
-
-	// "extensions/v1beta1={true|false} allows users to enable/disable the extensions API.
+	// "<groupVersion>={true|false} allows users to enable/disable the appriopriate API.
 	// This takes preference over api/all, if specified.
-	disableExtensions := disableAllAPIs
-	extensionsGroupVersion := "extensions/v1beta1"
-	// TODO: Make this a loop over all group/versions when there are more of them.
-	disableExtensions = !getRuntimeConfigValue(s, extensionsGroupVersion, !disableExtensions)
-	if disableExtensions {
-		apiGroupVersionOverrides[extensionsGroupVersion] = genericapiserver.APIGroupVersionOverride{
-			Disable: true,
+	groupVersions := []string{"api/v1", "autoscaling/v1", "extensions/v1beta1"}
+	for _, gv := range groupVersions {
+		disable := disableAllAPIs
+		disable = !getRuntimeConfigValue(s, gv, !disable)
+		if disable {
+			apiGroupVersionOverrides[gv] = genericapiserver.APIGroupVersionOverride{
+				Disable: true,
+			}
 		}
 	}
 
+	extensionsGroupVersion := "extensions/v1beta1"
 	for key := range s.RuntimeConfig {
-		if strings.HasPrefix(key, v1GroupVersion+"/") {
-			return nil, fmt.Errorf("api/v1 resources cannot be enabled/disabled individually")
+		if strings.HasPrefix(key, "api/v1/") || strings.HasPrefix(key, "autoscaling/v1/") {
+			return nil, fmt.Errorf("api/v1 and autoscaling/v1 resources cannot be enabled/disabled individually")
 		} else if strings.HasPrefix(key, extensionsGroupVersion+"/") {
 			resource := strings.TrimPrefix(key, extensionsGroupVersion+"/")
 
