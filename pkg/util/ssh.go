@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 var (
@@ -289,7 +290,7 @@ func (l *SSHTunnelList) Close() {
 	for ix := range l.entries {
 		entry := l.entries[ix]
 		go func() {
-			defer HandleCrash()
+			defer runtime.HandleCrash()
 			time.Sleep(1 * time.Minute)
 			if err := entry.Tunnel.Close(); err != nil {
 				glog.Errorf("Failed to close tunnel %v: %v", entry, err)

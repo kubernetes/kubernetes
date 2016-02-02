@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -299,7 +300,7 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 		}
 	}
 
-	util.ReallyCrash = s.ReallyCrashForTesting
+	runtime.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)

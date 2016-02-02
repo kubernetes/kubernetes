@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
@@ -64,7 +65,7 @@ import (
 )
 
 func init() {
-	util.ReallyCrash = true
+	utilruntime.ReallyCrash = true
 }
 
 const testKubeletHostname = "127.0.0.1"

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -153,7 +154,7 @@ func (rq *ResourceQuotaController) worker() {
 			defer rq.queue.Done(key)
 			err := rq.syncHandler(key.(string))
 			if err != nil {
-				util.HandleError(err)
+				utilruntime.HandleError(err)
 			}
 		}()
 	}
@@ -161,7 +162,7 @@ func (rq *ResourceQuotaController) worker() {
 
 // Run begins quota controller using the specified number of workers
 func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	go rq.rqController.Run(stopCh)
 	go rq.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {

@@ -40,6 +40,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -185,7 +186,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	go dc.dController.Run(stopCh)
 	go dc.rcController.Run(stopCh)
 	go dc.podController.Run(stopCh)

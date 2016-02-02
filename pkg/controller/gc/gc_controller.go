@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -103,7 +104,7 @@ func (gcc *GCController) gc() {
 			defer wait.Done()
 			if err := gcc.deletePod(namespace, name); err != nil {
 				// ignore not founds
-				defer util.HandleError(err)
+				defer utilruntime.HandleError(err)
 			}
 		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
 	}
