@@ -26,9 +26,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -220,7 +220,7 @@ func verifyDevicePath(devicePaths []string, xvdBeforeSet sets.String) (string, e
 // This function is intended to be called asynchronously as a go routine.
 func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
 	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Will block for pending operations", c.volumeID)
-	defer util.HandleCrash()
+	defer runtime.HandleCrash()
 
 	// Block execution until any pending attach/detach operations for this PD have completed
 	attachDetachMutex.LockKey(c.volumeID)
