@@ -66,7 +66,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: replicas,
-			Selector: &extensions.LabelSelector{MatchLabels: selectorMap},
+			Selector: &unversioned.LabelSelector{MatchLabels: selectorMap},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -379,7 +379,7 @@ func TestPodControllerLookup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -394,7 +394,7 @@ func TestPodControllerLookup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -537,7 +537,7 @@ func TestUpdatePods(t *testing.T) {
 	manager.rsStore.Store.Add(testRSSpec1)
 	testRSSpec2 := *testRSSpec1
 	labelMap2 := map[string]string{"bar": "foo"}
-	testRSSpec2.Spec.Selector = &extensions.LabelSelector{MatchLabels: labelMap2}
+	testRSSpec2.Spec.Selector = &unversioned.LabelSelector{MatchLabels: labelMap2}
 	testRSSpec2.Name = "barfoo"
 	manager.rsStore.Store.Add(&testRSSpec2)
 
