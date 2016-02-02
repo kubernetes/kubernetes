@@ -160,7 +160,9 @@ func testNewDeployment(f *Framework) {
 	podLabels := map[string]string{"name": "nginx"}
 	replicas := 1
 	Logf("Creating simple deployment %s", deploymentName)
-	_, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil))
+	d := newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
+	d.Annotations = map[string]string{"test": "annotation-should-copy-to-RC"}
+	_, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
@@ -189,7 +191,8 @@ func testNewDeployment(f *Framework) {
 	Expect(deployment.Status.UpdatedReplicas).Should(Equal(replicas))
 
 	// Check if it's updated to revision 1 correctly
-	checkDeploymentRevision(c, ns, deploymentName, "1", "nginx", "nginx")
+	_, newRC := checkDeploymentRevision(c, ns, deploymentName, "1", "nginx", "nginx")
+	Expect(newRC.Annotations["test"]).Should(Equal("annotation-should-copy-to-RC"))
 }
 
 func testRollingUpdateDeployment(f *Framework) {
