@@ -92,7 +92,6 @@ hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credent
 hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
-hack/test-cmd.sh:  --runtime_config="extensions/v1beta1/deployments=true" \
 pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
 pkg/kubelet/qos/memory_policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
