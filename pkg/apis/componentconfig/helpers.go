@@ -54,8 +54,7 @@ func (v IPVar) Type() string {
 }
 
 func (m *ProxyMode) Set(s string) error {
-	nm := ProxyMode(s)
-	m = &nm
+	*m = ProxyMode(s)
 	return nil
 }
 
