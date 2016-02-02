@@ -76,6 +76,7 @@ func init() {
 		DeepCopy_api_GitRepoVolumeSource,
 		DeepCopy_api_GlusterfsVolumeSource,
 		DeepCopy_api_HTTPGetAction,
+		DeepCopy_api_HTTPHeader,
 		DeepCopy_api_Handler,
 		DeepCopy_api_HostPathVolumeSource,
 		DeepCopy_api_ISCSIVolumeSource,
@@ -930,6 +931,23 @@ func DeepCopy_api_HTTPGetAction(in HTTPGetAction, out *HTTPGetAction, c *convers
 	}
 	out.Host = in.Host
 	out.Scheme = in.Scheme
+	if in.HTTPHeaders != nil {
+		in, out := in.HTTPHeaders, &out.HTTPHeaders
+		*out = make([]HTTPHeader, len(in))
+		for i := range in {
+			if err := DeepCopy_api_HTTPHeader(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.HTTPHeaders = nil
+	}
+	return nil
+}
+
+func DeepCopy_api_HTTPHeader(in HTTPHeader, out *HTTPHeader, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.Value = in.Value
 	return nil
 }
 
