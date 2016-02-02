@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -416,7 +417,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
 	if !ok {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("Pod %q does not exist", podID))
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod %q does not exist\n", podID))
 		return
 	}
 	// Check if containerName is valid.
@@ -427,12 +428,12 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		}
 	}
 	if !containerExists {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("Container %q not found in Pod %q", containerName, podID))
+		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q\n", containerName, podID))
 		return
 	}
 
 	if _, ok := response.ResponseWriter.(http.Flusher); !ok {
-		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher", response))
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs\n", reflect.TypeOf(response)))
 		return
 	}
 	fw := flushwriter.Wrap(response.ResponseWriter)
@@ -440,10 +441,9 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		fw = limitwriter.New(fw, *logOptions.LimitBytes)
 	}
 	response.Header().Set("Transfer-Encoding", "chunked")
-	response.WriteHeader(http.StatusOK)
 	if err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
 		if err != limitwriter.ErrMaximumWrite {
-			response.WriteError(http.StatusInternalServerError, err)
+			response.WriteError(http.StatusBadRequest, err)
 		}
 		return
 	}

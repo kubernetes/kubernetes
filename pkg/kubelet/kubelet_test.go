@@ -2399,33 +2399,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 }
 
-func TestValidatePodStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	testCases := []struct {
-		podPhase api.PodPhase
-		success  bool
-	}{
-		{api.PodRunning, true},
-		{api.PodSucceeded, true},
-		{api.PodFailed, true},
-		{api.PodPending, false},
-		{api.PodUnknown, false},
-	}
-
-	for i, tc := range testCases {
-		err := kubelet.validatePodPhase(&api.PodStatus{Phase: tc.podPhase})
-		if tc.success {
-			if err != nil {
-				t.Errorf("[case %d]: unexpected failure - %v", i, err)
-			}
-		} else if err == nil {
-			t.Errorf("[case %d]: unexpected success", i)
-		}
-	}
-}
-
-func TestValidateContainerStatus(t *testing.T) {
+func TestValidateContainerLogStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	containerName := "x"
@@ -2442,6 +2416,17 @@ func TestValidateContainerStatus(t *testing.T) {
 					},
 					LastTerminationState: api.ContainerState{
 						Terminated: &api.ContainerStateTerminated{},
+					},
+				},
+			},
+			success: true,
+		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Running: &api.ContainerStateRunning{},
 					},
 				},
 			},
@@ -2469,10 +2454,28 @@ func TestValidateContainerStatus(t *testing.T) {
 			},
 			success: false,
 		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name:  containerName,
+					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePull"}},
+				},
+			},
+			success: false,
+		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name:  containerName,
+					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePullBackOff"}},
+				},
+			},
+			success: false,
+		},
 	}
 
 	for i, tc := range testCases {
-		_, err := kubelet.validateContainerStatus(&api.PodStatus{
+		_, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 			ContainerStatuses: tc.statuses,
 		}, containerName, false)
 		if tc.success {
@@ -2483,20 +2486,30 @@ func TestValidateContainerStatus(t *testing.T) {
 			t.Errorf("[case %d]: unexpected success", i)
 		}
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
 	}, "blah", false); err == nil {
 		t.Errorf("expected error with invalid container name")
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
 	}, containerName, true); err != nil {
 		t.Errorf("unexpected error with for previous terminated container - %v", err)
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
+		ContainerStatuses: testCases[0].statuses,
+	}, containerName, false); err != nil {
+		t.Errorf("unexpected error with for most recent container - %v", err)
+	}
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[1].statuses,
 	}, containerName, true); err == nil {
 		t.Errorf("expected error with for previous terminated container")
+	}
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
+		ContainerStatuses: testCases[1].statuses,
+	}, containerName, false); err != nil {
+		t.Errorf("unexpected error with for most recent container")
 	}
 }
 
