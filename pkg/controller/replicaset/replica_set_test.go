@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -198,7 +199,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 		if key != expected {
 			t.Errorf("Unexpected sync all for ReplicaSet %v, expected %v", key, expected)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Processing DeleteFinalStateUnknown took longer than expected")
 	}
 }
@@ -454,14 +455,14 @@ func TestWatchControllers(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.rsController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	testRSSpec.Name = "foo"
 	fakeWatch.Add(&testRSSpec)
 
 	select {
 	case <-received:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -498,7 +499,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.podController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(nil, 1, api.PodRunning, labelMap, testRSSpec)
 	testPod := pods.Items[0]
@@ -507,7 +508,7 @@ func TestWatchPods(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -529,7 +530,7 @@ func TestUpdatePods(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	// Put 2 ReplicaSets and one pod into the controller's stores
 	labelMap1 := map[string]string{"foo": "bar"}
@@ -558,7 +559,7 @@ func TestUpdatePods(t *testing.T) {
 			if !expected.Has(got) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Expected update notifications for replica sets within 100ms each")
 		}
 	}
@@ -599,7 +600,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 		if key != expectedKey {
 			t.Errorf("Expected requeue of replica set with key %s got %s", expectedKey, key)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		manager.queue.ShutDown()
 		t.Errorf("Expected to find a ReplicaSet in the queue, found none.")
 	}

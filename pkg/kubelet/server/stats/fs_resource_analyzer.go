@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -68,7 +68,7 @@ func (s *fsResourceAnalyzer) Start() {
 		return
 	}
 	glog.Info("Starting FS ResourceAnalyzer")
-	go util.Forever(func() {
+	go wait.Forever(func() {
 		startTime := time.Now()
 		s.updateCachedPodVolumeStats()
 		glog.V(3).Infof("Finished calculating volume stats in %v.", time.Now().Sub(startTime))

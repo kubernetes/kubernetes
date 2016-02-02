@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -295,7 +294,7 @@ func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err = wait.Poll(time.Second, util.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}

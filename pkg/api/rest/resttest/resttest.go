@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type Tester struct {
@@ -927,7 +927,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 				if !ok {
 					t.Errorf("watch channel should be open")
 				}
-			case <-time.After(util.ForeverTestTimeout):
+			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()
@@ -975,7 +975,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 				if !ok {
 					t.Errorf("watch channel should be open")
 				}
-			case <-time.After(util.ForeverTestTimeout):
+			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()

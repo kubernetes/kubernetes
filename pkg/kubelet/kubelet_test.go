@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
@@ -3877,7 +3878,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		done <- struct{}{}
 	}()
 	select {
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timed out waiting for registration")
 	case <-done:
 		return

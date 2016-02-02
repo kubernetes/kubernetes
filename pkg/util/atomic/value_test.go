@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func ExpectValue(t *testing.T, atomicValue *Value, expectedValue interface{}) {
@@ -38,7 +38,7 @@ func ExpectValue(t *testing.T, atomicValue *Value, expectedValue interface{}) {
 			t.Errorf("Expected to find %v, found %v", expectedValue, actualValue)
 			return
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Error("Value could not be read")
 		return
 	}

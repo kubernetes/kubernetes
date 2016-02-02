@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -62,13 +62,13 @@ var _ = Describe("Mesos", func() {
 
 	It("starts static pods on every node in the mesos cluster", func() {
 		client := framework.Client
-		expectNoError(allNodesReady(client, util.ForeverTestTimeout), "all nodes ready")
+		expectNoError(allNodesReady(client, wait.ForeverTestTimeout), "all nodes ready")
 
 		nodelist := ListSchedulableNodesOrDie(framework.Client)
 
 		const ns = "static-pods"
 		numpods := len(nodelist.Items)
-		expectNoError(waitForPodsRunningReady(ns, numpods, util.ForeverTestTimeout),
+		expectNoError(waitForPodsRunningReady(ns, numpods, wait.ForeverTestTimeout),
 			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
 

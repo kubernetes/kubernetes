@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
@@ -97,7 +97,7 @@ func NewManager(
 // Start syncing probe status. This should only be called once.
 func (m *manager) Start() {
 	// Start syncing readiness.
-	go util.Forever(m.updateReadiness, 0)
+	go wait.Forever(m.updateReadiness, 0)
 }
 
 // Key uniquely identifying container probes

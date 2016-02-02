@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes controller
@@ -99,7 +100,7 @@ func (c *Controller) Start() {
 
 // RunKubernetesService periodically updates the kubernetes service
 func (c *Controller) RunKubernetesService(ch chan struct{}) {
-	util.Until(func() {
+	wait.Until(func() {
 		// Service definition is not reconciled after first
 		// run, ports and type will be corrected only during
 		// start.

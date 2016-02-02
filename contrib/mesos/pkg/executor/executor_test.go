@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/mesos/mesos-go/mesosproto"
@@ -233,7 +233,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	executor.LaunchTask(mockDriver, taskInfo)
 
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, wait.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return !registry.empty()
@@ -251,7 +251,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	finished := kmruntime.After(statusUpdateCalls.Wait)
 	select {
 	case <-finished:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for status update calls to finish")
 	}
 
@@ -267,7 +267,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	})
 
 	executor.KillTask(mockDriver, taskInfo.TaskId)
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, wait.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return registry.empty()
@@ -277,7 +277,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	finished = kmruntime.After(statusUpdateCalls.Wait)
 	select {
 	case <-finished:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for status update calls to finish")
 	}
 
@@ -428,7 +428,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	executor.LaunchTask(mockDriver, taskInfo)
 
 	// must wait for this otherwise phase changes may not apply
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, wait.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return !registry.empty()
@@ -444,7 +444,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	// from k.tasks through the "task-lost:foo" message below.
 	select {
 	case <-called:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for SendStatusUpdate for the running task")
 	}
 
@@ -462,7 +462,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 
 	executor.FrameworkMessage(mockDriver, "task-lost:foo")
 
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, wait.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return registry.empty()
@@ -470,7 +470,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 
 	select {
 	case <-called:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for SendStatusUpdate")
 	}
 
@@ -614,7 +614,7 @@ func TestExecutorsendFrameworkMessage(t *testing.T) {
 	// guard against data race in mock driver between AssertExpectations and Called
 	select {
 	case <-called: // expected
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("expected call to SendFrameworkMessage")
 	}
 	mockDriver.AssertExpectations(t)
