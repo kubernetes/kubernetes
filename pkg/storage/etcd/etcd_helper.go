@@ -46,6 +46,7 @@ type EtcdConfig struct {
 	ServerList []string
 	Codec      runtime.Codec
 	Prefix     string
+	Quorum     bool
 }
 
 // implements storage.Config
@@ -72,12 +73,12 @@ func (c *EtcdConfig) NewStorage() (storage.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewEtcdStorage(etcdClient, c.Codec, c.Prefix), nil
+	return NewEtcdStorage(etcdClient, c.Codec, c.Prefix, c.Quorum), nil
 }
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool) storage.Interface {
 	return &etcdHelper{
 		etcdclient: client,
 		client:     etcd.NewKeysAPI(client),
@@ -85,6 +86,7 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string) stor
 		versioner:  APIObjectVersioner{},
 		copier:     api.Scheme,
 		pathPrefix: path.Join("/", prefix),
+		quorum:     quorum,
 		cache:      util.NewCache(maxEtcdCacheEntries),
 	}
 }
@@ -99,6 +101,8 @@ type etcdHelper struct {
 	versioner storage.Versioner
 	// prefix for all etcd keys
 	pathPrefix string
+	// if true,  perform quorum read
+	quorum bool
 
 	// We cache objects stored in etcd. For keys we use Node.ModifiedIndex which is equivalent
 	// to resourceVersion.
@@ -269,7 +273,7 @@ func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion stri
 		return nil, err
 	}
 	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
+	w := newEtcdWatcher(false, h.quorum, nil, filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(ctx, h.client, key, watchRV)
 	return w, nil
 }
@@ -284,7 +288,7 @@ func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion 
 		return nil, err
 	}
 	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
+	w := newEtcdWatcher(true, h.quorum, exceptKey(key), filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(ctx, h.client, key, watchRV)
 	return w, nil
 }
@@ -306,7 +310,12 @@ func (h *etcdHelper) bodyAndExtractObj(ctx context.Context, key string, objPtr r
 		glog.Errorf("Context is nil")
 	}
 	startTime := time.Now()
-	response, err := h.client.Get(ctx, key, nil)
+
+	opts := &etcd.GetOptions{
+		Quorum: h.quorum,
+	}
+
+	response, err := h.client.Get(ctx, key, opts)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !etcdutil.IsEtcdNotFound(err) {
@@ -365,7 +374,12 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
 	trace.Step("About to read etcd node")
-	response, err := h.client.Get(ctx, key, nil)
+
+	opts := &etcd.GetOptions{
+		Quorum: h.quorum,
+	}
+	response, err := h.client.Get(ctx, key, opts)
+
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node read")
 	if err != nil {
@@ -473,6 +487,7 @@ func (h *etcdHelper) listEtcdNode(ctx context.Context, key string) ([]*etcd.Node
 	opts := etcd.GetOptions{
 		Recursive: true,
 		Sort:      true,
+		Quorum:    h.quorum,
 	}
 	result, err := h.client.Get(ctx, key, &opts)
 	if err != nil {

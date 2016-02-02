@@ -82,6 +82,7 @@ type etcdWatcher struct {
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
+	quorum  bool // If we enable quorum, shoule be true
 	include includeFunc
 	filter  storage.FilterFunc
 
@@ -109,12 +110,13 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
+func newEtcdWatcher(list bool, quorum bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
 		versioner: versioner,
 		transform: transform,
 		list:      list,
+		quorum:    quorum,
 		include:   include,
 		filter:    filter,
 		// Buffer this channel, so that the etcd client is not forced
@@ -171,7 +173,7 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 		// Stop() is called in the meantime (which in tests can cause etcd termination and
 		// strange behavior here).
 		if resourceVersion == 0 {
-			latest, err := etcdGetInitialWatchState(ctx, client, key, w.list, w.etcdIncoming)
+			latest, err := etcdGetInitialWatchState(ctx, client, key, w.list, w.quorum, w.etcdIncoming)
 			if err != nil {
 				w.etcdError <- err
 				return true
@@ -203,10 +205,11 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key string, recursive bool, quorum bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	opts := etcd.GetOptions{
 		Recursive: recursive,
 		Sort:      false,
+		Quorum:    quorum,
 	}
 	resp, err := client.Get(ctx, key, &opts)
 	if err != nil {
