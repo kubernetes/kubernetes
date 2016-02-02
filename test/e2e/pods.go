@@ -209,7 +209,7 @@ func getRestartDelay(c *client.Client, pod *api.Pod, ns string, name string, con
 var _ = Describe("Pods", func() {
 	framework := NewFramework("pods")
 
-	PIt("should get a host IP [Conformance]", func() {
+	It("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(util.NewUUID())
 		testHostIP(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
