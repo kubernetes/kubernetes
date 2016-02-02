@@ -290,6 +290,16 @@ func providerIs(providers ...string) bool {
 	return false
 }
 
+func SkipUnlessServerVersionGTE(v semver.Version, c client.ServerVersionInterface) {
+	gte, err := serverVersionGTE(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if !gte {
+		Skipf("Not supported for server versions before %q", v)
+	}
+}
+
 // providersWithSSH are those providers where each node is accessible with SSH
 var providersWithSSH = []string{"gce", "gke", "aws"}
 
