@@ -3454,8 +3454,8 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	}
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
-	if creates != 0 || deletes != 1 {
-		t.Errorf("expected 0 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
+	if creates != 1 || deletes != 1 {
+		t.Errorf("expected 1 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
 	}
 }
 
