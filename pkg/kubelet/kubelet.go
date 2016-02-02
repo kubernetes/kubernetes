@@ -36,6 +36,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -80,6 +81,7 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -1215,7 +1217,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 	return nil
 }
 
-func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
+func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName, hostDomain string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
 	// Kubernetes only mounts on /etc/hosts if :
 	// - container does not use hostNetwork and
 	// - container is not a infrastructure(pause) container
@@ -1249,7 +1251,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		})
 	}
 	if mountEtcHostsFile {
-		hostsMount, err := makeHostsMount(podDir, pod.Status.PodIP, pod.Name)
+		hostsMount, err := makeHostsMount(podDir, pod.Status.PodIP, hostName, hostDomain)
 		if err != nil {
 			return nil, err
 		}
@@ -1258,9 +1260,9 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 	return mounts, nil
 }
 
-func makeHostsMount(podDir, podIP, podName string) (*kubecontainer.Mount, error) {
+func makeHostsMount(podDir, podIP, hostName, hostDomainName string) (*kubecontainer.Mount, error) {
 	hostsFilePath := path.Join(podDir, "etc-hosts")
-	if err := ensureHostsFile(hostsFilePath, podIP, podName); err != nil {
+	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName); err != nil {
 		return nil, err
 	}
 	return &kubecontainer.Mount{
@@ -1271,7 +1273,7 @@ func makeHostsMount(podDir, podIP, podName string) (*kubecontainer.Mount, error)
 	}, nil
 }
 
-func ensureHostsFile(fileName string, hostIP, hostName string) error {
+func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
 	if _, err := os.Stat(fileName); os.IsExist(err) {
 		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
 		return nil
@@ -1284,7 +1286,11 @@ func ensureHostsFile(fileName string, hostIP, hostName string) error {
 	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
 	buffer.WriteString("fe00::1\tip6-allnodes\n")
 	buffer.WriteString("fe00::2\tip6-allrouters\n")
-	buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
+	if len(hostDomainName) > 0 {
+		buffer.WriteString(fmt.Sprintf("%s\t%s.%s\t%s\n", hostIP, hostName, hostDomainName, hostName))
+	} else {
+		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
+	}
 	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
@@ -1318,12 +1324,40 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	return
 }
 
+func generatePodHostNameAndDomain(pod *api.Pod, clusterDomain string) (string, string) {
+	// TODO(vmarmol): Handle better.
+	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
+	const hostnameMaxLen = 63
+	podAnnotations := pod.Annotations
+	if podAnnotations == nil {
+		podAnnotations = make(map[string]string)
+	}
+	hostname := pod.Name
+	hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
+	if utilvalidation.IsDNS1123Label(hostnameCandidate) {
+		// use hostname annotation, if specified.
+		hostname = hostnameCandidate
+	}
+	if len(hostname) > hostnameMaxLen {
+		hostname = hostname[:hostnameMaxLen]
+		glog.Errorf("hostname for pod:%q was longer than %d. Truncated hostname to :%q", pod.Name, hostnameMaxLen, hostname)
+	}
+
+	hostDomain := ""
+	subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
+	if utilvalidation.IsDNS1123Label(subdomainCandidate) {
+		hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
+	}
+	return hostname, hostDomain
+}
+
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
-
+	hostname, hostDomainName := generatePodHostNameAndDomain(pod, kl.clusterDomain)
+	opts.Hostname = hostname
 	vol, ok := kl.volumeManager.GetVolumes(pod.UID)
 	if !ok {
 		return nil, fmt.Errorf("impossible: cannot find the mounted volumes for pod %q", format.Pod(pod))
@@ -1340,7 +1374,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		}
 	}
 
-	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, vol)
+	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, vol)
 	if err != nil {
 		return nil, err
 	}
