@@ -17,6 +17,7 @@ limitations under the License.
 package release_1_1
 
 import (
+	autoscaling_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/autoscaling/unversioned"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
@@ -24,6 +25,7 @@ import (
 
 type Interface interface {
 	Legacy() legacy_unversioned.LegacyInterface
+	Autoscaling() autoscaling_unversioned.AutoscalingInterface
 	Extensions() extensions_unversioned.ExtensionsInterface
 }
 
@@ -31,12 +33,18 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*legacy_unversioned.LegacyClient
+	*autoscaling_unversioned.AutoscalingClient
 	*extensions_unversioned.ExtensionsClient
 }
 
 // Legacy retrieves the LegacyClient
 func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
 	return c.LegacyClient
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() autoscaling_unversioned.AutoscalingInterface {
+	return c.AutoscalingClient
 }
 
 // Extensions retrieves the ExtensionsClient
@@ -49,6 +57,10 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	var clientset Clientset
 	var err error
 	clientset.LegacyClient, err = legacy_unversioned.NewForConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	clientset.AutoscalingClient, err = autoscaling_unversioned.NewForConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +77,7 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	var clientset Clientset
 	clientset.LegacyClient = legacy_unversioned.NewForConfigOrDie(c)
+	clientset.AutoscalingClient = autoscaling_unversioned.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = extensions_unversioned.NewForConfigOrDie(c)
 
 	return &clientset
@@ -74,6 +87,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 func New(c *unversioned.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.LegacyClient = legacy_unversioned.New(c)
+	clientset.AutoscalingClient = autoscaling_unversioned.New(c)
 	clientset.ExtensionsClient = extensions_unversioned.New(c)
 
 	return &clientset

@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,25 +30,25 @@ type HorizontalPodAutoscalersGetter interface {
 
 // HorizontalPodAutoscalerInterface has methods to work with HorizontalPodAutoscaler resources.
 type HorizontalPodAutoscalerInterface interface {
-	Create(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
-	Update(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
-	UpdateStatus(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	Create(*autoscaling.HorizontalPodAutoscaler) (*autoscaling.HorizontalPodAutoscaler, error)
+	Update(*autoscaling.HorizontalPodAutoscaler) (*autoscaling.HorizontalPodAutoscaler, error)
+	UpdateStatus(*autoscaling.HorizontalPodAutoscaler) (*autoscaling.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
-	List(opts api.ListOptions) (*extensions.HorizontalPodAutoscalerList, error)
+	Get(name string) (*autoscaling.HorizontalPodAutoscaler, error)
+	List(opts api.ListOptions) (*autoscaling.HorizontalPodAutoscalerList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	HorizontalPodAutoscalerExpansion
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type horizontalPodAutoscalers struct {
-	client *ExtensionsClient
+	client *AutoscalingClient
 	ns     string
 }
 
 // newHorizontalPodAutoscalers returns a HorizontalPodAutoscalers
-func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizontalPodAutoscalers {
+func newHorizontalPodAutoscalers(c *AutoscalingClient, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
 		client: c,
 		ns:     namespace,
@@ -56,8 +56,8 @@ func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizon
 }
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
-func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
-	result = &extensions.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *autoscaling.HorizontalPodAutoscaler) (result *autoscaling.HorizontalPodAutoscaler, err error) {
+	result = &autoscaling.HorizontalPodAutoscaler{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -68,8 +68,8 @@ func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.Ho
 }
 
 // Update takes the representation of a horizontalPodAutoscaler and updates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
-func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
-	result = &extensions.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *autoscaling.HorizontalPodAutoscaler) (result *autoscaling.HorizontalPodAutoscaler, err error) {
+	result = &autoscaling.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -80,8 +80,8 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	return
 }
 
-func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
-	result = &extensions.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *autoscaling.HorizontalPodAutoscaler) (result *autoscaling.HorizontalPodAutoscaler, err error) {
+	result = &autoscaling.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -116,8 +116,8 @@ func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, 
 }
 
 // Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
-func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.HorizontalPodAutoscaler, err error) {
-	result = &extensions.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Get(name string) (result *autoscaling.HorizontalPodAutoscaler, err error) {
+	result = &autoscaling.HorizontalPodAutoscaler{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -128,8 +128,8 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.Horizont
 }
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
-	result = &extensions.HorizontalPodAutoscalerList{}
+func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *autoscaling.HorizontalPodAutoscalerList, err error) {
+	result = &autoscaling.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").

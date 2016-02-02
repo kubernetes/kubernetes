@@ -22,51 +22,21 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-type ExtensionsInterface interface {
-	DaemonSetsGetter
-	DeploymentsGetter
-	IngressesGetter
-	JobsGetter
-	ReplicaSetsGetter
-	ScalesGetter
-	ThirdPartyResourcesGetter
+type AutoscalingInterface interface {
+	HorizontalPodAutoscalersGetter
 }
 
-// ExtensionsClient is used to interact with features provided by the Extensions group.
-type ExtensionsClient struct {
+// AutoscalingClient is used to interact with features provided by the Autoscaling group.
+type AutoscalingClient struct {
 	*unversioned.RESTClient
 }
 
-func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
-	return newDaemonSets(c, namespace)
+func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
+	return newHorizontalPodAutoscalers(c, namespace)
 }
 
-func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
-	return newDeployments(c, namespace)
-}
-
-func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
-	return newIngresses(c, namespace)
-}
-
-func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
-}
-
-func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
-	return newReplicaSets(c, namespace)
-}
-
-func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
-	return newScales(c, namespace)
-}
-
-func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
-	return newThirdPartyResources(c, namespace)
-}
-
-// NewForConfig creates a new ExtensionsClient for the given config.
-func NewForConfig(c *unversioned.Config) (*ExtensionsClient, error) {
+// NewForConfig creates a new AutoscalingClient for the given config.
+func NewForConfig(c *unversioned.Config) (*AutoscalingClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -75,12 +45,12 @@ func NewForConfig(c *unversioned.Config) (*ExtensionsClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ExtensionsClient{client}, nil
+	return &AutoscalingClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new ExtensionsClient for the given config and
+// NewForConfigOrDie creates a new AutoscalingClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversioned.Config) *ExtensionsClient {
+func NewForConfigOrDie(c *unversioned.Config) *AutoscalingClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -88,14 +58,14 @@ func NewForConfigOrDie(c *unversioned.Config) *ExtensionsClient {
 	return client
 }
 
-// New creates a new ExtensionsClient for the given RESTClient.
-func New(c *unversioned.RESTClient) *ExtensionsClient {
-	return &ExtensionsClient{c}
+// New creates a new AutoscalingClient for the given RESTClient.
+func New(c *unversioned.RESTClient) *AutoscalingClient {
+	return &AutoscalingClient{c}
 }
 
 func setConfigDefaults(config *unversioned.Config) error {
-	// if extensions group is not registered, return an error
-	g, err := registered.Group("extensions")
+	// if autoscaling group is not registered, return an error
+	g, err := registered.Group("autoscaling")
 	if err != nil {
 		return err
 	}

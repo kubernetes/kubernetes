@@ -20,6 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	autoscaling_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/autoscaling/unversioned"
+	autoscaling_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/autoscaling/unversioned/fake"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	extensions_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned/fake"
 	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
@@ -56,6 +58,10 @@ var _ clientset.Interface = &Clientset{}
 
 func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
 	return &legacy_unversioned_fake.FakeLegacy{&c.Fake}
+}
+
+func (c *Clientset) Autoscaling() autoscaling_unversioned.AutoscalingInterface {
+	return &autoscaling_unversioned_fake.FakeAutoscaling{&c.Fake}
 }
 
 func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
