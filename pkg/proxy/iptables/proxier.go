@@ -115,8 +115,7 @@ type serviceInfo struct {
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeSeconds int
-	// Deprecated, but required for back-compat (including e2e)
-	externalIPs []string
+	externalIPs         []string
 }
 
 // returns a new serviceInfo struct
@@ -196,18 +195,24 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	//TODO: actually tear down all rules and chains.
 	args := []string{"-m", "comment", "--comment", "kubernetes service portals", "-j", string(iptablesServicesChain)}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainOutput, args...); err != nil {
-		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-		encounteredError = true
+		if !utiliptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+			encounteredError = true
+		}
 	}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPrerouting, args...); err != nil {
-		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-		encounteredError = true
+		if !utiliptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+			encounteredError = true
+		}
 	}
 
 	args = []string{"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT", "-m", "mark", "--mark", iptablesMasqueradeMark, "-j", "MASQUERADE"}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-		encounteredError = true
+		if !utiliptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+			encounteredError = true
+		}
 	}
 
 	// flush and delete chains.
@@ -215,12 +220,16 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	for _, c := range chains {
 		// flush chain, then if sucessful delete, delete will fail if flush fails.
 		if err := ipt.FlushChain(utiliptables.TableNAT, c); err != nil {
-			glog.Errorf("Error flushing pure-iptables proxy chain: %v", err)
-			encounteredError = true
+			if !utiliptables.IsNotFoundError(err) {
+				glog.Errorf("Error flushing pure-iptables proxy chain: %v", err)
+				encounteredError = true
+			}
 		} else {
 			if err = ipt.DeleteChain(utiliptables.TableNAT, c); err != nil {
-				glog.Errorf("Error deleting pure-iptables proxy chain: %v", err)
-				encounteredError = true
+				if !utiliptables.IsNotFoundError(err) {
+					glog.Errorf("Error deleting pure-iptables proxy chain: %v", err)
+					encounteredError = true
+				}
 			}
 		}
 	}

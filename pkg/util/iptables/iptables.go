@@ -576,3 +576,17 @@ func (runner *runner) reload() {
 		f()
 	}
 }
+
+// IsNotFoundError returns true if the error indicates "not found".  It parses
+// the error string looking for known values, which is imperfect but works in
+// practice.
+func IsNotFoundError(err error) bool {
+	es := err.Error()
+	if strings.Contains(es, "No such file or directory") {
+		return true
+	}
+	if strings.Contains(es, "No chain/target/match by that name") {
+		return true
+	}
+	return false
+}
