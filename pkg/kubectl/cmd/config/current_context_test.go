@@ -35,6 +35,8 @@ type currentContextTest struct {
 func newFederalContextConfig() clientcmdapi.Config {
 	return clientcmdapi.Config{
 		CurrentContext: "federal-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"federal-context": {AuthInfo: "some-user", Namespace: "different-namespace"}},
 	}
 }
 

@@ -19,6 +19,8 @@ package config
 import (
 	"fmt"
 	"io"
+
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"github.com/spf13/cobra"
@@ -56,12 +58,22 @@ func RunCurrentContext(out io.Writer, args []string, options *CurrentContextOpti
 	if err != nil {
 		return err
 	}
+	return describeCurrentContext(out, config)
+}
 
+func describeCurrentContext(out io.Writer, config *clientcmdapi.Config) error {
 	if config.CurrentContext == "" {
-		err = fmt.Errorf("current-context is not set\n")
+		err := fmt.Errorf("current-context is not set\n")
 		return err
 	}
-
-	fmt.Fprintf(out, "%s\n", config.CurrentContext)
+	fmt.Fprintf(out, "Name:\t%s\n", config.CurrentContext)
+	currentContext := config.Contexts[config.CurrentContext]
+	if currentContext == nil {
+		err := fmt.Errorf("has no current-context named %s\n", config.CurrentContext)
+		return err
+	}
+	fmt.Fprintf(out, "  Cluster:\t%s\n", currentContext.Cluster)
+	fmt.Fprintf(out, "  User:\t%s\n", currentContext.AuthInfo)
+	fmt.Fprintf(out, "  Namespace:\t%s\n", currentContext.Namespace)
 	return nil
 }
