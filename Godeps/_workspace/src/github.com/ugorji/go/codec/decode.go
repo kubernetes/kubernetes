@@ -1862,6 +1862,7 @@ func (d *Decoder) intern(s string) {
 	}
 }
 
+// nextValueBytes returns the next value in the stream as a set of bytes.
 func (d *Decoder) nextValueBytes() []byte {
 	d.d.uncacheRead()
 	d.r.track()

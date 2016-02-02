@@ -931,7 +931,7 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
+			"Rev": "4a79e5b7b21e51ae8d61641bca20399b79735a32"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink",
