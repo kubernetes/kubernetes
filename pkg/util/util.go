@@ -22,18 +22,13 @@ import (
 	"os"
 	"reflect"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/intstr"
-
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
-
-// For testing, bypass HandleCrash.
-var ReallyCrash bool
 
 // For any test of the style:
 //   ...
@@ -43,57 +38,6 @@ var ReallyCrash bool
 // is long enough that it is effectively forever for the things that can slow down a run on a heavily contended machine
 // (GC, seeks, etc), but not so long as to make a developer ctrl-c a test run if they do happen to break that test.
 var ForeverTestTimeout = time.Second * 30
-
-// PanicHandlers is a list of functions which will be invoked when a panic happens.
-var PanicHandlers = []func(interface{}){logPanic}
-
-// HandleCrash simply catches a crash and logs an error. Meant to be called via defer.
-// Additional context-specific handlers can be provided, and will be called in case of panic
-func HandleCrash(additionalHandlers ...func(interface{})) {
-	if ReallyCrash {
-		return
-	}
-	if r := recover(); r != nil {
-		for _, fn := range PanicHandlers {
-			fn(r)
-		}
-		for _, fn := range additionalHandlers {
-			fn(r)
-		}
-	}
-}
-
-// logPanic logs the caller tree when a panic occurs.
-func logPanic(r interface{}) {
-	callers := ""
-	for i := 0; true; i++ {
-		_, file, line, ok := runtime.Caller(i)
-		if !ok {
-			break
-		}
-		callers = callers + fmt.Sprintf("%v:%v\n", file, line)
-	}
-	glog.Errorf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
-}
-
-// ErrorHandlers is a list of functions which will be invoked when an unreturnable
-// error occurs.
-var ErrorHandlers = []func(error){logError}
-
-// HandlerError is a method to invoke when a non-user facing piece of code cannot
-// return an error and needs to indicate it has been ignored. Invoking this method
-// is preferable to logging the error - the default behavior is to log but the
-// errors may be sent to a remote server for analysis.
-func HandleError(err error) {
-	for _, fn := range ErrorHandlers {
-		fn(err)
-	}
-}
-
-// logError prints an error with the call stack of the location it was reported
-func logError(err error) {
-	glog.ErrorDepth(2, err)
-}
 
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
@@ -116,7 +60,7 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 
 	for {
 		func() {
-			defer HandleCrash()
+			defer runtime.HandleCrash()
 			f()
 		}()
 		select {

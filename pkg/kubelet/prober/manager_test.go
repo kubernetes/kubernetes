@@ -27,11 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func init() {
-	util.ReallyCrash = true
+	runtime.ReallyCrash = true
 }
 
 var defaultProbe *api.Probe = &api.Probe{

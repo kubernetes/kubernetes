@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
@@ -1297,7 +1298,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 	wg.Add(len(runningPod.Containers))
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {
-			defer util.HandleCrash()
+			defer utilruntime.HandleCrash()
 			defer wg.Done()
 
 			var containerSpec *api.Container
@@ -1418,7 +1419,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			defer util.HandleCrash()
+			defer utilruntime.HandleCrash()
 			if err := dm.runner.Run(containerID, pod, container, container.Lifecycle.PreStop); err != nil {
 				glog.Errorf("preStop hook for container %q failed: %v", name, err)
 			}
