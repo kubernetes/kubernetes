@@ -578,6 +578,7 @@ func (e *cborEncDriver) reset() {
 
 func (d *cborDecDriver) reset() {
 	d.r = d.d.r
+	d.bd, d.bdRead = 0, false
 }
 
 var _ decDriver = (*cborDecDriver)(nil)

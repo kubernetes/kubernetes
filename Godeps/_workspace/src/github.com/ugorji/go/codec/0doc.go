@@ -64,6 +64,7 @@ Rich Feature Set includes:
   - Never silently skip data when decoding.
     User decides whether to return an error or silently skip data when keys or indexes
     in the data stream do not map to fields in the struct.
+  - Detect and error when encoding a cyclic reference (instead of stack overflow shutdown)
   - Encode/Decode from/to chan types (for iterative streaming support)
   - Drop-in replacement for encoding/json. `json:` key in struct tag supported.
   - Provides a RPC Server and Client Codec for net/rpc communication protocol.
@@ -171,6 +172,8 @@ package codec
 
 // TODO:
 //
+//   - optimization for codecgen:
+//     if len of entity is <= 3 words, then support a value receiver for encode.
 //   - (En|De)coder should store an error when it occurs.
 //     Until reset, subsequent calls return that error that was stored.
 //     This means that free panics must go away.
@@ -190,4 +193,7 @@ package codec
 //    - Consider making Handle used AS-IS within the encoding/decoding session.
 //      This means that we don't cache Handle information within the (En|De)coder,
 //      except we really need it at Reset(...)
-//    - Handle recursive types during encoding/decoding?
+//    - Consider adding math/big support
+//    - Consider reducing the size of the generated functions:
+//      Maybe use one loop, and put the conditionals in the loop.
+//      for ... { if cLen > 0 { if j == cLen { break } } else if dd.CheckBreak() { break } }

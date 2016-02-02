@@ -328,7 +328,7 @@ func (_ fastpathT) {{ .MethodNamePfx "Dec" false }}V(v []{{ .Elem }}, checkNil b
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 	
 	if containerLenS > 0 {
@@ -391,7 +391,7 @@ func (_ fastpathT) {{ .MethodNamePfx "Dec" false }}V(v []{{ .Elem }}, checkNil b
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]{{ .Elem }}, 1, 4)
