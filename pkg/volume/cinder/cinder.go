@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -35,11 +36,13 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&cinderPlugin{nil}}
+	return []volume.VolumePlugin{&cinderPlugin{}}
 }
 
 type cinderPlugin struct {
 	host volume.VolumeHost
+	// Guarding SetUp and TearDown operations
+	volumeLocks keymutex.KeyMutex
 }
 
 var _ volume.VolumePlugin = &cinderPlugin{}
@@ -53,6 +56,7 @@ const (
 
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.volumeLocks = keymutex.NewKeyMutex()
 	return nil
 }
 
@@ -228,19 +232,27 @@ func (b *cinderVolumeBuilder) SetUp(fsGroup *int64) error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *cinderVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
+	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
+
+	b.plugin.volumeLocks.LockKey(b.pdName)
+	defer b.plugin.volumeLocks.UnlockKey(b.pdName)
+
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notmnt, err)
 	if err != nil && !os.IsNotExist(err) {
+		glog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
 		return err
 	}
 	if !notmnt {
+		glog.V(4).Infof("Something is already mounted to target %s", dir)
 		return nil
 	}
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
+		glog.V(4).Infof("AttachDisk failed: %v", err)
 		return err
 	}
+	glog.V(3).Infof("Cinder volume %s attached", b.pdName)
 
 	options := []string{"bind"}
 	if b.readOnly {
@@ -249,6 +261,7 @@ func (b *cinderVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		// TODO: we should really eject the attach/detach out into its own control loop.
+		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
 		detachDiskLogError(b.cinderVolume)
 		return err
 	}
@@ -256,6 +269,7 @@ func (b *cinderVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
+		glog.V(4).Infof("Mount failed: %v", err)
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
@@ -286,6 +300,7 @@ func (b *cinderVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
+	glog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
 
 	return nil
 }
@@ -312,37 +327,65 @@ func (c *cinderVolumeCleaner) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *cinderVolumeCleaner) TearDownAt(dir string) error {
+	glog.V(5).Infof("Cinder TearDown of %s", dir)
 	notmnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
+		glog.V(4).Infof("IsLikelyNotMountPoint check failed: %v", err)
 		return err
 	}
 	if notmnt {
+		glog.V(4).Infof("Nothing is mounted to %s, ignoring", dir)
 		return os.Remove(dir)
 	}
+
+	// Find Cinder volumeID to lock the right volume
+	// TODO: refactor VolumePlugin.NewCleaner to get full volume.Spec just like
+	// NewBuilder. We could then find volumeID there without probing MountRefs.
 	refs, err := mount.GetMountRefs(c.mounter, dir)
 	if err != nil {
+		glog.V(4).Infof("GetMountRefs failed: %v", err)
+		return err
+	}
+	if len(refs) == 0 {
+		glog.V(4).Infof("Directory %s is not mounted", dir)
+		return fmt.Errorf("directory %s is not mounted", dir)
+	}
+	c.pdName = path.Base(refs[0])
+	glog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
+
+	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
+	c.plugin.volumeLocks.LockKey(c.pdName)
+	defer c.plugin.volumeLocks.UnlockKey(c.pdName)
+
+	// Reload list of references, there might be SetUpAt finished in the meantime
+	refs, err = mount.GetMountRefs(c.mounter, dir)
+	if err != nil {
+		glog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err
 	}
 	if err := c.mounter.Unmount(dir); err != nil {
+		glog.V(4).Infof("Unmount failed: %v", err)
 		return err
 	}
-	glog.Infof("successfully unmounted: %s\n", dir)
+	glog.V(3).Infof("Successfully unmounted: %s\n", dir)
 
 	// If refCount is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
-		c.pdName = path.Base(refs[0])
 		if err := c.manager.DetachDisk(c); err != nil {
+			glog.V(4).Infof("DetachDisk failed: %v", err)
 			return err
 		}
+		glog.V(3).Infof("Volume %s detached", c.pdName)
 	}
 	notmnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
-	if !notmnt {
+	if notmnt {
 		if err := os.Remove(dir); err != nil {
+			glog.V(4).Infof("Failed to remove directory after unmount: %v", err)
 			return err
 		}
 	}
