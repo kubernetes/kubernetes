@@ -977,11 +977,34 @@ func autoConvert_api_HTTPGetAction_To_v1_HTTPGetAction(in *api.HTTPGetAction, ou
 	}
 	out.Host = in.Host
 	out.Scheme = URIScheme(in.Scheme)
+	if in.HTTPHeaders != nil {
+		out.HTTPHeaders = make([]HTTPHeader, len(in.HTTPHeaders))
+		for i := range in.HTTPHeaders {
+			if err := Convert_api_HTTPHeader_To_v1_HTTPHeader(&in.HTTPHeaders[i], &out.HTTPHeaders[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.HTTPHeaders = nil
+	}
 	return nil
 }
 
 func Convert_api_HTTPGetAction_To_v1_HTTPGetAction(in *api.HTTPGetAction, out *HTTPGetAction, s conversion.Scope) error {
 	return autoConvert_api_HTTPGetAction_To_v1_HTTPGetAction(in, out, s)
+}
+
+func autoConvert_api_HTTPHeader_To_v1_HTTPHeader(in *api.HTTPHeader, out *HTTPHeader, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.HTTPHeader))(in)
+	}
+	out.Name = in.Name
+	out.Value = in.Value
+	return nil
+}
+
+func Convert_api_HTTPHeader_To_v1_HTTPHeader(in *api.HTTPHeader, out *HTTPHeader, s conversion.Scope) error {
+	return autoConvert_api_HTTPHeader_To_v1_HTTPHeader(in, out, s)
 }
 
 func autoConvert_api_Handler_To_v1_Handler(in *api.Handler, out *Handler, s conversion.Scope) error {
@@ -4155,11 +4178,34 @@ func autoConvert_v1_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *a
 	}
 	out.Host = in.Host
 	out.Scheme = api.URIScheme(in.Scheme)
+	if in.HTTPHeaders != nil {
+		out.HTTPHeaders = make([]api.HTTPHeader, len(in.HTTPHeaders))
+		for i := range in.HTTPHeaders {
+			if err := Convert_v1_HTTPHeader_To_api_HTTPHeader(&in.HTTPHeaders[i], &out.HTTPHeaders[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.HTTPHeaders = nil
+	}
 	return nil
 }
 
 func Convert_v1_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *api.HTTPGetAction, s conversion.Scope) error {
 	return autoConvert_v1_HTTPGetAction_To_api_HTTPGetAction(in, out, s)
+}
+
+func autoConvert_v1_HTTPHeader_To_api_HTTPHeader(in *HTTPHeader, out *api.HTTPHeader, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HTTPHeader))(in)
+	}
+	out.Name = in.Name
+	out.Value = in.Value
+	return nil
+}
+
+func Convert_v1_HTTPHeader_To_api_HTTPHeader(in *HTTPHeader, out *api.HTTPHeader, s conversion.Scope) error {
+	return autoConvert_v1_HTTPHeader_To_api_HTTPHeader(in, out, s)
 }
 
 func autoConvert_v1_Handler_To_api_Handler(in *Handler, out *api.Handler, s conversion.Scope) error {
@@ -6279,6 +6325,7 @@ func init() {
 		autoConvert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource,
 		autoConvert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource,
 		autoConvert_api_HTTPGetAction_To_v1_HTTPGetAction,
+		autoConvert_api_HTTPHeader_To_v1_HTTPHeader,
 		autoConvert_api_Handler_To_v1_Handler,
 		autoConvert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
@@ -6405,6 +6452,7 @@ func init() {
 		autoConvert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource,
 		autoConvert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource,
 		autoConvert_v1_HTTPGetAction_To_api_HTTPGetAction,
+		autoConvert_v1_HTTPHeader_To_api_HTTPHeader,
 		autoConvert_v1_Handler_To_api_Handler,
 		autoConvert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,

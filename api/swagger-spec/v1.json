@@ -15902,11 +15902,36 @@
      },
      "host": {
       "type": "string",
-      "description": "Host name to connect to, defaults to the pod IP."
+      "description": "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead."
      },
      "scheme": {
       "type": "string",
       "description": "Scheme to use for connecting to the host. Defaults to HTTP."
+     },
+     "httpHeaders": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.HTTPHeader"
+      },
+      "description": "Custom headers to set in the request. HTTP allows repeated headers."
+     }
+    }
+   },
+   "v1.HTTPHeader": {
+    "id": "v1.HTTPHeader",
+    "description": "HTTPHeader describes a custom header to be used in HTTP probes",
+    "required": [
+     "name",
+     "value"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The header field name"
+     },
+     "value": {
+      "type": "string",
+      "description": "The header field value"
      }
     }
    },

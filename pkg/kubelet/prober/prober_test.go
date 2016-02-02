@@ -19,6 +19,8 @@ package prober
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -160,6 +162,33 @@ func TestGetTCPAddrParts(t *testing.T) {
 			if host != test.host || port != test.port {
 				t.Errorf("Expected %s:%d, got %s:%d", test.host, test.port, host, port)
 			}
+		}
+	}
+}
+
+func TestHTTPHeaders(t *testing.T) {
+	testCases := []struct {
+		input  []api.HTTPHeader
+		output http.Header
+	}{
+		{[]api.HTTPHeader{}, http.Header{}},
+		{[]api.HTTPHeader{
+			{"X-Muffins-Or-Cupcakes", "Muffins"},
+		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"}}},
+		{[]api.HTTPHeader{
+			{"X-Muffins-Or-Cupcakes", "Muffins"},
+			{"X-Muffins-Or-Plumcakes", "Muffins!"},
+		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"},
+			"X-Muffins-Or-Plumcakes": {"Muffins!"}}},
+		{[]api.HTTPHeader{
+			{"X-Muffins-Or-Cupcakes", "Muffins"},
+			{"X-Muffins-Or-Cupcakes", "Cupcakes, too"},
+		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins", "Cupcakes, too"}}},
+	}
+	for _, test := range testCases {
+		headers := buildHeader(test.input)
+		if !reflect.DeepEqual(test.output, headers) {
+			t.Errorf("Expected %#v, got %#v", test.output, headers)
 		}
 	}
 }
