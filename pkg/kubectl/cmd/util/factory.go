@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -85,6 +86,8 @@ type Factory struct {
 	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
+	// Returns a HistoryViewer for viewing change history
+	HistoryViewer func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
 	PodSelectorForObject func(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
@@ -312,6 +315,15 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), client)
+		},
+		HistoryViewer: func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset := clientset.FromUnversionedClient(client)
+			if err != nil {
+				return nil, err
+			}
+			return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
