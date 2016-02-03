@@ -82,6 +82,9 @@ type ConfigFactory struct {
 
 // Initializes the factory.
 func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactory {
+	stopEverything := make(chan struct{})
+	schedulerCache := schedulercache.New(30*time.Second, 1*time.Second, stopEverything)
+
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
@@ -92,12 +95,10 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		PVCLister:        &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		StopEverything:   make(chan struct{}),
+		schedulerCache:   schedulerCache,
+		StopEverything:   stopEverything,
 		SchedulerName:    schedulerName,
 	}
-	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{Store: c.PodQueue}, c.ScheduledPodLister)
-	schedulerCache := schedulercache.New(modeler.PodLister(), modeler)
-	c.schedulerCache = schedulerCache
 
 	c.PodLister = &schedulercache.CacheToPodLister{Cache: schedulerCache}
 
