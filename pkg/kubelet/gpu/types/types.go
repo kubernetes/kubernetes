@@ -54,6 +54,7 @@ type GPUCommonInfo struct {
 
 type GPUDeviceState struct {
 	IsOccupied bool
+	Device     *GPUDevice
 }
 
 type GPUState struct {

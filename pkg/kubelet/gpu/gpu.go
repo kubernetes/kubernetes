@@ -2,13 +2,14 @@ package gpu
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/gpu/cuda"
 	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu/types"
 )
 
-func ProbeGPUPlugins() []*gpuTypes.GPUPlugin {
+func ProbeGPUPlugins() []gpuTypes.GPUPlugin {
 	glog.Infof("Hans: ProbeGPUPlugins")
-	allPlugins := []*gpuTypes.GPUPlugin{}
+	allPlugins := []gpuTypes.GPUPlugin{}
 
 	// add cuda plugin
 	cudaPlugin := cuda.ProbeGPUPlugin()
@@ -25,6 +26,7 @@ func ProbeGPUPlugins() []*gpuTypes.GPUPlugin {
 }
 
 func IsGPUAvaiable(pods []*api.Pod, gpuCapacity int) bool {
+	glog.Infof("Hans: IsGPUAvaiable()")
 	totalGPU := gpuCapacity
 	totalGPURequest := int(0)
 
@@ -36,10 +38,12 @@ func IsGPUAvaiable(pods []*api.Pod, gpuCapacity int) bool {
 }
 
 func getGPUResourceRequest(pod *api.Pod) int {
+
 	gpuReqNum := 0
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
-		gpuReqNum += requests.Gpu().MilliValue()
+		gpuReqNum += int(requests.Gpu().MilliValue())
 	}
+	glog.Infof("Hans: getGPUResourceRequest() gpuReqNum:%d", gpuReqNum)
 	return gpuReqNum
 }

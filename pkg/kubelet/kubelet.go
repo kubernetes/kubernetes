@@ -2217,15 +2217,15 @@ func (kl *Kubelet) isOutOfDisk() bool {
 
 func (kl *Kubelet) hasInsufficientGPU(pods []*api.Pod) bool {
 	glog.Infof("Hans: hasInsufficientGPU()")
-	totalGpuNum := int(0)
+	totalGPUNum := int(0)
 	for _, gpuPlugin := range kl.gpuPlugins {
 		gpuDevices, err := gpuPlugin.Detect()
 		if err == nil {
-			totalGpuNum += len(gpuDevices.Devices)
+			totalGPUNum += len(gpuDevices.Devices)
 		}
 	}
-
-	return gpu.IsGPUAvaiable(pods, totalGpuNum)
+	glog.Infof("Hans: hasInsufficientGPU() totalGPUNum: %d", totalGPUNum)
+	return gpu.IsGPUAvaiable(pods, totalGPUNum)
 }
 
 // matchesNodeSelector returns true if pod matches node's labels.

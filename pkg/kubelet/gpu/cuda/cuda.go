@@ -15,7 +15,7 @@ const (
 
 type Cuda struct {
 	commonInfo gpuTypes.GPUCommonInfo
-	gpuDevices *GPUDevices
+	gpuDevices *gpuTypes.GPUDevices
 }
 
 func ProbeGPUPlugin() gpuTypes.GPUPlugin {
@@ -82,36 +82,36 @@ func (cuda *Cuda) InitGPUEnv() error {
 }
 
 func createLocalVolumes() error {
-	drv, err := nvidia.GetDriverVersion()
-	if err != nil {
-		return err
-	}
-	vols, err := nvidia.LookupVolumes("")
-	if err != nil {
-		return err
-	}
+	// drv, err := nvidia.GetDriverVersion()
+	// if err != nil {
+	// 	return err
+	// }
+	// vols, err := nvidia.LookupVolumes("")
+	// if err != nil {
+	// 	return err
+	// }
 
-	for _, v := range vols {
-		n := fmt.Sprintf("%s_%s", v.Name, drv)
-		if _, err := docker.InspectVolume(n); err == nil {
-			if err = docker.RemoveVolume(n); err != nil {
-				return fmt.Errorf("cannot remove %s: volume is in use", n)
-			}
-		}
+	// for _, v := range vols {
+	// 	n := fmt.Sprintf("%s_%s", v.Name, drv)
+	// 	if _, err := docker.InspectVolume(n); err == nil {
+	// 		if err = docker.RemoveVolume(n); err != nil {
+	// 			return fmt.Errorf("cannot remove %s: volume is in use", n)
+	// 		}
+	// 	}
 
-		if err := docker.CreateVolume(n); err != nil {
-			return err
-		}
-		path, err := docker.InspectVolume(n)
-		if err != nil {
-			docker.RemoveVolume(n)
-			return err
-		}
-		if err := v.CreateAt(path); err != nil {
-			docker.RemoveVolume(n)
-			return err
-		}
-		fmt.Println(n)
-	}
+	// 	if err := docker.CreateVolume(n); err != nil {
+	// 		return err
+	// 	}
+	// 	path, err := docker.InspectVolume(n)
+	// 	if err != nil {
+	// 		docker.RemoveVolume(n)
+	// 		return err
+	// 	}
+	// 	if err := v.CreateAt(path); err != nil {
+	// 		docker.RemoveVolume(n)
+	// 		return err
+	// 	}
+	// 	fmt.Println(n)
+	// }
 	return nil
 }
