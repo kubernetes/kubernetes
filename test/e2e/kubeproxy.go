@@ -185,12 +185,10 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	By("dialing(http) endpoint container --> node1:nodeHttpPort")
 	config.dialFromEndpointContainer("http", node1_IP, nodeHttpPort, tries, epCount)
 
-	// TODO: doesn't work because masquerading is not done
-	By("TODO: Test disabled. dialing(udp) node --> 127.0.0.1:nodeUdpPort")
-	//config.dialFromNode("udp", "127.0.0.1", nodeUdpPort, tries, epCount)
-	// TODO: doesn't work because masquerading is not done
-	By("Test disabled. dialing(http) node --> 127.0.0.1:nodeHttpPort")
-	//config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
+	By("dialing(udp) node --> 127.0.0.1:nodeUdpPort")
+	config.dialFromNode("udp", "127.0.0.1", nodeUdpPort, tries, epCount)
+	By("dialing(http) node --> 127.0.0.1:nodeHttpPort")
+	config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
 
 	node2_IP := config.externalAddrs[1]
 	By("dialing(udp) node1 --> node2:nodeUdpPort")
