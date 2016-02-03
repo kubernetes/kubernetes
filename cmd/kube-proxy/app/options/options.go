@@ -57,7 +57,6 @@ func NewProxyConfig() *ProxyServerConfig {
 			ResourceContainer:              "/kube-proxy",
 			IPTablesSyncPeriod:             unversioned.Duration{30 * time.Second},
 			UDPIdleTimeout:                 unversioned.Duration{250 * time.Millisecond},
-			Mode:                           componentconfig.ProxyModeUserspace,
 			ConntrackMax:                   256 * 1024,                                     // 4x default (64k)
 			ConntrackTCPEstablishedTimeout: unversioned.Duration{Duration: 24 * time.Hour}, // 1 day (1/5 default)
 		},
