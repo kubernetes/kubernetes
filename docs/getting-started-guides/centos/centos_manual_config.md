@@ -88,7 +88,7 @@ echo "192.168.121.9	centos-master
 
 ```sh
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd-servers=http://centos-master:4001"
+KUBE_ETCD_SERVERS="--etcd-servers=http://centos-master:2379"
 
 # logging to stderr means we get it in the systemd journal
 KUBE_LOGTOSTDERR="--logtostderr=true"
