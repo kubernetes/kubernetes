@@ -1730,6 +1730,10 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, fmt.Errorf("publicIP cannot be specified for AWS ELB")
 	}
 
+	if len(hosts) == 0 {
+		return nil, fmt.Errorf("Load balancer cannot be created, there are no hosts to attach")
+	}
+
 	instances, err := s.getInstancesByNodeNames(hosts)
 	if err != nil {
 		return nil, err
