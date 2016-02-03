@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	unversioned_extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -71,7 +73,7 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
-func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
+func describerMap(c *clientset.Clientset) map[unversioned.GroupKind]Describer {
 	m := map[unversioned.GroupKind]Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
 		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
@@ -89,7 +91,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 
 		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
+		extensions.Kind("Deployment"):              &DeploymentDescriber{c},
 		extensions.Kind("Job"):                     &JobDescriber{c},
 		extensions.Kind("Ingress"):                 &IngressDescriber{c},
 	}
@@ -110,7 +112,7 @@ func DescribableResources() []string {
 
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind unversioned.GroupKind, c *client.Client) (Describer, bool) {
+func DescriberFor(kind unversioned.GroupKind, c *clientset.Clientset) (Describer, bool) {
 	f, ok := describerMap(c)[kind]
 	return f, ok
 }
@@ -138,19 +140,19 @@ func init() {
 
 // NamespaceDescriber generates information about a namespace
 type NamespaceDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
-	ns, err := d.Namespaces().Get(name)
+	ns, err := d.Legacy().Namespaces().Get(name)
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.ResourceQuotas(name).List(api.ListOptions{})
+	resourceQuotaList, err := d.Legacy().ResourceQuotas(name).List(api.ListOptions{})
 	if err != nil {
 		return "", err
 	}
-	limitRangeList, err := d.LimitRanges(name).List(api.ListOptions{})
+	limitRangeList, err := d.Legacy().LimitRanges(name).List(api.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -289,11 +291,11 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 
 // LimitRangeDescriber generates information about a limit range
 type LimitRangeDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
-	lr := d.LimitRanges(namespace)
+	lr := d.Legacy().LimitRanges(namespace)
 
 	limitRange, err := lr.Get(name)
 	if err != nil {
@@ -376,11 +378,11 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 
 // ResourceQuotaDescriber generates information about a resource quota
 type ResourceQuotaDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error) {
-	rq := d.ResourceQuotas(namespace)
+	rq := d.Legacy().ResourceQuotas(namespace)
 
 	resourceQuota, err := rq.Get(name)
 	if err != nil {
@@ -417,16 +419,16 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 // PodDescriber generates information about a pod and the replication controllers that
 // create it.
 type PodDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *PodDescriber) Describe(namespace, name string) (string, error) {
-	rc := d.ReplicationControllers(namespace)
-	pc := d.Pods(namespace)
+	rc := d.Legacy().ReplicationControllers(namespace)
+	pc := d.Legacy().Pods(namespace)
 
 	pod, err := pc.Get(name)
 	if err != nil {
-		eventsInterface := d.Events(namespace)
+		eventsInterface := d.Legacy().Events(namespace)
 		selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
 		options := api.ListOptions{FieldSelector: selector}
 		events, err2 := eventsInterface.List(options)
@@ -445,7 +447,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 	} else {
 		ref.Kind = ""
-		events, _ = d.Events(namespace).Search(ref)
+		events, _ = d.Legacy().Events(namespace).Search(ref)
 	}
 
 	rcs, err := getReplicationControllersForLabels(rc, labels.Set(pod.Labels))
@@ -635,11 +637,11 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
 }
 
 type PersistentVolumeDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, error) {
-	c := d.PersistentVolumes()
+	c := d.Legacy().PersistentVolumes()
 
 	pv, err := c.Get(name)
 	if err != nil {
@@ -685,11 +687,11 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 }
 
 type PersistentVolumeClaimDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (string, error) {
-	c := d.PersistentVolumeClaims(namespace)
+	c := d.Legacy().PersistentVolumeClaims(namespace)
 
 	pvc, err := c.Get(name)
 	if err != nil {
@@ -840,12 +842,12 @@ func printBool(value bool) string {
 // ReplicationControllerDescriber generates information about a replication controller
 // and the pods it has created.
 type ReplicationControllerDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *ReplicationControllerDescriber) Describe(namespace, name string) (string, error) {
-	rc := d.ReplicationControllers(namespace)
-	pc := d.Pods(namespace)
+	rc := d.Legacy().ReplicationControllers(namespace)
+	pc := d.Legacy().Pods(namespace)
 
 	controller, err := rc.Get(name)
 	if err != nil {
@@ -857,7 +859,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(controller)
+	events, _ := d.Legacy().Events(namespace).Search(controller)
 
 	return describeReplicationController(controller, events, running, waiting, succeeded, failed)
 }
@@ -901,7 +903,7 @@ func DescribePodTemplate(template *api.PodTemplateSpec) (string, error) {
 
 // JobDescriber generates information about a job and the pods it has created.
 type JobDescriber struct {
-	client *client.Client
+	client *clientset.Clientset
 }
 
 func (d *JobDescriber) Describe(namespace, name string) (string, error) {
@@ -946,12 +948,12 @@ func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 
 // DaemonSetDescriber generates information about a daemon set and the pods it has created.
 type DaemonSetDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 	dc := d.Extensions().DaemonSets(namespace)
-	pc := d.Pods(namespace)
+	pc := d.Legacy().Pods(namespace)
 
 	daemon, err := dc.Get(name)
 	if err != nil {
@@ -967,7 +969,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(daemon)
+	events, _ := d.Legacy().Events(namespace).Search(daemon)
 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
@@ -997,11 +999,11 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 
 // SecretDescriber generates information about a secret
 type SecretDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *SecretDescriber) Describe(namespace, name string) (string, error) {
-	c := d.Secrets(namespace)
+	c := d.Legacy().Secrets(namespace)
 
 	secret, err := c.Get(name)
 	if err != nil {
@@ -1035,11 +1037,11 @@ func describeSecret(secret *api.Secret) (string, error) {
 }
 
 type IngressDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
-	c := i.Extensions().Ingress(namespace)
+	c := i.Extensions().Ingresses(namespace)
 	ing, err := c.Get(name)
 	if err != nil {
 		return "", err
@@ -1048,8 +1050,8 @@ func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
 }
 
 func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
-	endpoints, _ := i.Endpoints(ns).Get(backend.ServiceName)
-	service, _ := i.Services(ns).Get(backend.ServiceName)
+	endpoints, _ := i.Legacy().Endpoints(ns).Get(backend.ServiceName)
+	service, _ := i.Legacy().Services(ns).Get(backend.ServiceName)
 	spName := ""
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
@@ -1097,7 +1099,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, err
 		}
 		describeIngressAnnotations(out, ing.Annotations)
 
-		events, _ := i.Events(ing.Namespace).Search(ing)
+		events, _ := i.Legacy().Events(ing.Namespace).Search(ing)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1121,19 +1123,19 @@ func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
 
 // ServiceDescriber generates information about a service.
 type ServiceDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
-	c := d.Services(namespace)
+	c := d.Legacy().Services(namespace)
 
 	service, err := c.Get(name)
 	if err != nil {
 		return "", err
 	}
 
-	endpoints, _ := d.Endpoints(namespace).Get(name)
-	events, _ := d.Events(namespace).Search(service)
+	endpoints, _ := d.Legacy().Endpoints(namespace).Get(name)
+	events, _ := d.Legacy().Events(namespace).Search(service)
 
 	return describeService(service, endpoints, events)
 }
@@ -1192,18 +1194,18 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 
 // EndpointsDescriber generates information about an Endpoint.
 type EndpointsDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *EndpointsDescriber) Describe(namespace, name string) (string, error) {
-	c := d.Endpoints(namespace)
+	c := d.Legacy().Endpoints(namespace)
 
 	ep, err := c.Get(name)
 	if err != nil {
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(ep)
+	events, _ := d.Legacy().Events(namespace).Search(ep)
 
 	return describeEndpoints(ep, events)
 }
@@ -1262,11 +1264,11 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 
 // ServiceAccountDescriber generates information about a service.
 type ServiceAccountDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, error) {
-	c := d.ServiceAccounts(namespace)
+	c := d.Legacy().ServiceAccounts(namespace)
 
 	serviceAccount, err := c.Get(name)
 	if err != nil {
@@ -1277,7 +1279,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, erro
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
 	options := api.ListOptions{FieldSelector: tokenSelector}
-	secrets, err := d.Secrets(namespace).List(options)
+	secrets, err := d.Legacy().Secrets(namespace).List(options)
 	if err == nil {
 		for _, s := range secrets.Items {
 			name, _ := s.Annotations[api.ServiceAccountNameKey]
@@ -1343,11 +1345,11 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 
 // NodeDescriber generates information about a node.
 type NodeDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
-	mc := d.Nodes()
+	mc := d.Legacy().Nodes()
 	node, err := mc.Get(name)
 	if err != nil {
 		return "", err
@@ -1360,7 +1362,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
-	nodeNonTerminatedPodsList, err := d.Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
+	nodeNonTerminatedPodsList, err := d.Legacy().Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
 	if err != nil {
 		if !errors.IsForbidden(err) {
 			return "", err
@@ -1374,7 +1376,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	} else {
 		// TODO: We haven't decided the namespace for Node object yet.
 		ref.UID = types.UID(ref.Name)
-		events, _ = d.Events("").Search(ref)
+		events, _ = d.Legacy().Events("").Search(ref)
 	}
 
 	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods)
@@ -1443,7 +1445,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 
 // HorizontalPodAutoscalerDescriber generates information about a horizontal pod autoscaler.
 type HorizontalPodAutoscalerDescriber struct {
-	client *client.Client
+	client *clientset.Clientset
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (string, error) {
@@ -1633,7 +1635,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 // of getting all DS's and searching through them manually).
 // TODO: write an interface for controllers and fuse getReplicationControllersForLabels
 // and getDaemonSetsForLabels.
-func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
+func getDaemonSetsForLabels(c unversioned_extensions.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
 	dss, err := c.List(api.ListOptions{})
@@ -1660,7 +1662,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 // labels.
 // TODO Move this to pkg/client and ideally implement it server-side (instead
 // of getting all RC's and searching through them manually).
-func getReplicationControllersForLabels(c client.ReplicationControllerInterface, labelsToMatch labels.Labels) ([]api.ReplicationController, error) {
+func getReplicationControllersForLabels(c unversioned_legacy.ReplicationControllerInterface, labelsToMatch labels.Labels) ([]api.ReplicationController, error) {
 	// Get all replication controllers.
 	// TODO this needs a namespace scope as argument
 	rcs, err := c.List(api.ListOptions{})
@@ -1693,7 +1695,7 @@ func printReplicationControllersByLabels(matchingRCs []*api.ReplicationControlle
 	return list
 }
 
-func getPodStatusForController(c client.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
+func getPodStatusForController(c unversioned_legacy.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
 	options := api.ListOptions{LabelSelector: selector}
 	rcPods, err := c.List(options)
 	if err != nil {
@@ -1716,11 +1718,11 @@ func getPodStatusForController(c client.PodInterface, selector labels.Selector) 
 
 // ConfigMapDescriber generates information about a ConfigMap
 type ConfigMapDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
-	c := d.ConfigMaps(namespace)
+	c := d.Legacy().ConfigMaps(namespace)
 
 	configMap, err := c.Get(name)
 	if err != nil {

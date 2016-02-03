@@ -68,17 +68,17 @@ func (c *RESTClient) ChangeTargetVersion(gv unversioned.GroupVersion) error {
 	if gv.Group != "" && gv.Group != segments[len(segments)-2] {
 		return fmt.Errorf("cannot switch from group %v to group %v", segments[len(segments)-2], gv.Group)
 	}
-	if gv.Group() != "" {
-		c.versionedAPIPath = strings.Join(append(segments[:len(segments)-2], gv.Group, gv.Version))
+	if gv.Group != "" {
+		c.versionedAPIPath = strings.Join(append(segments[:len(segments)-2], gv.Group, gv.Version), "/")
 	} else {
-		c.versionedAPIPath = strings.Join(append(segments[:len(segments)-1], gv.Version))
+		c.versionedAPIPath = strings.Join(append(segments[:len(segments)-1], gv.Version), "/")
 	}
 	fmt.Println("CHAO: after change, c.versionedAPIPath=", c.versionedAPIPath)
 	return nil
 }
 
 // SwitchCodec changes the codec the RESTClient uses.
-func (c *RESTClient) SwitchCodec(codec runtime.Codec) error {
+func (c *RESTClient) SwitchCodec(codec runtime.Codec) {
 	c.contentConfig.Codec = codec
 }
 
