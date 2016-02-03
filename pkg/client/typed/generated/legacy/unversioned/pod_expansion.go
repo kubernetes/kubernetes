@@ -21,6 +21,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
+// The PodExpansion interface allows manually adding extra methods to the PodInterface.
 type PodExpansion interface {
 	Bind(binding *api.Binding) error
 	GetLogs(name string, opts *api.PodLogOptions) *unversioned.Request

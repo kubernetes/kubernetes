@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -68,7 +70,7 @@ type testCase struct {
 	verifyEvents        bool
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
+func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	rcName := "test-rc"
@@ -77,8 +79,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	tc.scaleUpdated = false
 	tc.eventCreated = false
 
-	fakeClient := &testclient.Fake{}
-	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient := &fake.Clientset{}
+	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &extensions.HorizontalPodAutoscalerList{
 			Items: []extensions.HorizontalPodAutoscaler{
 				{
@@ -113,7 +115,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddReactor("get", "replicationController", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("get", "replicationController", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &extensions.Scale{
 			ObjectMeta: api.ObjectMeta{
 				Name:      rcName,
@@ -130,7 +132,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &api.PodList{}
 		for i := 0; i < len(tc.reportedCPURequests); i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
@@ -162,7 +164,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddProxyReactor("services", func(action testclient.Action) (handled bool, ret client.ResponseWrapper, err error) {
+	fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret client.ResponseWrapper, err error) {
 		timestamp := time.Now()
 		metrics := heapster.MetricResultList{}
 		for _, level := range tc.reportedLevels {
@@ -176,7 +178,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
 	})
 
-	fakeClient.AddReactor("update", "replicationController", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("update", "replicationController", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
 		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
@@ -184,7 +186,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := action.(testclient.UpdateAction).GetObject().(*extensions.HorizontalPodAutoscaler)
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
@@ -192,7 +194,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddReactor("*", "events", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("*", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := action.(testclient.CreateAction).GetObject().(*api.Event)
 		if tc.verifyEvents {
 			assert.Equal(t, "SuccessfulRescale", obj.Reason)
@@ -215,7 +217,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
-	hpaController := NewHorizontalController(testClient, testClient.Extensions(), testClient.Extensions(), metricsClient)
+	hpaController := NewHorizontalController(testClient.Legacy(), testClient.Extensions(), testClient.Extensions(), metricsClient)
 	err := hpaController.reconcileAutoscalers()
 	assert.Equal(t, nil, err)
 	if tc.verifyEvents {
