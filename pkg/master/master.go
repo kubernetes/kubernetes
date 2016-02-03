@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	// Need import here.
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -214,6 +215,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
 	// Install extensions unless disabled.
+	// NEED COPY OF THIS FOR batch, nothing special.
 	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
 		m.thirdPartyResources = map[string]thirdPartyEntry{}
@@ -626,6 +628,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["deployments/scale"] = deploymentStorage.Scale
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
+	// XXX Need something like this for new api group, with just job.
 	if isEnabled("jobs") {
 		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
 		storage["jobs"] = jobStorage
