@@ -284,6 +284,9 @@ function kube-up {
   detect-nodes
   create-kubeconfig
 
+  echo "Checking local directory"
+  ls -laF ${KUBE_ROOT}
+
   echo "Checking server version"
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   ${kubectl} version
