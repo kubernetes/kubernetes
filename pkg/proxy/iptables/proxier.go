@@ -198,24 +198,29 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
-	//TODO: actually tear down all rules and chains.
+	// Unlink the services chain.
 	args := []string{
 		"-m", "comment", "--comment", "kubernetes service portals",
 		"-j", string(kubeServicesChain),
 	}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainOutput, args...); err != nil {
-		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-			encounteredError = true
-		}
+	tableChainsWithJumpServices := []struct {
+		table utiliptables.Table
+		chain utiliptables.Chain
+	}{
+		{utiliptables.TableFilter, utiliptables.ChainOutput},
+		{utiliptables.TableNAT, utiliptables.ChainOutput},
+		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
 	}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPrerouting, args...); err != nil {
-		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-			encounteredError = true
+	for _, tc := range tableChainsWithJumpServices {
+		if err := ipt.DeleteRule(tc.table, tc.chain, args...); err != nil {
+			if !utiliptables.IsNotFoundError(err) {
+				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+				encounteredError = true
+			}
 		}
 	}
 
+	// Unlink the postrouting chain.
 	args = []string{
 		"-m", "comment", "--comment", "kubernetes postrouting rules",
 		"-j", string(kubePostroutingChain),
@@ -227,22 +232,50 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		}
 	}
 
-	// flush and delete chains.
-	chains := []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain}
-	for _, c := range chains {
-		// flush chain, then if sucessful delete, delete will fail if flush fails.
-		if err := ipt.FlushChain(utiliptables.TableNAT, c); err != nil {
-			if !utiliptables.IsNotFoundError(err) {
-				glog.Errorf("Error flushing pure-iptables proxy chain: %v", err)
-				encounteredError = true
+	// Flush and remove all of our chains.
+	if iptablesSaveRaw, err := ipt.Save(utiliptables.TableNAT); err != nil {
+		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err)
+		encounteredError = true
+	} else {
+		existingNATChains := getChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		natChains := bytes.NewBuffer(nil)
+		natRules := bytes.NewBuffer(nil)
+		writeLine(natChains, "*nat")
+		// Start with chains we know we need to remove.
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain} {
+			if _, found := existingNATChains[chain]; found {
+				chainString := string(chain)
+				writeLine(natChains, existingNATChains[chain]) // flush
+				writeLine(natRules, "-X", chainString)         // delete
 			}
-		} else {
-			if err = ipt.DeleteChain(utiliptables.TableNAT, c); err != nil {
-				if !utiliptables.IsNotFoundError(err) {
-					glog.Errorf("Error deleting pure-iptables proxy chain: %v", err)
-					encounteredError = true
-				}
+		}
+		// Hunt for service and endpoint chains.
+		for chain := range existingNATChains {
+			chainString := string(chain)
+			if strings.HasPrefix(chainString, "KUBE-SVC-") || strings.HasPrefix(chainString, "KUBE-SEP-") {
+				writeLine(natChains, existingNATChains[chain]) // flush
+				writeLine(natRules, "-X", chainString)         // delete
 			}
+		}
+		writeLine(natRules, "COMMIT")
+		natLines := append(natChains.Bytes(), natRules.Bytes()...)
+		// Write it.
+		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+		if err != nil {
+			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableNAT, err)
+			encounteredError = true
+		}
+	}
+	{
+		filterBuf := bytes.NewBuffer(nil)
+		writeLine(filterBuf, "*filter")
+		writeLine(filterBuf, fmt.Sprintf(":%s - [0:0]", kubeServicesChain))
+		writeLine(filterBuf, fmt.Sprintf("-X %s", kubeServicesChain))
+		writeLine(filterBuf, "COMMIT")
+		// Write it.
+		if err := ipt.Restore(utiliptables.TableFilter, filterBuf.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
+			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFilter, err)
+			encounteredError = true
 		}
 	}
 
@@ -554,7 +587,7 @@ func (proxier *Proxier) syncProxyRules() {
 	existingFilterChains := make(map[utiliptables.Chain]string)
 	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableFilter)
 	if err != nil { // if we failed to get any rules
-		glog.Errorf("Failed to execute iptables-save, syncing all rules. %s", err.Error())
+		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
 		existingFilterChains = getChainLines(utiliptables.TableFilter, iptablesSaveRaw)
 	}
@@ -562,7 +595,7 @@ func (proxier *Proxier) syncProxyRules() {
 	existingNATChains := make(map[utiliptables.Chain]string)
 	iptablesSaveRaw, err = proxier.iptables.Save(utiliptables.TableNAT)
 	if err != nil { // if we failed to get any rules
-		glog.Errorf("Failed to execute iptables-save, syncing all rules. %s", err.Error())
+		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
 		existingNATChains = getChainLines(utiliptables.TableNAT, iptablesSaveRaw)
 	}
@@ -874,10 +907,10 @@ func (proxier *Proxier) syncProxyRules() {
 	natLines := append(natChains.Bytes(), natRules.Bytes()...)
 	lines := append(filterLines, natLines...)
 
-	glog.V(3).Infof("Syncing iptables rules: %s", lines)
+	glog.V(3).Infof("Restoring iptables rules: %s", lines)
 	err = proxier.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		glog.Errorf("Failed to sync iptables rules: %v", err)
+		glog.Errorf("Failed to execute iptables-restore: %v", err)
 		// Revert new local ports.
 		for k, v := range newLocalPorts {
 			glog.Errorf("Closing local port %s", k.String())

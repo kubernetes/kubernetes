@@ -296,6 +296,7 @@ func (runner *runner) Save(table Table) ([]byte, error) {
 
 	// run and return
 	args := []string{"-t", string(table)}
+	glog.V(4).Infof("running iptables-save %v", args)
 	return runner.exec.Command(cmdIptablesSave, args...).CombinedOutput()
 }
 
@@ -305,6 +306,7 @@ func (runner *runner) SaveAll() ([]byte, error) {
 	defer runner.mu.Unlock()
 
 	// run and return
+	glog.V(4).Infof("running iptables-save")
 	return runner.exec.Command(cmdIptablesSave, []string{}...).CombinedOutput()
 }
 
@@ -354,6 +356,7 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		return err
 	}
 	// run the command and return the output or an error including the output and error
+	glog.V(4).Infof("running iptables-restore %v", args)
 	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v (%s)", err, b)
