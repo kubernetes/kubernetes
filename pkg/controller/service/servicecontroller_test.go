@@ -282,48 +282,4 @@ func TestHostsFromNodeList(t *testing.T) {
 	}
 }
 
-func TestGetNodeConditionPredicate(t *testing.T) {
-	tests := []struct {
-		node         api.Node
-		expectAccept bool
-		name         string
-	}{
-		{
-			node:         api.Node{},
-			expectAccept: false,
-			name:         "empty",
-		},
-		{
-			node: api.Node{
-				Status: api.NodeStatus{
-					Conditions: []api.NodeCondition{
-						{Type: api.NodeReady, Status: api.ConditionTrue},
-					},
-				},
-			},
-			expectAccept: true,
-			name:         "basic",
-		},
-		{
-			node: api.Node{
-				Spec: api.NodeSpec{Unschedulable: true},
-				Status: api.NodeStatus{
-					Conditions: []api.NodeCondition{
-						{Type: api.NodeReady, Status: api.ConditionTrue},
-					},
-				},
-			},
-			expectAccept: false,
-			name:         "unschedulable",
-		},
-	}
-	pred := getNodeConditionPredicate()
-	for _, test := range tests {
-		accept := pred(test.node)
-		if accept != test.expectAccept {
-			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
-		}
-	}
-}
-
 // TODO(a-robinson): Add tests for update/sync/delete.

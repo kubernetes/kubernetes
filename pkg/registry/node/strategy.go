@@ -139,8 +139,22 @@ type ResourceGetter interface {
 // NodeToSelectableFields returns a field set that represents the object.
 func NodeToSelectableFields(node *api.Node) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(node.ObjectMeta, false)
+
+	var conditionReady api.ConditionStatus
+	var conditionOutOfDisk api.ConditionStatus
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == api.NodeReady {
+			conditionReady = cond.Status
+		}
+		if cond.Type == api.NodeOutOfDisk {
+			conditionOutOfDisk = cond.Status
+		}
+	}
+
 	specificFieldsSet := fields.Set{
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
+		"spec.unschedulable":        fmt.Sprint(node.Spec.Unschedulable),
+		"status.conditionReady":     string(conditionReady),
+		"status.conditionOutOfDisk": string(conditionOutOfDisk),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

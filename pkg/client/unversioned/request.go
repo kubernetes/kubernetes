@@ -283,11 +283,13 @@ func (r *Request) RequestURI(uri string) *Request {
 const (
 	// A constant that clients can use to refer in a field selector to the object name field.
 	// Will be automatically emitted as the correct name for the API version.
-	NodeUnschedulable = "spec.unschedulable"
-	ObjectNameField   = "metadata.name"
-	PodHost           = "spec.nodeName"
-	PodStatus         = "status.phase"
-	SecretType        = "type"
+	NodeUnschedulable      = "spec.unschedulable"
+	NodeConditionReady     = "status.conditionReady"
+	NodeConditionOutOfDisk = "status.conditionOutOfDisk"
+	ObjectNameField        = "metadata.name"
+	PodHost                = "spec.nodeName"
+	PodStatus              = "status.phase"
+	SecretType             = "type"
 
 	EventReason                  = "reason"
 	EventSource                  = "source"
@@ -341,8 +343,10 @@ func (v versionToResourceToFieldMapping) filterField(groupVersion *unversioned.G
 var fieldMappings = versionToResourceToFieldMapping{
 	v1.SchemeGroupVersion: resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   ObjectNameField,
-			NodeUnschedulable: NodeUnschedulable,
+			ObjectNameField:        ObjectNameField,
+			NodeUnschedulable:      NodeUnschedulable,
+			NodeConditionReady:     NodeConditionReady,
+			NodeConditionOutOfDisk: NodeConditionOutOfDisk,
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
 			PodHost:   PodHost,
