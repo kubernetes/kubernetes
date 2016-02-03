@@ -20,13 +20,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -179,7 +177,7 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 		devicePaths := getDiskByIdPaths(b.awsElasticBlockStore, devicePath)
 
 		for numChecks := 0; numChecks < maxChecks; numChecks++ {
-			path, err := verifyDevicePath(devicePaths, xvdBeforeSet)
+			path, err := verifyDevicePath(devicePaths)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
 				glog.Errorf("Error verifying EBS Disk (%q) is attached: %v", b.volumeID, err)
@@ -199,12 +197,7 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 }
 
 // Returns the first path that exists, or empty string if none exist.
-func verifyDevicePath(devicePaths []string, xvdBeforeSet sets.String) (string, error) {
-	if err := udevadmChangeToNewDrives(xvdBeforeSet); err != nil {
-		// udevadm errors should not block disk detachment, log and continue
-		glog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
-	}
-
+func verifyDevicePath(devicePaths []string) (string, error) {
 	for _, path := range devicePaths {
 		if pathExists, err := pathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
@@ -289,10 +282,6 @@ func unmountPDAndRemoveGlobalPath(c *awsElasticBlockStoreCleaner) error {
 func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 	allPathsRemoved := true
 	for _, path := range devicePaths {
-		if err := udevadmChangeToDrive(path); err != nil {
-			// udevadm errors should not block disk detachment, log and continue
-			glog.Errorf("%v", err)
-		}
 		if exists, err := pathExists(path); err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
 		} else {
@@ -342,53 +331,4 @@ func getCloudProvider() (*aws.AWSCloud, error) {
 
 	// The conversion must be safe otherwise bug in GetCloudProvider()
 	return awsCloudProvider.(*aws.AWSCloud), nil
-}
-
-// TODO: This udev code is copy-and-paste from the gce_pd provider; refactor
-
-// Calls "udevadm trigger --action=change" for newly created "/dev/xvd*" drives (exist only in after set).
-// This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToNewDrives(xvdBeforeSet sets.String) error {
-	xvdAfter, err := filepath.Glob(diskXVDPattern)
-	if err != nil {
-		return fmt.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskXVDPattern, err)
-	}
-
-	for _, xvd := range xvdAfter {
-		if !xvdBeforeSet.Has(xvd) {
-			return udevadmChangeToDrive(xvd)
-		}
-	}
-
-	return nil
-}
-
-// Calls "udevadm trigger --action=change" on the specified drive.
-// drivePath must be the the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
-// This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToDrive(drivePath string) error {
-	glog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)
-
-	// Evaluate symlink, if any
-	drive, err := filepath.EvalSymlinks(drivePath)
-	if err != nil {
-		return fmt.Errorf("udevadmChangeToDrive: filepath.EvalSymlinks(%q) failed with %v.", drivePath, err)
-	}
-	glog.V(5).Infof("udevadmChangeToDrive: symlink path is %q", drive)
-
-	// Check to make sure input is "/dev/xvd*"
-	if !strings.Contains(drive, diskXVDPath) {
-		return fmt.Errorf("udevadmChangeToDrive: expected input in the form \"%s\" but drive is %q.", diskXVDPattern, drive)
-	}
-
-	// Call "udevadm trigger --action=change --property-match=DEVNAME=/dev/sd..."
-	_, err = exec.New().Command(
-		"udevadm",
-		"trigger",
-		"--action=change",
-		fmt.Sprintf("--property-match=DEVNAME=%s", drive)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v.", drive, err)
-	}
-	return nil
 }
