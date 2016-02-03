@@ -256,7 +256,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-slow)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
     : ${E2E_NETWORK:="e2e-slow"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
                            --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${GINKGO_PARALLEL:="y"}
@@ -307,7 +307,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
                            --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
@@ -321,7 +321,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="parallel-flaky"}
     : ${E2E_NETWORK:="e2e-parallel-flaky"}
     : ${GINKGO_PARALLEL:="y"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
                            --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
@@ -351,7 +351,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
                            --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${GINKGO_PARALLEL:="y"}
@@ -374,7 +374,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
                            --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
     ;;
