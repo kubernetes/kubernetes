@@ -128,19 +128,19 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	update := change.(EndpointsUpdate)
 	switch update.Op {
 	case ADD:
-		glog.V(4).Infof("Adding new endpoint from source %s : %s", source, spew.Sdump(update.Endpoints))
+		glog.V(5).Infof("Adding new endpoint from source %s : %s", source, spew.Sdump(update.Endpoints))
 		for _, value := range update.Endpoints {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			endpoints[name] = value
 		}
 	case REMOVE:
-		glog.V(4).Infof("Removing an endpoint %s", spew.Sdump(update))
+		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update))
 		for _, value := range update.Endpoints {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			delete(endpoints, name)
 		}
 	case SET:
-		glog.V(4).Infof("Setting endpoints %s", spew.Sdump(update))
+		glog.V(5).Infof("Setting endpoints %s", spew.Sdump(update))
 		// Clear the old map entries by just creating a new map
 		endpoints = make(map[types.NamespacedName]api.Endpoints)
 		for _, value := range update.Endpoints {
@@ -153,7 +153,13 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	s.endpoints[source] = endpoints
 	s.endpointLock.Unlock()
 	if s.updates != nil {
-		s.updates <- struct{}{}
+		// Since we record the snapshot before sending this signal, it's
+		// possible that the consumer ends up performing an extra update.
+		select {
+		case s.updates <- struct{}{}:
+		default:
+			glog.V(4).Infof("Endpoints handler already has a pending interrupt.")
+		}
 	}
 	return nil
 }
@@ -227,19 +233,19 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	update := change.(ServiceUpdate)
 	switch update.Op {
 	case ADD:
-		glog.V(4).Infof("Adding new service from source %s : %s", source, spew.Sdump(update.Services))
+		glog.V(5).Infof("Adding new service from source %s : %s", source, spew.Sdump(update.Services))
 		for _, value := range update.Services {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			services[name] = value
 		}
 	case REMOVE:
-		glog.V(4).Infof("Removing a service %s", spew.Sdump(update))
+		glog.V(5).Infof("Removing a service %s", spew.Sdump(update))
 		for _, value := range update.Services {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			delete(services, name)
 		}
 	case SET:
-		glog.V(4).Infof("Setting services %s", spew.Sdump(update))
+		glog.V(5).Infof("Setting services %s", spew.Sdump(update))
 		// Clear the old map entries by just creating a new map
 		services = make(map[types.NamespacedName]api.Service)
 		for _, value := range update.Services {
@@ -252,7 +258,13 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	s.services[source] = services
 	s.serviceLock.Unlock()
 	if s.updates != nil {
-		s.updates <- struct{}{}
+		// Since we record the snapshot before sending this signal, it's
+		// possible that the consumer ends up performing an extra update.
+		select {
+		case s.updates <- struct{}{}:
+		default:
+			glog.V(4).Infof("Service handler already has a pending interrupt.")
+		}
 	}
 	return nil
 }
