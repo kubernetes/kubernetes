@@ -18,8 +18,12 @@ package main
 
 import (
 	"k8s.io/kubernetes/examples/apiserver"
+
+	"github.com/golang/glog"
 )
 
 func main() {
-	apiserver.Run()
+	if err := apiserver.Run(); err != nil {
+		glog.Fatalf("Error in bringing up the server: %v", err)
+	}
 }

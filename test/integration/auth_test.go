@@ -394,7 +394,10 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	transport := http.DefaultTransport
 	previousResourceVersion := make(map[string]float64)
@@ -498,7 +501,10 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authorizer = apiserver.NewAlwaysDenyAuthorizer()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	transport := http.DefaultTransport
 
@@ -555,7 +561,10 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = allowAliceAuthorizer{}
 	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -630,7 +639,10 @@ func TestBobIsForbidden(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = allowAliceAuthorizer{}
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	transport := http.DefaultTransport
 
@@ -679,7 +691,10 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = allowAliceAuthorizer{}
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	transport := http.DefaultTransport
 
@@ -753,7 +768,10 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = trackingAuthorizer
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	transport := http.DefaultTransport
 
@@ -822,7 +840,10 @@ func TestNamespaceAuthorization(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = a
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -925,7 +946,10 @@ func TestKindAuthorization(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = a
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -1016,7 +1040,10 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = a
 
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	transport := http.DefaultTransport
 

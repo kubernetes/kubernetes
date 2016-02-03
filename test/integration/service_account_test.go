@@ -408,7 +408,10 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	masterConfig.AdmissionControl = serviceAccountAdmission
 
 	// Create a master and install handlers into mux.
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
 
 	// Start the service account and service account token controllers
 	tokenController := serviceaccountcontroller.NewTokensController(rootClient, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
