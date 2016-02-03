@@ -493,6 +493,106 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 	}
 }
 
+// Test for https://github.com/kubernetes/kubernetes/pull/19600
+func TestCleanupOrphanedVolumes(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
+
+	// create a volume "on disk"
+	volsOnDisk := []struct {
+		podUID  types.UID
+		volName string
+	}{
+		{"podUID", "myrealvol"},
+	}
+
+	pathsOnDisk := []string{}
+	for i := range volsOnDisk {
+		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
+		fv.SetUp(nil)
+		pathsOnDisk = append(pathsOnDisk, fv.GetPath())
+	}
+
+	// store the claim in fake kubelet database
+	claim := api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "myclaim",
+			Namespace: "test",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "myrealvol",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+		claim,
+	}}).ReactionChain
+
+	// Create a pod referencing the volume via a PersistentVolumeClaim
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "podUID",
+			Name:      "pod",
+			Namespace: "test",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "myvolumeclaim",
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "myclaim",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// The pod is pending and not running yet. Test that cleanupOrphanedVolumes
+	// won't remove the volume from disk if the volume is referenced only
+	// indirectly by a claim.
+	err := kubelet.cleanupOrphanedVolumes([]*api.Pod{&pod}, []*kubecontainer.Pod{})
+	if err != nil {
+		t.Errorf("cleanupOrphanedVolumes failed: %v", err)
+	}
+
+	volumesFound := kubelet.getPodVolumesFromDisk()
+	if len(volumesFound) != len(pathsOnDisk) {
+		t.Errorf("Expected to find %d cleaners, got %d", len(pathsOnDisk), len(volumesFound))
+	}
+	for _, ep := range pathsOnDisk {
+		found := false
+		for _, cl := range volumesFound {
+			if ep == cl.GetPath() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Could not find a volume with path %s", ep)
+		}
+	}
+
+	// The pod is deleted -> kubelet should delete the volume
+	err = kubelet.cleanupOrphanedVolumes([]*api.Pod{}, []*kubecontainer.Pod{})
+	if err != nil {
+		t.Errorf("cleanupOrphanedVolumes failed: %v", err)
+	}
+	volumesFound = kubelet.getPodVolumesFromDisk()
+	if len(volumesFound) != 0 {
+		t.Errorf("Expected to find 0 cleaners, got %d", len(volumesFound))
+	}
+	for _, cl := range volumesFound {
+		t.Errorf("Found unexpected volume %s", cl.GetPath())
+	}
+}
+
 type stubVolume struct {
 	path string
 }
