@@ -155,11 +155,11 @@ type Volumes interface {
 	// Attach the disk to the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
+	AttachDisk(diskName string, instanceName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
-	DetachDisk(instanceName string, volumeName string) (string, error)
+	DetachDisk(diskName string, instanceName string) (string, error)
 
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
@@ -1172,7 +1172,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 }
 
 // Implements Volumes.AttachDisk
-func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
+func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1237,7 +1237,7 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 }
 
 // Implements Volumes.DetachDisk
-func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) (string, error) {
+func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, error) {
 	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
 		return "", err
