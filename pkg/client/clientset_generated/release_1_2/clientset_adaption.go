@@ -17,8 +17,8 @@ limitations under the License.
 package release_1_2
 
 import (
+	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -28,9 +28,9 @@ import (
 func FromUnversionedClient(c *unversioned.Client) *Clientset {
 	var clientset Clientset
 	if c != nil {
-		clientset.LegacyClient = legacy_unversioned.New(c.RESTClient)
+		clientset.CoreClient = core_unversioned.New(c.RESTClient)
 	} else {
-		clientset.LegacyClient = legacy_unversioned.New(nil)
+		clientset.CoreClient = core_unversioned.New(nil)
 	}
 	if c != nil && c.ExtensionsClient != nil {
 		clientset.ExtensionsClient = extensions_unversioned.New(c.ExtensionsClient.RESTClient)

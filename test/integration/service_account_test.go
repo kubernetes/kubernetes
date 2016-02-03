@@ -69,7 +69,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	ns := "test-service-account-creation"
 
 	// Create namespace
-	_, err := c.Legacy().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
+	_, err := c.Core().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.Legacy().ServiceAccounts(ns).Delete(defaultUser.Name, nil)
+	err = c.Core().ServiceAccounts(ns).Delete(defaultUser.Name, nil)
 	if err != nil {
 		t.Fatalf("Could not delete default serviceaccount: %v", err)
 	}
@@ -104,13 +104,13 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	name := "my-service-account"
 
 	// Create namespace
-	_, err := c.Legacy().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
+	_, err := c.Core().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create service account
-	serviceAccount, err := c.Legacy().ServiceAccounts(ns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: name}})
+	serviceAccount, err := c.Core().ServiceAccounts(ns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: name}})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Delete token
-	err = c.Legacy().Secrets(ns).Delete(token1Name, nil)
+	err = c.Core().Secrets(ns).Delete(token1Name, nil)
 	if err != nil {
 		t.Fatalf("Could not delete token: %v", err)
 	}
@@ -140,12 +140,12 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Trigger creation of a new referenced token
-	serviceAccount, err = c.Legacy().ServiceAccounts(ns).Get(name)
+	serviceAccount, err = c.Core().ServiceAccounts(ns).Get(name)
 	if err != nil {
 		t.Fatal(err)
 	}
 	serviceAccount.Secrets = []api.ObjectReference{}
-	_, err = c.Legacy().ServiceAccounts(ns).Update(serviceAccount)
+	_, err = c.Core().ServiceAccounts(ns).Update(serviceAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.Legacy().ServiceAccounts(ns).Delete(name, nil)
+	err = c.Core().ServiceAccounts(ns).Delete(name, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
-		secrets, err := c.Legacy().Secrets(ns).List(api.ListOptions{})
+		secrets, err := c.Core().Secrets(ns).List(api.ListOptions{})
 		// Retrieval errors should fail
 		if err != nil {
 			return false, err
@@ -198,7 +198,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	ns := "auto-mount-ns"
 
 	// Create "my" namespace
-	_, err := c.Legacy().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
+	_, err := c.Core().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: ns}})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -250,7 +250,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	}
 	expectedContainer2VolumeMounts := protoPod.Spec.Containers[1].VolumeMounts
 
-	createdPod, err := c.Legacy().Pods(ns).Create(&protoPod)
+	createdPod, err := c.Core().Pods(ns).Create(&protoPod)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,19 +276,19 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	otherns := "other-ns"
 
 	// Create "my" namespace
-	_, err := c.Legacy().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: myns}})
+	_, err := c.Core().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: myns}})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "other" namespace
-	_, err = c.Legacy().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: otherns}})
+	_, err = c.Core().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: otherns}})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "ro" user in myns
-	_, err = c.Legacy().ServiceAccounts(myns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: readOnlyServiceAccountName}})
+	_, err = c.Core().ServiceAccounts(myns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: readOnlyServiceAccountName}})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -301,14 +301,14 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	roClient := clientset.NewForConfigOrDie(&roClientConfig)
 	doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
 	doServiceAccountAPIRequests(t, roClient, otherns, true, false, false)
-	err = c.Legacy().Secrets(myns).Delete(roTokenName, nil)
+	err = c.Core().Secrets(myns).Delete(roTokenName, nil)
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
 	doServiceAccountAPIRequests(t, roClient, myns, false, false, false)
 
 	// Create "rw" user in myns
-	_, err = c.Legacy().ServiceAccounts(myns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: readWriteServiceAccountName}})
+	_, err = c.Core().ServiceAccounts(myns).Create(&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: readWriteServiceAccountName}})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -435,13 +435,13 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, client.C
 
 func getServiceAccount(c *clientset.Clientset, ns string, name string, shouldWait bool) (*api.ServiceAccount, error) {
 	if !shouldWait {
-		return c.Legacy().ServiceAccounts(ns).Get(name)
+		return c.Core().ServiceAccounts(ns).Get(name)
 	}
 
 	var user *api.ServiceAccount
 	var err error
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
-		user, err = c.Legacy().ServiceAccounts(ns).Get(name)
+		user, err = c.Core().ServiceAccounts(ns).Get(name)
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -458,7 +458,7 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 	token := ""
 
 	findToken := func() (bool, error) {
-		user, err := c.Legacy().ServiceAccounts(ns).Get(name)
+		user, err := c.Core().ServiceAccounts(ns).Get(name)
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -467,7 +467,7 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 		}
 
 		for _, ref := range user.Secrets {
-			secret, err := c.Legacy().Secrets(ns).Get(ref.Name)
+			secret, err := c.Core().Secrets(ns).Get(ref.Name)
 			if errors.IsNotFound(err) {
 				continue
 			}
@@ -517,17 +517,17 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 
 	readOps := []testOperation{
 		func() error {
-			_, err := c.Legacy().Secrets(ns).List(api.ListOptions{})
+			_, err := c.Core().Secrets(ns).List(api.ListOptions{})
 			return err
 		},
 		func() error {
-			_, err := c.Legacy().Pods(ns).List(api.ListOptions{})
+			_, err := c.Core().Pods(ns).List(api.ListOptions{})
 			return err
 		},
 	}
 	writeOps := []testOperation{
-		func() error { _, err := c.Legacy().Secrets(ns).Create(testSecret); return err },
-		func() error { return c.Legacy().Secrets(ns).Delete(testSecret.Name, nil) },
+		func() error { _, err := c.Core().Secrets(ns).Create(testSecret); return err },
+		func() error { return c.Core().Secrets(ns).Delete(testSecret.Name, nil) },
 	}
 
 	for _, op := range readOps {

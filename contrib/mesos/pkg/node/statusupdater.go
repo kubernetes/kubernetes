@@ -59,7 +59,7 @@ func NewStatusUpdater(client *clientset.Clientset, relistPeriod time.Duration, n
 
 func (u *StatusUpdater) Run(terminate <-chan struct{}) error {
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	nodeLW := cache.NewListWatchFromClient(u.client.LegacyClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(u.client.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, nodeStore, u.relistPeriod).Run()
 
 	monitor := func() {

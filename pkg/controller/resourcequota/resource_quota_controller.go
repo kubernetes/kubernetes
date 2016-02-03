@@ -66,10 +66,10 @@ func NewResourceQuotaController(kubeClient clientset.Interface, resyncPeriod con
 	rq.rqIndexer, rq.rqController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Legacy().ResourceQuotas(api.NamespaceAll).List(options)
+				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Legacy().ResourceQuotas(api.NamespaceAll).Watch(options)
+				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ResourceQuota{},
@@ -106,10 +106,10 @@ func NewResourceQuotaController(kubeClient clientset.Interface, resyncPeriod con
 	rq.podStore.Store, rq.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
+				return rq.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return rq.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -265,7 +265,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rq.kubeClient.Legacy().Pods(usage.Namespace).List(api.ListOptions{})
+		pods, err = rq.kubeClient.Core().Pods(usage.Namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -288,31 +288,31 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 		case api.ResourcePods:
 			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
 		case api.ResourceServices:
-			items, err := rq.kubeClient.Legacy().Services(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().Services(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceReplicationControllers:
-			items, err := rq.kubeClient.Legacy().ReplicationControllers(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().ReplicationControllers(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
-			items, err := rq.kubeClient.Legacy().ResourceQuotas(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().ResourceQuotas(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceSecrets:
-			items, err := rq.kubeClient.Legacy().Secrets(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().Secrets(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourcePersistentVolumeClaims:
-			items, err := rq.kubeClient.Legacy().PersistentVolumeClaims(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().PersistentVolumeClaims(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -334,7 +334,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 
 	// update the usage only if it changed
 	if dirty {
-		_, err = rq.kubeClient.Legacy().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+		_, err = rq.kubeClient.Core().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 		return err
 	}
 	return nil

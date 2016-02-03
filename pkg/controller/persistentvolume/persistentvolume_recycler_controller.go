@@ -64,10 +64,10 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Legacy().PersistentVolumes().List(options)
+				return kubeClient.Core().PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Legacy().PersistentVolumes().Watch(options)
+				return kubeClient.Core().PersistentVolumes().Watch(options)
 			},
 		},
 		&api.PersistentVolume{},
@@ -258,19 +258,19 @@ type realRecyclerClient struct {
 }
 
 func (c *realRecyclerClient) GetPersistentVolume(name string) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().Get(name)
+	return c.client.Core().PersistentVolumes().Get(name)
 }
 
 func (c *realRecyclerClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().Update(volume)
+	return c.client.Core().PersistentVolumes().Update(volume)
 }
 
 func (c *realRecyclerClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
-	return c.client.Legacy().PersistentVolumes().Delete(volume.Name, nil)
+	return c.client.Core().PersistentVolumes().Delete(volume.Name, nil)
 }
 
 func (c *realRecyclerClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().UpdateStatus(volume)
+	return c.client.Core().PersistentVolumes().UpdateStatus(volume)
 }
 
 // PersistentVolumeRecycler is host to the volume plugins, but does not actually mount any volumes.

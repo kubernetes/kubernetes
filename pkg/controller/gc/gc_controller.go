@@ -53,7 +53,7 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 		kubeClient: kubeClient,
 		threshold:  threshold,
 		deletePod: func(namespace, name string) error {
-			return kubeClient.Legacy().Pods(namespace).Delete(name, api.NewDeleteOptions(0))
+			return kubeClient.Core().Pods(namespace).Delete(name, api.NewDeleteOptions(0))
 		},
 	}
 
@@ -63,11 +63,11 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
+				return gcc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return gcc.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},

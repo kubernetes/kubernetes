@@ -39,7 +39,7 @@ var (
 
 func versionToPath(group string, version string) (path string) {
 	const base = "k8s.io/kubernetes/pkg"
-	// special case for the legacy group
+	// special case for the core group
 	if group == "api" {
 		path = filepath.Join(base, "api", version)
 	} else {

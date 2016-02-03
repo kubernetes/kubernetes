@@ -347,7 +347,7 @@ func (m *manager) syncBatch() {
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.Legacy().Pods(status.podNamespace).Get(status.podName)
+	pod, err := m.kubeClient.Core().Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
 		glog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
 		// If the Pod is deleted the status will be cleared in
@@ -367,7 +367,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		}
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
-		pod, err = m.kubeClient.Legacy().Pods(pod.Namespace).UpdateStatus(pod)
+		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
@@ -382,7 +382,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
-			if err := m.kubeClient.Legacy().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
+			if err := m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
 				return

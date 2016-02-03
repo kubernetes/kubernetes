@@ -72,10 +72,10 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Legacy().ServiceAccounts(api.NamespaceAll).List(options)
+				return e.client.Core().ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Legacy().ServiceAccounts(api.NamespaceAll).Watch(options)
+				return e.client.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -93,11 +93,11 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = tokenSelector
-				return e.client.Legacy().Secrets(api.NamespaceAll).List(options)
+				return e.client.Core().Secrets(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = tokenSelector
-				return e.client.Legacy().Secrets(api.NamespaceAll).Watch(options)
+				return e.client.Core().Secrets(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Secret{},
@@ -292,7 +292,7 @@ func (e *TokensController) createSecretIfNeeded(serviceAccount *api.ServiceAccou
 func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) error {
 	// We don't want to update the cache's copy of the service account
 	// so add the secret to a freshly retrieved copy of the service account
-	serviceAccounts := e.client.Legacy().ServiceAccounts(serviceAccount.Namespace)
+	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)
 	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name)
 	if err != nil {
 		return err
@@ -330,7 +330,7 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	}
 
 	// Save the secret
-	if _, err := e.client.Legacy().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
+	if _, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
 		return err
 	}
 
@@ -340,7 +340,7 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	if err != nil {
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("Deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
-		if err := e.client.Legacy().Secrets(secret.Namespace).Delete(secret.Name, nil); err != nil {
+		if err := e.client.Core().Secrets(secret.Namespace).Delete(secret.Name, nil); err != nil {
 			glog.Error(err) // if we fail, just log it
 		}
 	}
@@ -390,7 +390,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 	secret.Annotations[api.ServiceAccountUIDKey] = string(serviceAccount.UID)
 
 	// Save the secret
-	if _, err := e.client.Legacy().Secrets(secret.Namespace).Update(secret); err != nil {
+	if _, err := e.client.Core().Secrets(secret.Namespace).Update(secret); err != nil {
 		return err
 	}
 	return nil
@@ -398,7 +398,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 
 // deleteSecret deletes the given secret
 func (e *TokensController) deleteSecret(secret *api.Secret) error {
-	return e.client.Legacy().Secrets(secret.Namespace).Delete(secret.Name, nil)
+	return e.client.Core().Secrets(secret.Namespace).Delete(secret.Name, nil)
 }
 
 // removeSecretReferenceIfNeeded updates the given ServiceAccount to remove a reference to the given secretName if needed.
@@ -411,7 +411,7 @@ func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.Ser
 
 	// We don't want to update the cache's copy of the service account
 	// so remove the secret from a freshly retrieved copy of the service account
-	serviceAccounts := e.client.Legacy().ServiceAccounts(serviceAccount.Namespace)
+	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)
 	serviceAccount, err := serviceAccounts.Get(serviceAccount.Name)
 	if err != nil {
 		return err
@@ -461,7 +461,7 @@ func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMis
 	}
 
 	if fetchOnCacheMiss {
-		serviceAccount, err := e.client.Legacy().ServiceAccounts(secret.Namespace).Get(name)
+		serviceAccount, err := e.client.Core().ServiceAccounts(secret.Namespace).Get(name)
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}

@@ -172,7 +172,7 @@ func testNewDeployment(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 	// Check that deployment is created fine.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
@@ -210,11 +210,11 @@ func testRollingUpdateDeployment(f *Framework) {
 
 	rcName := "nginx-controller"
 	replicas := 3
-	_, err := c.Legacy().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	_, err := c.Core().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, "sample-pod", false, 3)
@@ -236,7 +236,7 @@ func testRollingUpdateDeployment(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
@@ -267,11 +267,11 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	rc := newRC(rcName, replicas, rcPodLabels, "nginx", "nginx")
 	rc.Annotations = annotations
 
-	_, err := c.Legacy().ReplicationControllers(ns).Create(rc)
+	_, err := c.Core().ReplicationControllers(ns).Create(rc)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, "sample-pod-2", false, 1)
@@ -293,7 +293,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
@@ -302,7 +302,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	waitForEvents(unversionedClient, ns, deployment, 2)
-	events, err := c.Legacy().Events(ns).Search(deployment)
+	events, err := c.Core().Events(ns).Search(deployment)
 	if err != nil {
 		Logf("error in listing events: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -334,11 +334,11 @@ func testRecreateDeployment(f *Framework) {
 
 	rcName := "nginx-controller"
 	replicas := 3
-	_, err := c.Legacy().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	_, err := c.Core().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, "sample-pod-3", false, 3)
@@ -360,7 +360,7 @@ func testRecreateDeployment(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, 0, replicas, 0)
@@ -374,7 +374,7 @@ func testRecreateDeployment(f *Framework) {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	waitForEvents(unversionedClient, ns, deployment, 2)
-	events, err := c.Legacy().Events(ns).Search(deployment)
+	events, err := c.Core().Events(ns).Search(deployment)
 	if err != nil {
 		Logf("error in listing events: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -406,7 +406,7 @@ func testDeploymentCleanUpPolicy(f *Framework) {
 	replicas := 1
 	revisionHistoryLimit := new(int)
 	*revisionHistoryLimit = 0
-	_, err := c.Legacy().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	_, err := c.Core().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
@@ -429,7 +429,7 @@ func testDeploymentCleanUpPolicy(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentOldRCsNum(c, ns, deploymentName, *revisionHistoryLimit)
@@ -453,11 +453,11 @@ func testRolloverDeployment(f *Framework) {
 
 	rcName := "nginx-controller"
 	rcReplicas := 4
-	_, err := c.Legacy().ReplicationControllers(ns).Create(newRC(rcName, rcReplicas, rcPodLabels, "nginx", "nginx"))
+	_, err := c.Core().ReplicationControllers(ns).Create(newRC(rcName, rcReplicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, podName, false, rcReplicas)
@@ -489,7 +489,7 @@ func testRolloverDeployment(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
@@ -553,7 +553,7 @@ func testPausedDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	opts := api.ListOptions{LabelSelector: labels.Set(deployment.Spec.Selector).AsSelector()}
-	w, err := c.Legacy().ReplicationControllers(ns).Watch(opts)
+	w, err := c.Core().ReplicationControllers(ns).Watch(opts)
 	Expect(err).NotTo(HaveOccurred())
 
 	select {
@@ -573,7 +573,7 @@ func testPausedDeployment(f *Framework) {
 
 	newRC, err := deploymentutil.GetNewRC(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+	Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
@@ -617,11 +617,11 @@ func testRollbackDeployment(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 		oldRCs, _, err := deploymentutil.GetOldRCs(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
 		for _, oldRC := range oldRCs {
-			Expect(c.Legacy().ReplicationControllers(ns).Delete(oldRC.Name, nil)).NotTo(HaveOccurred())
+			Expect(c.Core().ReplicationControllers(ns).Delete(oldRC.Name, nil)).NotTo(HaveOccurred())
 		}
 	}()
 	// Check that deployment is created fine.
@@ -707,11 +707,11 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 	rc := newRC(rcName, rcReplicas, rcPodLabels, "nginx", "nginx")
 	rc.Annotations = make(map[string]string)
 	rc.Annotations["make"] = "difference"
-	_, err := c.Legacy().ReplicationControllers(ns).Create(rc)
+	_, err := c.Core().ReplicationControllers(ns).Create(rc)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 
 	// Create a deployment to create nginx pods, which have different template than the rc created above.
@@ -731,11 +731,11 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 		// TODO: remove this once we can delete rcs with deployment
 		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
+		Expect(c.Core().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 		oldRCs, _, err := deploymentutil.GetOldRCs(*deployment, c)
 		Expect(err).NotTo(HaveOccurred())
 		for _, oldRC := range oldRCs {
-			Expect(c.Legacy().ReplicationControllers(ns).Delete(oldRC.Name, nil)).NotTo(HaveOccurred())
+			Expect(c.Core().ReplicationControllers(ns).Delete(oldRC.Name, nil)).NotTo(HaveOccurred())
 		}
 	}()
 	// Check that deployment is created fine.
@@ -758,7 +758,7 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 	checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
 
 	// Check that the rc we created still doesn't contain revision information
-	rc, err = c.Legacy().ReplicationControllers(ns).Get(rcName)
+	rc, err = c.Core().ReplicationControllers(ns).Get(rcName)
 	Expect(rc.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal(""))
 
 	// Update the deploymentRollback to rollback to last revision

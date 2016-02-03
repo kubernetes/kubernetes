@@ -113,7 +113,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	avgRequest int64, timestamp time.Time, err error) {
 
 	labelSelector := labels.SelectorFromSet(labels.Set(selector))
-	podList, err := h.client.Legacy().Pods(namespace).
+	podList, err := h.client.Core().Pods(namespace).
 		List(api.ListOptions{LabelSelector: labelSelector})
 
 	if err != nil {
@@ -152,7 +152,7 @@ func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespa
 	metricSpec := getHeapsterCustomMetricDefinition(customMetricName)
 
 	labelSelector := labels.SelectorFromSet(labels.Set(selector))
-	podList, err := h.client.Legacy().Pods(namespace).List(api.ListOptions{LabelSelector: labelSelector})
+	podList, err := h.client.Core().Pods(namespace).List(api.ListOptions{LabelSelector: labelSelector})
 
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
@@ -179,7 +179,7 @@ func (h *HeapsterMetricsClient) getForPods(metricSpec metricDefinition, namespac
 		strings.Join(podNames, ","),
 		metricSpec.name)
 
-	resultRaw, err := h.client.Legacy().Services(h.heapsterNamespace).
+	resultRaw, err := h.client.Core().Services(h.heapsterNamespace).
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
 		DoRaw()
 

@@ -69,7 +69,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.Legacy().Namespaces().Get(a.GetNamespace())
+	_, err = e.client.Core().Namespaces().Get(a.GetNamespace())
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err
@@ -86,10 +86,10 @@ func NewExists(c clientset.Interface) admission.Interface {
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Legacy().Namespaces().List(options)
+				return c.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Legacy().Namespaces().Watch(options)
+				return c.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},

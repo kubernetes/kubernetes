@@ -59,10 +59,10 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Legacy().Services(api.NamespaceAll).List(options)
+				return e.client.Core().Services(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Legacy().Services(api.NamespaceAll).Watch(options)
+				return e.client.Core().Services(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Service{},
@@ -79,10 +79,10 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 	e.podStore.Store, e.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Legacy().Pods(api.NamespaceAll).List(options)
+				return e.client.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return e.client.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},

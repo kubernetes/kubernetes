@@ -37,7 +37,7 @@ type clientAPIWrapper struct {
 }
 
 func (cw *clientAPIWrapper) killPod(ns, name string) error {
-	return cw.client.Legacy().Pods(ns).Delete(name, api.NewDeleteOptions(0))
+	return cw.client.Core().Pods(ns).Delete(name, api.NewDeleteOptions(0))
 }
 
 func (cw *clientAPIWrapper) createOrUpdate(hostname string, slaveAttrLabels, annotations map[string]string) (*api.Node, error) {
