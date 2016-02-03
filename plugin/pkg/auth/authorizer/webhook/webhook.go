@@ -133,7 +133,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		r.Spec = v1beta1.SubjectAccessReviewSpec{
 			User:   user.GetName(),
 			Groups: user.GetGroups(),
-			Extra:  user.GetExtra(),
+			Extra:  convertToSARExtra(user.GetExtra()),
 		}
 	}
 
@@ -185,4 +185,16 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		}
 	}
 	return r.Status.Allowed, r.Status.Reason, nil
+}
+
+func convertToSARExtra(extra map[string][]string) map[string]v1beta1.ExtraValue {
+	if extra == nil {
+		return nil
+	}
+	ret := map[string]v1beta1.ExtraValue{}
+	for k, v := range extra {
+		ret[k] = v1beta1.ExtraValue(v)
+	}
+
+	return ret
 }

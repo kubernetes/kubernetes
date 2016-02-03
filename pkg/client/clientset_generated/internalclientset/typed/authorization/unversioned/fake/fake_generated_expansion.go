@@ -14,8 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/authorization
+package fake
 
-// +groupName=authorization.k8s.io
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+import (
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
+
+func (c *FakeSubjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
+	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("subjectaccessreviews"), sar), &authorizationapi.SubjectAccessReview{})
+	return obj.(*authorizationapi.SubjectAccessReview), err
+}
