@@ -193,6 +193,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList []generator.Package
 
 	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
+	if customArgs.FakeClient {
+		packageList = append(packageList, fake.PackageForClientset(arguments.OutputPackagePath, customArgs.GroupVersions, boilerplate))
+	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
 	if customArgs.ClientsetOnly {
