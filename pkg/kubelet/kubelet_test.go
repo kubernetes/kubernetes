@@ -176,7 +176,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeClock := util.NewFakeClock(time.Now())
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
-	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)
+	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.reservation = kubetypes.Reservation{
 		Kubernetes: api.ResourceList{
