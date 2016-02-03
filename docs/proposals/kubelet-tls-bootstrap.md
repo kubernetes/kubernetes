@@ -128,7 +128,7 @@ CertificateSigningRequestStatus with the new data.
 An administrator using `kubectl` or another API client can query the
 CertificateSigningRequestList and update the status of
 CertificateSigningRequests. The default Status is Unknown, indicating that
-there has been no decision so fare. A Status of True indicates that the admin
+there has been no decision so far. A Status of True indicates that the admin
 has approved the request and the apiserver should issue the certificate. A
 Status of False indicates that the admin has denied the request. An admin may
 also supply Reason and Message fields to explain the rejection.
