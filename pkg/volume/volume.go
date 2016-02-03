@@ -81,7 +81,7 @@ type Builder interface {
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, sGroup *int64) error
+	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the builder.
 	GetAttributes() Attributes
 }

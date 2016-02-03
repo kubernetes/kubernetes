@@ -30,8 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Flaky issue #17873
-var _ = Describe("Cluster level logging using Elasticsearch [Flaky]", func() {
+var _ = Describe("Cluster level logging using Elasticsearch", func() {
 	f := NewFramework("es-logging")
 
 	BeforeEach(func() {
@@ -406,6 +405,10 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			}
 			if index < 0 || index >= countTo {
 				Logf("Index value out of range: %d", index)
+				continue
+			}
+			if words[1] != taintName {
+				Logf("Elasticsearch query return unexpected log line: %s", msg)
 				continue
 			}
 			// Record the observation of a log line from node n at the given index.
