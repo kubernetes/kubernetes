@@ -2322,3 +2322,43 @@ const (
 	// "default-scheduler" is the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"
 )
+
+
+type ClusterSpec struct {
+	Address NodeAddress `json:"address"`
+	Credential string `json:"credential,omitempty"`
+}
+type ClusterPhase string
+const (
+	ClusterPending ClusterPhase = "pending"
+	ClusterRunning ClusterPhase = "running"
+	ClusterOffline ClusterPhase = "offline"
+	ClusterTerminated ClusterPhase = "terminated"
+)
+type ClusterMeta struct {
+	Version string `json:"version,omitempty"`
+}
+type ClusterStatus struct {
+	Phase ClusterPhase `json:"phase,omitempty"`
+	Capacity ResourceList `json:"capacity,omitempty"`
+	ClusterMeta string `json:",inline"`
+}
+// Cluster information in Ubernetes
+type Cluster struct {
+	unversioned.TypeMeta `json:",inline"`
+	ObjectMeta           `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of the Cluster.
+	Spec ClusterSpec `json:"spec,omitempty"`
+	// Status describes the current status of a Cluster
+	Status ClusterStatus `json:"status,omitempty"`
+}
+
+// A list of Clusters
+type ClusterList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	Items []Cluster `json:"items"`
+
+}

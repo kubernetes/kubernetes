@@ -533,3 +533,15 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 
 	return o.(*api.PersistentVolumeClaim), nil
 }
+
+
+type StoreToClusterLister struct {
+	Store
+}
+
+func (s *StoreToClusterLister) List() (clusters api.ClusterList, err error) {
+	for _, m := range s.Store.List() {
+		clusters.Items = append(clusters.Items, *(m.(*api.Cluster)))
+	}
+	return clusters, nil
+}

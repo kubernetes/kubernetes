@@ -43,6 +43,7 @@ type Interface interface {
 	ConfigMapsNamespacer
 	Extensions() ExtensionsInterface
 	Discovery() DiscoveryInterface
+	ClustersInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -152,4 +153,8 @@ func (c *Client) Extensions() ExtensionsInterface {
 
 func (c *Client) Discovery() DiscoveryInterface {
 	return c.DiscoveryClient
+}
+
+func (c *Client) Clusters() ClusterInterface {
+	return newClusters(c)
 }
