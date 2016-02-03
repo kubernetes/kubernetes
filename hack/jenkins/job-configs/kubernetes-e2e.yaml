@@ -189,5 +189,15 @@
             timeout: 300
             emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
             test-owner: 'ihmccreery'
+        - 'gke-ingress':
+            description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
+            test-owner: 'beeps'
+        - 'gce-ingress':
+            description: 'Run [Feature:Ingress] tests on GCE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
+            test-owner: 'beeps'
     jobs:
         - 'kubernetes-e2e-{suffix}'
