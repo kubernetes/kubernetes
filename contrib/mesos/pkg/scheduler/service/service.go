@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/gogo/protobuf/proto"

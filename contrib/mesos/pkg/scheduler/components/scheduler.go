@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"sync"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
