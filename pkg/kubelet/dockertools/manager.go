@@ -94,6 +94,7 @@ type DockerManager struct {
 	machineInfo         *cadvisorapi.MachineInfo
 	gpuPlugins          []gpuTypes.GPUPlugin
 
+	gpuStates *[string]gpuTypes.GPUState
 	// The image name of the pod infra container.
 	podInfraContainerImage string
 	// reasonCache stores the failure reason of the last container creation
@@ -208,6 +209,7 @@ func NewDockerManager(
 		os:                     osInterface,
 		machineInfo:            machineInfo,
 		gpuPlugins:             gpuPlugins,
+		gpuStates:              initGPUState(gpuPlugins),
 		podInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
 		dockerPuller:           newDockerPuller(client, qps, burst),
@@ -241,6 +243,8 @@ type reasonInfo struct {
 	reason  string
 	message string
 }
+
+func
 
 func (sc *reasonInfoCache) composeKey(uid types.UID, name string) string {
 	return fmt.Sprintf("%s_%s", uid, name)

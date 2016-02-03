@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -112,6 +113,31 @@ func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 		puller:  dp,
 		limiter: util.NewTokenBucketRateLimiter(qps, burst),
 	}
+}
+
+func initGPUState(gpuPlugins []gpuTypes.GPUPlugin) ([string]*gpuTypes.GPUState, error) {
+	gpuStates := make([string]gpuTypes.GPUState)
+	for _, gpuPlguin := range gpuPlugins {
+		var gpuState gpuTypes.GPUState
+		gpuState.IsInit = false
+
+		if gpuDevices, err := gpuPlugin.Detect(); err != nil {
+			gpuDevicesState := make([]*gpuTypes.GPUDeviceState, len(gpuDevices))
+			for _, dev := range gpuDevices {
+				var devState GPUDeviceState
+				devState.IsOccupied = false
+				gpuDevicesState = append(gpuDevicesState, &devState)
+			}
+			gpuState.DevsState = gpuDevicesState
+		} else {
+			return nil, fmt.Errorf("Failed to init GPU state.")
+		}
+
+		gpuStates[gpuPlguin.Name()] = gpuState
+
+	}
+
+	return &gpuStates, nil
 }
 
 func filterHTTPError(err error, image string) error {

@@ -33,6 +33,14 @@ func (self *ResourceList) Cpu() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
+// Returns the GPU limit if specified.
+func (self *ResourceList) Gpu() *resource.Quantity {
+	if val, ok := (*self)[ResourceGPU]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
+
 // Returns the Memory limit if specified.
 func (self *ResourceList) Memory() *resource.Quantity {
 	if val, ok := (*self)[ResourceMemory]; ok {

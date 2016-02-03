@@ -29,9 +29,15 @@ type GPUDevices struct {
 
 // GPUInterface is an abstract interface for gpu related operatons.
 type GPUPlugin interface {
-	Init() error
+	// Init plugin before use it
+	InitPlugin() error
+
 	// detect the gpu hardware and the corresponding environment
 	Detect() (*GPUDevices, error)
+
+	// Init GPU environment before launch container
+	InitGPUEnv() error
+
 	// // parepare the overall environment
 	// Prepare(id string) (*docker.Container, error)
 	// // setup the launched parameter for each container
@@ -44,4 +50,13 @@ type GPUPlugin interface {
 
 type GPUCommonInfo struct {
 	Name string
+}
+
+type GPUDeviceState struct {
+	IsOccupied bool
+}
+
+type GPUState struct {
+	IsInit    bool
+	DevsState []*GPUDeviceState
 }

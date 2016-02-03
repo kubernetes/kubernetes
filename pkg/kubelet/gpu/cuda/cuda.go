@@ -15,6 +15,7 @@ const (
 
 type Cuda struct {
 	commonInfo gpuTypes.GPUCommonInfo
+	gpuDevices *GPUDevices
 }
 
 func ProbeGPUPlugin() gpuTypes.GPUPlugin {
@@ -24,12 +25,21 @@ func ProbeGPUPlugin() gpuTypes.GPUPlugin {
 	}
 }
 
-func (cuda *Cuda) Init() error {
+func (cuda *Cuda) Name() string {
+	return cuda.commonInfo.Name
+}
+
+func (cuda *Cuda) InitPlugin() error {
 	return nvidia.Init()
 }
 
 func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 	glog.Infof("Hans: cuda.Detect()")
+
+	if cuda.gpuDevices != nil {
+		return cuda.gpuDevices, nil
+	}
+
 	gpuDevices := gpuTypes.GPUDevices{}
 
 	cudaDevices, err := nvidia.LookupDevices()
@@ -62,10 +72,46 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 
 	gpuDevices.GPUPlatform.Name = cuda.commonInfo.Name
 
+	cuda.gpuDevices = &gpuDevices
 	glog.Infof("Hans: cuda.Detect(): gpuDevices:%+v", gpuDevices)
-	return &gpuDevices, nil
+	return cuda.gpuDevices, nil
 }
 
-func (cuda *Cuda) Name() string {
-	return cuda.commonInfo.Name
+func (cuda *Cuda) InitGPUEnv() error {
+	return createLocalVolumes()
+}
+
+func createLocalVolumes() error {
+	drv, err := nvidia.GetDriverVersion()
+	if err != nil {
+		return err
+	}
+	vols, err := nvidia.LookupVolumes("")
+	if err != nil {
+		return err
+	}
+
+	for _, v := range vols {
+		n := fmt.Sprintf("%s_%s", v.Name, drv)
+		if _, err := docker.InspectVolume(n); err == nil {
+			if err = docker.RemoveVolume(n); err != nil {
+				return fmt.Errorf("cannot remove %s: volume is in use", n)
+			}
+		}
+
+		if err := docker.CreateVolume(n); err != nil {
+			return err
+		}
+		path, err := docker.InspectVolume(n)
+		if err != nil {
+			docker.RemoveVolume(n)
+			return err
+		}
+		if err := v.CreateAt(path); err != nil {
+			docker.RemoveVolume(n)
+			return err
+		}
+		fmt.Println(n)
+	}
+	return nil
 }

@@ -2215,6 +2215,19 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	return outOfDockerDisk || outOfRootDisk
 }
 
+func (kl *Kubelet) hasInsufficientGPU(pods []*api.Pod) bool {
+	glog.Infof("Hans: hasInsufficientGPU()")
+	totalGpuNum := int(0)
+	for _, gpuPlugin := range kl.gpuPlugins {
+		gpuDevices, err := gpuPlugin.Detect()
+		if err == nil {
+			totalGpuNum += len(gpuDevices.Devices)
+		}
+	}
+
+	return gpu.IsGPUAvaiable(pods, totalGpuNum)
+}
+
 // matchesNodeSelector returns true if pod matches node's labels.
 func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
 	if kl.standaloneMode {
@@ -2256,6 +2269,10 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	}
 	if kl.isOutOfDisk() {
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
+	}
+
+	if kl.hasInsufficientGPU(pods) {
+		return false, "InsufficientFreeGPU", "cannot start the pod due to insufficient free GPU."
 	}
 
 	return true, "", ""
