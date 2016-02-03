@@ -173,7 +173,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		LowThresholdPercent:  80,
 	}
 	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
-	fakeClock := &util.FakeClock{Time: time.Now()}
+	fakeClock := util.NewFakeClock(time.Now())
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)

@@ -23,7 +23,7 @@ import (
 
 func TestFakeClock(t *testing.T) {
 	startTime := time.Now()
-	tc := &FakeClock{Time: startTime}
+	tc := NewFakeClock(startTime)
 	tc.Step(time.Second)
 	now := tc.Now()
 	if now.Sub(startTime) != time.Second {
@@ -31,8 +31,66 @@ func TestFakeClock(t *testing.T) {
 	}
 
 	tt := tc.Now()
-	tc.Time = tt.Add(time.Hour)
+	tc.SetTime(tt.Add(time.Hour))
 	if tc.Now().Sub(tt) != time.Hour {
 		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Now().Sub(tt), time.Hour)
+	}
+}
+
+func TestFakeAfter(t *testing.T) {
+	tc := NewFakeClock(time.Now())
+	if tc.HasWaiters() {
+		t.Errorf("unexpected waiter?")
+	}
+	oneSec := tc.After(time.Second)
+	if !tc.HasWaiters() {
+		t.Errorf("unexpected lack of waiter?")
+	}
+
+	oneOhOneSec := tc.After(time.Second + time.Millisecond)
+	twoSec := tc.After(2 * time.Second)
+	select {
+	case <-oneSec:
+		t.Errorf("unexpected channel read")
+	case <-oneOhOneSec:
+		t.Errorf("unexpected channel read")
+	case <-twoSec:
+		t.Errorf("unexpected channel read")
+	default:
+	}
+
+	tc.Step(999 * time.Millisecond)
+	select {
+	case <-oneSec:
+		t.Errorf("unexpected channel read")
+	case <-oneOhOneSec:
+		t.Errorf("unexpected channel read")
+	case <-twoSec:
+		t.Errorf("unexpected channel read")
+	default:
+	}
+
+	tc.Step(time.Millisecond)
+	select {
+	case <-oneSec:
+		// Expected!
+	case <-oneOhOneSec:
+		t.Errorf("unexpected channel read")
+	case <-twoSec:
+		t.Errorf("unexpected channel read")
+	default:
+		t.Errorf("unexpected non-channel read")
+	}
+	tc.Step(time.Millisecond)
+	select {
+	case <-oneSec:
+		// should not double-trigger!
+		t.Errorf("unexpected channel read")
+	case <-oneOhOneSec:
+		// Expected!
+	case <-twoSec:
+		t.Errorf("unexpected channel read")
+	default:
+		t.Errorf("unexpected non-channel read")
 	}
 }
