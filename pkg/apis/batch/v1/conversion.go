@@ -62,7 +62,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 	if in.Volumes != nil {
 		out.Volumes = make([]v1.Volume, len(in.Volumes))
 		for i := range in.Volumes {
-			if err := Convert_api_Volume_To_v1_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
+			if err := v1.Convert_api_Volume_To_v1_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
 				return err
 			}
 		}
@@ -72,7 +72,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 	if in.Containers != nil {
 		out.Containers = make([]v1.Container, len(in.Containers))
 		for i := range in.Containers {
-			if err := Convert_api_Container_To_v1_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
+			if err := v1.Convert_api_Container_To_v1_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
 				return err
 			}
 		}
@@ -107,7 +107,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {
 		out.SecurityContext = new(v1.PodSecurityContext)
-		if err := Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+		if err := v1.Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
 			return err
 		}
 
@@ -118,7 +118,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]v1.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
-			if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+			if err := v1.Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
 				return err
 			}
 		}
@@ -135,7 +135,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	if in.Volumes != nil {
 		out.Volumes = make([]api.Volume, len(in.Volumes))
 		for i := range in.Volumes {
-			if err := Convert_v1_Volume_To_api_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
+			if err := v1.Convert_v1_Volume_To_api_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
 				return err
 			}
 		}
@@ -145,7 +145,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	if in.Containers != nil {
 		out.Containers = make([]api.Container, len(in.Containers))
 		for i := range in.Containers {
-			if err := Convert_v1_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
+			if err := v1.Convert_v1_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
 				return err
 			}
 		}
@@ -184,7 +184,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 
 	if in.SecurityContext != nil {
 		out.SecurityContext = new(api.PodSecurityContext)
-		if err := Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+		if err := v1.Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
 			return err
 		}
 	}
@@ -197,7 +197,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
-			if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+			if err := v1.Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
 				return err
 			}
 		}
