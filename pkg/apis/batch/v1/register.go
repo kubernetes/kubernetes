@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -22,10 +22,10 @@ import (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "extensions"
+const GroupName = "batch"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1beta1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
 
 func AddToScheme(scheme *runtime.Scheme) {
 	addKnownTypes(scheme)

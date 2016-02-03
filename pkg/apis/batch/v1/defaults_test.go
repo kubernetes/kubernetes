@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1_test
+package v1_test
 
 import (
 	"reflect"
@@ -23,7 +23,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
 	. "k8s.io/kubernetes/pkg/apis/batch/v1"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
