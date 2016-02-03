@@ -28,20 +28,19 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/testing/fake"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
 type describeClient struct {
 	T         *testing.T
 	Namespace string
 	Err       error
-	client.Interface
+	clientset.Interface
 }
 
 func TestDescribePod(t *testing.T) {
-	fake := testclient.NewSimpleFake(&api.Pod{
+	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -59,7 +58,7 @@ func TestDescribePod(t *testing.T) {
 }
 
 func TestDescribeService(t *testing.T) {
-	fake := testclient.NewSimpleFake(&api.Service{
+	fake := fake.NewSimpleClientset(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -78,7 +77,7 @@ func TestDescribeService(t *testing.T) {
 
 func TestPodDescribeResultsSorted(t *testing.T) {
 	// Arrange
-	fake := testclient.NewSimpleFake(&api.EventList{
+	fake := fake.NewSimpleClientset(&api.EventList{
 		Items: []api.Event{
 			{
 				Source:         api.EventSource{Component: "kubelet"},
@@ -490,7 +489,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 	}
 
 	for name, pv := range tests {
-		fake := testclient.NewSimpleFake(pv)
+		fake := fake.NewSimpleClientset(pv)
 		c := PersistentVolumeDescriber{fake}
 		str, err := c.Describe("foo", "bar")
 		if err != nil {
