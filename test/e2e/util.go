@@ -2814,16 +2814,19 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 
 func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
 	gceCloud, ok := testContext.CloudConfig.Provider.(*gcecloud.GCECloud)
-	project := testContext.CloudConfig.ProjectID
-	zone := testContext.CloudConfig.Zone
-
 	if !ok {
 		return fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", testContext.CloudConfig.Provider)
+	}
+	project := testContext.CloudConfig.ProjectID
+	zone := testContext.CloudConfig.Zone
+	region, err := gcecloud.GetGCERegion(zone)
+	if err != nil {
+		return err
 	}
 
 	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
 		service := gceCloud.GetComputeService()
-		list, err := service.ForwardingRules.List(project, zone).Do()
+		list, err := service.ForwardingRules.List(project, region).Do()
 		if err != nil {
 			return false, err
 		}
