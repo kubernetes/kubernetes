@@ -82,15 +82,17 @@ type MinionServer struct {
 // NewMinionServer creates the MinionServer struct with default values to be used by hyperkube
 func NewMinionServer() *MinionServer {
 	s := &MinionServer{
-		KubeletExecutorServer: exservice.NewKubeletExecutorServer(),
-		privateMountNS:        false, // disabled until Docker supports customization of the parent mount namespace
-		cgroupPrefix:          config.DefaultCgroupPrefix,
-		containPodResources:   true,
-		logMaxSize:            config.DefaultLogMaxSize(),
-		logMaxBackups:         config.DefaultLogMaxBackups,
-		logMaxAgeInDays:       config.DefaultLogMaxAgeInDays,
-		runProxy:              true,
-		proxyMode:             "userspace", // upstream default is "iptables" post-v1.1
+		KubeletExecutorServer:      exservice.NewKubeletExecutorServer(),
+		privateMountNS:             false, // disabled until Docker supports customization of the parent mount namespace
+		cgroupPrefix:               config.DefaultCgroupPrefix,
+		containPodResources:        true,
+		logMaxSize:                 config.DefaultLogMaxSize(),
+		logMaxBackups:              config.DefaultLogMaxBackups,
+		logMaxAgeInDays:            config.DefaultLogMaxAgeInDays,
+		runProxy:                   true,
+		proxyMode:                  "userspace", // upstream default is "iptables" post-v1.1
+		globalHousekeepingInterval: 1 * time.Second,
+		housekeepingInterval:       1 * time.Minute,
 	}
 
 	// cache this for later use
@@ -176,6 +178,9 @@ func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 	if ms.cgroupRoot != "" {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
+
+	executorArgs = append(executorArgs, "--housekeeping_interval="+ms.housekeepingInterval)
+	executorArgs = append(executorArgs, "--global_housekeeping_interval="+ms.globalHousekeepingInterval)
 
 	// run executor and quit minion server when this exits cleanly
 	execDied := make(chan struct{})
@@ -336,10 +341,6 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 
 	// hack to forward log verbosity flag to the executor
 	fs.Int32Var(&ms.logVerbosity, "v", ms.logVerbosity, "log level for V logs")
-
-	// hacks to forward selected cadvisor flags to the executor
-	fs.DurationVar(&ms.housekeepingInterval, "housekeeping-interval", ms.housekeepingInterval, "Interval between container housekeepings")
-	fs.DurationVar(&ms.globalHousekeepingInterval, "global-housekeeping-interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
 }
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
@@ -361,4 +362,8 @@ func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&ms.proxyMode, "proxy-mode", ms.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.IntVar(&ms.conntrackMax, "conntrack-max", ms.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
 	fs.IntVar(&ms.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", ms.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
+
+	// cadvisor flags
+	fs.DurationVar(&ms.housekeepingInterval, "housekeeping-interval", ms.housekeepingInterval, "Interval between container housekeepings")
+	fs.DurationVar(&ms.globalHousekeepingInterval, "global-housekeeping-interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
 }

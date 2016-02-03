@@ -1,7 +1,6 @@
 Vagrantfile:      node_ip = $node_ips[n]
 cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
 cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
-cluster/aws/templates/salt-minion.sh:  hostname_override: "${HOSTNAME_OVERRIDE}"
 cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
@@ -67,6 +66,8 @@ cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e 
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--global_housekeeping_interval="+ms.globalHousekeepingInterval)
+contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--housekeeping_interval="+ms.housekeepingInterval)
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
@@ -89,6 +90,7 @@ hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
 hack/test-cmd.sh:  --runtime_config="extensions/v1beta1/deployments=true" \
+pkg/kubelet/cadvisor/cadvisor_linux.go:	if f := flag.Lookup("housekeeping_interval"); f != nil {
 pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
 pkg/kubelet/qos/memory_policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
