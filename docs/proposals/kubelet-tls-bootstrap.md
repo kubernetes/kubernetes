@@ -1,12 +1,44 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubelet TLS bootstrap
+
 Author: George Tankersley (george.tankersley@coreos.com)
 
 ## Preface
+
 This document describes a method for a kubelet to bootstrap itself
 into a TLS-secured cluster. Crucially, it automates the provision and
 distribution of signed certificates.
 
 ## Overview
+
 When a kubelet runs for the first time, it must be given TLS assets
 or generate them itself. In the first case, this is a burden on the cluster
 admin and a significant logistical barrier to secure Kubernetes rollouts. In
@@ -16,6 +48,7 @@ private key and a CSR for submission to a cluster-level certificate signing
 process.
 
 ## Preliminaries
+
 We assume the existence of a functioning control plane. The
 apiserver should be configured for TLS initially or possess the ability to
 generate valid TLS credentials for itself. If secret information is passed in
@@ -33,7 +66,9 @@ These should not change often and are thus simple to include in a static
 provisioning script.
 
 ## API Changes
+
 ### CertificateSigningRequest Object
+
 We introduce a new API object to represent PKCS#10 certificate signing
 requests. It will be accessible under:
 
@@ -102,6 +137,7 @@ type CertificateSigningRequestList struct {
 ## Certificate Request Process
 
 ### Node intialization
+
 When the kubelet executes it checks a location on disk for TLS assets
 (currently `/var/run/kubernetes/kubelet.{key,crt}` by default). If it finds
 them, it proceeds. If there are no TLS assets, the kubelet generates a keypair
@@ -115,6 +151,7 @@ and self-signed certificate. We propose the following optional fallback behavior
 4. Set a watch on the CSR object to be notified of approval or rejection.
 
 ### Controller response
+
 The apiserver must first validate the signature on the raw CSR data and reject
 requests featuring invalid CSRs. It then persists the
 CertificateSigningRequests and exposes the List of all CSRs for an
@@ -125,6 +162,7 @@ generate and sign the certificate, then update the
 CertificateSigningRequestStatus with the new data.
 
 ### Manual CSR approval
+
 An administrator using `kubectl` or another API client can query the
 CertificateSigningRequestList and update the status of
 CertificateSigningRequests. The default Status is Unknown, indicating that
@@ -134,6 +172,7 @@ Status of False indicates that the admin has denied the request. An admin may
 also supply Reason and Message fields to explain the rejection.
 
 ## kube-apiserver support (CA assets)
+
 So that the apiserver can handle certificate issuance on its own, it will need
 access to CA signing assets. This could be as simple as a private key and a
 config file or as complex as a PKCS#11 client and supplementary policy system.
@@ -141,6 +180,7 @@ For now, we will add flags for a signing key, a certificate, and a basic config
 file.
 
 ## kubectl support
+
 To support manual CSR inspection and approval, we will add support for listing,
 inspecting, and approving/rejecting CertificateSigningRequests to kubectl. The
 interface will be similar to
@@ -159,12 +199,14 @@ able to supply Reason and Message fields via additional flags.
 ## Security Considerations
 
 ### Endpoint Access Control
+
 The ability to post CSRs to the signing endpoint should be controlled. As a
 simple solution we propose that each node be provisioned with an auth token
 (possibly static across the cluster) that is scoped via ABAC to only allow
 access to the CSR endpoint.
 
 ### Expiration & Revocation
+
 The node is responsible for monitoring its own certificate expiration date.
 When the certificate is close to expiration, the kubelet should begin repeating
 this flow until it successfully obtains a new certificate. If the expiring
@@ -178,6 +220,12 @@ the future it may make sense to add CRL support to the apiserver's client cert
 auth.
 
 ## Future Work
+
 - revocation UI in kubectl and CRL support at the apiserver
 - supplemental policy (e.g. cluster CA only issues 30-day certs for hostnames *.k8s.example.com, each new cert must have fresh keys, ...)
 - fully automated provisioning (using a handshake protocol or external list of authorized machines)
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/kubelet-tls-bootstrap.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
