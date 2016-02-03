@@ -18,6 +18,7 @@ package master
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
+	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -68,6 +70,7 @@ import (
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -158,6 +161,12 @@ func New(c *Config) *Master {
 	return m
 }
 
+func resetMetrics(w http.ResponseWriter, req *http.Request) {
+	apiservermetrics.Reset()
+	etcdmetrics.Reset()
+	io.WriteString(w, "metrics reset\n")
+}
+
 func (m *Master) InstallAPIs(c *Config) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
@@ -190,7 +199,10 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
-	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, c.EnableProfiling, healthzChecks...)
+	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, healthzChecks...)
+	if c.EnableProfiling {
+		m.MuxHelper.HandleFunc("/resetMetrics", resetMetrics)
+	}
 
 	// Install root web services
 	m.HandlerContainer.Add(m.RootWebService)
