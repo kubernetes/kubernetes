@@ -68,7 +68,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 	done := make(chan interface{}, 1)
 
 	go func() {
-                finished := false
+		finished := false
 
 		defer func() {
 			if e := recover(); e != nil || !finished {
@@ -83,7 +83,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 		}()
 
 		r.asyncFunc(done)
-                finished = true
+		finished = true
 	}()
 
 	select {
@@ -96,7 +96,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 	return
 }
 func (r *runner) runSync() (outcome types.SpecState, failure types.SpecFailure) {
-        finished := false
+	finished := false
 
 	defer func() {
 		if e := recover(); e != nil || !finished {
@@ -107,7 +107,7 @@ func (r *runner) runSync() (outcome types.SpecState, failure types.SpecFailure) 
 	}()
 
 	r.syncFunc()
-        finished = true
+	finished = true
 
 	return
 }

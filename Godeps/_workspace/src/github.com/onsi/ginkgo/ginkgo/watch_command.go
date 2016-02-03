@@ -80,7 +80,7 @@ func (w *SpecWatcher) WatchSuites(args []string, additionalArgs []string) {
 	}
 
 	for suite, err := range errors {
-		fmt.Printf("Failed to watch %s: %s\n"+suite.PackageName, err)
+		fmt.Printf("Failed to watch %s: %s\n", suite.PackageName, err)
 	}
 
 	if len(suites) == 1 {
