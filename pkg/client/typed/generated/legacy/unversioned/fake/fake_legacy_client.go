@@ -29,6 +29,10 @@ func (c *FakeLegacy) ComponentStatuses() unversioned.ComponentStatusInterface {
 	return &FakeComponentStatuses{c}
 }
 
+func (c *FakeLegacy) ConfigMaps(namespace string) unversioned.ConfigMapInterface {
+	return &FakeConfigMaps{c, namespace}
+}
+
 func (c *FakeLegacy) Endpoints(namespace string) unversioned.EndpointsInterface {
 	return &FakeEndpoints{c, namespace}
 }
