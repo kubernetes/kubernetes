@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -95,7 +95,7 @@ type ReplicationManager struct {
 func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
@@ -111,10 +111,10 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rm.kubeClient.Legacy().ReplicationControllers(api.NamespaceAll).List(options)
+				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rm.kubeClient.Legacy().ReplicationControllers(api.NamespaceAll).Watch(options)
+				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ReplicationController{},
@@ -152,10 +152,10 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 	rm.podStore.Store, rm.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rm.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
+				return rm.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rm.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return rm.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -453,7 +453,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rm.kubeClient.Legacy().ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
+	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the controller ensures
 		// we retry with some fairness.
 		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)

@@ -51,10 +51,10 @@ type quota struct {
 func NewResourceQuota(client clientset.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Legacy().ResourceQuotas(api.NamespaceAll).List(options)
+			return client.Core().ResourceQuotas(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Legacy().ResourceQuotas(api.NamespaceAll).Watch(options)
+			return client.Core().ResourceQuotas(api.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)
@@ -143,7 +143,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 						Annotations:     quota.Annotations},
 				}
 				usage.Status = *status
-				_, err = q.client.Legacy().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+				_, err = q.client.Core().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 				if err == nil {
 					break
 				}
@@ -154,7 +154,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 				}
 				time.Sleep(interval)
 				// manually get the latest quota
-				quota, err = q.client.Legacy().ResourceQuotas(usage.Namespace).Get(quota.Name)
+				quota, err = q.client.Core().ResourceQuotas(usage.Namespace).Get(quota.Name)
 				if err != nil {
 					return admission.NewForbidden(a, err)
 				}
@@ -228,7 +228,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 
 			// if this operation is an update, we need to find the delta usage from the previous state
 			if a.GetOperation() == admission.Update {
-				oldPod, err := client.Legacy().Pods(a.GetNamespace()).Get(pod.Name)
+				oldPod, err := client.Core().Pods(a.GetNamespace()).Get(pod.Name)
 				if err != nil {
 					return false, err
 				}

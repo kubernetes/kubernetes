@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
@@ -82,7 +82,7 @@ type ServiceController struct {
 // (like load balancers) in sync with the registry.
 func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
+	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
 
 	return &ServiceController{
@@ -134,13 +134,13 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		}),
 		s.cache,
 	)
-	lw := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).LegacyClient, "services", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient, "services", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(lw, &api.Service{}, serviceQueue, serviceSyncPeriod).Run()
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
 
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).LegacyClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go s.nodeSyncLoop(nodeSyncPeriod)
 	return nil
@@ -344,7 +344,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 func (s *ServiceController) persistUpdate(service *api.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.Legacy().Services(service.Namespace).UpdateStatus(service)
+		_, err = s.kubeClient.Core().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}

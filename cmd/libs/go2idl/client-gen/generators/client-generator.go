@@ -174,9 +174,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				continue
 			}
 			group := filepath.Base(t.Name.Package)
-			// Special case for the legacy API.
+			// Special case for the core API.
 			if group == "api" {
-				group = "legacy"
+				group = "core"
 			}
 			if _, found := groupToTypes[group]; !found {
 				groupToTypes[group] = []*types.Type{}

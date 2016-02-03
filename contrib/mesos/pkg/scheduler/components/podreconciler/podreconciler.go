@@ -66,7 +66,7 @@ func New(sched scheduler.Scheduler, client *clientset.Clientset, qr queuer.Queue
 func (s *podReconciler) Reconcile(t *podtask.T) {
 	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
-	pod, err := s.client.Legacy().Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
+	pod, err := s.client.Core().Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// attempt to delete

@@ -84,7 +84,7 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
 
-		secretName, err := kubeClient.Legacy().Secrets(pod.Namespace).Get(source.SecretRef.Name)
+		secretName, err := kubeClient.Core().Secrets(pod.Namespace).Get(source.SecretRef.Name)
 		if err != nil {
 			glog.Errorf("Couldn't get secret %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err

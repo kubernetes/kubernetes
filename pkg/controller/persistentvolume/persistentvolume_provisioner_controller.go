@@ -382,51 +382,51 @@ type realControllerClient struct {
 }
 
 func (c *realControllerClient) GetPersistentVolume(name string) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().Get(name)
+	return c.client.Core().PersistentVolumes().Get(name)
 }
 
 func (c *realControllerClient) ListPersistentVolumes(options api.ListOptions) (*api.PersistentVolumeList, error) {
-	return c.client.Legacy().PersistentVolumes().List(options)
+	return c.client.Core().PersistentVolumes().List(options)
 }
 
 func (c *realControllerClient) WatchPersistentVolumes(options api.ListOptions) (watch.Interface, error) {
-	return c.client.Legacy().PersistentVolumes().Watch(options)
+	return c.client.Core().PersistentVolumes().Watch(options)
 }
 
 func (c *realControllerClient) CreatePersistentVolume(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().Create(pv)
+	return c.client.Core().PersistentVolumes().Create(pv)
 }
 
 func (c *realControllerClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().Update(volume)
+	return c.client.Core().PersistentVolumes().Update(volume)
 }
 
 func (c *realControllerClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
-	return c.client.Legacy().PersistentVolumes().Delete(volume.Name, nil)
+	return c.client.Core().PersistentVolumes().Delete(volume.Name, nil)
 }
 
 func (c *realControllerClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.Legacy().PersistentVolumes().UpdateStatus(volume)
+	return c.client.Core().PersistentVolumes().UpdateStatus(volume)
 }
 
 func (c *realControllerClient) GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error) {
-	return c.client.Legacy().PersistentVolumeClaims(namespace).Get(name)
+	return c.client.Core().PersistentVolumeClaims(namespace).Get(name)
 }
 
 func (c *realControllerClient) ListPersistentVolumeClaims(namespace string, options api.ListOptions) (*api.PersistentVolumeClaimList, error) {
-	return c.client.Legacy().PersistentVolumeClaims(namespace).List(options)
+	return c.client.Core().PersistentVolumeClaims(namespace).List(options)
 }
 
 func (c *realControllerClient) WatchPersistentVolumeClaims(namespace string, options api.ListOptions) (watch.Interface, error) {
-	return c.client.Legacy().PersistentVolumeClaims(namespace).Watch(options)
+	return c.client.Core().PersistentVolumeClaims(namespace).Watch(options)
 }
 
 func (c *realControllerClient) UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	return c.client.Legacy().PersistentVolumeClaims(claim.Namespace).Update(claim)
+	return c.client.Core().PersistentVolumeClaims(claim.Namespace).Update(claim)
 }
 
 func (c *realControllerClient) UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	return c.client.Legacy().PersistentVolumeClaims(claim.Namespace).UpdateStatus(claim)
+	return c.client.Core().PersistentVolumeClaims(claim.Namespace).UpdateStatus(claim)
 }
 
 func (c *realControllerClient) GetKubeClient() clientset.Interface {

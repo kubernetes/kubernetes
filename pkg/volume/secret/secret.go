@@ -165,7 +165,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
 	}
 
-	secret, err := kubeClient.Legacy().Secrets(b.pod.Namespace).Get(b.secretName)
+	secret, err := kubeClient.Core().Secrets(b.pod.Namespace).Get(b.secretName)
 	if err != nil {
 		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.secretName)
 		return err

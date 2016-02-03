@@ -82,11 +82,11 @@ func NewServiceAccountsController(cl clientset.Interface, options ServiceAccount
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = accountSelector
-				return e.client.Legacy().ServiceAccounts(api.NamespaceAll).List(options)
+				return e.client.Core().ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = accountSelector
-				return e.client.Legacy().ServiceAccounts(api.NamespaceAll).Watch(options)
+				return e.client.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -100,10 +100,10 @@ func NewServiceAccountsController(cl clientset.Interface, options ServiceAccount
 	e.namespaces, e.namespaceController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Legacy().Namespaces().List(options)
+				return e.client.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Legacy().Namespaces().Watch(options)
+				return e.client.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
@@ -217,7 +217,7 @@ func (e *ServiceAccountsController) createServiceAccountIfNeeded(sa api.ServiceA
 // createDefaultServiceAccount creates a default ServiceAccount in the specified namespace
 func (e *ServiceAccountsController) createServiceAccount(sa api.ServiceAccount, namespace string) {
 	sa.Namespace = namespace
-	if _, err := e.client.Legacy().ServiceAccounts(namespace).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
+	if _, err := e.client.Core().ServiceAccounts(namespace).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
 		glog.Error(err)
 	}
 }

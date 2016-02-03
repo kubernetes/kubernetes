@@ -241,7 +241,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	var (
-		pw = cache.NewListWatchFromClient(apiclient.LegacyClient, "pods", api.NamespaceAll,
+		pw = cache.NewListWatchFromClient(apiclient.CoreClient, "pods", api.NamespaceAll,
 			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
 		)
 		reg = executor.NewRegistry(apiclient)

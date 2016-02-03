@@ -79,7 +79,7 @@ func (s *controller) scheduleOne() {
 	// the scheduler has to take care of this:
 	if pod.Spec.NodeName != "" && pod.DeletionTimestamp != nil {
 		log.V(3).Infof("deleting pre-scheduled, not yet running pod: %s/%s", pod.Namespace, pod.Name)
-		s.client.Legacy().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
+		s.client.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
 		return
 	}
 

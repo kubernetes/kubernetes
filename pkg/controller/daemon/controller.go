@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	unversioned_extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -98,7 +98,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 
 	dsc := &DaemonSetsController{
 		kubeClient: kubeClient,
@@ -146,10 +146,10 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	dsc.podStore.Store, dsc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dsc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
+				return dsc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return dsc.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -164,10 +164,10 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dsc.kubeClient.Legacy().Nodes().List(options)
+				return dsc.kubeClient.Core().Nodes().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Legacy().Nodes().Watch(options)
+				return dsc.kubeClient.Core().Nodes().Watch(options)
 			},
 		},
 		&api.Node{},

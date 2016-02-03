@@ -66,7 +66,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	if exists {
 		return nil
 	}
-	_, err = p.client.Legacy().Namespaces().Create(namespace)
+	_, err = p.client.Core().Namespaces().Create(namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}
@@ -79,10 +79,10 @@ func NewProvision(c clientset.Interface) admission.Interface {
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Legacy().Namespaces().List(options)
+				return c.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Legacy().Namespaces().Watch(options)
+				return c.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},

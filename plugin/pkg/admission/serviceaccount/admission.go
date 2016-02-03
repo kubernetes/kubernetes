@@ -92,10 +92,10 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return cl.Legacy().ServiceAccounts(api.NamespaceAll).List(options)
+				return cl.Core().ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return cl.Legacy().ServiceAccounts(api.NamespaceAll).Watch(options)
+				return cl.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -107,11 +107,11 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = tokenSelector
-				return cl.Legacy().Secrets(api.NamespaceAll).List(options)
+				return cl.Core().Secrets(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = tokenSelector
-				return cl.Legacy().Secrets(api.NamespaceAll).Watch(options)
+				return cl.Core().Secrets(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Secret{},
@@ -253,7 +253,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 		if i != 0 {
 			time.Sleep(retryInterval)
 		}
-		serviceAccount, err := s.client.Legacy().ServiceAccounts(namespace).Get(name)
+		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name)
 		if err == nil {
 			return serviceAccount, nil
 		}
