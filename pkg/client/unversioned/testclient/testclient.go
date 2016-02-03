@@ -281,6 +281,10 @@ func (c *Fake) Apps() client.AppsInterface {
 	return &FakeApps{c}
 }
 
+func (c *Fake) Authorization() client.AuthorizationInterface {
+	return &FakeAuthorization{c}
+}
+
 func (c *Fake) Autoscaling() client.AutoscalingInterface {
 	return &FakeAutoscaling{c}
 }
@@ -342,6 +346,19 @@ type FakeApps struct {
 
 func (c *FakeApps) PetSets(namespace string) client.PetSetInterface {
 	return &FakePetSets{Fake: c, Namespace: namespace}
+}
+
+// NewSimpleFakeAuthorization returns a client that will respond with the provided objects
+func NewSimpleFakeAuthorization(objects ...runtime.Object) *FakeAuthorization {
+	return &FakeAuthorization{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeAuthorization struct {
+	*Fake
+}
+
+func (c *FakeAuthorization) SubjectAccessReviews() client.SubjectAccessReviewInterface {
+	return &FakeSubjectAccessReviews{Fake: c}
 }
 
 // NewSimpleFakeAutoscaling returns a client that will respond with the provided objects

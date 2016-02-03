@@ -503,11 +503,12 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 }
 
 var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:  {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                               {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                      {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                 {},
-	unversioned.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}: {},
+	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:         {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                      {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                             {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                        {},
+	unversioned.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:        {},
+	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}: {},
 }
 
 func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
