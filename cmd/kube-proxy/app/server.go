@@ -20,6 +20,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -58,6 +59,7 @@ type ProxyServer struct {
 	Broadcaster  record.EventBroadcaster
 	Recorder     record.EventRecorder
 	Conntracker  Conntracker // if nil, ignored
+	ProxyMode    string
 }
 
 const (
@@ -83,6 +85,7 @@ func NewProxyServer(
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
 	conntracker Conntracker,
+	proxyMode string,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
 		Client:       client,
@@ -92,6 +95,7 @@ func NewProxyServer(
 		Broadcaster:  broadcaster,
 		Recorder:     recorder,
 		Conntracker:  conntracker,
+		ProxyMode:    proxyMode,
 	}, nil
 }
 
@@ -248,7 +252,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	conntracker := realConntracker{}
 
-	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker)
+	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -265,8 +269,11 @@ func (s *ProxyServer) Run() error {
 
 	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
 
-	// Start up Healthz service if requested
+	// Start up a webserver if requested
 	if s.Config.HealthzPort > 0 {
+		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "%s", s.ProxyMode)
+		})
 		go util.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(s.Config.HealthzPort), nil)
 			if err != nil {

@@ -197,6 +197,10 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	config.dialFromNode("udp", node2_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1 --> node2:nodeHttpPort")
 	config.dialFromNode("http", node2_IP, nodeHttpPort, tries, epCount)
+
+	By("checking kube-proxy URLs")
+	config.getSelfURL("/healthz", "ok")
+	config.getSelfURL("/proxyMode", "iptables") // the default
 }
 
 func (config *KubeProxyTestConfig) hitEndpoints() {
@@ -250,6 +254,13 @@ func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targe
 	By(fmt.Sprintf("Dialing from node. command:%s", forLoop))
 	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, forLoop)
 	Expect(strconv.Atoi(strings.TrimSpace(stdout))).To(BeNumerically("==", expectedCount))
+}
+
+func (config *KubeProxyTestConfig) getSelfURL(path string, expected string) {
+	cmd := fmt.Sprintf("curl -s --connect-timeout 1 http://localhost:10249%s", path)
+	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
+	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, cmd)
+	Expect(strings.Contains(stdout, expected)).To(BeTrue())
 }
 
 func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {
