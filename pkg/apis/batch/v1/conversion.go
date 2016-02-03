@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		panic(err)
 	}
 
-	err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
+	err = api.Scheme.AddFieldLabelConversionFunc("batch/v1", "Job",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
