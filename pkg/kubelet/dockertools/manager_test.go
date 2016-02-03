@@ -1160,7 +1160,7 @@ func TestGetAPIPodStatusWithLastTermination(t *testing.T) {
 }
 
 func TestSyncPodBackoff(t *testing.T) {
-	var fakeClock = &util.FakeClock{Time: time.Now()}
+	var fakeClock = util.NewFakeClock(time.Now())
 	startTime := fakeClock.Now()
 
 	dm, fakeDocker := newTestDockerManager()
@@ -1232,7 +1232,7 @@ func TestSyncPodBackoff(t *testing.T) {
 	backOff.Clock = fakeClock
 	for _, c := range tests {
 		fakeDocker.SetFakeContainers(dockerContainers)
-		fakeClock.Time = startTime.Add(time.Duration(c.tick) * time.Second)
+		fakeClock.SetTime(startTime.Add(time.Duration(c.tick) * time.Second))
 
 		runSyncPod(t, dm, fakeDocker, pod, backOff, c.expectErr)
 		verifyCalls(t, fakeDocker, c.result)
