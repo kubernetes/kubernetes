@@ -397,6 +397,13 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			s.MinReplicas = &minReplicas
 			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(int32(c.RandUint64()))}
 		},
+		func(s *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
+			c.FuzzNoCustom(s)
+			s.Type = extensions.RollingUpdateDaemonSetStrategyType
+			s.RollingUpdate = &extensions.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(10),
+			}
+		},
 	)
 	return f
 }
