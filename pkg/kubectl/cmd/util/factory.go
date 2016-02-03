@@ -60,8 +60,9 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients *ClientCache
-	flags   *pflag.FlagSet
+	clients   *ClientCache
+	clientset clientset.Clientset
+	flags     *pflag.FlagSet
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -180,8 +181,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	clients := NewClientCache(clientConfig)
 
 	return &Factory{
-		clients: clients,
-		flags:   flags,
+		clients:   clients,
+		clientset: clientset.NewForConfigOrDie(clientConfig),
+		flags:     flags,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
