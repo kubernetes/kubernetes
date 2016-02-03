@@ -161,20 +161,6 @@ func New(c *Config) *Master {
 func (m *Master) InstallAPIs(c *Config) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
-	// Run the tunnel.
-	healthzChecks := []healthz.HealthzChecker{}
-	if m.tunneler != nil {
-		m.tunneler.Run(m.getNodeAddresses)
-		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
-		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Name: "apiserver_proxy_tunnel_sync_latency_secs",
-			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
-	}
-
-	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
-	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, c.EnableProfiling, healthzChecks...)
-
 	// Install v1 unless disabled.
 	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
 		// Install v1 API.
@@ -191,6 +177,20 @@ func (m *Master) InstallAPIs(c *Config) {
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
+
+	// Run the tunneler.
+	healthzChecks := []healthz.HealthzChecker{}
+	if m.tunneler != nil {
+		m.tunneler.Run(m.getNodeAddresses)
+		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "apiserver_proxy_tunnel_sync_latency_secs",
+			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
+	}
+
+	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
+	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, c.EnableProfiling, healthzChecks...)
 
 	// Install root web services
 	m.HandlerContainer.Add(m.RootWebService)
