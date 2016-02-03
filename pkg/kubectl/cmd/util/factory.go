@@ -179,10 +179,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
+	clientset := clientset.NewForConfigOrDie(clientConfig)
 
 	return &Factory{
 		clients:   clients,
-		clientset: clientset.NewForConfigOrDie(clientConfig),
+		clientset: clientset,
 		flags:     flags,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
@@ -218,10 +219,24 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
 			client, err := clients.ClientForVersion(&mappingVersion)
-			if err != nil {
-				return nil, err
+			copyClientset := clientset
+			// TODO: we should add a Group("groupName") function to clientset
+			serializer, ok := api.Codecs.SerializerForFileExtension("json")
+			if !ok {
+				return nil, fmt.Errorf("failed to get json serializer")
 			}
-			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), client); ok {
+			gv := mapping.GroupVersionKind.GroupVersion()
+			switch mapping.GroupVersionKind.Group {
+			case api.GroupName:
+				// TODO: we need to add a method to typed group client to tell us what version it supports in default
+				copyClientset.LegacyClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, gv, unversioned.GroupVersion{api.GroupName, runtime.APIVersionInternal}))
+				copyClientset.LegacyClient.RESTClient.ChangeTargetVersion(mapping.GroupVersionKind.GroupVersion())
+			case extensions.GroupName:
+				copyClientset.ExtensionsClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, gv, unversioned.GroupVersion{extensions.GroupName, runtime.APIVersionInternal}))
+				copyClientset.ExtensionsClient.RESTClient.ChangeTargetVersion(mapping.GroupVersionKind.GroupVersion())
+			}
+
+			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), copyClientset); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
