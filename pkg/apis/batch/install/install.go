@@ -28,18 +28,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
+const importPrefix = "k8s.io/kubernetes/pkg/apis/batch"
 
 var accessor = meta.NewAccessor()
 
 // availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
+var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
 
 func init() {
 	registered.RegisterVersions(availableVersions)
@@ -50,7 +50,7 @@ func init() {
 		}
 	}
 	if len(externalVersions) == 0 {
-		glog.V(4).Infof("No version is registered for group %v", extensions.GroupName)
+		glog.V(4).Infof("No version is registered for group %v", batch.GroupName)
 		return
 	}
 
@@ -101,20 +101,20 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 // string, or an error if the version is not known.
 func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
-	case v1beta1.SchemeGroupVersion:
+	case v1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := registered.Group(extensions.GroupName)
+		g, _ := registered.Group(batch.GroupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	extensions.AddToScheme(api.Scheme)
+	batch.AddToScheme(api.Scheme)
 	// add the enabled external versions to Scheme
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
@@ -122,8 +122,8 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 			continue
 		}
 		switch v {
-		case v1beta1.SchemeGroupVersion:
-			v1beta1.AddToScheme(api.Scheme)
+		case v1.SchemeGroupVersion:
+			v1.AddToScheme(api.Scheme)
 		}
 	}
 }
