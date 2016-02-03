@@ -62,3 +62,4 @@
 - defaults:
     name: global
     emails: '$DEFAULT_RECIPIENTS'
+    cron-string: 'H/30 * * * *'
