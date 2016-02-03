@@ -17,12 +17,14 @@ limitations under the License.
 package schedulercache
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 // TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
@@ -333,6 +335,45 @@ func TestRemovePod(t *testing.T) {
 	}
 }
 
+func BenchmarkGetNodeNameToInfoMap1kNodes30kPods(b *testing.B) {
+	cache := setupCacheOf1kNodes30kPods(b)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		cache.GetNodeNameToInfoMap()
+	}
+}
+
+func BenchmarkList1kNodes30kPods(b *testing.B) {
+	cache := setupCacheOf1kNodes30kPods(b)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		cache.List(labels.Everything())
+	}
+
+}
+
+func BenchmarkExpire100Pods(b *testing.B) {
+	benchmarkExpire(b, 100)
+}
+
+func BenchmarkExpire1kPods(b *testing.B) {
+	benchmarkExpire(b, 1000)
+}
+
+func BenchmarkExpire10kPods(b *testing.B) {
+	benchmarkExpire(b, 10000)
+}
+
+func benchmarkExpire(b *testing.B, podNum int) {
+	now := time.Now()
+	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		cache := setupCacheWithAssumedPods(b, podNum, now)
+		b.StartTimer()
+		cache.cleanupAssumedPods(now.Add(2 * time.Second))
+	}
+}
+
 func makeBasePod(nodeName, objName, cpu, mem string, ports []api.ContainerPort) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -352,6 +393,42 @@ func makeBasePod(nodeName, objName, cpu, mem string, ports []api.ContainerPort) 
 			NodeName: nodeName,
 		},
 	}
+}
+
+func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
+	cache := newSchedulerCache(time.Second, time.Second, nil)
+	for i := 0; i < 1000; i++ {
+		nodeName := fmt.Sprintf("node-%d", i)
+		for j := 0; j < 30; j++ {
+			objName := fmt.Sprintf("%s-pod-%d", nodeName, j)
+			pod := makeBasePod(nodeName, objName, "0", "0", nil)
+
+			err := cache.AssumePodIfBindSucceed(pod, alwaysTrue)
+			if err != nil {
+				b.Fatalf("AssumePodIfBindSucceed failed: %v", err)
+			}
+			err = cache.AddPod(pod)
+			if err != nil {
+				b.Fatalf("AddPod failed: %v", err)
+			}
+		}
+	}
+	return cache
+}
+
+func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) *schedulerCache {
+	cache := newSchedulerCache(time.Second, time.Second, nil)
+	for i := 0; i < podNum; i++ {
+		nodeName := fmt.Sprintf("node-%d", i/10)
+		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)
+		pod := makeBasePod(nodeName, objName, "0", "0", nil)
+
+		err := cache.assumePodIfBindSucceed(pod, alwaysTrue, assumedTime)
+		if err != nil {
+			b.Fatalf("assumePodIfBindSucceed failed: %v", err)
+		}
+	}
+	return cache
 }
 
 func alwaysTrue() bool {
