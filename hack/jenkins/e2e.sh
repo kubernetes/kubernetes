@@ -392,6 +392,27 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-flannel"}
     ;;
 
+  # Runs only the deployment tests on GCE.
+  kubernetes-e2e-gce-deployment)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-deployment"}
+    : ${E2E_NETWORK:="e2e-deployment"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Deployment\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-deployment"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
+   # Runs only the deployment tests on GKE.
+   kubernetes-e2e-gke-deployment)
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-deployment"}
+    : ${E2E_NETWORK:="e2e-gke-deployment"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Deployment\]"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gke-deployment"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
   # Runs the flaky tests on GCE, sequentially.
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
