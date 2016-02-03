@@ -57,7 +57,7 @@ func (c *FakeConfigMaps) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakeConfigMaps) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("configmaps", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ConfigMapList{})
 	return err

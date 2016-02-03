@@ -57,7 +57,7 @@ func (c *FakeEndpoints) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakeEndpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("endpoints", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.EndpointsList{})
 	return err

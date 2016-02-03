@@ -67,7 +67,7 @@ func (c *FakeResourceQuotas) Delete(name string, options *api.DeleteOptions) err
 }
 
 func (c *FakeResourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("resourcequotas", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ResourceQuotaList{})
 	return err

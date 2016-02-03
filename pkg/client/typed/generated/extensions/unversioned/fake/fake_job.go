@@ -68,7 +68,7 @@ func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("jobs", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.JobList{})
 	return err

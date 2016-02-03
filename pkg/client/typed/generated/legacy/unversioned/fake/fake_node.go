@@ -62,7 +62,7 @@ func (c *FakeNodes) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakeNodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("events", listOptions)
+	action := core.NewRootDeleteCollectionAction("nodes", listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.NodeList{})
 	return err
