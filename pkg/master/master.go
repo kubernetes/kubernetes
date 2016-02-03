@@ -85,6 +85,10 @@ import (
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
+
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
@@ -301,6 +305,34 @@ func (m *Master) InstallAPIs(c *Config) {
 			Name:             autoscalingGroupMeta.GroupVersion.Group,
 			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
 			PreferredVersion: autoscalingGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(authorizationapiv1beta1.SchemeGroupVersion) {
+		resources := m.getAuthorizationResources(c)
+		groupMeta := registered.GroupOrDie(authorizationapi.GroupName)
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *groupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1beta1": resources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		gvForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: groupMeta.GroupVersion.String(),
+			Version:      groupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             groupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{gvForDiscovery},
+			PreferredVersion: gvForDiscovery,
 		}
 		allGroups = append(allGroups, group)
 	}
@@ -839,6 +871,17 @@ func (m *Master) getAppsResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
+func (m *Master) getAuthorizationResources(c *Config) map[string]rest.Storage {
+	version := authorizationapiv1beta1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("subjectaccessreviews")) {
+		storage["subjectaccessreviews"] = subjectaccessreview.NewREST(c.Authorizer)
+	}
+
+	return storage
+}
+
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
 func findExternalAddress(node *api.Node) (string, error) {
 	var fallback string
@@ -891,7 +934,7 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, authorizationapiv1beta1.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(
