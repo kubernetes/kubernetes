@@ -181,12 +181,12 @@
     suffix:
         - 'gce-serial':
             description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GCE using the latest successful build.'
-            timeout: 300
+            timeout: 600
             emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
             test-owner: 'ihmccreery'
         - 'gke-serial':
             description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GKE using the latest successful build.'
-            timeout: 300
+            timeout: 600
             emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
             test-owner: 'ihmccreery'
         - 'gke-ingress':
