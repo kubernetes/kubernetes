@@ -33,6 +33,7 @@ import (
 // REST implements a RESTStorage for ThirdPartyResourceDatas against etcd
 type REST struct {
 	*etcdgeneric.Etcd
+	kind string
 }
 
 // NewREST returns a registry which will store ThirdPartyResourceData in the given helper
@@ -64,5 +65,13 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, gro
 		Storage: storageInterface,
 	}
 
-	return &REST{store}
+	return &REST{
+		Etcd: store,
+		kind: kind,
+	}
+}
+
+// Implements the rest.KindProvider interface
+func (r *REST) Kind() string {
+	return r.kind
 }
