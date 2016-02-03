@@ -553,6 +553,7 @@ case ${JOB_NAME} in
     NODE_DISK_SIZE="50GB"
     NUM_NODES="1000"
     ALLOWED_NOTREADY_NODES="2"
+    EXIT_ON_WEAK_ERROR="false"
     # Reduce logs verbosity
     TEST_CLUSTER_LOG_LEVEL="--v=1"
     # Increase resync period to simulate production
@@ -953,6 +954,7 @@ export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
 export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
 export FAIL_ON_GCP_RESOURCE_LEAK="${FAIL_ON_GCP_RESOURCE_LEAK:-false}"
 export ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-}
+export EXIT_ON_WEAK_ERROR=${EXIT_ON_WEAK_ERROR:-}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
