@@ -33,6 +33,7 @@ rootdir = os.path.abspath(rootdir)
 
 def get_refs():
     refs = {}
+
     for path in glob.glob(os.path.join(rootdir, "hack/boilerplate/boilerplate.*.txt")):
         extension = os.path.basename(path).split(".")[1]
 
@@ -52,8 +53,12 @@ def file_passes(filename, refs, regexs):
     data = f.read()
     f.close()
 
+    basename = os.path.basename(filename)
     extension = file_extension(filename)
-    ref = refs[extension]
+    if extension != "":
+        ref = refs[extension]
+    else:
+        ref = refs[basename]
 
     # remove build tags from the top of Go files
     if extension == "go":
@@ -128,8 +133,9 @@ def get_files(extensions):
     files = normalize_files(files)
     outfiles = []
     for pathname in files:
+        basename = os.path.basename(pathname)
         extension = file_extension(pathname)
-        if extension in extensions:
+        if extension in extensions or basename in extensions:
             outfiles.append(pathname)
     return outfiles
 
