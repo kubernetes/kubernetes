@@ -11,6 +11,9 @@ import (
 
 const (
 	CudaName string = "cuda"
+
+	labelCUDAVersion   = "com.nvidia.cuda.version"
+	labelVolumesNeeded = "com.nvidia.volumes.needed"
 )
 
 type Cuda struct {
