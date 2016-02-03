@@ -24,6 +24,7 @@ import (
 	"net/http/pprof"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -301,6 +302,10 @@ type GenericAPIServer struct {
 	ProxyTransport http.RoundTripper
 
 	KubernetesServiceNodePort int
+
+	// Map storing information about all groups to be exposed in discovery response.
+	// The map is from name to the group.
+	apiGroupsForDiscovery map[string]unversioned.APIGroup
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -415,6 +420,7 @@ func New(c *Config) *GenericAPIServer {
 		ExtraEndpointPorts:   c.ExtraEndpointPorts,
 
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
+		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
 	}
 
 	var handlerContainer *restful.Container
@@ -543,6 +549,8 @@ func (s *GenericAPIServer) init(c *Config) {
 	} else {
 		s.InsecureHandler = handler
 	}
+
+	s.installGroupsDiscoveryHandler()
 }
 
 // Exposes the given group versions in API.
@@ -553,6 +561,25 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 		}
 	}
 	return nil
+}
+
+// Installs handler at /apis to list all group versions for discovery
+func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
+	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.APIGroupPrefix, func() []unversioned.APIGroup {
+		// Return the list of supported groups in sorted order (to have a deterministic order).
+		groups := []unversioned.APIGroup{}
+		groupNames := make([]string, len(s.apiGroupsForDiscovery))
+		var i int = 0
+		for groupName := range s.apiGroupsForDiscovery {
+			groupNames[i] = groupName
+			i++
+		}
+		sort.Strings(groupNames)
+		for _, groupName := range groupNames {
+			groups = append(groups, s.apiGroupsForDiscovery[groupName])
+		}
+		return groups
+	})
 }
 
 func (s *GenericAPIServer) Run(options *ServerRunOptions) {
@@ -692,10 +719,19 @@ func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			Versions:         apiVersionsForDiscovery,
 			PreferredVersion: preferedVersionForDiscovery,
 		}
+		s.AddAPIGroupForDiscovery(apiGroup)
 		apiserver.AddGroupWebService(s.Serializer, s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
 	}
 	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
 	return nil
+}
+
+func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup unversioned.APIGroup) {
+	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
+}
+
+func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
+	delete(s.apiGroupsForDiscovery, groupName)
 }
 
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {

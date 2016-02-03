@@ -37,6 +37,10 @@ func makeThirdPartyPath(group string) string {
 	return thirdpartyprefix + "/" + group
 }
 
+func getThirdPartyGroupName(path string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(path, thirdpartyprefix), "/")
+}
+
 // resourceInterface is the interface for the parts of the master that know how to add/remove
 // third party resources.  Extracted into an interface for injection for testing.
 type resourceInterface interface {
