@@ -17,6 +17,7 @@ limitations under the License.
 package generators
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -202,6 +203,16 @@ func (g *genDeepCopy) Imports(c *generator.Context) (imports []string) {
 	return importLines
 }
 
+func argsFromType(t *types.Type) interface{} {
+	return map[string]interface{}{
+		"type": t,
+	}
+}
+
+func (g *genDeepCopy) funcNameTmpl(t *types.Type) string {
+	return "DeepCopy_$.type|public$"
+}
+
 func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
@@ -211,7 +222,7 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 		sw.Do("if err := api.Scheme.AddGeneratedDeepCopyFuncs(\n", nil)
 	}
 	for _, t := range g.typesForInit {
-		sw.Do("deepCopy_$.|public$,\n", t)
+		sw.Do(fmt.Sprintf("%s,\n", g.funcNameTmpl(t)), argsFromType(t))
 	}
 	sw.Do("); err != nil {\n", nil)
 	sw.Do("// if one of the deep copy functions is malformed, detect it immediately.\n", nil)
@@ -224,7 +235,8 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 // GenerateType makes the body of a file implementing a set for type t.
 func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("func deepCopy_$.|public$(in $.|raw$, out *$.|raw$, c *conversion.Cloner) error {\n", t)
+	funcName := g.funcNameTmpl(t)
+	sw.Do(fmt.Sprintf("func %s(in $.type|raw$, out *$.type|raw$, c *conversion.Cloner) error {\n", funcName), argsFromType(t))
 	g.generateFor(t, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
@@ -270,7 +282,8 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		} else {
 			if g.copyableWithinPackage(t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
-				sw.Do("if err := deepCopy_$.|public$(val, newVal, c); err != nil {\n", t.Elem)
+				funcName := g.funcNameTmpl(t.Elem)
+				sw.Do(fmt.Sprintf("if err := %s(val, newVal, c); err != nil {\n", funcName), argsFromType(t.Elem))
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
@@ -298,7 +311,8 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = in[i]\n", nil)
 		} else if g.copyableWithinPackage(t.Elem) {
-			sw.Do("if err := deepCopy_$.|public$(in[i], &(*out)[i], c); err != nil {\n", t.Elem)
+			funcName := g.funcNameTmpl(t.Elem)
+			sw.Do(fmt.Sprintf("if err := %s(in[i], &(*out)[i], c); err != nil {\n", funcName), argsFromType(t.Elem))
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		} else {
@@ -330,7 +344,8 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("}\n", nil)
 		case types.Struct:
 			if g.copyableWithinPackage(m.Type) {
-				sw.Do("if err := deepCopy_$.type|public$(in.$.name$, &out.$.name$, c); err != nil {\n", args)
+				funcName := g.funcNameTmpl(m.Type)
+				sw.Do(fmt.Sprintf("if err := %s(in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 			} else {
@@ -364,7 +379,8 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	if t.Elem.Kind == types.Builtin {
 		sw.Do("**out = *in", nil)
 	} else if g.copyableWithinPackage(t.Elem) {
-		sw.Do("if err := deepCopy_$.|public$(*in, *out, c); err != nil {\n", t.Elem)
+		funcName := g.funcNameTmpl(t.Elem)
+		sw.Do(fmt.Sprintf("if err := %s(*in, *out, c); err != nil {\n", funcName), argsFromType(t.Elem))
 		sw.Do("return err\n", nil)
 		sw.Do("}\n", nil)
 	} else {
