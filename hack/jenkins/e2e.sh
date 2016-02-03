@@ -533,6 +533,7 @@ case ${JOB_NAME} in
 
   # Runs the performance/scalability test on huge 1000-node cluster on GCE.
   # Flannel is used as network provider.
+  # Allows a couple of nodes to be NotReady during startup
   kubernetes-e2e-gce-enormous-cluster)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-enormous-cluster"}
     : ${E2E_NETWORK:="e2e-enormous-cluster"}
@@ -540,6 +541,32 @@ case ${JOB_NAME} in
     # Once this is stable, run the whole [Performance] suite.
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=starting\s30\spods\sper\snode"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-enormous-cluster"}
+    : ${PROJECT:="kubernetes-scale"}
+    # Override GCE defaults.
+    NETWORK_PROVIDER="flannel"
+    # Temporarily switch of Heapster, as this will not schedule anywhere.
+    # TODO: Think of a solution to enable it.
+    ENABLE_CLUSTER_MONITORING="none"
+    E2E_ZONE="asia-east1-a"
+    MASTER_SIZE="n1-standard-32"
+    NODE_SIZE="n1-standard-1"
+    NODE_DISK_SIZE="50GB"
+    NUM_NODES="1000"
+    ALLOWED_NOTREADY_NODES="2"
+    # Reduce logs verbosity
+    TEST_CLUSTER_LOG_LEVEL="--v=1"
+    # Increase resync period to simulate production
+    TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+    ;;
+
+  # Starts and tears down 1000-node cluster on GCE using flannel networking
+  # Requires all 1000 nodes to come up.
+  kubernetes-e2e-gce-enormous-startup)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-enormous-startup"}
+    # TODO: increase a quota for networks in kubernetes-scale and move this test to its own network
+    : ${E2E_NETWORK:="e2e-enormous-cluster"}
+    : ${E2E_TEST:="false"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-enormous-startup"}
     : ${PROJECT:="kubernetes-scale"}
     # Override GCE defaults.
     NETWORK_PROVIDER="flannel"
@@ -925,6 +952,7 @@ export KUBE_GCE_NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-}
 export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
 export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
 export FAIL_ON_GCP_RESOURCE_LEAK="${FAIL_ON_GCP_RESOURCE_LEAK:-false}"
+export ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
