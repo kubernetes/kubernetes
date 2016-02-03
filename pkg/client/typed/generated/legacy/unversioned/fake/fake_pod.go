@@ -67,7 +67,7 @@ func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakePods) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("pods", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PodList{})
 	return err

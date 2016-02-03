@@ -57,7 +57,7 @@ func (c *FakeLimitRanges) Delete(name string, options *api.DeleteOptions) error 
 }
 
 func (c *FakeLimitRanges) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("limitranges", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.LimitRangeList{})
 	return err

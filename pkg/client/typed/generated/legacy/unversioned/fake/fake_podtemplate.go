@@ -57,7 +57,7 @@ func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error
 }
 
 func (c *FakePodTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("podtemplates", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PodTemplateList{})
 	return err

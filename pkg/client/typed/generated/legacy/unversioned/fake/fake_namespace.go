@@ -62,7 +62,7 @@ func (c *FakeNamespaces) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("events", listOptions)
+	action := core.NewRootDeleteCollectionAction("namespaces", listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.NamespaceList{})
 	return err
