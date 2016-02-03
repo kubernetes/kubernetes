@@ -60,9 +60,8 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients   *ClientCache
-	clientset clientset.Clientset
-	flags     *pflag.FlagSet
+	clients *ClientCache
+	flags   *pflag.FlagSet
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -179,12 +178,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
-	clientset := clientset.NewForConfigOrDie(clientConfig)
+	var clientsetPtr *clientset.Clientset
 
 	return &Factory{
-		clients:   clients,
-		clientset: clientset,
-		flags:     flags,
+		clients: clients,
+		flags:   flags,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -217,9 +215,18 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
-			copyClientset := clientset
+			if clientsetPtr == nil {
+				config, err := clients.ClientConfigForVersion(nil)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get config: %v", err)
+				}
+				clientsetPtr, err = clientset.NewForConfig(config)
+				if err != nil {
+					return nil, fmt.Errorf("failed to initialize a clientset: %v", err)
+				}
+			}
+			// TODO: we need a clientset cache
+			copyClientset := *clientsetPtr
 			// TODO: we should add a Group("groupName") function to clientset
 			serializer, ok := api.Codecs.SerializerForFileExtension("json")
 			if !ok {
@@ -229,14 +236,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch mapping.GroupVersionKind.Group {
 			case api.GroupName:
 				// TODO: we need to add a method to typed group client to tell us what version it supports in default
-				copyClientset.LegacyClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, gv, unversioned.GroupVersion{api.GroupName, runtime.APIVersionInternal}))
+				copyClientset.LegacyClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, []unversioned.GroupVersion{{api.GroupName, runtime.APIVersionInternal}}))
 				copyClientset.LegacyClient.RESTClient.ChangeTargetVersion(mapping.GroupVersionKind.GroupVersion())
 			case extensions.GroupName:
-				copyClientset.ExtensionsClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, gv, unversioned.GroupVersion{extensions.GroupName, runtime.APIVersionInternal}))
+				copyClientset.ExtensionsClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, []unversioned.GroupVersion{{extensions.GroupName, runtime.APIVersionInternal}}))
 				copyClientset.ExtensionsClient.RESTClient.ChangeTargetVersion(mapping.GroupVersionKind.GroupVersion())
 			}
 
-			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), copyClientset); ok {
+			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), &copyClientset); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
