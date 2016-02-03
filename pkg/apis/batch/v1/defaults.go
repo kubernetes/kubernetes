@@ -18,93 +18,10 @@ package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
-		func(obj *APIVersion) {
-			if len(obj.APIGroup) == 0 {
-				obj.APIGroup = GroupName
-			}
-		},
-		func(obj *DaemonSet) {
-			labels := obj.Spec.Template.Labels
-
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			updateStrategy := &obj.Spec.UpdateStrategy
-			if updateStrategy.Type == "" {
-				updateStrategy.Type = RollingUpdateDaemonSetStrategyType
-			}
-			if updateStrategy.Type == RollingUpdateDaemonSetStrategyType {
-				if updateStrategy.RollingUpdate == nil {
-					rollingUpdate := RollingUpdateDaemonSet{}
-					updateStrategy.RollingUpdate = &rollingUpdate
-				}
-				if updateStrategy.RollingUpdate.MaxUnavailable == nil {
-					// Set default MaxUnavailable as 1 by default.
-					maxUnavailable := intstr.FromInt(1)
-					updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-				}
-			}
-			if obj.Spec.UniqueLabelKey == nil {
-				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = DefaultDaemonSetUniqueLabelKey
-			}
-		},
-		func(obj *Deployment) {
-			// Default labels and selector to labels from pod template spec.
-			labels := obj.Spec.Template.Labels
-
-			if labels != nil {
-				if len(obj.Spec.Selector) == 0 {
-					obj.Spec.Selector = labels
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			// Set DeploymentSpec.Replicas to 1 if it is not set.
-			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int32)
-				*obj.Spec.Replicas = 1
-			}
-			strategy := &obj.Spec.Strategy
-			// Set default DeploymentStrategyType as RollingUpdate.
-			if strategy.Type == "" {
-				strategy.Type = RollingUpdateDeploymentStrategyType
-			}
-			if strategy.Type == RollingUpdateDeploymentStrategyType {
-				if strategy.RollingUpdate == nil {
-					rollingUpdate := RollingUpdateDeployment{}
-					strategy.RollingUpdate = &rollingUpdate
-				}
-				if strategy.RollingUpdate.MaxUnavailable == nil {
-					// Set default MaxUnavailable as 1 by default.
-					maxUnavailable := intstr.FromInt(1)
-					strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-				}
-				if strategy.RollingUpdate.MaxSurge == nil {
-					// Set default MaxSurge as 1 by default.
-					maxSurge := intstr.FromInt(1)
-					strategy.RollingUpdate.MaxSurge = &maxSurge
-				}
-			}
-			if obj.Spec.UniqueLabelKey == nil {
-				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = DefaultDeploymentUniqueLabelKey
-			}
-		},
 		func(obj *Job) {
 			labels := obj.Spec.Template.Labels
 			// TODO: support templates defined elsewhere when we support them in the API
@@ -129,36 +46,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			if obj.Spec.Parallelism == nil {
 				obj.Spec.Parallelism = new(int32)
 				*obj.Spec.Parallelism = 1
-			}
-		},
-		func(obj *HorizontalPodAutoscaler) {
-			if obj.Spec.MinReplicas == nil {
-				minReplicas := int32(1)
-				obj.Spec.MinReplicas = &minReplicas
-			}
-			if obj.Spec.CPUUtilization == nil {
-				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
-			}
-		},
-		func(obj *ReplicaSet) {
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int32)
-				*obj.Spec.Replicas = 1
 			}
 		},
 	)
