@@ -450,7 +450,7 @@ func NewMainKubelet(
 	klet.podWorkers = newPodWorkers(klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
-	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
+	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
 	return klet, nil
 }
@@ -632,7 +632,7 @@ type Kubelet struct {
 	backOff *util.Backoff
 
 	// Channel for sending pods to kill.
-	podKillingCh chan *kubecontainer.Pod
+	podKillingCh chan *kubecontainer.PodPair
 
 	// The configuration file used as the base to generate the container's
 	// DNS resolver configuration file. This can be used in conjunction with
@@ -1961,13 +1961,16 @@ func (kl *Kubelet) removeOrphanedPodStatuses(pods []*api.Pod, mirrorPods []*api.
 	kl.statusManager.RemoveOrphanedStatuses(podUIDs)
 }
 
-func (kl *Kubelet) deletePod(uid types.UID) error {
+func (kl *Kubelet) deletePod(pod *api.Pod) error {
+	if pod == nil {
+		return fmt.Errorf("deletePod does not allow nil pod")
+	}
 	if !kl.allSourcesReady() {
 		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
 		// for sources that haven't reported yet.
 		return fmt.Errorf("skipping delete because sources aren't ready yet")
 	}
-	kl.podWorkers.ForgetWorker(uid)
+	kl.podWorkers.ForgetWorker(pod.UID)
 
 	// Runtime cache may not have been updated to with the pod, but it's okay
 	// because the periodic cleanup routine will attempt to delete again later.
@@ -1975,12 +1978,13 @@ func (kl *Kubelet) deletePod(uid types.UID) error {
 	if err != nil {
 		return fmt.Errorf("error listing containers: %v", err)
 	}
-	pod := kubecontainer.Pods(runningPods).FindPod("", uid)
-	if pod.IsEmpty() {
+	runningPod := kubecontainer.Pods(runningPods).FindPod("", pod.UID)
+	if runningPod.IsEmpty() {
 		return fmt.Errorf("pod not found")
 	}
+	podPair := kubecontainer.PodPair{pod, &runningPod}
 
-	kl.podKillingCh <- &pod
+	kl.podKillingCh <- &podPair
 	// TODO: delete the mirror pod here?
 
 	// We leave the volume/directory cleanup to the periodic cleanup routine.
@@ -2023,7 +2027,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	}
 	for _, pod := range runningPods {
 		if _, found := desiredPods[pod.ID]; !found {
-			kl.podKillingCh <- pod
+			kl.podKillingCh <- &kubecontainer.PodPair{nil, pod}
 		}
 	}
 
@@ -2082,25 +2086,27 @@ func (kl *Kubelet) podKiller() {
 	defer close(resultCh)
 	for {
 		select {
-		case pod, ok := <-kl.podKillingCh:
+		case podPair, ok := <-kl.podKillingCh:
+			runningPod := podPair.RunningPod
+			apiPod := podPair.APIPod
 			if !ok {
 				return
 			}
-			if killing.Has(string(pod.ID)) {
+			if killing.Has(string(runningPod.ID)) {
 				// The pod is already being killed.
 				break
 			}
-			killing.Insert(string(pod.ID))
-			go func(pod *kubecontainer.Pod, ch chan types.UID) {
+			killing.Insert(string(runningPod.ID))
+			go func(apiPod *api.Pod, runningPod *kubecontainer.Pod, ch chan types.UID) {
 				defer func() {
-					ch <- pod.ID
+					ch <- runningPod.ID
 				}()
-				glog.V(2).Infof("Killing unwanted pod %q", pod.Name)
-				err := kl.killPod(nil, pod, nil)
+				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
+				err := kl.killPod(apiPod, runningPod, nil)
 				if err != nil {
-					glog.Errorf("Failed killing the pod %q: %v", pod.Name, err)
+					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
 				}
-			}(pod, resultCh)
+			}(apiPod, runningPod, resultCh)
 
 		case podID := <-resultCh:
 			killing.Delete(string(podID))
@@ -2388,7 +2394,7 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 		}
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
-		if err := kl.deletePod(pod.UID); err != nil {
+		if err := kl.deletePod(pod); err != nil {
 			glog.V(2).Infof("Failed to delete pod %q, err: %v", format.Pod(pod), err)
 		}
 		kl.probeManager.RemovePod(pod)

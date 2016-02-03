@@ -141,6 +141,14 @@ type Pod struct {
 	Containers []*Container
 }
 
+// PodPair contains both runtime#Pod and api#Pod
+type PodPair struct {
+	// APIPod is the api.Pod
+	APIPod *api.Pod
+	// RunningPod is the pod defined defined in pkg/kubelet/container/runtime#Pod
+	RunningPod *Pod
+}
+
 // ContainerID is a type that identifies a container.
 type ContainerID struct {
 	// The type of the container runtime. e.g. 'docker', 'rkt'.
