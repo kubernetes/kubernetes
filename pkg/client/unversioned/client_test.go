@@ -137,17 +137,17 @@ func TestGetServerResources(t *testing.T) {
 	stable := unversioned.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []unversioned.APIResource{
-			{"pods", true},
-			{"services", true},
-			{"namespaces", false},
+			{"pods", true, "Pod"},
+			{"services", true, "Service"},
+			{"namespaces", false, "Namespace"},
 		},
 	}
 	beta := unversioned.APIResourceList{
 		GroupVersion: "extensions/v1",
 		APIResources: []unversioned.APIResource{
-			{"deployments", true},
-			{"ingresses", true},
-			{"jobs", true},
+			{"deployments", true, "Deployment"},
+			{"ingresses", true, "Ingress"},
+			{"jobs", true, "Job"},
 		},
 	}
 	tests := []struct {

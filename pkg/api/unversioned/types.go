@@ -339,6 +339,8 @@ type APIResource struct {
 	Name string `json:"name"`
 	// namespaced indicates if a resource is namespaced or not.
 	Namespaced bool `json:"namespaced"`
+	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
+	Kind string `json:"kind"`
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the

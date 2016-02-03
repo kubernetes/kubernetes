@@ -51,6 +51,7 @@ var map_APIResource = map[string]string{
 	"":           "APIResource specifies the name of a resource and whether it is namespaced.",
 	"name":       "name is the name of the resource.",
 	"namespaced": "namespaced indicates if a resource is namespaced or not.",
+	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
