@@ -17,6 +17,12 @@
 # Utility function for kubernetes docker setup
 # Author @loopingz
 
+K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.6"}
+ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
+FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
+ARCH=${ARCH:-"amd64"}
+
 bootstrap_daemon() {
     RUNNING=`ps -efa|grep docker-bootstrap.sock|wc -l`
     if [ "$RUNNING" -gt "1" ]; then
@@ -73,22 +79,10 @@ check_params() {
       echo "Docker is not running on this machine!"
       exit 1
     fi
-    # Make sure k8s version env is properly set
-    if [ -z ${K8S_VERSION} ]; then
-      K8S_VERSION="1.0.7"
-      echo "K8S_VERSION is not set, using default: ${K8S_VERSION}"
-    else
-      echo "k8s version is set to: ${K8S_VERSION}"
-    fi
     # Run as root
     if [ "$(id -u)" != "0" ]; then
       echo >&2 "Please run as root"
       exit 1
-    fi
-    # Make default eth0
-    if [ -z ${FLANNEL_IF} ]; then
-      echo "Using eth0 as default"
-      FLANNEL_IF="eth0"
     fi
     # Get current ip
     CURRENT_IP=`ifconfig $FLANNEL_IF | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'`
@@ -99,9 +93,13 @@ check_params() {
     if [ -z ${MASTER_IP} ]; then
         echo "Please export MASTER_IP in your env"
         exit 1
-    else
-        echo "k8s master is set to: ${MASTER_IP}"
     fi
+    echo "K8S_VERSION is set to: ${K8S_VERSION}"
+    echo "ETCD_VERSION is set to: ${ETCD_VERSION}"
+    echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
+    echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
+    echo "MASTER_IP is set to: ${MASTER_IP}"
+    echo "ARCH is set to: ${ARCH}"
 }
 
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
@@ -161,7 +159,7 @@ etcd_master() {
       --net=host \
       --name=etcd \
       -d \
-      gcr.io/google_containers/etcd:2.2.1 \
+      gcr.io/google_containers/etcd:${ETCD_VERSION} \
       /usr/local/bin/etcd \
       --listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001 \
       --advertise-client-urls=http://${MASTER_IP}:2379,http://${MASTER_IP}:4001 \
@@ -175,7 +173,7 @@ etcd_master() {
       sleep 5
       # Set flannel net config
       docker -H unix:///var/run/docker-bootstrap.sock run \
-      --net=host gcr.io/google_containers/etcd:2.2.1 \
+      --net=host gcr.io/google_containers/etcd:${ETCD_VERSION} \
       etcdctl \
       set /coreos.com/network/config \
       '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
@@ -192,7 +190,7 @@ etcd_join() {
   echo " - ETCD_NAME=$ETCD_NAME"
   echo " - ETCD_INITIAL_CLUSTER=$ETCD_INITIAL_CLUSTER"
   echo " - ETCD_INITIAL_CLUSTER_STATE=$ETCD_INITIAL_CLUSTER_STATE"
-  docker-bootstrap run --restart=always --net=host --name=etcd -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd \
+  docker-bootstrap run --restart=always --net=host --name=etcd -d gcr.io/google_containers/etcd:${ETCD_VERSION} /usr/local/bin/etcd \
            --listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001 \
            --advertise-client-urls=http://$CURRENT_IP:2379,http://$CURRENT_IP:4001 \
            --data-dir=/var/etcd/data \
@@ -215,10 +213,10 @@ flannel() {
       --name=flannel \
       --privileged \
       -v /dev/net:/dev/net \
-      quay.io/coreos/flannel:0.5.5 \
+      quay.io/coreos/flannel:${FLANNEL_VERSION} \
       /opt/bin/flanneld \
       --ip-masq \
-      -iface="$FLANNEL_IF")
+      -iface="${FLANNEL_IF}")
 
       sleep 8
       # Copy flannel env out and source it on the host
@@ -291,7 +289,7 @@ k8s_worker() {
           -v /dev:/dev \
           -v /var/lib/docker/:/var/lib/docker:rw \
           -v /var/lib/kubelet/:/var/lib/kubelet:rw \
-          gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+          gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
           /hyperkube kubelet \
           --v=2 --address=0.0.0.0 --enable-server \
           --config=/etc/kubernetes/manifests-multi \
@@ -319,7 +317,7 @@ k8s_master() {
           -v /dev:/dev \
           -v /var/lib/docker/:/var/lib/docker:rw \
           -v /var/lib/kubelet/:/var/lib/kubelet:rw \
-          gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+          gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
           /hyperkube kubelet \
           --v=2 --address=0.0.0.0 --enable-server \
           --config=/etc/kubernetes/manifests-multi \
@@ -340,6 +338,6 @@ k8s_proxy() {
         --net=host \
         --name=k8s-proxy \
         --privileged \
-        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
         /hyperkube proxy --master=http://$MASTER_IP:8080 --v=2  
 }
