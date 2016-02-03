@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/admission"

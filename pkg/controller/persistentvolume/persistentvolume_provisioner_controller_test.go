@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
