@@ -387,13 +387,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validSelector2 := map[string]string{"c": "d"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 
-	validUpdateStrategy := extensions.DaemonSetUpdateStrategy{
-		Type: extensions.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &extensions.RollingUpdateDaemonSet{
-			MaxUnavailable: intstr.FromInt(1),
-		},
-	}
-
 	validPodSpecAbc := api.PodSpec{
 		RestartPolicy: api.RestartPolicyAlways,
 		DNSPolicy:     api.DNSClusterFirst,
@@ -479,17 +472,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 		},
@@ -497,17 +488,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector2},
-					Template:       validPodTemplateAbc2.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector2},
+					Template: validPodTemplateAbc2.Template,
 				},
 			},
 		},
@@ -515,17 +504,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateNodeSelector.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateNodeSelector.Template,
 				},
 			},
 		},
@@ -542,17 +529,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 		},
@@ -560,81 +545,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: invalidSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"invalid pod": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       invalidPodTemplate.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"change container image": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateDef.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"read-write volume": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       readWriteVolumePodTemplate.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"invalid update strategy": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -642,10 +554,70 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &unversioned.LabelSelector{MatchLabels: invalidSelector},
 					Template: validPodTemplateAbc.Template,
-					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-						Type:          extensions.RollingUpdateDaemonSetStrategyType,
-						RollingUpdate: nil,
-					},
+				},
+			},
+		},
+		"invalid pod": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: invalidPodTemplate.Template,
+				},
+			},
+		},
+		"change container image": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateDef.Template,
+				},
+			},
+		},
+		"read-write volume": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: readWriteVolumePodTemplate.Template,
+				},
+			},
+		},
+		"invalid update strategy": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: invalidSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 		},
@@ -659,12 +631,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 
 func TestValidateDaemonSet(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
-	validUpdateStrategy := extensions.DaemonSetUpdateStrategy{
-		Type: extensions.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &extensions.RollingUpdateDaemonSet{
-			MaxUnavailable: intstr.FromInt(1),
-		},
-	}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
@@ -693,17 +659,15 @@ func TestValidateDaemonSet(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template:       validPodTemplate.Template,
-				UpdateStrategy: validUpdateStrategy,
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+				Template: validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template:       validPodTemplate.Template,
-				UpdateStrategy: validUpdateStrategy,
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+				Template: validPodTemplate.Template,
 			},
 		},
 	}
@@ -819,104 +783,6 @@ func TestValidateDaemonSet(t *testing.T) {
 					},
 					ObjectMeta: api.ObjectMeta{
 						Labels: validSelector,
-					},
-				},
-			},
-		},
-		"invalid update strategy - Type is not RollingUpdate": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: "",
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable: intstr.FromInt(1),
-					},
-				},
-			},
-		},
-		"invalid update strategy - RollingUpdate field is nil": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type:          extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: nil,
-				},
-			},
-		},
-		"invalid update strategy - MaxUnavailable is 0": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromInt(0),
-						MinReadySeconds: 1,
-					},
-				},
-			},
-		},
-		"invalid update strategy - MaxUnavailable is greater than 100%": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromString("150%"),
-						MinReadySeconds: 1,
-					},
-				},
-			},
-		},
-		"invalid update strategy - MaxUnavailable is negative": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromInt(-1),
-						MinReadySeconds: 0,
-					},
-				},
-			},
-		},
-		"invalid update strategy - MinReadySeconds is negative": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromInt(-1),
-						MinReadySeconds: -1,
 					},
 				},
 			},
