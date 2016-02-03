@@ -291,6 +291,8 @@ type KubeletConfiguration struct {
 }
 
 type KubeSchedulerConfiguration struct {
+	unversioned.TypeMeta
+
 	// port is the port that the scheduler's http service runs on.
 	Port int `json:"port"`
 	// address is the IP address to serve on.
