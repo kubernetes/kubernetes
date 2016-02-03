@@ -303,6 +303,30 @@ GCE_PARALLEL_SKIP_TESTS=(
 # release branches defines relevant jobs for that particular version of
 # Kubernetes.
 case ${JOB_NAME} in
+
+  # PR builder
+
+  # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
+  kubernetes-pull-build-test-e2e-gce)
+    : ${E2E_CLUSTER_NAME:="jnks-e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
+    : ${E2E_NETWORK:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
+    : ${GINKGO_PARALLEL:="y"}
+    # This list should match the list in kubernetes-e2e-gce-parallel.
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
+    : ${PROJECT:="kubernetes-jenkins-pull"}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    # Override GCE defaults
+    NUM_NODES=${NUM_NODES_PARALLEL}
+    ;;
+
+  # GCE core jobs
+
   # Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.
   kubernetes-e2e-gce)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
@@ -316,6 +340,113 @@ case ${JOB_NAME} in
     : ${ENABLE_DEPLOYMENTS:=true}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
+
+  # Runs slow tests on GCE, sequentially.
+  kubernetes-e2e-gce-slow)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
+    : ${E2E_NETWORK:="e2e-slow"}
+    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_PARALLEL:="y"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-slow"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    ;;
+
+  # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GCE.
+  kubernetes-e2e-gce-serial)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-serial"}
+    : ${E2E_NETWORK:="jenkins-gce-e2e-serial"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                           --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-serial"}
+    : ${PROJECT:="kubernetes-jkns-e2e-gce-serial"}
+    ;;
+
+  # Runs the flaky tests on GCE, sequentially.
+  kubernetes-e2e-gce-flaky)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
+    : ${E2E_NETWORK:="e2e-flaky"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ) --ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${E2E_DOWN:="true"}
+    ;;
+
+  # Runs the flaky tests on GCE in parallel.
+  kubernetes-e2e-gce-parallel-flaky)
+    : ${E2E_CLUSTER_NAME:="parallel-flaky"}
+    : ${E2E_NETWORK:="e2e-parallel-flaky"}
+    : ${GINKGO_PARALLEL:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ) --ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    # Override GCE defaults.
+    NUM_NODES=${NUM_NODES_PARALLEL}
+    ;;
+
+  # GKE core jobs
+
+  # Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel.
+  kubernetes-e2e-gke)
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
+    : ${E2E_NETWORK:="e2e-gke-ci"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_PARALLEL:="y"}
+    ;;
+
+  kubernetes-e2e-gke-slow)
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-slow"}
+    : ${E2E_NETWORK:="e2e-gke-slow"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_PARALLEL:="y"}
+    ;;
+
+  # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GKE.
+  kubernetes-e2e-gke-serial)
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-serial"}
+    : ${E2E_NETWORK:="jenkins-gke-e2e-serial"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                           --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"}
+    : ${PROJECT:="jenkins-gke-e2e-serial"}
+    ;;
+
+  kubernetes-e2e-gke-flaky)
+    : ${E2E_CLUSTER_NAME:="kubernetes-gke-e2e-flaky"}
+    : ${E2E_NETWORK:="gke-e2e-flaky"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    ;;
+
+  # AWS core jobs
 
   # Runs all non-flaky, non-slow tests on AWS, sequentially.
   kubernetes-e2e-aws)
@@ -339,6 +470,23 @@ case ${JOB_NAME} in
     : ${AWS_SHARED_CREDENTIALS_FILE:='/var/lib/jenkins/.aws/credentials'}
     ;;
 
+  # Runs all non-flaky tests on AWS in parallel.
+  kubernetes-e2e-aws-parallel)
+    : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e-parallel"}
+    : ${E2E_NETWORK:="e2e-parallel"}
+    : ${GINKGO_PARALLEL:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    # Override AWS defaults.
+    NUM_NODES=${NUM_NODES_PARALLEL}
+    ;;
+
+  # Feature jobs
+
   # Runs only the examples tests on GCE.
   kubernetes-e2e-gce-examples)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
@@ -359,108 +507,6 @@ case ${JOB_NAME} in
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${ENABLE_DEPLOYMENTS:=true}
     ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
-    ;;
-
-  # Runs the flaky tests on GCE, sequentially.
-  kubernetes-e2e-gce-flaky)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
-    : ${E2E_NETWORK:="e2e-flaky"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ) --ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
-    : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${E2E_DOWN:="true"}
-    ;;
-
-  # Runs slow tests on GCE, sequentially.
-  kubernetes-e2e-gce-slow)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
-    : ${E2E_NETWORK:="e2e-slow"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
-    : ${GINKGO_PARALLEL:="y"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-slow"}
-    : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    ;;
-
-  # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
-  kubernetes-pull-build-test-e2e-gce)
-    : ${E2E_CLUSTER_NAME:="jnks-e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
-    : ${E2E_NETWORK:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
-    : ${GINKGO_PARALLEL:="y"}
-    # This list should match the list in kubernetes-e2e-gce-parallel.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
-    : ${PROJECT:="kubernetes-jenkins-pull"}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    # Override GCE defaults
-    NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
-  # Runs all non-flaky tests on AWS in parallel.
-  kubernetes-e2e-aws-parallel)
-    : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e-parallel"}
-    : ${E2E_NETWORK:="e2e-parallel"}
-    : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    # Override AWS defaults.
-    NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
-  # Runs the flaky tests on GCE in parallel.
-  kubernetes-e2e-gce-parallel-flaky)
-    : ${E2E_CLUSTER_NAME:="parallel-flaky"}
-    : ${E2E_NETWORK:="e2e-parallel-flaky"}
-    : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ) --ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
-    : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # Override GCE defaults.
-    NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
-  # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GCE.
-  kubernetes-e2e-gce-serial)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-serial"}
-    : ${E2E_NETWORK:="jenkins-gce-e2e-serial"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
-                           --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-serial"}
-    : ${PROJECT:="kubernetes-jkns-e2e-gce-serial"}
-    ;;
-
-  # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GKE.
-  kubernetes-e2e-gke-serial)
-    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-serial"}
-    : ${E2E_NETWORK:="jenkins-gke-e2e-serial"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
-                           --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"}
-    : ${PROJECT:="jenkins-gke-e2e-serial"}
     ;;
 
   # Runs the performance/scalability tests on GCE. A larger cluster is used.
@@ -530,6 +576,70 @@ case ${JOB_NAME} in
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
 
+  # Run Kubemark test on a fake 100 node cluster to have a comparison
+  # to the real results from scalability suite
+  kubernetes-kubemark-gce)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark"}
+    : ${E2E_NETWORK:="kubernetes-kubemark"}
+    : ${PROJECT:="k8s-jenkins-kubemark"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    KUBE_GCE_INSTANCE_PREFIX="kubemark100"
+    NUM_NODES="10"
+    MASTER_SIZE="n1-standard-2"
+    NODE_SIZE="n1-standard-1"
+    E2E_ZONE="asia-east1-a"
+    KUBEMARK_MASTER_SIZE="n1-standard-4"
+    KUBEMARK_NUM_NODES="100"
+    ;;
+
+  # Run Kubemark test on a fake 500 node cluster to test for regressions on
+  # bigger clusters
+  kubernetes-kubemark-500-gce)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-500"}
+    : ${E2E_NETWORK:="kubernetes-kubemark-500"}
+    : ${PROJECT:="kubernetes-scale"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    NUM_NODES="6"
+    MASTER_SIZE="n1-standard-4"
+    NODE_SIZE="n1-standard-8"
+    KUBE_GCE_INSTANCE_PREFIX="kubemark500"
+    E2E_ZONE="us-east1-b"
+    KUBEMARK_MASTER_SIZE="n1-standard-16"
+    KUBEMARK_NUM_NODES="500"
+    ;;
+
+  # Run big Kubemark test, this currently means a 1000 node cluster and 16 core master
+  kubernetes-kubemark-gce-scale)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-scale"}
+    : ${E2E_NETWORK:="kubernetes-kubemark-scale"}
+    : ${PROJECT:="kubernetes-scale"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
+    NUM_NODES="11"
+    MASTER_SIZE="n1-standard-4"
+    NODE_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
+    #                                     so NUM_NODES x cores_per_node should
+    #                                     be set accordingly.
+    KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
+    E2E_ZONE="us-east1-b"
+    KUBEMARK_MASTER_SIZE="n1-standard-16"
+    KUBEMARK_NUM_NODES="1000"
+    ;;
+
+  # Soak jobs
+
   # Sets up the GCE soak cluster weekly using the latest CI release.
   kubernetes-soak-weekly-deploy-gce)
     : ${E2E_CLUSTER_NAME:="gce-soak-weekly"}
@@ -559,41 +669,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${PROJECT:="kubernetes-jenkins"}
-    ;;
-
-  # Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel.
-  kubernetes-e2e-gke)
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
-    : ${E2E_NETWORK:="e2e-gke-ci"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
-    : ${GINKGO_PARALLEL:="y"}
-    ;;
-
-  kubernetes-e2e-gke-slow)
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-slow"}
-    : ${E2E_NETWORK:="e2e-gke-slow"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tetss are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
-    : ${GINKGO_PARALLEL:="y"}
-    ;;
-
-  kubernetes-e2e-gke-flaky)
-    : ${E2E_CLUSTER_NAME:="kubernetes-gke-e2e-flaky"}
-    : ${E2E_NETWORK:="gke-e2e-flaky"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
     ;;
 
   # Sets up the GKE soak cluster weekly using the latest CI release.
@@ -629,6 +704,8 @@ case ${JOB_NAME} in
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
           )"}
     ;;
+
+  # Upgrade jobs
 
   # kubernetes-upgrade-gke-1.0-master
   #
@@ -812,68 +889,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
-    ;;
-
-  # Run Kubemark test on a fake 100 node cluster to have a comparison
-  # to the real results from scalability suite
-  kubernetes-kubemark-gce)
-    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark"}
-    : ${E2E_NETWORK:="kubernetes-kubemark"}
-    : ${PROJECT:="k8s-jenkins-kubemark"}
-    : ${E2E_UP:="true"}
-    : ${E2E_DOWN:="true"}
-    : ${E2E_TEST:="false"}
-    : ${USE_KUBEMARK:="true"}
-    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
-    KUBE_GCE_INSTANCE_PREFIX="kubemark100"
-    NUM_NODES="10"
-    MASTER_SIZE="n1-standard-2"
-    NODE_SIZE="n1-standard-1"
-    E2E_ZONE="asia-east1-a"
-    KUBEMARK_MASTER_SIZE="n1-standard-4"
-    KUBEMARK_NUM_NODES="100"
-    ;;
-
-  # Run Kubemark test on a fake 500 node cluster to test for regressions on
-  # bigger clusters
-  kubernetes-kubemark-500-gce)
-    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-500"}
-    : ${E2E_NETWORK:="kubernetes-kubemark-500"}
-    : ${PROJECT:="kubernetes-scale"}
-    : ${E2E_UP:="true"}
-    : ${E2E_DOWN:="true"}
-    : ${E2E_TEST:="false"}
-    : ${USE_KUBEMARK:="true"}
-    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
-    NUM_NODES="6"
-    MASTER_SIZE="n1-standard-4"
-    NODE_SIZE="n1-standard-8"
-    KUBE_GCE_INSTANCE_PREFIX="kubemark500"
-    E2E_ZONE="us-east1-b"
-    KUBEMARK_MASTER_SIZE="n1-standard-16"
-    KUBEMARK_NUM_NODES="500"
-    ;;
-
-  # Run big Kubemark test, this currently means a 1000 node cluster and 16 core master
-  kubernetes-kubemark-gce-scale)
-    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-scale"}
-    : ${E2E_NETWORK:="kubernetes-kubemark-scale"}
-    : ${PROJECT:="kubernetes-scale"}
-    : ${E2E_UP:="true"}
-    : ${E2E_DOWN:="true"}
-    : ${E2E_TEST:="false"}
-    : ${USE_KUBEMARK:="true"}
-    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
-    # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
-    NUM_NODES="11"
-    MASTER_SIZE="n1-standard-4"
-    NODE_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
-    #                                     so NUM_NODES x cores_per_node should
-    #                                     be set accordingly.
-    KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
-    E2E_ZONE="us-east1-b"
-    KUBEMARK_MASTER_SIZE="n1-standard-16"
-    KUBEMARK_NUM_NODES="1000"
     ;;
 esac
 
