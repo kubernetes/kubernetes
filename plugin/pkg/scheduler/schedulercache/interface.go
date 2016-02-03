@@ -80,12 +80,6 @@ type Cache interface {
 	List(labels.Selector) []*api.Pod
 }
 
-// PodLister is a clone of algorithm.PodLister. There is important cycle issue if we use that one.
-// TODO: move algorithm.PodLister into a separate standalone package.
-type PodLister interface {
-	List(labels.Selector) ([]*api.Pod, error)
-}
-
 // CacheToPodLister make a Cache have the List method required by algorithm.PodLister
 type CacheToPodLister struct {
 	Cache Cache
