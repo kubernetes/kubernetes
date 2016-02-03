@@ -43,7 +43,9 @@ import (
 
 // Maximum time a kube-proxy daemon on a node is allowed to not
 // notice a Service update, such as type=NodePort.
-const kubeProxyLagTimeout = 45 * time.Second
+// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
+// liberal. Fix tracked in #20567.
+const kubeProxyLagTimeout = 5 * time.Minute
 
 // Maximum time a load balancer is allowed to not respond after creation.
 const loadBalancerLagTimeout = 2 * time.Minute
@@ -828,9 +830,17 @@ var _ = Describe("Services", func() {
 
 		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
-		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
-		if err != nil {
-			Failf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
+		var stdout string
+		if pollErr := wait.PollImmediate(poll, kubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			if err != nil {
+				Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			Failf("expected node port (%d) to not be in use in %v, stdout: %v", nodePort, kubeProxyLagTimeout, stdout)
 		}
 
 		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
