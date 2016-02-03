@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -255,9 +256,9 @@ func Run(s *options.APIServer) error {
 		clientConfig.GroupVersion = &gv
 	}
 
-	client, err := client.New(clientConfig)
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		glog.Fatalf("Invalid server address: %v", err)
+		glog.Errorf("Failed to create clientset: %v", err)
 	}
 
 	legacyV1Group, err := registered.Group(api.GroupName)

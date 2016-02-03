@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// The EventExpansion interface allows manually adding extra methods to the EventInterface.
 type EventExpansion interface {
 	// CreateWithEventNamespace is the same as a Create, except that it sends the request to the event.Namespace.
 	CreateWithEventNamespace(event *api.Event) (*api.Event, error)

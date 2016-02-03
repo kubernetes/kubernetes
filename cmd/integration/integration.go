@@ -187,14 +187,14 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	scheduler.New(schedulerConfig).Run()
 
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
-	go endpointcontroller.NewEndpointController(cl, controller.NoResyncPeriodFunc).
+	go endpointcontroller.NewEndpointController(clientset, controller.NoResyncPeriodFunc).
 		Run(3, util.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
 	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
 		Run(3, util.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
@@ -205,7 +205,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker1,
 		"localhost",
 		testRootDir,
@@ -237,7 +237,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 
 	kcfg = kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker2,
 		"127.0.0.1",
 		testRootDir,

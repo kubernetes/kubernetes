@@ -24,6 +24,7 @@ import (
 
 type LegacyInterface interface {
 	ComponentStatusesGetter
+	ConfigMapsGetter
 	EndpointsGetter
 	EventsGetter
 	LimitRangesGetter
@@ -47,6 +48,10 @@ type LegacyClient struct {
 
 func (c *LegacyClient) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
+}
+
+func (c *LegacyClient) ConfigMaps(namespace string) ConfigMapInterface {
+	return newConfigMaps(c, namespace)
 }
 
 func (c *LegacyClient) Endpoints(namespace string) EndpointsInterface {

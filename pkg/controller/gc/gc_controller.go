@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -41,19 +41,19 @@ const (
 )
 
 type GCController struct {
-	kubeClient     client.Interface
+	kubeClient     clientset.Interface
 	podStore       cache.StoreToPodLister
 	podStoreSyncer *framework.Controller
 	deletePod      func(namespace, name string) error
 	threshold      int
 }
 
-func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
+func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
 	gcc := &GCController{
 		kubeClient: kubeClient,
 		threshold:  threshold,
 		deletePod: func(namespace, name string) error {
-			return kubeClient.Pods(namespace).Delete(name, api.NewDeleteOptions(0))
+			return kubeClient.Legacy().Pods(namespace).Delete(name, api.NewDeleteOptions(0))
 		},
 	}
 
@@ -63,11 +63,11 @@ func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, 
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Pods(api.NamespaceAll).List(options)
+				return gcc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return gcc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},

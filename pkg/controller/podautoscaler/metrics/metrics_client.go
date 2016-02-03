@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/labels"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -66,7 +66,7 @@ type metricDefinition struct {
 
 // HeapsterMetricsClient is Heapster-based implementation of MetricsClient
 type HeapsterMetricsClient struct {
-	client            client.Interface
+	client            clientset.Interface
 	heapsterNamespace string
 	heapsterScheme    string
 	heapsterService   string
@@ -90,7 +90,7 @@ func getHeapsterCustomMetricDefinition(metricName string) metricDefinition {
 }
 
 // NewHeapsterMetricsClient returns a new instance of Heapster-based implementation of MetricsClient interface.
-func NewHeapsterMetricsClient(client client.Interface, namespace, scheme, service, port string) *HeapsterMetricsClient {
+func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port string) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
 		client:            client,
 		heapsterNamespace: namespace,
@@ -113,7 +113,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	avgRequest int64, timestamp time.Time, err error) {
 
 	labelSelector := labels.SelectorFromSet(labels.Set(selector))
-	podList, err := h.client.Pods(namespace).
+	podList, err := h.client.Legacy().Pods(namespace).
 		List(api.ListOptions{LabelSelector: labelSelector})
 
 	if err != nil {
@@ -152,7 +152,7 @@ func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespa
 	metricSpec := getHeapsterCustomMetricDefinition(customMetricName)
 
 	labelSelector := labels.SelectorFromSet(labels.Set(selector))
-	podList, err := h.client.Pods(namespace).List(api.ListOptions{LabelSelector: labelSelector})
+	podList, err := h.client.Legacy().Pods(namespace).List(api.ListOptions{LabelSelector: labelSelector})
 
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
@@ -179,7 +179,7 @@ func (h *HeapsterMetricsClient) getForPods(metricSpec metricDefinition, namespac
 		strings.Join(podNames, ","),
 		metricSpec.name)
 
-	resultRaw, err := h.client.Services(h.heapsterNamespace).
+	resultRaw, err := h.client.Legacy().Services(h.heapsterNamespace).
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
 		DoRaw()
 

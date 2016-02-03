@@ -55,7 +55,7 @@ func (vh *volumeHost) GetPodPluginDir(podUID types.UID, pluginName string) strin
 }
 
 func (vh *volumeHost) GetKubeClient() clientset.Interface {
-	return vh.kubelet.clientset
+	return vh.kubelet.kubeClient
 }
 
 func (vh *volumeHost) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {

@@ -18,6 +18,7 @@ package unversioned
 
 import "k8s.io/kubernetes/pkg/api"
 
+// The NamespaceExpansion interface allows manually adding extra methods to the NamespaceInterface.
 type NamespaceExpansion interface {
 	Finalize(item *api.Namespace) (*api.Namespace, error)
 }
