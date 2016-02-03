@@ -32,8 +32,6 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apis/extensions"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -61,7 +59,7 @@ func fuzzInternalObject(t *testing.T, forVersion unversioned.GroupVersion, item 
 }
 
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
-	t.Logf("codec: %#v", codec)
+	//t.Logf("codec: %#v", codec)
 
 	printer := spew.ConfigState{DisableMethods: true}
 
@@ -94,12 +92,12 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 }
 
 // roundTripSame verifies the same source object is tested in all API versions.
-func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
+func roundTripSame(t *testing.T, group testapi.TestGroup, item runtime.Object, except ...string) {
 	set := sets.NewString(except...)
 	seed := rand.Int63()
-	fuzzInternalObject(t, testapi.Default.InternalGroupVersion(), item, seed)
+	fuzzInternalObject(t, group.InternalGroupVersion(), item, seed)
 
-	version := *testapi.Default.GroupVersion()
+	version := *group.GroupVersion()
 	codecs := []runtime.Codec{}
 	for _, fn := range codecsToTest {
 		codec, err := fn(version, item)
@@ -123,9 +121,9 @@ func TestSpecificKind(t *testing.T) {
 	// api.Scheme.Log(t)
 	// defer api.Scheme.Log(nil)
 
-	kind := "List"
+	kind := "DaemonSet"
 	for i := 0; i < *fuzzIters; i++ {
-		doRoundTripTest(kind, t)
+		doRoundTripTest(testapi.Groups["extensions"], kind, t)
 		if t.Failed() {
 			break
 		}
@@ -142,7 +140,7 @@ func TestList(t *testing.T) {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
 	}
-	roundTripSame(t, item)
+	roundTripSame(t, testapi.Default, item)
 }
 
 var nonRoundTrippableTypes = sets.NewString("ExportOptions")
@@ -154,34 +152,36 @@ func TestRoundTripTypes(t *testing.T) {
 	// api.Scheme.Log(t)
 	// defer api.Scheme.Log(nil)
 
-	for kind := range api.Scheme.KnownTypes(testapi.Default.InternalGroupVersion()) {
-		t.Logf("working on %v in %v", kind, testapi.Default.InternalGroupVersion())
-		if nonRoundTrippableTypes.Has(kind) {
-			continue
-		}
-		// Try a few times, since runTest uses random values.
-		for i := 0; i < *fuzzIters; i++ {
-			doRoundTripTest(kind, t)
-			if t.Failed() {
-				break
+	for groupKey, group := range testapi.Groups {
+		for kind := range api.Scheme.KnownTypes(group.InternalGroupVersion()) {
+			t.Logf("working on %v in %v", kind, groupKey)
+			if nonRoundTrippableTypes.Has(kind) {
+				continue
+			}
+			// Try a few times, since runTest uses random values.
+			for i := 0; i < *fuzzIters; i++ {
+				doRoundTripTest(group, kind, t)
+				if t.Failed() {
+					break
+				}
 			}
 		}
 	}
 }
 
-func doRoundTripTest(kind string, t *testing.T) {
-	item, err := api.Scheme.New(testapi.Default.InternalGroupVersion().WithKind(kind))
+func doRoundTripTest(group testapi.TestGroup, kind string, t *testing.T) {
+	item, err := api.Scheme.New(group.InternalGroupVersion().WithKind(kind))
 	if err != nil {
 		t.Fatalf("Couldn't make a %v? %v", kind, err)
 	}
 	if _, err := meta.TypeAccessor(item); err != nil {
 		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
 	}
-	if api.Scheme.Recognizes(testapi.Default.GroupVersion().WithKind(kind)) {
-		roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
+	if api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
+		roundTripSame(t, group, item, nonRoundTrippableTypesByVersion[kind]...)
 	}
 	if !nonInternalRoundTrippableTypes.Has(kind) {
-		roundTrip(t, testapi.Default.Codec(), fuzzInternalObject(t, testapi.Default.InternalGroupVersion(), item, rand.Int63()))
+		roundTrip(t, group.Codec(), fuzzInternalObject(t, group.InternalGroupVersion(), item, rand.Int63()))
 	}
 }
 
