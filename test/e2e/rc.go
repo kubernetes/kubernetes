@@ -112,7 +112,7 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 	By("Trying to dial each unique pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, podResponseChecker{f.Client, f.Namespace.Name, label, name, true, pods}.checkAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, podProxyResponseChecker{f.Client, f.Namespace.Name, label, name, true, pods}.checkAllResponses)
 	if err != nil {
 		Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
