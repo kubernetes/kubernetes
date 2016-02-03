@@ -49,6 +49,7 @@ concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
+concurrent-namespace-syncs
 config-sync-period
 configure-cbr0
 conntrack-max
