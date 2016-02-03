@@ -33,6 +33,8 @@ import (
 	"sync"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+
 	etcd "github.com/coreos/etcd/client"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
@@ -172,7 +174,7 @@ type SchedulerServer struct {
 	conntrackTCPTimeoutEstablished int
 
 	executable  string // path to the binary running this service
-	client      *client.Client
+	client      *clientset.Clientset
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -520,7 +522,7 @@ func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, stati
 
 // TODO(jdef): hacked from kubelet/server/server.go
 // TODO(k8s): replace this with clientcmd
-func (s *SchedulerServer) createAPIServerClient() (*client.Client, error) {
+func (s *SchedulerServer) createAPIServerClient() (*clientset.Clientset, error) {
 	authInfo, err := clientauth.LoadFromFile(s.authPath)
 	if err != nil {
 		log.Warningf("Could not load kubernetes auth path: %v. Continuing with defaults.", err)
@@ -541,7 +543,7 @@ func (s *SchedulerServer) createAPIServerClient() (*client.Client, error) {
 		log.Infof("Multiple api servers specified.  Picking first one")
 	}
 	clientConfig.Host = s.apiServerList[0]
-	c, err := client.New(&clientConfig)
+	c, err := clientset.NewForConfig(&clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -721,7 +723,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	if err != nil {
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
-	nodeLW := cache.NewListWatchFromClient(nodesClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(nodesClient.LegacyClient, "nodes", api.NamespaceAll, fields.Everything())
 	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			node := obj.(*api.Node)
@@ -795,7 +797,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	broadcaster.StartRecordingToSink(client.Events(""))
 
 	// create scheduler core with all components arranged around it
-	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(client.LegacyClient, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(
 		sc,
 		framework,
