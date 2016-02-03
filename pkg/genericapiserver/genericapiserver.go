@@ -378,9 +378,9 @@ func setDefaults(c *Config) {
 //   If the caller wants to add additional endpoints not using the GenericAPIServer's
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
-func New(c *Config) *GenericAPIServer {
+func New(c *Config) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
-		glog.Fatalf("Genericapiserver.New() called with config.Serializer == nil")
+		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
 	setDefaults(c)
 
@@ -435,7 +435,7 @@ func New(c *Config) *GenericAPIServer {
 
 	s.init(c)
 
-	return s
+	return s, nil
 }
 
 func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {

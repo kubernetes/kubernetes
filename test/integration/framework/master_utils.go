@@ -135,7 +135,11 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig.EnableProfiling = true
 		masterConfig.EnableSwaggerSupport = true
 	}
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		glog.Fatalf("error in bringing up the master: %v", err)
+	}
+
 	return m, s
 }
 
@@ -289,7 +293,11 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableProfiling = true
-	m := master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		// TODO: Return error.
+		glog.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)

@@ -35,7 +35,11 @@ var serverIP = "http://localhost:8080"
 var groupVersion = v1.SchemeGroupVersion
 
 func TestRun(t *testing.T) {
-	go Run()
+	go func() {
+		if err := Run(); err != nil {
+			t.Fatalf("Error in bringing up the server: %v", err)
+		}
+	}()
 	if err := waitForApiserverUp(); err != nil {
 		t.Fatalf("%v", err)
 	}
