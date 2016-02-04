@@ -1,10 +1,24 @@
 -
+    date: 2016-05-25 00:00:00 -0000
+    title: "GlueCon"
+    location: "Broomfield, Colorado"
+    venue: "Omni Interlaken"
+    speaker: "Joe Beda and Brendan Burns"
+    url: "http://gluecon.com/" 
+-
     date: 2016-03-10 00:00:00 -0000
     title: "KubeCon"
     location: "London, England"
     venue: "Codenode"
     speaker: ""
     url: "https://kubecon.io/" 
+-
+    date: 2016-02-17 00:18:30 -0800
+    title: "Kubernetes San Francisco Meetup"
+    location: "San Francisco, California"
+    venue: "Engineyard/Deis"
+    speaker: "Aaron Levy, Craig Peters and Bhasker Nallapothula"
+    url: "http://www.meetup.com/San-Francisco-Kubernetes-Meetup/events/228419934/"
 -
     date: 2016-02-16 00:00:00 -0800
     title: "Container World 16"
@@ -13,7 +27,14 @@
     speaker: "Craig McLuckie"
     url: "http://containerevent.com/"
 -
-    date: 2016-02-02 00:00:00 -0800
+    date: 2016-02-11 00:18:30 -0800
+    title: "Kubernetes Bay Area Meetup"
+    location: "Santa Clara, Washington"
+    venue: "Ooyala"
+    speaker: "Tim Hockin, Chris Marino, Mike Danese and Xiang Li"
+    url: "http://www.meetup.com/Bay-Area-Kubernetes-Meetup/events/228213245/"
+-
+    date: 2016-02-02 00:18:30 -0800
     title: "Kubernetes Seattle Meetup"
     location: "Seattle, Washington"
     venue: "Google Seattle"
