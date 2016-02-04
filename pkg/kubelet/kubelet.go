@@ -1297,7 +1297,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		}
 	}
 
-	opts.DNS, opts.DNSSearch, err = kl.getClusterDNS(pod)
+	opts.DNS, opts.DNSSearch, err = kl.GetClusterDNS(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -1466,9 +1466,9 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
 
-// getClusterDNS returns a list of the DNS servers and a list of the DNS search
+// GetClusterDNS returns a list of the DNS servers and a list of the DNS search
 // domains of the cluster.
-func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
+func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	var hostDNS, hostSearch []string
 	// Get host DNS settings
 	if kl.resolverConfig != "" {

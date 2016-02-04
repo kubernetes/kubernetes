@@ -129,8 +129,8 @@ type DockerManager struct {
 	// Health check results.
 	livenessManager proberesults.Manager
 
-	// Generator of runtime container options.
-	generator kubecontainer.RunContainerOptionsGenerator
+	// RuntimeHelper that wraps kubelet to generate runtime container options.
+	runtimeHelper kubecontainer.RuntimeHelper
 
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
@@ -163,7 +163,7 @@ func NewDockerManager(
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
-	generator kubecontainer.RunContainerOptionsGenerator,
+	runtimeHelper kubecontainer.RuntimeHelper,
 	httpClient kubetypes.HttpGetter,
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
@@ -217,7 +217,7 @@ func NewDockerManager(
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
 		livenessManager:        livenessManager,
-		generator:              generator,
+		runtimeHelper:          runtimeHelper,
 		execHandler:            execHandler,
 		oomAdjuster:            oomAdjuster,
 		procFs:                 procFs,
@@ -1533,7 +1533,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		glog.Errorf("Can't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	opts, err := dm.generator.GenerateRunContainerOptions(pod, container)
+	opts, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container)
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("GenerateRunContainerOptions: %v", err)
 	}
