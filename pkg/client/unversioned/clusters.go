@@ -1,8 +1,6 @@
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -47,7 +45,7 @@ func (c *clusters) Create(cluster *api.Cluster) (*api.Cluster, error) {
 
 func (c *clusters) List(opts api.ListOptions) (*api.ClusterList, error) {
 	result := &api.ClusterList{}
-	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return result, err
 }
 
@@ -58,20 +56,12 @@ func (c *clusters) Delete(name string) error {
 
 func (c *clusters) Update(cluster *api.Cluster) (*api.Cluster, error) {
 	result := &api.Cluster{}
-	if len(cluster.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", cluster)
-		return nil, err
-	}
 	err := c.r.Put().Resource(c.resourceName()).Name(cluster.Name).Body(cluster).Do().Into(result)
 	return result, err
 }
 
 func (c *clusters) UpdateStatus(cluster *api.Cluster) (*api.Cluster, error) {
 	result := &api.Cluster{}
-	if len(cluster.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", cluster)
-		return nil, err
-	}
 	err := c.r.Put().Resource(c.resourceName()).Name(cluster.Name).SubResource("status").Body(cluster).Do().Into(result)
 	return result, err
 }
@@ -82,6 +72,6 @@ func (c *clusters) Watch(opts api.ListOptions) (watch.Interface, error) {
 	Prefix("watch").
 	Namespace(api.NamespaceAll).
 	Resource(c.resourceName()).
-	VersionedParams(&opts, api.Scheme).
+	VersionedParams(&opts, api.ParameterCodec).
 	Watch()
 }

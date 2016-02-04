@@ -32,7 +32,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &api.ClusterList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.Cluster{}, prefix, false, newListFunc)
+		s, 100, &api.Cluster{}, prefix, cluster.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Cluster{} },

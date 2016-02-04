@@ -196,6 +196,20 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Cluster",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name",
+				"status.phase":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }
 
 func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {

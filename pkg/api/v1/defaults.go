@@ -248,6 +248,10 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				obj.Data = make(map[string]string)
 			}
 		},
+		func(obj *Cluster) {
+		},
+		func(obj *ClusterStatus) {
+		},
 	)
 }
 
