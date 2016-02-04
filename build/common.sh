@@ -159,7 +159,11 @@ function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
   docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" "${DOCKER_MACHINE_NAME}" > /dev/null || {
+    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
+      --engine-env HTTP_PROXY="${KUBE_BUILD_HTTP_PROXY:-}" \
+      --engine-env HTTPS_PROXY="${KUBE_BUILD_HTTPS_PROXY:-}" \
+      --engine-env NO_PROXY="${KUBE_BUILD_NO_PROXY:-127.0.0.1}" \
+      "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
       kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
@@ -201,6 +205,18 @@ function kube::build::prepare_boot2docker() {
 
 function kube::build::is_osx() {
   [[ "$(uname)" == "Darwin" ]]
+}
+
+function kube::build::update_dockerfile() {
+  if kube::build::is_osx; then
+    sed_arg=\"\"
+  else
+    sed_arg=""
+  fi
+  sed -i $sed_arg "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  sed -i $sed_arg "s#KUBE_BUILD_HTTP_PROXY#"`echo ${KUBE_BUILD_HTTP_PROXY:-\"\"}`"#" ${build_context_dir}/Dockerfile
+  sed -i $sed_arg "s#KUBE_BUILD_HTTPS_PROXY#"`echo ${KUBE_BUILD_HTTPS_PROXY:-\"\"}`"#" ${build_context_dir}/Dockerfile
+  sed -i $sed_arg "s#KUBE_BUILD_NO_PROXY#"`echo ${KUBE_BUILD_NO_PROXY:-127.0.0.1}`"#" ${build_context_dir}/Dockerfile
 }
 
 function kube::build::ensure_docker_in_path() {
@@ -472,11 +488,8 @@ function kube::build::build_image() {
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
 
   cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
-  if kube::build::is_osx; then
-    sed -i "" "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
-  else
-    sed -i "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
-  fi
+  kube::build::update_dockerfile
+
   # We don't want to force-pull this image because it's based on a local image
   # (see kube::build::build_image_cross), not upstream.
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}" 'false'
