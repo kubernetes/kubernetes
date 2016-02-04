@@ -20,9 +20,11 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	. "k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const TomcatPort int = 8080
@@ -64,19 +66,21 @@ func (h *ServiceHandlerMock) OnServiceUpdate(services []api.Service) {
 func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []api.Service) {
 	// We might get 1 or more updates for N service updates, because we
 	// over write older snapshots of services from the producer go-routine
-	// if the consumer falls behind. Unittests will hard timeout in 5m.
+	// if the consumer falls behind.
 	var services []api.Service
-	for ; h.waits > 0; h.waits = h.waits - 1 {
-		services = <-h.updated
-		if reflect.DeepEqual(services, expectedServices) {
+	for {
+		select {
+		case services = <-h.updated:
+			if reflect.DeepEqual(services, expectedServices) {
+				return
+			}
+		// Unittests will hard timeout in 5m with a stack trace, prevent that
+		// and surface a clearer reason for failure.
+		case <-time.After(util.ForeverTestTimeout):
+			t.Errorf("Timed out. Expected %#v, Got %#v", expectedServices, services)
 			return
 		}
 	}
-	t.Errorf("Expected %#v, Got %#v", expectedServices, services)
-}
-
-func (h *ServiceHandlerMock) Wait(waits int) {
-	h.waits = waits
 }
 
 type sortedEndpoints []api.Endpoints
@@ -110,17 +114,19 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 	// over write older snapshots of endpoints from the producer go-routine
 	// if the consumer falls behind. Unittests will hard timeout in 5m.
 	var endpoints []api.Endpoints
-	for ; h.waits > 0; h.waits = h.waits - 1 {
-		endpoints := <-h.updated
-		if reflect.DeepEqual(endpoints, expectedEndpoints) {
+	for {
+		select {
+		case endpoints = <-h.updated:
+			if reflect.DeepEqual(endpoints, expectedEndpoints) {
+				return
+			}
+		// Unittests will hard timeout in 5m with a stack trace, prevent that
+		// and surface a clearer reason for failure.
+		case <-time.After(util.ForeverTestTimeout):
+			t.Errorf("Timed out. Expected %#v, Got %#v", expectedEndpoints, endpoints)
 			return
 		}
 	}
-	t.Errorf("Expected %#v, Got %#v", expectedEndpoints, endpoints)
-}
-
-func (h *EndpointsHandlerMock) Wait(waits int) {
-	h.waits = waits
 }
 
 func CreateServiceUpdate(op Operation, services ...api.Service) ServiceUpdate {
@@ -145,7 +151,6 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig()
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
-	handler.Wait(1)
 	config.RegisterHandler(handler)
 	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
@@ -165,7 +170,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
@@ -173,7 +177,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate.Services[0]}
 	handler.ValidateServices(t, services)
@@ -181,7 +184,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate3
 	services = []api.Service{serviceUpdate2.Services[0]}
 	handler.ValidateServices(t, services)
@@ -190,7 +192,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 99}}},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate4
 	services = []api.Service{serviceUpdate4.Services[0]}
 	handler.ValidateServices(t, services)
@@ -213,7 +214,6 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
-	handler.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate1.Services[0]}
@@ -236,8 +236,6 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
-	handler.Wait(2)
-	handler2.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate1.Services[0]}
@@ -267,8 +265,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(2)
-	handler2.Wait(2)
 	channelOne <- endpointsUpdate1
 	channelTwo <- endpointsUpdate2
 
@@ -299,8 +295,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(2)
-	handler2.Wait(2)
 	channelOne <- endpointsUpdate1
 	channelTwo <- endpointsUpdate2
 
@@ -316,8 +310,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(1)
-	handler2.Wait(1)
 	channelTwo <- endpointsUpdate3
 	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
 	handler.ValidateEndpoints(t, endpoints)
@@ -331,8 +323,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(1)
-	handler2.Wait(1)
 	channelOne <- endpointsUpdate1
 	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
 	handler.ValidateEndpoints(t, endpoints)
@@ -340,8 +330,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 
 	// Remove "bar" service
 	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
-	handler.Wait(1)
-	handler2.Wait(1)
 	channelTwo <- endpointsUpdate2
 
 	endpoints = []api.Endpoints{endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
