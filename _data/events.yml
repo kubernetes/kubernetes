@@ -34,6 +34,13 @@
     speaker: "Tim Hockin, Chris Marino, Mike Danese and Xiang Li"
     url: "http://www.meetup.com/Bay-Area-Kubernetes-Meetup/events/228213245/"
 -
+    date: 2016-02-04 00:19:30 -0500
+    title: "DC Linux Users Group Meetup"
+    location: "Washington DC"
+    venue: "Google Washington DC"
+    speaker: ""
+    url: "http://www.meetup.com/DC-Linux-Users-Group/events/228060751/"
+-
     date: 2016-02-02 00:18:30 -0800
     title: "Kubernetes Seattle Meetup"
     location: "Seattle, Washington"
