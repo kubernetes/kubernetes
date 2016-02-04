@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package apiserver
 
 import (
-	"github.com/golang/glog"
+	"fmt"
+
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -44,23 +46,27 @@ func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta)
 	return &storageDestinations, nil
 }
 
-func main() {
+func Run() error {
 	config := genericapiserver.Config{
 		EnableIndex:    true,
 		APIPrefix:      "/api",
 		APIGroupPrefix: "/apis",
+		Serializer:     api.Codecs,
 	}
-	s := genericapiserver.New(&config)
+	s, err := genericapiserver.New(&config)
+	if err != nil {
+		return fmt.Errorf("Error in bringing up the server: %v", err)
+	}
 
 	groupVersion := v1.SchemeGroupVersion
 	groupName := groupVersion.Group
 	groupMeta, err := registered.Group(groupName)
 	if err != nil {
-		glog.Fatalf("%v", err)
+		return fmt.Errorf("%v", err)
 	}
 	storageDestinations, err := newStorageDestinations(groupName, groupMeta)
 	if err != nil {
-		glog.Fatalf("Unable to init etcd: %v", err)
+		return fmt.Errorf("Unable to init etcd: %v", err)
 	}
 	restStorageMap := map[string]rest.Storage{
 		"testtypes": testgroupetcd.NewREST(storageDestinations.Get(groupName, "testtype"), s.StorageDecorator()),
@@ -70,9 +76,12 @@ func main() {
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			groupVersion.Version: restStorageMap,
 		},
+		Scheme:               api.Scheme,
+		NegotiatedSerializer: api.Codecs,
 	}
 	if err := s.InstallAPIGroups([]genericapiserver.APIGroupInfo{apiGroupInfo}); err != nil {
-		glog.Fatalf("Error in installing API: %v", err)
+		return fmt.Errorf("Error in installing API: %v", err)
 	}
 	s.Run(genericapiserver.NewServerRunOptions())
+	return nil
 }

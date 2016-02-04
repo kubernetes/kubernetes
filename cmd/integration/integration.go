@@ -171,7 +171,10 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	masterConfig.CacheTimeout = 2 * time.Second
 
 	// Create a master and install handlers into mux.
-	m := master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		glog.Fatalf("Error in bringing up the master: %v", err)
+	}
 	handler.delegate = m.Handler
 
 	// Scheduler

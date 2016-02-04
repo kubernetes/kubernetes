@@ -134,12 +134,15 @@ type thirdPartyEntry struct {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClient
-func New(c *Config) *Master {
+func New(c *Config) (*Master, error) {
 	if c.KubeletClient == nil {
-		glog.Fatalf("Master.New() called with config.KubeletClient == nil")
+		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	s := genericapiserver.New(c.Config)
+	s, err := genericapiserver.New(c.Config)
+	if err != nil {
+		return nil, err
+	}
 
 	m := &Master{
 		GenericAPIServer:      s,
@@ -158,7 +161,7 @@ func New(c *Config) *Master {
 		m.NewBootstrapController().Start()
 	}
 
-	return m
+	return m, nil
 }
 
 func resetMetrics(w http.ResponseWriter, req *http.Request) {

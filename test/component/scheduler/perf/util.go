@@ -45,7 +45,10 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 
 	var m *master.Master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		panic("error in brining up the master: " + err.Error())
+	}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))

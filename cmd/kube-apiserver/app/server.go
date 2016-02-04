@@ -401,7 +401,10 @@ func Run(s *options.APIServer) error {
 
 		Tunneler: tunneler,
 	}
-	m := master.New(config)
+	m, err := master.New(config)
+	if err != nil {
+		return err
+	}
 	m.Run(s.ServerRunOptions)
 	return nil
 }
