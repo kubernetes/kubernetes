@@ -241,8 +241,10 @@ var _ = Describe("Services", func() {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
+		By("creating service1 in namespace " + ns)
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
+		By("creating service2 in namespace " + ns)
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -253,28 +255,35 @@ var _ = Describe("Services", func() {
 		}
 		host := hosts[0]
 
+		By("verifying service1 is up")
 		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+
+		By("verifying service2 is up")
 		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
 		// Stop service 1 and make sure it is gone.
+		By("stopping service1")
 		expectNoError(stopServeHostnameService(c, ns, "service1"))
 
+		By("verifying service1 is not up")
 		expectNoError(verifyServeHostnameServiceDown(c, host, svc1IP, servicePort))
+		By("verifying service2 is still up")
 		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
 		// Start another service and verify both are up.
+		By("creating service3 in namespace " + ns)
 		podNames3, svc3IP, err := startServeHostnameService(c, ns, "service3", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc2IP == svc3IP {
-			Failf("VIPs conflict: %v", svc2IP)
+			Failf("service IPs conflict: %v", svc2IP)
 		}
 
+		By("verifying service2 is still up")
 		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames3, svc3IP, servicePort))
 
-		expectNoError(stopServeHostnameService(c, ns, "service2"))
-		expectNoError(stopServeHostnameService(c, ns, "service3"))
+		By("verifying service3 is up")
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames3, svc3IP, servicePort))
 	})
 
 	It("should work after restarting kube-proxy [Disruptive]", func() {
@@ -1300,17 +1309,18 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 	defer func() {
 		deletePodOrFail(c, ns, execPodName)
 	}()
+
 	// Loop a bunch of times - the proxy is randomized, so we want a good
 	// chance of hitting each backend at least once.
-	command := fmt.Sprintf(
-		"for i in $(seq 1 %d); do wget -q -T 1 -O - http://%s:%d 2>&1 || true; echo; done",
-		50*len(expectedPods), serviceIP, servicePort)
-
+	buildCommand := func(wget string) string {
+		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s:%d 2>&1 || true; echo; done",
+			50*len(expectedPods), wget, serviceIP, servicePort)
+	}
 	commands := []func() string{
 		// verify service from node
 		func() string {
-			cmd := fmt.Sprintf(`set -e; %s`, command)
-			Logf("Executing cmd %v on host %v", cmd, host)
+			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
+			Logf("Executing cmd %q on host %v", cmd, host)
 			result, err := SSH(cmd, host, testContext.Provider)
 			if err != nil || result.Code != 0 {
 				LogSSHResult(result)
@@ -1320,11 +1330,12 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 		},
 		// verify service from pod
 		func() string {
-			Logf("Executing cmd %v in pod %v/%v", command, ns, execPodName)
+			cmd := buildCommand("wget -q -T 1 -O -")
+			Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
 			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-			output, err := RunHostCmd(ns, execPodName, command)
+			output, err := RunHostCmd(ns, execPodName, cmd)
 			if err != nil {
-				Logf("error while kubectl execing %v in pod %v/%v: %v\nOutput: %v", command, ns, execPodName, err, output)
+				Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPodName, err, output)
 			}
 			return output
 		},
@@ -1339,7 +1350,7 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 			pods := strings.Split(strings.TrimSpace(cmdFunc()), "\n")
 			// Uniq pods before the sort because inserting them into a set
 			// (which is implemented using dicts) can re-order them.
-			gotPods := sets.NewString(pods...).List()
+			gotPods = sets.NewString(pods...).List()
 			if api.Semantic.DeepEqual(gotPods, expectedPods) {
 				passed = true
 				break
