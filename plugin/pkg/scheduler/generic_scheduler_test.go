@@ -257,7 +257,7 @@ func TestGenericScheduler(t *testing.T) {
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, algorithm.FakePodLister(test.pods), random)
+		scheduler := NewGenericScheduler(schedulercache.PodsToCache(test.pods), test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, random)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
