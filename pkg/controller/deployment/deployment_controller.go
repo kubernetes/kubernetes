@@ -678,9 +678,21 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 		if existingNewRC.Annotations == nil {
 			existingNewRC.Annotations = make(map[string]string)
 		}
+		// Copy deployment's annotations to existing new RC
+		annotationChanged := false
+		for k, v := range deployment.Annotations {
+			if existingNewRC.Annotations[k] != v {
+				annotationChanged = true
+				existingNewRC.Annotations[k] = v
+			}
+		}
+		// Update existing new RC's revision annotation
 		if existingNewRC.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
 			existingNewRC.Annotations[deploymentutil.RevisionAnnotation] = newRevision
+			annotationChanged = true
 			glog.V(4).Infof("update existingNewRC %s revision to %s - %+v\n", existingNewRC.Name, newRevision)
+		}
+		if annotationChanged {
 			return dc.client.Legacy().ReplicationControllers(deployment.ObjectMeta.Namespace).Update(existingNewRC)
 		}
 		return existingNewRC, nil
@@ -707,13 +719,20 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 		return nil, fmt.Errorf("couldn't get key for deployment controller %#v: %v", deployment, err)
 	}
 	dc.rcExpectations.ExpectCreations(dKey, 1)
+	// Copy deployment's annotations to new RC
+	annotations := deployment.Annotations
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	// Set new RC's revision annotation
+	annotations[deploymentutil.RevisionAnnotation] = newRevision
 
 	// Create new RC
 	newRC := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: deployment.Name + "-",
 			Namespace:    namespace,
-			Annotations:  map[string]string{deploymentutil.RevisionAnnotation: newRevision},
+			Annotations:  annotations,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 0,
