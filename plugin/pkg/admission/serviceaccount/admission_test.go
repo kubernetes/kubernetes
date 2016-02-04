@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -176,7 +176,7 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	ns := "myns"
 
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
-	client := testclient.NewSimpleFake(&api.ServiceAccount{
+	client := fake.NewSimpleClientset(&api.ServiceAccount{
 		ObjectMeta: api.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -201,7 +201,7 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 	ns := "myns"
 
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
-	client := testclient.NewSimpleFake()
+	client := fake.NewSimpleClientset()
 
 	admit := NewServiceAccount(client)
 

@@ -46,12 +46,11 @@ func (obj *InternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj
 func (obj *ExternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestStringMapConversion(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "external"}
 
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Complex"), &InternalComplex{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("Complex"), &ExternalComplex{})
 

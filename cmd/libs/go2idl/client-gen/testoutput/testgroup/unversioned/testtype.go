@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// TestTypeNamespacer has methods to work with TestType resources in a namespace
-type TestTypeNamespacer interface {
+// TestTypesGetter has a method to return a TestTypeInterface.
+// A group's client should implement this interface.
+type TestTypesGetter interface {
 	TestTypes(namespace string) TestTypeInterface
 }
 
@@ -59,7 +60,7 @@ func (c *testTypes) Create(testType *testgroup.TestType) (result *testgroup.Test
 	result = &testgroup.TestType{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("testTypes").
+		Resource("testtypes").
 		Body(testType).
 		Do().
 		Into(result)
@@ -71,7 +72,7 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 	result = &testgroup.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("testTypes").
+		Resource("testtypes").
 		Name(testType.Name).
 		Body(testType).
 		Do().
@@ -79,17 +80,24 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 	return
 }
 
-func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.TestType, error) {
-	result := &testgroup.TestType{}
-	err := c.client.Put().Resource("testTypes").Name(testType.Name).SubResource("status").Body(testType).Do().Into(result)
-	return result, err
+func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("testtypes").
+		Name(testType.Name).
+		SubResource("status").
+		Body(testType).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("testTypes").
+		Resource("testtypes").
 		Name(name).
 		Body(options).
 		Do().
@@ -100,8 +108,8 @@ func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
 func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("testTypes").
-		VersionedParams(&listOptions, api.Scheme).
+		Resource("testtypes").
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +120,7 @@ func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("testTypes").
+		Resource("testtypes").
 		Name(name).
 		Do().
 		Into(result)
@@ -124,8 +132,8 @@ func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, 
 	result = &testgroup.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("testTypes").
-		VersionedParams(&opts, api.Scheme).
+		Resource("testtypes").
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +144,7 @@ func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("testTypes").
-		VersionedParams(&opts, api.Scheme).
+		Resource("testtypes").
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

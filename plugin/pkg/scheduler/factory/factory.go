@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -69,8 +69,6 @@ type ConfigFactory struct {
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
-	// Rate limiter for binding pods
-	BindPodsRateLimiter util.RateLimiter
 
 	scheduledPodPopulator *framework.Controller
 	modeler               scheduler.SystemModeler
@@ -82,7 +80,7 @@ type ConfigFactory struct {
 }
 
 // Initializes the factory.
-func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, schedulerName string) *ConfigFactory {
+func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactory {
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
@@ -99,7 +97,6 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, sched
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{Store: c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
 	c.PodLister = modeler.PodLister()
-	c.BindPodsRateLimiter = rateLimiter
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
@@ -253,9 +250,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NextPod: func() *api.Pod {
 			return f.getNextPod()
 		},
-		Error:               f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
-		BindPodsRateLimiter: f.BindPodsRateLimiter,
-		StopEverything:      f.StopEverything,
+		Error:          f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
+		StopEverything: f.StopEverything,
 	}, nil
 }
 
@@ -347,7 +343,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 			podID := types.NamespacedName{
 				Namespace: pod.Namespace,
 				Name:      pod.Name,

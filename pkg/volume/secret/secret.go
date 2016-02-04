@@ -24,9 +24,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -47,6 +47,10 @@ type secretPlugin struct {
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
+var wrappedVolumeSpec = volume.Spec{
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+}
+
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
@@ -62,14 +66,31 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 
 func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return &secretVolumeBuilder{
-		secretVolume: &secretVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
-		secretName:   spec.Volume.Secret.SecretName,
-		pod:          *pod,
-		opts:         &opts}, nil
+		secretVolume: &secretVolume{
+			spec.Name(),
+			pod.UID,
+			plugin,
+			plugin.host.GetMounter(),
+			plugin.host.GetWriter(),
+			volume.MetricsNil{},
+		},
+		secretName: spec.Volume.Secret.SecretName,
+		pod:        *pod,
+		opts:       &opts,
+	}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &secretVolumeCleaner{&secretVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
+	return &secretVolumeCleaner{
+		&secretVolume{
+			volName,
+			podUID,
+			plugin,
+			plugin.host.GetMounter(),
+			plugin.host.GetWriter(),
+			volume.MetricsNil{},
+		},
+	}, nil
 }
 
 type secretVolume struct {
@@ -84,7 +105,7 @@ type secretVolume struct {
 var _ volume.Volume = &secretVolume{}
 
 func (sv *secretVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, util.EscapeQualifiedNameForDisk(secretPluginName), sv.volName)
+	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedNameForDisk(secretPluginName), sv.volName)
 }
 
 // secretVolumeBuilder handles retrieving secrets from the API server
@@ -101,26 +122,20 @@ var _ volume.Builder = &secretVolumeBuilder{}
 
 func (sv *secretVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    true,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        true,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
-func (b *secretVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
-}
-
-// This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+func (b *secretVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 func (b *secretVolumeBuilder) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, util.EscapeQualifiedNameForDisk(secretPluginName)), b.volName)
+	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, strings.EscapeQualifiedNameForDisk(secretPluginName)), b.volName)
 }
 
-func (b *secretVolumeBuilder) SetUpAt(dir string) error {
+func (b *secretVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -137,11 +152,11 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
 
@@ -150,7 +165,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
 	}
 
-	secret, err := kubeClient.Secrets(b.pod.Namespace).Get(b.secretName)
+	secret, err := kubeClient.Legacy().Secrets(b.pod.Namespace).Get(b.secretName)
 	if err != nil {
 		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.secretName)
 		return err
@@ -172,6 +187,8 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 			return err
 		}
 	}
+
+	volume.SetVolumeOwnership(b, fsGroup)
 
 	volumeutil.SetReady(b.getMetaDir())
 
@@ -202,7 +219,7 @@ func (c *secretVolumeCleaner) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 
@@ -203,9 +204,7 @@ func (s *ingManager) test(path string) error {
 	})
 }
 
-// TODO(ihmccreery) Skipped originally in #14988, never sent follow-up PR, as
-// far as I can tell.
-var _ = Describe("ServiceLoadBalancer [Skipped]", func() {
+var _ = Describe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var repoRoot string
@@ -274,7 +273,7 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(api.Scheme.DecodeInto(json, &controller)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
 	return &controller
 }
 
@@ -288,6 +287,6 @@ func svcFromManifest(fileName string) *api.Service {
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(api.Scheme.DecodeInto(json, &svc)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &svc)).NotTo(HaveOccurred())
 	return &svc
 }

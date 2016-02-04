@@ -85,7 +85,7 @@ func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controll
 	}, nil
 }
 
-func (g *MetricsGrabber) GrabFromKubelet(nodeName string, unknownMetrics sets.String) (KubeletMetrics, error) {
+func (g *MetricsGrabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error) {
 	nodes, err := g.client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{client.ObjectNameField: nodeName}.AsSelector()})
 	if err != nil {
 		return KubeletMetrics{}, err
@@ -94,10 +94,10 @@ func (g *MetricsGrabber) GrabFromKubelet(nodeName string, unknownMetrics sets.St
 		return KubeletMetrics{}, fmt.Errorf("Error listing nodes with name %v, got %v", nodeName, nodes.Items)
 	}
 	kubeletPort := nodes.Items[0].Status.DaemonEndpoints.KubeletEndpoint.Port
-	return g.grabFromKubeletInternal(nodeName, kubeletPort, unknownMetrics)
+	return g.grabFromKubeletInternal(nodeName, kubeletPort)
 }
 
-func (g *MetricsGrabber) grabFromKubeletInternal(nodeName string, kubeletPort int, unknownMetrics sets.String) (KubeletMetrics, error) {
+func (g *MetricsGrabber) grabFromKubeletInternal(nodeName string, kubeletPort int) (KubeletMetrics, error) {
 	if kubeletPort <= 0 || kubeletPort > 65535 {
 		return KubeletMetrics{}, fmt.Errorf("Invalid Kubelet port %v. Skipping Kubelet's metrics gathering.", kubeletPort)
 	}
@@ -105,7 +105,7 @@ func (g *MetricsGrabber) grabFromKubeletInternal(nodeName string, kubeletPort in
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
-	return parseKubeletMetrics(output, unknownMetrics)
+	return parseKubeletMetrics(output)
 }
 
 func (g *MetricsGrabber) GrabFromScheduler(unknownMetrics sets.String) (SchedulerMetrics, error) {
@@ -173,7 +173,7 @@ func (g *MetricsGrabber) Grab(unknownMetrics sets.String) (MetricsCollection, er
 		} else {
 			for _, node := range nodes.Items {
 				kubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
-				metrics, err := g.grabFromKubeletInternal(node.Name, kubeletPort, nil)
+				metrics, err := g.grabFromKubeletInternal(node.Name, kubeletPort)
 				if err != nil {
 					errs = append(errs, err)
 				}

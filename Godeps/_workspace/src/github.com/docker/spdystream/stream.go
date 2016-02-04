@@ -322,6 +322,5 @@ func (s *Stream) closeRemoteChannels() {
 		close(s.closeChan)
 		s.dataLock.Lock()
 		defer s.dataLock.Unlock()
-		close(s.dataChan)
 	}
 }

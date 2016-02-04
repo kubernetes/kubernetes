@@ -119,8 +119,12 @@ func (f fileProcessor) visit(path string) error {
 			}
 			fmt.Printf("%s:\n", munge.name)
 			if *verbose {
-				fmt.Printf("INPUT: <<<%v>>>\n", mungeLines)
-				fmt.Printf("MUNGED: <<<%v>>>\n", after)
+				if len(mungeLines) <= 20 {
+					fmt.Printf("INPUT: <<<%v>>>\n", mungeLines)
+					fmt.Printf("MUNGED: <<<%v>>>\n", after)
+				} else {
+					fmt.Printf("not printing failed chunk: too many lines\n")
+				}
 			}
 			if err != nil {
 				fmt.Println(err)

@@ -32,7 +32,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -93,14 +93,15 @@ func Run(s *options.SchedulerServer) error {
 		mux.Handle("/metrics", prometheus.Handler())
 
 		server := &http.Server{
-			Addr:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)),
+			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(s.Port)),
 			Handler: mux,
 		}
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	configFactory := factory.NewConfigFactory(kubeClient, util.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst), s.SchedulerName)
+	configFactory := factory.NewConfigFactory(kubeClient, s.SchedulerName)
 	config, err := createConfig(s, configFactory)
+
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}
@@ -136,9 +137,9 @@ func Run(s *options.SchedulerServer) error {
 		Client:        kubeClient,
 		Identity:      id,
 		EventRecorder: config.Recorder,
-		LeaseDuration: s.LeaderElection.LeaseDuration,
-		RenewDeadline: s.LeaderElection.RenewDeadline,
-		RetryPeriod:   s.LeaderElection.RetryPeriod,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -152,19 +153,18 @@ func Run(s *options.SchedulerServer) error {
 }
 
 func createConfig(s *options.SchedulerServer, configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
-	var policy schedulerapi.Policy
-	var configData []byte
-
 	if _, err := os.Stat(s.PolicyConfigFile); err == nil {
-		configData, err = ioutil.ReadFile(s.PolicyConfigFile)
+		var (
+			policy     schedulerapi.Policy
+			configData []byte
+		)
+		configData, err := ioutil.ReadFile(s.PolicyConfigFile)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to read policy config: %v", err)
+			return nil, fmt.Errorf("unable to read policy config: %v", err)
 		}
-		err = latestschedulerapi.Codec.DecodeInto(configData, &policy)
-		if err != nil {
-			return nil, fmt.Errorf("Invalid configuration: %v", err)
+		if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+			return nil, fmt.Errorf("invalid configuration: %v", err)
 		}
-
 		return configFactory.CreateFromConfig(policy)
 	}
 

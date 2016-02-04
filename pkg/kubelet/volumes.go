@@ -23,13 +23,14 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -53,20 +54,32 @@ func (vh *volumeHost) GetPodPluginDir(podUID types.UID, pluginName string) strin
 	return vh.kubelet.getPodPluginDir(podUID, pluginName)
 }
 
-func (vh *volumeHost) GetKubeClient() client.Interface {
+func (vh *volumeHost) GetKubeClient() clientset.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, pod, opts)
+func (vh *volumeHost) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
+	wrapperVolumeName := "wrapped_" + volName
+	if spec.Volume != nil {
+		spec.Volume.Name = wrapperVolumeName
+	}
+
+	b, err := vh.kubelet.newVolumeBuilderFromPlugins(&spec, pod, opts)
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
 	}
 	return b, nil
 }
 
-func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (volume.Cleaner, error) {
-	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(spec)
+func (vh *volumeHost) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
+	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
+	wrapperVolumeName := "wrapped_" + volName
+	if spec.Volume != nil {
+		spec.Volume.Name = wrapperVolumeName
+	}
+
+	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(&spec)
 	if err != nil {
 		return nil, err
 	}
@@ -119,11 +132,9 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]
-		hasFSGroup := false
-		var fsGroup int64 = 0
+		var fsGroup *int64
 		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
-			hasFSGroup = true
-			fsGroup = *pod.Spec.SecurityContext.FSGroup
+			fsGroup = pod.Spec.SecurityContext.FSGroup
 		}
 
 		rootContext, err := kl.getRootDirContext()
@@ -141,20 +152,9 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if builder == nil {
 			return nil, errUnsupportedVolumeType
 		}
-		err = builder.SetUp()
+		err = builder.SetUp(fsGroup)
 		if err != nil {
 			return nil, err
-		}
-		if hasFSGroup &&
-			builder.GetAttributes().Managed &&
-			builder.GetAttributes().SupportsOwnershipManagement {
-			err := kl.manageVolumeOwnership(pod, internal, builder, fsGroup)
-			if err != nil {
-				glog.Errorf("Error managing ownership of volume %v for pod %v/%v: %v", internal.Name(), pod.Namespace, pod.Name, err)
-				return nil, err
-			} else {
-				glog.V(3).Infof("Managed ownership of volume %v for pod %v/%v", internal.Name(), pod.Namespace, pod.Name)
-			}
 		}
 		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}
 	}
@@ -233,7 +233,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 }
 
 func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
-	plugName := util.UnescapeQualifiedNameForDisk(kind)
+	plugName := strings.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
 		// TODO: Maybe we should launch a cleanup of this dir?

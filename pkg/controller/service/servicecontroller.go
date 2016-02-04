@@ -27,12 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -67,7 +68,7 @@ type serviceCache struct {
 
 type ServiceController struct {
 	cloud            cloudprovider.Interface
-	kubeClient       client.Interface
+	kubeClient       clientset.Interface
 	clusterName      string
 	balancer         cloudprovider.LoadBalancer
 	zone             cloudprovider.Zone
@@ -79,9 +80,9 @@ type ServiceController struct {
 
 // New returns a new service controller to keep cloud provider service resources
 // (like load balancers) in sync with the registry.
-func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName string) *ServiceController {
+func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(kubeClient.Events(""))
+	broadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
 
 	return &ServiceController{
@@ -115,8 +116,8 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 	// We have to make this check beecause the ListWatch that we use in
 	// WatchServices requires Client functions that aren't in the interface
 	// for some reason.
-	if _, ok := s.kubeClient.(*client.Client); !ok {
-		return fmt.Errorf("ServiceController only works with real Client objects, but was passed something else satisfying the client Interface.")
+	if _, ok := s.kubeClient.(*clientset.Clientset); !ok {
+		return fmt.Errorf("ServiceController only works with real Client objects, but was passed something else satisfying the clientset.Interface.")
 	}
 
 	// Get the currently existing set of services and then all future creates
@@ -133,13 +134,13 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		}),
 		s.cache,
 	)
-	lw := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "services", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).LegacyClient, "services", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(lw, &api.Service{}, serviceQueue, serviceSyncPeriod).Run()
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
 
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).LegacyClient, "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go s.nodeSyncLoop(nodeSyncPeriod)
 	return nil
@@ -188,7 +189,7 @@ func (s *ServiceController) watchServices(serviceQueue *cache.DeltaFIFO) {
 			time.Sleep(processingRetryInterval)
 			serviceQueue.AddIfNotPresent(deltas)
 		} else if err != nil {
-			util.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
+			runtime.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
 		}
 	}
 }
@@ -343,7 +344,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 func (s *ServiceController) persistUpdate(service *api.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.Services(service.Namespace).Update(service)
+		_, err = s.kubeClient.Legacy().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}
@@ -358,7 +359,7 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 		// balancer status. For now, just rely on the fact that we'll
 		// also process the update that caused the resource version to change.
 		if errors.IsConflict(err) {
-			glog.Infof("Not persisting update to service that has been changed since we received it: %v", err)
+			glog.V(4).Infof("Not persisting update to service that has been changed since we received it: %v", err)
 			return nil
 		}
 		glog.Warningf("Failed to persist updated LoadBalancerStatus to service %s after creating its load balancer: %v",
@@ -627,11 +628,7 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	var prevHosts []string
 	var servicesToUpdate []*cachedService
-	// TODO: Eliminate the unneeded now variable once we stop compiling in go1.3.
-	// It's needed at the moment because go1.3 requires ranges to be assigned to
-	// something to compile, and gofmt1.4 complains about using `_ = range`.
-	for now := range time.Tick(period) {
-		_ = now
+	for range time.Tick(period) {
 		nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
 		if err != nil {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)

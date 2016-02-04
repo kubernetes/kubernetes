@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -198,7 +198,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			return err
 		}
 
-		request := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		request := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, filename).
@@ -235,6 +235,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	// than the old rc. This selector is the hash of the rc, which will differ because the new rc has a
 	// different image.
 	if len(image) != 0 {
+		codec := registered.GroupOrDie(client.APIVersion().Group).Codec
 		keepOldName = len(args) == 1
 		newName := findNewName(args, oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(client, cmdNamespace, newName); err != nil {
@@ -249,14 +250,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
 				return cmdutil.UsageError(cmd, "Specified --image must be distinct from existing container image")
 			}
-			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, client.Codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
+			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
 			if err != nil {
 				return err
 			}
 		}
 		// Update the existing replication controller with pointers to the 'next' controller
 		// and adding the <deploymentKey> label if necessary to distinguish it from the 'next' controller.
-		oldHash, err := api.HashObject(oldRc, client.Codec)
+		oldHash, err := api.HashObject(oldRc, codec)
 		if err != nil {
 			return err
 		}
@@ -385,12 +386,9 @@ func isReplicasDefaulted(info *resource.Info) bool {
 		// was unable to recover versioned info
 		return false
 	}
-
-	switch info.Mapping.GroupVersionKind.GroupVersion() {
-	case unversioned.GroupVersion{Version: "v1"}:
-		if rc, ok := info.VersionedObject.(*v1.ReplicationController); ok {
-			return rc.Spec.Replicas == nil
-		}
+	switch t := info.VersionedObject.(type) {
+	case *v1.ReplicationController:
+		return t.Spec.Replicas == nil
 	}
 	return false
 }

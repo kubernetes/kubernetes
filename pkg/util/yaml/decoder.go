@@ -136,7 +136,7 @@ func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
 // provide object, or returns an error.
 func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.decoder == nil {
-		buffer, isJSON := guessJSONStream(d.r, d.bufferSize)
+		buffer, isJSON := GuessJSONStream(d.r, d.bufferSize)
 		if isJSON {
 			glog.V(4).Infof("decoding stream as JSON")
 			d.decoder = json.NewDecoder(buffer)
@@ -148,10 +148,10 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	return d.decoder.Decode(into)
 }
 
-// guessJSONStream scans the provided reader up to size, looking
+// GuessJSONStream scans the provided reader up to size, looking
 // for an open brace indicating this is JSON. It will return the
 // bufio.Reader it creates for the consumer.
-func guessJSONStream(r io.Reader, size int) (io.Reader, bool) {
+func GuessJSONStream(r io.Reader, size int) (io.Reader, bool) {
 	buffer := bufio.NewReaderSize(r, size)
 	b, _ := buffer.Peek(size)
 	return buffer, hasJSONPrefix(b)

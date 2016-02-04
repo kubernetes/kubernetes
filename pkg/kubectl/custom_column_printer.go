@@ -26,7 +26,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
@@ -74,7 +73,7 @@ func massageJSONPath(pathExpression string) (string, error) {
 //
 //      NAME               API_VERSION
 //      foo                bar
-func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error) {
+func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder) (*CustomColumnsPrinter, error) {
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
@@ -91,7 +90,7 @@ func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error)
 		}
 		columns[ix] = Column{Header: colSpec[0], FieldSpec: spec}
 	}
-	return &CustomColumnsPrinter{Columns: columns}, nil
+	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder}, nil
 }
 
 func splitOnWhitespace(line string) []string {
@@ -109,7 +108,7 @@ func splitOnWhitespace(line string) []string {
 // For example the template below:
 // NAME               API_VERSION
 // {metadata.name}    {apiVersion}
-func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColumnsPrinter, error) {
+func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader, decoder runtime.Decoder) (*CustomColumnsPrinter, error) {
 	scanner := bufio.NewScanner(templateReader)
 	if !scanner.Scan() {
 		return nil, fmt.Errorf("invalid template, missing header line. Expected format is one line of space separated headers, one line of space separated column specs.")
@@ -136,7 +135,7 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColum
 			FieldSpec: spec,
 		}
 	}
-	return &CustomColumnsPrinter{Columns: columns}, nil
+	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder}, nil
 }
 
 // Column represents a user specified column
@@ -152,6 +151,7 @@ type Column struct {
 // of data from templates specified in the `Columns` array
 type CustomColumnsPrinter struct {
 	Columns []Column
+	Decoder runtime.Decoder
 }
 
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
@@ -191,9 +191,11 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	columns := make([]string, len(parsers))
 	switch u := obj.(type) {
 	case *runtime.Unknown:
-		var err error
-		if obj, err = api.Codec.Decode(u.RawJSON); err != nil {
-			return err
+		if len(u.RawJSON) > 0 {
+			var err error
+			if obj, err = runtime.Decode(s.Decoder, u.RawJSON); err != nil {
+				return fmt.Errorf("can't decode object for printing: %v (%s)", err, u.RawJSON)
+			}
 		}
 	}
 	for ix := range parsers {

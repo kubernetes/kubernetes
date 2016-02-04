@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // Config contains all the settings for a Controller.
@@ -79,7 +80,7 @@ func New(c *Config) *Controller {
 // It's an error to call Run more than once.
 // Run blocks; call via go.
 func (c *Controller) Run(stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	r := cache.NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,

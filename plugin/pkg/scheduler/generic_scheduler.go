@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -41,17 +42,15 @@ type FitError struct {
 
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
-// implementation of the error interface
+// Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
-	var reason string
-	// We iterate over all nodes for logging purposes, even though we only return one reason from one node
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
 	for node, predicateList := range f.FailedPredicates {
-		glog.V(2).Infof("Failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
-		if len(reason) == 0 {
-			reason, _ = predicateList.PopAny()
-		}
+		reason := fmt.Sprintf("fit failure on node (%s): %s\n", node, strings.Join(predicateList.List(), ","))
+		buf.WriteString(reason)
 	}
-	return fmt.Sprintf("Failed for reason %s and possibly others", reason)
+	return buf.String()
 }
 
 type genericScheduler struct {
@@ -127,18 +126,25 @@ func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predica
 	for _, node := range nodes.Items {
 		fits := true
 		for name, predicate := range predicateFuncs {
-			predicates.FailedResourceType = ""
 			fit, err := predicate(pod, machineToPods[node.Name], node.Name)
 			if err != nil {
-				return api.NodeList{}, FailedPredicateMap{}, err
+				switch e := err.(type) {
+				case *predicates.InsufficientResourceError:
+					if fit {
+						err := fmt.Errorf("got InsufficientResourceError: %v, but also fit='true' which is unexpected", e)
+						return api.NodeList{}, FailedPredicateMap{}, err
+					}
+				default:
+					return api.NodeList{}, FailedPredicateMap{}, err
+				}
 			}
 			if !fit {
 				fits = false
 				if _, found := failedPredicateMap[node.Name]; !found {
 					failedPredicateMap[node.Name] = sets.String{}
 				}
-				if predicates.FailedResourceType != "" {
-					failedPredicateMap[node.Name].Insert(predicates.FailedResourceType)
+				if re, ok := err.(*predicates.InsufficientResourceError); ok {
+					failedPredicateMap[node.Name].Insert(re.Error())
 					break
 				}
 				failedPredicateMap[node.Name].Insert(name)

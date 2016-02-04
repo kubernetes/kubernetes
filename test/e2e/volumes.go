@@ -42,6 +42,7 @@ package e2e
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,16 +168,19 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 		glog.Warningf("Failed to delete client pod: %v", err)
 		expectNoError(err, "Failed to delete client pod: %v", err)
 	}
-	err = podClient.Delete(config.prefix+"-server", nil)
-	if err != nil {
-		glog.Warningf("Failed to delete server pod: %v", err)
-		expectNoError(err, "Failed to delete server pod: %v", err)
+
+	if config.serverImage != "" {
+		err = podClient.Delete(config.prefix+"-server", nil)
+		if err != nil {
+			glog.Warningf("Failed to delete server pod: %v", err)
+			expectNoError(err, "Failed to delete server pod: %v", err)
+		}
 	}
 }
 
 // Start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees the data from the server pod.
-func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, expectedContent string) {
+func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, fsGroup *int64, expectedContent string) {
 	By(fmt.Sprint("starting ", config.prefix, " client"))
 	podClient := client.Pods(config.namespace)
 
@@ -211,6 +215,11 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 					},
 				},
 			},
+			SecurityContext: &api.PodSecurityContext{
+				SELinuxOptions: &api.SELinuxOptions{
+					Level: "s0:c0,c1",
+				},
+			},
 			Volumes: []api.Volume{
 				{
 					Name:         config.prefix + "-volume",
@@ -219,6 +228,10 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 			},
 		},
 	}
+	if fsGroup != nil {
+		clientPod.Spec.SecurityContext.FSGroup = fsGroup
+	}
+
 	if _, err := podClient.Create(clientPod); err != nil {
 		Failf("Failed to create %s pod: %v", clientPod.Name, err)
 	}
@@ -250,6 +263,12 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 
 	By("checking the page content")
 	Expect(body).To(ContainSubstring(expectedContent))
+
+	if fsGroup != nil {
+		By("Checking fsGroup")
+		_, err = lookForStringInPodExec(config.namespace, clientPod.Name, []string{"ls", "-ld", "/usr/share/nginx/html"}, strconv.Itoa(int(*fsGroup)), time.Minute)
+		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
+	}
 }
 
 // Insert index.html with given content into given volume. It does so by
@@ -283,6 +302,11 @@ func injectHtml(client *client.Client, config VolumeTestConfig, volume api.Volum
 							MountPath: "/mnt",
 						},
 					},
+				},
+			},
+			SecurityContext: &api.PodSecurityContext{
+				SELinuxOptions: &api.SELinuxOptions{
+					Level: "s0:c0,c1",
 				},
 			},
 			RestartPolicy: api.RestartPolicyNever,
@@ -326,10 +350,9 @@ func deleteCinderVolume(name string) error {
 	return err
 }
 
-// Marked with [Skipped] to skip the test by default (see driver.go),
-// these tests needs privileged containers, which are disabled by default.
-// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-var _ = Describe("Volumes [Skipped]", func() {
+// These tests need privileged containers, which are disabled by default.  Run
+// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+var _ = Describe("Volumes [Feature:Volumes]", func() {
 	framework := NewFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -374,7 +397,7 @@ var _ = Describe("Volumes [Skipped]", func() {
 				},
 			}
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			testVolumeClient(c, config, volume, "Hello from NFS!")
+			testVolumeClient(c, config, volume, nil, "Hello from NFS!")
 		})
 	})
 
@@ -448,7 +471,7 @@ var _ = Describe("Volumes [Skipped]", func() {
 				},
 			}
 			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(c, config, volume, "Hello from GlusterFS!")
+			testVolumeClient(c, config, volume, nil, "Hello from GlusterFS!")
 		})
 	})
 
@@ -487,14 +510,15 @@ var _ = Describe("Volumes [Skipped]", func() {
 				ISCSI: &api.ISCSIVolumeSource{
 					TargetPortal: serverIP + ":3260",
 					// from test/images/volumes-tester/iscsi/initiatorname.iscsi
-					IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
-					Lun:      0,
-					FSType:   "ext2",
-					ReadOnly: true,
+					IQN:    "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
+					Lun:    0,
+					FSType: "ext2",
 				},
 			}
+
+			fsGroup := int64(1234)
 			// Must match content of test/images/volumes-tester/iscsi/block.tar.gz
-			testVolumeClient(c, config, volume, "Hello from iSCSI")
+			testVolumeClient(c, config, volume, &fsGroup, "Hello from iSCSI")
 		})
 	})
 
@@ -561,12 +585,13 @@ var _ = Describe("Volumes [Skipped]", func() {
 					SecretRef: &api.LocalObjectReference{
 						Name: config.prefix + "-secret",
 					},
-					FSType:   "ext2",
-					ReadOnly: true,
+					FSType: "ext2",
 				},
 			}
+			fsGroup := int64(1234)
+
 			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(c, config, volume, "Hello from RBD")
+			testVolumeClient(c, config, volume, &fsGroup, "Hello from RBD")
 
 		})
 	})
@@ -632,7 +657,7 @@ var _ = Describe("Volumes [Skipped]", func() {
 				},
 			}
 			// Must match content of contrib/for-tests/volumes-ceph/ceph/index.html
-			testVolumeClient(c, config, volume, "Hello Ceph!")
+			testVolumeClient(c, config, volume, nil, "Hello Ceph!")
 		})
 	})
 
@@ -705,7 +730,8 @@ var _ = Describe("Volumes [Skipped]", func() {
 			content := "Hello from Cinder from namespace " + volumeName
 			injectHtml(c, config, volume, content)
 
-			testVolumeClient(c, config, volume, content)
+			fsGroup := int64(1234)
+			testVolumeClient(c, config, volume, &fsGroup, content)
 		})
 	})
 })

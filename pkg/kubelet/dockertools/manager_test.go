@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
@@ -448,7 +449,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 				},
 				{Name: "bar"}}},
 	}
-	podString, err := testapi.Default.Codec().Encode(pod)
+	podString, err := runtime.Encode(testapi.Default.Codec(), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -542,15 +543,23 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 // runSyncPod is a helper function to retrieve the running pods from the fake
 // docker client and runs SyncPod for the given pod.
 func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff, expectErr bool) {
-	podStatus, apiPodStatus, err := dm.GetPodStatusAndAPIPodStatus(pod)
+	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	var apiPodStatus *api.PodStatus
+	apiPodStatus, err = dm.ConvertPodStatusToAPIPodStatus(pod, podStatus)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	fakeDocker.ClearCalls()
 	if backOff == nil {
 		backOff = util.NewBackOff(time.Second, time.Minute)
 	}
-	err = dm.SyncPod(pod, *apiPodStatus, podStatus, []api.Secret{}, backOff)
+	//TODO(random-liu): Add test for PodSyncResult
+	result := dm.SyncPod(pod, *apiPodStatus, podStatus, []api.Secret{}, backOff)
+	err = result.Error()
 	if err != nil && !expectErr {
 		t.Errorf("unexpected error: %v", err)
 	} else if err == nil && expectErr {
@@ -1019,7 +1028,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 			api.RestartPolicyNever,
 			[]string{
 				// Check the pod infra container.
-				"inspect_container", "inspect_container",
+				"inspect_container", "inspect_container", "inspect_container",
 				// Stop the last pod infra container.
 				"stop",
 			},
@@ -1036,10 +1045,10 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 		verifyCalls(t, fakeDocker, tt.calls)
 
 		if err := fakeDocker.AssertCreated(tt.created); err != nil {
-			t.Errorf("%d: %v", i, err)
+			t.Errorf("case [%d]: %v", i, err)
 		}
 		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
-			t.Errorf("%d: %v", i, err)
+			t.Errorf("case [%d]: %v", i, err)
 		}
 	}
 }
@@ -1151,7 +1160,7 @@ func TestGetAPIPodStatusWithLastTermination(t *testing.T) {
 }
 
 func TestSyncPodBackoff(t *testing.T) {
-	var fakeClock = &util.FakeClock{Time: time.Now()}
+	var fakeClock = util.NewFakeClock(time.Now())
 	startTime := fakeClock.Now()
 
 	dm, fakeDocker := newTestDockerManager()
@@ -1223,7 +1232,7 @@ func TestSyncPodBackoff(t *testing.T) {
 	backOff.Clock = fakeClock
 	for _, c := range tests {
 		fakeDocker.SetFakeContainers(dockerContainers)
-		fakeClock.Time = startTime.Add(time.Duration(c.tick) * time.Second)
+		fakeClock.SetTime(startTime.Add(time.Duration(c.tick) * time.Second))
 
 		runSyncPod(t, dm, fakeDocker, pod, backOff, c.expectErr)
 		verifyCalls(t, fakeDocker, c.result)
@@ -1776,7 +1785,7 @@ func TestVerifyNonRoot(t *testing.T) {
 					User: "foo",
 				},
 			},
-			expectedError: "unable to validate image is non-root, non-numeric user",
+			expectedError: "non-numeric user",
 		},
 		"numeric root image user": {
 			container: &api.Container{},
@@ -1811,10 +1820,10 @@ func TestVerifyNonRoot(t *testing.T) {
 		fakeDocker.Image = v.inspectImage
 		err := dm.verifyNonRoot(v.container)
 		if v.expectedError == "" && err != nil {
-			t.Errorf("%s had unexpected error %v", k, err)
+			t.Errorf("case[%q]: unexpected error: %v", k, err)
 		}
 		if v.expectedError != "" && !strings.Contains(err.Error(), v.expectedError) {
-			t.Errorf("%s expected error %s but received %s", k, v.expectedError, err.Error())
+			t.Errorf("case[%q]: expected: %q, got: %q", k, v.expectedError, err.Error())
 		}
 	}
 }

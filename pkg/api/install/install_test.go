@@ -18,11 +18,13 @@ package install
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	internal "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -47,9 +49,9 @@ func TestResourceVersioner(t *testing.T) {
 
 func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
-	// We do want to use package latest rather than testapi here, because we
-	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie(internal.GroupName).Codec.Encode(&pod)
+	// We do want to use package registered rather than testapi here, because we
+	// want to test if the package install and package registered work as expected.
+	data, err := runtime.Encode(internal.Codecs.LegacyCodec(registered.GroupOrDie(internal.GroupName).GroupVersion), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -57,17 +59,17 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie(internal.GroupName).GroupVersion.Version || other.Kind != "Pod" {
+	if other.APIVersion != registered.GroupOrDie(internal.GroupName).GroupVersion.Version || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie(internal.GroupName).InterfacesFor(internal.SchemeGroupVersion); err == nil {
+	if _, err := registered.GroupOrDie(internal.GroupName).InterfacesFor(internal.SchemeGroupVersion); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, version := range latest.GroupOrDie(internal.GroupName).GroupVersions {
-		if vi, err := latest.GroupOrDie(internal.GroupName).InterfacesFor(version); err != nil || vi == nil {
+	for i, version := range registered.GroupOrDie(internal.GroupName).GroupVersions {
+		if vi, err := registered.GroupOrDie(internal.GroupName).InterfacesFor(version); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
@@ -78,16 +80,16 @@ func TestRESTMapper(t *testing.T) {
 	rcGVK := gv.WithKind("ReplicationController")
 	podTemplateGVK := gv.WithKind("PodTemplate")
 
-	if gvk, err := latest.GroupOrDie(internal.GroupName).RESTMapper.KindFor(internal.SchemeGroupVersion.WithResource("replicationcontrollers")); err != nil || gvk != rcGVK {
+	if gvk, err := registered.GroupOrDie(internal.GroupName).RESTMapper.KindFor(internal.SchemeGroupVersion.WithResource("replicationcontrollers")); err != nil || gvk != rcGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := latest.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
+	if m, err := registered.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie(internal.GroupName).GroupVersions {
-		mapping, err := latest.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(rcGVK.GroupKind(), version.Version)
+	for _, version := range registered.GroupOrDie(internal.GroupName).GroupVersions {
+		mapping, err := registered.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(rcGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -99,9 +101,9 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect version: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie(internal.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
+		interfaces, _ := registered.GroupOrDie(internal.GroupName).InterfacesFor(version)
+		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
+			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
 		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}
@@ -111,6 +113,17 @@ func TestRESTMapper(t *testing.T) {
 		}
 		if name != "foo" {
 			t.Errorf("unable to retrieve object meta with: %v", mapping.MetadataAccessor)
+		}
+	}
+}
+
+func TestUnversioned(t *testing.T) {
+	for _, obj := range []runtime.Object{
+		&unversioned.Status{},
+		&unversioned.ExportOptions{},
+	} {
+		if unversioned, ok := internal.Scheme.IsUnversioned(obj); !unversioned || !ok {
+			t.Errorf("%v is expected to be unversioned", reflect.TypeOf(obj))
 		}
 	}
 }

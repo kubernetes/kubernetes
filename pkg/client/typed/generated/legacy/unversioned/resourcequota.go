@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ResourceQuotaNamespacer has methods to work with ResourceQuota resources in a namespace
-type ResourceQuotaNamespacer interface {
+// ResourceQuotasGetter has a method to return a ResourceQuotaInterface.
+// A group's client should implement this interface.
+type ResourceQuotasGetter interface {
 	ResourceQuotas(namespace string) ResourceQuotaInterface
 }
 
@@ -58,7 +59,7 @@ func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.R
 	result = &api.ResourceQuota{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Body(resourceQuota).
 		Do().
 		Into(result)
@@ -70,7 +71,7 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	result = &api.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(resourceQuota.Name).
 		Body(resourceQuota).
 		Do().
@@ -78,17 +79,24 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	return
 }
 
-func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	result := &api.ResourceQuota{}
-	err := c.client.Put().Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
-	return result, err
+func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
+	result = &api.ResourceQuota{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		Name(resourceQuota.Name).
+		SubResource("status").
+		Body(resourceQuota).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.
 func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(name).
 		Body(options).
 		Do().
@@ -99,8 +107,8 @@ func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
-		VersionedParams(&listOptions, api.Scheme).
+		Resource("resourcequotas").
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -111,7 +119,7 @@ func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error)
 	result = &api.ResourceQuota{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(name).
 		Do().
 		Into(result)
@@ -123,8 +131,8 @@ func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaLi
 	result = &api.ResourceQuotaList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
-		VersionedParams(&opts, api.Scheme).
+		Resource("resourcequotas").
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -135,7 +143,7 @@ func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("resourceQuotas").
-		VersionedParams(&opts, api.Scheme).
+		Resource("resourcequotas").
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

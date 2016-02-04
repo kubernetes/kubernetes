@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -66,6 +66,7 @@ import (
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
@@ -160,7 +161,24 @@ func New(c *Config) *Master {
 func (m *Master) InstallAPIs(c *Config) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
-	// Run the tunnel.
+	// Install v1 unless disabled.
+	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
+		// Install v1 API.
+		m.initV1ResourcesStorage(c)
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *registered.GroupOrDie(api.GroupName),
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": m.v1ResourcesStorage,
+			},
+			IsLegacyGroup:        true,
+			Scheme:               api.Scheme,
+			ParameterCodec:       api.ParameterCodec,
+			NegotiatedSerializer: api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+	}
+
+	// Run the tunneler.
 	healthzChecks := []healthz.HealthzChecker{}
 	if m.tunneler != nil {
 		m.tunneler.Run(m.getNodeAddresses)
@@ -174,20 +192,6 @@ func (m *Master) InstallAPIs(c *Config) {
 	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
 	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, c.EnableProfiling, healthzChecks...)
 
-	// Install v1 unless disabled.
-	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
-		// Install v1 API.
-		m.initV1ResourcesStorage(c)
-		apiGroupInfo := genericapiserver.APIGroupInfo{
-			GroupMeta: *latest.GroupOrDie(api.GroupName),
-			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-				"v1": m.v1ResourcesStorage,
-			},
-			IsLegacyGroup: true,
-		}
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-	}
-
 	// Install root web services
 	m.HandlerContainer.Add(m.RootWebService)
 
@@ -199,7 +203,7 @@ func (m *Master) InstallAPIs(c *Config) {
 		m.thirdPartyResources = map[string]thirdPartyEntry{}
 
 		extensionResources := m.getExtensionResources(c)
-		extensionsGroupMeta := latest.GroupOrDie(extensions.GroupName)
+		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 		// Update the prefered version as per StorageVersions in the config.
 		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
 		if !found {
@@ -216,7 +220,10 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1beta1": extensionResources,
 			},
-			OptionsExternalVersion: &latest.GroupOrDie(api.GroupName).GroupVersion,
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
@@ -237,7 +244,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// This should be done after all groups are registered
 	// TODO: replace the hardcoded "apis".
-	apiserver.AddApisWebService(m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
+	apiserver.AddApisWebService(m.Serializer, m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
 		groups := []unversioned.APIGroup{}
 		for ix := range allGroups {
 			groups = append(groups, allGroups[ix])
@@ -267,6 +274,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	serviceAccountStorage := serviceaccountetcd.NewREST(dbClient("serviceAccounts"), storageDecorator)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(dbClient("persistentVolumes"), storageDecorator)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(dbClient("persistentVolumeClaims"), storageDecorator)
+	configMapStorage := configmapetcd.NewREST(dbClient("configMaps"), storageDecorator)
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(dbClient("namespaces"), storageDecorator)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -284,7 +292,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		m.ProxyTransport,
 	)
 
-	serviceStorage := serviceetcd.NewREST(dbClient("services"), storageDecorator)
+	serviceStorage, serviceStatusStorage := serviceetcd.NewREST(dbClient("services"), storageDecorator)
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
 
 	var serviceClusterIPRegistry service.RangeRegistry
@@ -328,6 +336,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"replicationControllers":        controllerStorage,
 		"replicationControllers/status": controllerStatusStorage,
 		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
+		"services/status":               serviceStatusStorage,
 		"endpoints":                     endpointsStorage,
 		"nodes":                         nodeStorage,
 		"nodes/status":                  nodeStatusStorage,
@@ -345,6 +354,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
+		"configMaps":                    configMapStorage,
 
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
@@ -517,9 +527,9 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Name:     group,
 		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
 	}
-	apiserver.AddGroupWebService(m.HandlerContainer, path, apiGroup)
+	apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
-	apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
+	apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
 
@@ -532,22 +542,26 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	optionsExternalVersion := latest.GroupOrDie(api.GroupName).GroupVersion
+	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion
+	internalVersion := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
+	externalVersion := unversioned.GroupVersion{Group: group, Version: version}
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
-		GroupVersion:        unversioned.GroupVersion{Group: group, Version: version},
+		GroupVersion:        externalVersion,
 		RequestInfoResolver: m.NewRequestInfoResolver(),
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:                 thirdpartyresourcedata.NewMapper(latest.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
-		Codec:                  thirdpartyresourcedata.NewCodec(latest.GroupOrDie(extensions.GroupName).Codec, kind),
-		Linker:                 latest.GroupOrDie(extensions.GroupName).SelfLinker,
+		Mapper:                 thirdpartyresourcedata.NewMapper(registered.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
+		Linker:                 registered.GroupOrDie(extensions.GroupName).SelfLinker,
 		Storage:                storage,
 		OptionsExternalVersion: &optionsExternalVersion,
+
+		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
+		ParameterCodec: api.ParameterCodec,
 
 		Context: m.RequestContextMapper,
 
@@ -558,7 +572,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // getExperimentalResources returns the resources for extenstions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses", "configmaps")
+	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
@@ -609,6 +623,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/scale"] = deploymentStorage.Scale
+		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
 	if isEnabled("jobs") {
 		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
@@ -619,9 +634,6 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
-	}
-	if isEnabled("configmaps") {
-		storage["configmaps"] = configmapetcd.NewREST(dbClient("configmaps"), storageDecorator)
 	}
 
 	return storage

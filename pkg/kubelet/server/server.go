@@ -18,14 +18,13 @@ package server
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,7 +37,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -49,12 +47,14 @@ import (
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 )
 
@@ -222,7 +222,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Handle("/stats/", &httpHandler{f: s.handleStats})
+	s.restfulCont.Add(stats.CreateHandlers(s.host))
 	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	ws = new(restful.WebService)
@@ -357,13 +357,6 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.f(w, r)
 }
 
-// error serializes an error object into an HTTP response.
-func (s *Server) error(w http.ResponseWriter, err error) {
-	msg := fmt.Sprintf("Internal Error: %v", err)
-	glog.Infof("HTTP InternalServerError: %s", msg)
-	http.Error(w, msg, http.StatusInternalServerError)
-}
-
 // Checks if kubelet's sync loop  that updates containers is working.
 func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	duration := s.host.ResyncInterval() * 2
@@ -410,18 +403,12 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 			delete(query, "tailLines")
 		}
 	}
-	// container logs on the kubelet are locked to v1
-	versioned := &v1.PodLogOptions{}
-	if err := api.Scheme.Convert(&query, versioned); err != nil {
+	// container logs on the kubelet are locked to the v1 API version of PodLogOptions
+	logOptions := &api.PodLogOptions{}
+	if err := api.ParameterCodec.DecodeParameters(query, v1.SchemeGroupVersion, logOptions); err != nil {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to decode query."}`))
 		return
 	}
-	out, err := api.Scheme.ConvertToVersion(versioned, "")
-	if err != nil {
-		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to convert request query."}`))
-		return
-	}
-	logOptions := out.(*api.PodLogOptions)
 	logOptions.TypeMeta = unversioned.TypeMeta{}
 	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
 		response.WriteError(apierrs.StatusUnprocessableEntity, fmt.Errorf(`{"message": "Invalid request."}`))
@@ -430,7 +417,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
 	if !ok {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("Pod %q does not exist", podID))
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod %q does not exist\n", podID))
 		return
 	}
 	// Check if containerName is valid.
@@ -441,12 +428,12 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		}
 	}
 	if !containerExists {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("Container %q not found in Pod %q", containerName, podID))
+		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q\n", containerName, podID))
 		return
 	}
 
 	if _, ok := response.ResponseWriter.(http.Flusher); !ok {
-		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher", response))
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs\n", reflect.TypeOf(response)))
 		return
 	}
 	fw := flushwriter.Wrap(response.ResponseWriter)
@@ -454,10 +441,9 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		fw = limitwriter.New(fw, *logOptions.LimitBytes)
 	}
 	response.Header().Set("Transfer-Encoding", "chunked")
-	response.WriteHeader(http.StatusOK)
 	if err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
 		if err != limitwriter.ErrMaximumWrite {
-			response.WriteError(http.StatusInternalServerError, err)
+			response.WriteError(http.StatusBadRequest, err)
 		}
 		return
 	}
@@ -470,7 +456,11 @@ func encodePods(pods []*api.Pod) (data []byte, err error) {
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
-	return latest.GroupOrDie(api.GroupName).Codec.Encode(podList)
+	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
+	//   as API server refactor.
+	// TODO: Locked to v1, needs to be made generic
+	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"})
+	return runtime.Encode(codec, podList)
 }
 
 // getPods returns a list of pods bound to the Kubelet and their spec.
@@ -499,11 +489,6 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 		return
 	}
 	response.Write(data)
-}
-
-// handleStats handles stats requests against the Kubelet.
-func (s *Server) handleStats(w http.ResponseWriter, req *http.Request) {
-	s.serveStats(w, req)
 }
 
 // getLogs handles logs requests against the Kubelet.
@@ -778,7 +763,7 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
 		// Handshake writes the error to the client
-		util.HandleError(err)
+		utilruntime.HandleError(err)
 		return
 	}
 
@@ -880,7 +865,7 @@ func (h *portForwardStreamHandler) monitorStreamPair(p *portForwardStreamPair, t
 	select {
 	case <-timeout:
 		err := fmt.Errorf("(conn=%p, request=%s) timed out waiting for streams", h.conn, p.requestID)
-		util.HandleError(err)
+		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
 		glog.V(5).Infof("(conn=%p, request=%s) successfully received error and data streams", h.conn, p.requestID)
@@ -964,7 +949,7 @@ Loop:
 			}
 			if complete, err := p.add(stream); err != nil {
 				msg := fmt.Sprintf("error processing stream for request %s: %v", requestID, err)
-				util.HandleError(errors.New(msg))
+				utilruntime.HandleError(errors.New(msg))
 				p.printError(msg)
 			} else if complete {
 				go h.portForward(p)
@@ -988,7 +973,7 @@ func (h *portForwardStreamHandler) portForward(p *portForwardStreamPair) {
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
-		util.HandleError(msg)
+		utilruntime.HandleError(msg)
 		fmt.Fprint(p.errorStream, msg.Error())
 	}
 }
@@ -1060,108 +1045,4 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		),
 	).Log()
 	s.restfulCont.ServeHTTP(w, req)
-}
-
-type StatsRequest struct {
-	// The name of the container for which to request stats.
-	// Default: /
-	ContainerName string `json:"containerName,omitempty"`
-
-	// Max number of stats to return.
-	// If start and end time are specified this limit is ignored.
-	// Default: 60
-	NumStats int `json:"num_stats,omitempty"`
-
-	// Start time for which to query information.
-	// If omitted, the beginning of time is assumed.
-	Start time.Time `json:"start,omitempty"`
-
-	// End time for which to query information.
-	// If omitted, current time is assumed.
-	End time.Time `json:"end,omitempty"`
-
-	// Whether to also include information from subcontainers.
-	// Default: false.
-	Subcontainers bool `json:"subcontainers,omitempty"`
-}
-
-// serveStats implements stats logic.
-func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// Stats requests are in the following forms:
-	//
-	// /stats/                                              : Root container stats
-	// /stats/container/                                    : Non-Kubernetes container stats (returns a map)
-	// /stats/<pod name>/<container name>                   : Stats for Kubernetes pod/container
-	// /stats/<namespace>/<pod name>/<uid>/<container name> : Stats for Kubernetes namespace/pod/uid/container
-	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
-	var stats interface{}
-	var err error
-	var query StatsRequest
-	query.NumStats = 60
-
-	err = json.NewDecoder(req.Body).Decode(&query)
-	if err != nil && err != io.EOF {
-		s.error(w, err)
-		return
-	}
-	cadvisorRequest := cadvisorapi.ContainerInfoRequest{
-		NumStats: query.NumStats,
-		Start:    query.Start,
-		End:      query.End,
-	}
-
-	switch len(components) {
-	case 1:
-		// Root container stats.
-		var statsMap map[string]*cadvisorapi.ContainerInfo
-		statsMap, err = s.host.GetRawContainerInfo("/", &cadvisorRequest, false)
-		stats = statsMap["/"]
-	case 2:
-		// Non-Kubernetes container stats.
-		if components[1] != "container" {
-			http.Error(w, fmt.Sprintf("unknown stats request type %q", components[1]), http.StatusNotFound)
-			return
-		}
-		containerName := path.Join("/", query.ContainerName)
-		stats, err = s.host.GetRawContainerInfo(containerName, &cadvisorRequest, query.Subcontainers)
-	case 3:
-		// Backward compatibility without uid information, does not support namespace
-		pod, ok := s.host.GetPodByName(api.NamespaceDefault, components[1])
-		if !ok {
-			http.Error(w, "Pod does not exist", http.StatusNotFound)
-			return
-		}
-		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), "", components[2], &cadvisorRequest)
-	case 5:
-		pod, ok := s.host.GetPodByName(components[1], components[2])
-		if !ok {
-			http.Error(w, "Pod does not exist", http.StatusNotFound)
-			return
-		}
-		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), types.UID(components[3]), components[4], &cadvisorRequest)
-	default:
-		http.Error(w, fmt.Sprintf("Unknown resource: %v", components), http.StatusNotFound)
-		return
-	}
-	switch err {
-	case nil:
-		break
-	case kubecontainer.ErrContainerNotFound:
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	default:
-		s.error(w, err)
-		return
-	}
-	if stats == nil {
-		fmt.Fprint(w, "{}")
-		return
-	}
-	data, err := json.Marshal(stats)
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	w.Header().Add("Content-type", "application/json")
-	w.Write(data)
 }

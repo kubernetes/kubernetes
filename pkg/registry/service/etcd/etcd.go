@@ -32,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/services/specs"
 
 	newListFunc := func() runtime.Object { return &api.ServiceList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.Service{}, prefix, false, newListFunc)
+		s, 100, &api.Service{}, prefix, service.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Service{} },
@@ -61,5 +61,21 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 		Storage: storageInterface,
 	}
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = service.StatusStrategy
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a service.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.Service{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

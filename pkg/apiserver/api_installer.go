@@ -65,7 +65,13 @@ var errEmptyName = errors.NewBadRequest("name must be provided")
 func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
 	errors = make([]error, 0)
 
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
+	proxyHandler := (&ProxyHandler{
+		prefix:              a.prefix + "/proxy/",
+		storage:             a.group.Storage,
+		serializer:          a.group.Serializer,
+		context:             a.group.Context,
+		requestInfoResolver: a.info,
+	})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
@@ -93,9 +99,11 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws.Path(a.prefix)
 	// a.prefix contains "prefix/group/version"
 	ws.Doc("API at " + a.prefix)
-	// TODO: change to restful.MIME_JSON when we set content type in client
+	// Backwards compatibilty, we accepted objects with empty content-type at V1.
+	// If we stop using go-restful, we can default empty content-type to application/json on an
+	// endpoint by endpoint basis
 	ws.Consumes("*/*")
-	ws.Produces(restful.MIME_JSON)
+	ws.Produces(a.group.Serializer.SupportedMediaTypes()...)
 	ws.ApiVersion(a.group.GroupVersion.String())
 
 	return ws
@@ -144,10 +152,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
+	kind := fqKindToRegister.Kind
+
 	if fqKindToRegister.IsEmpty() {
 		return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
-	kind := fqKindToRegister.Kind
 
 	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(kind))
 	if err != nil {
@@ -262,19 +271,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		getOptions             runtime.Object
 		versionedGetOptions    runtime.Object
 		getOptionsInternalKind unversioned.GroupVersionKind
-		getOptionsExternalKind unversioned.GroupVersionKind
 		getSubpath             bool
-		getSubpathKey          string
 	)
 	if isGetterWithOptions {
-		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
+		getOptions, getSubpath, _ = getterWithOptions.NewGetOptions()
 		getOptionsInternalKind, err = a.group.Typer.ObjectKind(getOptions)
 		if err != nil {
 			return nil, err
 		}
-		// TODO this should be a list of all the different external versions we can coerce into the internalKind
-		getOptionsExternalKind = optionsExternalVersion.WithKind(getOptionsInternalKind.Kind)
-
 		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
 			return nil, err
@@ -286,19 +290,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		connectOptions             runtime.Object
 		versionedConnectOptions    runtime.Object
 		connectOptionsInternalKind unversioned.GroupVersionKind
-		connectOptionsExternalKind unversioned.GroupVersionKind
 		connectSubpath             bool
-		connectSubpathKey          string
 	)
 	if isConnecter {
-		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
+		connectOptions, connectSubpath, _ = connecter.NewConnectOptions()
 		if connectOptions != nil {
 			connectOptionsInternalKind, err = a.group.Typer.ObjectKind(connectOptions)
 			if err != nil {
 				return nil, err
 			}
-			// TODO this should be a list of all the different external versions we can coerce into the internalKind
-			connectOptionsExternalKind = optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind)
 
 			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
 		}
@@ -323,6 +323,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	params := []*restful.Parameter{}
 	actions := []action{}
 
+	var resourceKind string
+	kindProvider, ok := storage.(rest.KindProvider)
+	if ok {
+		resourceKind = kindProvider.Kind()
+	} else {
+		resourceKind = fqKindToRegister.Kind
+	}
+
 	var apiResource unversioned.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
@@ -340,6 +348,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		apiResource.Name = path
 		apiResource.Namespaced = false
+		apiResource.Kind = resourceKind
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -382,6 +391,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		apiResource.Name = path
 		apiResource.Namespaced = true
+		apiResource.Kind = resourceKind
 		namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
@@ -434,10 +444,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc: ctxFn,
-		Creater:     a.group.Creater,
-		Convertor:   a.group.Convertor,
-		Codec:       mapping.Codec,
+		ContextFunc:    ctxFn,
+		Serializer:     a.group.Serializer,
+		ParameterCodec: a.group.ParameterCodec,
+		Creater:        a.group.Creater,
+		Convertor:      a.group.Convertor,
 
 		Resource:    a.group.GroupVersion.WithResource(resource),
 		Subresource: subresource,
@@ -454,7 +465,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, exporter, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope)
 			} else {
 				handler = GetResource(getter, exporter, reqScope)
 			}
@@ -467,7 +478,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
 			if isGetterWithOptions {
@@ -492,7 +503,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)).
-				Produces("application/json").
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
@@ -524,7 +535,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(versionedObject).
 				Writes(versionedObject)
@@ -541,7 +552,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(unversioned.Patch{}).
 				Writes(versionedObject)
@@ -563,7 +574,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(versionedObject).
 				Writes(versionedObject)
@@ -579,7 +590,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
 			if isGracefulDeleter {
@@ -597,7 +608,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
@@ -658,7 +669,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, admit, connectOptionsInternalKind, connectOptionsExternalKind, path, connectSubpath, connectSubpathKey)).
+					To(ConnectResource(connecter, reqScope, admit, path)).
 					Filter(m).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource)).

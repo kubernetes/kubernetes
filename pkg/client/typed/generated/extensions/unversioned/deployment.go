@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// DeploymentNamespacer has methods to work with Deployment resources in a namespace
-type DeploymentNamespacer interface {
+// DeploymentsGetter has a method to return a DeploymentInterface.
+// A group's client should implement this interface.
+type DeploymentsGetter interface {
 	Deployments(namespace string) DeploymentInterface
 }
 
@@ -79,10 +80,17 @@ func (c *deployments) Update(deployment *extensions.Deployment) (result *extensi
 	return
 }
 
-func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	result := &extensions.Deployment{}
-	err := c.client.Put().Resource("deployments").Name(deployment.Name).SubResource("status").Body(deployment).Do().Into(result)
-	return result, err
+func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deployment.Name).
+		SubResource("status").
+		Body(deployment).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
@@ -101,7 +109,7 @@ func (c *deployments) DeleteCollection(options *api.DeleteOptions, listOptions a
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("deployments").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -125,7 +133,7 @@ func (c *deployments) List(opts api.ListOptions) (result *extensions.DeploymentL
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("deployments").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -137,6 +145,6 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

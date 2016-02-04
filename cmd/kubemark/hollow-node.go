@@ -23,6 +23,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -88,6 +89,7 @@ func main() {
 
 	// create a client to communicate with API server.
 	cl, err := createClientFromFile(config.KubeconfigPath)
+	clientset := clientset.FromUnversionedClient(cl)
 	if err != nil {
 		glog.Fatal("Failed to create a Client. Exiting.")
 	}
@@ -97,12 +99,12 @@ func main() {
 		containerManager := cm.NewStubContainerManager()
 
 		fakeDockerClient := dockertools.NewFakeDockerClient()
-		fakeDockerClient.VersionInfo = docker.Env{"ApiVersion=1.18"}
+		fakeDockerClient.VersionInfo = docker.Env{"Version=1.1.3", "ApiVersion=1.18"}
 		fakeDockerClient.EnableSleep = true
 
 		hollowKubelet := kubemark.NewHollowKubelet(
 			config.NodeName,
-			cl,
+			clientset,
 			cadvisorInterface,
 			fakeDockerClient,
 			config.KubeletPort,

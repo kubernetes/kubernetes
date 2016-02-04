@@ -22,9 +22,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -65,13 +68,18 @@ func NewRepair(interval time.Duration, registry service.Registry, network *net.I
 func (c *Repair) RunUntil(ch chan struct{}) {
 	util.Until(func() {
 		if err := c.RunOnce(); err != nil {
-			util.HandleError(err)
+			runtime.HandleError(err)
 		}
 	}, c.interval, ch)
 }
 
 // RunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
+	return client.RetryOnConflict(client.DefaultBackoff, c.runOnce)
+}
+
+// runOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
+func (c *Repair) runOnce() error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
 	// the ordering guarantee required to ensure no IP is allocated twice is violated.
@@ -92,8 +100,12 @@ func (c *Repair) RunOnce() error {
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	options := &api.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
-	list, err := c.registry.ListServices(ctx, options)
+	// We explicitly send no resource version, since the resource version
+	// of 'latest' is from a different collection, it's not comparable to
+	// the service collection. The caching layer keeps per-collection RVs,
+	// and this is proper, since in theory the collections could be hosted
+	// in separate etcd (or even non-etcd) instances.
+	list, err := c.registry.ListServices(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
@@ -106,7 +118,7 @@ func (c *Repair) RunOnce() error {
 		ip := net.ParseIP(svc.Spec.ClusterIP)
 		if ip == nil {
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
+			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
 			continue
 		}
 		switch err := r.Allocate(ip); err {
@@ -114,11 +126,11 @@ func (c *Repair) RunOnce() error {
 		case ipallocator.ErrAllocated:
 			// TODO: send event
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
+			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
 		case ipallocator.ErrNotInRange:
 			// TODO: send event
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
+			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// TODO: send event
 			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", r)
@@ -127,12 +139,14 @@ func (c *Repair) RunOnce() error {
 		}
 	}
 
-	err = r.Snapshot(latest)
-	if err != nil {
-		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
+	if err := r.Snapshot(latest); err != nil {
+		return fmt.Errorf("unable to snapshot the updated service IP allocations: %v", err)
 	}
 
 	if err := c.alloc.CreateOrUpdate(latest); err != nil {
+		if errors.IsConflict(err) {
+			return err
+		}
 		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
 	}
 	return nil

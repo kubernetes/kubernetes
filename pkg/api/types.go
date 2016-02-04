@@ -261,7 +261,7 @@ type PersistentVolumeClaimVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// +genclient=true
+// +genclient=true,nonNamespaced=true
 
 type PersistentVolume struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -560,8 +560,8 @@ type GitRepoVolumeSource struct {
 // as files using the keys in the Data field as the file names.
 // Secret volumes support ownership management and SELinux relabeling.
 type SecretVolumeSource struct {
-	// Name of the secret in the pod's namespace to use
-	SecretName string `json:"secretName"`
+	// Name of the secret in the pod's namespace to use.
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -624,9 +624,8 @@ type RBDVolumeSource struct {
 type CinderVolumeSource struct {
 	// Unique id of the volume used to identify the cinder volume
 	VolumeID string `json:"volumeID"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Only ext3 and ext4 are allowed
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -638,6 +637,8 @@ type CinderVolumeSource struct {
 type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
 	Monitors []string `json:"monitors"`
+	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	Path string `json:"path,omitempty"`
 	// Optional: User is the rados user name, default is admin
 	User string `json:"user,omitempty"`
 	// Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
@@ -715,9 +716,14 @@ type EnvVar struct {
 }
 
 // EnvVarSource represents a source for the value of an EnvVar.
+// Only one of its fields may be set.
 type EnvVarSource struct {
-	// Required: Selects a field of the pod; only name and namespace are supported.
-	FieldRef *ObjectFieldSelector `json:"fieldRef"`
+	// Selects a field of the pod; only name and namespace are supported.
+	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty"`
+	// Selects a key of a ConfigMap.
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+	// Selects a key of a secret in the pod's namespace.
+	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -728,6 +734,22 @@ type ObjectFieldSelector struct {
 	APIVersion string `json:"apiVersion"`
 	// Required: Path of the field to select in the specified API version
 	FieldPath string `json:"fieldPath"`
+}
+
+// Selects a key from a ConfigMap.
+type ConfigMapKeySelector struct {
+	// The ConfigMap to select from.
+	LocalObjectReference `json:",inline"`
+	// The key to select.
+	Key string `json:"key"`
+}
+
+// SecretKeySelector selects a key of a Secret.
+type SecretKeySelector struct {
+	// The name of the secret in the pod's namespace to select from.
+	LocalObjectReference `json:",inline"`
+	// The key of the secret to select from.  Must be a valid secret key.
+	Key string `json:"key"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
@@ -1629,7 +1651,7 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient=true
+// +genclient=true,nonNamespaced=true
 
 // Node is a worker node in Kubernetes
 // The name of the node according to etcd is in ObjectMeta.Name.
@@ -1681,7 +1703,7 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient=true
+// +genclient=true,nonNamespaced=true
 
 // A namespace provides a scope for Names.
 // Use of multiple namespaces is optional
@@ -2100,6 +2122,27 @@ const (
 
 	// DockerConfigJsonKey is the key of the required data for SecretTypeDockerConfigJson secrets
 	DockerConfigJsonKey = ".dockerconfigjson"
+
+	// SecretTypeBasicAuth contains data needed for basic authentication.
+	//
+	// Required at least one of fields:
+	// - Secret.Data["username"] - username used for authentication
+	// - Secret.Data["password"] - password or token needed for authentication
+	SecretTypeBasicAuth SecretType = "kubernetes.io/basic-auth"
+
+	// BasicAuthUsernameKey is the key of the username for SecretTypeBasicAuth secrets
+	BasicAuthUsernameKey = "username"
+	// BasicAuthPasswordKey is the key of the password or token for SecretTypeBasicAuth secrets
+	BasicAuthPasswordKey = "password"
+
+	// SecretTypeSSHAuth contains data needed for SSH authetication.
+	//
+	// Required field:
+	// - Secret.Data["ssh-privatekey"] - private SSH key needed for authentication
+	SecretTypeSSHAuth SecretType = "kubernetes.io/ssh-auth"
+
+	// SSHAuthPrivateKey is the key of the required SSH private key for SecretTypeSSHAuth secrets
+	SSHAuthPrivateKey = "ssh-privatekey"
 )
 
 type SecretList struct {
@@ -2107,6 +2150,27 @@ type SecretList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []Secret `json:"items"`
+}
+
+// +genclient=true
+
+// ConfigMap holds configuration data for components or applications to consume.
+type ConfigMap struct {
+	unversioned.TypeMeta `json:",inline"`
+	ObjectMeta           `json:"metadata,omitempty"`
+
+	// Data contains the configuration data.
+	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	Data map[string]string `json:"data,omitempty"`
+}
+
+// ConfigMapList is a resource containing a list of ConfigMap objects.
+type ConfigMapList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of ConfigMaps.
+	Items []ConfigMap `json:"items,omitempty"`
 }
 
 // These constants are for remote command execution and port forwarding and are
@@ -2174,7 +2238,7 @@ type ComponentCondition struct {
 	Error   string                 `json:"error,omitempty"`
 }
 
-// +genclient=true
+// +genclient=true,nonNamespaced=true
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {

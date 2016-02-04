@@ -38,7 +38,7 @@ import (
 func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -49,7 +49,7 @@ func TestSet(t *testing.T) {
 		if err != nil || resp.Node == nil {
 			t.Fatalf("unexpected error: %v %v", err, resp)
 		}
-		decoded, err := testapi.Default.Codec().Decode([]byte(resp.Node.Value))
+		decoded, err := runtime.Decode(testapi.Default.Codec(), []byte(resp.Node.Value))
 		if err != nil {
 			t.Fatalf("unexpected response: %#v", resp.Node)
 		}
@@ -63,11 +63,11 @@ func TestSet(t *testing.T) {
 func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		coded, err := testapi.Default.Codec().Encode(&testObject)
+		coded, err := runtime.Encode(testapi.Default.Codec(), &testObject)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -90,7 +90,7 @@ func TestGet(t *testing.T) {
 func TestWriteTTL(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -145,7 +145,7 @@ func TestWriteTTL(t *testing.T) {
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix(), false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -30,7 +31,8 @@ import (
 
 const (
 	sysfsNetPath            = "/sys/devices/virtual/net"
-	hairpinModeRelativePath = "brport/hairpin_mode"
+	brportRelativePath      = "brport"
+	hairpinModeRelativePath = "hairpin_mode"
 	hairpinEnable           = "1"
 )
 
@@ -95,6 +97,15 @@ func setUpAllInterfaces() error {
 
 func setUpInterface(ifName string) error {
 	glog.V(3).Infof("Enabling hairpin on interface %s", ifName)
-	hairpinModeFile := path.Join(sysfsNetPath, ifName, hairpinModeRelativePath)
+	ifPath := path.Join(sysfsNetPath, ifName)
+	if _, err := os.Stat(ifPath); err != nil {
+		return err
+	}
+	brportPath := path.Join(ifPath, brportRelativePath)
+	if _, err := os.Stat(brportPath); err != nil && os.IsNotExist(err) {
+		// Device is not on a bridge, so doesn't need hairpin mode
+		return nil
+	}
+	hairpinModeFile := path.Join(brportPath, hairpinModeRelativePath)
 	return ioutil.WriteFile(hairpinModeFile, []byte(hairpinEnable), 0644)
 }

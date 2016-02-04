@@ -102,6 +102,22 @@ As mentioned earlier there are a host of other options that are available, but a
 - `rm -rf /var/run/kubernetes`, clear kube generated credentials, sometimes stale permissions can cause problems.
 - `sudo iptables -F`, clear ip tables rules left by the kube-proxy.
 
+## Kinds of tests
+
+We are working on implementing clearer partitioning of our e2e tests to make running a known set of tests easier (#10548).  Tests can be labeled with any of the following labels, in order of increasing precedence (that is, each label listed below supersedes the previous ones):
+
+- If a test has no labels, it is expected to run fast (under five minutes), be able to be run in parallel, and be consistent.
+- `[Slow]`: If a test takes more than five minutes to run (by itself or in parallel with many other tests), it is labeled `[Slow]`.  This partition allows us to run almost all of our tests quickly in parallel, without waiting for the stragglers to finish.
+- `[Serial]`: If a test cannot be run in parallel with other tests (e.g. it takes too many resources or restarts nodes), it is labeled `[Serial]`, and should be run in serial as part of a separate suite.
+- `[Disruptive]`: If a test restarts components that might cause other tests to fail or break the cluster completely, it is labeled `[Disruptive]`.  Any `[Disruptive]` test is also assumed to qualify for the `[Serial]` label, but need not be labeled as both.  These tests are not run against soak clusters to avoid restarting components.
+- `[Flaky]`: If a test is found to be flaky and we have decided that it's too hard to fix in the short term (e.g. it's going to take a full engineer-week), it receives the `[Flaky]` label until it is fixed.  The `[Flaky]` label should be used very sparingly, and should be accompanied with a reference to the issue for de-flaking the test, because while a test remains labeled `[Flaky]`, it is not monitored closely in CI. `[Flaky]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
+- `[Skipped]`: `[Skipped]` is a legacy label that we're phasing out.  If a test is marked `[Skipped]`, there should be an issue open to label it properly.  `[Skipped]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
+- `[Feature:...]`: If a test has non-default requirements to run or targets some non-core functionality, and thus should not be run as part of the standard suite, it receives a `[Feature:...]` label, e.g. `[Feature:Performance]` or `[Feature:Ingress]`.  `[Feature:...]` tests are not run in our core suites, instead running in custom suites.  There are a few use-cases for `[Feature:...]` tests:
+  - If a feature is experimental or alpha and is not enabled by default due to being incomplete or potentially subject to breaking changes, it should *not* block the merge-queue, and thus should run in some separate test suites owned by the feature owner(s).
+  - If a feature is in beta or GA, it *should* block the merge-queue.  In moving from experimental to beta or GA, tests that are expected to pass by default should simply remove the `[Feature:...]` label, and will be incorporated into our core suites.  If tests are not expected to pass by default, (e.g. they require a special environment such as added quota,) they should remain with the `[Feature:...]` label, and the suites that run them should be incorporated into our merge-queue, owned by the Build Cop.
+
+Finally, `[Conformance]` tests are tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.  `[Conformance]` test policies are a work-in-progress; see #18162.
+
 ## Adding a New Test
 
 As mentioned above, prior to adding a new test, it is a good idea to perform a `-ginkgo.dryRun=true` on the system, in order to see if a behavior is already being tested, or to determine if it may be possible to augment an existing set of tests for a specific use case.

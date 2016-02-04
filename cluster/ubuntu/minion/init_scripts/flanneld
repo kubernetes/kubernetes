@@ -3,7 +3,7 @@ set -e
 
 ### BEGIN INIT INFO
 # Provides:           flannel
-# Required-Start:     $etcd
+# Required-Start:
 # Required-Stop:      
 # Should-Start:       
 # Should-Stop:        

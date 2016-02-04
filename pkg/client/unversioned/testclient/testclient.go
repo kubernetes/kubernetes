@@ -23,7 +23,6 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -34,7 +33,7 @@ import (
 
 // NewSimpleFake returns a client that will respond with the provided objects
 func NewSimpleFake(objects ...runtime.Object) *Fake {
-	o := NewObjects(api.Scheme, api.Scheme)
+	o := NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -279,31 +278,12 @@ func (c *Fake) Discovery() client.DiscoveryInterface {
 	return &FakeDiscovery{c}
 }
 
-func (c *Fake) ServerVersion() (*version.Info, error) {
-	action := ActionImpl{}
-	action.Verb = "get"
-	action.Resource = "version"
-
-	c.Invokes(action, nil)
-	versionInfo := version.Get()
-	return &versionInfo, nil
-}
-
-func (c *Fake) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	action := ActionImpl{}
-	action.Verb = "get"
-	action.Resource = "apiversions"
-
-	c.Invokes(action, nil)
-	gvStrings := []string{}
-	for _, gv := range registered.EnabledVersions() {
-		gvStrings = append(gvStrings, gv.String())
-	}
-	return &unversioned.APIVersions{Versions: gvStrings}, nil
-}
-
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
+}
+
+func (c *Fake) ConfigMaps(namespace string) client.ConfigMapsInterface {
+	return &FakeConfigMaps{Fake: c, Namespace: namespace}
 }
 
 // SwaggerSchema returns an empty swagger.ApiDeclaration for testing
@@ -353,12 +333,12 @@ func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 	return &FakeIngress{Fake: c, Namespace: namespace}
 }
 
-func (c *FakeExperimental) ConfigMaps(namespace string) client.ConfigMapsInterface {
-	return &FakeConfigMaps{Fake: c, Namespace: namespace}
-}
-
 func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterface {
+	return &FakeReplicaSets{Fake: c, Namespace: namespace}
 }
 
 type FakeDiscovery struct {
@@ -385,4 +365,14 @@ func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceLi
 
 func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 	return nil, nil
+}
+
+func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
+	action := ActionImpl{}
+	action.Verb = "get"
+	action.Resource = "version"
+
+	c.Invokes(action, nil)
+	versionInfo := version.Get()
+	return &versionInfo, nil
 }

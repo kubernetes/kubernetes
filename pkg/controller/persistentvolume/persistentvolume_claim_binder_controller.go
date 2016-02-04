@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,7 +44,7 @@ type PersistentVolumeClaimBinder struct {
 }
 
 // NewPersistentVolumeClaimBinder creates a new PersistentVolumeClaimBinder
-func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time.Duration) *PersistentVolumeClaimBinder {
+func NewPersistentVolumeClaimBinder(kubeClient clientset.Interface, syncPeriod time.Duration) *PersistentVolumeClaimBinder {
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	binderClient := NewBinderClient(kubeClient)
 	binder := &PersistentVolumeClaimBinder{
@@ -55,10 +55,10 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.PersistentVolumes().List(options)
+				return kubeClient.Legacy().PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.PersistentVolumes().Watch(options)
+				return kubeClient.Legacy().PersistentVolumes().Watch(options)
 			},
 		},
 		&api.PersistentVolume{},
@@ -73,10 +73,10 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 	_, claimController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(options)
+				return kubeClient.Legacy().PersistentVolumeClaims(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+				return kubeClient.Legacy().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.PersistentVolumeClaim{},
@@ -156,6 +156,7 @@ func (binder *PersistentVolumeClaimBinder) updateClaim(oldObj, newObj interface{
 	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but handler received %+v", newObj)
+		return
 	}
 	if err := syncClaim(binder.volumeIndex, binder.client, newClaim); err != nil {
 		glog.Errorf("PVClaimBinder could not update claim %s: %+v", newClaim.Name, err)
@@ -225,7 +226,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		nextPhase = api.VolumeAvailable
 
 		if volume.Spec.ClaimRef != nil {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if errors.IsNotFound(err) {
 				// Pending volumes that have a ClaimRef where the claim is missing were recently recycled.
 				// The Recycler set the phase to VolumePending to start the volume at the beginning of this lifecycle.
@@ -248,6 +249,14 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				}
 			} else if err != nil {
 				return fmt.Errorf("Error getting PersistentVolumeClaim[%s/%s]: %v", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, err)
+			}
+
+			// Dynamically provisioned claims remain Pending until its volume is completely provisioned.
+			// The provisioner updates the PV and triggers this update for the volume.  Explicitly sync'ing
+			// the claim here prevents the need to wait until the next sync period when the claim would normally
+			// advance to Bound phase. Otherwise, the maximum wait time for the claim to be Bound is the default sync period.
+			if claim != nil && claim.Status.Phase == api.ClaimPending && keyExists(qosProvisioningKey, claim.Annotations) && isProvisioningComplete(volume) {
+				syncClaim(volumeIndex, binderClient, claim)
 			}
 		}
 		glog.V(5).Infof("PersistentVolume[%s] is available\n", volume.Name)
@@ -444,38 +453,38 @@ type binderClient interface {
 	UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 }
 
-func NewBinderClient(c client.Interface) binderClient {
+func NewBinderClient(c clientset.Interface) binderClient {
 	return &realBinderClient{c}
 }
 
 type realBinderClient struct {
-	client client.Interface
+	client clientset.Interface
 }
 
 func (c *realBinderClient) GetPersistentVolume(name string) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().Get(name)
+	return c.client.Legacy().PersistentVolumes().Get(name)
 }
 
 func (c *realBinderClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().Update(volume)
+	return c.client.Legacy().PersistentVolumes().Update(volume)
 }
 
 func (c *realBinderClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
-	return c.client.PersistentVolumes().Delete(volume.Name)
+	return c.client.Legacy().PersistentVolumes().Delete(volume.Name, nil)
 }
 
 func (c *realBinderClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().UpdateStatus(volume)
+	return c.client.Legacy().PersistentVolumes().UpdateStatus(volume)
 }
 
 func (c *realBinderClient) GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error) {
-	return c.client.PersistentVolumeClaims(namespace).Get(name)
+	return c.client.Legacy().PersistentVolumeClaims(namespace).Get(name)
 }
 
 func (c *realBinderClient) UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	return c.client.PersistentVolumeClaims(claim.Namespace).Update(claim)
+	return c.client.Legacy().PersistentVolumeClaims(claim.Namespace).Update(claim)
 }
 
 func (c *realBinderClient) UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	return c.client.PersistentVolumeClaims(claim.Namespace).UpdateStatus(claim)
+	return c.client.Legacy().PersistentVolumeClaims(claim.Namespace).UpdateStatus(claim)
 }

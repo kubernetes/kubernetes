@@ -18,10 +18,11 @@ package volume
 
 import (
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"os"
 	"path"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // Volume represents a directory used by pods or hosts on a node.
@@ -59,24 +60,28 @@ type Metrics struct {
 
 // Attributes represents the attributes of this builder.
 type Attributes struct {
-	ReadOnly                    bool
-	Managed                     bool
-	SupportsOwnershipManagement bool
-	SupportsSELinux             bool
+	ReadOnly        bool
+	Managed         bool
+	SupportsSELinux bool
 }
 
 // Builder interface provides methods to set up/mount the volume.
 type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
-	// SetUp prepares and mounts/unpacks the volume to a self-determined
-	// directory path.  This may be called more than once, so
+	// SetUp prepares and mounts/unpacks the volume to a
+	// self-determined directory path. The mount point and its
+	// content should be owned by 'fsGroup' so that it can be
+	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp() error
-	// SetUpAt prepares and mounts/unpacks the volume to the specified
-	// directory path, which may or may not exist yet.  This may be called
-	// more than once, so implementations must be idempotent.
-	SetUpAt(dir string) error
+	SetUp(fsGroup *int64) error
+	// SetUpAt prepares and mounts/unpacks the volume to the
+	// specified directory path, which may or may not exist yet.
+	// The mount point and its content should be owned by
+	// 'fsGroup' so that it can be accessed by the pod. This may
+	// be called more than once, so implementations must be
+	// idempotent.
+	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the builder.
 	GetAttributes() Attributes
 }

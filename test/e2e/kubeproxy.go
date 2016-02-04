@@ -28,8 +28,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	api "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -46,7 +46,7 @@ const (
 	nodeHttpPort            = 32080
 	nodeUdpPort             = 32081
 	loadBalancerHttpPort    = 100
-	netexecImageName        = "gcr.io/google_containers/netexec:1.0"
+	netexecImageName        = "gcr.io/google_containers/netexec:1.4"
 	testPodName             = "test-container-pod"
 	hostTestPodName         = "host-test-container-pod"
 	nodePortServiceName     = "node-port-service"
@@ -197,6 +197,10 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	config.dialFromNode("udp", node2_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1 --> node2:nodeHttpPort")
 	config.dialFromNode("http", node2_IP, nodeHttpPort, tries, epCount)
+
+	By("checking kube-proxy URLs")
+	config.getSelfURL("/healthz", "ok")
+	config.getSelfURL("/proxyMode", "iptables") // the default
 }
 
 func (config *KubeProxyTestConfig) hitEndpoints() {
@@ -252,11 +256,18 @@ func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targe
 	Expect(strconv.Atoi(strings.TrimSpace(stdout))).To(BeNumerically("==", expectedCount))
 }
 
+func (config *KubeProxyTestConfig) getSelfURL(path string, expected string) {
+	cmd := fmt.Sprintf("curl -s --connect-timeout 1 http://localhost:10249%s", path)
+	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
+	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, cmd)
+	Expect(strings.Contains(stdout, expected)).To(BeTrue())
+}
+
 func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
@@ -296,7 +307,7 @@ func (config *KubeProxyTestConfig) createTestPodSpec() *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      testPodName,

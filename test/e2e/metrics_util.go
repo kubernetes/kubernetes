@@ -49,6 +49,22 @@ const (
 
 type MetricsForE2E metrics.MetricsCollection
 
+func (m *MetricsForE2E) filterMetrics() {
+	interestingApiServerMetrics := make(metrics.ApiServerMetrics)
+	for _, metric := range InterestingApiServerMetrics {
+		interestingApiServerMetrics[metric] = (*m).ApiServerMetrics[metric]
+	}
+	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
+	for kubelet, grabbed := range (*m).KubeletMetrics {
+		interestingKubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
+		for _, metric := range InterestingKubeletMetrics {
+			interestingKubeletMetrics[kubelet][metric] = grabbed[metric]
+		}
+	}
+	(*m).ApiServerMetrics = interestingApiServerMetrics
+	(*m).KubeletMetrics = interestingKubeletMetrics
+}
+
 func (m *MetricsForE2E) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
 	for _, interestingMetric := range InterestingApiServerMetrics {
@@ -70,6 +86,7 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 }
 
 func (m *MetricsForE2E) PrintJSON() string {
+	m.filterMetrics()
 	return prettyPrintJSON(*m)
 }
 
@@ -92,12 +109,6 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingKubeletMetrics = []string{
-	"container_cpu_system_seconds_total",
-	"container_cpu_user_seconds_total",
-	"container_fs_io_time_weighted_seconds_total",
-	"container_memory_usage_bytes",
-	"container_spec_cpu_shares",
-	"container_start_time_seconds",
 	"go_gc_duration_seconds",
 	"go_goroutines",
 	"kubelet_container_manager_latency_microseconds",

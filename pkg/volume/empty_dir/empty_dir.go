@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -142,20 +142,19 @@ type emptyDir struct {
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    false,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        false,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp() error {
-	return ed.SetUpAt(ed.GetPath())
+func (ed *emptyDir) SetUp(fsGroup *int64) error {
+	return ed.SetUpAt(ed.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string) error {
+func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -189,6 +188,8 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
+
+	volume.SetVolumeOwnership(ed, fsGroup)
 
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
@@ -275,7 +276,7 @@ func (ed *emptyDir) GetPath() string {
 
 func GetPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	name := emptyDirPluginName
-	return host.GetPodVolumeDir(uid, util.EscapeQualifiedNameForDisk(name), volName)
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(name), volName)
 }
 
 // TearDown simply discards everything in the directory.
@@ -324,5 +325,5 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
 }

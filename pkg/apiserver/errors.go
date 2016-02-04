@@ -19,10 +19,11 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // statusError is an object that can be converted into an unversioned.Status
@@ -59,7 +60,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		util.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
+		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
 		return &unversioned.Status{
 			Status:  unversioned.StatusFailure,
 			Code:    int32(status),
@@ -104,4 +105,42 @@ func IsAPIPrefixNotFound(err error) bool {
 
 	_, ok := err.(*errAPIPrefixNotFound)
 	return ok
+}
+
+// errNotAcceptable indicates Accept negotiation has failed
+// TODO: move to api/errors if other code needs to return this
+type errNotAcceptable struct {
+	accepted []string
+}
+
+func (e errNotAcceptable) Error() string {
+	return fmt.Sprintf("only the following media types are accepted: %v", strings.Join(e.accepted, ", "))
+}
+
+func (e errNotAcceptable) Status() unversioned.Status {
+	return unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    http.StatusNotAcceptable,
+		Reason:  unversioned.StatusReason("NotAcceptable"),
+		Message: e.Error(),
+	}
+}
+
+// errNotAcceptable indicates Content-Type is not recognized
+// TODO: move to api/errors if other code needs to return this
+type errUnsupportedMediaType struct {
+	accepted []string
+}
+
+func (e errUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("the body of the request was in an unknown format - accepted media types include: %v", strings.Join(e.accepted, ", "))
+}
+
+func (e errUnsupportedMediaType) Status() unversioned.Status {
+	return unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    http.StatusUnsupportedMediaType,
+		Reason:  unversioned.StatusReason("UnsupportedMediaType"),
+		Message: e.Error(),
+	}
 }

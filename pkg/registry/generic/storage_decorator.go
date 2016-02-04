@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -28,7 +29,7 @@ type StorageDecorator func(
 	capacity int,
 	objectType runtime.Object,
 	resourcePrefix string,
-	namespaceScoped bool,
+	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object) storage.Interface
 
 // Returns given 'storageInterface' without any decoration.
@@ -37,7 +38,7 @@ func UndecoratedStorage(
 	capacity int,
 	objectType runtime.Object,
 	resourcePrefix string,
-	namespaceScoped bool,
+	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object) storage.Interface {
 	return storageInterface
 }

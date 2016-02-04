@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -57,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
@@ -64,7 +67,7 @@ import (
 )
 
 func init() {
-	util.ReallyCrash = true
+	utilruntime.ReallyCrash = true
 }
 
 const testKubeletHostname = "127.0.0.1"
@@ -86,7 +89,7 @@ type TestKubelet struct {
 	kubelet          *Kubelet
 	fakeRuntime      *kubecontainer.FakeRuntime
 	fakeCadvisor     *cadvisor.Mock
-	fakeKubeClient   *testclient.Fake
+	fakeKubeClient   *fake.Clientset
 	fakeMirrorClient *kubepod.FakeMirrorClient
 	fakeClock        *util.FakeClock
 }
@@ -107,7 +110,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		},
 	}
 	fakeRecorder := &record.FakeRecorder{}
-	fakeKubeClient := &testclient.Fake{}
+	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = kubecontainer.FakeOS{}
@@ -148,10 +151,12 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
+	kubelet.reasonCache = NewReasonCache()
+	kubelet.podCache = kubecontainer.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn:    kubelet.syncPod,
-		runtimeCache: kubelet.runtimeCache,
-		t:            t,
+		syncPodFn: kubelet.syncPod,
+		cache:     kubelet.podCache,
+		t:         t,
 	}
 
 	kubelet.probeManager = prober.FakeManager{}
@@ -170,10 +175,10 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		LowThresholdPercent:  80,
 	}
 	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
-	fakeClock := &util.FakeClock{Time: time.Now()}
+	fakeClock := util.NewFakeClock(time.Now())
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
-	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)
+	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.reservation = kubetypes.Reservation{
 		Kubernetes: api.ResourceList{
@@ -183,7 +188,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	}
 	kubelet.workQueue = queue.NewBasicWorkQueue()
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour)
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil)
 	kubelet.clock = fakeClock
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
 }
@@ -524,7 +529,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 	expectedPaths := []string{}
 	for i := range volsOnDisk {
 		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
-		fv.SetUp()
+		fv.SetUp(nil)
 		expectedPaths = append(expectedPaths, fv.GetPath())
 	}
 
@@ -546,6 +551,106 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 	}
 }
 
+// Test for https://github.com/kubernetes/kubernetes/pull/19600
+func TestCleanupOrphanedVolumes(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
+
+	// create a volume "on disk"
+	volsOnDisk := []struct {
+		podUID  types.UID
+		volName string
+	}{
+		{"podUID", "myrealvol"},
+	}
+
+	pathsOnDisk := []string{}
+	for i := range volsOnDisk {
+		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
+		fv.SetUp(nil)
+		pathsOnDisk = append(pathsOnDisk, fv.GetPath())
+	}
+
+	// store the claim in fake kubelet database
+	claim := api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "myclaim",
+			Namespace: "test",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "myrealvol",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+		claim,
+	}}).ReactionChain
+
+	// Create a pod referencing the volume via a PersistentVolumeClaim
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "podUID",
+			Name:      "pod",
+			Namespace: "test",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "myvolumeclaim",
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "myclaim",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// The pod is pending and not running yet. Test that cleanupOrphanedVolumes
+	// won't remove the volume from disk if the volume is referenced only
+	// indirectly by a claim.
+	err := kubelet.cleanupOrphanedVolumes([]*api.Pod{&pod}, []*kubecontainer.Pod{})
+	if err != nil {
+		t.Errorf("cleanupOrphanedVolumes failed: %v", err)
+	}
+
+	volumesFound := kubelet.getPodVolumesFromDisk()
+	if len(volumesFound) != len(pathsOnDisk) {
+		t.Errorf("Expected to find %d cleaners, got %d", len(pathsOnDisk), len(volumesFound))
+	}
+	for _, ep := range pathsOnDisk {
+		found := false
+		for _, cl := range volumesFound {
+			if ep == cl.GetPath() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Could not find a volume with path %s", ep)
+		}
+	}
+
+	// The pod is deleted -> kubelet should delete the volume
+	err = kubelet.cleanupOrphanedVolumes([]*api.Pod{}, []*kubecontainer.Pod{})
+	if err != nil {
+		t.Errorf("cleanupOrphanedVolumes failed: %v", err)
+	}
+	volumesFound = kubelet.getPodVolumesFromDisk()
+	if len(volumesFound) != 0 {
+		t.Errorf("Expected to find 0 cleaners, got %d", len(volumesFound))
+	}
+	for _, cl := range volumesFound {
+		t.Errorf("Found unexpected volume %s", cl.GetPath())
+	}
+}
+
 type stubVolume struct {
 	path string
 	volume.MetricsNil
@@ -559,11 +664,11 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{}
 }
 
-func (f *stubVolume) SetUp() error {
+func (f *stubVolume) SetUp(fsGroup *int64) error {
 	return nil
 }
 
-func (f *stubVolume) SetUpAt(dir string) error {
+func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
@@ -2398,33 +2503,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 }
 
-func TestValidatePodStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	testCases := []struct {
-		podPhase api.PodPhase
-		success  bool
-	}{
-		{api.PodRunning, true},
-		{api.PodSucceeded, true},
-		{api.PodFailed, true},
-		{api.PodPending, false},
-		{api.PodUnknown, false},
-	}
-
-	for i, tc := range testCases {
-		err := kubelet.validatePodPhase(&api.PodStatus{Phase: tc.podPhase})
-		if tc.success {
-			if err != nil {
-				t.Errorf("[case %d]: unexpected failure - %v", i, err)
-			}
-		} else if err == nil {
-			t.Errorf("[case %d]: unexpected success", i)
-		}
-	}
-}
-
-func TestValidateContainerStatus(t *testing.T) {
+func TestValidateContainerLogStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	containerName := "x"
@@ -2441,6 +2520,17 @@ func TestValidateContainerStatus(t *testing.T) {
 					},
 					LastTerminationState: api.ContainerState{
 						Terminated: &api.ContainerStateTerminated{},
+					},
+				},
+			},
+			success: true,
+		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Running: &api.ContainerStateRunning{},
 					},
 				},
 			},
@@ -2468,10 +2558,28 @@ func TestValidateContainerStatus(t *testing.T) {
 			},
 			success: false,
 		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name:  containerName,
+					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePull"}},
+				},
+			},
+			success: false,
+		},
+		{
+			statuses: []api.ContainerStatus{
+				{
+					Name:  containerName,
+					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePullBackOff"}},
+				},
+			},
+			success: false,
+		},
 	}
 
 	for i, tc := range testCases {
-		_, err := kubelet.validateContainerStatus(&api.PodStatus{
+		_, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 			ContainerStatuses: tc.statuses,
 		}, containerName, false)
 		if tc.success {
@@ -2482,20 +2590,30 @@ func TestValidateContainerStatus(t *testing.T) {
 			t.Errorf("[case %d]: unexpected success", i)
 		}
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
 	}, "blah", false); err == nil {
 		t.Errorf("expected error with invalid container name")
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
 	}, containerName, true); err != nil {
 		t.Errorf("unexpected error with for previous terminated container - %v", err)
 	}
-	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
+		ContainerStatuses: testCases[0].statuses,
+	}, containerName, false); err != nil {
+		t.Errorf("unexpected error with for most recent container - %v", err)
+	}
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
 		ContainerStatuses: testCases[1].statuses,
 	}, containerName, true); err == nil {
 		t.Errorf("expected error with for previous terminated container")
+	}
+	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
+		ContainerStatuses: testCases[1].statuses,
+	}, containerName, false); err != nil {
+		t.Errorf("unexpected error with for most recent container")
 	}
 }
 
@@ -2521,8 +2639,11 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisor.Mock, rootCa
 func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.RuntimeType = "docker"
+	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
 	machineInfo := &cadvisorapi.MachineInfo{
@@ -2538,7 +2659,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -2646,7 +2766,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
 	machineInfo := &cadvisorapi.MachineInfo{
@@ -2662,7 +2782,6 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -2718,30 +2837,63 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	}
 }
 
-// FIXME: Enable me..
-func testDockerRuntimeVersion(t *testing.T) {
+func TestDockerRuntimeVersion(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.18"
+	fakeRuntime.VersionInfo = "1.10.0-rc1-fc24"
+	fakeRuntime.APIVersionInfo = "1.22"
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Spec:       api.NodeSpec{},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:               api.NodeOutOfDisk,
+						Status:             api.ConditionFalse,
+						Reason:             "KubeletHasSufficientDisk",
+						Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:               api.NodeReady,
+						Status:             api.ConditionTrue,
+						Reason:             "KubeletReady",
+						Message:            fmt.Sprintf("kubelet is posting ready status"),
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+					api.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
+					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				},
+				Allocatable: api.ResourceList{
+					api.ResourceCPU:    *resource.NewMilliQuantity(2800, resource.DecimalSI),
+					api.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
+					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				},
+			},
+		},
 	}}).ReactionChain
+	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
-		MemoryCapacity: 1024,
+		MemoryCapacity: 20E9,
 	}
-	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -2778,13 +2930,18 @@ func testDockerRuntimeVersion(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
+				ContainerRuntimeVersion: "docker://1.10.0-rc1-fc24",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+			},
+			Allocatable: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{
@@ -2804,6 +2961,7 @@ func testDockerRuntimeVersion(t *testing.T) {
 		},
 	}
 
+	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, "", kubelet.isContainerRuntimeVersionCompatible)
 	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2835,13 +2993,14 @@ func testDockerRuntimeVersion(t *testing.T) {
 		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
-	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
 	}
 
 	// Downgrade docker version, node should be NotReady
 	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.17"
+	fakeRuntime.VersionInfo = "1.5.0"
+	fakeRuntime.APIVersionInfo = "1.17"
 	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2857,8 +3016,8 @@ func testDockerRuntimeVersion(t *testing.T) {
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
-	if updatedNode.Status.Conditions[0].Reason != "KubeletNotReady" &&
-		!strings.Contains(updatedNode.Status.Conditions[0].Message, "container runtime version is older than") {
+	if updatedNode.Status.Conditions[1].Reason != "KubeletNotReady" &&
+		!strings.Contains(updatedNode.Status.Conditions[1].Message, "container runtime version is older than") {
 		t.Errorf("unexpect NodeStatus due to container runtime version")
 	}
 }
@@ -2866,8 +3025,11 @@ func testDockerRuntimeVersion(t *testing.T) {
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.RuntimeType = "docker"
+	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Spec:       api.NodeSpec{},
@@ -2916,7 +3078,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -3027,7 +3188,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Spec:       api.NodeSpec{},
@@ -3179,11 +3340,9 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	fakeRuntime := testKubelet.fakeRuntime
-	// This causes returning an error from GetContainerRuntimeVersion() which
-	// simulates that container runtime is down.
-	fakeRuntime.VersionInfo = ""
-
-	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	fakeRuntime.RuntimeType = "docker"
+	fakeRuntime.VersionInfo = "1.5.0"
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
@@ -3199,7 +3358,6 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -3308,7 +3466,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
-	testKubelet.fakeKubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactionChain
+	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{}}).ReactionChain
 
 	if err := kubelet.updateNodeStatus(); err == nil {
 		t.Errorf("unexpected non error: %v", err)
@@ -3335,7 +3493,7 @@ func TestCreateMirrorPod(t *testing.T) {
 		}
 		pods := []*api.Pod{pod}
 		kl.podManager.SetPods(pods)
-		err := kl.syncPod(pod, nil, container.Pod{}, updateType)
+		err := kl.syncPod(pod, nil, &container.PodStatus{}, updateType)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -3393,14 +3551,14 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kl.syncPod(pod, mirrorPod, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
-	if creates != 0 || deletes != 1 {
-		t.Errorf("expected 0 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
+	if creates != 1 || deletes != 1 {
+		t.Errorf("expected 1 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
 	}
 }
 
@@ -3559,7 +3717,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3592,7 +3750,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3619,7 +3777,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3645,7 +3803,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3672,20 +3830,20 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.AddReactor("create", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
+	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an error on create.
 		return true, &api.Node{}, &apierrors.StatusError{
 			ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonAlreadyExists},
 		}
 	})
-	kubeClient.AddReactor("get", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
+	kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an existing (matching) node on get.
 		return true, &api.Node{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
-	kubeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
+	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 	machineInfo := &cadvisorapi.MachineInfo{
@@ -3723,56 +3881,6 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		t.Errorf("timed out waiting for registration")
 	case <-done:
 		return
-	}
-}
-
-func TestGetNodeLabels(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting  map[string]string
-		NodeLabels string
-		Ok         bool
-	}{
-		{
-			Expecting: map[string]string{"key1": "value1", "key2": "2", "key3": "3.3"},
-			NodeLabels: `---
-key1: value1
-key2: 2
-key3: 3.3`,
-			Ok: true,
-		},
-		{
-			Expecting: nil,
-			NodeLabels: `---
-key11: value11
-key12: 12
-key13: 13.3
-key14:
-  nested_key: nested_value`,
-			Ok: false,
-		},
-		{
-			Expecting:  map[string]string{"key21": "value21", "key22": "22", "key23": "23.3"},
-			NodeLabels: `{"key21": "value21", "key22": "22", "key23": "23.3"}`,
-			Ok:         true,
-		},
-		{
-			Expecting:  nil,
-			NodeLabels: `{"key31": "value31", "key32": "32", "key33": "33.3", "key34": {"nested_key": "nested_value"}}`,
-			Ok:         false,
-		},
-	}
-
-	for i, test := range testCases {
-		kubelet.nodeLabels = test.NodeLabels
-		list, err := kubelet.getNodeLabels()
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have failed, error: %s", i, err)
-		}
-		if !reflect.DeepEqual(test.Expecting, list) {
-			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
-		}
 	}
 }
 

@@ -20,6 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+K8S_VERSION=${K8S_VERSION:-"1.1.3"}
+
 docker run \
   --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \

@@ -75,6 +75,17 @@ func ExampleView() {
 	//     token: red-token
 }
 
+func TestCurrentContext(t *testing.T) {
+	startingConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"current-context"},
+		startingConfig:  startingConfig,
+		expectedConfig:  startingConfig,
+		expectedOutputs: []string{startingConfig.CurrentContext},
+	}
+	test.run(t)
+}
+
 func TestSetCurrentContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	startingConfig := newRedFederalCowHammerConfig()
@@ -134,13 +145,9 @@ func TestSetWithPathPrefixIntoExistingStruct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedHost := "http://cow.org:8080"
+	expectedHost := "http://cow.org:8080/foo/baz"
 	if expectedHost != dcc.Host {
 		t.Fatalf("expected client.Config.Host = %q instead of %q", expectedHost, dcc.Host)
-	}
-	expectedPrefix := "/foo/baz"
-	if expectedPrefix != dcc.Prefix {
-		t.Fatalf("expected client.Config.Prefix = %q instead of %q", expectedPrefix, dcc.Prefix)
 	}
 }
 

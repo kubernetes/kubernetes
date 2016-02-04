@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
@@ -30,6 +31,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -39,29 +41,34 @@ import (
 
 const validEtcdVersion = "etcd 2.0.9"
 
-var scheme *runtime.Scheme
-var codec runtime.Codec
-
-func init() {
-	scheme = runtime.NewScheme()
-	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
+func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
+	scheme := runtime.NewScheme()
+	scheme.Log(t)
 	scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &storagetesting.TestResource{})
-	codec = runtime.CodecFor(scheme, *testapi.Default.GroupVersion())
-	scheme.AddConversionFuncs(
+	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
+	if err := scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
 			*out = *in
 			return nil
 		},
-	)
+		func(in, out *time.Time, s conversion.Scope) error {
+			*out = *in
+			return nil
+		},
+	); err != nil {
+		panic(err)
+	}
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(*testapi.Default.GroupVersion())
+	return scheme, codec
 }
 
 func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
-	return *NewEtcdStorage(client, codec, prefix).(*etcdHelper)
+	return *NewEtcdStorage(client, codec, prefix, false).(*etcdHelper)
 }
 
 // Returns an encoded version of api.Pod with the given name.
 func getEncodedPod(name string) string {
-	pod, _ := testapi.Default.Codec().Encode(&api.Pod{
+	pod, _ := runtime.Encode(testapi.Default.Codec(), &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: name},
 	})
 	return string(pod)
@@ -258,7 +265,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	_, err = testapi.Default.Codec().Encode(obj)
+	_, err = runtime.Encode(testapi.Default.Codec(), obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -266,7 +273,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	_, err = testapi.Default.Codec().Encode(returnedObj)
+	_, err = runtime.Encode(testapi.Default.Codec(), returnedObj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -374,6 +381,7 @@ func TestSetNilOutParam(t *testing.T) {
 }
 
 func TestGuaranteedUpdate(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
@@ -418,6 +426,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 }
 
 func TestGuaranteedUpdateNoChange(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
@@ -447,6 +456,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 }
 
 func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
@@ -473,6 +483,7 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 }
 
 func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")

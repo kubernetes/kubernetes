@@ -26,14 +26,15 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/testgroup"
+const importPrefix = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
 
 var accessor = meta.NewAccessor()
 
@@ -44,24 +45,39 @@ var availableVersions = []unversioned.GroupVersion{{Group: groupName, Version: "
 
 func init() {
 	externalVersions := availableVersions
-	preferredExternalVersion := externalVersions[0]
-	addVersionsToScheme(externalVersions...)
+	registered.RegisterVersions(availableVersions)
 
-	groupMeta := latest.GroupMeta{
+	if err := registered.EnableVersions(externalVersions...); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+	if err := enableVersions(externalVersions); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+}
+
+// TODO: enableVersions should be centralized rather than spread in each API
+// group.
+// We can combine registered.RegisterVersions, registered.EnableVersions and
+// registered.RegisterGroup once we have moved enableVersions there.
+func enableVersions(externalVersions []unversioned.GroupVersion) error {
+	addVersionsToScheme(externalVersions...)
+	preferredExternalVersion := externalVersions[0]
+
+	groupMeta := apimachinery.GroupMeta{
 		GroupVersion:  preferredExternalVersion,
 		GroupVersions: externalVersions,
-		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion),
 		RESTMapper:    newRESTMapper(externalVersions),
 		SelfLinker:    runtime.SelfLinker(accessor),
 		InterfacesFor: interfacesFor,
 	}
 
-	if err := latest.RegisterGroup(groupMeta); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
+	if err := registered.RegisterGroup(groupMeta); err != nil {
+		return err
 	}
-
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
+	return nil
 }
 
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
@@ -80,12 +96,11 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 	switch version {
 	case v1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group(groupName)
+		g, _ := registered.Group(groupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }

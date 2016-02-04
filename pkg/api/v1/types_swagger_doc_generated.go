@@ -62,6 +62,7 @@ func (Capabilities) SwaggerDoc() map[string]string {
 var map_CephFSVolumeSource = map[string]string{
 	"":           "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
 	"monitors":   "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
+	"path":       "Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
 	"user":       "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
 	"secretFile": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
 	"secretRef":  "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it",
@@ -113,6 +114,35 @@ var map_ComponentStatusList = map[string]string{
 
 func (ComponentStatusList) SwaggerDoc() map[string]string {
 	return map_ComponentStatusList
+}
+
+var map_ConfigMap = map[string]string{
+	"":         "ConfigMap holds configuration data for pods to consume.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"data":     "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+}
+
+func (ConfigMap) SwaggerDoc() map[string]string {
+	return map_ConfigMap
+}
+
+var map_ConfigMapKeySelector = map[string]string{
+	"":    "Selects a key from a ConfigMap.",
+	"key": "The key to select.",
+}
+
+func (ConfigMapKeySelector) SwaggerDoc() map[string]string {
+	return map_ConfigMapKeySelector
+}
+
+var map_ConfigMapList = map[string]string{
+	"":         "ConfigMapList is a resource containing a list of ConfigMap objects.",
+	"metadata": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is the list of ConfigMaps.",
+}
+
+func (ConfigMapList) SwaggerDoc() map[string]string {
+	return map_ConfigMapList
 }
 
 var map_Container = map[string]string{
@@ -335,8 +365,10 @@ func (EnvVar) SwaggerDoc() map[string]string {
 }
 
 var map_EnvVarSource = map[string]string{
-	"":         "EnvVarSource represents a source for the value of an EnvVar.",
-	"fieldRef": "Selects a field of the pod. Only name and namespace are supported.",
+	"":                "EnvVarSource represents a source for the value of an EnvVar.",
+	"fieldRef":        "Selects a field of the pod; only name and namespace are supported.",
+	"configMapKeyRef": "Selects a key of a ConfigMap.",
+	"secretKeyRef":    "Selects a key of a secret in the pod's namespace",
 }
 
 func (EnvVarSource) SwaggerDoc() map[string]string {
@@ -690,7 +722,7 @@ func (NodeAddress) SwaggerDoc() map[string]string {
 
 var map_NodeCondition = map[string]string{
 	"":                   "NodeCondition contains condition infromation for a node.",
-	"type":               "Type of node condition, currently only Ready.",
+	"type":               "Type of node condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastHeartbeatTime":  "Last time we got an update on a given condition.",
 	"lastTransitionTime": "Last time the condition transit from one status to another.",
@@ -1261,6 +1293,15 @@ func (Secret) SwaggerDoc() map[string]string {
 	return map_Secret
 }
 
+var map_SecretKeySelector = map[string]string{
+	"":    "SecretKeySelector selects a key of a Secret.",
+	"key": "The key of the secret to select from.  Must be a valid secret key.",
+}
+
+func (SecretKeySelector) SwaggerDoc() map[string]string {
+	return map_SecretKeySelector
+}
+
 var map_SecretList = map[string]string{
 	"":         "SecretList is a list of Secret.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -1273,7 +1314,7 @@ func (SecretList) SwaggerDoc() map[string]string {
 
 var map_SecretVolumeSource = map[string]string{
 	"":           "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
-	"secretName": "SecretName is the name of a secret in the pod's namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets",
+	"secretName": "Name of the secret in the pod's namespace to use. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets",
 }
 
 func (SecretVolumeSource) SwaggerDoc() map[string]string {

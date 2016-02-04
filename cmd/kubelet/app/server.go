@@ -38,7 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -56,12 +58,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/chmod"
-	"k8s.io/kubernetes/pkg/util/chown"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -134,9 +135,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		writer = &io.NsenterWriter{}
 	}
 
-	chmodRunner := chmod.New()
-	chownRunner := chown.New()
-
 	tlsOptions, err := InitializeTLS(s)
 	if err != nil {
 		return nil, err
@@ -178,13 +176,13 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	}
 
 	return &KubeletConfig{
-		Address:                   s.Address,
+		Address:                   net.ParseIP(s.Address),
 		AllowPrivileged:           s.AllowPrivileged,
 		Auth:                      nil, // default does not enforce auth[nz]
 		CAdvisorInterface:         nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
-		ClusterDNS:                s.ClusterDNS,
+		ClusterDNS:                net.ParseIP(s.ClusterDNS),
 		ClusterDomain:             s.ClusterDomain,
 		ConfigFile:                s.Config,
 		ConfigureCBR0:             s.ConfigureCBR0,
@@ -199,12 +197,12 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		EnableServer:              s.EnableServer,
 		EventBurst:                s.EventBurst,
 		EventRecordQPS:            s.EventRecordQPS,
-		FileCheckFrequency:        s.FileCheckFrequency,
+		FileCheckFrequency:        s.FileCheckFrequency.Duration,
 		HostnameOverride:          s.HostnameOverride,
 		HostNetworkSources:        hostNetworkSources,
 		HostPIDSources:            hostPIDSources,
 		HostIPCSources:            hostIPCSources,
-		HTTPCheckFrequency:        s.HTTPCheckFrequency,
+		HTTPCheckFrequency:        s.HTTPCheckFrequency.Duration,
 		ImageGCPolicy:             imageGCPolicy,
 		KubeClient:                nil,
 		ManifestURL:               s.ManifestURL,
@@ -214,14 +212,13 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		MaxOpenFiles:              s.MaxOpenFiles,
 		MaxPerPodContainerCount:   s.MaxPerPodContainerCount,
 		MaxPods:                   s.MaxPods,
-		MinimumGCAge:              s.MinimumGCAge,
+		MinimumGCAge:              s.MinimumGCAge.Duration,
 		Mounter:                   mounter,
-		ChownRunner:               chownRunner,
-		ChmodRunner:               chmodRunner,
 		NetworkPluginName:         s.NetworkPluginName,
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
 		NodeLabels:                s.NodeLabels,
-		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
+		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency.Duration,
+		NonMasqueradeCIDR:         s.NonMasqueradeCIDR,
 		OOMAdjuster:               oom.NewOOMAdjuster(),
 		OSInterface:               kubecontainer.RealOS{},
 		PodCIDR:                   s.PodCIDR,
@@ -242,16 +239,16 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Runonce:                        s.RunOnce,
 		SerializeImagePulls:            s.SerializeImagePulls,
 		StandaloneMode:                 (len(s.APIServerList) == 0),
-		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
-		SyncFrequency:                  s.SyncFrequency,
+		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout.Duration,
+		SyncFrequency:                  s.SyncFrequency.Duration,
 		SystemContainer:                s.SystemContainer,
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
-		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency,
+		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency.Duration,
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
-		NodeIP: s.NodeIP,
+		NodeIP: net.ParseIP(s.NodeIP),
 	}, nil
 }
 
@@ -270,13 +267,13 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
 		if err == nil {
-			kcfg.KubeClient, err = client.New(clientConfig)
+			kcfg.KubeClient, err = clientset.NewForConfig(clientConfig)
 
 			// make a separate client for events
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = s.EventRecordQPS
 			eventClientConfig.Burst = s.EventBurst
-			kcfg.EventClient, err = client.New(&eventClientConfig)
+			kcfg.EventClient, err = clientset.NewForConfig(&eventClientConfig)
 		}
 		if err != nil && len(s.APIServerList) > 0 {
 			glog.Warningf("No API client: %v", err)
@@ -304,7 +301,7 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 		}
 	}
 
-	util.ReallyCrash = s.ReallyCrashForTesting
+	runtime.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
@@ -324,7 +321,7 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	if s.HealthzPort > 0 {
 		healthz.DefaultHealthz()
 		go util.Until(func() {
-			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
+			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(s.HealthzPort)), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
@@ -456,7 +453,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *client.Config) {
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
 // Under the hood it calls RunKubelet (below)
-func SimpleKubelet(client *client.Client,
+func SimpleKubelet(client *clientset.Clientset,
 	dockerClient dockertools.DockerInterface,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
@@ -489,7 +486,7 @@ func SimpleKubelet(client *client.Client,
 		ConfigFile:                configFilePath,
 		ContainerManager:          containerManager,
 		ContainerRuntime:          "docker",
-		CPUCFSQuota:               false,
+		CPUCFSQuota:               true,
 		DiskSpacePolicy:           diskSpacePolicy,
 		DockerClient:              dockerClient,
 		DockerDaemonContainer:     "/docker-daemon",
@@ -509,8 +506,6 @@ func SimpleKubelet(client *client.Client,
 		MaxPods:                   maxPods,
 		MinimumGCAge:              minimumGCAge,
 		Mounter:                   mount.New(),
-		ChownRunner:               chown.New(),
-		ChmodRunner:               chmod.New(),
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
 		OSInterface:               osInterface,
@@ -569,7 +564,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(kcfg.EventClient.Events(""))
+		eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kcfg.EventClient.Events("")})
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
@@ -602,10 +597,10 @@ func RunKubelet(kcfg *KubeletConfig) error {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}
-		glog.Infof("Started kubelet as runonce")
+		glog.Info("Started kubelet as runonce")
 	} else {
 		startKubelet(k, podCfg, kcfg)
-		glog.Infof("Started kubelet")
+		glog.Info("Started kubelet")
 	}
 	return nil
 }
@@ -672,7 +667,7 @@ type KubeletConfig struct {
 	DockerExecHandler              dockertools.ExecHandler
 	EnableDebuggingHandlers        bool
 	EnableServer                   bool
-	EventClient                    *client.Client
+	EventClient                    *clientset.Clientset
 	EventBurst                     int
 	EventRecordQPS                 float32
 	FileCheckFrequency             time.Duration
@@ -683,7 +678,7 @@ type KubeletConfig struct {
 	HostIPCSources                 []string
 	HTTPCheckFrequency             time.Duration
 	ImageGCPolicy                  kubelet.ImageGCPolicy
-	KubeClient                     *client.Client
+	KubeClient                     *clientset.Clientset
 	ManifestURL                    string
 	ManifestURLHeader              http.Header
 	MasterServiceNamespace         string
@@ -693,13 +688,12 @@ type KubeletConfig struct {
 	MaxPods                        int
 	MinimumGCAge                   time.Duration
 	Mounter                        mount.Interface
-	ChownRunner                    chown.Interface
-	ChmodRunner                    chmod.Interface
 	NetworkPluginName              string
 	NetworkPlugins                 []network.NetworkPlugin
 	NodeName                       string
-	NodeLabels                     string
+	NodeLabels                     map[string]string
 	NodeStatusUpdateFrequency      time.Duration
+	NonMasqueradeCIDR              string
 	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
@@ -740,9 +734,10 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
 	// a nil pointer to it when what we really want is a nil interface.
-	var kubeClient client.Interface
+	var kubeClient clientset.Interface
 	if kc.KubeClient != nil {
 		kubeClient = kc.KubeClient
+		// TODO: remove this when we've refactored kubelet to only use clientset.
 	}
 
 	gcPolicy := kubecontainer.ContainerGCPolicy{
@@ -798,11 +793,10 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,
-		kc.ChownRunner,
-		kc.ChmodRunner,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
+		kc.NonMasqueradeCIDR,
 		kc.PodCIDR,
 		kc.ReconcileCIDR,
 		kc.MaxPods,

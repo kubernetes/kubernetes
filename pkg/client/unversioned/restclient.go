@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -45,26 +44,25 @@ const (
 //
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
-	baseURL *url.URL
-	// A string identifying the version of the API this client is expected to use.
-	groupVersion unversioned.GroupVersion
+	// base is the root URL for all invocations of the client
+	base *url.URL
+	// versionedAPIPath is a path segment connecting the base URL to the resource root
+	versionedAPIPath string
 
-	// Codec is the encoding and decoding scheme that applies to a particular set of
-	// REST resources.
-	Codec runtime.Codec
-
-	// Set specific behavior of the client.  If not set http.DefaultClient will be
-	// used.
-	Client *http.Client
+	// contentConfig is the information used to communicate with the server.
+	contentConfig ContentConfig
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
 	Throttle util.RateLimiter
+
+	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
+	Client *http.Client
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, client *http.Client) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -72,15 +70,23 @@ func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c ru
 	base.RawQuery = ""
 	base.Fragment = ""
 
+	if config.GroupVersion == nil {
+		config.GroupVersion = &unversioned.GroupVersion{}
+	}
+	if len(config.ContentType) == 0 {
+		config.ContentType = "application/json"
+	}
+
 	var throttle util.RateLimiter
 	if maxQPS > 0 {
 		throttle = util.NewTokenBucketRateLimiter(maxQPS, maxBurst)
 	}
 	return &RESTClient{
-		baseURL:      &base,
-		groupVersion: groupVersion,
-		Codec:        c,
-		Throttle:     throttle,
+		base:             &base,
+		versionedAPIPath: versionedAPIPath,
+		contentConfig:    config,
+		Throttle:         throttle,
+		Client:           client,
 	}
 }
 
@@ -95,12 +101,11 @@ func readExpBackoffConfig() BackoffManager {
 	backoffDurationInt, errDuration := strconv.ParseInt(backoffDuration, 10, 64)
 	if errBase != nil || errDuration != nil {
 		return &NoBackoff{}
-	} else {
-		return &URLBackoff{
-			Backoff: util.NewBackOff(
-				time.Duration(backoffBaseInt)*time.Second,
-				time.Duration(backoffDurationInt)*time.Second)}
 	}
+	return &URLBackoff{
+		Backoff: util.NewBackOff(
+			time.Duration(backoffBaseInt)*time.Second,
+			time.Duration(backoffDurationInt)*time.Second)}
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
@@ -123,9 +128,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := readExpBackoffConfig()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.baseURL, c.groupVersion, c.Codec, backoff)
+		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff)
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.groupVersion, c.Codec, backoff)
+	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -155,5 +160,5 @@ func (c *RESTClient) Delete() *Request {
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() unversioned.GroupVersion {
-	return c.groupVersion
+	return *c.contentConfig.GroupVersion
 }

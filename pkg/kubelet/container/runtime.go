@@ -17,7 +17,6 @@ limitations under the License.
 package container
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -30,32 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
-
-// Container Terminated and Kubelet is backing off the restart
-var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
-
-var (
-	// Container image pull failed, kubelet is backing off image pull
-	ErrImagePullBackOff = errors.New("ImagePullBackOff")
-
-	// Unable to inspect image
-	ErrImageInspect = errors.New("ImageInspectError")
-
-	// General image pull error
-	ErrImagePull = errors.New("ErrImagePull")
-
-	// Required Image is absent on host and PullPolicy is NeverPullImage
-	ErrImageNeverPull = errors.New("ErrImageNeverPull")
-
-	// ErrContainerNotFound returned when a container in the given pod with the
-	// given container name was not found, amongst those managed by the kubelet.
-	ErrContainerNotFound = errors.New("no matching container")
-
-	// Get http error when pulling image from registry
-	RegistryUnavailable = errors.New("RegistryUnavailable")
-)
-
-var ErrRunContainer = errors.New("RunContainerError")
 
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
@@ -82,6 +55,9 @@ type Runtime interface {
 
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
+	// APIVersion returns the API version information of the container
+	// runtime. This may be different from the runtime engine's version.
+	APIVersion() (Version, error)
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
@@ -89,8 +65,9 @@ type Runtime interface {
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
+	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+	// TODO(random-liu): Return PodSyncResult in KillPod.
 	KillPod(pod *api.Pod, runningPod Pod) error
 	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
 	// all containers in the pod. Clients of this interface assume the
@@ -106,9 +83,6 @@ type Runtime interface {
 	// exists to determine the reason). We should try generalizing the logic
 	// for all container runtimes in kubelet and remove this funciton.
 	ConvertPodStatusToAPIPodStatus(*api.Pod, *PodStatus) (*api.PodStatus, error)
-	// Return both PodStatus and api.PodStatus, this is just a temporary function.
-	// TODO(random-liu): Remove this method later
-	GetPodStatusAndAPIPodStatus(*api.Pod) (*PodStatus, *api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
@@ -165,6 +139,14 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
+}
+
+// PodPair contains both runtime#Pod and api#Pod
+type PodPair struct {
+	// APIPod is the api.Pod
+	APIPod *api.Pod
+	// RunningPod is the pod defined defined in pkg/kubelet/container/runtime#Pod
+	RunningPod *Pod
 }
 
 // ContainerID is a type that identifies a container.
@@ -436,6 +418,15 @@ func (p Pods) FindPod(podFullName string, podUID types.UID) Pod {
 func (p *Pod) FindContainerByName(containerName string) *Container {
 	for _, c := range p.Containers {
 		if c.Name == containerName {
+			return c
+		}
+	}
+	return nil
+}
+
+func (p *Pod) FindContainerByID(id ContainerID) *Container {
+	for _, c := range p.Containers {
+		if c.ID == id {
 			return c
 		}
 	}

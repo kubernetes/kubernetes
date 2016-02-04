@@ -1,6 +1,5 @@
 check_version_skew
 concurrent_rc_syncs
-etcd_mutation_timeout
 file_content
 file_mode
 file_owner
@@ -8,8 +7,6 @@ file_perm
 fs_type
 gke_context
 host_port_endpoints
-kubecfg_file
-kube_master_url
 max_in_flight
 max_par
 new_file_0644

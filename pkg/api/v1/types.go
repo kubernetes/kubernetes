@@ -590,6 +590,8 @@ type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
 	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
 	Monitors []string `json:"monitors"`
+	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	Path string `json:"path,omitempty"`
 	// Optional: User is the rados user name, default is admin
 	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
 	User string `json:"user,omitempty"`
@@ -724,9 +726,9 @@ type GitRepoVolumeSource struct {
 // as files using the keys in the Data field as the file names.
 // Secret volumes support ownership management and SELinux relabeling.
 type SecretVolumeSource struct {
-	// SecretName is the name of a secret in the pod's namespace.
+	// Name of the secret in the pod's namespace to use.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
-	SecretName string `json:"secretName"`
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -843,8 +845,12 @@ type EnvVar struct {
 
 // EnvVarSource represents a source for the value of an EnvVar.
 type EnvVarSource struct {
-	// Selects a field of the pod. Only name and namespace are supported.
-	FieldRef *ObjectFieldSelector `json:"fieldRef"`
+	// Selects a field of the pod; only name and namespace are supported.
+	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty"`
+	// Selects a key of a ConfigMap.
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+	// Selects a key of a secret in the pod's namespace
+	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -853,6 +859,22 @@ type ObjectFieldSelector struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Path of the field to select in the specified API version.
 	FieldPath string `json:"fieldPath"`
+}
+
+// Selects a key from a ConfigMap.
+type ConfigMapKeySelector struct {
+	// The ConfigMap to select from.
+	LocalObjectReference `json:",inline"`
+	// The key to select.
+	Key string `json:"key"`
+}
+
+// SecretKeySelector selects a key of a Secret.
+type SecretKeySelector struct {
+	// The name of the secret in the pod's namespace to select from.
+	LocalObjectReference `json:",inline"`
+	// The key of the secret to select from.  Must be a valid secret key.
+	Key string `json:"key"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
@@ -1951,7 +1973,7 @@ const (
 
 // NodeCondition contains condition infromation for a node.
 type NodeCondition struct {
-	// Type of node condition, currently only Ready.
+	// Type of node condition.
 	Type NodeConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status ConditionStatus `json:"status"`
@@ -2544,6 +2566,29 @@ type SecretList struct {
 	// Items is a list of secret objects.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/secrets.md
 	Items []Secret `json:"items"`
+}
+
+// ConfigMap holds configuration data for pods to consume.
+type ConfigMap struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Data contains the configuration data.
+	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	Data map[string]string `json:"data,omitempty"`
+}
+
+// ConfigMapList is a resource containing a list of ConfigMap objects.
+type ConfigMapList struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of ConfigMaps.
+	Items []ConfigMap `json:"items,omitempty"`
 }
 
 // Type and constants for component health validation.

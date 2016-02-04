@@ -23,14 +23,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -41,23 +41,19 @@ const (
 )
 
 type GCController struct {
-	kubeClient     client.Interface
+	kubeClient     clientset.Interface
 	podStore       cache.StoreToPodLister
 	podStoreSyncer *framework.Controller
 	deletePod      func(namespace, name string) error
 	threshold      int
 }
 
-func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
-
+func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
 	gcc := &GCController{
 		kubeClient: kubeClient,
 		threshold:  threshold,
 		deletePod: func(namespace, name string) error {
-			return kubeClient.Pods(namespace).Delete(name, api.NewDeleteOptions(0))
+			return kubeClient.Legacy().Pods(namespace).Delete(name, api.NewDeleteOptions(0))
 		},
 	}
 
@@ -67,11 +63,11 @@ func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, 
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Pods(api.NamespaceAll).List(options)
+				return gcc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return gcc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -108,7 +104,7 @@ func (gcc *GCController) gc() {
 			defer wait.Done()
 			if err := gcc.deletePod(namespace, name); err != nil {
 				// ignore not founds
-				defer util.HandleError(err)
+				defer utilruntime.HandleError(err)
 			}
 		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
 	}

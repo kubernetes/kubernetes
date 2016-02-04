@@ -22,9 +22,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -51,7 +52,7 @@ func TestLabels(t *testing.T) {
 	}
 	container := &api.Container{
 		Name: "test_container",
-		TerminationMessagePath: "/tmp",
+		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
 	pod := &api.Pod{
@@ -107,7 +108,7 @@ func TestLabels(t *testing.T) {
 	pod.DeletionGracePeriodSeconds = &deletionGracePeriod
 	pod.Spec.TerminationGracePeriodSeconds = &terminationGracePeriod
 	container.Lifecycle = lifecycle
-	data, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
+	data, err := runtime.Encode(testapi.Default.Codec(), pod)
 	if err != nil {
 		t.Fatalf("Failed to encode pod %q into string: %v", format.Pod(pod), err)
 	}

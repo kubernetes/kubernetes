@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -38,7 +39,46 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
+		Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
+		Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
+		Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy,
+		Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
+		Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
+		Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
+		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
+		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
 	)
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+
+	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
+	for _, kind := range []string{"DaemonSet", "Deployment", "Ingress"} {
+		err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name", "metadata.namespace":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			})
+		if err != nil {
+			// If one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	}
+
+	err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "metadata.namespace", "status.successful":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -220,8 +260,19 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = int32(*in.RevisionHistoryLimit)
+	}
 	out.UniqueLabelKey = new(string)
 	*out.UniqueLabelKey = in.UniqueLabelKey
+	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(RollbackConfig)
+		out.RollbackTo.Revision = int64(in.RollbackTo.Revision)
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -246,8 +297,19 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int)
+		*out.RevisionHistoryLimit = int(*in.RevisionHistoryLimit)
+	}
 	if in.UniqueLabelKey != nil {
 		out.UniqueLabelKey = *in.UniqueLabelKey
+	}
+	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(extensions.RollbackConfig)
+		out.RollbackTo.Revision = in.RollbackTo.Revision
+	} else {
+		out.RollbackTo = nil
 	}
 	return nil
 }
@@ -384,6 +446,163 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityC
 		*out.FSGroup = *in.FSGroup
 	} else {
 		out.FSGroup = nil
+	}
+	return nil
+}
+
+func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DaemonSetSpec))(in)
+	}
+	// unable to generate simple pointer conversion for extensions.LabelSelector -> v1beta1.LabelSelector
+	if in.Selector != nil {
+		out.Selector = new(LabelSelector)
+		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	out.UniqueLabelKey = new(string)
+	*out.UniqueLabelKey = in.UniqueLabelKey
+	return nil
+}
+
+func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonSetSpec))(in)
+	}
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> extensions.LabelSelector
+	if in.Selector != nil {
+		out.Selector = new(extensions.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	if in.UniqueLabelKey != nil {
+		out.UniqueLabelKey = *in.UniqueLabelKey
+	}
+	return nil
+}
+
+func Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DaemonSetUpdateStrategy))(in)
+	}
+	out.Type = DaemonSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateDaemonSet)
+		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonSetUpdateStrategy))(in)
+	}
+	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(extensions.RollingUpdateDaemonSet)
+		if err := Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
+}
+
+func Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.RollingUpdateDaemonSet))(in)
+	}
+	if out.MaxUnavailable == nil {
+		out.MaxUnavailable = &intstr.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	out.MinReadySeconds = int32(in.MinReadySeconds)
+	return nil
+}
+
+func Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*RollingUpdateDaemonSet))(in)
+	}
+	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	out.MinReadySeconds = int(in.MinReadySeconds)
+	return nil
+}
+
+func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *ReplicaSetSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.ReplicaSetSpec))(in)
+	}
+	out.Replicas = new(int32)
+	*out.Replicas = int32(in.Replicas)
+	if in.Selector != nil {
+		out.Selector = new(LabelSelector)
+		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(v1.PodTemplateSpec)
+		if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ReplicaSetSpec))(in)
+	}
+	if in.Replicas != nil {
+		out.Replicas = int(*in.Replicas)
+	}
+	if in.Selector != nil {
+		out.Selector = new(extensions.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
 	}
 	return nil
 }

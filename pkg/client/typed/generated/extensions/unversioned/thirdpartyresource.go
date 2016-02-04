@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ThirdPartyResourceNamespacer has methods to work with ThirdPartyResource resources in a namespace
-type ThirdPartyResourceNamespacer interface {
+// ThirdPartyResourcesGetter has a method to return a ThirdPartyResourceInterface.
+// A group's client should implement this interface.
+type ThirdPartyResourcesGetter interface {
 	ThirdPartyResources(namespace string) ThirdPartyResourceInterface
 }
 
@@ -58,7 +59,7 @@ func (c *thirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyRe
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Body(thirdPartyResource).
 		Do().
 		Into(result)
@@ -70,7 +71,7 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Name(thirdPartyResource.Name).
 		Body(thirdPartyResource).
 		Do().
@@ -82,7 +83,7 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Name(name).
 		Body(options).
 		Do().
@@ -93,8 +94,8 @@ func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) er
 func (c *thirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
-		VersionedParams(&listOptions, api.Scheme).
+		Resource("thirdpartyresources").
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +106,7 @@ func (c *thirdPartyResources) Get(name string) (result *extensions.ThirdPartyRes
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
+		Resource("thirdpartyresources").
 		Name(name).
 		Do().
 		Into(result)
@@ -117,8 +118,8 @@ func (c *thirdPartyResources) List(opts api.ListOptions) (result *extensions.Thi
 	result = &extensions.ThirdPartyResourceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
-		VersionedParams(&opts, api.Scheme).
+		Resource("thirdpartyresources").
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -129,7 +130,7 @@ func (c *thirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, erro
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("thirdPartyResources").
-		VersionedParams(&opts, api.Scheme).
+		Resource("thirdpartyresources").
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

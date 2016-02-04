@@ -161,11 +161,17 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		if len(deletes.Pods) > 0 {
 			s.updates <- *deletes
 		}
-		if len(adds.Pods) > 0 || firstSet {
+		if len(adds.Pods) > 0 {
 			s.updates <- *adds
 		}
 		if len(updates.Pods) > 0 {
 			s.updates <- *updates
+		}
+		if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 {
+			// Send an empty update when first seeing the source and there are
+			// no ADD or UPDATE pods from the source. This signals kubelet that
+			// the source is ready.
+			s.updates <- *adds
 		}
 		// Only add reconcile support here, because kubelet doesn't support Snapshot update now.
 		if len(reconciles.Pods) > 0 {
@@ -208,67 +214,11 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		pods = make(map[string]*api.Pod)
 	}
 
-	update := change.(kubetypes.PodUpdate)
-	switch update.Op {
-	case kubetypes.ADD, kubetypes.UPDATE:
-		if update.Op == kubetypes.ADD {
-			glog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
-		} else {
-			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
-		}
-
-		filtered := filterInvalidPods(update.Pods, source, s.recorder)
-		for _, ref := range filtered {
-			name := kubecontainer.GetPodFullName(ref)
-			// Annotate the pod with the source before any comparison.
-			if ref.Annotations == nil {
-				ref.Annotations = make(map[string]string)
-			}
-			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
-			if existing, found := pods[name]; found {
-				needUpdate, needReconcile := checkAndUpdatePod(existing, ref)
-				if needUpdate {
-					updatePods = append(updatePods, existing)
-				} else if needReconcile {
-					reconcilePods = append(reconcilePods, existing)
-				}
-				continue
-			}
-			recordFirstSeenTime(ref)
-			pods[name] = ref
-			// If a pod is not found in the cache, and it's also not in the
-			// pending phase, it implies that kubelet may have restarted.
-			// Treat this pod as update so that kubelet wouldn't reject the
-			// pod in the admission process.
-			if ref.Status.Phase != api.PodPending {
-				updatePods = append(updatePods, ref)
-			} else {
-				// this is an add
-				addPods = append(addPods, ref)
-			}
-		}
-
-	case kubetypes.REMOVE:
-		glog.V(4).Infof("Removing a pod %v", update)
-		for _, value := range update.Pods {
-			name := kubecontainer.GetPodFullName(value)
-			if existing, found := pods[name]; found {
-				// this is a delete
-				delete(pods, name)
-				deletePods = append(deletePods, existing)
-				continue
-			}
-			// this is a no-op
-		}
-
-	case kubetypes.SET:
-		glog.V(4).Infof("Setting pods for source %s", source)
-		s.markSourceSet(source)
-		// Clear the old map entries by just creating a new map
-		oldPods := pods
-		pods = make(map[string]*api.Pod)
-
-		filtered := filterInvalidPods(update.Pods, source, s.recorder)
+	// updatePodFunc is the local function which updates the pod cache *oldPods* with new pods *newPods*.
+	// After updated, new pod will be stored in the pod cache *pods*.
+	// Notice that *pods* and *oldPods* could be the same cache.
+	updatePodsFunc := func(newPods []*api.Pod, oldPods, pods map[string]*api.Pod) {
+		filtered := filterInvalidPods(newPods, source, s.recorder)
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
 			// Annotate the pod with the source before any comparison.
@@ -299,7 +249,38 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				addPods = append(addPods, ref)
 			}
 		}
+	}
 
+	update := change.(kubetypes.PodUpdate)
+	switch update.Op {
+	case kubetypes.ADD, kubetypes.UPDATE:
+		if update.Op == kubetypes.ADD {
+			glog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
+		} else {
+			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
+		}
+		updatePodsFunc(update.Pods, pods, pods)
+
+	case kubetypes.REMOVE:
+		glog.V(4).Infof("Removing a pod %v", update)
+		for _, value := range update.Pods {
+			name := kubecontainer.GetPodFullName(value)
+			if existing, found := pods[name]; found {
+				// this is a delete
+				delete(pods, name)
+				deletePods = append(deletePods, existing)
+				continue
+			}
+			// this is a no-op
+		}
+
+	case kubetypes.SET:
+		glog.V(4).Infof("Setting pods for source %s", source)
+		s.markSourceSet(source)
+		// Clear the old map entries by just creating a new map
+		oldPods := pods
+		pods = make(map[string]*api.Pod)
+		updatePodsFunc(update.Pods, oldPods, pods)
 		for name, existing := range oldPods {
 			if _, found := pods[name]; !found {
 				// this is a delete

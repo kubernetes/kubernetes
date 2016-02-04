@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -44,7 +46,6 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/emicklei/go-restful"
@@ -65,9 +66,9 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageVersions := make(map[string]string)
 	storageDestinations := genericapiserver.NewStorageDestinations()
 	storageDestinations.AddAPIGroup(
-		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()))
+		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false))
 	storageDestinations.AddAPIGroup(
-		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
+		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false))
 
 	config.StorageDestinations = storageDestinations
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
@@ -82,6 +83,7 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 
+	config.Serializer = api.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
@@ -110,7 +112,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.ServiceReadWriteIP, config.ServiceReadWriteIP)
 
 	// These functions should point to the same memory location
-	masterDialer, _ := util.Dialer(master.ProxyTransport)
+	masterDialer, _ := utilnet.Dialer(master.ProxyTransport)
 	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
 	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
 	assert.Equal(masterDialerFunc, configDialerFunc)
@@ -164,7 +166,7 @@ func TestNewBootstrapController(t *testing.T) {
 	master, etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	portRange := util.PortRange{Base: 10, Size: 10}
+	portRange := utilnet.PortRange{Base: 10, Size: 10}
 
 	master.namespaceRegistry = namespace.NewRegistry(nil)
 	master.serviceRegistry = registrytest.NewServiceRegistry()
@@ -346,7 +348,7 @@ func initThirdParty(t *testing.T, version string) (*Master, *etcdtesting.EtcdTes
 		},
 	}
 	master.HandlerContainer = restful.NewContainer()
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix())
+	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
 		t.FailNow()
@@ -495,7 +497,6 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-
 	if err := json.Unmarshal(data, obj); err != nil {
 		return err
 	}

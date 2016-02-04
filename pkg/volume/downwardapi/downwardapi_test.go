@@ -24,9 +24,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 )
@@ -39,22 +40,19 @@ func formatMap(m map[string]string) (fmtstr string) {
 	return
 }
 
-func newTestHost(t *testing.T, client client.Interface, basePath string) volume.VolumeHost {
-	tempDir, err := ioutil.TempDir(basePath, "downwardApi_volume_test.")
+func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
+	tempDir, err := utiltesting.MkTmpdir("downwardApi_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, nil, tmpDir))
+	tmpDir, host := newTestHost(t, nil)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -96,7 +94,7 @@ func TestLabels(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -104,13 +102,10 @@ func TestLabels(t *testing.T) {
 		},
 	})
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	rootDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(rootDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -136,9 +131,20 @@ func TestLabels(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
+	}
+
+	// downwardAPI volume should create its own empty wrapper path
+	podWrapperMetadataDir := fmt.Sprintf("%v/pods/%v/plugins/kubernetes.io~empty-dir/wrapped_%v", rootDir, testPodUID, testVolumeName)
+
+	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, empty-dir wrapper path was not created: %s", podWrapperMetadataDir)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
 	}
 
 	var data []byte
@@ -175,7 +181,7 @@ func TestAnnotations(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:        testName,
 			Namespace:   testNamespace,
@@ -183,13 +189,10 @@ func TestAnnotations(t *testing.T) {
 		},
 	})
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -205,7 +208,7 @@ func TestAnnotations(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -241,20 +244,17 @@ func TestName(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
 	})
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -270,7 +270,7 @@ func TestName(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -307,20 +307,17 @@ func TestNamespace(t *testing.T) {
 		},
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
 	})
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -336,7 +333,7 @@ func TestNamespace(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -366,20 +363,17 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
 		},
 	})
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -404,7 +398,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -415,7 +409,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		t.Errorf(".current should be a link... %s\n", err.Error())
 	}
 
-	err = builder.SetUp() // now re-run Setup
+	err = builder.SetUp(nil) // now re-run Setup
 	if err != nil {
 		t.Errorf("Failed to re-setup volume: %v", err)
 	}
@@ -455,20 +449,17 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
 		},
 	})
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -493,7 +484,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -520,7 +511,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 
 	// Now update the labels
 	pod.ObjectMeta.Labels = newLabels
-	err = builder.SetUp() // now re-run Setup
+	err = builder.SetUp(nil) // now re-run Setup
 	if err != nil {
 		t.Errorf("Failed to re-setup volume: %v", err)
 	}
@@ -563,7 +554,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 		"a1": "value1",
 		"a2": "value2"}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -571,13 +562,10 @@ func TestWriteWithUnixPath(t *testing.T) {
 		},
 	})
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -604,7 +592,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -642,7 +630,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		"key2": "value2",
 	}
 
-	fake := testclient.NewSimpleFake(&api.Pod{
+	clientset := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
@@ -650,13 +638,10 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		},
 	})
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir")
-	}
-	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -689,7 +674,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	volumePath := builder.GetPath()
 	defer CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Fatalf("Failed to setup volume: %v", err)
 	}

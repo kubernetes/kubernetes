@@ -24,7 +24,7 @@ import (
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestHTTPKubeletClient(t *testing.T) {
@@ -34,7 +34,7 @@ func TestHTTPKubeletClient(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}

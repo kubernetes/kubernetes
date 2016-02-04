@@ -17,3 +17,8 @@ func InitSeccomp(config *configs.Seccomp) error {
 	}
 	return nil
 }
+
+// IsEnabled returns false, because it is not supported.
+func IsEnabled() bool {
+	return false
+}

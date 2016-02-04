@@ -19,6 +19,7 @@ limitations under the License.
 package cadvisor
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -33,7 +34,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type cadvisorClient struct {
@@ -46,7 +47,16 @@ var _ Interface = new(cadvisorClient)
 // The amount of time for which to keep stats in memory.
 const statsCacheDuration = 2 * time.Minute
 const maxHousekeepingInterval = 15 * time.Second
+const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
+
+func init() {
+	// Override the default cAdvisor housekeeping interval.
+	if f := flag.Lookup("housekeeping_interval"); f != nil {
+		f.DefValue = defaultHousekeepingInterval.String()
+		f.Value.Set(f.DefValue)
+	}
+}
 
 // Creates a cAdvisor and exports its API on the specified port if port > 0.
 func New(port uint) (Interface, error) {
@@ -109,7 +119,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		// If export failed, retry in the background until we are able to bind.
 		// This allows an existing cAdvisor to be killed before this one registers.
 		go func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 
 			err := serv.ListenAndServe()
 			for err != nil {

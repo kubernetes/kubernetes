@@ -46,39 +46,39 @@ cd $CURR_DIR
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
-gcloud compute disks create "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
+run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
+  ${GCLOUD_COMMON_ARGS} \
+  --type "${MASTER_DISK_TYPE}" \
+  --size "${MASTER_DISK_SIZE}"
 
-gcloud compute instances create "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${MASTER_IMAGE_PROJECT}" \
-    --image "${MASTER_IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
+  ${GCLOUD_COMMON_ARGS} \
+  --machine-type "${MASTER_SIZE}" \
+  --image-project="${MASTER_IMAGE_PROJECT}" \
+  --image "${MASTER_IMAGE}" \
+  --tags "${MASTER_TAG}" \
+  --network "${NETWORK}" \
+  --scopes "storage-ro,compute-rw,logging-write" \
+  --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
-gcloud compute firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
-    --project "${PROJECT}" \
-    --network "${NETWORK}" \
-    --source-ranges "0.0.0.0/0" \
-    --target-tags "${MASTER_TAG}" \
-    --allow "tcp:443"
+run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
+  --project "${PROJECT}" \
+  --network "${NETWORK}" \
+  --source-ranges "0.0.0.0/0" \
+  --target-tags "${MASTER_TAG}" \
+  --allow "tcp:443"
 
 MASTER_IP=$(gcloud compute instances describe ${MASTER_NAME} \
   --zone="${ZONE}" --project="${PROJECT}" | grep natIP: | cut -f2 -d":" | sed "s/ //g")
 
 if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
   EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
-  gcloud compute disks create "${EVENT_STORE_NAME}-pd" \
+    run-gcloud-compute-with-retries disks create "${EVENT_STORE_NAME}-pd" \
       ${GCLOUD_COMMON_ARGS} \
       --type "${MASTER_DISK_TYPE}" \
       --size "${MASTER_DISK_SIZE}"
 
-  gcloud compute instances create "${EVENT_STORE_NAME}" \
+    run-gcloud-compute-with-retries instances create "${EVENT_STORE_NAME}" \
       ${GCLOUD_COMMON_ARGS} \
       --machine-type "${MASTER_SIZE}" \
       --image-project="${MASTER_IMAGE_PROJECT}" \
@@ -95,7 +95,7 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
     sleep 1
   done
 
-  gcloud compute ssh ${EVENT_STORE_NAME} --zone=${ZONE} --project="${PROJECT}" \
+  gcloud compute ssh "${EVENT_STORE_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
     --command="sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
       --listen-peer-urls http://127.0.0.1:2380 \
       --addr=127.0.0.1:4002 \
@@ -117,17 +117,19 @@ until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}
   sleep 1
 done
 
-gcloud compute ssh --zone=${ZONE} --project="${PROJECT}" ${MASTER_NAME} \
+password=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
+
+gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
   --command="sudo mkdir /srv/kubernetes -p && \
-  sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
-  sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
-  sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
-  sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
-  sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
-  sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
-  sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
-  sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
-  sudo bash -c \"echo admin,admin,admin > /srv/kubernetes/basic_auth.csv\""
+    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
+    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
+    sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo ${password},admin,admin > /srv/kubernetes/basic_auth.csv\""
 
 if [ "${RUN_FROM_DISTRO}" == "false" ]; then
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
@@ -143,7 +145,7 @@ else
     "${MASTER_NAME}":~
 fi
 
-gcloud compute ssh ${MASTER_NAME} --zone=${ZONE} --project="${PROJECT}" \
+gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1}"
 
 # create kubeconfig for Kubelet:
@@ -152,12 +154,12 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT_BASE64}
-    client-key-data: ${KUBELET_KEY_BASE64}
+    client-certificate-data: "${KUBELET_CERT_BASE64}"
+    client-key-data: "${KUBELET_KEY_BASE64}"
 clusters:
 - name: kubemark
   cluster:
-    certificate-authority-data: ${CA_CERT_BASE64}
+    certificate-authority-data: "${CA_CERT_BASE64}"
     server: https://${MASTER_IP}
 contexts:
 - context:
@@ -188,14 +190,14 @@ kind: Config
 users:
 - name: admin
   user:
-    client-certificate-data: ${KUBECFG_CERT_BASE64}
-    client-key-data: ${KUBECFG_KEY_BASE64}
+    client-certificate-data: "${KUBECFG_CERT_BASE64}"
+    client-key-data: "${KUBECFG_KEY_BASE64}"
     username: admin
     password: admin
 clusters:
 - name: kubemark
   cluster:
-    certificate-authority-data: ${CA_CERT_BASE64}
+    certificate-authority-data: "${CA_CERT_BASE64}"
     server: https://${MASTER_IP}
 contexts:
 - context:
@@ -205,18 +207,19 @@ contexts:
 current-context: kubemark-context
 EOF
 
-sed "s/##numreplicas##/${NUM_NODES:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-node_template.json > ${KUBE_ROOT}/test/kubemark/hollow-node.json
-sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-node.json
-kubectl create -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json
-kubectl create -f ${KUBECONFIG_SECRET} --namespace="kubemark"
-kubectl create -f ${KUBE_ROOT}/test/kubemark/hollow-node.json --namespace="kubemark"
+sed "s/##numreplicas##/${NUM_NODES:-10}/g" "${KUBE_ROOT}"/test/kubemark/hollow-node_template.json > "${KUBE_ROOT}"/test/kubemark/hollow-node.json
+sed -i'' -e "s/##project##/${PROJECT}/g" "${KUBE_ROOT}"/test/kubemark/hollow-node.json
+kubectl create -f "${KUBE_ROOT}"/test/kubemark/kubemark-ns.json
+kubectl create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
+kubectl create -f "${KUBE_ROOT}"/test/kubemark/hollow-node.json --namespace="kubemark"
 
-rm ${KUBECONFIG_SECRET}
+rm "${KUBECONFIG_SECRET}"
 
 echo "Waiting for all HollowNodes to become Running..."
 echo "This can loop forever if something crashed."
-until [[ "$(kubectl --kubeconfig=${KUBE_ROOT}/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_NODES}" ]]; do
+until [[ "$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_NODES}" ]]; do
   echo -n .
   sleep 1
 done
 echo ""
+echo "Password to kubemark master: ${password}"

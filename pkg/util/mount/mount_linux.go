@@ -30,6 +30,7 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+	utilExec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 const (
@@ -39,6 +40,13 @@ const (
 	expectedNumFieldsPerLine = 6
 	// Location of the mount file to use
 	procMountsPath = "/proc/mounts"
+)
+
+const (
+	// 'fsck' found errors and corrected them
+	fsckErrorsCorrected = 1
+	// 'fsck' found errors but exited without correcting them
+	fsckErrorsUncorrected = 4
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -240,13 +248,31 @@ func readProcMountsFrom(file io.Reader, out *[]MountPoint) (uint32, error) {
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	options = append(options, "defaults")
 
+	// Run fsck on the disk to fix repairable issues
+	args := []string{"-a", source}
+	cmd := mounter.Runner.Command("fsck", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		ee, isExitError := err.(utilExec.ExitError)
+		switch {
+		case err == utilExec.ErrExecutableNotFound:
+			glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
+		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
+			glog.Infof("Device %s has errors which were corrected by fsck.", source)
+		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
+			return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
+			glog.Infof("`fsck` error %s", string(out))
+		}
+	}
+
 	// Try to mount the disk
-	err := mounter.Interface.Mount(source, target, fstype, options)
+	err = mounter.Interface.Mount(source, target, fstype, options)
 	if err != nil {
 		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
 		notFormatted, err := mounter.diskLooksUnformatted(source)
 		if err == nil && notFormatted {
-			args := []string{source}
+			args = []string{source}
 			// Disk is unformatted so format it.
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {

@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// PodTemplateNamespacer has methods to work with PodTemplate resources in a namespace
-type PodTemplateNamespacer interface {
+// PodTemplatesGetter has a method to return a PodTemplateInterface.
+// A group's client should implement this interface.
+type PodTemplatesGetter interface {
 	PodTemplates(namespace string) PodTemplateInterface
 }
 
@@ -57,7 +58,7 @@ func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemp
 	result = &api.PodTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Body(podTemplate).
 		Do().
 		Into(result)
@@ -69,7 +70,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 	result = &api.PodTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Name(podTemplate.Name).
 		Body(podTemplate).
 		Do().
@@ -81,7 +82,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Name(name).
 		Body(options).
 		Do().
@@ -92,8 +93,8 @@ func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 func (c *podTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("podTemplates").
-		VersionedParams(&listOptions, api.Scheme).
+		Resource("podtemplates").
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -104,7 +105,7 @@ func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Name(name).
 		Do().
 		Into(result)
@@ -116,8 +117,8 @@ func (c *podTemplates) List(opts api.ListOptions) (result *api.PodTemplateList, 
 	result = &api.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("podTemplates").
-		VersionedParams(&opts, api.Scheme).
+		Resource("podtemplates").
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -128,7 +129,7 @@ func (c *podTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("podTemplates").
-		VersionedParams(&opts, api.Scheme).
+		Resource("podtemplates").
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

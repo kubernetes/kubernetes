@@ -86,9 +86,6 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 // created with the "" namespace. Update also requires the ResourceVersion to be set in the event
 // object.
 func (e *events) Update(event *api.Event) (*api.Event, error) {
-	if len(event.ResourceVersion) == 0 {
-		return nil, fmt.Errorf("invalid event update object, missing resource version: %#v", event)
-	}
 	result := &api.Event{}
 	err := e.client.Put().
 		Namespace(event.Namespace).
@@ -122,7 +119,7 @@ func (e *events) List(opts api.ListOptions) (*api.EventList, error) {
 	err := e.client.Get().
 		Namespace(e.namespace).
 		Resource("events").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return result, err
@@ -146,7 +143,7 @@ func (e *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(e.namespace).
 		Resource("events").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
@@ -190,7 +187,7 @@ func (e *events) DeleteCollection(options *api.DeleteOptions, listOptions api.Li
 	return e.client.Delete().
 		Namespace(e.namespace).
 		Resource("events").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()

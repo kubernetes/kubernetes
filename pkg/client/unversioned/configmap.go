@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,31 +30,31 @@ type ConfigMapsNamespacer interface {
 }
 
 type ConfigMapsInterface interface {
-	Get(string) (*extensions.ConfigMap, error)
-	List(opts api.ListOptions) (*extensions.ConfigMapList, error)
-	Create(*extensions.ConfigMap) (*extensions.ConfigMap, error)
+	Get(string) (*api.ConfigMap, error)
+	List(opts api.ListOptions) (*api.ConfigMapList, error)
+	Create(*api.ConfigMap) (*api.ConfigMap, error)
 	Delete(string) error
-	Update(*extensions.ConfigMap) (*extensions.ConfigMap, error)
+	Update(*api.ConfigMap) (*api.ConfigMap, error)
 	Watch(api.ListOptions) (watch.Interface, error)
 }
 
 type ConfigMaps struct {
-	client    *ExtensionsClient
+	client    *Client
 	namespace string
 }
 
 // ConfigMaps should implement ConfigMapsInterface
 var _ ConfigMapsInterface = &ConfigMaps{}
 
-func newConfigMaps(c *ExtensionsClient, ns string) *ConfigMaps {
+func newConfigMaps(c *Client, ns string) *ConfigMaps {
 	return &ConfigMaps{
 		client:    c,
 		namespace: ns,
 	}
 }
 
-func (c *ConfigMaps) Get(name string) (*extensions.ConfigMap, error) {
-	result := &extensions.ConfigMap{}
+func (c *ConfigMaps) Get(name string) (*api.ConfigMap, error) {
+	result := &api.ConfigMap{}
 	err := c.client.Get().
 		Namespace(c.namespace).
 		Resource(ConfigMapResourceName).
@@ -66,20 +65,20 @@ func (c *ConfigMaps) Get(name string) (*extensions.ConfigMap, error) {
 	return result, err
 }
 
-func (c *ConfigMaps) List(opts api.ListOptions) (*extensions.ConfigMapList, error) {
-	result := &extensions.ConfigMapList{}
+func (c *ConfigMaps) List(opts api.ListOptions) (*api.ConfigMapList, error) {
+	result := &api.ConfigMapList{}
 	err := c.client.Get().
 		Namespace(c.namespace).
 		Resource(ConfigMapResourceName).
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
 	return result, err
 }
 
-func (c *ConfigMaps) Create(cfg *extensions.ConfigMap) (*extensions.ConfigMap, error) {
-	result := &extensions.ConfigMap{}
+func (c *ConfigMaps) Create(cfg *api.ConfigMap) (*api.ConfigMap, error) {
+	result := &api.ConfigMap{}
 	err := c.client.Post().
 		Namespace(c.namespace).
 		Resource(ConfigMapResourceName).
@@ -99,8 +98,8 @@ func (c *ConfigMaps) Delete(name string) error {
 		Error()
 }
 
-func (c *ConfigMaps) Update(cfg *extensions.ConfigMap) (*extensions.ConfigMap, error) {
-	result := &extensions.ConfigMap{}
+func (c *ConfigMaps) Update(cfg *api.ConfigMap) (*api.ConfigMap, error) {
+	result := &api.ConfigMap{}
 
 	err := c.client.Put().
 		Namespace(c.namespace).
@@ -118,6 +117,6 @@ func (c *ConfigMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.namespace).
 		Resource(ConfigMapResourceName).
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

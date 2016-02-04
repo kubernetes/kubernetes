@@ -32,7 +32,7 @@ type RESTClient interface {
 	Put() *client.Request
 }
 
-// ClientMapper retrieves a client object for a given mapping
+// ClientMapper abstracts retrieving a Client for mapped objects.
 type ClientMapper interface {
 	ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error)
 }

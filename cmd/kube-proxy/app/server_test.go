@@ -18,6 +18,7 @@ package app
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,6 +46,9 @@ func (fake *fakeIptablesVersioner) GetVersion() (string, error) {
 }
 
 func Test_getProxyMode(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping on non-Linux")
+	}
 	var cases = []struct {
 		flag            string
 		annotationKey   string

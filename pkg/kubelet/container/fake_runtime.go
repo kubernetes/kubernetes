@@ -43,6 +43,7 @@ type FakeRuntime struct {
 	StartedContainers []string
 	KilledContainers  []string
 	VersionInfo       string
+	APIVersionInfo    string
 	RuntimeType       string
 	Err               error
 	InspectErr        error
@@ -154,6 +155,14 @@ func (f *FakeRuntime) Version() (Version, error) {
 	return &FakeVersion{Version: f.VersionInfo}, f.Err
 }
 
+func (f *FakeRuntime) APIVersion() (Version, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "APIVersion")
+	return &FakeVersion{Version: f.APIVersionInfo}, f.Err
+}
+
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -165,7 +174,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -174,7 +183,11 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []a
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)
 	}
-	return f.Err
+	// TODO(random-liu): Add SyncResult for starting and killing containers
+	if f.Err != nil {
+		result.Fail(f.Err)
+	}
+	return
 }
 
 func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod) error {
@@ -248,17 +261,6 @@ func (f *FakeRuntime) ConvertPodStatusToAPIPodStatus(_ *api.Pod, _ *PodStatus) (
 	f.CalledFunctions = append(f.CalledFunctions, "ConvertPodStatusToAPIPodStatus")
 	status := f.APIPodStatus
 	return &status, f.Err
-}
-
-func (f *FakeRuntime) GetPodStatusAndAPIPodStatus(_ *api.Pod) (*PodStatus, *api.PodStatus, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	// This is only a temporary function, it should be logged as GetAPIPodStatus
-	f.CalledFunctions = append(f.CalledFunctions, "GetAPIPodStatus")
-	apiPodStatus := f.APIPodStatus
-	podStatus := f.PodStatus
-	return &podStatus, &apiPodStatus, f.Err
 }
 
 func (f *FakeRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {

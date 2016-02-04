@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
@@ -81,6 +82,7 @@ type etcdWatcher struct {
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
+	quorum  bool // If we enable quorum, shoule be true
 	include includeFunc
 	filter  storage.FilterFunc
 
@@ -108,12 +110,13 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
+func newEtcdWatcher(list bool, quorum bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
 		versioner: versioner,
 		transform: transform,
 		list:      list,
+		quorum:    quorum,
 		include:   include,
 		filter:    filter,
 		// Buffer this channel, so that the etcd client is not forced
@@ -144,7 +147,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, e
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
 func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key string, resourceVersion uint64) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	defer close(w.etcdError)
 	defer close(w.etcdIncoming)
 
@@ -170,7 +173,7 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 		// Stop() is called in the meantime (which in tests can cause etcd termination and
 		// strange behavior here).
 		if resourceVersion == 0 {
-			latest, err := etcdGetInitialWatchState(ctx, client, key, w.list, w.etcdIncoming)
+			latest, err := etcdGetInitialWatchState(ctx, client, key, w.list, w.quorum, w.etcdIncoming)
 			if err != nil {
 				w.etcdError <- err
 				return true
@@ -202,15 +205,16 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key string, recursive bool, quorum bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	opts := etcd.GetOptions{
 		Recursive: recursive,
 		Sort:      false,
+		Quorum:    quorum,
 	}
 	resp, err := client.Get(ctx, key, &opts)
 	if err != nil {
 		if !etcdutil.IsEtcdNotFound(err) {
-			glog.Errorf("watch was unable to retrieve the current index for the provided key (%q): %v", key, err)
+			utilruntime.HandleError(fmt.Errorf("watch was unable to retrieve the current index for the provided key (%q): %v", key, err))
 			return resourceVersion, err
 		}
 		if etcdError, ok := err.(etcd.Error); ok {
@@ -246,7 +250,7 @@ var (
 // called as a goroutine.
 func (w *etcdWatcher) translate() {
 	defer close(w.outgoing)
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 
 	for {
 		select {
@@ -300,7 +304,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	obj, err := w.encoding.Decode([]byte(node.Value))
+	obj, err := runtime.Decode(w.encoding, []byte(node.Value))
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +312,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	// ensure resource version is set on the object we load from etcd
 	if w.versioner != nil {
 		if err := w.versioner.UpdateObject(obj, node.Expiration, node.ModifiedIndex); err != nil {
-			glog.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err)
+			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err))
 		}
 	}
 
@@ -316,7 +320,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	if w.transform != nil {
 		obj, err = w.transform(obj)
 		if err != nil {
-			glog.Errorf("failure to transform api object %#v: %v", obj, err)
+			utilruntime.HandleError(fmt.Errorf("failure to transform api object %#v: %v", obj, err))
 			return nil, err
 		}
 	}
@@ -329,7 +333,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 
 func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 	if res.Node == nil {
-		glog.Errorf("unexpected nil node: %#v", res)
+		utilruntime.HandleError(fmt.Errorf("unexpected nil node: %#v", res))
 		return
 	}
 	if w.include != nil && !w.include(res.Node.Key) {
@@ -337,7 +341,7 @@ func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 	}
 	obj, err := w.decodeObject(res.Node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.Node.Value), res, res.Node)
+		utilruntime.HandleError(fmt.Errorf("failure to decode api object: %v\n'%v' from %#v %#v", err, string(res.Node.Value), res, res.Node))
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -366,7 +370,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	}
 	curObj, err := w.decodeObject(res.Node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.Node.Value), res, res.Node)
+		utilruntime.HandleError(fmt.Errorf("failure to decode api object: %v\n'%v' from %#v %#v", err, string(res.Node.Value), res, res.Node))
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -406,7 +410,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 
 func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 	if res.PrevNode == nil {
-		glog.Errorf("unexpected nil prev node: %#v", res)
+		utilruntime.HandleError(fmt.Errorf("unexpected nil prev node: %#v", res))
 		return
 	}
 	if w.include != nil && !w.include(res.PrevNode.Key) {
@@ -421,7 +425,7 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 	}
 	obj, err := w.decodeObject(&node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.PrevNode.Value), res, res.PrevNode)
+		utilruntime.HandleError(fmt.Errorf("failure to decode api object: %v\nfrom %#v %#v", err, res, res.Node))
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -445,7 +449,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	case EtcdDelete, EtcdExpire:
 		w.sendDelete(res)
 	default:
-		glog.Errorf("unknown action: %v", res.Action)
+		utilruntime.HandleError(fmt.Errorf("unknown action: %v", res.Action))
 	}
 }
 

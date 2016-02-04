@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -222,20 +222,19 @@ var _ volume.Builder = &awsElasticBlockStoreBuilder{}
 
 func (b *awsElasticBlockStoreBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *awsElasticBlockStoreBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *awsElasticBlockStoreBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
+func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
@@ -291,6 +290,10 @@ func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
 		return err
 	}
 
+	if !b.readOnly {
+		volume.SetVolumeOwnership(b, fsGroup)
+	}
+
 	return nil
 }
 
@@ -321,7 +324,7 @@ func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (stri
 
 func (ebs *awsElasticBlockStore) GetPath() string {
 	name := awsElasticBlockStorePluginName
-	return ebs.plugin.host.GetPodVolumeDir(ebs.podUID, util.EscapeQualifiedNameForDisk(name), ebs.volName)
+	return ebs.plugin.host.GetPodVolumeDir(ebs.podUID, utilstrings.EscapeQualifiedNameForDisk(name), ebs.volName)
 }
 
 type awsElasticBlockStoreCleaner struct {
@@ -400,7 +403,7 @@ var _ volume.Deleter = &awsElasticBlockStoreDeleter{}
 
 func (d *awsElasticBlockStoreDeleter) GetPath() string {
 	name := awsElasticBlockStorePluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(name), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(name), d.volName)
 }
 
 func (d *awsElasticBlockStoreDeleter) Delete() error {

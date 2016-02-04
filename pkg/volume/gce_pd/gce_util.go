@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -137,7 +138,16 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (volum
 	requestBytes := c.options.Capacity.Value()
 	// GCE works with gigabytes, convert to GiB with rounding up
 	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
-	err = cloud.CreateDisk(name, int64(requestGB))
+
+	// The disk will be created in the zone in which this code is currently running
+	// TODO: We should support auto-provisioning volumes in multiple/specified zones
+	zone, err := cloud.GetZone()
+	if err != nil {
+		glog.V(2).Infof("error getting zone information from GCE: %v", err)
+		return "", 0, err
+	}
+
+	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB))
 	if err != nil {
 		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
 		return "", 0, err
@@ -214,7 +224,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 // This function is intended to be called asynchronously as a go routine.
 func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Will block for pending operations", c.pdName)
-	defer util.HandleCrash()
+	defer runtime.HandleCrash()
 
 	// Block execution until any pending attach/detach operations for this PD have completed
 	attachDetachMutex.LockKey(c.pdName)

@@ -4,7 +4,7 @@ language: go
 
 matrix:
   include:
-    - go: 1.5.2
+    - go: 1.5.3
       env:
         - KUBE_TEST_API_VERSIONS=v1,extensions/v1beta1 KUBE_TEST_ETCD_PREFIXES=registry
         - KUBE_JUNIT_REPORT_DIR="${SHIPPABLE_REPO_DIR}/shippable/testresults"
@@ -49,13 +49,13 @@ install:
   - ./hack/verify-description.sh
   - ./hack/verify-flags-underscore.py
   - ./hack/verify-godeps.sh ${BASE_BRANCH}
+  - ./hack/verify-godep-licenses.sh ${BASE_BRANCH}
   - ./hack/travis/install-std-race.sh
   - ./hack/verify-generated-conversions.sh
   - ./hack/verify-generated-deep-copies.sh
   - ./hack/verify-generated-docs.sh
   - ./hack/verify-generated-swagger-docs.sh
   - ./hack/verify-swagger-spec.sh
-  - ./hack/verify-linkcheck.sh
 
 script:
   # Disable coverage collection on pull requests

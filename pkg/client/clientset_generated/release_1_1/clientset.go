@@ -17,31 +17,39 @@ limitations under the License.
 package release_1_1
 
 import (
+	"github.com/golang/glog"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Interface interface {
-	Legacy() legacy_unversioned.LegacyClient
-	Extensions() extensions_unversioned.ExtensionsClient
+	Discovery() unversioned.DiscoveryInterface
+	Legacy() legacy_unversioned.LegacyInterface
+	Extensions() extensions_unversioned.ExtensionsInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*unversioned.DiscoveryClient
 	*legacy_unversioned.LegacyClient
 	*extensions_unversioned.ExtensionsClient
 }
 
 // Legacy retrieves the LegacyClient
-func (c *Clientset) Legacy() *legacy_unversioned.LegacyClient {
+func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
 	return c.LegacyClient
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() *extensions_unversioned.ExtensionsClient {
+func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
 	return c.ExtensionsClient
+}
+
+// Discovery retrieves the DiscoveryClient
+func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+	return c.DiscoveryClient
 }
 
 // NewForConfig creates a new Clientset for the given config.
@@ -50,14 +58,18 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	var err error
 	clientset.LegacyClient, err = legacy_unversioned.NewForConfig(c)
 	if err != nil {
-		return nil, err
+		return &clientset, err
 	}
 	clientset.ExtensionsClient, err = extensions_unversioned.NewForConfig(c)
 	if err != nil {
-		return nil, err
+		return &clientset, err
 	}
 
-	return &clientset, nil
+	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	if err != nil {
+		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+	}
+	return &clientset, err
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
@@ -67,6 +79,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	clientset.LegacyClient = legacy_unversioned.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = extensions_unversioned.NewForConfigOrDie(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
@@ -76,5 +89,6 @@ func New(c *unversioned.RESTClient) *Clientset {
 	clientset.LegacyClient = legacy_unversioned.New(c)
 	clientset.ExtensionsClient = extensions_unversioned.New(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset
 }

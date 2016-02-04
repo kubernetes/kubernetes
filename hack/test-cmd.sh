@@ -28,32 +28,46 @@ source "${KUBE_ROOT}/hack/lib/test.sh"
 # Stops the running kubectl proxy, if there is one.
 function stop-proxy()
 {
+  [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
   [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
+  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f ${PROXY_PORT_FILE}
   PROXY_PID=
   PROXY_PORT=
+  PROXY_PORT_FILE=
 }
+
 
 # Starts "kubect proxy" to test the client proxy. $1: api_prefix
 function start-proxy()
 {
   stop-proxy
 
-  kube::log::status "Starting kubectl proxy"
+  PROXY_PORT_FILE=$(mktemp proxy-port.out.XXXXX)
+  kube::log::status "Starting kubectl proxy on random port; output file in ${PROXY_PORT_FILE}; args: ${1-}"
 
-  for retry in $(seq 1 3); do
-    PROXY_PORT=$(kube::util::get_random_port)
-    kube::log::status "On try ${retry}, use proxy port ${PROXY_PORT} if it's free"
-    if kube::util::test_host_port_free "127.0.0.1" "${PROXY_PORT}"; then
-      if [ $# -eq 0 ]; then
-        kubectl proxy -p ${PROXY_PORT} --www=. 1>&2 & break
-      else
-        kubectl proxy -p ${PROXY_PORT} --www=. --api-prefix="$1" 1>&2 & break
-      fi
+
+  if [ $# -eq 0 ]; then
+    kubectl proxy --port=0 --www=. 1>${PROXY_PORT_FILE} 2>&1 &
+  else
+    kubectl proxy --port=0 --www=. --api-prefix="$1" 1>${PROXY_PORT_FILE} 2>&1 &
+  fi
+  PROXY_PID=$!
+  PROXY_PORT=
+
+  local attempts=0
+  while [[ -z ${PROXY_PORT} ]]; do
+    if (( ${attempts} > 9 )); then
+      kill "${PROXY_PID}"
+      kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat ${PROXY_PORT_FILE})"
     fi
-    sleep 1;
+    sleep .5
+    kube::log::status "Attempt ${attempts} to read ${PROXY_PORT_FILE}..."
+    PROXY_PORT=$(sed 's/.*Starting to serve on 127.0.0.1:\([0-9]*\)$/\1/'< ${PROXY_PORT_FILE})
+    attempts=$((attempts+1))
   done
 
-  PROXY_PID=$!
+  kube::log::status "kubectl proxy running on port ${PROXY_PORT}"
+
   # We try checking kubectl proxy 30 times with 1s delays to avoid occasional
   # failures.
   if [ $# -eq 0 ]; then
@@ -235,32 +249,34 @@ runTests() {
   #######################
   # kubectl local proxy #
   #######################
-
-  # Make sure the UI can be proxied
-  start-proxy
-  check-curl-proxy-code /ui 301
-  check-curl-proxy-code /metrics 200
-  check-curl-proxy-code /api/ui 404
-  if [[ -n "${version}" ]]; then
-    check-curl-proxy-code /api/${version}/namespaces 200
-  fi
-  check-curl-proxy-code /static/ 200
-  stop-proxy
-
-  # Make sure the in-development api is accessible by default
-  start-proxy
-  check-curl-proxy-code /apis 200
-  check-curl-proxy-code /apis/extensions/ 200
-  stop-proxy
-
-  # Custom paths let you see everything.
-  start-proxy /custom
-  check-curl-proxy-code /custom/ui 301
-  check-curl-proxy-code /custom/metrics 200
-  if [[ -n "${version}" ]]; then
-    check-curl-proxy-code /custom/api/${version}/namespaces 200
-  fi
-  stop-proxy
+# This next block disabled until non-racy solution to 
+# port allocation can be found (#19999).
+#
+#  # Make sure the UI can be proxied
+#  start-proxy
+#  check-curl-proxy-code /ui 301
+#  check-curl-proxy-code /metrics 200
+#  check-curl-proxy-code /api/ui 404
+#  if [[ -n "${version}" ]]; then
+#    check-curl-proxy-code /api/${version}/namespaces 200
+#  fi
+#  check-curl-proxy-code /static/ 200
+#  stop-proxy
+#
+#  # Make sure the in-development api is accessible by default
+#  start-proxy
+#  check-curl-proxy-code /apis 200
+#  check-curl-proxy-code /apis/extensions/ 200
+#  stop-proxy
+#
+#  # Custom paths let you see everything.
+#  start-proxy /custom
+#  check-curl-proxy-code /custom/ui 301
+#  check-curl-proxy-code /custom/metrics 200
+#  if [[ -n "${version}" ]]; then
+#    check-curl-proxy-code /custom/api/${version}/namespaces 200
+#  fi
+#  stop-proxy
 
   ###########################
   # POD creation / deletion #
@@ -377,23 +393,6 @@ runTests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
 
   ### Delete multiple PODs at once
-  # Pre-condition: valid-pod and redis-proxy PODs exist
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
-  # Command
-  kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" --grace-period=0 # delete multiple pods at once
-  # Post-condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-
-  ### Create two PODs
-  # Pre-condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command
-  kubectl create -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
-  kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
-  # Post-condition: valid-pod and redis-proxy PODs are created
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
-
-  ### Stop multiple PODs at once
   # Pre-condition: valid-pod and redis-proxy PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
   # Command
@@ -848,6 +847,12 @@ __EOF__
   # Post-condition: redis-master and redis-slave services are created
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
 
+  ### Custom columns can be specified
+  # Pre-condition: generate output using custom columns
+  output_message=$(kubectl get services -o=custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion 2>&1 "${kube_flags[@]}")
+  # Post-condition: should contain name column
+  kube::test::if_has_string "${output_message}" 'redis-master'
+
   ### Delete multiple services at once
   # Pre-condition: redis-master and redis-slave services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
@@ -943,6 +948,19 @@ __EOF__
   kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
   # Clean-up
   kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
+  # TODO: Remove once deployment reaping is implemented
+  kubectl delete rc --all "${kube_flags[@]}"
+
+  ### Expose a deployment as a service
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '3'
+  # Command
+  kubectl expose deployment/nginx-deployment
+  # Post-condition: service exists and exposes deployment port (80)
+  kube::test::get_object_assert 'service nginx-deployment' "{{$port_field}}" '80'
+  # Clean-up
+  kubectl delete deployment/nginx-deployment service/nginx-deployment "${kube_flags[@]}"
   # TODO: Remove once deployment reaping is implemented
   kubectl delete rc --all "${kube_flags[@]}"
 
@@ -1327,6 +1345,16 @@ __EOF__
     [[ "$(grep "List of pods" "${file}")" ]]
     [[ "$(grep "Watch for changes to the described resources" "${file}")" ]]
   fi
+
+  #####################
+  # Kubectl --sort-by #
+  #####################
+
+  ### sort-by should not panic if no pod exists
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl get pods --sort-by="{metadata.name}"
 
   kube::test::clear_all
 }

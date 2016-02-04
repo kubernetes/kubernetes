@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// PodNamespacer has methods to work with Pod resources in a namespace
-type PodNamespacer interface {
+// PodsGetter has a method to return a PodInterface.
+// A group's client should implement this interface.
+type PodsGetter interface {
 	Pods(namespace string) PodInterface
 }
 
@@ -78,10 +79,17 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	return
 }
 
-func (c *pods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	result := &api.Pod{}
-	err := c.client.Put().Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
-	return result, err
+func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
+	result = &api.Pod{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("pods").
+		Name(pod.Name).
+		SubResource("status").
+		Body(pod).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.
@@ -100,7 +108,7 @@ func (c *pods) DeleteCollection(options *api.DeleteOptions, listOptions api.List
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -124,7 +132,7 @@ func (c *pods) List(opts api.ListOptions) (result *api.PodList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,6 +144,6 @@ func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

@@ -37,7 +37,7 @@ the new service will re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-external\-ip\fP=""
-    External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.
+    Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.
 
 .PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
@@ -53,7 +53,7 @@ the new service will re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-load\-balancer\-ip\fP=""
-    IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud\-provider specific).
+    IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud\-provider specific).
 
 .PP
 \fB\-\-name\fP=""

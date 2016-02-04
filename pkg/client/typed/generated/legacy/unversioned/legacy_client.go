@@ -17,27 +17,28 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-	latest "k8s.io/kubernetes/pkg/api/latest"
+	api "k8s.io/kubernetes/pkg/api"
+	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type LegacyInterface interface {
-	ComponentStatusNamespacer
-	EndpointsNamespacer
-	EventNamespacer
-	LimitRangeNamespacer
-	NamespaceNamespacer
-	NodeNamespacer
-	PersistentVolumeNamespacer
-	PersistentVolumeClaimNamespacer
-	PodNamespacer
-	PodTemplateNamespacer
-	ReplicationControllerNamespacer
-	ResourceQuotaNamespacer
-	SecretNamespacer
-	ServiceNamespacer
-	ServiceAccountNamespacer
+	ComponentStatusesGetter
+	ConfigMapsGetter
+	EndpointsGetter
+	EventsGetter
+	LimitRangesGetter
+	NamespacesGetter
+	NodesGetter
+	PersistentVolumesGetter
+	PersistentVolumeClaimsGetter
+	PodsGetter
+	PodTemplatesGetter
+	ReplicationControllersGetter
+	ResourceQuotasGetter
+	SecretsGetter
+	ServicesGetter
+	ServiceAccountsGetter
 }
 
 // LegacyClient is used to interact with features provided by the Legacy group.
@@ -45,8 +46,12 @@ type LegacyClient struct {
 	*unversioned.RESTClient
 }
 
-func (c *LegacyClient) ComponentStatus(namespace string) ComponentStatusInterface {
-	return newComponentStatus(c, namespace)
+func (c *LegacyClient) ComponentStatuses() ComponentStatusInterface {
+	return newComponentStatuses(c)
+}
+
+func (c *LegacyClient) ConfigMaps(namespace string) ConfigMapInterface {
+	return newConfigMaps(c, namespace)
 }
 
 func (c *LegacyClient) Endpoints(namespace string) EndpointsInterface {
@@ -61,16 +66,16 @@ func (c *LegacyClient) LimitRanges(namespace string) LimitRangeInterface {
 	return newLimitRanges(c, namespace)
 }
 
-func (c *LegacyClient) Namespaces(namespace string) NamespaceInterface {
-	return newNamespaces(c, namespace)
+func (c *LegacyClient) Namespaces() NamespaceInterface {
+	return newNamespaces(c)
 }
 
-func (c *LegacyClient) Nodes(namespace string) NodeInterface {
-	return newNodes(c, namespace)
+func (c *LegacyClient) Nodes() NodeInterface {
+	return newNodes(c)
 }
 
-func (c *LegacyClient) PersistentVolumes(namespace string) PersistentVolumeInterface {
-	return newPersistentVolumes(c, namespace)
+func (c *LegacyClient) PersistentVolumes() PersistentVolumeInterface {
+	return newPersistentVolumes(c)
 }
 
 func (c *LegacyClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
@@ -135,11 +140,11 @@ func New(c *unversioned.RESTClient) *LegacyClient {
 
 func setConfigDefaults(config *unversioned.Config) error {
 	// if legacy group is not registered, return an error
-	g, err := latest.Group("")
+	g, err := registered.Group("")
 	if err != nil {
 		return err
 	}
-	config.Prefix = "/api"
+	config.APIPath = "/api"
 	if config.UserAgent == "" {
 		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
 	}
@@ -149,12 +154,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("Legacy API version '%s' is not recognized (valid values: %s)",
-			config.GroupVersion, g.GroupVersions)
-	}
-	config.Codec = versionInterfaces.Codec
+	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

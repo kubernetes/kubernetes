@@ -16,7 +16,7 @@
 {% endif -%}
 
 # TODO: remove nginx for other cloud providers.
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere' ]  %}
   {% set api_servers_with_port = api_servers -%}
 {% else -%}
   {% set api_servers_with_port = api_servers + ":6443" -%}
@@ -27,7 +27,7 @@
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
-  {% if grains.cloud in ['aws', 'gce', 'vagrant'] -%}
+  {% if grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere'] -%}
 
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
@@ -46,7 +46,7 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined and grains.cloud != 'vagrant' -%}
+{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'vsphere'] -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
@@ -85,6 +85,11 @@
   {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 
+{% set non_masquerade_cidr = "" -%}
+{% if grains.non_masquerade_cidr is defined -%}
+  {% set non_masquerade_cidr = "--non-masquerade-cidr=" + grains.non_masquerade_cidr -%}
+{% endif -%}
+
 # The master kubelet cannot wait for the flannel daemon because it is responsible
 # for starting up the flannel server in a static pod. So even though the flannel
 # daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
@@ -100,7 +105,11 @@
 {% set cgroup_root = "" -%}
 {% if grains['os_family'] == 'Debian' -%}
   {% set system_container = "--system-container=/system" -%}
-  {% set cgroup_root = "--cgroup-root=/" -%}
+  {% if pillar.get('is_systemd') %}
+    {% set cgroup_root = "--cgroup-root=docker" -%}
+  {% else %}
+    {% set cgroup_root = "--cgroup-root=/" -%}
+  {% endif %}
 {% endif -%}
 {% if grains['oscodename'] == 'vivid' -%}
   {% set cgroup_root = "--cgroup-root=docker" -%}
@@ -137,4 +146,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"

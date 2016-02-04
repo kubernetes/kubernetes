@@ -17,13 +17,13 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-	latest "k8s.io/kubernetes/pkg/api/latest"
+	api "k8s.io/kubernetes/pkg/api"
+	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type TestgroupInterface interface {
-	TestTypeNamespacer
+	TestTypesGetter
 }
 
 // TestgroupClient is used to interact with features provided by the Testgroup group.
@@ -65,11 +65,11 @@ func New(c *unversioned.RESTClient) *TestgroupClient {
 
 func setConfigDefaults(config *unversioned.Config) error {
 	// if testgroup group is not registered, return an error
-	g, err := latest.Group("testgroup")
+	g, err := registered.Group("testgroup")
 	if err != nil {
 		return err
 	}
-	config.Prefix = "/apis"
+	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
 	}
@@ -79,12 +79,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("Testgroup API version '%s' is not recognized (valid values: %s)",
-			config.GroupVersion, g.GroupVersions)
-	}
-	config.Codec = versionInterfaces.Codec
+	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

@@ -31,8 +31,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -40,22 +40,28 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const (
+	legacyAPIPath  = "/api"
+	defaultAPIPath = "/apis"
+)
+
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
-	// Host must be a host string, a host:port pair, or a URL to the base of the API.
+	// Host must be a host string, a host:port pair, or a URL to the base of the apiserver.
+	// If a URL is given then the (optional) Path of that URL represents a prefix that must
+	// be appended to all request URIs used to access the apiserver. This allows a frontend
+	// proxy to easily relocate all of the apiserver endpoints.
 	Host string
+	// APIPath is a sub-path that points to an API root.
+	APIPath string
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
 	Prefix string
-	// GroupVersion is the API version to talk to. Must be provided when initializing
-	// a RESTClient directly. When initializing a Client, will be set with the default
-	// code version.
-	GroupVersion *unversioned.GroupVersion
-	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
-	// to a RESTClient or Client. Required when initializing a RESTClient, optional
-	// when initializing a Client.
-	Codec runtime.Codec
+
+	// ContentConfig contains settings that affect how objects are transformed when
+	// sent to the server.
+	ContentConfig
 
 	// Server requires Basic authentication
 	Username string
@@ -113,6 +119,22 @@ type TLSClientConfig struct {
 	CAData []byte
 }
 
+type ContentConfig struct {
+	// ContentType specifies the wire format used to communicate with the server.
+	// This value will be set as the Accept header on requests made to the server, and
+	// as the default content type on any object sent to the server. If not set,
+	// "application/json" is used.
+	ContentType string
+	// GroupVersion is the API version to talk to. Must be provided when initializing
+	// a RESTClient directly. When initializing a Client, will be set with the default
+	// code version.
+	GroupVersion *unversioned.GroupVersion
+	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
+	// to a RESTClient or Client. Required when initializing a RESTClient, optional
+	// when initializing a Client.
+	Codec runtime.Codec
+}
+
 // New creates a Kubernetes client for the given config. This client works with pods,
 // replication controllers, daemons, and services. It allows operations such as list, get, update
 // and delete on these objects. An error is returned if the provided configuration
@@ -128,12 +150,12 @@ func New(c *Config) (*Client, error) {
 	}
 
 	discoveryConfig := *c
-	discoveryClient, err := NewDiscoveryClient(&discoveryConfig)
+	discoveryClient, err := NewDiscoveryClientForConfig(&discoveryConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := latest.Group(extensions.GroupName); err != nil {
+	if _, err := registered.Group(extensions.GroupName); err != nil {
 		return &Client{RESTClient: client, ExtensionsClient: nil, DiscoveryClient: discoveryClient}, nil
 	}
 	experimentalConfig := *c
@@ -157,7 +179,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 		}
 	}
 	clientVersion := version.Get()
-	serverVersion, err := client.ServerVersion()
+	serverVersion, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("couldn't read version from server: %v\n", err)
 	}
@@ -180,7 +202,7 @@ func ExtractGroupVersions(l *unversioned.APIGroupList) []string {
 
 // ServerAPIVersions returns the GroupVersions supported by the API server.
 // It creates a RESTClient based on the passed in config, but it doesn't rely
-// on the Version, Codec, and Prefix of the config, because it uses AbsPath and
+// on the Version and Codec of the config, because it uses AbsPath and
 // takes the raw response.
 func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	transport, err := TransportFor(c)
@@ -191,13 +213,14 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 
 	configCopy := *c
 	configCopy.GroupVersion = nil
-	configCopy.Prefix = ""
-	baseURL, err := defaultServerUrlFor(c)
+	configCopy.APIPath = ""
+	baseURL, _, err := defaultServerUrlFor(&configCopy)
 	if err != nil {
 		return nil, err
 	}
 	// Get the groupVersions exposed at /api
-	baseURL.Path = "/api"
+	originalPath := baseURL.Path
+	baseURL.Path = path.Join(originalPath, legacyAPIPath)
 	resp, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
@@ -211,7 +234,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 
 	groupVersions = append(groupVersions, v.Versions...)
 	// Get the groupVersions exposed at /apis
-	baseURL.Path = "/apis"
+	baseURL.Path = path.Join(originalPath, defaultAPIPath)
 	resp2, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
@@ -357,25 +380,21 @@ func NewInCluster() (*Client, error) {
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 // TODO: this method needs to be split into one that sets defaults per group, expected to be fix in PR "Refactoring clientcache.go and helper.go #14592"
 func SetKubernetesDefaults(config *Config) error {
-	if config.Prefix == "" {
-		config.Prefix = "/api"
+	if config.APIPath == "" {
+		config.APIPath = legacyAPIPath
 	}
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	g, err := latest.Group(api.GroupName)
+	g, err := registered.Group(api.GroupName)
 	if err != nil {
 		return err
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	copyGroupVersion := g.GroupVersion
 	config.GroupVersion = &copyGroupVersion
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie(api.GroupName).GroupVersions)
-	}
 	if config.Codec == nil {
-		config.Codec = versionInterfaces.Codec
+		config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	}
 	if config.QPS == 0.0 {
 		config.QPS = 5.0
@@ -398,21 +417,23 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
-	baseURL, err := defaultServerUrlFor(config)
+	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
 	}
-
-	client := NewRESTClient(baseURL, *config.GroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
 		return nil, err
 	}
 
+	var httpClient *http.Client
 	if transport != http.DefaultTransport {
-		client.Client = &http.Client{Transport: transport}
+		httpClient = &http.Client{Transport: transport}
 	}
+
+	client := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, httpClient)
+
 	return client, nil
 }
 
@@ -423,35 +444,42 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
-	baseURL, err := defaultServerUrlFor(config)
+	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
 	}
-
-	client := NewRESTClient(baseURL, unversioned.SchemeGroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
 		return nil, err
 	}
 
+	var httpClient *http.Client
 	if transport != http.DefaultTransport {
-		client.Client = &http.Client{Transport: transport}
+		httpClient = &http.Client{Transport: transport}
 	}
+
+	versionConfig := config.ContentConfig
+	if versionConfig.GroupVersion == nil {
+		v := unversioned.SchemeGroupVersion
+		versionConfig.GroupVersion = &v
+	}
+
+	client := NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, httpClient)
 	return client, nil
 }
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
-func DefaultServerURL(host, prefix string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, error) {
+func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, string, error) {
 	if host == "" {
-		return nil, fmt.Errorf("host must be a URL or a host:port pair")
+		return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if hostURL.Scheme == "" {
 		scheme := "http://"
@@ -460,32 +488,34 @@ func DefaultServerURL(host, prefix string, groupVersion unversioned.GroupVersion
 		}
 		hostURL, err = url.Parse(scheme + base)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, fmt.Errorf("host must be a URL or a host:port pair: %q", base)
+			return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
 		}
 	}
 
-	// If the user specified a URL without a path component (http://server.com), automatically
-	// append the default prefix
-	if hostURL.Path == "" {
-		if prefix == "" {
-			prefix = "/"
-		}
-		hostURL.Path = prefix
-	}
+	// hostURL.Path is optional; a non-empty Path is treated as a prefix that is to be applied to
+	// all URIs used to access the host. this is useful when there's a proxy in front of the
+	// apiserver that has relocated the apiserver endpoints, forwarding all requests from, for
+	// example, /a/b/c to the apiserver. in this case the Path should be /a/b/c.
+	//
+	// if running without a frontend proxy (that changes the location of the apiserver), then
+	// hostURL.Path should be blank.
+	//
+	// versionedAPIPath, a path relative to baseURL.Path, points to a versioned API base
+	versionedAPIPath := path.Join("/", apiPath)
 
 	// Add the version to the end of the path
 	if len(groupVersion.Group) > 0 {
-		hostURL.Path = path.Join(hostURL.Path, groupVersion.Group, groupVersion.Version)
+		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Group, groupVersion.Version)
 
 	} else {
-		hostURL.Path = path.Join(hostURL.Path, groupVersion.Version)
+		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Version)
 
 	}
 
-	return hostURL, nil
+	return hostURL, versionedAPIPath, nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided config will result in a protected
@@ -499,7 +529,7 @@ func IsConfigTransportTLS(config Config) bool {
 	// modify the copy of the config we got to satisfy preconditions for defaultServerUrlFor
 	config.GroupVersion = defaultVersionFor(&config)
 
-	baseURL, err := defaultServerUrlFor(&config)
+	baseURL, _, err := defaultServerUrlFor(&config)
 	if err != nil {
 		return false
 	}
@@ -508,7 +538,7 @@ func IsConfigTransportTLS(config Config) bool {
 
 // defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor. It
 // requires Host and Version to be set prior to being called.
-func defaultServerUrlFor(config *Config) (*url.URL, error) {
+func defaultServerUrlFor(config *Config) (*url.URL, string, error) {
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
 	hasCA := len(config.CAFile) != 0 || len(config.CAData) != 0
@@ -520,18 +550,18 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	}
 
 	if config.GroupVersion != nil {
-		return DefaultServerURL(host, config.Prefix, *config.GroupVersion, defaultTLS)
+		return DefaultServerURL(host, config.APIPath, *config.GroupVersion, defaultTLS)
 	}
-	return DefaultServerURL(host, config.Prefix, unversioned.GroupVersion{}, defaultTLS)
+	return DefaultServerURL(host, config.APIPath, unversioned.GroupVersion{}, defaultTLS)
 }
 
-// defaultVersionFor is shared between defaultServerUrlFor and RESTClientFor
+// defaultVersionFor is shared between IsConfigTransportTLS and RESTClientFor
 func defaultVersionFor(config *Config) *unversioned.GroupVersion {
 	if config.GroupVersion == nil {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		// TODO this drops out when groupmeta is refactored
-		copyGroupVersion := latest.GroupOrDie(api.GroupName).GroupVersion
+		copyGroupVersion := registered.GroupOrDie(api.GroupName).GroupVersion
 		return &copyGroupVersion
 	}
 
@@ -551,4 +581,48 @@ func DefaultKubernetesUserAgent() string {
 	seg := strings.SplitN(version, "-", 2)
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
+}
+
+// LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
+// KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
+// either populated or were empty to start.
+func LoadTLSFiles(c *Config) error {
+	var err error
+	c.CAData, err = dataFromSliceOrFile(c.CAData, c.CAFile)
+	if err != nil {
+		return err
+	}
+
+	c.CertData, err = dataFromSliceOrFile(c.CertData, c.CertFile)
+	if err != nil {
+		return err
+	}
+
+	c.KeyData, err = dataFromSliceOrFile(c.KeyData, c.KeyFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
+// or an error if an error occurred reading the file
+func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
+	if len(data) > 0 {
+		return data, nil
+	}
+	if len(file) > 0 {
+		fileData, err := ioutil.ReadFile(file)
+		if err != nil {
+			return []byte{}, err
+		}
+		return fileData, nil
+	}
+	return nil, nil
+}
+
+func AddUserAgent(config *Config, userAgent string) *Config {
+	fullUserAgent := DefaultKubernetesUserAgent() + "/" + userAgent
+	config.UserAgent = fullUserAgent
+	return config
 }

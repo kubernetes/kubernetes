@@ -29,10 +29,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			}
 		},
 		func(obj *DaemonSet) {
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
+			labels := obj.Spec.Template.Labels
+
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
@@ -43,6 +41,25 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				if len(obj.Labels) == 0 {
 					obj.Labels = labels
 				}
+			}
+			updateStrategy := &obj.Spec.UpdateStrategy
+			if updateStrategy.Type == "" {
+				updateStrategy.Type = RollingUpdateDaemonSetStrategyType
+			}
+			if updateStrategy.Type == RollingUpdateDaemonSetStrategyType {
+				if updateStrategy.RollingUpdate == nil {
+					rollingUpdate := RollingUpdateDaemonSet{}
+					updateStrategy.RollingUpdate = &rollingUpdate
+				}
+				if updateStrategy.RollingUpdate.MaxUnavailable == nil {
+					// Set default MaxUnavailable as 1 by default.
+					maxUnavailable := intstr.FromInt(1)
+					updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+				}
+			}
+			if obj.Spec.UniqueLabelKey == nil {
+				obj.Spec.UniqueLabelKey = new(string)
+				*obj.Spec.UniqueLabelKey = DefaultDaemonSetUniqueLabelKey
 			}
 		},
 		func(obj *Deployment) {
@@ -101,12 +118,17 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 					obj.Labels = labels
 				}
 			}
-			if obj.Spec.Completions == nil {
-				completions := int32(1)
-				obj.Spec.Completions = &completions
+			// For a non-parallel job, you can leave both `.spec.completions` and
+			// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
+			if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
+				obj.Spec.Completions = new(int32)
+				*obj.Spec.Completions = 1
+				obj.Spec.Parallelism = new(int32)
+				*obj.Spec.Parallelism = 1
 			}
 			if obj.Spec.Parallelism == nil {
-				obj.Spec.Parallelism = obj.Spec.Completions
+				obj.Spec.Parallelism = new(int32)
+				*obj.Spec.Parallelism = 1
 			}
 		},
 		func(obj *HorizontalPodAutoscaler) {
@@ -118,9 +140,25 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 			}
 		},
-		func(obj *ConfigMap) {
-			if obj.Data == nil {
-				obj.Data = make(map[string]string)
+		func(obj *ReplicaSet) {
+			var labels map[string]string
+			if obj.Spec.Template != nil {
+				labels = obj.Spec.Template.Labels
+			}
+			// TODO: support templates defined elsewhere when we support them in the API
+			if labels != nil {
+				if obj.Spec.Selector == nil {
+					obj.Spec.Selector = &LabelSelector{
+						MatchLabels: labels,
+					}
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int32)
+				*obj.Spec.Replicas = 1
 			}
 		},
 	)

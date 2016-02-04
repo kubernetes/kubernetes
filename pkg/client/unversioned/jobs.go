@@ -55,7 +55,7 @@ var _ JobInterface = &jobs{}
 // List returns a list of jobs that match the label and field selectors.
 func (c *jobs) List(opts api.ListOptions) (result *extensions.JobList, err error) {
 	result = &extensions.JobList{}
-	err = c.r.Get().Namespace(c.ns).Resource("jobs").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("jobs").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -91,7 +91,7 @@ func (c *jobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 

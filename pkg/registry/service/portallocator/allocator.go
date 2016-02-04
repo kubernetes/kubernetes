@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/golang/glog"
 )
@@ -43,7 +43,7 @@ var (
 )
 
 type PortAllocator struct {
-	portRange util.PortRange
+	portRange net.PortRange
 
 	alloc allocator.Interface
 }
@@ -51,8 +51,8 @@ type PortAllocator struct {
 // PortAllocator implements Interface and Snapshottable
 var _ Interface = &PortAllocator{}
 
-// NewPortAllocatorCustom creates a PortAllocator over a util.PortRange, calling allocatorFactory to construct the backing store.
-func NewPortAllocatorCustom(pr util.PortRange, allocatorFactory allocator.AllocatorFactory) *PortAllocator {
+// NewPortAllocatorCustom creates a PortAllocator over a net.PortRange, calling allocatorFactory to construct the backing store.
+func NewPortAllocatorCustom(pr net.PortRange, allocatorFactory allocator.AllocatorFactory) *PortAllocator {
 	max := pr.Size
 	rangeSpec := pr.String()
 
@@ -64,7 +64,7 @@ func NewPortAllocatorCustom(pr util.PortRange, allocatorFactory allocator.Alloca
 }
 
 // Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
-func NewPortAllocator(pr util.PortRange) *PortAllocator {
+func NewPortAllocator(pr net.PortRange) *PortAllocator {
 	return NewPortAllocatorCustom(pr, func(max int, rangeSpec string) allocator.Interface {
 		return allocator.NewAllocationMap(max, rangeSpec)
 	})
@@ -146,7 +146,7 @@ func (r *PortAllocator) Snapshot(dst *api.RangeAllocation) error {
 
 // Restore restores the pool to the previously captured state. ErrMismatchedNetwork
 // is returned if the provided port range doesn't exactly match the previous range.
-func (r *PortAllocator) Restore(pr util.PortRange, data []byte) error {
+func (r *PortAllocator) Restore(pr net.PortRange, data []byte) error {
 	if pr.String() != r.portRange.String() {
 		return ErrMismatchedNetwork
 	}

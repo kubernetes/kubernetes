@@ -18,6 +18,7 @@ package wait
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -25,6 +26,52 @@ import (
 
 	"k8s.io/kubernetes/pkg/util"
 )
+
+func TestExponentialBackoff(t *testing.T) {
+	opts := Backoff{Factor: 1.0, Steps: 3}
+
+	// waits up to steps
+	i := 0
+	err := ExponentialBackoff(opts, func() (bool, error) {
+		i++
+		return false, nil
+	})
+	if err != ErrWaitTimeout || i != opts.Steps {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// returns immediately
+	i = 0
+	err = ExponentialBackoff(opts, func() (bool, error) {
+		i++
+		return true, nil
+	})
+	if err != nil || i != 1 {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// returns immediately on error
+	testErr := fmt.Errorf("some other error")
+	err = ExponentialBackoff(opts, func() (bool, error) {
+		return false, testErr
+	})
+	if err != testErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// invoked multiple times
+	i = 1
+	err = ExponentialBackoff(opts, func() (bool, error) {
+		if i < opts.Steps {
+			i++
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil || i != opts.Steps {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
 
 func TestPoller(t *testing.T) {
 	done := make(chan struct{})

@@ -32,17 +32,18 @@ import (
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 )
 
-func newTestHost(t *testing.T) volume.VolumeHost {
+func newTestHost(t *testing.T) (string, volume.VolumeHost) {
 	tempDir, err := ioutil.TempDir("/tmp", "git_repo_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return volume.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
+	_, host := newTestHost(t)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
@@ -65,7 +66,7 @@ type expectedCommand struct {
 }
 
 func TestPlugin(t *testing.T) {
-	gitUrl := "https://github.com/GoogleCloudPlatform/kubernetes.git"
+	gitUrl := "https://github.com/kubernetes/kubernetes.git"
 	revision := "2a30ce65c5ab586b98916d83385c5983edd353a1"
 
 	scenarios := []struct {
@@ -218,7 +219,8 @@ func doTestPlugin(scenario struct {
 	allErrs := []error{}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
+	rootDir, host := newTestHost(t)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
@@ -241,7 +243,8 @@ func doTestPlugin(scenario struct {
 	}
 
 	path := builder.GetPath()
-	if !strings.HasSuffix(path, "pods/poduid/volumes/kubernetes.io~git-repo/vol1") {
+	suffix := fmt.Sprintf("pods/poduid/volumes/kubernetes.io~git-repo/%v", scenario.vol.Name)
+	if !strings.HasSuffix(path, suffix) {
 		allErrs = append(allErrs,
 			fmt.Errorf("Got unexpected path: %s", path))
 		return allErrs
@@ -260,6 +263,19 @@ func doTestPlugin(scenario struct {
 			allErrs = append(allErrs,
 				fmt.Errorf("SetUp() failed: %v", err))
 			return allErrs
+		}
+	}
+
+	// gitRepo volume should create its own empty wrapper path
+	podWrapperMetadataDir := fmt.Sprintf("%v/pods/poduid/plugins/kubernetes.io~empty-dir/wrapped_%v", rootDir, scenario.vol.Name)
+
+	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
+		if os.IsNotExist(err) {
+			allErrs = append(allErrs,
+				fmt.Errorf("SetUp() failed, empty-dir wrapper path is not created: %s", podWrapperMetadataDir))
+		} else {
+			allErrs = append(allErrs,
+				fmt.Errorf("SetUp() failed: %v", err))
 		}
 	}
 
@@ -335,7 +351,7 @@ func doTestSetUp(scenario struct {
 	g := builder.(*gitRepoVolumeBuilder)
 	g.exec = &fake
 
-	g.SetUp()
+	g.SetUp(nil)
 
 	if fake.CommandCalls != len(expecteds) {
 		allErrs = append(allErrs,

@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// HorizontalPodAutoscalerNamespacer has methods to work with HorizontalPodAutoscaler resources in a namespace
-type HorizontalPodAutoscalerNamespacer interface {
+// HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.
+// A group's client should implement this interface.
+type HorizontalPodAutoscalersGetter interface {
 	HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface
 }
 
@@ -59,7 +60,7 @@ func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.Ho
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Body(horizontalPodAutoscaler).
 		Do().
 		Into(result)
@@ -71,7 +72,7 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
 		Body(horizontalPodAutoscaler).
 		Do().
@@ -79,17 +80,24 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	return
 }
 
-func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error) {
-	result := &extensions.HorizontalPodAutoscaler{}
-	err := c.client.Put().Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
-	return result, err
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("horizontalpodautoscalers").
+		Name(horizontalPodAutoscaler.Name).
+		SubResource("status").
+		Body(horizontalPodAutoscaler).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
 func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Name(name).
 		Body(options).
 		Do().
@@ -100,8 +108,8 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
-		VersionedParams(&listOptions, api.Scheme).
+		Resource("horizontalpodautoscalers").
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +120,7 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.Horizont
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
+		Resource("horizontalpodautoscalers").
 		Name(name).
 		Do().
 		Into(result)
@@ -124,8 +132,8 @@ func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *extension
 	result = &extensions.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
-		VersionedParams(&opts, api.Scheme).
+		Resource("horizontalpodautoscalers").
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +144,7 @@ func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface,
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("horizontalPodAutoscalers").
-		VersionedParams(&opts, api.Scheme).
+		Resource("horizontalpodautoscalers").
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

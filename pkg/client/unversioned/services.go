@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,6 +33,7 @@ type ServiceInterface interface {
 	Get(name string) (*api.Service, error)
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
+	UpdateStatus(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	ProxyGet(scheme, name, port, path string, params map[string]string) ResponseWrapper
@@ -55,7 +56,7 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -82,6 +83,13 @@ func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	return
 }
 
+// UpdateStatus takes a Service object with the new status and applies it as an update to the existing Service.
+func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.r.Put().Namespace(c.ns).Resource("services").Name(service.Name).SubResource("status").Body(service).Do().Into(result)
+	return
+}
+
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
@@ -93,7 +101,7 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
@@ -103,7 +111,7 @@ func (c *services) ProxyGet(scheme, name, port, path string, params map[string]s
 		Prefix("proxy").
 		Namespace(c.ns).
 		Resource("services").
-		Name(util.JoinSchemeNamePort(scheme, name, port)).
+		Name(net.JoinSchemeNamePort(scheme, name, port)).
 		Suffix(path)
 	for k, v := range params {
 		request = request.Param(k, v)

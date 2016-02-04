@@ -299,14 +299,14 @@ func TestGeneratePodName(t *testing.T) {
 		},
 	}
 	name := generateTaskName(p)
-	expected := "foo.bar.pods"
+	expected := "foo.bar.pod"
 	if name != expected {
 		t.Fatalf("expected %q instead of %q", expected, name)
 	}
 
 	p.Namespace = ""
 	name = generateTaskName(p)
-	expected = "foo.default.pods"
+	expected = "foo.default.pod"
 	if name != expected {
 		t.Fatalf("expected %q instead of %q", expected, name)
 	}

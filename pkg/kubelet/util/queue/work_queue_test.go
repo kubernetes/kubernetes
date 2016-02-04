@@ -26,7 +26,7 @@ import (
 )
 
 func newTestBasicWorkQueue() (*basicWorkQueue, *util.FakeClock) {
-	fakeClock := &util.FakeClock{Time: time.Now()}
+	fakeClock := util.NewFakeClock(time.Now())
 	wq := &basicWorkQueue{
 		clock: fakeClock,
 		queue: make(map[types.UID]time.Time),
@@ -61,17 +61,5 @@ func TestGetWork(t *testing.T) {
 	clock.Step(time.Hour)
 	expected = []types.UID{types.UID("foo3"), types.UID("foo4")}
 	compareResults(t, expected, q.GetWork())
-	compareResults(t, []types.UID{}, q.GetWork())
-}
-
-func TestEnqueueKeepGreaterTimestamp(t *testing.T) {
-	q, _ := newTestBasicWorkQueue()
-	item := types.UID("foo")
-	q.Enqueue(item, -7*time.Hour)
-	q.Enqueue(item, 3*time.Hour)
-	compareResults(t, []types.UID{}, q.GetWork())
-
-	q.Enqueue(item, 3*time.Hour)
-	q.Enqueue(item, -7*time.Hour)
 	compareResults(t, []types.UID{}, q.GetWork())
 }

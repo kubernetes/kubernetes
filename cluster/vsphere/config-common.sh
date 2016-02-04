@@ -20,9 +20,8 @@ SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=E
 #export GOVC_URL=
 #export GOVC_DATACENTER=
 #export GOVC_DATASTORE=
-#export GOVC_RESOURCE_POOL=
 #export GOVC_NETWORK=
-#export GOVC_GUEST_LOGIN='kube:kube'
+#export GOVC_GUEST_LOGIN=
 
 # Set GOVC_INSECURE if the host in GOVC_URL is using a certificate that cannot
 # be verified (i.e. a self-signed certificate), but IS trusted.

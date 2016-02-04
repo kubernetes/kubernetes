@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// SecretNamespacer has methods to work with Secret resources in a namespace
-type SecretNamespacer interface {
+// SecretsGetter has a method to return a SecretInterface.
+// A group's client should implement this interface.
+type SecretsGetter interface {
 	Secrets(namespace string) SecretInterface
 }
 
@@ -93,7 +94,7 @@ func (c *secrets) DeleteCollection(options *api.DeleteOptions, listOptions api.L
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -117,7 +118,7 @@ func (c *secrets) List(opts api.ListOptions) (result *api.SecretList, err error)
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -129,6 +130,6 @@ func (c *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

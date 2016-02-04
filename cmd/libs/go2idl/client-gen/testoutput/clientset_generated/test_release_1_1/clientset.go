@@ -17,23 +17,31 @@ limitations under the License.
 package test_release_1_1
 
 import (
+	"github.com/golang/glog"
 	testgroup_unversioned "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Interface interface {
-	Testgroup() testgroup_unversioned.TestgroupClient
+	Discovery() unversioned.DiscoveryInterface
+	Testgroup() testgroup_unversioned.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*unversioned.DiscoveryClient
 	*testgroup_unversioned.TestgroupClient
 }
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() *testgroup_unversioned.TestgroupClient {
+func (c *Clientset) Testgroup() testgroup_unversioned.TestgroupInterface {
 	return c.TestgroupClient
+}
+
+// Discovery retrieves the DiscoveryClient
+func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+	return c.DiscoveryClient
 }
 
 // NewForConfig creates a new Clientset for the given config.
@@ -42,10 +50,14 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	var err error
 	clientset.TestgroupClient, err = testgroup_unversioned.NewForConfig(c)
 	if err != nil {
-		return nil, err
+		return &clientset, err
 	}
 
-	return &clientset, nil
+	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	if err != nil {
+		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+	}
+	return &clientset, err
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
@@ -54,6 +66,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = testgroup_unversioned.NewForConfigOrDie(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
@@ -62,5 +75,6 @@ func New(c *unversioned.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = testgroup_unversioned.New(c)
 
+	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset
 }

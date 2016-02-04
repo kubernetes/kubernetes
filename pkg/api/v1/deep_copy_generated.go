@@ -115,6 +115,7 @@ func deepCopy_v1_CephFSVolumeSource(in CephFSVolumeSource, out *CephFSVolumeSour
 	} else {
 		out.Monitors = nil
 	}
+	out.Path = in.Path
 	out.User = in.User
 	out.SecretFile = in.SecretFile
 	if in.SecretRef != nil {
@@ -175,6 +176,52 @@ func deepCopy_v1_ComponentStatusList(in ComponentStatusList, out *ComponentStatu
 		out.Items = make([]ComponentStatus, len(in.Items))
 		for i := range in.Items {
 			if err := deepCopy_v1_ComponentStatus(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_ConfigMap(in ConfigMap, out *ConfigMap, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make(map[string]string)
+		for key, val := range in.Data {
+			out.Data[key] = val
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_ConfigMapKeySelector(in ConfigMapKeySelector, out *ConfigMapKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func deepCopy_v1_ConfigMapList(in ConfigMapList, out *ConfigMapList, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ConfigMap, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_ConfigMap(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -532,6 +579,22 @@ func deepCopy_v1_EnvVarSource(in EnvVarSource, out *EnvVarSource, c *conversion.
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(ConfigMapKeySelector)
+		if err := deepCopy_v1_ConfigMapKeySelector(*in.ConfigMapKeyRef, out.ConfigMapKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
+	}
+	if in.SecretKeyRef != nil {
+		out.SecretKeyRef = new(SecretKeySelector)
+		if err := deepCopy_v1_SecretKeySelector(*in.SecretKeyRef, out.SecretKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
 	}
 	return nil
 }
@@ -2049,6 +2112,14 @@ func deepCopy_v1_Secret(in Secret, out *Secret, c *conversion.Cloner) error {
 	return nil
 }
 
+func deepCopy_v1_SecretKeySelector(in SecretKeySelector, out *SecretKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
 func deepCopy_v1_SecretList(in SecretList, out *SecretList, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -2439,6 +2510,13 @@ func deepCopy_runtime_RawExtension(in runtime.RawExtension, out *runtime.RawExte
 	} else {
 		out.RawJSON = nil
 	}
+	if newVal, err := c.DeepCopy(in.Object); err != nil {
+		return err
+	} else if newVal == nil {
+		out.Object = nil
+	} else {
+		out.Object = newVal.(runtime.Object)
+	}
 	return nil
 }
 
@@ -2463,6 +2541,9 @@ func init() {
 		deepCopy_v1_ComponentCondition,
 		deepCopy_v1_ComponentStatus,
 		deepCopy_v1_ComponentStatusList,
+		deepCopy_v1_ConfigMap,
+		deepCopy_v1_ConfigMapKeySelector,
+		deepCopy_v1_ConfigMapList,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerImage,
 		deepCopy_v1_ContainerPort,
@@ -2562,6 +2643,7 @@ func init() {
 		deepCopy_v1_ResourceRequirements,
 		deepCopy_v1_SELinuxOptions,
 		deepCopy_v1_Secret,
+		deepCopy_v1_SecretKeySelector,
 		deepCopy_v1_SecretList,
 		deepCopy_v1_SecretVolumeSource,
 		deepCopy_v1_SecurityContext,

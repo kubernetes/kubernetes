@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -70,9 +71,30 @@ const (
 	simplePodName            = "nginx"
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
+	runJobTimeout            = 5 * time.Minute
 )
 
-var proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
+var (
+	proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
+
+	// Extended pod logging options were introduced in #13780 (v1.1.0) so we don't expect tests
+	// that rely on extended pod logging options to work on clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
+	extendedPodLogFilterVersion = version.MustParse("v1.1.0")
+
+	// NodePorts were made optional in #12831 (v1.1.0) so we don't expect tests that used to
+	// require NodePorts but no longer include them to work on clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
+	nodePortsOptionalVersion = version.MustParse("v1.1.0")
+
+	// Jobs were introduced in v1.1, so we don't expect tests that rely on jobs to work on
+	// clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
+	jobsVersion = version.MustParse("v1.1.0")
+)
 
 var _ = Describe("Kubectl client", func() {
 	defer GinkgoRecover()
@@ -132,6 +154,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create and stop a working application [Conformance]", func() {
+			SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+
 			defer cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
 			By("creating all guestbook components")
@@ -203,7 +227,6 @@ var _ = Describe("Kubectl client", func() {
 				Failf("Unable to parse URL %s. Error=%s", apiServer, err)
 			}
 			apiServerUrl.Scheme = "https"
-			apiServerUrl.Path = "/api"
 			if !strings.Contains(apiServer, ":443") {
 				apiServerUrl.Host = apiServerUrl.Host + ":443"
 			}
@@ -352,7 +375,9 @@ var _ = Describe("Kubectl client", func() {
 				}
 				proxyAddr := fmt.Sprintf("http://%s:8080", goproxyPod.Status.PodIP)
 
-				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
+				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container",
+					proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
+				Logf("About to remote exec: %v", shellCommand)
 				// Execute kubectl on remote exec server.
 				var netexecShellOutput []byte
 				if subResourceProxyAvailable {
@@ -383,6 +408,12 @@ var _ = Describe("Kubectl client", func() {
 					Failf("Unable to read the result from the netexec server. Error: %s", err)
 				}
 
+				// Get (and print!) the proxy logs here, so
+				// they'll be present in case the below check
+				// fails the test, to help diagnose #19500 if
+				// it recurs.
+				proxyLog := runKubectlOrDie("log", "goproxy", fmt.Sprintf("--namespace=%v", ns))
+
 				// Verify we got the normal output captured by the exec server
 				expectedExecOutput := "running in container\n"
 				if netexecOuput.Output != expectedExecOutput {
@@ -391,7 +422,6 @@ var _ = Describe("Kubectl client", func() {
 
 				// Verify the proxy server logs saw the connection
 				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimRight(strings.TrimLeft(testContext.Host, "https://"), "/api"))
-				proxyLog := runKubectlOrDie("log", "goproxy", fmt.Sprintf("--namespace=%v", ns))
 
 				if !strings.Contains(proxyLog, expectedProxyLog) {
 					Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
@@ -402,6 +432,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should support inline execution and attach", func() {
+			SkipUnlessServerVersionGTE(jobsVersion, c)
+
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("executing a command with run and attach with stdin")
@@ -517,6 +549,8 @@ var _ = Describe("Kubectl client", func() {
 
 	Describe("Kubectl describe", func() {
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
+			SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
@@ -554,7 +588,12 @@ var _ = Describe("Kubectl client", func() {
 				{"Labels:", "app=redis,role=master"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
-				{"Events:"}}
+				// {"Events:"} would ordinarily go in the list
+				// here, but in some rare circumstances the
+				// events are delayed, and instead kubectl
+				// prints "No events." This string will match
+				// either way.
+				{"vents"}}
 			checkOutput(output, requiredStrings)
 
 			// Service
@@ -730,6 +769,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should be able to retrieve and filter logs [Conformance]", func() {
+			SkipUnlessServerVersionGTE(extendedPodLogFilterVersion, c)
+
 			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
 				By("checking for a matching strings")
 				_, err := lookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", podStartTimeout)
@@ -758,12 +799,15 @@ var _ = Describe("Kubectl client", func() {
 				}
 
 				By("restricting to a time range")
-				time.Sleep(1500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
-				out = runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=1s")
-				recent := len(strings.Split(out, "\n"))
-				out = runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=24h")
-				older := len(strings.Split(out, "\n"))
-				Expect(recent).To(BeNumerically("<", older))
+				// Note: we must wait at least two seconds,
+				// because the granularity is only 1 second and
+				// it could end up rounding the wrong way.
+				time.Sleep(2500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
+				recent_out := runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=1s")
+				recent := len(strings.Split(recent_out, "\n"))
+				older_out := runKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=24h")
+				older := len(strings.Split(older_out, "\n"))
+				Expect(recent).To(BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recent_out, older_out)
 			})
 		})
 	})
@@ -866,6 +910,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create a job from an image when restart is OnFailure [Conformance]", func() {
+			SkipUnlessServerVersionGTE(jobsVersion, c)
+
 			image := "nginx"
 
 			By("running the image " + image)
@@ -885,6 +931,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create a job from an image when restart is Never [Conformance]", func() {
+			SkipUnlessServerVersionGTE(jobsVersion, c)
+
 			image := "nginx"
 
 			By("running the image " + image)
@@ -910,9 +958,14 @@ var _ = Describe("Kubectl client", func() {
 		jobName := "e2e-test-rm-busybox-job"
 
 		It("should create a job from an image, then delete the job [Conformance]", func() {
+			SkipUnlessServerVersionGTE(jobsVersion, c)
+
 			By("executing a command with run --rm and attach with stdin")
+			t := time.NewTimer(runJobTimeout)
+			defer t.Stop()
 			runOutput := newKubectlCommand(nsFlag, "run", jobName, "--image=busybox", "--rm=true", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234").
+				withTimeout(t.C).
 				execOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))

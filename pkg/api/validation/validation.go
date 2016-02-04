@@ -220,7 +220,7 @@ func NameIsDNS952Label(name string, prefix bool) (bool, string) {
 }
 
 // Validates that given value is not negative.
-func ValidatePositiveField(value int64, fldPath *field.Path) field.ErrorList {
+func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, isNegativeErrorMsg))
@@ -229,7 +229,7 @@ func ValidatePositiveField(value int64, fldPath *field.Path) field.ErrorList {
 }
 
 // Validates that a Quantity is not negative
-func ValidatePositiveQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
+func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNegativeErrorMsg))
@@ -278,7 +278,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 			allErrs = append(allErrs, field.Forbidden(fldPath, "not allowed on this type"))
 		}
 	}
-	allErrs = append(allErrs, ValidatePositiveField(meta.Generation, fldPath.Child("generation"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 
@@ -689,7 +689,7 @@ func validateCinderVolumeSource(cd *api.CinderVolumeSource, fldPath *field.Path)
 	if len(cd.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
-	if len(cd.FSType) == 0 || (cd.FSType != "ext3" && cd.FSType != "ext4") {
+	if len(cd.FSType) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
 	}
 	return allErrs
@@ -964,14 +964,25 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 
 	numSources := 0
 
-	switch {
-	case ev.ValueFrom.FieldRef != nil:
+	if ev.ValueFrom.FieldRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
 	}
+	if ev.ValueFrom.ConfigMapKeyRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateConfigMapKeySelector(ev.ValueFrom.ConfigMapKeyRef, fldPath.Child("configMapKeyRef"))...)
+	}
+	if ev.ValueFrom.SecretKeyRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
+	}
 
-	if len(ev.Value) != 0 && numSources != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
+	if len(ev.Value) != 0 {
+		if numSources != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
+		}
+	} else if numSources != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
 	}
 
 	return allErrs
@@ -991,6 +1002,36 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 		} else if !expressions.Has(internalFieldPath) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
 		}
+	}
+
+	return allErrs
+}
+
+func validateConfigMapKeySelector(s *api.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(s.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	if len(s.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+	} else if !IsSecretKey(s.Key) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+	}
+
+	return allErrs
+}
+
+func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(s.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	if len(s.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+	} else if !IsSecretKey(s.Key) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
 	}
 
 	return allErrs
@@ -1021,11 +1062,11 @@ func validateProbe(probe *api.Probe, fldPath *field.Path) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler, fldPath)...)
 
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
 	return allErrs
 }
 
@@ -1352,7 +1393,6 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image`"))
 	}
 
-	newPod.Status = oldPod.Status
 	return allErrs
 }
 
@@ -1562,6 +1602,13 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 	return allErrs
 }
 
+// ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
+func ValidateServiceStatusUpdate(service, oldService *api.Service) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	return allErrs
+}
+
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) field.ErrorList {
 	allErrs := ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName, field.NewPath("metadata"))
@@ -1580,8 +1627,8 @@ func ValidateReplicationControllerUpdate(controller, oldController *api.Replicat
 func ValidateReplicationControllerStatusUpdate(controller, oldController *api.ReplicationController) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
 	statusPath := field.NewPath("status")
-	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
 	return allErrs
 }
 
@@ -1625,7 +1672,7 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	allErrs = append(allErrs, ValidatePositiveField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
 	return allErrs
 }
@@ -1898,6 +1945,32 @@ func ValidateSecret(secret *api.Secret) field.ErrorList {
 		if err := json.Unmarshal(dockercfgBytes, &map[string]interface{}{}); err != nil {
 			allErrs = append(allErrs, field.Invalid(dataPath.Key(api.DockerConfigKey), "<secret contents redacted>", err.Error()))
 		}
+	case api.SecretTypeDockerConfigJson:
+		dockerConfigJsonBytes, exists := secret.Data[api.DockerConfigJsonKey]
+		if !exists {
+			allErrs = append(allErrs, field.Required(dataPath.Key(api.DockerConfigJsonKey), ""))
+			break
+		}
+
+		// make sure that the content is well-formed json.
+		if err := json.Unmarshal(dockerConfigJsonBytes, &map[string]interface{}{}); err != nil {
+			allErrs = append(allErrs, field.Invalid(dataPath.Key(api.DockerConfigJsonKey), "<secret contents redacted>", err.Error()))
+		}
+	case api.SecretTypeBasicAuth:
+		_, usernameFieldExists := secret.Data[api.BasicAuthUsernameKey]
+		_, passwordFieldExists := secret.Data[api.BasicAuthPasswordKey]
+
+		// username or password might be empty, but the field must be present
+		if !usernameFieldExists && !passwordFieldExists {
+			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(api.BasicAuthUsernameKey), ""))
+			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(api.BasicAuthPasswordKey), ""))
+			break
+		}
+	case api.SecretTypeSSHAuth:
+		if len(secret.Data[api.SSHAuthPrivateKey]) == 0 {
+			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(api.SSHAuthPrivateKey), ""))
+			break
+		}
 
 	default:
 		// no-op
@@ -1917,6 +1990,42 @@ func ValidateSecretUpdate(newSecret, oldSecret *api.Secret) field.ErrorList {
 	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
+	return allErrs
+}
+
+// ValidateConfigMapName can be used to check whether the given ConfigMap name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateConfigMapName(name string, prefix bool) (bool, string) {
+	return NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateConfigMap tests whether required fields in the ConfigMap are set.
+func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&cfg.ObjectMeta, true, ValidateConfigMapName, field.NewPath("metadata"))...)
+
+	totalSize := 0
+
+	for key, value := range cfg.Data {
+		if !IsSecretKey(key) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+		}
+		totalSize += len(value)
+	}
+	if totalSize > api.MaxSecretSize {
+		allErrs = append(allErrs, field.TooLong(field.NewPath("data"), "", api.MaxSecretSize))
+	}
+
+	return allErrs
+}
+
+// ValidateConfigMapUpdate tests if required fields in the ConfigMap are set.
+func ValidateConfigMapUpdate(newCfg, oldCfg *api.ConfigMap) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newCfg.ObjectMeta, &oldCfg.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateConfigMap(newCfg)...)
+
 	return allErrs
 }
 
@@ -1994,7 +2103,7 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) field.ErrorList {
 // validateResourceQuantityValue enforces that specified quantity is valid for specified resource
 func validateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidatePositiveQuantity(value, fldPath)...)
+	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if api.IsIntegerResourceName(resource) {
 		if value.MilliValue()%int64(1000) != int64(0) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))

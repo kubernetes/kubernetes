@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ServiceNamespacer has methods to work with Service resources in a namespace
-type ServiceNamespacer interface {
+// ServicesGetter has a method to return a ServiceInterface.
+// A group's client should implement this interface.
+type ServicesGetter interface {
 	Services(namespace string) ServiceInterface
 }
 
@@ -78,10 +79,17 @@ func (c *services) Update(service *api.Service) (result *api.Service, err error)
 	return
 }
 
-func (c *services) UpdateStatus(service *api.Service) (*api.Service, error) {
-	result := &api.Service{}
-	err := c.client.Put().Resource("services").Name(service.Name).SubResource("status").Body(service).Do().Into(result)
-	return result, err
+func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("services").
+		Name(service.Name).
+		SubResource("status").
+		Body(service).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
@@ -100,7 +108,7 @@ func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions api.
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -124,7 +132,7 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,6 +144,6 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

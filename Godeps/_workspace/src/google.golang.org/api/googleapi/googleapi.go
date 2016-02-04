@@ -9,13 +9,10 @@ package googleapi
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -24,6 +21,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 	"google.golang.org/api/googleapi/internal/uritemplates"
 )
 
@@ -40,6 +38,16 @@ type ContentTyper interface {
 type SizeReaderAt interface {
 	io.ReaderAt
 	Size() int64
+}
+
+// ServerResponse is embedded in each Do response and
+// provides the HTTP status code and header sent by the server.
+type ServerResponse struct {
+	// HTTPStatusCode is the server's response status code.
+	// When using a resource method's Do call, this will always be in the 2xx range.
+	HTTPStatusCode int
+	// Header contains the response header fields from the server.
+	Header http.Header
 }
 
 const (
@@ -65,6 +73,8 @@ type Error struct {
 	// Body is the raw response returned by the server.
 	// It is often but not always JSON, depending on how the request fails.
 	Body string
+	// Header contains the response header fields from the server.
+	Header http.Header
 
 	Errors []ErrorItem
 }
@@ -123,6 +133,34 @@ func CheckResponse(res *http.Response) error {
 		}
 	}
 	return &Error{
+		Code:   res.StatusCode,
+		Body:   string(slurp),
+		Header: res.Header,
+	}
+}
+
+// IsNotModified reports whether err is the result of the
+// server replying with http.StatusNotModified.
+// Such error values are sometimes returned by "Do" methods
+// on calls when If-None-Match is used.
+func IsNotModified(err error) bool {
+	if err == nil {
+		return false
+	}
+	ae, ok := err.(*Error)
+	return ok && ae.Code == http.StatusNotModified
+}
+
+// CheckMediaResponse returns an error (of type *Error) if the response
+// status code is not 2xx. Unlike CheckResponse it does not assume the
+// body is a JSON error document.
+func CheckMediaResponse(res *http.Response) error {
+	if res.StatusCode >= 200 && res.StatusCode <= 299 {
+		return nil
+	}
+	slurp, _ := ioutil.ReadAll(io.LimitReader(res.Body, 1<<20))
+	res.Body.Close()
+	return &Error{
 		Code: res.StatusCode,
 		Body: string(slurp),
 	}
@@ -148,52 +186,6 @@ func (wrap MarshalStyle) JSONReader(v interface{}) (io.Reader, error) {
 	return buf, nil
 }
 
-func getMediaType(media io.Reader) (io.Reader, string) {
-	if typer, ok := media.(ContentTyper); ok {
-		return media, typer.ContentType()
-	}
-
-	pr, pw := io.Pipe()
-	typ := "application/octet-stream"
-	buf, err := ioutil.ReadAll(io.LimitReader(media, 512))
-	if err != nil {
-		pw.CloseWithError(fmt.Errorf("error reading media: %v", err))
-		return pr, typ
-	}
-	typ = http.DetectContentType(buf)
-	mr := io.MultiReader(bytes.NewReader(buf), media)
-	go func() {
-		_, err = io.Copy(pw, mr)
-		if err != nil {
-			pw.CloseWithError(fmt.Errorf("error reading media: %v", err))
-			return
-		}
-		pw.Close()
-	}()
-	return pr, typ
-}
-
-// DetectMediaType detects and returns the content type of the provided media.
-// If the type can not be determined, "application/octet-stream" is returned.
-func DetectMediaType(media io.ReaderAt) string {
-	if typer, ok := media.(ContentTyper); ok {
-		return typer.ContentType()
-	}
-
-	typ := "application/octet-stream"
-	buf := make([]byte, 1024)
-	n, err := media.ReadAt(buf, 0)
-	buf = buf[:n]
-	if err == nil || err == io.EOF {
-		typ = http.DetectContentType(buf)
-	}
-	return typ
-}
-
-type Lengther interface {
-	Len() int
-}
-
 // endingWithErrorReader from r until it returns an error.  If the
 // final error from r is io.EOF and e is non-nil, e is used instead.
 type endingWithErrorReader struct {
@@ -209,12 +201,6 @@ func (er endingWithErrorReader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func typeHeader(contentType string) textproto.MIMEHeader {
-	h := make(textproto.MIMEHeader)
-	h.Set("Content-Type", contentType)
-	return h
-}
-
 // countingWriter counts the number of bytes it receives to write, but
 // discards them.
 type countingWriter struct {
@@ -225,66 +211,6 @@ func (w countingWriter) Write(p []byte) (int, error) {
 	*w.n += int64(len(p))
 	return len(p), nil
 }
-
-// ConditionallyIncludeMedia does nothing if media is nil.
-//
-// bodyp is an in/out parameter.  It should initially point to the
-// reader of the application/json (or whatever) payload to send in the
-// API request.  It's updated to point to the multipart body reader.
-//
-// ctypep is an in/out parameter.  It should initially point to the
-// content type of the bodyp, usually "application/json".  It's updated
-// to the "multipart/related" content type, with random boundary.
-//
-// The return value is the content-length of the entire multpart body.
-func ConditionallyIncludeMedia(media io.Reader, bodyp *io.Reader, ctypep *string) (cancel func(), ok bool) {
-	if media == nil {
-		return
-	}
-	// Get the media type, which might return a different reader instance.
-	var mediaType string
-	media, mediaType = getMediaType(media)
-
-	body, bodyType := *bodyp, *ctypep
-
-	pr, pw := io.Pipe()
-	mpw := multipart.NewWriter(pw)
-	*bodyp = pr
-	*ctypep = "multipart/related; boundary=" + mpw.Boundary()
-	go func() {
-		w, err := mpw.CreatePart(typeHeader(bodyType))
-		if err != nil {
-			mpw.Close()
-			pw.CloseWithError(fmt.Errorf("googleapi: body CreatePart failed: %v", err))
-			return
-		}
-		_, err = io.Copy(w, body)
-		if err != nil {
-			mpw.Close()
-			pw.CloseWithError(fmt.Errorf("googleapi: body Copy failed: %v", err))
-			return
-		}
-
-		w, err = mpw.CreatePart(typeHeader(mediaType))
-		if err != nil {
-			mpw.Close()
-			pw.CloseWithError(fmt.Errorf("googleapi: media CreatePart failed: %v", err))
-			return
-		}
-		_, err = io.Copy(w, media)
-		if err != nil {
-			mpw.Close()
-			pw.CloseWithError(fmt.Errorf("googleapi: media Copy failed: %v", err))
-			return
-		}
-		mpw.Close()
-		pw.Close()
-	}()
-	cancel = func() { pw.CloseWithError(errAborted) }
-	return cancel, true
-}
-
-var errAborted = errors.New("googleapi: upload aborted")
 
 // ProgressUpdater is a function that is called upon every progress update of a resumable upload.
 // This is the only part of a resumable upload (from googleapi) that is usable by the developer.
@@ -307,10 +233,9 @@ type ResumableUpload struct {
 
 	mu       sync.Mutex // guards progress
 	progress int64      // number of bytes uploaded so far
-	started  bool       // whether the upload has been started
 
-	// Callback is an optional function that will be called upon every progress update.
-	Callback ProgressUpdater
+	// Callback is an optional function that will be periodically called with the cumulative number of bytes uploaded.
+	Callback func(int64)
 }
 
 var (
@@ -328,12 +253,12 @@ func (rx *ResumableUpload) Progress() int64 {
 	return rx.progress
 }
 
-func (rx *ResumableUpload) transferStatus() (int64, *http.Response, error) {
+func (rx *ResumableUpload) transferStatus(ctx context.Context) (int64, *http.Response, error) {
 	req, _ := http.NewRequest("POST", rx.URI, nil)
 	req.ContentLength = 0
 	req.Header.Set("User-Agent", rx.UserAgent)
 	req.Header.Set("Content-Range", fmt.Sprintf("bytes */%v", rx.ContentLength))
-	res, err := rx.Client.Do(req)
+	res, err := ctxhttp.Do(ctx, rx.Client, req)
 	if err != nil || res.StatusCode != statusResumeIncomplete {
 		return 0, res, err
 	}
@@ -355,16 +280,13 @@ type chunk struct {
 }
 
 func (rx *ResumableUpload) transferChunks(ctx context.Context) (*http.Response, error) {
-	var start int64
-	var err error
-	res := &http.Response{}
-	if rx.started {
-		start, res, err = rx.transferStatus()
-		if err != nil || res.StatusCode != statusResumeIncomplete {
-			return res, err
+	start, res, err := rx.transferStatus(ctx)
+	if err != nil || res.StatusCode != statusResumeIncomplete {
+		if err == context.Canceled {
+			return &http.Response{StatusCode: http.StatusRequestTimeout}, err
 		}
+		return res, err
 	}
-	rx.started = true
 
 	for {
 		select { // Check for cancellation
@@ -383,14 +305,14 @@ func (rx *ResumableUpload) transferChunks(ctx context.Context) (*http.Response, 
 		req.Header.Set("Content-Range", fmt.Sprintf("bytes %v-%v/%v", start, start+reqSize-1, rx.ContentLength))
 		req.Header.Set("Content-Type", rx.MediaType)
 		req.Header.Set("User-Agent", rx.UserAgent)
-		res, err = rx.Client.Do(req)
+		res, err = ctxhttp.Do(ctx, rx.Client, req)
 		start += reqSize
 		if err == nil && (res.StatusCode == statusResumeIncomplete || res.StatusCode == http.StatusOK) {
 			rx.mu.Lock()
 			rx.progress = start // keep track of number of bytes sent so far
 			rx.mu.Unlock()
 			if rx.Callback != nil {
-				rx.Callback(start, rx.ContentLength)
+				rx.Callback(start)
 			}
 		}
 		if err != nil || res.StatusCode != statusResumeIncomplete {

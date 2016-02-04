@@ -25,18 +25,27 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const NumServiceAccountRemoveReferenceRetries = 10
+// RemoveTokenBackoff is the recommended (empirical) retry interval for removing
+// a secret reference from a service account when the secret is deleted. It is
+// exported for use by custom secret controllers.
+var RemoveTokenBackoff = wait.Backoff{
+	Steps:    10,
+	Duration: 100 * time.Millisecond,
+	Jitter:   1.0,
+}
 
 // TokensControllerOptions contains options for the TokensController
 type TokensControllerOptions struct {
@@ -53,7 +62,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(cl client.Interface, options TokensControllerOptions) *TokensController {
+func NewTokensController(cl clientset.Interface, options TokensControllerOptions) *TokensController {
 	e := &TokensController{
 		client: cl,
 		token:  options.TokenGenerator,
@@ -63,10 +72,10 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.ServiceAccounts(api.NamespaceAll).List(options)
+				return e.client.Legacy().ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.ServiceAccounts(api.NamespaceAll).Watch(options)
+				return e.client.Legacy().ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -84,11 +93,11 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = tokenSelector
-				return e.client.Secrets(api.NamespaceAll).List(options)
+				return e.client.Legacy().Secrets(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = tokenSelector
-				return e.client.Secrets(api.NamespaceAll).Watch(options)
+				return e.client.Legacy().Secrets(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Secret{},
@@ -111,7 +120,7 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 type TokensController struct {
 	stopChan chan struct{}
 
-	client client.Interface
+	client clientset.Interface
 	token  serviceaccount.TokenGenerator
 
 	rootCA []byte
@@ -244,16 +253,10 @@ func (e *TokensController) secretDeleted(obj interface{}) {
 		return
 	}
 
-	for i := 1; i <= NumServiceAccountRemoveReferenceRetries; i++ {
-		if _, err := e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name); err != nil {
-			if apierrors.IsConflict(err) && i < NumServiceAccountRemoveReferenceRetries {
-				time.Sleep(wait.Jitter(100*time.Millisecond, 0.0))
-				continue
-			}
-			glog.Error(err)
-			break
-		}
-		break
+	if err := client.RetryOnConflict(RemoveTokenBackoff, func() error {
+		return e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name)
+	}); err != nil {
+		utilruntime.HandleError(err)
 	}
 }
 
@@ -289,7 +292,7 @@ func (e *TokensController) createSecretIfNeeded(serviceAccount *api.ServiceAccou
 func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) error {
 	// We don't want to update the cache's copy of the service account
 	// so add the secret to a freshly retrieved copy of the service account
-	serviceAccounts := e.client.ServiceAccounts(serviceAccount.Namespace)
+	serviceAccounts := e.client.Legacy().ServiceAccounts(serviceAccount.Namespace)
 	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name)
 	if err != nil {
 		return err
@@ -327,7 +330,7 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	}
 
 	// Save the secret
-	if _, err := e.client.Secrets(serviceAccount.Namespace).Create(secret); err != nil {
+	if _, err := e.client.Legacy().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
 		return err
 	}
 
@@ -337,7 +340,7 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	if err != nil {
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("Deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
-		if err := e.client.Secrets(secret.Namespace).Delete(secret.Name); err != nil {
+		if err := e.client.Legacy().Secrets(secret.Namespace).Delete(secret.Name, nil); err != nil {
 			glog.Error(err) // if we fail, just log it
 		}
 	}
@@ -387,7 +390,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 	secret.Annotations[api.ServiceAccountUIDKey] = string(serviceAccount.UID)
 
 	// Save the secret
-	if _, err := e.client.Secrets(secret.Namespace).Update(secret); err != nil {
+	if _, err := e.client.Legacy().Secrets(secret.Namespace).Update(secret); err != nil {
 		return err
 	}
 	return nil
@@ -395,28 +398,28 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 
 // deleteSecret deletes the given secret
 func (e *TokensController) deleteSecret(secret *api.Secret) error {
-	return e.client.Secrets(secret.Namespace).Delete(secret.Name)
+	return e.client.Legacy().Secrets(secret.Namespace).Delete(secret.Name, nil)
 }
 
 // removeSecretReferenceIfNeeded updates the given ServiceAccount to remove a reference to the given secretName if needed.
 // Returns whether an update was performed, and any error that occurred
-func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.ServiceAccount, secretName string) (bool, error) {
+func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.ServiceAccount, secretName string) error {
 	// See if the account even referenced the secret
 	if !getSecretReferences(serviceAccount).Has(secretName) {
-		return false, nil
+		return nil
 	}
 
 	// We don't want to update the cache's copy of the service account
 	// so remove the secret from a freshly retrieved copy of the service account
-	serviceAccounts := e.client.ServiceAccounts(serviceAccount.Namespace)
+	serviceAccounts := e.client.Legacy().ServiceAccounts(serviceAccount.Namespace)
 	serviceAccount, err := serviceAccounts.Get(serviceAccount.Name)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// Double-check to see if the account still references the secret
 	if !getSecretReferences(serviceAccount).Has(secretName) {
-		return false, nil
+		return nil
 	}
 
 	secrets := []api.ObjectReference{}
@@ -429,10 +432,10 @@ func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.Ser
 
 	_, err = serviceAccounts.Update(serviceAccount)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 // getServiceAccount returns the ServiceAccount referenced by the given secret. If the secret is not
@@ -458,7 +461,7 @@ func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMis
 	}
 
 	if fetchOnCacheMiss {
-		serviceAccount, err := e.client.ServiceAccounts(secret.Namespace).Get(name)
+		serviceAccount, err := e.client.Legacy().ServiceAccounts(secret.Namespace).Get(name)
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}

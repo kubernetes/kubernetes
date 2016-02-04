@@ -46,7 +46,7 @@ branch, but release branches of Kubernetes should not change.
 
 ## Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If you want to build go code locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -219,7 +219,7 @@ _If `go get -u path/to/dependency` fails with compilation errors, instead try `g
 to fetch the dependencies without compiling them.  This can happen when updating the cadvisor dependency._
 
 
-5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running hack/verify-godeps.sh
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running `hack/verify-godeps.sh`
 
 _If hack/verify-godeps.sh fails after a `godep update`, it is possible that a transitive dependency was added or removed but not
 updated by godeps.  It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
@@ -227,6 +227,10 @@ updated by godeps.  It then may be necessary to perform a `godep save ./...` to 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
+
+6) If you updated the Godeps, please also update `Godeps/LICENSES.md` by running `hack/update-godep-licenses.sh`.
+
+_If Godep does not automatically vendor the proper license file for a new dependency, be sure to add an exception entry to `hack/update-godep-licenses.sh`._
 
 ## Unit tests
 
@@ -354,6 +358,34 @@ go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'
 ```
 
+## Local clusters
+
+It can be much faster to iterate on a local cluster instead of a cloud-based one.  To start a local cluster, you can run:
+
+```sh
+# The PATH construction is needed because PATH is one of the special-cased
+# environment variables not passed by sudo -E
+sudo PATH=$PATH hack/local-up-cluster.sh
+```
+
+This will start a single-node Kubernetes cluster than runs pods using the local docker daemon.  Press Control-C to stop the cluster.
+
+### E2E tests against local clusters
+
+In order to run an E2E test against a locally running cluster, use the `e2e.test` binary built by `hack/build-go.sh`
+directly:
+
+```sh
+export KUBECONFIG=/path/to/kubeconfig
+e2e.test --host=http://127.0.0.1:8080
+```
+
+To control the tests that are run:
+
+```sh
+e2e.test --host=http://127.0.0.1:8080 --ginkgo.focus="Secrets"
+```
+
 ## Conformance testing
 
 End-to-end testing, as described above, is for [development
@@ -369,6 +401,15 @@ See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
 ## Testing out flaky tests
 
 [Instructions here](flaky-tests.md)
+
+## Benchmarking
+
+To run benchmark tests, you'll typically use something like:
+
+    $ godep go test ./pkg/apiserver -benchmem -run=XXX -bench=BenchmarkWatch
+
+The `-run=XXX` prevents normal unit tests for running, while `-bench` is a regexp for selecting which benchmarks to run.
+See `go test -h` for more instructions on generating profiles from benchmarks.
 
 ## Regenerating the CLI documentation
 

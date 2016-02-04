@@ -28,11 +28,11 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/apis/abac/latest"
+	api "k8s.io/kubernetes/pkg/apis/abac"
+	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
-	_ "k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type policyLoadError struct {
@@ -64,6 +64,8 @@ func NewFromFile(path string) (policyList, error) {
 	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
 
+	decoder := api.Codecs.UniversalDecoder()
+
 	i := 0
 	unversionedLines := 0
 	for scanner.Scan() {
@@ -77,34 +79,29 @@ func NewFromFile(path string) (policyList, error) {
 			continue
 		}
 
-		dataKind, err := api.Scheme.DataKind(b)
+		decodedObj, _, err := decoder.Decode(b, nil, nil)
 		if err != nil {
-			return nil, policyLoadError{path, i, b, err}
-		}
-
-		if dataKind.IsEmpty() {
+			if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
+				return nil, policyLoadError{path, i, b, err}
+			}
 			unversionedLines++
 			// Migrate unversioned policy object
 			oldPolicy := &v0.Policy{}
-			if err := latest.Codec.DecodeInto(b, oldPolicy); err != nil {
+			if err := runtime.DecodeInto(decoder, b, oldPolicy); err != nil {
 				return nil, policyLoadError{path, i, b, err}
 			}
 			if err := api.Scheme.Convert(oldPolicy, p); err != nil {
 				return nil, policyLoadError{path, i, b, err}
 			}
-		} else {
-			decodedObj, err := latest.Codec.Decode(b)
-			if err != nil {
-				return nil, policyLoadError{path, i, b, err}
-			}
-			decodedPolicy, ok := decodedObj.(*api.Policy)
-			if !ok {
-				return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}
-			}
-			p = decodedPolicy
+			pl = append(pl, p)
+			continue
 		}
 
-		pl = append(pl, p)
+		decodedPolicy, ok := decodedObj.(*api.Policy)
+		if !ok {
+			return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}
+		}
+		pl = append(pl, decodedPolicy)
 	}
 
 	if unversionedLines > 0 {

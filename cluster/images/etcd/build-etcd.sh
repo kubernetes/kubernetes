@@ -27,7 +27,7 @@ TAG=$1
 ARCH=$2
 TARGET_DIR=$3
 
-GOLANG_VERSION=${GOLANG_VERSION:-1.5.2}
+GOLANG_VERSION=${GOLANG_VERSION:-1.5.3}
 GOARM=6
 
 # Create the ${TARGET_DIR} directory, if it doesn't exist

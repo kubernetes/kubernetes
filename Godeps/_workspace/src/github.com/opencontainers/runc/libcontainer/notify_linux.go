@@ -12,31 +12,32 @@ import (
 
 const oomCgroupName = "memory"
 
-// notifyOnOOM returns channel on which you can expect event about OOM,
-// if process died without OOM this channel will be closed.
-// s is current *libcontainer.State for container.
-func notifyOnOOM(paths map[string]string) (<-chan struct{}, error) {
-	dir := paths[oomCgroupName]
-	if dir == "" {
-		return nil, fmt.Errorf("There is no path for %q in state", oomCgroupName)
-	}
-	oomControl, err := os.Open(filepath.Join(dir, "memory.oom_control"))
+type PressureLevel uint
+
+const (
+	LowPressure PressureLevel = iota
+	MediumPressure
+	CriticalPressure
+)
+
+func registerMemoryEvent(cgDir string, evName string, arg string) (<-chan struct{}, error) {
+	evFile, err := os.Open(filepath.Join(cgDir, evName))
 	if err != nil {
 		return nil, err
 	}
 	fd, _, syserr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, syscall.FD_CLOEXEC, 0)
 	if syserr != 0 {
-		oomControl.Close()
+		evFile.Close()
 		return nil, syserr
 	}
 
 	eventfd := os.NewFile(fd, "eventfd")
 
-	eventControlPath := filepath.Join(dir, "cgroup.event_control")
-	data := fmt.Sprintf("%d %d", eventfd.Fd(), oomControl.Fd())
+	eventControlPath := filepath.Join(cgDir, "cgroup.event_control")
+	data := fmt.Sprintf("%d %d %s", eventfd.Fd(), evFile.Fd(), arg)
 	if err := ioutil.WriteFile(eventControlPath, []byte(data), 0700); err != nil {
 		eventfd.Close()
-		oomControl.Close()
+		evFile.Close()
 		return nil, err
 	}
 	ch := make(chan struct{})
@@ -44,7 +45,7 @@ func notifyOnOOM(paths map[string]string) (<-chan struct{}, error) {
 		defer func() {
 			close(ch)
 			eventfd.Close()
-			oomControl.Close()
+			evFile.Close()
 		}()
 		buf := make([]byte, 8)
 		for {
@@ -60,4 +61,29 @@ func notifyOnOOM(paths map[string]string) (<-chan struct{}, error) {
 		}
 	}()
 	return ch, nil
+}
+
+// notifyOnOOM returns channel on which you can expect event about OOM,
+// if process died without OOM this channel will be closed.
+func notifyOnOOM(paths map[string]string) (<-chan struct{}, error) {
+	dir := paths[oomCgroupName]
+	if dir == "" {
+		return nil, fmt.Errorf("path %q missing", oomCgroupName)
+	}
+
+	return registerMemoryEvent(dir, "memory.oom_control", "")
+}
+
+func notifyMemoryPressure(paths map[string]string, level PressureLevel) (<-chan struct{}, error) {
+	dir := paths[oomCgroupName]
+	if dir == "" {
+		return nil, fmt.Errorf("path %q missing", oomCgroupName)
+	}
+
+	if level > CriticalPressure {
+		return nil, fmt.Errorf("invalid pressure level %d", level)
+	}
+
+	levelStr := []string{"low", "medium", "critical"}[level]
+	return registerMemoryEvent(dir, "memory.pressure_level", levelStr)
 }

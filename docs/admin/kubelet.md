@@ -73,13 +73,13 @@ kubelet
       --chaos-chance=0: If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]
       --cloud-config="": The path to the cloud provider configuration file.  Empty string for no configuration file.
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
-      --cluster-dns=<nil>: IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
+      --cluster-dns="": IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
       --cluster-domain="": Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
       --config="": Path to the config file or directory of files
       --configure-cbr0[=false]: If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.
       --container-runtime="docker": The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
       --containerized[=false]: Experimental support for running kubelet in a container.  Intended for testing. [default=false]
-      --cpu-cfs-quota[=false]: Enable CPU CFS quota enforcement for containers that specify CPU limits
+      --cpu-cfs-quota[=true]: Enable CPU CFS quota enforcement for containers that specify CPU limits
       --docker-endpoint="": If non-empty, use this for the docker endpoint to communicate with
       --docker-exec-handler="native": Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.
       --enable-debugging-handlers[=true]: Enables server endpoints for log collection and local running of containers and commands
@@ -114,9 +114,10 @@ kubelet
       --minimum-container-ttl-duration=1m0s: Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
       --network-plugin="": <Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle
       --network-plugin-dir="/usr/libexec/kubernetes/kubelet-plugins/net/exec/": <Warning: Alpha feature> The full path of the directory in which to search for network plugins
-      --node-ip=<nil>: IP address of the node. If set, kubelet will use this IP address for the node
-      --node-labels="": <Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be specified as a json map of key:value pairs.
+      --node-ip="": IP address of the node. If set, kubelet will use this IP address for the node
+      --node-labels=: <Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must are key=value pairs seperated by ','.
       --node-status-update-frequency=10s: Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s
+      --non-masquerade-cidr="10.0.0.0/8": Traffic to IPs outside this range will use IP masquerade.
       --oom-score-adj=-999: The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]
       --outofdisk-transition-frequency=5m0s: Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s
       --pod-cidr="": The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.
@@ -136,7 +137,7 @@ kubelet
       --root-dir="/var/lib/kubelet": Directory path for managing kubelet files (volume mounts,etc).
       --runonce[=false]: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server
       --serialize-image-pulls[=true]: Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]
-      --streaming-connection-idle-timeout=5m0s: Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'
+      --streaming-connection-idle-timeout=4h0m0s: Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'
       --sync-frequency=1m0s: Max period between synchronizing running containers and config
       --system-container="": Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: "").
       --system-reserved=: A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]
@@ -145,7 +146,7 @@ kubelet
       --volume-plugin-dir="/usr/libexec/kubernetes/kubelet-plugins/volume/exec/": <Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins
 ```
 
-###### Auto generated by spf13/cobra on 12-Jan-2016
+###### Auto generated by spf13/cobra on 29-Jan-2016
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

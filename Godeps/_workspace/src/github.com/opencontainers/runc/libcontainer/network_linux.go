@@ -93,7 +93,7 @@ func (l *loopback) create(n *network, nspid int) error {
 }
 
 func (l *loopback) initialize(config *network) error {
-	return netlink.LinkSetUp(&netlink.Device{netlink.LinkAttrs{Name: "lo"}})
+	return netlink.LinkSetUp(&netlink.Device{LinkAttrs: netlink.LinkAttrs{Name: "lo"}})
 }
 
 func (l *loopback) attach(n *configs.Network) (err error) {
@@ -111,7 +111,7 @@ type veth struct {
 }
 
 func (v *veth) detach(n *configs.Network) (err error) {
-	return netlink.LinkSetMaster(&netlink.Device{netlink.LinkAttrs{Name: n.HostInterfaceName}}, nil)
+	return netlink.LinkSetMaster(&netlink.Device{LinkAttrs: netlink.LinkAttrs{Name: n.HostInterfaceName}}, nil)
 }
 
 // attach a container network interface to an external network

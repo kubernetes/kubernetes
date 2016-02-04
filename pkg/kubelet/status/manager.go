@@ -21,11 +21,12 @@ import (
 	"sync"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -53,7 +54,7 @@ type podStatusSyncRequest struct {
 // Updates pod statuses in apiserver. Writes only when new status has changed.
 // All methods are thread-safe.
 type manager struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	podManager kubepod.Manager
 	// Map from pod UID to sync status of the corresponding pod.
 	podStatuses      map[types.UID]versionedPodStatus
@@ -93,7 +94,7 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient client.Interface, podManager kubepod.Manager) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
@@ -346,7 +347,7 @@ func (m *manager) syncBatch() {
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.Pods(status.podNamespace).Get(status.podName)
+	pod, err := m.kubeClient.Legacy().Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
 		glog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
 		// If the Pod is deleted the status will be cleared in
@@ -366,11 +367,14 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		}
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
-		pod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(pod)
+		pod, err = m.kubeClient.Legacy().Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
-
+			if kubepod.IsMirrorPod(pod) {
+				// We don't handle graceful deletion of mirror pods.
+				return
+			}
 			if pod.DeletionTimestamp == nil {
 				return
 			}
@@ -378,7 +382,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
-			if err := m.kubeClient.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
+			if err := m.kubeClient.Legacy().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
 				return
@@ -410,8 +414,7 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 	// The pod could be a static pod, so we should translate first.
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
-		// Although we get uid from pod manager in syncBatch, it still could be deleted before here.
-		glog.V(4).Infof("Pod %q has been deleted, no need to reconcile", format.Pod(pod))
+		glog.V(4).Infof("Pod %q has been deleted, no need to reconcile", string(uid))
 		return false
 	}
 	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
@@ -429,7 +432,8 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 		// reconcile is not needed. Just return.
 		return false
 	}
-	glog.V(3).Infof("Pod status is inconsistent with cached status, a reconciliation should be triggered:\n %+v", util.ObjectDiff(pod.Status, status))
+	glog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
+		util.ObjectDiff(pod.Status, status))
 
 	return true
 }

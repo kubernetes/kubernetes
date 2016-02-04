@@ -247,6 +247,11 @@ The rules for loading and merging the kubeconfig files are straightforward, but 
       1. The command line flags are: `client-certificate`, `client-key`, `username`, `password`, and `token`.
       1. If there are two conflicting techniques, fail.
   1.  For any information still missing, use default values and potentially prompt for authentication information
+  1.  All file references inside of a kubeconfig file are resolved relative to the location of the kubeconfig file itself.  When file references are presented on the command line
+  they are resolved relative to the current working directory.  When paths are saved in the ~/.kube/config, relative paths are stored relatively while absolute paths are stored absolutely.
+
+Any path in a kubeconfig file is resolved relative to the location of the kubeconfig file itself.
+
 
 ## Manipulation of kubeconfig via `kubectl config <subcommand>`
 

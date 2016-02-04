@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -62,7 +60,7 @@ func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err e
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -86,15 +84,12 @@ func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
 func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	if len(endpoints.ResourceVersion) == 0 {
-		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
-	}
 	err := c.r.Put().
 		Namespace(c.ns).
 		Resource("endpoints").

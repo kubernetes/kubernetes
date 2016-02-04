@@ -60,7 +60,7 @@ func (c *namespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
 	err := c.r.Get().
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().Into(result)
 	return result, err
 }
@@ -68,10 +68,6 @@ func (c *namespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
 // Update takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
 func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
-	if len(namespace.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
-		return
-	}
 	err = c.r.Put().Resource("namespaces").Name(namespace.Name).Body(namespace).Do().Into(result)
 	return
 }
@@ -115,6 +111,6 @@ func (c *namespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

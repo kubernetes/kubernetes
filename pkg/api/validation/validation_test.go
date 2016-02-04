@@ -812,6 +812,28 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "secret_value",
+			ValueFrom: &api.EnvVarSource{
+				SecretKeyRef: &api.SecretKeySelector{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "some-secret",
+					},
+					Key: "secret-key",
+				},
+			},
+		},
+		{
+			Name: "ENV_VAR_1",
+			ValueFrom: &api.EnvVarSource{
+				ConfigMapKeyRef: &api.ConfigMapKeySelector{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "some-config-map",
+					},
+					Key: "some-key",
+				},
+			},
+		},
 	}
 	if errs := validateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -845,6 +867,69 @@ func TestValidateEnv(t *testing.T) {
 				},
 			}},
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					SecretKeyRef: &api.SecretKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "a-secret",
+						},
+						Key: "a-key",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom: Invalid value: \"\": may not have more than one field specified at a time",
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.configMapKeyRef set",
+			envs: []api.EnvVar{{
+				Name: "some_var_name",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "some-config-map",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					SecretKeyRef: &api.SecretKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "a-secret",
+						},
+						Key: "a-key",
+					},
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "some-config-map",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
 		},
 		{
 			name: "missing FieldPath on ObjectFieldSelector",
@@ -3958,25 +4043,128 @@ func TestValidateDockerConfigSecret(t *testing.T) {
 			},
 		}
 	}
+	validDockerSecret2 := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeDockerConfigJson,
+			Data: map[string][]byte{
+				api.DockerConfigJsonKey: []byte(`{"auths":{"https://index.docker.io/v1/": {"auth": "Y2x1ZWRyb29sZXIwMDAxOnBhc3N3b3Jk","email": "fake@example.com"}}}`),
+			},
+		}
+	}
 
 	var (
-		missingDockerConfigKey = validDockerSecret()
-		emptyDockerConfigKey   = validDockerSecret()
-		invalidDockerConfigKey = validDockerSecret()
+		missingDockerConfigKey  = validDockerSecret()
+		emptyDockerConfigKey    = validDockerSecret()
+		invalidDockerConfigKey  = validDockerSecret()
+		missingDockerConfigKey2 = validDockerSecret2()
+		emptyDockerConfigKey2   = validDockerSecret2()
+		invalidDockerConfigKey2 = validDockerSecret2()
 	)
 
 	delete(missingDockerConfigKey.Data, api.DockerConfigKey)
 	emptyDockerConfigKey.Data[api.DockerConfigKey] = []byte("")
 	invalidDockerConfigKey.Data[api.DockerConfigKey] = []byte("bad")
+	delete(missingDockerConfigKey2.Data, api.DockerConfigJsonKey)
+	emptyDockerConfigKey2.Data[api.DockerConfigJsonKey] = []byte("")
+	invalidDockerConfigKey2.Data[api.DockerConfigJsonKey] = []byte("bad")
 
 	tests := map[string]struct {
 		secret api.Secret
 		valid  bool
 	}{
-		"valid":             {validDockerSecret(), true},
-		"missing dockercfg": {missingDockerConfigKey, false},
-		"empty dockercfg":   {emptyDockerConfigKey, false},
-		"invalid dockercfg": {invalidDockerConfigKey, false},
+		"valid dockercfg":     {validDockerSecret(), true},
+		"missing dockercfg":   {missingDockerConfigKey, false},
+		"empty dockercfg":     {emptyDockerConfigKey, false},
+		"invalid dockercfg":   {invalidDockerConfigKey, false},
+		"valid config.json":   {validDockerSecret2(), true},
+		"missing config.json": {missingDockerConfigKey2, false},
+		"empty config.json":   {emptyDockerConfigKey2, false},
+		"invalid config.json": {invalidDockerConfigKey2, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateSecret(&tc.secret)
+		if tc.valid && len(errs) > 0 {
+			t.Errorf("%v: Unexpected error: %v", name, errs)
+		}
+		if !tc.valid && len(errs) == 0 {
+			t.Errorf("%v: Unexpected non-error", name)
+		}
+	}
+}
+
+func TestValidateBasicAuthSecret(t *testing.T) {
+	validBasicAuthSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				api.BasicAuthUsernameKey: []byte("username"),
+				api.BasicAuthPasswordKey: []byte("password"),
+			},
+		}
+	}
+
+	var (
+		missingBasicAuthUsernamePasswordKeys = validBasicAuthSecret()
+		// invalidBasicAuthUsernamePasswordKey  = validBasicAuthSecret()
+		// emptyBasicAuthUsernameKey            = validBasicAuthSecret()
+		// emptyBasicAuthPasswordKey            = validBasicAuthSecret()
+	)
+
+	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthUsernameKey)
+	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthPasswordKey)
+
+	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthUsernameKey] = []byte("bad")
+	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthPasswordKey] = []byte("bad")
+
+	// emptyBasicAuthUsernameKey.Data[api.BasicAuthUsernameKey] = []byte("")
+	// emptyBasicAuthPasswordKey.Data[api.BasicAuthPasswordKey] = []byte("")
+
+	tests := map[string]struct {
+		secret api.Secret
+		valid  bool
+	}{
+		"valid": {validBasicAuthSecret(), true},
+		"missing username and password": {missingBasicAuthUsernamePasswordKeys, false},
+		// "invalid username and password": {invalidBasicAuthUsernamePasswordKey, false},
+		// "empty username":   {emptyBasicAuthUsernameKey, false},
+		// "empty password":   {emptyBasicAuthPasswordKey, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateSecret(&tc.secret)
+		if tc.valid && len(errs) > 0 {
+			t.Errorf("%v: Unexpected error: %v", name, errs)
+		}
+		if !tc.valid && len(errs) == 0 {
+			t.Errorf("%v: Unexpected non-error", name)
+		}
+	}
+}
+
+func TestValidateSSHAuthSecret(t *testing.T) {
+	validSSHAuthSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeSSHAuth,
+			Data: map[string][]byte{
+				api.SSHAuthPrivateKey: []byte("foo-bar-baz"),
+			},
+		}
+	}
+
+	missingSSHAuthPrivateKey := validSSHAuthSecret()
+
+	delete(missingSSHAuthPrivateKey.Data, api.SSHAuthPrivateKey)
+
+	tests := map[string]struct {
+		secret api.Secret
+		valid  bool
+	}{
+		"valid":               {validSSHAuthSecret(), true},
+		"missing private key": {missingSSHAuthPrivateKey, false},
 	}
 
 	for name, tc := range tests {
@@ -4319,6 +4507,110 @@ func TestValidPodLogOptions(t *testing.T) {
 		errs := ValidatePodLogOptions(&test.opt)
 		if test.errs != len(errs) {
 			t.Errorf("%d: Unexpected errors: %v", i, errs)
+		}
+	}
+}
+
+func TestValidateConfigMap(t *testing.T) {
+	newConfigMap := func(name, namespace string, data map[string]string) api.ConfigMap {
+		return api.ConfigMap{
+			ObjectMeta: api.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Data: data,
+		}
+	}
+
+	var (
+		validConfigMap = newConfigMap("validname", "validns", map[string]string{"key": "value"})
+		maxKeyLength   = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 253): "value"})
+
+		emptyName        = newConfigMap("", "validns", nil)
+		invalidName      = newConfigMap("NoUppercaseOrSpecialCharsLike=Equals", "validns", nil)
+		emptyNs          = newConfigMap("validname", "", nil)
+		invalidNs        = newConfigMap("validname", "NoUppercaseOrSpecialCharsLike=Equals", nil)
+		invalidKey       = newConfigMap("validname", "validns", map[string]string{"a..b": "value"})
+		leadingDotKey    = newConfigMap("validname", "validns", map[string]string{".ab": "value"})
+		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
+		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
+		overMaxKeyLength = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"})
+		overMaxSize      = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", api.MaxSecretSize+1)})
+	)
+
+	tests := map[string]struct {
+		cfg     api.ConfigMap
+		isValid bool
+	}{
+		"valid":               {validConfigMap, true},
+		"max key length":      {maxKeyLength, true},
+		"leading dot key":     {leadingDotKey, true},
+		"empty name":          {emptyName, false},
+		"invalid name":        {invalidName, false},
+		"invalid key":         {invalidKey, false},
+		"empty namespace":     {emptyNs, false},
+		"invalid namespace":   {invalidNs, false},
+		"dot key":             {dotKey, false},
+		"double dot key":      {doubleDotKey, false},
+		"over max key length": {overMaxKeyLength, false},
+		"over max size":       {overMaxSize, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateConfigMap(&tc.cfg)
+		if tc.isValid && len(errs) > 0 {
+			t.Errorf("%v: unexpected error: %v", name, errs)
+		}
+		if !tc.isValid && len(errs) == 0 {
+			t.Errorf("%v: unexpected non-error", name)
+		}
+	}
+}
+
+func TestValidateConfigMapUpdate(t *testing.T) {
+	newConfigMap := func(version, name, namespace string, data map[string]string) api.ConfigMap {
+		return api.ConfigMap{
+			ObjectMeta: api.ObjectMeta{
+				Name:            name,
+				Namespace:       namespace,
+				ResourceVersion: version,
+			},
+			Data: data,
+		}
+	}
+
+	var (
+		validConfigMap = newConfigMap("1", "validname", "validns", map[string]string{"key": "value"})
+		noVersion      = newConfigMap("", "validname", "validns", map[string]string{"key": "value"})
+	)
+
+	cases := []struct {
+		name    string
+		newCfg  api.ConfigMap
+		oldCfg  api.ConfigMap
+		isValid bool
+	}{
+		{
+			name:    "valid",
+			newCfg:  validConfigMap,
+			oldCfg:  validConfigMap,
+			isValid: true,
+		},
+		{
+			name:    "invalid",
+			newCfg:  noVersion,
+			oldCfg:  validConfigMap,
+			isValid: false,
+		},
+	}
+
+	for _, tc := range cases {
+		errs := ValidateConfigMapUpdate(&tc.newCfg, &tc.oldCfg)
+		if tc.isValid && len(errs) > 0 {
+			t.Errorf("%v: unexpected error: %v", tc.name, errs)
+		}
+		if !tc.isValid && len(errs) == 0 {
+			t.Errorf("%v: unexpected non-error", tc.name)
 		}
 	}
 }

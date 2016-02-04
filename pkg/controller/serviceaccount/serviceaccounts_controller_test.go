@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -149,7 +150,7 @@ func TestServiceAccountCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		client := testclient.NewSimpleFake(defaultServiceAccount, managedServiceAccount)
+		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
 		options := DefaultServiceAccountsControllerOptions()
 		options.ServiceAccounts = []api.ServiceAccount{
 			{ObjectMeta: api.ObjectMeta{Name: defaultName}},

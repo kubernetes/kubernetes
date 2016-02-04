@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -51,7 +49,7 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentVolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -72,10 +70,6 @@ func (c *persistentVolumes) Create(volume *api.PersistentVolume) (result *api.Pe
 
 func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	if len(volume.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", volume)
-		return
-	}
 	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).Body(volume).Do().Into(result)
 	return
 }
@@ -94,6 +88,6 @@ func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error)
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentVolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

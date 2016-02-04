@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -211,20 +211,19 @@ var _ volume.Builder = &gcePersistentDiskBuilder{}
 
 func (b *gcePersistentDiskBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *gcePersistentDiskBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *gcePersistentDiskBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
+func (b *gcePersistentDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
@@ -280,6 +279,10 @@ func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
 		return err
 	}
 
+	if !b.readOnly {
+		volume.SetVolumeOwnership(b, fsGroup)
+	}
+
 	return nil
 }
 
@@ -289,7 +292,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 
 func (pd *gcePersistentDisk) GetPath() string {
 	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
+	return pd.plugin.host.GetPodVolumeDir(pd.podUID, strings.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
 type gcePersistentDiskCleaner struct {
@@ -353,7 +356,7 @@ var _ volume.Deleter = &gcePersistentDiskDeleter{}
 
 func (d *gcePersistentDiskDeleter) GetPath() string {
 	name := gcePersistentDiskPluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(name), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, strings.EscapeQualifiedNameForDisk(name), d.volName)
 }
 
 func (d *gcePersistentDiskDeleter) Delete() error {

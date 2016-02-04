@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -42,7 +41,7 @@ type ConversionGenerator interface {
 	AssumePrivateConversions()
 }
 
-func NewConversionGenerator(scheme *conversion.Scheme, targetPkg string) ConversionGenerator {
+func NewConversionGenerator(scheme *Scheme, targetPkg string) ConversionGenerator {
 	g := &conversionGenerator{
 		scheme: scheme,
 
@@ -66,7 +65,7 @@ func NewConversionGenerator(scheme *conversion.Scheme, targetPkg string) Convers
 var complexTypes []reflect.Kind = []reflect.Kind{reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct}
 
 type conversionGenerator struct {
-	scheme *conversion.Scheme
+	scheme *Scheme
 
 	nameFormat          string
 	generatedNamePrefix string
@@ -102,12 +101,10 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVersion, reflection reflect.Type) error {
 	kind := reflection.Name()
 	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
-	internalVersion, exists := g.scheme.InternalVersions[gv.Group]
-	if !exists {
-		return fmt.Errorf("no internal version for %v", gv)
-	}
+	internalVersion := gv
+	internalVersion.Version = APIVersionInternal
 
-	internalObj, err := g.scheme.NewObject(internalVersion.WithKind(kind))
+	internalObj, err := g.scheme.New(internalVersion.WithKind(kind))
 	if err != nil {
 		return fmt.Errorf("cannot create an object of type %v in internal version", kind)
 	}
@@ -775,6 +772,10 @@ func (g *conversionGenerator) writeConversionForStruct(b *buffer, inType, outTyp
 			continue
 		}
 
+		if g.scheme.Converter().IsConversionIgnored(inField.Type, outField.Type) {
+			continue
+		}
+
 		existsConversion := g.scheme.Converter().HasConversionFunc(inField.Type, outField.Type)
 		_, hasPublicConversion := g.publicFuncs[typePair{inField.Type, outField.Type}]
 		// TODO: This allows a private conversion for a slice to take precedence over a public
@@ -895,12 +896,7 @@ type typePair struct {
 	outType reflect.Type
 }
 
-var defaultConversions []typePair = []typePair{
-	{reflect.TypeOf([]RawExtension{}), reflect.TypeOf([]Object{})},
-	{reflect.TypeOf([]Object{}), reflect.TypeOf([]RawExtension{})},
-	{reflect.TypeOf(RawExtension{}), reflect.TypeOf(EmbeddedObject{})},
-	{reflect.TypeOf(EmbeddedObject{}), reflect.TypeOf(RawExtension{})},
-}
+var defaultConversions []typePair = []typePair{}
 
 func (g *conversionGenerator) OverwritePackage(pkg, overwrite string) {
 	g.pkgOverwrites[pkg] = overwrite

@@ -176,7 +176,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// all entries inserted with fakeTime will expire.
 	ttl := 30 * time.Second
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{Time: fakeTime}
+	fakeClock := util.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	assumedPodsStore := cache.NewFakeExpirationStore(
 		cache.MetaNamespaceKeyFunc, nil, ttlPolicy, fakeClock)
@@ -274,7 +274,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// Second scheduling pass will fail to schedule if the store hasn't expired
 	// the deleted pod. This would normally happen with a timeout.
 	//expirationPolicy.NeverExpire = util.NewStringSet()
-	fakeClock.Time = fakeClock.Time.Add(ttl + 1)
+	fakeClock.Step(ttl + 1)
 
 	called = make(chan struct{})
 	events = eventBroadcaster.StartEventWatcher(func(e *api.Event) {
@@ -295,73 +295,4 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	}
 	<-called
 	events.Stop()
-}
-
-// Fake rate limiter that records the 'accept' tokens from the real rate limiter
-type FakeRateLimiter struct {
-	r            util.RateLimiter
-	acceptValues []bool
-}
-
-func (fr *FakeRateLimiter) TryAccept() bool {
-	return true
-}
-
-func (fr *FakeRateLimiter) Saturation() float64 {
-	return 0
-}
-
-func (fr *FakeRateLimiter) Stop() {}
-
-func (fr *FakeRateLimiter) Accept() {
-	fr.acceptValues = append(fr.acceptValues, fr.r.TryAccept())
-}
-
-func TestSchedulerRateLimitsBinding(t *testing.T) {
-	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	scheduledPodLister := &cache.StoreToPodLister{Store: scheduledPodStore}
-	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	queuedPodLister := &cache.StoreToPodLister{Store: queuedPodStore}
-	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
-
-	algo := NewGenericScheduler(
-		map[string]algorithm.FitPredicate{},
-		[]algorithm.PriorityConfig{},
-		[]algorithm.SchedulerExtender{},
-		modeler.PodLister(),
-		rand.New(rand.NewSource(time.Now().UnixNano())))
-
-	// Rate limit to 1 pod
-	fr := FakeRateLimiter{util.NewTokenBucketRateLimiter(0.02, 1), []bool{}}
-	c := &Config{
-		Modeler: modeler,
-		NodeLister: algorithm.FakeNodeLister(
-			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
-		),
-		Algorithm: algo,
-		Binder: fakeBinder{func(b *api.Binding) error {
-			return nil
-		}},
-		NextPod: func() *api.Pod {
-			return queuedPodStore.Pop().(*api.Pod)
-		},
-		Error: func(p *api.Pod, err error) {
-			t.Errorf("Unexpected error when scheduling pod %+v: %v", p, err)
-		},
-		Recorder:            &record.FakeRecorder{},
-		BindPodsRateLimiter: &fr,
-	}
-
-	s := New(c)
-	firstPod := podWithID("foo", "")
-	secondPod := podWithID("boo", "")
-	queuedPodStore.Add(firstPod)
-	queuedPodStore.Add(secondPod)
-
-	for i, hitRateLimit := range []bool{true, false} {
-		s.scheduleOne()
-		if fr.acceptValues[i] != hitRateLimit {
-			t.Errorf("Unexpected rate limiting, expect rate limit to be: %v but found it was %v", hitRateLimit, fr.acceptValues[i])
-		}
-	}
 }

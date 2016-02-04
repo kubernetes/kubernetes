@@ -26,8 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
@@ -91,6 +90,7 @@ func TestRecycler(t *testing.T) {
 }
 
 func TestDeleter(t *testing.T) {
+	// Deleter has a hard-coded regex for "/tmp".
 	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
@@ -148,7 +148,7 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := "/tmp/hostpath/"
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 
@@ -211,7 +211,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := builder.SetUp(); err != nil {
+	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -256,11 +256,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 	}
 
-	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	o.Add(pv)
-	o.Add(claim)
-	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
+	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", client, nil))

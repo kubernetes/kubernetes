@@ -19,6 +19,8 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -26,7 +28,10 @@ import (
 	appctypes "github.com/appc/spec/schema/types"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -57,7 +62,7 @@ func makeRktPod(rktPodState rktapi.PodState,
 	rktPodID, podUID, podName, podNamespace,
 	podIP, podCreationTs, podRestartCount string,
 	appNames, imgIDs, imgNames, containerHashes []string,
-	appStates []rktapi.AppState) *rktapi.Pod {
+	appStates []rktapi.AppState, exitcodes []int32) *rktapi.Pod {
 
 	podManifest := &appcschema.PodManifest{
 		ACKind:    appcschema.PodManifestKind,
@@ -120,6 +125,7 @@ func makeRktPod(rktPodState rktapi.PodState,
 					},
 				),
 			},
+			ExitCode: exitcodes[i],
 		}
 		podManifest.Apps = append(podManifest.Apps, appcschema.RuntimeApp{
 			Name:  *appctypes.MustACName(appNames[i]),
@@ -245,7 +251,7 @@ func TestCheckVersion(t *testing.T) {
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		err := r.checkVersion(tt.minimumRktBinVersion, tt.recommendedRktBinVersion, tt.minimumAppcVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
-		assert.Equal(t, err, tt.err, testCaseHint)
+		assert.Equal(t, tt.err, err, testCaseHint)
 
 		if tt.calledGetInfo {
 			assert.Equal(t, fr.called, []string{"GetInfo"}, testCaseHint)
@@ -254,9 +260,9 @@ func TestCheckVersion(t *testing.T) {
 			assert.Equal(t, fs.called, []string{"Version"}, testCaseHint)
 		}
 		if err == nil {
-			assert.Equal(t, r.binVersion.String(), fr.info.RktVersion, testCaseHint)
-			assert.Equal(t, r.appcVersion.String(), fr.info.AppcVersion, testCaseHint)
-			assert.Equal(t, r.apiVersion.String(), fr.info.ApiVersion, testCaseHint)
+			assert.Equal(t, fr.info.RktVersion, r.binVersion.String(), testCaseHint)
+			assert.Equal(t, fr.info.AppcVersion, r.appcVersion.String(), testCaseHint)
+			assert.Equal(t, fr.info.ApiVersion, r.apiVersion.String(), testCaseHint)
 		}
 		fr.CleanCalls()
 		fs.CleanCalls()
@@ -294,21 +300,25 @@ func TestListImages(t *testing.T) {
 					Id:      "sha512-a2fb8f390702",
 					Name:    "quay.io/coreos/alpine-sh",
 					Version: "latest",
+					Size:    400,
 				},
 				{
 					Id:      "sha512-c6b597f42816",
 					Name:    "coreos.com/rkt/stage1-coreos",
 					Version: "0.10.0",
+					Size:    400,
 				},
 			},
 			[]kubecontainer.Image{
 				{
 					ID:       "sha512-a2fb8f390702",
 					RepoTags: []string{"quay.io/coreos/alpine-sh:latest"},
+					Size:     400,
 				},
 				{
 					ID:       "sha512-c6b597f42816",
 					RepoTags: []string{"coreos.com/rkt/stage1-coreos:0.10.0"},
+					Size:     400,
 				},
 			},
 		},
@@ -350,6 +360,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			[]*kubecontainer.Pod{
@@ -389,6 +400,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4003", "43", "guestbook", "default",
@@ -398,6 +410,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-11", "img-name-22"},
 					[]string{"10011", "10022"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			[]*kubecontainer.Pod{
@@ -537,6 +550,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			&kubecontainer.PodStatus{
@@ -566,6 +580,7 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
+						Reason:       "Completed",
 					},
 				},
 			},
@@ -581,6 +596,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING, // The latest pod is running.
 					"uuid-4003", "42", "guestbook", "default",
@@ -590,6 +606,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 1},
 				),
 			},
 			&kubecontainer.PodStatus{
@@ -620,6 +637,7 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
+						Reason:       "Completed",
 					},
 					{
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-1"),
@@ -642,6 +660,8 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 10,
+						ExitCode:     1,
+						Reason:       "Error",
 					},
 				},
 			},
@@ -660,5 +680,278 @@ func TestGetPodStatus(t *testing.T) {
 		assert.Equal(t, tt.result, status, testCaseHint)
 		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
 		fr.CleanCalls()
+	}
+}
+
+func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator {
+	retain, err := appctypes.NewLinuxCapabilitiesRetainSet(caps...)
+	if err != nil {
+		t.Fatalf("Error generating cap retain isolator", err)
+	}
+	return retain.AsIsolator()
+}
+
+func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator {
+	revoke, err := appctypes.NewLinuxCapabilitiesRevokeSet(caps...)
+	if err != nil {
+		t.Fatalf("Error generating cap revoke isolator", err)
+	}
+	return revoke.AsIsolator()
+}
+
+func generateCPUIsolator(t *testing.T, request, limit string) appctypes.Isolator {
+	cpu, err := appctypes.NewResourceCPUIsolator(request, limit)
+	if err != nil {
+		t.Fatalf("Error generating cpu resource isolator", err)
+	}
+	return cpu.AsIsolator()
+}
+
+func generateMemoryIsolator(t *testing.T, request, limit string) appctypes.Isolator {
+	memory, err := appctypes.NewResourceMemoryIsolator(request, limit)
+	if err != nil {
+		t.Fatalf("Error generating memory resource isolator", err)
+	}
+	return memory.AsIsolator()
+}
+
+func baseApp(t *testing.T) *appctypes.App {
+	return &appctypes.App{
+		Exec:              appctypes.Exec{"/bin/foo"},
+		SupplementaryGIDs: []int{4, 5, 6},
+		WorkingDirectory:  "/foo",
+		Environment: []appctypes.EnvironmentVariable{
+			{"env-foo", "bar"},
+		},
+		MountPoints: []appctypes.MountPoint{
+			{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
+		},
+		Ports: []appctypes.Port{
+			{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 4242},
+		},
+		Isolators: []appctypes.Isolator{
+			generateCapRetainIsolator(t, "CAP_SYS_ADMIN"),
+			generateCapRevokeIsolator(t, "CAP_NET_ADMIN"),
+			generateCPUIsolator(t, "100m", "200m"),
+			generateMemoryIsolator(t, "10M", "20M"),
+		},
+	}
+}
+
+func baseAppWithRootUserGroup(t *testing.T) *appctypes.App {
+	app := baseApp(t)
+	app.User, app.Group = "0", "0"
+	return app
+}
+
+type envByName []appctypes.EnvironmentVariable
+
+func (s envByName) Len() int           { return len(s) }
+func (s envByName) Less(i, j int) bool { return s[i].Name < s[j].Name }
+func (s envByName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+type mountsByName []appctypes.MountPoint
+
+func (s mountsByName) Len() int           { return len(s) }
+func (s mountsByName) Less(i, j int) bool { return s[i].Name < s[j].Name }
+func (s mountsByName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+type portsByName []appctypes.Port
+
+func (s portsByName) Len() int           { return len(s) }
+func (s portsByName) Less(i, j int) bool { return s[i].Name < s[j].Name }
+func (s portsByName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+type isolatorsByName []appctypes.Isolator
+
+func (s isolatorsByName) Len() int           { return len(s) }
+func (s isolatorsByName) Less(i, j int) bool { return s[i].Name < s[j].Name }
+func (s isolatorsByName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func sortAppFields(app *appctypes.App) {
+	sort.Sort(envByName(app.Environment))
+	sort.Sort(mountsByName(app.MountPoints))
+	sort.Sort(portsByName(app.Ports))
+	sort.Sort(isolatorsByName(app.Isolators))
+}
+
+func TestSetApp(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rkt_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	rootUser := int64(0)
+	nonRootUser := int64(42)
+	runAsNonRootTrue := true
+	fsgid := int64(3)
+
+	tests := []struct {
+		container *api.Container
+		opts      *kubecontainer.RunContainerOptions
+		ctx       *api.SecurityContext
+		podCtx    *api.PodSecurityContext
+		expect    *appctypes.App
+		err       error
+	}{
+		// Nothing should change, but the "User" and "Group" should be filled.
+		{
+			container: &api.Container{},
+			opts:      &kubecontainer.RunContainerOptions{},
+			ctx:       nil,
+			podCtx:    nil,
+			expect:    baseAppWithRootUserGroup(t),
+			err:       nil,
+		},
+
+		// error verifying non-root.
+		{
+			container: &api.Container{},
+			opts:      &kubecontainer.RunContainerOptions{},
+			ctx: &api.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsUser:    &rootUser,
+			},
+			podCtx: nil,
+			expect: nil,
+			err:    fmt.Errorf("container has no runAsUser and image will run as root"),
+		},
+
+		// app should be changed.
+		{
+			container: &api.Container{
+				Command:    []string{"/bin/bar"},
+				Args:       []string{"hello", "world"},
+				WorkingDir: tmpDir,
+				Resources: api.ResourceRequirements{
+					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
+					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+				},
+			},
+			opts: &kubecontainer.RunContainerOptions{
+				Envs: []kubecontainer.EnvVar{
+					{Name: "env-bar", Value: "foo"},
+				},
+				Mounts: []kubecontainer.Mount{
+					{Name: "mnt-bar", ContainerPath: "/mnt-bar", ReadOnly: true},
+				},
+				PortMappings: []kubecontainer.PortMapping{
+					{Name: "port-bar", Protocol: api.ProtocolTCP, ContainerPort: 1234},
+				},
+			},
+			ctx: &api.SecurityContext{
+				Capabilities: &api.Capabilities{
+					Add:  []api.Capability{"CAP_SYS_CHROOT", "CAP_SYS_BOOT"},
+					Drop: []api.Capability{"CAP_SETUID", "CAP_SETGID"},
+				},
+				RunAsUser:    &nonRootUser,
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			podCtx: &api.PodSecurityContext{
+				SupplementalGroups: []int64{1, 2},
+				FSGroup:            &fsgid,
+			},
+			expect: &appctypes.App{
+				Exec:              appctypes.Exec{"/bin/bar", "hello", "world"},
+				User:              "42",
+				Group:             "0",
+				SupplementaryGIDs: []int{1, 2, 3},
+				WorkingDirectory:  tmpDir,
+				Environment: []appctypes.EnvironmentVariable{
+					{"env-foo", "bar"},
+					{"env-bar", "foo"},
+				},
+				MountPoints: []appctypes.MountPoint{
+					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
+					{Name: *appctypes.MustACName("mnt-bar"), Path: "/mnt-bar", ReadOnly: true},
+				},
+				Ports: []appctypes.Port{
+					{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 4242},
+					{Name: *appctypes.MustACName("port-bar"), Protocol: "TCP", Port: 1234},
+				},
+				Isolators: []appctypes.Isolator{
+					generateCapRetainIsolator(t, "CAP_SYS_CHROOT", "CAP_SYS_BOOT"),
+					generateCapRevokeIsolator(t, "CAP_SETUID", "CAP_SETGID"),
+					generateCPUIsolator(t, "5m", "50m"),
+					generateMemoryIsolator(t, "5M", "50M"),
+				},
+			},
+		},
+
+		// app should be changed. (env, mounts, ports, are overrided).
+		{
+			container: &api.Container{
+				Name:       "hello-world",
+				Command:    []string{"/bin/bar", "$(env-foo)"},
+				Args:       []string{"hello", "world", "$(env-bar)"},
+				WorkingDir: tmpDir,
+				Resources: api.ResourceRequirements{
+					Limits:   api.ResourceList{"cpu": resource.MustParse("50m")},
+					Requests: api.ResourceList{"memory": resource.MustParse("5M")},
+				},
+			},
+			opts: &kubecontainer.RunContainerOptions{
+				Envs: []kubecontainer.EnvVar{
+					{Name: "env-foo", Value: "foo"},
+					{Name: "env-bar", Value: "bar"},
+				},
+				Mounts: []kubecontainer.Mount{
+					{Name: "mnt-foo", ContainerPath: "/mnt-bar", ReadOnly: true},
+				},
+				PortMappings: []kubecontainer.PortMapping{
+					{Name: "port-foo", Protocol: api.ProtocolTCP, ContainerPort: 1234},
+				},
+			},
+			ctx: &api.SecurityContext{
+				Capabilities: &api.Capabilities{
+					Add:  []api.Capability{"CAP_SYS_CHROOT", "CAP_SYS_BOOT"},
+					Drop: []api.Capability{"CAP_SETUID", "CAP_SETGID"},
+				},
+				RunAsUser:    &nonRootUser,
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			podCtx: &api.PodSecurityContext{
+				SupplementalGroups: []int64{1, 2},
+				FSGroup:            &fsgid,
+			},
+			expect: &appctypes.App{
+				Exec:              appctypes.Exec{"/bin/bar", "foo", "hello", "world", "bar"},
+				User:              "42",
+				Group:             "0",
+				SupplementaryGIDs: []int{1, 2, 3},
+				WorkingDirectory:  tmpDir,
+				Environment: []appctypes.EnvironmentVariable{
+					{"env-foo", "foo"},
+					{"env-bar", "bar"},
+				},
+				MountPoints: []appctypes.MountPoint{
+					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-bar", ReadOnly: true},
+				},
+				Ports: []appctypes.Port{
+					{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 1234},
+				},
+				Isolators: []appctypes.Isolator{
+					generateCapRetainIsolator(t, "CAP_SYS_CHROOT", "CAP_SYS_BOOT"),
+					generateCapRevokeIsolator(t, "CAP_SETUID", "CAP_SETGID"),
+					generateCPUIsolator(t, "50m", "50m"),
+					generateMemoryIsolator(t, "5M", "5M"),
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		testCaseHint := fmt.Sprintf("test case #%d", i)
+		app := baseApp(t)
+		err := setApp(app, tt.container, tt.opts, tt.ctx, tt.podCtx)
+		if err == nil && tt.err != nil || err != nil && tt.err == nil {
+			t.Errorf("%s: expect %v, saw %v", testCaseHint, tt.err, err)
+		}
+		if err == nil {
+			sortAppFields(tt.expect)
+			sortAppFields(app)
+			assert.Equal(t, tt.expect, app, testCaseHint)
+		}
 	}
 }

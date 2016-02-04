@@ -23,6 +23,8 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
+readonly DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
+readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox"}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -46,13 +48,9 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-# These get set in verify_prereqs with a unique hash based on KUBE_ROOT
-# KUBE_BUILD_IMAGE_TAG=<hash>
-# KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
-# KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
-readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
+readonly KUBE_BUILD_GOLANG_VERSION=1.5.3
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-1"
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-readonly KUBE_BUILD_GOLANG_VERSION=1.4
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
 # Here we map the output directories across both the local and remote _output
@@ -114,10 +112,6 @@ readonly KUBE_ADDON_PATHS=(
 # Verify that the right utilities and such are installed for building Kube.  Set
 # up some dynamic constants.
 #
-# Args:
-#   $1 The type of operation to verify for.  Only 'clean' is supported in which
-#   case we don't verify docker.
-#
 # Vars set:
 #   KUBE_ROOT_HASH
 #   KUBE_BUILD_IMAGE_TAG
@@ -163,18 +157,22 @@ function kube::build::docker_available_on_osx() {
 
 function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
-  docker-machine inspect kube-dev >/dev/null || {
+  docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create -d virtualbox kube-dev > /dev/null || {
+    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
-      kube::log::error "docker-machine create -d <provider> kube-dev"
+      kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
       return 1
     }
   }
-  docker-machine start kube-dev > /dev/null
-  eval $(docker-machine env kube-dev)
-  kube::log::status "A Docker host using docker-machine named kube-dev is ready to go!"
+  docker-machine start "${DOCKER_MACHINE_NAME}" > /dev/null
+  # it takes `docker-machine env` a few seconds to work if the machine was just started
+  while ! docker-machine env ${DOCKER_MACHINE_NAME} &> /dev/null; do
+    sleep 1
+  done
+  eval $(docker-machine env "${DOCKER_MACHINE_NAME}")
+  kube::log::status "A Docker host using docker-machine named '${DOCKER_MACHINE_NAME}' is ready to go!"
   return 0
 }
 
@@ -221,10 +219,10 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo "Possible causes:"
       echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
       echo "    - Create and start your VM using docker-machine or boot2docker: "
-      echo "      - docker-machine create -d <driver> kube-dev"
+      echo "      - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
       echo "      - boot2docker init && boot2docker start"
       echo "    - Set your environment variables using: "
-      echo "      - eval \$(docker-machine env kube-dev)"
+      echo "      - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
       echo "      - \$(boot2docker shellinit)"
       echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
       echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
@@ -414,7 +412,7 @@ function kube::build::build_image_built() {
 function kube::build::ensure_golang() {
   kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang docker image. This image is 450MB."
+      echo "You don't have a local copy of the golang:${KUBE_BUILD_GOLANG_VERSION} docker image. This image is 450MB."
       read -p "Download it now? [y/n] " -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
@@ -474,7 +472,14 @@ function kube::build::build_image() {
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
 
   cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}"
+  if kube::build::is_osx; then
+    sed -i "" "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  else
+    sed -i "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  fi
+  # We don't want to force-pull this image because it's based on a local image
+  # (see kube::build::build_image_cross), not upstream.
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}" 'false'
 }
 
 # Build the kubernetes golang cross base image.
@@ -490,10 +495,12 @@ function kube::build::build_image_cross() {
 # Build a docker image from a Dockerfile.
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
+# $3 is the value to set the --pull flag for docker build; true by default
 function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "${context_dir}")
+  local -r pull="${3:-true}"
+  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}."
   local docker_output
@@ -618,8 +625,8 @@ function kube::build::copy_output() {
     # Wait until binaries have finished coppying
     count=0
     while true;do
-      if docker "${DOCKER_OPTS}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
-        docker "${DOCKER_OPTS}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
+      if "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
+        "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
         break;
       fi
 
@@ -827,8 +834,8 @@ function kube::release::write_addon_docker_images_for_server() {
         kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
 
         local dest_name="${addon_path//\//\~}"
-        docker pull "${addon_path}"
-        docker save "${addon_path}" > "${1}/${dest_name}.tar"
+        "${DOCKER[@]}" pull "${addon_path}"
+        "${DOCKER[@]}" save "${addon_path}" > "${1}/${dest_name}.tar"
       ) &
     done
 
@@ -837,8 +844,8 @@ function kube::release::write_addon_docker_images_for_server() {
         kube::log::status "Building Docker python image"
         
         local img_name=python:2.7-slim-pyyaml
-        docker build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
-        docker save "${img_name}" > "${1}/${img_name}.tar"
+        "${DOCKER[@]}" build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
+        "${DOCKER[@]}" save "${img_name}" > "${1}/${img_name}.tar"
       ) &
     fi
 
@@ -896,7 +903,8 @@ function kube::release::package_kube_manifests_tarball() {
 
   # Source 2: manifests from cluster/gce/kube-manifests.
   # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
-  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/"* "${release_stage}/"
+  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/*" "${release_stage}/"
+  cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
   kube::release::clean_cruft
 
@@ -1466,7 +1474,7 @@ function kube::release::docker::release() {
     "amd64"
   )
 
-  local docker_push_cmd=("docker")
+  local docker_push_cmd=("${DOCKER[@]}")
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
     docker_push_cmd=("gcloud" "docker")
   fi

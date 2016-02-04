@@ -42,6 +42,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -63,6 +64,9 @@ const MaxReadThenCreateRetries = 30
 // TODO: Remove when user/admin can configure volume types and thus we don't
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
+
+// Used to call aws_credentials.Init() just once
+var once sync.Once
 
 // Abstraction over AWS, to allow mocking/other implementations
 type AWSServices interface {
@@ -591,6 +595,11 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		glog.Infof("AWS cloud - no tag filtering")
 	}
 
+	// Register handler for ECR credentials
+	once.Do(func() {
+		aws_credentials.Init()
+	})
+
 	return awsCloud, nil
 }
 
@@ -681,29 +690,47 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	// We must verify that the instance still exists
-	instance, err := aws.findInstanceByNodeName(name)
+	awsInstance, err := aws.getSelfAWSInstance()
 	if err != nil {
 		return "", err
 	}
-	if instance == nil || !isAlive(instance) {
-		return "", cloudprovider.InstanceNotFound
+
+	if awsInstance.nodeName == name {
+		// We assume that if this is run on the instance itself, the instance exists and is alive
+		return awsInstance.awsID, nil
+	} else {
+		// We must verify that the instance still exists
+		// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+		instance, err := aws.findInstanceByNodeName(name)
+		if err != nil {
+			return "", err
+		}
+		if instance == nil || !isAlive(instance) {
+			return "", cloudprovider.InstanceNotFound
+		}
+		return orEmpty(instance.InstanceId), nil
 	}
-	return orEmpty(instance.InstanceId), nil
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (aws *AWSCloud) InstanceID(name string) (string, error) {
-	// TODO: Do we need to verify it exists, or can we just construct it knowing our AZ (or via caching?)
-	inst, err := aws.getInstanceByNodeName(name)
+	awsInstance, err := aws.getSelfAWSInstance()
 	if err != nil {
 		return "", err
 	}
+
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
-	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	if awsInstance.nodeName == name {
+		return "/" + awsInstance.availabilityZone + "/" + awsInstance.awsID, nil
+	} else {
+		inst, err := aws.getInstanceByNodeName(name)
+		if err != nil {
+			return "", err
+		}
+		return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	}
 }
 
 // Check if the instance is alive (running or pending)
@@ -802,12 +829,16 @@ func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
 type awsInstanceType struct {
 }
 
+// Used to represent a mount device for attaching an EBS volume
+// This should be stored as a single letter (i.e. c, not sdc or /dev/sdc)
+type mountDevice string
+
 // TODO: Also return number of mounts allowed?
-func (self *awsInstanceType) getEBSMountDevices() []string {
+func (self *awsInstanceType) getEBSMountDevices() []mountDevice {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
-	devices := []string{}
+	devices := []mountDevice{}
 	for c := 'f'; c <= 'p'; c++ {
-		devices = append(devices, fmt.Sprintf("%c", c))
+		devices = append(devices, mountDevice(fmt.Sprintf("%c", c)))
 	}
 	return devices
 }
@@ -821,15 +852,18 @@ type awsInstance struct {
 	// node name in k8s
 	nodeName string
 
+	// availability zone the instance resides in
+	availabilityZone string
+
 	mutex sync.Mutex
 
 	// We must cache because otherwise there is a race condition,
 	// where we assign a device mapping and then get a second request before we attach the volume
-	deviceMappings map[string]string
+	deviceMappings map[mountDevice]string
 }
 
-func newAWSInstance(ec2 EC2, awsID, nodeName string) *awsInstance {
-	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName}
+func newAWSInstance(ec2 EC2, awsID, nodeName string, availabilityZone string) *awsInstance {
+	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName, availabilityZone: availabilityZone}
 
 	// We lazy-init deviceMappings
 	self.deviceMappings = nil
@@ -864,9 +898,10 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	return instances[0], nil
 }
 
-// Assigns an unused mountpoint (device) for the specified volume.
-// If the volume is already assigned, this will return the existing mountpoint and true
-func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, alreadyAttached bool, err error) {
+// Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice.
+// If the volume is already assigned, this will return the existing mountDevice with alreadyAttached=true.
+// Otherwise the mountDevice is assigned by finding the first available mountDevice, and it is returned with alreadyAttached=false.
+func (self *awsInstance) getMountDevice(volumeID string) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -884,35 +919,38 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 		if err != nil {
 			return "", false, err
 		}
-		deviceMappings := map[string]string{}
+		deviceMappings := map[mountDevice]string{}
 		for _, blockDevice := range info.BlockDeviceMappings {
-			mountpoint := orEmpty(blockDevice.DeviceName)
-			if strings.HasPrefix(mountpoint, "/dev/sd") {
-				mountpoint = mountpoint[7:]
+			name := aws.StringValue(blockDevice.DeviceName)
+			if strings.HasPrefix(name, "/dev/sd") {
+				name = name[7:]
 			}
-			if strings.HasPrefix(mountpoint, "/dev/xvd") {
-				mountpoint = mountpoint[8:]
+			if strings.HasPrefix(name, "/dev/xvd") {
+				name = name[8:]
 			}
-			deviceMappings[mountpoint] = orEmpty(blockDevice.Ebs.VolumeId)
+			if len(name) != 1 {
+				glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
+			}
+			deviceMappings[mountDevice(name)] = aws.StringValue(blockDevice.Ebs.VolumeId)
 		}
 		self.deviceMappings = deviceMappings
 	}
 
 	// Check to see if this volume is already assigned a device on this machine
-	for mountpoint, mappingVolumeID := range self.deviceMappings {
+	for mountDevice, mappingVolumeID := range self.deviceMappings {
 		if volumeID == mappingVolumeID {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountpoint, mappingVolumeID)
-			return mountpoint, true, nil
+			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			return mountDevice, true, nil
 		}
 	}
 
 	// Check all the valid mountpoints to see if any of them are free
 	valid := instanceType.getEBSMountDevices()
-	chosen := ""
-	for _, device := range valid {
-		_, found := self.deviceMappings[device]
+	chosen := mountDevice("")
+	for _, mountDevice := range valid {
+		_, found := self.deviceMappings[mountDevice]
 		if !found {
-			chosen = device
+			chosen = mountDevice
 			break
 		}
 	}
@@ -928,7 +966,7 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 	return chosen, false, nil
 }
 
-func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice string) {
+func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice mountDevice) {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 
@@ -1083,8 +1121,12 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error fetching local-hostname from ec2 metadata service: %v", err)
 		}
+		availabilityZone, err := getAvailabilityZone(s.metadata)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
+		}
 
-		i = newAWSInstance(s.ec2, instanceId, privateDnsName)
+		i = newAWSInstance(s.ec2, instanceId, privateDnsName, availabilityZone)
 		s.selfAWSInstance = i
 	}
 
@@ -1106,7 +1148,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName))
+		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName), orEmpty(instance.Placement.AvailabilityZone))
 	}
 
 	return awsInstance, nil
@@ -1130,24 +1172,24 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountpoint, alreadyAttached, err := awsInstance.assignMountpoint(disk.awsID)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID)
 	if err != nil {
 		return "", err
 	}
 
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + mountpoint
+	hostDevice := "/dev/xvd" + string(mountDevice)
 	// In the EC2 API, it is sometimes is /dev/sdX and sometimes /dev/xvdX
 	// We are running on the node here, so we check if /dev/xvda exists to determine this
-	ec2Device := "/dev/xvd" + mountpoint
+	ec2Device := "/dev/xvd" + string(mountDevice)
 	if _, err := os.Stat("/dev/xvda"); os.IsNotExist(err) {
-		ec2Device = "/dev/sd" + mountpoint
+		ec2Device = "/dev/sd" + string(mountDevice)
 	}
 
 	attached := false
 	defer func() {
 		if !attached {
-			awsInstance.releaseMountDevice(disk.awsID, mountpoint)
+			awsInstance.releaseMountDevice(disk.awsID, mountDevice)
 		}
 	}()
 
@@ -1304,14 +1346,6 @@ func (c *AWSCloud) GetVolumeLabels(volumeName string) (map[string]string, error)
 	labels[unversioned.LabelZoneRegion] = region
 
 	return labels, nil
-}
-
-func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (v *AWSCloud) Release(name string) error {
-	return nil
 }
 
 // Gets the current load balancer state
@@ -1682,7 +1716,7 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 	return subnetIds, nil
 }
 
-// EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
+// EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
 func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
@@ -1700,9 +1734,10 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
 
-	// The service controller verified all the protocols match on the ports, just check and use the first one
-	if ports[0].Protocol != api.ProtocolTCP {
-		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+	for _, port := range ports {
+		if port.Protocol != api.ProtocolTCP {
+			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+		}
 	}
 
 	if publicIP != nil {
@@ -2146,20 +2181,53 @@ func (a *AWSCloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Ins
 	return instancesByID, nil
 }
 
-// TODO: Make efficient
+// Fetches instances by node names; returns an error if any cannot be found.
+// This is currently implemented by fetching all the instances, because this is currently called for all nodes (i.e. the majority)
+// In practice, the breakeven vs looping through and calling getInstanceByNodeName is probably around N=2.
 func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
-	instances := []*ec2.Instance{}
-	for _, nodeName := range nodeNames {
-		instance, err := a.getInstanceByNodeName(nodeName)
-		if err != nil {
-			return nil, err
-		}
-		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance " + nodeName)
-		}
-		instances = append(instances, instance)
+	allInstances, err := a.getAllInstances()
+	if err != nil {
+		return nil, err
 	}
+
+	nodeNamesMap := make(map[string]int, len(nodeNames))
+	for i, nodeName := range nodeNames {
+		nodeNamesMap[nodeName] = i
+	}
+
+	instances := make([]*ec2.Instance, len(nodeNames))
+	for _, instance := range allInstances {
+		nodeName := aws.StringValue(instance.PrivateDnsName)
+		if nodeName == "" {
+			glog.V(2).Infof("ignoring ec2 instance with no PrivateDnsName: %q", aws.StringValue(instance.InstanceId))
+			continue
+		}
+		i, found := nodeNamesMap[nodeName]
+		if !found {
+			continue
+		}
+		instances[i] = instance
+	}
+
+	for i, instance := range instances {
+		if instance == nil {
+			nodeName := nodeNames[i]
+			return nil, fmt.Errorf("unable to find instance %q", nodeName)
+		}
+	}
+
 	return instances, nil
+}
+
+// Returns all instances that are tagged as being in this cluster.
+func (a *AWSCloud) getAllInstances() ([]*ec2.Instance, error) {
+	filters := []*ec2.Filter{}
+	filters = a.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	return a.ec2.DescribeInstances(request)
 }
 
 // Returns the instance with the specified node name

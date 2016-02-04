@@ -131,7 +131,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
+			w := newEtcdWatcher(true, false, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -169,7 +169,8 @@ func TestWatchInterpretations(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	w := newEtcdWatcher(false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+	_, codec := testScheme(t)
+	w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -181,9 +182,10 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
+	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -195,9 +197,10 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseBadData(t *testing.T) {
+	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -216,24 +219,6 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 		w.Stop()
 	}
 }
-
-/* re-Disabling due to flakes seen upstream #18914
-func TestWatchEtcdError(t *testing.T) {
-	codec := testapi.Default.Codec()
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), "/some/key", "4", storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	server.Terminate(t)
-
-	got, ok := <-watching.ResultChan()
-	if ok && got.Type != watch.Error {
-		t.Fatalf("Unexpected non-error")
-	}
-	watching.Stop()
-}*/
 
 func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
@@ -448,6 +433,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"

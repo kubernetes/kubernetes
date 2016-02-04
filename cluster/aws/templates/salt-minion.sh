@@ -37,29 +37,24 @@ if [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
   HOSTNAME_OVERRIDE=`curl --silent curl http://169.254.169.254/2007-01-19/meta-data/local-hostname`
 fi
 
-if [[ -n "${HOSTNAME_OVERRIDE}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  hostname_override: "${HOSTNAME_OVERRIDE}"
+# Helper that sets a salt grain in grains.conf, if the upper-cased key is a non-empty env
+function env_to_salt {
+  local key=$1
+  local env_key=`echo $key | tr '[:lower:]' '[:upper:]'`
+  local value=${!env_key}
+  if [[ -n "${value}" ]]; then
+    # Note this is yaml, so indentation matters
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
-fi
+  fi
+}
 
-if [[ -n "${DOCKER_OPTS}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${DOCKER_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${KUBELET_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
+env_to_salt hostname_override
+env_to_salt docker_opts
+env_to_salt docker_root
+env_to_salt kubelet_root
+env_to_salt non_masquerade_cidr
 
 install-salt
 

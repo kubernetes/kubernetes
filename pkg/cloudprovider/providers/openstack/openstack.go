@@ -352,58 +352,90 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.S
 	return &serverList[0], nil
 }
 
-func findAddrs(netblob interface{}) []string {
-	// Run-time types for the win :(
-	ret := []string{}
-	list, ok := netblob.([]interface{})
-	if !ok {
-		return ret
+func getAddressesByName(client *gophercloud.ServiceClient, name string) ([]api.NodeAddress, error) {
+	srv, err := getServerByName(client, name)
+	if err != nil {
+		return nil, err
 	}
-	for _, item := range list {
-		props, ok := item.(map[string]interface{})
+
+	addrs := []api.NodeAddress{}
+
+	for network, netblob := range srv.Addresses {
+		list, ok := netblob.([]interface{})
 		if !ok {
 			continue
 		}
-		tmp, ok := props["addr"]
-		if !ok {
-			continue
+
+		for _, item := range list {
+			var addressType api.NodeAddressType
+
+			props, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			extIPType, ok := props["OS-EXT-IPS:type"]
+			if (ok && extIPType == "floating") || (!ok && network == "public") {
+				addressType = api.NodeExternalIP
+			} else {
+				addressType = api.NodeInternalIP
+			}
+
+			tmp, ok := props["addr"]
+			if !ok {
+				continue
+			}
+			addr, ok := tmp.(string)
+			if !ok {
+				continue
+			}
+
+			api.AddToNodeAddresses(&addrs,
+				api.NodeAddress{
+					Type:    addressType,
+					Address: addr,
+				},
+			)
 		}
-		addr, ok := tmp.(string)
-		if !ok {
-			continue
-		}
-		ret = append(ret, addr)
 	}
-	return ret
+
+	// AccessIPs are usually duplicates of "public" addresses.
+	if srv.AccessIPv4 != "" {
+		api.AddToNodeAddresses(&addrs,
+			api.NodeAddress{
+				Type:    api.NodeExternalIP,
+				Address: srv.AccessIPv4,
+			},
+		)
+	}
+
+	if srv.AccessIPv6 != "" {
+		api.AddToNodeAddresses(&addrs,
+			api.NodeAddress{
+				Type:    api.NodeExternalIP,
+				Address: srv.AccessIPv6,
+			},
+		)
+	}
+
+	return addrs, nil
 }
 
-func getAddressByName(api *gophercloud.ServiceClient, name string) (string, error) {
-	srv, err := getServerByName(api, name)
+func getAddressByName(client *gophercloud.ServiceClient, name string) (string, error) {
+	addrs, err := getAddressesByName(client, name)
 	if err != nil {
 		return "", err
-	}
-
-	var s string
-	if s == "" {
-		if tmp := findAddrs(srv.Addresses["private"]); len(tmp) >= 1 {
-			s = tmp[0]
-		}
-	}
-	if s == "" {
-		if tmp := findAddrs(srv.Addresses["public"]); len(tmp) >= 1 {
-			s = tmp[0]
-		}
-	}
-	if s == "" {
-		s = srv.AccessIPv4
-	}
-	if s == "" {
-		s = srv.AccessIPv6
-	}
-	if s == "" {
+	} else if len(addrs) == 0 {
 		return "", ErrNoAddressFound
 	}
-	return s, nil
+
+	for _, addr := range addrs {
+		if addr.Type == api.NodeInternalIP {
+			return addr.Address, nil
+		}
+	}
+
+	return addrs[0].Address, nil
 }
 
 // Implementation of Instances.CurrentNodeName
@@ -418,38 +450,10 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
-	srv, err := getServerByName(i.compute, name)
+	addrs, err := getAddressesByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
-
-	addrs := []api.NodeAddress{}
-
-	for _, addr := range findAddrs(srv.Addresses["private"]) {
-		addrs = append(addrs, api.NodeAddress{
-			Type:    api.NodeInternalIP,
-			Address: addr,
-		})
-	}
-
-	for _, addr := range findAddrs(srv.Addresses["public"]) {
-		addrs = append(addrs, api.NodeAddress{
-			Type:    api.NodeExternalIP,
-			Address: addr,
-		})
-	}
-
-	// AccessIPs are usually duplicates of "public" addresses.
-	api.AddToNodeAddresses(&addrs,
-		api.NodeAddress{
-			Type:    api.NodeExternalIP,
-			Address: srv.AccessIPv6,
-		},
-		api.NodeAddress{
-			Type:    api.NodeExternalIP,
-			Address: srv.AccessIPv4,
-		},
-	)
 
 	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
 	return addrs, nil
@@ -1033,7 +1037,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(size int) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(size int, tags *map[string]string) (volumeName string, err error) {
 
 	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -1045,6 +1049,9 @@ func (os *OpenStack) CreateVolume(size int) (volumeName string, err error) {
 	}
 
 	opts := volumes.CreateOpts{Size: size}
+	if tags != nil {
+		opts.Metadata = *tags
+	}
 	vol, err := volumes.Create(sClient, opts).Extract()
 	if err != nil {
 		glog.Errorf("Failed to create a %d GB volume: %v", size, err)

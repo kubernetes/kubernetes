@@ -88,7 +88,9 @@ enable-debugging-handlers
 enable-hostpath-provisioner
 enable-server
 etcd-config
+etcd-mutation-timeout
 etcd-prefix
+etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides
@@ -110,6 +112,7 @@ file-suffix
 file_content_in_loop
 forward-services
 framework-name
+framework-store-uri
 framework-weburi
 from-file
 from-literal
@@ -152,11 +155,13 @@ ir-user
 jenkins-host
 jenkins-jobs
 k8s-build-output
+keep-gogoproto
 km-path
 kube-api-burst
 kube-api-qps
 kube-master
 kube-reserved
+kubecfg-file
 kubectl-path
 kubelet-address
 kubelet-cadvisor-port
@@ -174,6 +179,8 @@ kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
 kubelet-timeout
+kube-master
+kube-master-url
 kubernetes-service-node-port
 label-columns
 last-release-pr
@@ -207,6 +214,7 @@ mesos-default-pod-roles
 mesos-executor-cpus
 mesos-executor-mem
 mesos-framework-roles
+mesos-generate-task-discovery
 mesos-launch-grace-period
 mesos-master
 mesos-sandbox-overlay
@@ -233,6 +241,7 @@ node-name
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
+non-masquerade-cidr
 num-nodes
 oidc-ca-file
 oidc-client-id

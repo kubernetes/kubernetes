@@ -274,11 +274,9 @@ spec:
   - name: test-volume
     # This AWS EBS volume must already exist.
     awsElasticBlockStore:
-      volumeID: aws://<availability-zone>/<volume-id>
+      volumeID: <volume-id>
       fsType: ext4
 ```
-
-(Note: the syntax of volumeID is currently awkward; #10181 fixes it)
 
 ### nfs
 

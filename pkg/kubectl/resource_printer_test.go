@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
+	yamlserializer "k8s.io/kubernetes/pkg/runtime/serializer/yaml"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -121,17 +122,17 @@ func TestPrinter(t *testing.T) {
 		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
 		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "foo bar"},
 		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, ""},
-		{"test name", "name", "", podTest, "/foo\n"},
+		{"test name", "name", "", podTest, "pod/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
 		printer, found, err := GetPrinter(test.Format, test.FormatArgument)
 		if err != nil || !found {
-			t.Errorf("unexpected error: %#v", err)
+			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
 		if err := printer.PrintObj(test.Input, buf); err != nil {
-			t.Errorf("unexpected error: %#v", err)
+			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
 		if buf.String() != test.Expect {
 			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
@@ -175,8 +176,8 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	poutput = kubectltesting.TestStruct{}
-	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &poutput)
-	if err != nil {
+	s := yamlserializer.NewDecodingSerializer(testapi.Default.Codec())
+	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, poutput) {
@@ -196,8 +197,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &objOut)
-	if err != nil {
+	if err := runtime.DecodeInto(s, buf.Bytes(), &objOut); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {
@@ -213,12 +213,12 @@ func TestJSONPrinter(t *testing.T) {
 	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
 }
 
-func PrintCustomType(obj *TestPrintType, w io.Writer, options printOptions) error {
+func PrintCustomType(obj *TestPrintType, w io.Writer, options PrintOptions) error {
 	_, err := fmt.Fprintf(w, "%s", obj.Data)
 	return err
 }
 
-func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options printOptions) error {
+func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options PrintOptions) error {
 	return fmt.Errorf("ErrorPrintHandler error")
 }
 
@@ -463,7 +463,10 @@ func TestPrinters(t *testing.T) {
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
 		"jsonpath":             jsonpathPrinter,
-		"name":                 &NamePrinter{},
+		"name": &NamePrinter{
+			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
+			Decoder: api.Codecs.UniversalDecoder(),
+		},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
@@ -752,7 +755,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 
 	for _, svc := range tests {
 		buff := bytes.Buffer{}
-		printService(&svc, &buff, printOptions{false, false, false, false, false, []string{}})
+		printService(&svc, &buff, PrintOptions{false, false, false, false, false, []string{}})
 		output := string(buff.Bytes())
 		ip := svc.Spec.ClusterIP
 		if !strings.Contains(output, ip) {
@@ -1041,7 +1044,7 @@ func TestPrintPod(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printPod(&test.pod, buf, printOptions{false, false, false, true, false, []string{}})
+		printPod(&test.pod, buf, PrintOptions{false, false, false, true, false, []string{}})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.expect) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
@@ -1134,7 +1137,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printPod(&test.pod, buf, printOptions{false, false, false, false, false, []string{}})
+		printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, []string{}})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.expect) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
@@ -1194,7 +1197,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printPod(&test.pod, buf, printOptions{false, false, false, false, false, test.labelColumns})
+		printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, test.labelColumns})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.startsWith) || !strings.HasSuffix(buf.String(), test.endsWith) {
 			t.Fatalf("Expected to start with: %s and end with: %s, but got: %s", test.startsWith, test.endsWith, buf.String())
@@ -1246,17 +1249,19 @@ func TestPrintDeployment(t *testing.T) {
 					},
 				},
 				Status: extensions.DeploymentStatus{
-					Replicas:        10,
-					UpdatedReplicas: 2,
+					Replicas:            10,
+					UpdatedReplicas:     2,
+					AvailableReplicas:   1,
+					UnavailableReplicas: 4,
 				},
 			},
-			"test1\t2/5\t0s\n",
+			"test1\t5\t10\t2\t1\t0s\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printDeployment(&test.deployment, buf, printOptions{false, false, false, true, false, []string{}})
+		printDeployment(&test.deployment, buf, PrintOptions{false, false, false, true, false, []string{}})
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}

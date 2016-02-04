@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -172,7 +172,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *a
 	}
 
 	glog.V(5).Infof("PersistentVolumeClaim[%s] provisioning", claim.Name)
-	provisioner, err := newProvisioner(controller.provisioner, claim)
+	provisioner, err := newProvisioner(controller.provisioner, claim, nil)
 	if err != nil {
 		return fmt.Errorf("Unexpected error getting new provisioner for claim %s: %v\n", claim.Name, err)
 	}
@@ -274,7 +274,7 @@ func provisionVolume(pv *api.PersistentVolume, controller *PersistentVolumeProvi
 	}
 	claim := obj.(*api.PersistentVolumeClaim)
 
-	provisioner, _ := newProvisioner(controller.provisioner, claim)
+	provisioner, _ := newProvisioner(controller.provisioner, claim, pv)
 	err := provisioner.Provision(pv)
 	if err != nil {
 		glog.Errorf("Could not provision %s", pv.Name)
@@ -330,15 +330,21 @@ func (controller *PersistentVolumeProvisionerController) Stop() {
 	}
 }
 
-func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.PersistentVolumeClaim) (volume.Provisioner, error) {
+func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.PersistentVolumeClaim, pv *api.PersistentVolume) (volume.Provisioner, error) {
+	tags := make(map[string]string)
+	tags[cloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
+	tags[cloudVolumeCreatedForClaimNameTag] = claim.Name
+
+	// pv can be nil when the provisioner has not created the PV yet
+	if pv != nil {
+		tags[cloudVolumeCreatedForVolumeNameTag] = pv.Name
+	}
+
 	volumeOptions := volume.VolumeOptions{
 		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
-		CloudTags: &map[string]string{
-			cloudVolumeCreatedForNamespaceTag: claim.Namespace,
-			cloudVolumeCreatedForNameTag:      claim.Name,
-		},
+		CloudTags:                     &tags,
 	}
 
 	provisioner, err := plugin.NewProvisioner(volumeOptions)
@@ -362,68 +368,68 @@ type controllerClient interface {
 	UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 
 	// provided to give VolumeHost and plugins access to the kube client
-	GetKubeClient() client.Interface
+	GetKubeClient() clientset.Interface
 }
 
-func NewControllerClient(c client.Interface) controllerClient {
+func NewControllerClient(c clientset.Interface) controllerClient {
 	return &realControllerClient{c}
 }
 
 var _ controllerClient = &realControllerClient{}
 
 type realControllerClient struct {
-	client client.Interface
+	client clientset.Interface
 }
 
 func (c *realControllerClient) GetPersistentVolume(name string) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().Get(name)
+	return c.client.Legacy().PersistentVolumes().Get(name)
 }
 
 func (c *realControllerClient) ListPersistentVolumes(options api.ListOptions) (*api.PersistentVolumeList, error) {
-	return c.client.PersistentVolumes().List(options)
+	return c.client.Legacy().PersistentVolumes().List(options)
 }
 
 func (c *realControllerClient) WatchPersistentVolumes(options api.ListOptions) (watch.Interface, error) {
-	return c.client.PersistentVolumes().Watch(options)
+	return c.client.Legacy().PersistentVolumes().Watch(options)
 }
 
 func (c *realControllerClient) CreatePersistentVolume(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().Create(pv)
+	return c.client.Legacy().PersistentVolumes().Create(pv)
 }
 
 func (c *realControllerClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().Update(volume)
+	return c.client.Legacy().PersistentVolumes().Update(volume)
 }
 
 func (c *realControllerClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
-	return c.client.PersistentVolumes().Delete(volume.Name)
+	return c.client.Legacy().PersistentVolumes().Delete(volume.Name, nil)
 }
 
 func (c *realControllerClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	return c.client.PersistentVolumes().UpdateStatus(volume)
+	return c.client.Legacy().PersistentVolumes().UpdateStatus(volume)
 }
 
 func (c *realControllerClient) GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error) {
-	return c.client.PersistentVolumeClaims(namespace).Get(name)
+	return c.client.Legacy().PersistentVolumeClaims(namespace).Get(name)
 }
 
 func (c *realControllerClient) ListPersistentVolumeClaims(namespace string, options api.ListOptions) (*api.PersistentVolumeClaimList, error) {
-	return c.client.PersistentVolumeClaims(namespace).List(options)
+	return c.client.Legacy().PersistentVolumeClaims(namespace).List(options)
 }
 
 func (c *realControllerClient) WatchPersistentVolumeClaims(namespace string, options api.ListOptions) (watch.Interface, error) {
-	return c.client.PersistentVolumeClaims(namespace).Watch(options)
+	return c.client.Legacy().PersistentVolumeClaims(namespace).Watch(options)
 }
 
 func (c *realControllerClient) UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	return c.client.PersistentVolumeClaims(claim.Namespace).Update(claim)
+	return c.client.Legacy().PersistentVolumeClaims(claim.Namespace).Update(claim)
 }
 
 func (c *realControllerClient) UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	return c.client.PersistentVolumeClaims(claim.Namespace).UpdateStatus(claim)
+	return c.client.Legacy().PersistentVolumeClaims(claim.Namespace).UpdateStatus(claim)
 }
 
-func (c *realControllerClient) GetKubeClient() client.Interface {
+func (c *realControllerClient) GetKubeClient() clientset.Interface {
 	return c.client
 }
 
@@ -463,15 +469,15 @@ func (c *PersistentVolumeProvisionerController) GetPodPluginDir(podUID types.UID
 	return ""
 }
 
-func (c *PersistentVolumeProvisionerController) GetKubeClient() client.Interface {
+func (c *PersistentVolumeProvisionerController) GetKubeClient() clientset.Interface {
 	return c.client.GetKubeClient()
 }
 
-func (c *PersistentVolumeProvisionerController) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (c *PersistentVolumeProvisionerController) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return nil, fmt.Errorf("NewWrapperBuilder not supported by PVClaimBinder's VolumeHost implementation")
 }
 
-func (c *PersistentVolumeProvisionerController) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (volume.Cleaner, error) {
+func (c *PersistentVolumeProvisionerController) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("NewWrapperCleaner not supported by PVClaimBinder's VolumeHost implementation")
 }
 

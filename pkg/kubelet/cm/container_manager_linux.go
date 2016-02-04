@@ -126,8 +126,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 func createManager(containerName string) *fs.Manager {
 	return &fs.Manager{
 		Cgroups: &configs.Cgroup{
-			Name:            containerName,
-			AllowAllDevices: true,
+			Parent: "/",
+			Name:   containerName,
+			Resources: &configs.Resources{
+				AllowAllDevices: true,
+			},
 		},
 	}
 }
@@ -208,10 +211,13 @@ func (cm *containerManagerImpl) setupNode() error {
 
 		dockerContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
-				Name:            cm.DockerDaemonContainerName,
-				Memory:          memoryLimit,
-				MemorySwap:      -1,
-				AllowAllDevices: true,
+				Parent: "/",
+				Name:   cm.DockerDaemonContainerName,
+				Resources: &configs.Resources{
+					Memory:          memoryLimit,
+					MemorySwap:      -1,
+					AllowAllDevices: true,
+				},
 			},
 		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
@@ -227,7 +233,8 @@ func (cm *containerManagerImpl) setupNode() error {
 
 		rootContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
-				Name: "/",
+				Parent: "/",
+				Name:   "/",
 			},
 		}
 		manager := createManager(cm.SystemContainerName)
@@ -377,40 +384,23 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 			continue
 		}
 
-		// Get PIDs already in target group so we can remove them from the list of
-		// PIDs to move.
-		systemCgroupPIDs, err := manager.GetPids()
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to list PIDs for %s: %v", manager.Cgroups.Name, err))
-			continue
-		}
-
-		systemCgroupPIDMap := make(map[int]struct{}, len(systemCgroupPIDs))
-		for _, pid := range systemCgroupPIDs {
-			systemCgroupPIDMap[pid] = struct{}{}
-		}
-
-		// Remove kernel pids and process 1
+		// Remove kernel pids and other protected PIDs (pid 1, PIDs already in system & kubelet containers)
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
 			if isKernelPid(pid) {
 				continue
 			}
 
-			if _, ok := systemCgroupPIDMap[pid]; ok {
-				continue
-			}
-
 			pids = append(pids, pid)
 		}
-		glog.Infof("Found %d PIDs in root, %d of them are kernel related", len(allPids), len(allPids)-len(pids))
+		glog.Infof("Found %d PIDs in root, %d of them are not to be moved", len(allPids), len(allPids)-len(pids))
 
-		// Check if we moved all the non-kernel PIDs.
+		// Check if we have moved all the non-kernel PIDs.
 		if len(pids) == 0 {
 			break
 		}
 
-		glog.Infof("Moving non-kernel threads: %v", pids)
+		glog.Infof("Moving non-kernel processes: %v", pids)
 		for _, pid := range pids {
 			err := manager.Apply(pid)
 			if err != nil {

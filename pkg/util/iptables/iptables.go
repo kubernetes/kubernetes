@@ -84,7 +84,8 @@ const (
 type Table string
 
 const (
-	TableNAT Table = "nat"
+	TableNAT    Table = "nat"
+	TableFilter Table = "filter"
 )
 
 type Chain string
@@ -93,6 +94,7 @@ const (
 	ChainPostrouting Chain = "POSTROUTING"
 	ChainPrerouting  Chain = "PREROUTING"
 	ChainOutput      Chain = "OUTPUT"
+	ChainInput       Chain = "INPUT"
 )
 
 const (

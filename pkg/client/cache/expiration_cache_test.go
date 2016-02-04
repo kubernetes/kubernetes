@@ -113,7 +113,7 @@ func TestTTLPolicy(t *testing.T) {
 	exactlyOnTTL := fakeTime.Add(-ttl)
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
-	policy := TTLPolicy{ttl, &util.FakeClock{Time: fakeTime}}
+	policy := TTLPolicy{ttl, util.NewFakeClock(fakeTime)}
 	fakeTimestampedEntry := &timestampedEntry{obj: struct{}{}, timestamp: exactlyOnTTL}
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL cache should not expire entries exactly on ttl")

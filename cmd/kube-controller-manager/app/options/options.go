@@ -24,6 +24,8 @@ import (
 	"net"
 	"time"
 
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	"github.com/spf13/pflag"
@@ -71,6 +73,8 @@ type CMServer struct {
 	Kubeconfig   string
 	KubeAPIQPS   float32
 	KubeAPIBurst int
+
+	LeaderElection componentconfig.LeaderElectionConfiguration
 }
 
 // VolumeConfigFlags is used to bind CLI flags to variables.  This top-level struct contains *all* enumerated
@@ -121,8 +125,9 @@ func NewCMServer() *CMServer {
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 			EnableHostPathProvisioning:                       false,
 		},
-		KubeAPIQPS:   20.0,
-		KubeAPIBurst: 30,
+		KubeAPIQPS:     20.0,
+		KubeAPIBurst:   30,
+		LeaderElection: leaderelection.DefaultLeaderElectionConfiguration(),
 	}
 	return &s
 }
@@ -179,4 +184,5 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
+	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

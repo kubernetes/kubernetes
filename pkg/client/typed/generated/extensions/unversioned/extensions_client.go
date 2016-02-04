@@ -17,18 +17,20 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-	latest "k8s.io/kubernetes/pkg/api/latest"
+	api "k8s.io/kubernetes/pkg/api"
+	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type ExtensionsInterface interface {
-	DaemonSetNamespacer
-	DeploymentNamespacer
-	HorizontalPodAutoscalerNamespacer
-	IngressNamespacer
-	JobNamespacer
-	ThirdPartyResourceNamespacer
+	DaemonSetsGetter
+	DeploymentsGetter
+	HorizontalPodAutoscalersGetter
+	IngressesGetter
+	JobsGetter
+	ReplicaSetsGetter
+	ScalesGetter
+	ThirdPartyResourcesGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the Extensions group.
@@ -54,6 +56,14 @@ func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
 
 func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
+}
+
+func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
+}
+
+func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
+	return newScales(c, namespace)
 }
 
 func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
@@ -90,11 +100,11 @@ func New(c *unversioned.RESTClient) *ExtensionsClient {
 
 func setConfigDefaults(config *unversioned.Config) error {
 	// if extensions group is not registered, return an error
-	g, err := latest.Group("extensions")
+	g, err := registered.Group("extensions")
 	if err != nil {
 		return err
 	}
-	config.Prefix = "/apis"
+	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
 	}
@@ -104,12 +114,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("Extensions API version '%s' is not recognized (valid values: %s)",
-			config.GroupVersion, g.GroupVersions)
-	}
-	config.Codec = versionInterfaces.Codec
+	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

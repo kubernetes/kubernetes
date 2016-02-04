@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: runtime.APIVersionInternal}
 
 func AddToScheme(scheme *runtime.Scheme) {
 	// Add the API to Scheme.

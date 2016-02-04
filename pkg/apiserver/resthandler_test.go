@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -133,6 +133,9 @@ func (p *testNamer) GenerateListLink(req *restful.Request) (path, query string, 
 type patchTestCase struct {
 	name string
 
+	// admission chain to use, nil is fine
+	admit updateAdmissionFunc
+
 	// startingPod is used for the first Get
 	startingPod *api.Pod
 	// changedPod is the "destination" pod for the patch.  The test will create a patch from the startingPod to the changedPod
@@ -152,7 +155,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namespace := tc.startingPod.Namespace
 	name := tc.startingPod.Name
 
-	codec := latest.GroupOrDie(api.GroupName).Codec
+	codec := testapi.Default.Codec()
+	admit := tc.admit
+	if admit == nil {
+		admit = func(updatedObject runtime.Object) error {
+			return nil
+		}
+	}
 
 	testPatcher := &testPatcher{}
 	testPatcher.startingPod = tc.startingPod
@@ -208,7 +217,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(ctx, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, codec)
+		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, codec)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -325,6 +334,89 @@ func TestPatchResourceWithConflict(t *testing.T) {
 	tc.updatePod.Namespace = namespace
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = "v1"
+	tc.updatePod.Spec.NodeName = "anywhere"
+
+	tc.Run(t)
+}
+
+func TestPatchWithAdmissionRejection(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	fifteen := int64(15)
+	thirty := int64(30)
+
+	tc := &patchTestCase{
+		name: "TestPatchWithAdmissionRejection",
+
+		admit: func(updatedObject runtime.Object) error {
+			return errors.New("admission failure")
+		},
+
+		startingPod: &api.Pod{},
+		changedPod:  &api.Pod{},
+		updatePod:   &api.Pod{},
+
+		expectedError: "admission failure",
+	}
+
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.ResourceVersion = "1"
+	tc.startingPod.APIVersion = "v1"
+	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+
+	tc.changedPod.Name = name
+	tc.changedPod.Namespace = namespace
+	tc.changedPod.ResourceVersion = "1"
+	tc.changedPod.APIVersion = "v1"
+	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+
+	tc.Run(t)
+}
+
+func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	fifteen := int64(15)
+	thirty := int64(30)
+	seen := false
+
+	tc := &patchTestCase{
+		name: "TestPatchWithVersionConflictThenAdmissionFailure",
+
+		admit: func(updatedObject runtime.Object) error {
+			if seen {
+				return errors.New("admission failure")
+			}
+
+			seen = true
+			return nil
+		},
+
+		startingPod: &api.Pod{},
+		changedPod:  &api.Pod{},
+		updatePod:   &api.Pod{},
+
+		expectedError: "admission failure",
+	}
+
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.ResourceVersion = "1"
+	tc.startingPod.APIVersion = "v1"
+	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+
+	tc.changedPod.Name = name
+	tc.changedPod.Namespace = namespace
+	tc.changedPod.ResourceVersion = "1"
+	tc.changedPod.APIVersion = "v1"
+	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+
+	tc.updatePod.Name = name
+	tc.updatePod.Namespace = namespace
+	tc.updatePod.ResourceVersion = "2"
+	tc.updatePod.APIVersion = "v1"
+	tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
 	tc.updatePod.Spec.NodeName = "anywhere"
 
 	tc.Run(t)

@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/configmap"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -36,13 +35,13 @@ type REST struct {
 func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/configmaps"
 
-	newListFunc := func() runtime.Object { return &extensions.ConfigMapList{} }
+	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
 	storageInterface := storageDecorator(
-		s, 100, &extensions.ConfigMap{}, prefix, false, newListFunc)
+		s, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object {
-			return &extensions.ConfigMap{}
+			return &api.ConfigMap{}
 		},
 
 		// NewListFunc returns an object to store results of an etcd list.
@@ -62,13 +61,13 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 		// Retrieves the name field of a ConfigMap object.
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*extensions.ConfigMap).Name, nil
+			return obj.(*api.ConfigMap).Name, nil
 		},
 
 		// Matches objects based on labels/fields for list and watch
 		PredicateFunc: configmap.MatchConfigMap,
 
-		QualifiedResource: extensions.Resource("configmaps"),
+		QualifiedResource: api.Resource("configmaps"),
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,

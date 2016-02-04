@@ -1,10 +1,17 @@
-sudo: false
+sudo: required
+
+# trusty required for docker
+# https://github.com/travis-ci/travis-ci/issues/5448
+dist: trusty
+
+services:
+  - docker
 
 language: go
 
 matrix:
   include:
-    - go: 1.5.2
+    - go: 1.5.3
 
 install:
   - go get github.com/tools/godep

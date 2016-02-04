@@ -50,7 +50,7 @@ kube::util::wait_for_url() {
 
 # returns a random port
 kube::util::get_random_port() {
-  awk -v min=1 -v max=65535 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'
+  awk -v min=1024 -v max=65535 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'
 }
 
 # use netcat to check if the host($1):port($2) is free (return 0 means free, 1 means used)
@@ -65,7 +65,7 @@ kube::util::test_host_port_free() {
     return ${success}
   }
 
-  if [ ! $(nc -vz "${host} ${port}") ]; then
+  if [ ! $(nc -vz "${host}" "${port}") ]; then
     kube::log::status "${host}:${port} is free, proceeding..."
     return ${success}
   else
@@ -282,7 +282,7 @@ kube::util::group-version-to-pkg-path() {
   # moving the results to pkg/apis/api.
   case "${group_version}" in
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
-    /)
+    __internal)
       echo "api"
       ;;
     v1)
@@ -292,7 +292,7 @@ kube::util::group-version-to-pkg-path() {
       echo "api/unversioned"
       ;;
     *)
-      echo "apis/${group_version}"
+      echo "apis/${group_version%__internal}"
       ;;
   esac
 }

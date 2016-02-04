@@ -539,7 +539,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 10, newReady: 20, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 10 pods available, don't exceed 70 pods)
+Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 20 pods available, don't exceed 70 pods)
 Scaling foo-v2 up to 20
 Scaling foo-v1 down to 0
 `,
@@ -556,6 +556,83 @@ Scaling foo-v1 down to 0
 			},
 			output: `Continuing update with existing controller foo-v2.
 Scaling up foo-v2 from 1 to 1, scaling down foo-v1 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
+Scaling foo-v1 down to 0
+`,
+		},
+		{
+			name:        "3->0 1/1 desired 0 (absolute values)",
+			oldRc:       oldRc(3, 3),
+			newRc:       newRc(0, 0),
+			newRcExists: true,
+			maxUnavail:  intstr.FromInt(1),
+			maxSurge:    intstr.FromInt(1),
+			expected: []interface{}{
+				down{oldReady: 3, newReady: 0, to: 0},
+			},
+			output: `Continuing update with existing controller foo-v2.
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 4 pods)
+Scaling foo-v1 down to 0
+`,
+		},
+		{
+			name:        "3->0 10/10 desired 0 (percentages)",
+			oldRc:       oldRc(3, 3),
+			newRc:       newRc(0, 0),
+			newRcExists: true,
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("10%"),
+			expected: []interface{}{
+				down{oldReady: 3, newReady: 0, to: 0},
+			},
+			output: `Continuing update with existing controller foo-v2.
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 3 pods)
+Scaling foo-v1 down to 0
+`,
+		},
+		{
+			name:        "3->0 10/10 desired 0 (create new RC)",
+			oldRc:       oldRc(3, 3),
+			newRc:       newRc(0, 0),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("10%"),
+			expected: []interface{}{
+				down{oldReady: 3, newReady: 0, to: 0},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 3 pods)
+Scaling foo-v1 down to 0
+`,
+		},
+		{
+			name:        "0->0 1/1 desired 0 (absolute values)",
+			oldRc:       oldRc(0, 0),
+			newRc:       newRc(0, 0),
+			newRcExists: true,
+			maxUnavail:  intstr.FromInt(1),
+			maxSurge:    intstr.FromInt(1),
+			expected: []interface{}{
+				down{oldReady: 0, newReady: 0, to: 0},
+			},
+			output: `Continuing update with existing controller foo-v2.
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 0 to 0 (keep 0 pods available, don't exceed 1 pods)
+`,
+		}, {
+			name:        "30->2 50%/0",
+			oldRc:       oldRc(30, 30),
+			newRc:       newRc(0, 2),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("50%"),
+			maxSurge:    intstr.FromInt(0),
+			expected: []interface{}{
+				down{oldReady: 30, newReady: 0, to: 1},
+				up{2},
+				down{oldReady: 1, newReady: 2, to: 0},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 30 to 0 (keep 1 pods available, don't exceed 30 pods)
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 2
 Scaling foo-v1 down to 0
 `,
 		},
@@ -1251,7 +1328,7 @@ func TestUpdateWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+	clientConfig := &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
@@ -1348,7 +1425,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+	clientConfig := &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 

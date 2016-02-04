@@ -27,6 +27,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -120,7 +121,7 @@ func recordToSink(sink EventSink, event *api.Event, eventCorrelator *EventCorrel
 	event = &eventCopy
 	result, err := eventCorrelator.EventCorrelate(event)
 	if err != nil {
-		util.HandleError(err)
+		utilruntime.HandleError(err)
 	}
 	if result.Skip {
 		return
@@ -216,7 +217,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format stri
 func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*api.Event)) watch.Interface {
 	watcher := eventBroadcaster.Watch()
 	go func() {
-		defer util.HandleCrash()
+		defer utilruntime.HandleCrash()
 		for {
 			watchEvent, open := <-watcher.ResultChan()
 			if !open {
@@ -262,6 +263,7 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 
 	go func() {
 		// NOTE: events should be a non-blocking operation
+		defer utilruntime.HandleCrash()
 		recorder.Action(watch.Added, event)
 	}()
 }

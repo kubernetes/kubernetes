@@ -18,22 +18,21 @@ package aws_ebs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -57,7 +56,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -120,7 +119,7 @@ func (fake *fakePDManager) DeleteVolume(cd *awsElasticBlockStoreDeleter) error {
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v")
 	}
@@ -154,7 +153,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := builder.SetUp(); err != nil {
+	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -259,19 +258,15 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 	}
 
-	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	o.Add(pv)
-	o.Add(claim)
-	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
+	clientset := fake.NewSimpleClientset(pv, claim)
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, clientset, nil))
 	plug, _ := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
@@ -285,7 +280,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func TestBuilderAndCleanerTypeAssert(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

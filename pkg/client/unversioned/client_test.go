@@ -50,7 +50,7 @@ func TestGetServerVersion(t *testing.T) {
 	// defer server.Close()
 	client := NewOrDie(&Config{Host: server.URL})
 
-	got, err := client.ServerVersion()
+	got, err := client.Discovery().ServerVersion()
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Errorf("unexpected encoding error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -88,7 +88,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	groupVersions := ExtractGroupVersions(apiGroupList)
 	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
@@ -137,17 +137,17 @@ func TestGetServerResources(t *testing.T) {
 	stable := unversioned.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []unversioned.APIResource{
-			{"pods", true},
-			{"services", true},
-			{"namespaces", false},
+			{"pods", true, "Pod"},
+			{"services", true, "Service"},
+			{"namespaces", false, "Namespace"},
 		},
 	}
 	beta := unversioned.APIResourceList{
 		GroupVersion: "extensions/v1",
 		APIResources: []unversioned.APIResource{
-			{"deployments", true},
-			{"ingresses", true},
-			{"jobs", true},
+			{"deployments", true, "Deployment"},
+			{"ingresses", true, "Ingress"},
+			{"jobs", true, "Job"},
 		},
 	}
 	tests := []struct {
@@ -278,7 +278,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 	// defer server.Close()
 
 	client := NewOrDie(&Config{Host: server.URL})
-	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
+	got, err := client.Discovery().SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	// defer server.Close()
 
 	client := NewOrDie(&Config{Host: server.URL})
-	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
+	got, err := client.Discovery().SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
 	}

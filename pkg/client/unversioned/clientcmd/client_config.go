@@ -94,8 +94,6 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 	clientConfig := &client.Config{}
 	clientConfig.Host = configClusterInfo.Server
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
-		clientConfig.Prefix = u.Path
-		u.Path = ""
 		u.RawQuery = ""
 		u.Fragment = ""
 		clientConfig.Host = u.String()
@@ -356,7 +354,7 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*client.Config, err
 		if err == nil {
 			return kubeconfig, nil
 		}
-		glog.Warning("error creating inClusterConfig, falling back to default config: %v", err)
+		glog.Warning("error creating inClusterConfig, falling back to default config: ", err)
 	}
 
 	return NewNonInteractiveDeferredLoadingClientConfig(

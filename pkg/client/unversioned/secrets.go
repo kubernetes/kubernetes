@@ -67,7 +67,7 @@ func (s *secrets) List(opts api.ListOptions) (*api.SecretList, error) {
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("secrets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -93,7 +93,7 @@ func (s *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(s.namespace).
 		Resource("secrets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 

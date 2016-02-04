@@ -28,6 +28,16 @@ if [[ "${#files[@]}" -ne 0 ]]; then
     echo "${green}OK"
   fi
   echo "${reset}"
+
+  echo -ne "Check if Godep licesnses are up to date..."
+  if ! OUT=$("hack/verify-godep-licenses.sh" 2>&1); then
+    echo
+    echo "${red}${OUT}"
+    exit_code=1
+  else
+    echo "${green}OK"
+  fi
+  echo "${reset}"
 fi
 
 echo -ne "Checking for files that need gofmt... "
@@ -106,16 +116,6 @@ if [[ "${#files_need_description[@]}" -ne 0 ]]; then
   for file in "${files_need_description[@]}"; do
     echo "  ${file}"
   done
-  exit_code=1
-else
-  echo "${green}OK"
-fi
-echo "${reset}"
-
-echo -ne "Checking for links in API descriptions... "
-if ! hack/after-build/verify-linkcheck.sh > /dev/null; then
-  echo "${red}ERROR!"
-  echo "Some links in pkg/api/.*types.go are outdated. They require a manual fix."
   exit_code=1
 else
   echo "${green}OK"

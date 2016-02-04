@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// JobNamespacer has methods to work with Job resources in a namespace
-type JobNamespacer interface {
+// JobsGetter has a method to return a JobInterface.
+// A group's client should implement this interface.
+type JobsGetter interface {
 	Jobs(namespace string) JobInterface
 }
 
@@ -79,10 +80,17 @@ func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 	return
 }
 
-func (c *jobs) UpdateStatus(job *extensions.Job) (*extensions.Job, error) {
-	result := &extensions.Job{}
-	err := c.client.Put().Resource("jobs").Name(job.Name).SubResource("status").Body(job).Do().Into(result)
-	return result, err
+func (c *jobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
+	result = &extensions.Job{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("jobs").
+		Name(job.Name).
+		SubResource("status").
+		Body(job).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
@@ -101,7 +109,7 @@ func (c *jobs) DeleteCollection(options *api.DeleteOptions, listOptions api.List
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -125,7 +133,7 @@ func (c *jobs) List(opts api.ListOptions) (result *extensions.JobList, err error
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -137,6 +145,6 @@ func (c *jobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

@@ -36,13 +36,13 @@ Documentation for other releases can be found at
 
 We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine
 is `${MASTER_IP}`.  We'll need to run several versioned Kubernetes components, so we'll assume that the version we want
-to run is `${K8S_VERSION}`, which should hold a value such as "1.1.3".
+to run is `${K8S_VERSION}`, which should hold a released version of Kubernetes >= "1.2.0-alpha.6"
 
 Enviroinment variables used:
 
 ```sh
 export MASTER_IP=<the_master_ip_here>
-export K8S_VERSION=<your_k8s_version (e.g. 1.1.3)>
+export K8S_VERSION=<your_k8s_version (e.g. 1.2.0-alpha.6)>
 export ETCD_VERSION=<your_etcd_version (e.g. 2.2.1)>
 export FLANNEL_VERSION=<your_flannel_version (e.g. 0.5.5)>
 export FLANNEL_IFACE=<flannel_interface (defaults to eth0)>
@@ -204,7 +204,7 @@ sudo docker run \
     --privileged=true \
     --pid=host \
     -d \
-    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+    gcr.io/google_containers/hyperkube-amd64:v${K8S_VERSION} \
     /hyperkube kubelet \
         --allow-privileged=true \
         --api-servers=http://localhost:8080 \
@@ -225,8 +225,11 @@ sudo docker run \
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
 Download the kubectl binary for `${K8S_VERSION}` (look at the URL in the following links) and make it available by editing your PATH environment variable.
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.1.3/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v1.1.3/bin/linux/amd64/kubectl))
+([OS X/amd64](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/darwin/amd64/kubectl))
+([OS X/386](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/darwin/386/kubectl))
+([linux/amd64](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/linux/amd64/kubectl))
+([linux/386](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/linux/386/kubectl))
+([linux/arm](http://storage.googleapis.com/kubernetes-release/release/v1.2.0-alpha.6/bin/linux/arm/kubectl))
 
 For example, OS X:
 

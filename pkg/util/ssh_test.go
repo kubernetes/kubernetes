@@ -24,6 +24,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
@@ -161,6 +164,88 @@ func TestSSHTunnel(t *testing.T) {
 	if err := tunnel.Close(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+}
+
+type fakeTunnel struct{}
+
+func (*fakeTunnel) Open() error {
+	return nil
+}
+
+func (*fakeTunnel) Close() error {
+	return nil
+}
+
+func (*fakeTunnel) Dial(network, address string) (net.Conn, error) {
+	return nil, nil
+}
+
+type fakeTunnelCreator struct{}
+
+func (*fakeTunnelCreator) NewSSHTunnel(string, string, string) (tunnel, error) {
+	return &fakeTunnel{}, nil
+}
+
+func TestSSHTunnelListUpdate(t *testing.T) {
+	// Start with an empty tunnel list.
+	l := &SSHTunnelList{
+		adding:        make(map[string]bool),
+		tunnelCreator: &fakeTunnelCreator{},
+	}
+
+	// Start with 2 tunnels.
+	addressStrings := []string{"1.2.3.4", "5.6.7.8"}
+	l.Update(addressStrings)
+	checkTunnelsCorrect(t, l, addressStrings)
+
+	// Add another tunnel.
+	addressStrings = append(addressStrings, "9.10.11.12")
+	l.Update(addressStrings)
+	checkTunnelsCorrect(t, l, addressStrings)
+
+	// Go down to a single tunnel.
+	addressStrings = []string{"1.2.3.4"}
+	l.Update(addressStrings)
+	checkTunnelsCorrect(t, l, addressStrings)
+
+	// Replace w/ all new tunnels.
+	addressStrings = []string{"21.22.23.24", "25.26.27.28"}
+	l.Update(addressStrings)
+	checkTunnelsCorrect(t, l, addressStrings)
+
+	// Call update with the same tunnels.
+	l.Update(addressStrings)
+	checkTunnelsCorrect(t, l, addressStrings)
+}
+
+func checkTunnelsCorrect(t *testing.T, tunnelList *SSHTunnelList, addresses []string) {
+	if err := wait.Poll(100*time.Millisecond, 2*time.Second, func() (bool, error) {
+		return hasCorrectTunnels(tunnelList, addresses), nil
+	}); err != nil {
+		t.Errorf("Error waiting for tunnels to reach expected state: %v. Expected %v, had %v", err, addresses, tunnelList)
+	}
+}
+
+func hasCorrectTunnels(tunnelList *SSHTunnelList, addresses []string) bool {
+	tunnelList.tunnelsLock.Lock()
+	defer tunnelList.tunnelsLock.Unlock()
+	wantMap := make(map[string]bool)
+	for _, addr := range addresses {
+		wantMap[addr] = true
+	}
+	haveMap := make(map[string]bool)
+	for _, entry := range tunnelList.entries {
+		if wantMap[entry.Address] == false {
+			return false
+		}
+		haveMap[entry.Address] = true
+	}
+	for _, addr := range addresses {
+		if haveMap[addr] == false {
+			return false
+		}
+	}
+	return true
 }
 
 type mockSSHDialer struct {

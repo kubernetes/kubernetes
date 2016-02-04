@@ -24,7 +24,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-var KnownKubeletMetrics = map[string][]string{
+var NecessaryKubeletMetrics = map[string][]string{
 	"cadvisor_version_info":                                  {"cadvisorRevision", "cadvisorVersion", "dockerVersion", "kernelVersion", "osVersion"},
 	"container_cpu_system_seconds_total":                     {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_cpu_usage_seconds_total":                      {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name", "cpu"},
@@ -43,6 +43,8 @@ var KnownKubeletMetrics = map[string][]string{
 	"container_fs_writes_merged_total":                       {"device", "id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_fs_writes_total":                              {"device", "id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_last_seen":                                    {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
+	"container_memory_cache":                                 {},
+	"container_memory_rss":                                   {},
 	"container_memory_failcnt":                               {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_memory_failures_total":                        {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name", "scope", "type"},
 	"container_memory_usage_bytes":                           {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
@@ -110,17 +112,21 @@ var KubeletMetricsLabelsToSkip = sets.NewString(
 
 type KubeletMetrics Metrics
 
+func (m *KubeletMetrics) Equal(o KubeletMetrics) bool {
+	return (*Metrics)(m).Equal(Metrics(o))
+}
+
 func NewKubeletMetrics() KubeletMetrics {
 	result := NewMetrics()
-	for metric := range KnownKubeletMetrics {
+	for metric := range NecessaryKubeletMetrics {
 		result[metric] = make(model.Samples, 0)
 	}
 	return KubeletMetrics(result)
 }
 
-func parseKubeletMetrics(data string, unknownMetrics sets.String) (KubeletMetrics, error) {
+func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 	result := NewKubeletMetrics()
-	if err := parseMetrics(data, KnownKubeletMetrics, (*Metrics)(&result), unknownMetrics); err != nil {
+	if err := parseMetrics(data, NecessaryKubeletMetrics, (*Metrics)(&result), nil); err != nil {
 		return KubeletMetrics{}, err
 	}
 	return result, nil

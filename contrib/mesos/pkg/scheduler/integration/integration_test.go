@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -198,13 +199,23 @@ func (lw *MockPodsListWatch) Pod(name string) *api.Pod {
 
 	for _, p := range lw.list.Items {
 		if p.Name == name {
-			return &p
+			clone, err := api.Scheme.DeepCopy(&p)
+			if err != nil {
+				panic(err.Error())
+			}
+			return clone.(*api.Pod)
 		}
 	}
 
 	return nil
 }
 func (lw *MockPodsListWatch) Add(pod *api.Pod, notify bool) {
+	clone, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	pod = clone.(*api.Pod)
 	func() {
 		lw.lock.Lock()
 		defer lw.lock.Unlock()
@@ -216,6 +227,12 @@ func (lw *MockPodsListWatch) Add(pod *api.Pod, notify bool) {
 	}
 }
 func (lw *MockPodsListWatch) Modify(pod *api.Pod, notify bool) {
+	clone, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		panic("failed to clone pod object")
+	}
+
+	pod = clone.(*api.Pod)
 	found := false
 	func() {
 		lw.lock.Lock()
@@ -472,9 +489,9 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	ei.Data = []byte{0, 1, 2}
 
 	// create framework
-	client := client.NewOrDie(&client.Config{
-		Host:         apiServer.server.URL,
-		GroupVersion: testapi.Default.GroupVersion(),
+	client := clientset.NewForConfigOrDie(&client.Config{
+		Host:          apiServer.server.URL,
+		ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 	})
 	c := *schedcfg.CreateDefaultConfig()
 	fw := framework.New(framework.Config{

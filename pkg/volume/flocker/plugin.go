@@ -19,7 +19,6 @@ package flocker
 import (
 	"fmt"
 	"path"
-	"strconv"
 	"time"
 
 	flockerclient "github.com/ClusterHQ/flocker-go"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -117,32 +117,31 @@ type flockerBuilder struct {
 
 func (b flockerBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        b.readOnly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
 func (b flockerBuilder) GetPath() string {
 	return b.flocker.path
 }
 
-func (b flockerBuilder) SetUp() error {
-	return b.SetUpAt(b.flocker.datasetName)
+func (b flockerBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.flocker.datasetName, fsGroup)
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a
 // flocker client capable of talking with the Flocker control service.
 func (b flockerBuilder) newFlockerClient() (*flockerclient.Client, error) {
-	host := getenvOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
-	portConfig := getenvOrFallback("FLOCKER_CONTROL_SERVICE_PORT", strconv.Itoa(defaultPort))
-	port, err := strconv.Atoi(portConfig)
+	host := util.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
+	port, err := util.GetEnvAsIntOrFallback("FLOCKER_CONTROL_SERVICE_PORT", defaultPort)
+
 	if err != nil {
 		return nil, err
 	}
-	caCertPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CA_FILE", defaultCACertFile)
-	keyPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
-	certPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
+	caCertPath := util.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CA_FILE", defaultCACertFile)
+	keyPath := util.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
+	certPath := util.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
 
 	c, err := flockerclient.NewClient(host, port, b.flocker.pod.Status.HostIP, caCertPath, keyPath, certPath)
 	return c, err
@@ -151,7 +150,7 @@ func (b flockerBuilder) newFlockerClient() (*flockerclient.Client, error) {
 func (b *flockerBuilder) getMetaDir() string {
 	return path.Join(
 		b.plugin.host.GetPodPluginDir(
-			b.flocker.pod.UID, util.EscapeQualifiedNameForDisk(flockerPluginName),
+			b.flocker.pod.UID, strings.EscapeQualifiedNameForDisk(flockerPluginName),
 		),
 		b.datasetName,
 	)
@@ -168,7 +167,7 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b flockerBuilder) SetUpAt(dir string) error {
+func (b flockerBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}

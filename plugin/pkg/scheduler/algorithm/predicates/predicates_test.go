@@ -54,6 +54,14 @@ func makeResources(milliCPU int64, memory int64, pods int64) api.NodeResources {
 	}
 }
 
+func makeAllocatableResources(milliCPU int64, memory int64, pods int64) api.ResourceList {
+	return api.ResourceList{
+		api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
+		api.ResourcePods:   *resource.NewQuantity(pods, resource.DecimalSI),
+	}
+}
+
 func newResourcePod(usage ...resourceRequest) *api.Pod {
 	containers := []api.Container{}
 	for _, req := range usage {
@@ -74,12 +82,12 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 }
 
 func TestPodFitsResources(t *testing.T) {
-
 	enoughPodsTests := []struct {
 		pod          *api.Pod
 		existingPods []*api.Pod
 		fits         bool
 		test         string
+		wErr         error
 	}{
 		{
 			pod: &api.Pod{},
@@ -88,6 +96,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: true,
 			test: "no resources requested always fits",
+			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -96,6 +105,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "too many resources fails",
+			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -104,6 +114,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: true,
 			test: "both resources fit",
+			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
@@ -112,6 +123,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "one resources fits",
+			wErr: newInsufficientResourceError(memoryResoureceName, 2, 19, 20),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -120,16 +132,17 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: true,
 			test: "equal edge case",
+			wErr: nil,
 		},
 	}
 
 	for _, test := range enoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity}}
+		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -141,6 +154,7 @@ func TestPodFitsResources(t *testing.T) {
 		existingPods []*api.Pod
 		fits         bool
 		test         string
+		wErr         error
 	}{
 		{
 			pod: &api.Pod{},
@@ -148,7 +162,8 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: false,
-			test: "even without specified resources predicate fails when there's no available ips",
+			test: "even without specified resources predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -156,7 +171,8 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
 			},
 			fits: false,
-			test: "even if both resources fit predicate fails when there's no available ips",
+			test: "even if both resources fit predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -164,16 +180,17 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: false,
-			test: "even for equal edge case predicate fails when there's no available ips",
+			test: "even for equal edge case predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1).Capacity}}
+		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)

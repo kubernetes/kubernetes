@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -84,13 +85,13 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("PersistentVolumeClaim"): &PersistentVolumeClaimDescriber{c},
 		api.Kind("Namespace"):             &NamespaceDescriber{c},
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
+		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
 		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
+		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                     &JobDescriber{c},
-		extensions.Kind("Deployment"):              &DeploymentDescriber{c},
 		extensions.Kind("Ingress"):                 &IngressDescriber{c},
-		extensions.Kind("ConfigMap"):               &ConfigMapDescriber{c},
 	}
 
 	return m
@@ -884,6 +885,20 @@ func describeReplicationController(controller *api.ReplicationController, events
 	})
 }
 
+func DescribePodTemplate(template *api.PodTemplateSpec) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		if template == nil {
+			fmt.Fprintf(out, "<no template>")
+			return nil
+		}
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(template.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(template.Annotations))
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&template.Spec))
+		describeVolumes(template.Spec.Volumes, out)
+		return nil
+	})
+}
+
 // JobDescriber generates information about a job and the pods it has created.
 type JobDescriber struct {
 	client *client.Client
@@ -908,7 +923,11 @@ func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 		selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
-		fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
+		if job.Spec.Completions != nil {
+			fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
+		} else {
+			fmt.Fprintf(out, "Completions:\tNot Set\n")
+		}
 		if job.Status.StartTime != nil {
 			fmt.Fprintf(out, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
@@ -956,11 +975,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
-		if daemon.Spec.Template != nil {
-			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
-		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
-		}
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
 		selector, err := extensions.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
 			// this shouldn't happen if LabelSelector passed validation
@@ -1029,55 +1044,60 @@ func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	events, _ := i.Events(namespace).Search(ing)
-	endpoints, _ := i.Endpoints(namespace).Get(ing.Spec.Backend.ServiceName)
-	service, _ := i.Services(namespace).Get(ing.Spec.Backend.ServiceName)
-	return describeIngress(ing, endpoints, service, events)
+	return i.describeIngress(ing)
 }
 
-func describeIngressEndpoints(out io.Writer, ing *extensions.Ingress, endpoints *api.Endpoints, service *api.Service) {
+func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
+	endpoints, _ := i.Endpoints(ns).Get(backend.ServiceName)
+	service, _ := i.Services(ns).Get(backend.ServiceName)
 	spName := ""
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
-		switch ing.Spec.Backend.ServicePort.Type {
+		switch backend.ServicePort.Type {
 		case intstr.String:
-			if ing.Spec.Backend.ServicePort.StrVal == sp.Name {
+			if backend.ServicePort.StrVal == sp.Name {
 				spName = sp.Name
 			}
 		case intstr.Int:
-			if int(ing.Spec.Backend.ServicePort.IntVal) == sp.Port {
+			if int(backend.ServicePort.IntVal) == sp.Port {
 				spName = sp.Name
 			}
 		}
 	}
-
-	fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(spName)))
+	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func describeIngress(ing *extensions.Ingress, endpoints *api.Endpoints, service *api.Service, events *api.EventList) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", ing.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", ing.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ing.Labels))
-
-		fmt.Fprintf(out, "Rules:\n")
+		fmt.Fprintf(out, "Name:\t%v\n", ing.Name)
+		fmt.Fprintf(out, "Namespace:\t%v\n", ing.Namespace)
+		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer))
+		def := ing.Spec.Backend
+		ns := ing.Namespace
+		if def == nil {
+			// Ingresses that don't specify a default backend inherit the
+			// default backend in the kube-system namespace.
+			def = &extensions.IngressBackend{
+				ServiceName: "default-http-backend",
+				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+			}
+			ns = api.NamespaceSystem
+		}
+		fmt.Fprintf(out, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackend(ns, def))
+		fmt.Fprint(out, "Rules:\n  Host\tPath\tBackends\n")
+		fmt.Fprint(out, "  ----\t----\t--------\n")
 		for _, rules := range ing.Spec.Rules {
 			if rules.HTTP == nil {
 				continue
 			}
-
-			fmt.Fprintf(out, "  Host\tPath\tBackend\n")
-			fmt.Fprintf(out, "  ----\t----\t--------\n")
+			fmt.Fprintf(out, "  %s\t\n", rules.Host)
 			for _, path := range rules.HTTP.Paths {
-				fmt.Fprintf(out, "  %s\t%s\t%s\n", rules.Host, path.Path, backendStringer(&path.Backend))
+				fmt.Fprintf(out, "    \t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ing.Namespace, &path.Backend))
 			}
 		}
-
-		fmt.Fprintf(out, "Backend:\t%v\t%v\n", backendStringer(ing.Spec.Backend),
-			loadBalancerStatusStringer(ing.Status.LoadBalancer))
-		describeIngressEndpoints(out, ing, endpoints, service)
-
 		describeIngressAnnotations(out, ing.Annotations)
+
+		events, _ := i.Events(ing.Namespace).Search(ing)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1094,7 +1114,7 @@ func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
 		}
 		parts := strings.Split(k, "/")
 		name := parts[len(parts)-1]
-		fmt.Fprintf(out, "%v:\t%s\n", name, v)
+		fmt.Fprintf(out, "  %v:\t%s\n", name, v)
 	}
 	return
 }
@@ -1568,7 +1588,7 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 
 // DeploymentDescriber generates information about a deployment.
 type DeploymentDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) {
@@ -1582,13 +1602,13 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(d.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(d.Spec.Selector))
-		fmt.Fprintf(out, "Replicas:\t%d updated / %d total\n", d.Status.UpdatedReplicas, d.Spec.Replicas)
+		fmt.Fprintf(out, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
 		if d.Spec.Strategy.RollingUpdate != nil {
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge, %d min ready seconds\n", ru.MaxUnavailable.String(), ru.MaxSurge.String(), ru.MinReadySeconds)
 		}
-		oldRCs, err := deploymentutil.GetOldRCs(*d, dd)
+		oldRCs, _, err := deploymentutil.GetOldRCs(*d, dd)
 		if err == nil {
 			fmt.Fprintf(out, "OldReplicationControllers:\t%s\n", printReplicationControllersByLabels(oldRCs))
 		}
@@ -1600,7 +1620,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			}
 			fmt.Fprintf(out, "NewReplicationController:\t%s\n", printReplicationControllersByLabels(newRCs))
 		}
-		events, err := dd.Events(namespace).Search(d)
+		events, err := dd.Legacy().Events(namespace).Search(d)
 		if err == nil && events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1700,7 +1720,7 @@ type ConfigMapDescriber struct {
 }
 
 func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
-	c := d.Extensions().ConfigMaps(namespace)
+	c := d.ConfigMaps(namespace)
 
 	configMap, err := c.Get(name)
 	if err != nil {
@@ -1710,7 +1730,7 @@ func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
 	return describeConfigMap(configMap)
 }
 
-func describeConfigMap(configMap *extensions.ConfigMap) (string, error) {
+func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", configMap.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", configMap.Namespace)

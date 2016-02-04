@@ -42,6 +42,10 @@ var KnownControllerManagerMetrics = map[string][]string{
 
 type ControllerManagerMetrics Metrics
 
+func (m *ControllerManagerMetrics) Equal(o ControllerManagerMetrics) bool {
+	return (*Metrics)(m).Equal(Metrics(o))
+}
+
 func NewControllerManagerMetrics() ControllerManagerMetrics {
 	result := NewMetrics()
 	for metric := range KnownControllerManagerMetrics {

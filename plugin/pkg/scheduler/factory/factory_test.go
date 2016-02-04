@@ -30,14 +30,14 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -45,8 +45,8 @@ func TestCreate(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
-	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	factory := NewConfigFactory(client, api.DefaultSchedulerName)
 	factory.Create()
 }
 
@@ -56,7 +56,7 @@ func TestCreateFromConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -64,8 +64,8 @@ func TestCreateFromConfig(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
-	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	factory := NewConfigFactory(client, api.DefaultSchedulerName)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -87,8 +87,7 @@ func TestCreateFromConfig(t *testing.T) {
 			{"name" : "PriorityOne", "weight" : 2},
 			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
-	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
-	if err != nil {
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -99,7 +98,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -107,12 +106,11 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
-	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	factory := NewConfigFactory(client, api.DefaultSchedulerName)
 
 	configData = []byte(`{}`)
-	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
-	if err != nil {
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -140,7 +138,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
 		T:            t,
@@ -152,7 +150,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	server := httptest.NewServer(mux)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()}), nil, api.DefaultSchedulerName)
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}), api.DefaultSchedulerName)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
@@ -228,7 +226,7 @@ func TestBind(t *testing.T) {
 	}
 
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: "",
 			T:            t,
@@ -236,7 +234,7 @@ func TestBind(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		// TODO: Uncomment when fix #19254
 		// defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
@@ -314,7 +312,7 @@ func TestBackoff(t *testing.T) {
 // is of name "foo-scheduler". A pod must be picked up by at most one of the two
 // schedulers.
 func TestResponsibleForPod(t *testing.T) {
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -322,11 +320,11 @@ func TestResponsibleForPod(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	// factory of "default-scheduler"
-	factoryDefaultScheduler := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+	factoryDefaultScheduler := NewConfigFactory(client, api.DefaultSchedulerName)
 	// factory of "foo-scheduler"
-	factoryFooScheduler := NewConfigFactory(client, nil, "foo-scheduler")
+	factoryFooScheduler := NewConfigFactory(client, "foo-scheduler")
 	// scheduler annotaions to be tested
 	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
 	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}

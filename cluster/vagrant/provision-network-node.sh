@@ -24,7 +24,7 @@ function provision-network-node {
   # Install flannel for overlay
   if ! which flanneld >/dev/null 2>&1; then
 
-    yum install -y flannel
+    dnf install -y flannel
 
     # Configure local daemon to speak to master
     NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
