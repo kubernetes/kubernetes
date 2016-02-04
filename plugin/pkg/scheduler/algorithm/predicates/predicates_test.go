@@ -574,7 +574,395 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: false,
 			test: "node labels are subset",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["bar", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using In operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "kernel-version",
+									"operator": "Gt",
+									"values": ["2.4"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"kernel-version": "2.6",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using Gt operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "mem-type",
+									"operator": "NotIn",
+									"values": ["DDR", "DDR2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"mem-type": "DDR3",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using NotIn operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "GPU",
+									"operator": "Exists"
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"GPU": "NVIDIA-GRID-K1",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using Exists operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with affinity that don't match node's labels won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": null
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with a nil []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": []
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{}, {}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with invalid NodeSelectTerms in affinity will match no objects and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{"matchExpressions": [{}]}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						"some-key": "some-value",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with no Affinity will schedule onto a node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": null
+						}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with Affinity but nil NodeSelector will schedule onto a node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "GPU",
+									"operator": "Exists"
+								}, {
+									"key": "GPU",
+									"operator": "NotIn",
+									"values": ["AMD", "INTER"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"GPU": "NVIDIA-GRID-K1",
+			},
+			fits: true,
+			test: "Pod with multiple matchExpressions ANDed that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "GPU",
+									"operator": "Exists"
+								}, {
+									"key": "GPU",
+									"operator": "In",
+									"values": ["AMD", "INTER"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"GPU": "NVIDIA-GRID-K1",
+			},
+			fits: false,
+			test: "Pod with multiple matchExpressions ANDed that doesn't match the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [
+								{
+									"matchExpressions": [{
+										"key": "foo",
+										"operator": "In",
+										"values": ["bar", "value2"]
+									}]
+								},
+								{
+									"matchExpressions": [{
+										"key": "diffkey",
+										"operator": "In",
+										"values": ["wrong", "value2"]
+									}]
+								}
+							]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with multiple NodeSelectorTerms ORed in affinity, matches the node's labels and will schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": {
+							"requiredDuringSchedulingRequiredDuringExecution": {
+								"nodeSelectorTerms": [{
+									"matchExpressions": [{
+										"key": "foo",
+										"operator": "In",
+										"values": ["bar", "value2"]
+									}]
+								}]
+							},
+							"requiredDuringSchedulingIgnoredDuringExecution": {
+								"nodeSelectorTerms": [{
+									"matchExpressions": [{
+										"key": "foo",
+										"operator": "NotIn",
+										"values": ["bar", "value2"]
+									}]
+								}]
+							}
+						}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
+				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "Exists"
+								}]
+							}]
+						}}}`,
+					},
+				},
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with an Affinity and a PodSpec.NodeSelector(the old thing that we are deprecating) " +
+				"both are satisfied, will schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "Exists"
+								}]
+							}]
+						}}}`,
+					},
+				},
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "barrrrrr",
+			},
+			fits: false,
+			test: "Pod with an Affinity matches node's labels but the PodSpec.NodeSelector(the old thing that we are deprecating) " +
+				"is not satisfied, won't schedule onto the node",
+		},
 	}
+
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 

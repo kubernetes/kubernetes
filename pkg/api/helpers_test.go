@@ -17,10 +17,12 @@ limitations under the License.
 package api
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/labels"
 
 	"speter.net/go/exp/math/dec/inf"
 )
@@ -173,5 +175,125 @@ func TestRemoveDuplicateAccessModes(t *testing.T) {
 	modes = removeDuplicateAccessModes(modes)
 	if len(modes) != 2 {
 		t.Errorf("Expected 2 distinct modes in set but found %v", len(modes))
+	}
+}
+
+func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
+	matchExpressions := []NodeSelectorRequirement{{
+		Key:      "foo",
+		Operator: NodeSelectorOpIn,
+		Values:   []string{"bar", "baz"},
+	}}
+	mustParse := func(s string) labels.Selector {
+		out, e := labels.Parse(s)
+		if e != nil {
+			panic(e)
+		}
+		return out
+	}
+	tc := []struct {
+		in        []NodeSelectorRequirement
+		out       labels.Selector
+		expectErr bool
+	}{
+		{in: nil, out: labels.Nothing()},
+		{in: []NodeSelectorRequirement{}, out: labels.Nothing()},
+		{
+			in:  matchExpressions,
+			out: mustParse("foo in (baz,bar)"),
+		},
+		{
+			in: []NodeSelectorRequirement{{
+				Key:      "foo",
+				Operator: NodeSelectorOpExists,
+				Values:   []string{"bar", "baz"},
+			}},
+			expectErr: true,
+		},
+		{
+			in: []NodeSelectorRequirement{{
+				Key:      "foo",
+				Operator: NodeSelectorOpGt,
+				Values:   []string{"1.1"},
+			}},
+			out: mustParse("foo>1.1"),
+		},
+		{
+			in: []NodeSelectorRequirement{{
+				Key:      "bar",
+				Operator: NodeSelectorOpLt,
+				Values:   []string{"7.1"},
+			}},
+			out: mustParse("bar<7.1"),
+		},
+	}
+
+	for i, tc := range tc {
+		out, err := NodeSelectorRequirementsAsSelector(tc.in)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(out, tc.out) {
+			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
+		}
+	}
+}
+
+func TestGetAffinityFromPod(t *testing.T) {
+	testCases := []struct {
+		pod       *Pod
+		expectErr bool
+	}{
+		{
+			pod:       &Pod{},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+						`,
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
 	}
 }

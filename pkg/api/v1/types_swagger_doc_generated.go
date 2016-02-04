@@ -39,6 +39,15 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 	return map_AWSElasticBlockStoreVolumeSource
 }
 
+var map_Affinity = map[string]string{
+	"":             "Affinity is a group of affinity scheduling requirements, including node affinity and inter pod affinity.",
+	"nodeAffinity": "Describes node affinity scheduling requirements for the pod.",
+}
+
+func (Affinity) SwaggerDoc() map[string]string {
+	return map_Affinity
+}
+
 var map_Binding = map[string]string{
 	"":         "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -720,6 +729,17 @@ func (NodeAddress) SwaggerDoc() map[string]string {
 	return map_NodeAddress
 }
 
+var map_NodeAffinity = map[string]string{
+	"": "Node affinity is a group of node affinity scheduling requirements. If RequiredDuringSchedulingRequiredDuringExecution and RequiredDuringSchedulingIgnoredDuringExecution are both set, then both node selectors must be satisfied.",
+	"requiredDuringSchedulingRequiredDuringExecution": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system will try to eventually evict the pod from its node.",
+	"requiredDuringSchedulingIgnoredDuringExecution":  "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node.",
+	"preferredDuringSchedulingIgnoredDuringExecution": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred.",
+}
+
+func (NodeAffinity) SwaggerDoc() map[string]string {
+	return map_NodeAffinity
+}
+
 var map_NodeCondition = map[string]string{
 	"":                   "NodeCondition contains condition infromation for a node.",
 	"type":               "Type of node condition.",
@@ -751,6 +771,35 @@ var map_NodeList = map[string]string{
 
 func (NodeList) SwaggerDoc() map[string]string {
 	return map_NodeList
+}
+
+var map_NodeSelector = map[string]string{
+	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
+	"nodeSelectorTerms": "Required. A list of node selector terms. The terms are ORed.",
+}
+
+func (NodeSelector) SwaggerDoc() map[string]string {
+	return map_NodeSelector
+}
+
+var map_NodeSelectorRequirement = map[string]string{
+	"":         "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+	"key":      "The label key that the selector applies to.",
+	"operator": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
+	"values":   "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+}
+
+func (NodeSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_NodeSelectorRequirement
+}
+
+var map_NodeSelectorTerm = map[string]string{
+	"":                 "A null or empty node selector term matches no objects.",
+	"matchExpressions": "Required. A list of node selector requirements. The requirements are ANDed.",
+}
+
+func (NodeSelectorTerm) SwaggerDoc() map[string]string {
+	return map_NodeSelectorTerm
 }
 
 var map_NodeSpec = map[string]string{
@@ -1136,6 +1185,16 @@ var map_PodTemplateSpec = map[string]string{
 
 func (PodTemplateSpec) SwaggerDoc() map[string]string {
 	return map_PodTemplateSpec
+}
+
+var map_PreferredSchedulingTerm = map[string]string{
+	"":           "An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).",
+	"weight":     "Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.",
+	"preference": "A node selector term, associated with the corresponding weight.",
+}
+
+func (PreferredSchedulingTerm) SwaggerDoc() map[string]string {
+	return map_PreferredSchedulingTerm
 }
 
 var map_Probe = map[string]string{
