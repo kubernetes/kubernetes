@@ -663,7 +663,7 @@ function create-certs {
   local -r cert_ip="${1}"
 
   # Determine extra certificate names for master
-  local octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+  local octets=($(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
   local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local sans=""
