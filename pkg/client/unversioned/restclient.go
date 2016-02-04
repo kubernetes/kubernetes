@@ -17,6 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -57,6 +59,27 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+}
+
+// ChangeTargetVersion changes the versioned API path the RESTClient targets at.
+func (c *RESTClient) ChangeTargetVersion(gv unversioned.GroupVersion) error {
+	fmt.Println("CHAO: before change, c.versionedAPIPath=", c.versionedAPIPath)
+	segments := strings.Split(c.versionedAPIPath, "/")
+	if gv.Group != "" && gv.Group != segments[len(segments)-2] {
+		return fmt.Errorf("cannot switch from group %v to group %v", segments[len(segments)-2], gv.Group)
+	}
+	if gv.Group != "" {
+		c.versionedAPIPath = strings.Join(append(segments[:len(segments)-2], gv.Group, gv.Version), "/")
+	} else {
+		c.versionedAPIPath = strings.Join(append(segments[:len(segments)-1], gv.Version), "/")
+	}
+	fmt.Println("CHAO: after change, c.versionedAPIPath=", c.versionedAPIPath)
+	return nil
+}
+
+// SwitchCodec changes the codec the RESTClient uses.
+func (c *RESTClient) SwitchCodec(codec runtime.Codec) {
+	c.contentConfig.Codec = codec
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions

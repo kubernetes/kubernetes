@@ -180,6 +180,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
+	var clientsetPtr *clientset.Clientset
 
 	return &Factory{
 		clients: clients,
@@ -216,12 +217,35 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
-			if err != nil {
-				return nil, err
+			if clientsetPtr == nil {
+				config, err := clients.ClientConfigForVersion(nil)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get config: %v", err)
+				}
+				clientsetPtr, err = clientset.NewForConfig(config)
+				if err != nil {
+					return nil, fmt.Errorf("failed to initialize a clientset: %v", err)
+				}
 			}
-			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), client); ok {
+			// TODO: we need a clientset cache
+			copyClientset := *clientsetPtr
+			// TODO: we should add a Group("groupName") function to clientset
+			serializer, ok := api.Codecs.SerializerForFileExtension("json")
+			if !ok {
+				return nil, fmt.Errorf("failed to get json serializer")
+			}
+			gv := mapping.GroupVersionKind.GroupVersion()
+			switch mapping.GroupVersionKind.Group {
+			case api.GroupName:
+				// TODO: we need to add a method to typed group client to tell us what version it supports in default
+				copyClientset.LegacyClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, []unversioned.GroupVersion{{api.GroupName, runtime.APIVersionInternal}}))
+				copyClientset.LegacyClient.RESTClient.ChangeTargetVersion(mapping.GroupVersionKind.GroupVersion())
+			case extensions.GroupName:
+				copyClientset.ExtensionsClient.RESTClient.SwitchCodec(api.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, []unversioned.GroupVersion{{extensions.GroupName, runtime.APIVersionInternal}}))
+				copyClientset.ExtensionsClient.RESTClient.ChangeTargetVersion(mapping.GroupVersionKind.GroupVersion())
+			}
+
+			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), &copyClientset); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
