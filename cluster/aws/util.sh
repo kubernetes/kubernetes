@@ -956,7 +956,7 @@ function start-master() {
 
   # We have to make sure that the cert is valid for API_SERVERS
   # i.e. we likely have to pass ELB name / elastic IP in future
-  create-certs "${MASTER_INTERNAL_IP}"
+  create-certs "${KUBE_MASTER_IP}" "${MASTER_INTERNAL_IP}"
 
   # This key is no longer needed, and this enables us to get under the 16KB size limit
   KUBECFG_CERT_BASE64=""
