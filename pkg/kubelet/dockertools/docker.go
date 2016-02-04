@@ -212,15 +212,19 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both full pod name and container name.
-func BuildDockerName(dockerName KubeletContainerName, container *api.Container) (string, string) {
+// This function returns stable name, unique name and an unique id.
+// Although rand.Uint32() is not really unique, but it's enough for us because error will
+// only occur when instances of the same container in the same pod have the same UID. The
+// chance is really slim.
+func BuildDockerName(dockerName KubeletContainerName, container *api.Container) (string, string, string) {
 	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	stableName := fmt.Sprintf("%s_%s_%s_%s",
 		containerNamePrefix,
 		containerName,
 		dockerName.PodFullName,
 		dockerName.PodUID)
-
-	return stableName, fmt.Sprintf("%s_%08x", stableName, rand.Uint32())
+	UID := fmt.Sprintf("%08x", rand.Uint32())
+	return stableName, fmt.Sprintf("%s_%s", stableName, UID), UID
 }
 
 // Unpacks a container name, returning the pod full name and container name we would have used to
