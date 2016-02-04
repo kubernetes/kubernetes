@@ -90,6 +90,12 @@ const (
 	defaultImageTag          = "latest"
 	defaultRktAPIServiceAddr = "localhost:15441"
 	defaultNetworkName       = "rkt.kubernetes.io"
+
+	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
+	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
+	// hence, setting ndots to be 5.
+	// TODO(yifan): Move this and dockertools.ndotsDNSOption to a common package.
+	defaultDNSOption = "ndots:5"
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
@@ -107,7 +113,7 @@ type Runtime struct {
 	dockerKeyring credentialprovider.DockerKeyring
 
 	containerRefManager *kubecontainer.RefManager
-	generator           kubecontainer.RunContainerOptionsGenerator
+	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
 	volumeGetter        volumeGetter
@@ -131,7 +137,7 @@ type volumeGetter interface {
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
 func New(config *Config,
-	generator kubecontainer.RunContainerOptionsGenerator,
+	runtimeHelper kubecontainer.RuntimeHelper,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
 	livenessManager proberesults.Manager,
@@ -169,7 +175,7 @@ func New(config *Config,
 		config:              config,
 		dockerKeyring:       credentialprovider.NewDockerKeyring(),
 		containerRefManager: containerRefManager,
-		generator:           generator,
+		runtimeHelper:       runtimeHelper,
 		recorder:            recorder,
 		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
@@ -582,7 +588,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 		return err
 	}
 
-	opts, err := r.generator.GenerateRunContainerOptions(pod, &c)
+	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c)
 	if err != nil {
 		return err
 	}
@@ -702,6 +708,35 @@ func serviceFilePath(serviceName string) string {
 	return path.Join(systemdServiceDir, serviceName)
 }
 
+// generateRunCommand crafts a 'rkt run-prepared' command with necessary parameters.
+func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) {
+	runPrepared := r.buildCommand("run-prepared").Args
+
+	// Setup network configuration.
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
+		runPrepared = append(runPrepared, "--net=host")
+	} else {
+		runPrepared = append(runPrepared, fmt.Sprintf("--net=%s", defaultNetworkName))
+	}
+
+	// Setup DNS.
+	dnsServers, dnsSearches, err := r.runtimeHelper.GetClusterDNS(pod)
+	if err != nil {
+		return "", err
+	}
+	for _, server := range dnsServers {
+		runPrepared = append(runPrepared, fmt.Sprintf("--dns=%s", server))
+	}
+	for _, search := range dnsSearches {
+		runPrepared = append(runPrepared, fmt.Sprintf("--dns-search=%s", search))
+	}
+	if len(dnsServers) > 0 || len(dnsSearches) > 0 {
+		runPrepared = append(runPrepared, fmt.Sprintf("--dns-opt=%s", defaultDNSOption))
+	}
+	runPrepared = append(runPrepared, uuid)
+	return strings.Join(runPrepared, " "), nil
+}
+
 // preparePod will:
 //
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
@@ -754,11 +789,9 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	glog.V(4).Infof("'rkt prepare' returns %q", uuid)
 
 	// Create systemd service file for the rkt pod.
-	var runPrepared string
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
-		runPrepared = fmt.Sprintf("%s run-prepared --mds-register=false --net=host %s", r.rktBinAbsPath, uuid)
-	} else {
-		runPrepared = fmt.Sprintf("%s run-prepared --mds-register=false --net=%s %s", r.rktBinAbsPath, defaultNetworkName, uuid)
+	runPrepared, err := r.generateRunCommand(pod, uuid)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to generate 'rkt run-prepared' command: %v", err)
 	}
 
 	// TODO handle pod.Spec.HostPID
