@@ -464,6 +464,12 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	// function in order to maintain the invariant that "if the forwarding rule
 	// exists, the LB has been fully created".
 	ipAddress := ""
+	// Through this process we try to keep track of whether it is safe to
+	// release the IP that was allocated.  If the user specifically asked for
+	// an IP, we assume they are managing it themselves.  Otherwise, we will
+	// release the IP in case of early-terminating failure or upon successful
+	// creating of the LB.
+	releaseStaticIP := false
 	if requestedIP != nil {
 		// If a specific IP address has been requested, we have to respect the
 		// user's request and use that IP. If the forwarding rule was already using
@@ -477,11 +483,34 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	} else {
 		// This will either allocate a new static IP if the forwarding rule didn't
 		// already have an IP, or it will promote the forwarding rule's IP from
-		// ephemeral to static.
-		ipAddress, err = gce.createOrPromoteStaticIP(name, region, fwdRuleIP)
+		// ephemeral to static, or it will just get the IP if it is already
+		// static.
+		existed := false
+		ipAddress, existed, err = gce.ensureStaticIP(name, region, fwdRuleIP)
 		if err != nil {
 			return nil, err
 		}
+		if existed {
+			// If the IP was not specifically requested by the user, but it
+			// already existed, it seems to be a failed update cycle.  We can
+			// use this IP and try to run through the process again, but we
+			// should not release the IP unless it is explicitly flagged as OK.
+			releaseStaticIP = false
+		} else {
+			// For total clarity.  The IP did not pre-exist and the user did
+			// not ask for a particular one, so we can release the IP in case
+			// of failure or success.
+			releaseStaticIP = true
+		}
+		defer func() {
+			if releaseStaticIP {
+				if err := gce.deleteStaticIP(name, region); err != nil {
+					glog.Errorf("failed to release static IP %s during update of load balancer (%v, %v): %v", ipAddress, name, region, err)
+				}
+			} else {
+				glog.Warningf("orphaning static IP %s during update of load balancer (%v, %v): %v", ipAddress, name, region, err)
+			}
+		}()
 	}
 
 	// Deal with the firewall next. The reason we do this here rather than last
@@ -520,6 +549,10 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	// Thus, we have to tear down the forwarding rule if either it or the target
 	// pool needs to be updated.
 	if fwdRuleExists && (fwdRuleNeedsUpdate || tpNeedsUpdate) {
+		// Begin critical section. If we have to delete the forwarding rule,
+		// and something should fail before we recreate it, don't release the
+		// IP.  That way we can come back to it later.
+		releaseStaticIP = false
 		if err := gce.deleteForwardingRule(name, region); err != nil {
 			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", name, err)
 		}
@@ -541,12 +574,10 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 		if err := gce.createForwardingRule(name, region, ipAddress, ports); err != nil {
 			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", name, err)
 		}
-	}
-
-	// Now that we're done operating on everything, demote the static IP back to
-	// ephemeral to avoid taking up the user's static IP quota.
-	if err := gce.deleteStaticIP(name, region); err != nil {
-		return nil, fmt.Errorf("failed to release static IP %s after finishing update of load balancer resources: %v", err)
+		// End critical section.  It is safe to release the static IP (which
+		// just demotes it to ephemeral) now that it is attached.  In the case
+		// of a user-requested IP, the 'defer' won't be installed anyway.
+		releaseStaticIP = true
 	}
 
 	status := &api.LoadBalancerStatus{}
@@ -857,32 +888,41 @@ func (gce *GCECloud) projectOwnsStaticIP(name, region string, ipAddress string) 
 	return fmt.Errorf("this gce project doesn't own the IP address: %s", ipAddress)
 }
 
-func (gce *GCECloud) createOrPromoteStaticIP(name, region, existingIP string) (ipAddress string, err error) {
+func (gce *GCECloud) ensureStaticIP(name, region, existingIP string) (ipAddress string, created bool, err error) {
 	// If the address doesn't exist, this will create it.
 	// If the existingIP exists but is ephemeral, this will promote it to static.
 	// If the address already exists, this will harmlessly return a StatusConflict
 	// and we'll grab the IP before returning.
+	existed := false
 	addressObj := &compute.Address{Name: name}
 	if existingIP != "" {
 		addressObj.Address = existingIP
 	}
 	op, err := gce.service.Addresses.Insert(gce.projectID, region, addressObj).Do()
-	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return "", fmt.Errorf("error creating gce static IP address: %v", err)
+	if err != nil {
+		if !isHTTPErrorCode(err, http.StatusConflict) {
+			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
+		}
+		// StatusConflict == the IP exists already.
+		existed = true
 	}
 	if op != nil {
 		err := gce.waitForRegionOp(op, region)
-		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", fmt.Errorf("error waiting for gce static IP address to be created: %v", err)
+		if err != nil {
+			if !isHTTPErrorCode(err, http.StatusConflict) {
+				return "", false, fmt.Errorf("error waiting for gce static IP address to be created: %v", err)
+			}
+			// StatusConflict == the IP exists already.
+			existed = true
 		}
 	}
 
 	// We have to get the address to know which IP was allocated for us.
 	address, err := gce.service.Addresses.Get(gce.projectID, region, name).Do()
 	if err != nil {
-		return "", fmt.Errorf("error re-getting gce static IP address: %v", err)
+		return "", false, fmt.Errorf("error re-getting gce static IP address: %v", err)
 	}
-	return address.Address, nil
+	return address.Address, existed, nil
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
