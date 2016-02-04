@@ -188,6 +188,26 @@ func TestSetDefaultJobSelector(t *testing.T) {
 	}
 }
 
+func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
+	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
+	if err != nil {
+		t.Errorf("%v\n %#v", err, obj)
+		return nil
+	}
+	obj2, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	if err != nil {
+		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
+		return nil
+	}
+	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+	err = api.Scheme.Convert(obj2, obj3)
+	if err != nil {
+		t.Errorf("%v\nSource: %#v", err, obj2)
+		return nil
+	}
+	return obj3
+}
+
 func newInt32(val int32) *int32 {
 	p := new(int32)
 	*p = val
