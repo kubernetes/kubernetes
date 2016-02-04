@@ -252,16 +252,24 @@ func nowStamp() string {
 	return time.Now().Format(time.StampMilli)
 }
 
-func Logf(format string, a ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, nowStamp()+": INFO: "+format+"\n", a...)
+func logf(level string, format string, args ...interface{}) {
+	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
-func Failf(format string, a ...interface{}) {
-	Fail(nowStamp()+": "+fmt.Sprintf(format, a...), 1)
+func Logf(format string, args ...interface{}) {
+	logf("INFO", format, args...)
+}
+
+func Failf(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	logf("FAIL", msg)
+	Fail(nowStamp()+": "+msg, 1)
 }
 
 func Skipf(format string, args ...interface{}) {
-	Skip(nowStamp() + ": " + fmt.Sprintf(format, args...))
+	msg := fmt.Sprintf(format, args...)
+	logf("SKIP", msg)
+	Skip(nowStamp() + ": " + msg)
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
