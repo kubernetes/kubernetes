@@ -48,12 +48,20 @@ func TestAssumePodScheduled(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
+			nonzeroRequest: &Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
 			pods: []*api.Pod{testPods[0]},
 		},
 	}, {
 		pods: []*api.Pod{testPods[1], testPods[2]},
 		wNodeInfo: &NodeInfo{
 			requestedResource: &Resource{
+				MilliCPU: 300,
+				Memory:   1524,
+			},
+			nonzeroRequest: &Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
@@ -106,6 +114,10 @@ func TestExpirePod(t *testing.T) {
 				MilliCPU: 200,
 				Memory:   1024,
 			},
+			nonzeroRequest: &Resource{
+				MilliCPU: 200,
+				Memory:   1024,
+			},
 			pods: []*api.Pod{testPods[1]},
 		},
 	}}
@@ -144,6 +156,10 @@ func TestAddPodWillConfirm(t *testing.T) {
 		podToAdd:    basePod,
 		wNodeInfo: &NodeInfo{
 			requestedResource: &Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
+			nonzeroRequest: &Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -186,6 +202,10 @@ func TestAddPodAfterExpiration(t *testing.T) {
 		podToAdd:    basePod,
 		wNodeInfo: &NodeInfo{
 			requestedResource: &Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
+			nonzeroRequest: &Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -244,10 +264,18 @@ func TestUpdatePod(t *testing.T) {
 				MilliCPU: 200,
 				Memory:   1024,
 			},
+			nonzeroRequest: &Resource{
+				MilliCPU: 200,
+				Memory:   1024,
+			},
 			pods: []*api.Pod{testPods[1]},
 		},
 		wNodeInfo2: &NodeInfo{
 			requestedResource: &Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
+			nonzeroRequest: &Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
@@ -301,6 +329,10 @@ func TestRemovePod(t *testing.T) {
 		pod: basePod,
 		wNodeInfo: &NodeInfo{
 			requestedResource: &Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
+			nonzeroRequest: &Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
