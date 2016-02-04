@@ -91,6 +91,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
       --session-affinity="": If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
+      --show-labels[=false]: When printing, show all labels as the last column (default hide labels column)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
       --target-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
       --template="": Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
