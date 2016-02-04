@@ -1633,7 +1633,7 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	parts := strings.Split(newContainer.HostConfig.Binds[0], ":")
-	if !matchString(t, testPodContainerDir+"/k8s_bar\\.[a-f0-9]", parts[0]) {
+	if !matchString(t, testPodContainerDir+"/[a-f0-9]", parts[0]) {
 		t.Errorf("Unexpected host path: %s", parts[0])
 	}
 	if parts[1] != "/dev/somepath" {
