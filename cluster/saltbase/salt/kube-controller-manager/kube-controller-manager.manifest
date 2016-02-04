@@ -14,6 +14,8 @@
 # This is expected to be a short-term compromise.
 {% if pillar.get('network_provider', '').lower() == 'flannel' %}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=false" -%}
+{% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+  {% set allocate_node_cidrs = "--allocate-node-cidrs=true" -%}
 {% elif pillar['allocate_node_cidrs'] is defined -%}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
