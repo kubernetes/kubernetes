@@ -297,7 +297,7 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 		}
 		for i := range pods.Items {
 			pod := pods.Items[i]
-			podString := fmt.Sprintf("%q/%q", pod.Namespace, pod.Name)
+			podString := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.NodeName)
 			if len(pod.Spec.NodeName) == 0 {
 				glog.Infof("Pod %q is not bound to a host yet", podString)
@@ -357,6 +357,7 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	return func() (bool, error) {
 		pod, err := c.Pods(podNamespace).Get(podName)
 		if apierrors.IsNotFound(err) {
+			glog.V(2).Infof("Pod %s/%s was not found", podNamespace, podName)
 			return false, nil
 		}
 		if err != nil {
@@ -365,6 +366,7 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 			return false, nil
 		}
 		if pod.Status.Phase != api.PodRunning {
+			glog.V(2).Infof("Pod %s/%s is not running. In phase %q", podNamespace, podName, pod.Status.Phase)
 			return false, nil
 		}
 		return true, nil
