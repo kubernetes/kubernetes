@@ -1147,25 +1147,15 @@ function wait-master() {
 }
 
 # Creates the ~/.kube/config file, getting the information from the master
-# The master much be running and set in KUBE_MASTER_IP
+# The master must be running and set in KUBE_MASTER_IP
 function build-config() {
-  # TODO use token instead of kube_auth
-  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
-  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
-  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
-  export CONTEXT="aws_${INSTANCE_PREFIX}"
-
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-  # config file.  Distribute the same way the htpasswd is done.
+  export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
+  export KUBE_KEY="${CERT_DIR}/pki/private/kubecfg.key"
+  export CA_CERT="${CERT_DIR}/pki/ca.crt"
+  export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   (
-    umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
-
-    create-kubeconfig
+   umask 077
+   create-kubeconfig
   )
 }
 
