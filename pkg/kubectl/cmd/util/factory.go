@@ -88,6 +88,8 @@ type Factory struct {
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 	// Returns a HistoryViewer for viewing change history
 	HistoryViewer func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
+	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
+	Rollbacker func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
 	PodSelectorForObject func(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
@@ -372,6 +374,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+		},
+		Rollbacker: func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
+			if err != nil {
+				return nil, err
+			}
+			return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {

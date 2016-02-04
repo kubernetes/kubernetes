@@ -446,7 +446,7 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 	if *toRevision == 0 {
 		if *toRevision = lastRevision(allRCs); *toRevision == 0 {
 			// If we still can't find the last revision, gives up rollback
-			dc.emitRollbackWarningEvent(deployment, "DeploymentRollbackRevisionNotFound", "Unable to find last revision.")
+			dc.emitRollbackWarningEvent(deployment, deploymentutil.RollbackRevisionNotFound, "Unable to find last revision.")
 			// Gives up rollback
 			return dc.updateDeploymentAndClearRollbackTo(deployment)
 		}
@@ -468,7 +468,7 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 			return deployment, err
 		}
 	}
-	dc.emitRollbackWarningEvent(deployment, "DeploymentRollbackRevisionNotFound", "Unable to find the revision to rollback to.")
+	dc.emitRollbackWarningEvent(deployment, deploymentutil.RollbackRevisionNotFound, "Unable to find the revision to rollback to.")
 	// Gives up rollback
 	return dc.updateDeploymentAndClearRollbackTo(deployment)
 }
@@ -478,7 +478,7 @@ func (dc *DeploymentController) emitRollbackWarningEvent(deployment *extensions.
 }
 
 func (dc *DeploymentController) emitRollbackNormalEvent(deployment *extensions.Deployment, message string) {
-	dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "DeploymentRollback", message)
+	dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, deploymentutil.RollbackDone, message)
 }
 
 // updateDeploymentAndClearRollbackTo sets .spec.rollbackTo to nil and update the input deployment
@@ -966,7 +966,7 @@ func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deploy
 		performedRollback = true
 	} else {
 		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %s, skipping rollback...", deployment.Name)
-		dc.emitRollbackWarningEvent(deployment, "DeploymentRollbackTemplateUnchanged", fmt.Sprintf("The rollback revision contains the same template as current deployment %q", deployment.Name))
+		dc.emitRollbackWarningEvent(deployment, deploymentutil.RollbackTemplateUnchanged, fmt.Sprintf("The rollback revision contains the same template as current deployment %q", deployment.Name))
 	}
 	d, err = dc.updateDeploymentAndClearRollbackTo(deployment)
 	return
