@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Utility function for kubernetes docker setup
-# Author @loopingz
+# Author @wizard_cxy @reouser @loopingz @luxas
 
 K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.6"}
 ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
