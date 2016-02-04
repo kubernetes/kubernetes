@@ -23,13 +23,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestResourceVersioner(t *testing.T) {
-	job := batch.Job{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
+	job := extensions.Job{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&job)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -38,7 +39,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Errorf("unexpected version %v", version)
 	}
 
-	jobList := batch.JobList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
+	jobList := extensions.JobList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
 	version, err = accessor.ResourceVersion(&jobList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -49,14 +50,14 @@ func TestResourceVersioner(t *testing.T) {
 }
 
 func TestCodec(t *testing.T) {
-	job := batch.Job{}
+	job := extensions.Job{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
 	data, err := runtime.Encode(api.Codecs.LegacyCodec(registered.GroupOrDie(batch.GroupName).GroupVersion), &job)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	other := batch.Job{}
+	other := extensions.Job{}
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -106,7 +107,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
-		rc := &batch.Job{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		rc := &extensions.Job{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		name, err := mapping.MetadataAccessor.Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
