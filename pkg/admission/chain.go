@@ -16,7 +16,7 @@ limitations under the License.
 
 package admission
 
-import clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+import clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface

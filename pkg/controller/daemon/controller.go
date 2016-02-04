@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/record"
 	unversioned_extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
