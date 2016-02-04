@@ -102,3 +102,12 @@ func ObserveCacheMiss() {
 func ObserveNewEntry() {
 	cacheEntryCounter.Inc()
 }
+
+func Reset() {
+	cacheHitCounter.Set(0)
+	cacheMissCounter.Set(0)
+	cacheEntryCounter.Set(0)
+	// TODO: Reset cacheAddLatency.
+	// TODO: Reset cacheGetLatency.
+	etcdRequestLatenciesSummary.Reset()
+}
