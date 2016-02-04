@@ -47,4 +47,9 @@ COPY ./bin/* /usr/local/bin/
 
 RUN install-etcd.sh
 
+RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
+
+# avoid git/ssh prompts for host key acceptance
+RUN ssh-keyscan -t rsa github.com 2>&1 >> /root/.ssh/known_hosts
+
 ENTRYPOINT [ "bash" ]
