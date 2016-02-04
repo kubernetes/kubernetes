@@ -477,7 +477,10 @@ func TestRequestWatch(t *testing.T) {
 			Request: &Request{
 				content: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()},
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{StatusCode: http.StatusForbidden}, nil
+					return &http.Response{
+						StatusCode: http.StatusForbidden,
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					}, nil
 				}),
 				baseURL: &url.URL{},
 			},
@@ -490,7 +493,10 @@ func TestRequestWatch(t *testing.T) {
 			Request: &Request{
 				content: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()},
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{StatusCode: http.StatusUnauthorized}, nil
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					}, nil
 				}),
 				baseURL: &url.URL{},
 			},
