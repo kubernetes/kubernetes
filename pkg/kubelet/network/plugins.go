@@ -28,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -93,6 +95,9 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &noopNetworkPlugin{}
+		if err := plug.Init(host); err != nil {
+			return nil, err
+		}
 		return plug, nil
 	}
 
@@ -135,7 +140,22 @@ func UnescapePluginName(in string) string {
 type noopNetworkPlugin struct {
 }
 
+const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
+
 func (plugin *noopNetworkPlugin) Init(host Host) error {
+	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
+	// kubernetes versions to ensure the iptables-based kube proxy functions
+	// correctly.  Other plugins are responsible for setting this correctly
+	// depending on whether or not they connect containers to Linux bridges
+	// or use some other mechanism (ie, SDN vswitch).
+
+	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
+	// it was built-in.
+	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
+	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	}
+
 	return nil
 }
 
