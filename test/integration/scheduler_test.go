@@ -62,7 +62,10 @@ func TestUnschedulableNodes(t *testing.T) {
 	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -286,7 +289,11 @@ func TestMultiScheduler(t *testing.T) {
 	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
+
 	/*
 		This integration tests the multi-scheduler feature in the following way:
 		1. create a default scheduler
@@ -461,7 +468,10 @@ func TestAllocatable(t *testing.T) {
 	defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
 
 	// 1. create and start default-scheduler
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
