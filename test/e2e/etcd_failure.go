@@ -29,7 +29,6 @@ import (
 
 var _ = Describe("Etcd failure [Disruptive]", func() {
 
-	var skipped bool
 	framework := NewFramework("etcd-failure")
 
 	BeforeEach(func() {
@@ -38,9 +37,7 @@ var _ = Describe("Etcd failure [Disruptive]", func() {
 		// - master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		skipped = true
 		SkipUnlessProviderIs("gce")
-		skipped = false
 
 		Expect(RunRC(RCConfig{
 			Client:    framework.Client,
