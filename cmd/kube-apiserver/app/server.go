@@ -464,6 +464,14 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 			Disable: true,
 		}
 	}
+        disableBatch := disableAllAPIs
+	batchGroupVersion := "batch/v1"
+	disableBatch = !getRuntimeConfigValue(s, batchGroupVersion, !disableBatch)
+	if disableBatch {
+		apiGroupVersionOverrides[batchGroupVersion] = genericapiserver.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
 
 	for key := range s.RuntimeConfig {
 		if strings.HasPrefix(key, v1GroupVersion+"/") {
