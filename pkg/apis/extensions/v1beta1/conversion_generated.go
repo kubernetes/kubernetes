@@ -1241,6 +1241,56 @@ func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *v1.V
 	return autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
 }
 
+func autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*unversioned.LabelSelector))(in)
+	}
+	if in.MatchLabels != nil {
+		out.MatchLabels = make(map[string]string)
+		for key, val := range in.MatchLabels {
+			out.MatchLabels[key] = val
+		}
+	} else {
+		out.MatchLabels = nil
+	}
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]LabelSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
+	return autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in, out, s)
+}
+
+func autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*unversioned.LabelSelectorRequirement))(in)
+	}
+	out.Key = in.Key
+	out.Operator = LabelSelectorOperator(in.Operator)
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
+func Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
+	return autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in, out, s)
+}
+
 func autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *v1.AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.AWSElasticBlockStoreVolumeSource))(in)
@@ -2578,10 +2628,10 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DaemonSetSpec))(in)
 	}
-	// unable to generate simple pointer conversion for extensions.LabelSelector -> v1beta1.LabelSelector
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
-		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -3169,10 +3219,10 @@ func autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, o
 	} else {
 		out.ActiveDeadlineSeconds = nil
 	}
-	// unable to generate simple pointer conversion for extensions.LabelSelector -> v1beta1.LabelSelector
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
-		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -3228,56 +3278,6 @@ func autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobSta
 
 func Convert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in, out, s)
-}
-
-func autoConvert_extensions_LabelSelector_To_v1beta1_LabelSelector(in *extensions.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.LabelSelector))(in)
-	}
-	if in.MatchLabels != nil {
-		out.MatchLabels = make(map[string]string)
-		for key, val := range in.MatchLabels {
-			out.MatchLabels[key] = val
-		}
-	} else {
-		out.MatchLabels = nil
-	}
-	if in.MatchExpressions != nil {
-		out.MatchExpressions = make([]LabelSelectorRequirement, len(in.MatchExpressions))
-		for i := range in.MatchExpressions {
-			if err := Convert_extensions_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
-	}
-	return nil
-}
-
-func Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in *extensions.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	return autoConvert_extensions_LabelSelector_To_v1beta1_LabelSelector(in, out, s)
-}
-
-func autoConvert_extensions_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *extensions.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.LabelSelectorRequirement))(in)
-	}
-	out.Key = in.Key
-	out.Operator = LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		out.Values = make([]string, len(in.Values))
-		for i := range in.Values {
-			out.Values[i] = in.Values[i]
-		}
-	} else {
-		out.Values = nil
-	}
-	return nil
-}
-
-func Convert_extensions_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *extensions.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_extensions_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in, out, s)
 }
 
 func autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
@@ -3350,10 +3350,10 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensi
 	if err := s.Convert(&in.Replicas, &out.Replicas, 0); err != nil {
 		return err
 	}
-	// unable to generate simple pointer conversion for extensions.LabelSelector -> v1beta1.LabelSelector
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
-		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -3755,10 +3755,10 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetSpec))(in)
 	}
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> extensions.LabelSelector
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
-		out.Selector = new(extensions.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -4327,10 +4327,10 @@ func autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensi
 	} else {
 		out.ActiveDeadlineSeconds = nil
 	}
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> extensions.LabelSelector
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
-		out.Selector = new(extensions.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -4388,7 +4388,7 @@ func Convert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *exten
 	return autoConvert_v1beta1_JobStatus_To_extensions_JobStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_LabelSelector_To_extensions_LabelSelector(in *LabelSelector, out *extensions.LabelSelector, s conversion.Scope) error {
+func autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LabelSelector))(in)
 	}
@@ -4401,9 +4401,9 @@ func autoConvert_v1beta1_LabelSelector_To_extensions_LabelSelector(in *LabelSele
 		out.MatchLabels = nil
 	}
 	if in.MatchExpressions != nil {
-		out.MatchExpressions = make([]extensions.LabelSelectorRequirement, len(in.MatchExpressions))
+		out.MatchExpressions = make([]unversioned.LabelSelectorRequirement, len(in.MatchExpressions))
 		for i := range in.MatchExpressions {
-			if err := Convert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
+			if err := Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
 				return err
 			}
 		}
@@ -4413,16 +4413,16 @@ func autoConvert_v1beta1_LabelSelector_To_extensions_LabelSelector(in *LabelSele
 	return nil
 }
 
-func Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in *LabelSelector, out *extensions.LabelSelector, s conversion.Scope) error {
-	return autoConvert_v1beta1_LabelSelector_To_extensions_LabelSelector(in, out, s)
+func Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
+	return autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in, out, s)
 }
 
-func autoConvert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement(in *LabelSelectorRequirement, out *extensions.LabelSelectorRequirement, s conversion.Scope) error {
+func autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LabelSelectorRequirement))(in)
 	}
 	out.Key = in.Key
-	out.Operator = extensions.LabelSelectorOperator(in.Operator)
+	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
 	if in.Values != nil {
 		out.Values = make([]string, len(in.Values))
 		for i := range in.Values {
@@ -4434,8 +4434,8 @@ func autoConvert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorReq
 	return nil
 }
 
-func Convert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement(in *LabelSelectorRequirement, out *extensions.LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement(in, out, s)
+func Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
+	return autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in, out, s)
 }
 
 func autoConvert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
@@ -4534,10 +4534,10 @@ func autoConvert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *Replica
 		defaulting.(func(*ReplicaSetSpec))(in)
 	}
 	// in.Replicas has no peer in out
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> extensions.LabelSelector
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
-		out.Selector = new(extensions.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -4865,8 +4865,6 @@ func init() {
 		autoConvert_extensions_JobSpec_To_v1beta1_JobSpec,
 		autoConvert_extensions_JobStatus_To_v1beta1_JobStatus,
 		autoConvert_extensions_Job_To_v1beta1_Job,
-		autoConvert_extensions_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
-		autoConvert_extensions_LabelSelector_To_v1beta1_LabelSelector,
 		autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization,
 		autoConvert_extensions_ReplicaSetList_To_v1beta1_ReplicaSetList,
 		autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
@@ -4884,6 +4882,8 @@ func init() {
 		autoConvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData,
 		autoConvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList,
 		autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource,
+		autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
+		autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector,
 		autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		autoConvert_v1_Capabilities_To_api_Capabilities,
 		autoConvert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
@@ -4961,8 +4961,8 @@ func init() {
 		autoConvert_v1beta1_JobSpec_To_extensions_JobSpec,
 		autoConvert_v1beta1_JobStatus_To_extensions_JobStatus,
 		autoConvert_v1beta1_Job_To_extensions_Job,
-		autoConvert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement,
-		autoConvert_v1beta1_LabelSelector_To_extensions_LabelSelector,
+		autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
+		autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector,
 		autoConvert_v1beta1_ListOptions_To_api_ListOptions,
 		autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization,
 		autoConvert_v1beta1_ReplicaSetList_To_extensions_ReplicaSetList,
