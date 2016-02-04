@@ -28,10 +28,11 @@ package unversioned
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_APIGroup = map[string]string{
-	"":                 "APIGroup contains the name, the supported versions, and the preferred version of a group.",
-	"name":             "name is the name of the group.",
-	"versions":         "versions are the versions supported in this group.",
-	"preferredVersion": "preferredVersion is the version preferred by the API server, which probably is the storage version.",
+	"":                           "APIGroup contains the name, the supported versions, and the preferred version of a group.",
+	"name":                       "name is the name of the group.",
+	"versions":                   "versions are the versions supported in this group.",
+	"preferredVersion":           "preferredVersion is the version preferred by the API server, which probably is the storage version.",
+	"serverAddressByClientCIDRs": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
 }
 
 func (APIGroup) SwaggerDoc() map[string]string {
@@ -69,8 +70,9 @@ func (APIResourceList) SwaggerDoc() map[string]string {
 }
 
 var map_APIVersions = map[string]string{
-	"":         "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
-	"versions": "versions are the api versions that are available.",
+	"":                           "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
+	"versions":                   "versions are the api versions that are available.",
+	"serverAddressByClientCIDRs": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
 }
 
 func (APIVersions) SwaggerDoc() map[string]string {
@@ -143,6 +145,16 @@ var map_RootPaths = map[string]string{
 
 func (RootPaths) SwaggerDoc() map[string]string {
 	return map_RootPaths
+}
+
+var map_ServerAddressByClientCIDR = map[string]string{
+	"":              "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+	"clientCIDR":    "The CIDR with which clients can match their IP to figure out the server address that they should use.",
+	"serverAddress": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port.",
+}
+
+func (ServerAddressByClientCIDR) SwaggerDoc() map[string]string {
+	return map_ServerAddressByClientCIDR
 }
 
 var map_Status = map[string]string{
