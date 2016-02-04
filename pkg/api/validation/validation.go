@@ -97,6 +97,10 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	if totalSize > (int64)(totalAnnotationSizeLimitB) {
 		allErrs = append(allErrs, field.TooLong(fldPath, "", totalAnnotationSizeLimitB))
 	}
+
+	if annotations[api.AffinityAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
+	}
 	return allErrs
 }
 
@@ -1343,6 +1347,102 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
 		}
 	}
+	return allErrs
+}
+
+// ValidateNodeSelectorRequirement tests that the specified NodeSelectorRequirement fields has valid data
+func ValidateNodeSelectorRequirement(rq api.NodeSelectorRequirement, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch rq.Operator {
+	case api.NodeSelectorOpIn, api.NodeSelectorOpNotIn:
+		if len(rq.Values) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
+		}
+	case api.NodeSelectorOpExists, api.NodeSelectorOpDoesNotExist:
+		if len(rq.Values) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
+		}
+
+	case api.NodeSelectorOpGt, api.NodeSelectorOpLt:
+		if len(rq.Values) != 1 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'"))
+		}
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
+	}
+	allErrs = append(allErrs, ValidateLabelName(rq.Key, fldPath.Child("key"))...)
+	return allErrs
+}
+
+// ValidateNodeSelectorTerm tests that the specified node selector term has valid data
+func ValidateNodeSelectorTerm(term api.NodeSelectorTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(term.MatchExpressions) == 0 {
+		return append(allErrs, field.Required(fldPath.Child("matchExpressions"), "must have at least one node selector requirement"))
+	}
+	for j, req := range term.MatchExpressions {
+		allErrs = append(allErrs, ValidateNodeSelectorRequirement(req, fldPath.Child("matchExpressions").Index(j))...)
+	}
+	return allErrs
+}
+
+// ValidateNodeSelector tests that the specified nodeSelector fields has valid data
+func ValidateNodeSelector(nodeSelector *api.NodeSelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	termFldPath := fldPath.Child("nodeSelectorTerms")
+	if len(nodeSelector.NodeSelectorTerms) == 0 {
+		return append(allErrs, field.Required(termFldPath, "must have at least one node selector term"))
+	}
+
+	for i, term := range nodeSelector.NodeSelectorTerms {
+		allErrs = append(allErrs, ValidateNodeSelectorTerm(term, termFldPath.Index(i))...)
+	}
+
+	return allErrs
+}
+
+// ValidatePreferredSchedulingTerms tests that the specified SoftNodeAffinity fields has valid data
+func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, term := range terms {
+		if term.Weight <= 0 || term.Weight > 100 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("weight"), term.Weight, "must be in the range 1-100"))
+		}
+
+		allErrs = append(allErrs, ValidateNodeSelectorTerm(term.Preference, fldPath.Index(i).Child("preference"))...)
+	}
+	return allErrs
+}
+
+// ValidateAffinityInPodAnnotations tests that the serialized Affinity in Pod.Annotations has valid data
+func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	affinity, err := api.GetAffinityFromPodAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.AffinityAnnotationKey, err.Error()))
+		return allErrs
+	}
+
+	if affinity.NodeAffinity != nil {
+		na := affinity.NodeAffinity
+		if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
+			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+		}
+
+		if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		}
+
+		if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+			allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+
+		}
+	}
+
 	return allErrs
 }
 
