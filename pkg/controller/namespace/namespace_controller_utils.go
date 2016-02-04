@@ -128,6 +128,10 @@ func deleteAllContent(kubeClient clientset.Interface, versions *unversioned.APIV
 	if err != nil {
 		return estimate, err
 	}
+	err = deleteConfigMaps(kubeClient, namespace)
+	if err != nil {
+		return estimate, err
+	}
 	err = deletePersistentVolumeClaims(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
@@ -313,6 +317,10 @@ func deleteEvents(kubeClient clientset.Interface, ns string) error {
 
 func deleteSecrets(kubeClient clientset.Interface, ns string) error {
 	return kubeClient.Core().Secrets(ns).DeleteCollection(nil, api.ListOptions{})
+}
+
+func deleteConfigMaps(kubeClient clientset.Interface, ns string) error {
+	return kubeClient.Core().ConfigMaps(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
 func deletePersistentVolumeClaims(kubeClient clientset.Interface, ns string) error {
