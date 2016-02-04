@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 type fakeBinder struct {
@@ -109,8 +110,8 @@ func TestScheduler(t *testing.T) {
 		var gotAssumedPod *api.Pod
 		var gotBinding *api.Binding
 		c := &Config{
-			Modeler: &FakeModeler{
-				AssumePodFunc: func(pod *api.Pod) {
+			SchedulerCache: &schedulercache.FakeCache{
+				AssumeFunc: func(pod *api.Pod) {
 					gotAssumedPod = pod
 				},
 			},
