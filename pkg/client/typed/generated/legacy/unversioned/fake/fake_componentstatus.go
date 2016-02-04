@@ -53,7 +53,7 @@ func (c *FakeComponentStatuses) Delete(name string, options *api.DeleteOptions) 
 }
 
 func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("events", listOptions)
+	action := core.NewRootDeleteCollectionAction("componentstatuses", listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ComponentStatusList{})
 	return err
