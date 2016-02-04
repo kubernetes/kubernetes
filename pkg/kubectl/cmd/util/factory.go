@@ -27,6 +27,7 @@ import (
 	"os/user"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -62,6 +63,7 @@ const (
 type Factory struct {
 	clients *ClientCache
 	flags   *pflag.FlagSet
+	cmd     string
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -184,6 +186,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	return &Factory{
 		clients: clients,
 		flags:   flags,
+		cmd:     recordCommand(os.Args),
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -480,6 +483,17 @@ func GetFirstPod(client *client.Client, namespace string, selector map[string]st
 	}
 	pod := &pods.Items[0]
 	return pod, nil
+}
+
+func recordCommand(args []string) string {
+	if len(args) > 0 {
+		args[0] = "kubectl"
+	}
+	return strings.Join(args, " ")
+}
+
+func (f *Factory) Command() string {
+	return f.cmd
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
