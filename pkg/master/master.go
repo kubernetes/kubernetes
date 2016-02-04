@@ -153,11 +153,6 @@ func New(c *Config) (*Master, error) {
 	}
 	m.InstallAPIs(c)
 
-	// TODO: Move this to generic api server.
-	if c.EnableSwaggerSupport {
-		m.InstallSwaggerAPI()
-	}
-
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
 		m.NewBootstrapController().Start()

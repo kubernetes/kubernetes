@@ -34,6 +34,11 @@ var serverIP = "http://localhost:8080"
 
 var groupVersion = v1.SchemeGroupVersion
 
+var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
+	GroupVersion: groupVersion.String(),
+	Version:      groupVersion.Version,
+}
+
 func TestRun(t *testing.T) {
 	go func() {
 		if err := Run(); err != nil {
@@ -43,6 +48,8 @@ func TestRun(t *testing.T) {
 	if err := waitForApiserverUp(); err != nil {
 		t.Fatalf("%v", err)
 	}
+	testSwaggerSpec(t)
+	testAPIGroupList(t)
 	testAPIGroup(t)
 	testAPIResourceList(t)
 }
@@ -63,11 +70,40 @@ func readResponse(serverURL string) ([]byte, error) {
 		return nil, fmt.Errorf("Error in fetching %s: %v", serverURL, err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d for URL: %s, expected status: %d", response.StatusCode, serverURL, http.StatusOK)
+	}
 	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("Error reading response from %s: %v", serverURL, err)
 	}
 	return contents, nil
+}
+
+func testSwaggerSpec(t *testing.T) {
+	serverURL := serverIP + "/swaggerapi"
+	_, err := readResponse(serverURL)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+func testAPIGroupList(t *testing.T) {
+	serverURL := serverIP + "/apis"
+	contents, err := readResponse(serverURL)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var apiGroupList unversioned.APIGroupList
+	err = json.Unmarshal(contents, &apiGroupList)
+	if err != nil {
+		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
+	}
+	assert.Equal(t, 1, len(apiGroupList.Groups))
+	assert.Equal(t, apiGroupList.Groups[0].Name, groupVersion.Group)
+	assert.Equal(t, 1, len(apiGroupList.Groups[0].Versions))
+	assert.Equal(t, apiGroupList.Groups[0].Versions[0], groupVersionForDiscovery)
+	assert.Equal(t, apiGroupList.Groups[0].PreferredVersion, groupVersionForDiscovery)
 }
 
 func testAPIGroup(t *testing.T) {
