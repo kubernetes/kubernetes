@@ -5915,6 +5915,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">containerID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Container&#8217;s ID in the format <em>docker://&lt;container_id&gt;</em>. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information">http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">image</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The image the container is running. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/images.md">http://releases.k8s.io/HEAD/docs/user-guide/images.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
@@ -5929,10 +5936,24 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">containerID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Container&#8217;s ID in the format <em>docker://&lt;container_id&gt;</em>. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information">http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">imageCreationTime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The image creation time from docker image inspection</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">imageSize</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The image size from docker image inspection</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">imageVirtualSize</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The image virtual size time from docker image inspection</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -7268,7 +7289,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-02-01 21:08:06 UTC
+Last updated 2016-02-04 19:52:41 UTC
 </div>
 </div>
 </body>

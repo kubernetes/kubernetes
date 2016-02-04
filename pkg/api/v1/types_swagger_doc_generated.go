@@ -249,15 +249,18 @@ func (ContainerStateWaiting) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerStatus = map[string]string{
-	"":             "ContainerStatus contains details for the current status of this container.",
-	"name":         "This must be a DNS_LABEL. Each container in a pod must have a unique name. Cannot be updated.",
-	"state":        "Details about the container's current condition.",
-	"lastState":    "Details about the container's last termination condition.",
-	"ready":        "Specifies whether the container has passed its readiness probe.",
-	"restartCount": "The number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed. Note that this is calculated from dead containers. But those containers are subject to garbage collection. This value will get capped at 5 by GC.",
-	"image":        "The image the container is running. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md",
-	"imageID":      "ImageID of the container's image.",
-	"containerID":  "Container's ID in the format 'docker://<container_id>'. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information",
+	"":                  "ContainerStatus contains details for the current status of this container.",
+	"name":              "This must be a DNS_LABEL. Each container in a pod must have a unique name. Cannot be updated.",
+	"state":             "Details about the container's current condition.",
+	"lastState":         "Details about the container's last termination condition.",
+	"ready":             "Specifies whether the container has passed its readiness probe.",
+	"restartCount":      "The number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed. Note that this is calculated from dead containers. But those containers are subject to garbage collection. This value will get capped at 5 by GC.",
+	"containerID":       "Container's ID in the format 'docker://<container_id>'. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information",
+	"image":             "The image the container is running. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md",
+	"imageID":           "ImageID of the container's image.",
+	"imageCreationTime": "The image creation time from docker image inspection",
+	"imageSize":         "The image size from docker image inspection",
+	"imageVirtualSize":  "The image virtual size time from docker image inspection",
 }
 
 func (ContainerStatus) SwaggerDoc() map[string]string {
