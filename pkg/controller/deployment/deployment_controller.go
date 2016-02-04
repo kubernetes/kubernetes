@@ -818,7 +818,7 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 	}
 	// Check if we can scale down.
 	minAvailable := deployment.Spec.Replicas - maxUnavailable
-	minReadySeconds := deployment.Spec.Strategy.RollingUpdate.MinReadySeconds
+	minReadySeconds := deployment.Spec.MinReadySeconds
 	// Check the expectations of deployment before counting available pods
 	dKey, err := controller.KeyFunc(&deployment)
 	if err != nil {
@@ -942,10 +942,7 @@ func (dc *DeploymentController) updateDeploymentStatus(allRCs []*api.Replication
 func (dc *DeploymentController) calculateStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) (totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
 	totalReplicas = deploymentutil.GetReplicaCountForRCs(allRCs)
 	updatedReplicas = deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
-	minReadySeconds := 0
-	if deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType {
-		minReadySeconds = deployment.Spec.Strategy.RollingUpdate.MinReadySeconds
-	}
+	minReadySeconds := deployment.Spec.MinReadySeconds
 	availableReplicas, err = deploymentutil.GetAvailablePodsForRCs(dc.client, allRCs, minReadySeconds)
 	if err != nil {
 		err = fmt.Errorf("failed to count available pods: %v", err)
