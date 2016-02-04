@@ -474,10 +474,10 @@ func testRolloverDeployment(f *Framework) {
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	Logf("Creating deployment %s", deploymentName)
 	newDeployment := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
+	newDeployment.Spec.MinReadySeconds = deploymentMinReadySeconds
 	newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
-		MaxUnavailable:  intstr.FromInt(1),
-		MaxSurge:        intstr.FromInt(1),
-		MinReadySeconds: deploymentMinReadySeconds,
+		MaxUnavailable: intstr.FromInt(1),
+		MaxSurge:       intstr.FromInt(1),
 	}
 	_, err = c.Extensions().Deployments(ns).Create(newDeployment)
 	Expect(err).NotTo(HaveOccurred())
