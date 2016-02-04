@@ -17,8 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"io"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -68,9 +66,8 @@ func Monitor(verb, resource *string, client string, httpCode *int, reqStart time
 	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
-func Reset(w http.ResponseWriter, req *http.Request) {
+func Reset() {
 	requestCounter.Reset()
 	requestLatencies.Reset()
 	requestLatenciesSummary.Reset()
-	io.WriteString(w, "metrics reset\n")
 }

@@ -297,7 +297,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	}
 
 	ws := new(restful.WebService)
-	InstallSupport(mux, ws, false)
+	InstallSupport(mux, ws)
 	container.Add(ws)
 	return &defaultAPIServer{mux, container}
 }
