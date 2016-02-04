@@ -891,22 +891,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
 // Note that the modules here must not depend on modules that are not initialized here.
 func (kl *Kubelet) initializeModules() error {
-	// Promethues metrics.
-	metrics.Register(kl.runtimeCache)
-
-	// Step 1: Setup filesystem directories.
-	if err := kl.setupDataDirs(); err != nil {
-		return err
-	}
-
-	// Step 2: If the container logs directory does not exist, create it.
-	if _, err := os.Stat(containerLogsDir); err != nil {
-		if err := kl.os.Mkdir(containerLogsDir, 0755); err != nil {
-			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
-		}
-	}
-
-	// Step 3: Move Kubelet to a container, if required.
+	// Step 1: Move Kubelet to a container, if required.
 	if kl.resourceContainer != "" {
 		// Fixme: I need to reside inside ContainerManager interface.
 		err := util.RunInResourceContainer(kl.resourceContainer)
@@ -916,17 +901,32 @@ func (kl *Kubelet) initializeModules() error {
 		glog.Infof("Running in container %q", kl.resourceContainer)
 	}
 
-	// Step 4: Start the image manager.
+	// Step 2: Promethues metrics.
+	metrics.Register(kl.runtimeCache)
+
+	// Step 3: Setup filesystem directories.
+	if err := kl.setupDataDirs(); err != nil {
+		return err
+	}
+
+	// Step 4: If the container logs directory does not exist, create it.
+	if _, err := os.Stat(containerLogsDir); err != nil {
+		if err := kl.os.Mkdir(containerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
+		}
+	}
+
+	// Step 5: Start the image manager.
 	if err := kl.imageManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
-	// Step 5: Start container manager.
+	// Step 6: Start container manager.
 	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 6: Start out of memory watcher.
+	// Step 7: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
