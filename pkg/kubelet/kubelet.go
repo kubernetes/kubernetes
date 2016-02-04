@@ -269,6 +269,13 @@ func NewMainKubelet(
 
 	oomWatcher := NewOOMWatcher(cadvisorInterface, recorder)
 
+	// TODO: remove when internal cbr0 implementation gets removed in favor
+	// of the kubenet network plugin
+	if networkPluginName == "kubenet" {
+		configureCBR0 = false
+		flannelExperimentalOverlay = false
+	}
+
 	klet := &Kubelet{
 		hostname:                       hostname,
 		nodeName:                       nodeName,
@@ -398,7 +405,8 @@ func NewMainKubelet(
 	}
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache)
-	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0, podCIDR, klet.isContainerRuntimeVersionCompatible)
+	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0, klet.isContainerRuntimeVersionCompatible)
+	klet.updatePodCIDR(podCIDR)
 
 	// setup containerGC
 	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
@@ -637,6 +645,7 @@ type Kubelet struct {
 	resolverConfig string
 
 	// Optionally shape the bandwidth of a pod
+	// TODO: remove when kubenet plugin is ready
 	shaper bandwidth.BandwidthShaper
 
 	// True if container cpu limits should be enforced via cgroup CFS quota
@@ -2594,6 +2603,8 @@ func (kl *Kubelet) updateRuntimeUp() {
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }
 
+// TODO: remove when kubenet plugin is ready
+// NOTE!!! if you make changes here, also make them to kubenet
 func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	if podCIDR == "" {
 		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
@@ -2644,9 +2655,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 				glog.Infof("Flannel server handshake failed %v", err)
 				return
 			}
-			glog.Infof("Setting cidr: %v -> %v",
-				kl.runtimeState.podCIDR(), podCIDR)
-			kl.runtimeState.setPodCIDR(podCIDR)
+			kl.updatePodCIDR(podCIDR)
 		}
 		if err := ensureIPTablesMasqRule(kl.nonMasqueradeCIDR); err != nil {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
@@ -3026,7 +3035,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 			}
 		}
 	} else if kl.reconcileCIDR {
-		kl.runtimeState.setPodCIDR(node.Spec.PodCIDR)
+		kl.updatePodCIDR(node.Spec.PodCIDR)
 	}
 
 	if err := kl.setNodeStatus(node); err != nil {
@@ -3443,6 +3452,21 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 // is exported to simplify integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
+}
+
+func (kl *Kubelet) updatePodCIDR(cidr string) {
+	if kl.runtimeState.podCIDR() == cidr {
+		return
+	}
+
+	glog.Infof("Setting Pod CIDR: %v -> %v", kl.runtimeState.podCIDR(), cidr)
+	kl.runtimeState.setPodCIDR(cidr)
+
+	if kl.networkPlugin != nil {
+		details := make(map[string]interface{})
+		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
+		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+	}
 }
 
 var minRsrc = resource.MustParse("1k")
