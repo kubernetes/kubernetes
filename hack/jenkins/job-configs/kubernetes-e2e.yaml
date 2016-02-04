@@ -20,7 +20,7 @@
         - reverse:
             jobs: '{trigger-job}'
             result: success
-        - timed: 'H/30 * * * *'
+        - timed: '{cron-string}'
     wrappers:
         - ansicolor:
             colormap: xterm
@@ -199,5 +199,23 @@
             timeout: 90
             emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
             test-owner: 'beeps'
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-aws
+    test-owner: 'bburns'
+    emails: 'bburns@google.com'
+    cron-string: '@daily'
+    trigger-job: ''
+    suffix:
+        - 'aws':
+            description: 'Run e2e tests on AWS using the latest successful Kubernetes build.'
+            timeout: 240
+            branch: 'master'
+        - 'aws-release-1.1':
+            description: 'Run e2e tests on AWS using the latest successful 1.1 Kubernetes build.'
+            timeout: 240
+            branch: 'release-1.1'
     jobs:
         - 'kubernetes-e2e-{suffix}'
