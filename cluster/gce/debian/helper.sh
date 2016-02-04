@@ -34,7 +34,7 @@ function create-master-instance {
   local address_opt=""
   [[ -n ${1:-} ]] && address_opt="--address ${1}"
   local preemptible_master=""
-  if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
+  if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
     preemptible_master="--preemptible --maintenance-policy TERMINATE"
   fi
 
