@@ -1042,11 +1042,11 @@ func main() {
 			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 pod infra containers + 2 containers from the replication controller +
+	// We expect 12: 2 pod infra containers + 2 containers from the replication controller +
 	//              1 pod infra container + 2 containers from the URL on first Kubelet +
 	//              1 pod infra container + 2 containers from the URL on second Kubelet +
 	//              1 pod infra container + 1 container from the service test.
-	// The total number of container created is 9
+	// The total number of container created is 12
 
 	if len(createdConts) != 12 {
 		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
