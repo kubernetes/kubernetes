@@ -304,6 +304,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 	}
 
+	assert.Equal(2, len(groupList.Groups))
 	assert.Equal(expectGroupNames[0], groupList.Groups[0].Name)
 	assert.Equal(expectGroupNames[1], groupList.Groups[1].Name)
 
@@ -383,6 +384,7 @@ func initThirdParty(t *testing.T, version string) (*Master, *etcdtesting.EtcdTes
 		},
 	}
 	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
+	_, master.ServiceClusterIPRange, _ = net.ParseCIDR("10.0.0.0/24")
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
 		t.FailNow()
