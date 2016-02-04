@@ -62,7 +62,7 @@ func (c *FakePersistentVolumes) Delete(name string, options *api.DeleteOptions) 
 }
 
 func (c *FakePersistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("events", listOptions)
+	action := core.NewRootDeleteCollectionAction("persistentvolumes", listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PersistentVolumeList{})
 	return err

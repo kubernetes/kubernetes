@@ -58,7 +58,7 @@ func (c *FakeThirdPartyResources) Delete(name string, options *api.DeleteOptions
 }
 
 func (c *FakeThirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("thirdpartyresources", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.ThirdPartyResourceList{})
 	return err
