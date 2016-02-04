@@ -3,30 +3,41 @@
 
 .SH NAME
 .PP
-kubectl create \- Create a resource by filename or stdin
+kubectl create quota \- Create a quota with the specified name.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl create\fP [OPTIONS]
+\fBkubectl create quota\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Create a resource by filename or stdin.
-
-.PP
-JSON and YAML formats are accepted.
+Create a resourcequota with the specified name and hard limits
 
 
 .SH OPTIONS
 .PP
-\fB\-f\fP, \fB\-\-filename\fP=[]
-    Filename, directory, or URL to file to use to create the resource
+\fB\-\-dry\-run\fP=false
+    If true, only print the object that would be sent, without sending it.
+
+.PP
+\fB\-\-generator\fP="resourcequotas/v1"
+    The name of the API generator to use.
+
+.PP
+\fB\-\-hard\fP=""
+    Specify multiple key/value pair to insert in resourcequota (i.e. \-\-hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10)
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output mode. Use "\-o name" for shorter output (resource/name).
+    Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
 
 .PP
 \fB\-\-save\-config\fP=false
@@ -140,11 +151,8 @@ JSON and YAML formats are accepted.
 .RS
 
 .nf
-# Create a pod using the data in pod.json.
-$ kubectl create \-f ./pod.json
-
-# Create a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl create \-f \-
+  // Create a new resourcequota named my\-quota
+  $ kubectl create quota my\-quota \-\-hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
 
 .fi
 .RE
@@ -152,7 +160,7 @@ $ cat pod.json | kubectl create \-f \-
 
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP, \fBkubectl\-create\-namespace(1)\fP, \fBkubectl\-create\-quota(1)\fP, \fBkubectl\-create\-secret(1)\fP,
+\fBkubectl\-create(1)\fP,
 
 
 .SH HISTORY

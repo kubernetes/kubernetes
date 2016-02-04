@@ -76,6 +76,7 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
+	cmd.AddCommand(NewCmdCreateQuota(f, out))
 	cmd.AddCommand(NewCmdCreateSecret(f, out))
 	return cmd
 }

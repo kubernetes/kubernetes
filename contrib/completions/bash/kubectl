@@ -451,6 +451,55 @@ _kubectl_create_namespace()
     must_have_one_noun=()
 }
 
+_kubectl_create_quota()
+{
+    last_command="kubectl_create_quota"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--dry-run")
+    flags+=("--generator=")
+    flags+=("--hard=")
+    flags+=("--output=")
+    two_word_flags+=("-o")
+    flags+=("--output-version=")
+    flags+=("--save-config")
+    flags+=("--schema-cache-dir=")
+    flags+=("--validate")
+    flags+=("--alsologtostderr")
+    flags+=("--api-version=")
+    flags+=("--certificate-authority=")
+    flags+=("--client-certificate=")
+    flags+=("--client-key=")
+    flags+=("--cluster=")
+    flags+=("--context=")
+    flags+=("--insecure-skip-tls-verify")
+    flags+=("--kubeconfig=")
+    flags+=("--log-backtrace-at=")
+    flags+=("--log-dir=")
+    flags+=("--log-flush-frequency=")
+    flags+=("--logtostderr")
+    flags+=("--match-server-version")
+    flags+=("--namespace=")
+    flags+=("--password=")
+    flags+=("--server=")
+    two_word_flags+=("-s")
+    flags+=("--stderrthreshold=")
+    flags+=("--token=")
+    flags+=("--user=")
+    flags+=("--username=")
+    flags+=("--v=")
+    flags+=("--vmodule=")
+
+    must_have_one_flag=()
+    must_have_one_flag+=("--hard=")
+    must_have_one_noun=()
+}
+
 _kubectl_create_secret_docker-registry()
 {
     last_command="kubectl_create_secret_docker-registry"
@@ -601,6 +650,7 @@ _kubectl_create()
     last_command="kubectl_create"
     commands=()
     commands+=("namespace")
+    commands+=("quota")
     commands+=("secret")
 
     flags=()

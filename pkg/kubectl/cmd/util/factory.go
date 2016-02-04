@@ -133,6 +133,7 @@ const (
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	NamespaceV1GeneratorName                    = "namespace/v1"
+	ResourceQuotaV1GeneratorName                = "resourcequotas/v1"
 	SecretV1GeneratorName                       = "secret/v1"
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
 )
@@ -156,6 +157,11 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	generators["namespace"] = map[string]kubectl.Generator{
 		NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},
 	}
+
+	generators["quota"] = map[string]kubectl.Generator{
+		ResourceQuotaV1GeneratorName: kubectl.ResourceQuotaGeneratorV1{},
+	}
+
 	generators["secret"] = map[string]kubectl.Generator{
 		SecretV1GeneratorName: kubectl.SecretGeneratorV1{},
 	}

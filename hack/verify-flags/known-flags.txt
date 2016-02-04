@@ -129,6 +129,7 @@ go-header-file
 google-json-key
 grace-period
 ha-domain
+hard
 healthz-bind-address
 healthz-port
 horizontal-pod-autoscaler-sync-period
