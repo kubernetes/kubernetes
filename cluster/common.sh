@@ -660,16 +660,18 @@ function sha1sum-file() {
 #   KUBECFG_CERT_BASE64
 #   KUBECFG_KEY_BASE64
 function create-certs {
-  local -r cert_ip="${1}"
+  local -r primary_cn="${1}"
 
   # Determine extra certificate names for master
   local octets=($(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
   local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local sans=""
-  if [[ -n "${cert_ip}" ]]; then
-    sans="IP:${cert_ip},"
-  fi
+  for extra in $@; do
+    if [[ -n "${extra}" ]]; then
+      sans="${sans}IP:${extra},"
+    fi
+  done
   sans="${sans}IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
   echo "Generating certs for alternate-names: ${sans}"
@@ -682,7 +684,7 @@ function create-certs {
     tar xzf easy-rsa.tar.gz
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki
-    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass
+    ./easyrsa --batch "--req-cn=${primary_cn}@$(date +%s)" build-ca nopass
     ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kubelet nopass
     ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
