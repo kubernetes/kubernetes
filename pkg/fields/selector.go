@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/util/selectors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Selector represents a field selector.
@@ -41,144 +44,158 @@ type Selector interface {
 
 	// String returns a human readable string that represents this selector.
 	String() string
+
+	// Add adds requirements to the Selector
+	Add(r ...selectors.Requirement) Selector
 }
 
-// Everything returns a selector that matches all fields.
+// Everything returns a selector that matches all labels.
 func Everything() Selector {
-	return andTerm{}
+	return internalSelector{}
 }
 
-type hasTerm struct {
-	field, value string
+type nothingSelector struct{}
+
+func (n nothingSelector) Matches(_ Fields) bool                                      { return false }
+func (n nothingSelector) Empty() bool                                                { return false }
+func (n nothingSelector) String() string                                             { return "<null>" }
+func (n nothingSelector) Transform(fn TransformFunc) (Selector, error)               { return nothingSelector{}, nil }
+func (n nothingSelector) Add(_ ...selectors.Requirement) Selector                    { return n }
+func (n nothingSelector) RequiresExactMatch(field string) (value string, found bool) { return "", false }
+
+// Nothing returns a selector that matches no labels
+func Nothing() Selector {
+	return nothingSelector{}
 }
 
-func (t *hasTerm) Matches(ls Fields) bool {
-	return ls.Get(t.field) == t.value
+func NewSelector() Selector {
+	return internalSelector(nil)
 }
 
-func (t *hasTerm) Empty() bool {
-	return false
+type internalSelector []selectors.Requirement
+
+// NewRequirement is the constructor for a Requirement.
+// TODO: determine if we need any additional validation over selectors.NewRequirement unique to fields
+//
+// The empty string is a valid value in the input values set.
+func NewRequirement(key string, op selectors.Operator, vals sets.String) (*selectors.Requirement, error) {
+	return selectors.NewRequirement(key, op, vals)
 }
 
-func (t *hasTerm) RequiresExactMatch(field string) (value string, found bool) {
-	if t.field == field {
-		return t.value, true
+// Return true if the internalSelector doesn't restrict selection space
+func (lsel internalSelector) Empty() bool {
+	if lsel == nil {
+		return true
 	}
-	return "", false
+	return len(lsel) == 0
 }
 
-func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
-	field, value, err := fn(t.field, t.value)
-	if err != nil {
-		return nil, err
+// Add adds requirements to the selector. It copies the current selector returning a new one
+func (lsel internalSelector) Add(reqs ...selectors.Requirement) Selector {
+	var sel internalSelector
+	for ix := range lsel {
+		sel = append(sel, lsel[ix])
 	}
-	return &hasTerm{field, value}, nil
-}
-
-func (t *hasTerm) String() string {
-	return fmt.Sprintf("%v=%v", t.field, t.value)
-}
-
-type notHasTerm struct {
-	field, value string
-}
-
-func (t *notHasTerm) Matches(ls Fields) bool {
-	return ls.Get(t.field) != t.value
-}
-
-func (t *notHasTerm) Empty() bool {
-	return false
-}
-
-func (t *notHasTerm) RequiresExactMatch(field string) (value string, found bool) {
-	return "", false
-}
-
-func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
-	field, value, err := fn(t.field, t.value)
-	if err != nil {
-		return nil, err
+	for _, r := range reqs {
+		sel = append(sel, r)
 	}
-	return &notHasTerm{field, value}, nil
+	sort.Sort(selectors.ByKey(sel))
+	return sel
 }
 
-func (t *notHasTerm) String() string {
-	return fmt.Sprintf("%v!=%v", t.field, t.value)
-}
-
-type andTerm []Selector
-
-func (t andTerm) Matches(ls Fields) bool {
-	for _, q := range t {
-		if !q.Matches(ls) {
+// Matches for a internalSelector returns true if all
+// its Requirements match the input Fields. If any
+// Requirement does not match, false is returned.
+func (lsel internalSelector) Matches(l Fields) bool {
+	for ix := range lsel {
+		if matches := lsel[ix].Matches(l); !matches {
 			return false
 		}
 	}
 	return true
 }
 
-func (t andTerm) Empty() bool {
-	if t == nil {
-		return true
+// String returns a comma-separated string of all
+// the internalSelector Requirements' human-readable strings.
+func (lsel internalSelector) String() string {
+	var reqs []string
+	for ix := range lsel {
+		reqs = append(reqs, lsel[ix].String())
 	}
-	if len([]Selector(t)) == 0 {
-		return true
-	}
-	for i := range t {
-		if !t[i].Empty() {
-			return false
-		}
-	}
-	return true
+	return strings.Join(reqs, ",")
 }
 
-func (t andTerm) RequiresExactMatch(field string) (string, bool) {
-	if t == nil || len([]Selector(t)) == 0 {
-		return "", false
-	}
-	for i := range t {
-		if value, found := t[i].RequiresExactMatch(field); found {
-			return value, found
+// RequiresExactMatch looks over all internal requirements to determine if the field
+// matches on a requirement key that accepts only 1 valid value where operator is IN, ==, =
+func (lsel internalSelector) RequiresExactMatch(field string) (value string, found bool) {
+	for ix := range lsel {
+		if lsel[ix].Key() == field && len(lsel[ix].Values()) == 1 {
+			switch lsel[ix].Operator() {
+			case selectors.DoubleEqualsOperator,
+				selectors.EqualsOperator,
+				selectors.InOperator:
+				return lsel[ix].Values().List()[0], true
+			}
 		}
 	}
 	return "", false
 }
 
-func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
-	next := make([]Selector, len([]Selector(t)))
-	for i, s := range []Selector(t) {
-		n, err := s.Transform(fn)
+func (lsel internalSelector) Transform(fn TransformFunc) (Selector, error) {
+	result := NewSelector()
+	var (
+		err         error
+		newKey      string
+		newValue    string
+		requirement *selectors.Requirement
+	)
+
+	for ix := range lsel {
+		key := lsel[ix].Key()
+		values := lsel[ix].Values()
+
+		newValues := sets.NewString()
+		if len(values) == 0 {
+			newKey, _, err = fn(key, "")
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			for _, value := range values.List() {
+				newKey, newValue, err = fn(key, value)
+				if err != nil {
+					return nil, err
+				}
+				newValues.Insert(newValue)
+			}
+		}
+		requirement, err = NewRequirement(newKey, lsel[ix].Operator(), newValues)
 		if err != nil {
 			return nil, err
 		}
-		next[i] = n
+		result = result.Add(*requirement)
 	}
-	return andTerm(next), nil
-}
-
-func (t andTerm) String() string {
-	var terms []string
-	for _, q := range t {
-		terms = append(terms, q.String())
-	}
-	return strings.Join(terms, ",")
+	return result, nil
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
-// nil Set is considered equivalent to Everything().
+// nil and empty Sets are considered equivalent to Everything().
 func SelectorFromSet(ls Set) Selector {
 	if ls == nil {
-		return Everything()
+		return internalSelector{}
 	}
-	items := make([]Selector, 0, len(ls))
-	for field, value := range ls {
-		items = append(items, &hasTerm{field: field, value: value})
+	var requirements internalSelector
+	for label, value := range ls {
+		if r, err := NewRequirement(label, selectors.EqualsOperator, sets.NewString(value)); err != nil {
+			//TODO: double check errors when input comes from serialization?
+			return internalSelector{}
+		} else {
+			requirements = append(requirements, *r)
+		}
 	}
-	if len(items) == 1 {
-		return items[0]
-	}
-	return andTerm(items)
+	// sort to have deterministic string representation
+	sort.Sort(selectors.ByKey(requirements))
+	return internalSelector(requirements)
 }
 
 // ParseSelectorOrDie takes a string representing a selector and returns an
@@ -219,29 +236,43 @@ func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 	parts := strings.Split(selector, ",")
 	sort.StringSlice(parts).Sort()
-	var items []Selector
+
+	result := NewSelector()
 	for _, part := range parts {
 		if part == "" {
 			continue
 		}
+		var (
+			requirement *selectors.Requirement
+			err         error
+		)
 		if lhs, rhs, ok := try(part, "!="); ok {
-			items = append(items, &notHasTerm{field: lhs, value: rhs})
+			requirement, err = NewRequirement(lhs, selectors.NotEqualsOperator, sets.NewString(rhs))
 		} else if lhs, rhs, ok := try(part, "=="); ok {
-			items = append(items, &hasTerm{field: lhs, value: rhs})
+			requirement, err = NewRequirement(lhs, selectors.DoubleEqualsOperator, sets.NewString(rhs))
 		} else if lhs, rhs, ok := try(part, "="); ok {
-			items = append(items, &hasTerm{field: lhs, value: rhs})
+			requirement, err = NewRequirement(lhs, selectors.EqualsOperator, sets.NewString(rhs))
 		} else {
 			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
 		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		result = result.Add(*requirement)
 	}
-	if len(items) == 1 {
-		return items[0].Transform(fn)
-	}
-	return andTerm(items).Transform(fn)
+	return result.Transform(fn)
 }
 
 // OneTermEqualSelector returns an object that matches objects where one field/field equals one value.
 // Cannot return an error.
 func OneTermEqualSelector(k, v string) Selector {
-	return &hasTerm{field: k, value: v}
+	result := NewSelector()
+	requirement, err := NewRequirement(k, selectors.EqualsOperator, sets.NewString(v))
+	if err != nil {
+		panic(err)
+	}
+	result = result.Add(*requirement)
+	return result
 }

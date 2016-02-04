@@ -17,11 +17,11 @@ limitations under the License.
 package labels
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/util/selectors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -38,7 +38,7 @@ type Selector interface {
 	String() string
 
 	// Add adds requirements to the Selector
-	Add(r ...Requirement) Selector
+	Add(r ...selectors.Requirement) Selector
 }
 
 // Everything returns a selector that matches all labels.
@@ -48,10 +48,10 @@ func Everything() Selector {
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool         { return false }
-func (n nothingSelector) Empty() bool                   { return false }
-func (n nothingSelector) String() string                { return "<null>" }
-func (n nothingSelector) Add(_ ...Requirement) Selector { return n }
+func (n nothingSelector) Matches(_ Labels) bool                   { return false }
+func (n nothingSelector) Empty() bool                             { return false }
+func (n nothingSelector) String() string                          { return "<null>" }
+func (n nothingSelector) Add(_ ...selectors.Requirement) Selector { return n }
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -76,109 +76,35 @@ func NewSelector() Selector {
 	return internalSelector(nil)
 }
 
-type internalSelector []Requirement
-
-// Sort by key to obtain determisitic parser
-type ByKey []Requirement
-
-func (a ByKey) Len() int { return len(a) }
-
-func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
-
-// Requirement is a selector that contains values, a key
-// and an operator that relates the key and values. The zero
-// value of Requirement is invalid.
-// Requirement implements both set based match and exact match
-// Requirement is initialized via NewRequirement constructor for creating a valid Requirement.
-type Requirement struct {
-	key       string
-	operator  Operator
-	strValues sets.String
-}
+type internalSelector []selectors.Requirement
 
 // NewRequirement is the constructor for a Requirement.
+// It provides additional validation over selectors.NewRequirement as follows:
 // If any of these rules is violated, an error is returned:
-// (1) The operator can only be In, NotIn, Equals, DoubleEquals, NotEquals, Exists, or DoesNotExist.
-// (2) If the operator is In or NotIn, the values set must be non-empty.
-// (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
-// (4) If the operator is Exists or DoesNotExist, the value set must be empty.
-// (5) The key is invalid due to its length, or sequence
+// (1) The key is invalid due to its length, or sequence
 //     of characters. See validateLabelKey for more details.
+// (2) The value is invalid, See validateLabelValue for more details.
 //
 // The empty string is a valid value in the input values set.
-func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, error) {
+func NewRequirement(key string, op selectors.Operator, vals sets.String) (*selectors.Requirement, error) {
 	if err := validateLabelKey(key); err != nil {
 		return nil, err
 	}
-	switch op {
-	case InOperator, NotInOperator:
-		if len(vals) == 0 {
-			return nil, fmt.Errorf("for 'in', 'notin' operators, values set can't be empty")
-		}
-	case EqualsOperator, DoubleEqualsOperator, NotEqualsOperator:
-		if len(vals) != 1 {
-			return nil, fmt.Errorf("exact-match compatibility requires one single value")
-		}
-	case ExistsOperator, DoesNotExistOperator:
-		if len(vals) != 0 {
-			return nil, fmt.Errorf("values set must be empty for exists and does not exist")
-		}
-	default:
-		return nil, fmt.Errorf("operator '%v' is not recognized", op)
-	}
-
 	for v := range vals {
 		if err := validateLabelValue(v); err != nil {
 			return nil, err
 		}
 	}
-	return &Requirement{key: key, operator: op, strValues: vals}, nil
+	return selectors.NewRequirement(key, op, vals)
 }
 
-// Matches returns true if the Requirement matches the input Labels.
-// There is a match in the following cases:
-// (1) The operator is Exists and Labels has the Requirement's key.
-// (2) The operator is In, Labels has the Requirement's key and Labels'
-//     value for that key is in Requirement's value set.
-// (3) The operator is NotIn, Labels has the Requirement's key and
-//     Labels' value for that key is not in Requirement's value set.
-// (4) The operator is DoesNotExist or NotIn and Labels does not have the
-//     Requirement's key.
-func (r *Requirement) Matches(ls Labels) bool {
-	switch r.operator {
-	case InOperator, EqualsOperator, DoubleEqualsOperator:
-		if !ls.Has(r.key) {
-			return false
-		}
-		return r.strValues.Has(ls.Get(r.key))
-	case NotInOperator, NotEqualsOperator:
-		if !ls.Has(r.key) {
-			return true
-		}
-		return !r.strValues.Has(ls.Get(r.key))
-	case ExistsOperator:
-		return ls.Has(r.key)
-	case DoesNotExistOperator:
-		return !ls.Has(r.key)
-	default:
-		return false
+// NewRequirementOrDie is used for test case scenarios
+func NewRequirementOrDie(key string, op selectors.Operator, vals sets.String) selectors.Requirement {
+	result, err := NewRequirement(key, op, vals)
+	if err != nil {
+		panic(fmt.Errorf("cannot create requirement: %v", err))
 	}
-}
-
-func (r *Requirement) Key() string {
-	return r.key
-}
-func (r *Requirement) Operator() Operator {
-	return r.operator
-}
-func (r *Requirement) Values() sets.String {
-	ret := sets.String{}
-	for k := range r.strValues {
-		ret.Insert(k)
-	}
-	return ret
+	return *result
 }
 
 // Return true if the internalSelector doesn't restrict selection space
@@ -189,50 +115,8 @@ func (lsel internalSelector) Empty() bool {
 	return len(lsel) == 0
 }
 
-// String returns a human-readable string that represents this
-// Requirement. If called on an invalid Requirement, an error is
-// returned. See NewRequirement for creating a valid Requirement.
-func (r *Requirement) String() string {
-	var buffer bytes.Buffer
-	if r.operator == DoesNotExistOperator {
-		buffer.WriteString("!")
-	}
-	buffer.WriteString(r.key)
-
-	switch r.operator {
-	case EqualsOperator:
-		buffer.WriteString("=")
-	case DoubleEqualsOperator:
-		buffer.WriteString("==")
-	case NotEqualsOperator:
-		buffer.WriteString("!=")
-	case InOperator:
-		buffer.WriteString(" in ")
-	case NotInOperator:
-		buffer.WriteString(" notin ")
-	case ExistsOperator, DoesNotExistOperator:
-		return buffer.String()
-	}
-
-	switch r.operator {
-	case InOperator, NotInOperator:
-		buffer.WriteString("(")
-	}
-	if len(r.strValues) == 1 {
-		buffer.WriteString(r.strValues.List()[0])
-	} else { // only > 1 since == 0 prohibited by NewRequirement
-		buffer.WriteString(strings.Join(r.strValues.List(), ","))
-	}
-
-	switch r.operator {
-	case InOperator, NotInOperator:
-		buffer.WriteString(")")
-	}
-	return buffer.String()
-}
-
 // Add adds requirements to the selector. It copies the current selector returning a new one
-func (lsel internalSelector) Add(reqs ...Requirement) Selector {
+func (lsel internalSelector) Add(reqs ...selectors.Requirement) Selector {
 	var sel internalSelector
 	for ix := range lsel {
 		sel = append(sel, lsel[ix])
@@ -240,7 +124,7 @@ func (lsel internalSelector) Add(reqs ...Requirement) Selector {
 	for _, r := range reqs {
 		sel = append(sel, r)
 	}
-	sort.Sort(ByKey(sel))
+	sort.Sort(selectors.ByKey(sel))
 	return sel
 }
 
@@ -510,12 +394,12 @@ func (p *Parser) parse() (internalSelector, error) {
 	}
 }
 
-func (p *Parser) parseRequirement() (*Requirement, error) {
+func (p *Parser) parseRequirement() (*selectors.Requirement, error) {
 	key, operator, err := p.parseKeyAndInferOperator()
 	if err != nil {
 		return nil, err
 	}
-	if operator == ExistsOperator || operator == DoesNotExistOperator { // operator found lookahead set checked
+	if operator == selectors.ExistsOperator || operator == selectors.DoesNotExistOperator { // operator found lookahead set checked
 		return NewRequirement(key, operator, nil)
 	}
 	operator, err = p.parseOperator()
@@ -524,9 +408,9 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	}
 	var values sets.String
 	switch operator {
-	case InOperator, NotInOperator:
+	case selectors.InOperator, selectors.NotInOperator:
 		values, err = p.parseValues()
-	case EqualsOperator, DoubleEqualsOperator, NotEqualsOperator:
+	case selectors.EqualsOperator, selectors.DoubleEqualsOperator, selectors.NotEqualsOperator:
 		values, err = p.parseExactValue()
 	}
 	if err != nil {
@@ -539,11 +423,11 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 // parseKeyAndInferOperator parse literals.
 // in case of no operator '!, in, notin, ==, =, !=' are found
 // the 'exists' operator is inferred
-func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
-	var operator Operator
+func (p *Parser) parseKeyAndInferOperator() (string, selectors.Operator, error) {
+	var operator selectors.Operator
 	tok, literal := p.consume(Values)
 	if tok == DoesNotExistToken {
-		operator = DoesNotExistOperator
+		operator = selectors.DoesNotExistOperator
 		tok, literal = p.consume(Values)
 	}
 	if tok != IdentifierToken {
@@ -554,8 +438,8 @@ func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
 		return "", "", err
 	}
 	if t, _ := p.lookahead(Values); t == EndOfStringToken || t == CommaToken {
-		if operator != DoesNotExistOperator {
-			operator = ExistsOperator
+		if operator != selectors.DoesNotExistOperator {
+			operator = selectors.ExistsOperator
 		}
 	}
 	return literal, operator, nil
@@ -563,20 +447,20 @@ func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
 
 // parseOperator return operator and eventually matchType
 // matchType can be exact
-func (p *Parser) parseOperator() (op Operator, err error) {
+func (p *Parser) parseOperator() (op selectors.Operator, err error) {
 	tok, lit := p.consume(KeyAndOperator)
 	switch tok {
 	// DoesNotExistToken shouldn't be here because it's a unary operator, not a binary operator
 	case InToken:
-		op = InOperator
+		op = selectors.InOperator
 	case EqualsToken:
-		op = EqualsOperator
+		op = selectors.EqualsOperator
 	case DoubleEqualsToken:
-		op = DoubleEqualsOperator
+		op = selectors.DoubleEqualsOperator
 	case NotInToken:
-		op = NotInOperator
+		op = selectors.NotInOperator
 	case NotEqualsToken:
-		op = NotEqualsOperator
+		op = selectors.NotEqualsOperator
 	default:
 		return "", fmt.Errorf("found '%s', expected: '=', '!=', '==', 'in', notin'", lit)
 	}
@@ -695,7 +579,7 @@ func Parse(selector string) (Selector, error) {
 	p := &Parser{l: &Lexer{s: selector, pos: 0}}
 	items, error := p.parse()
 	if error == nil {
-		sort.Sort(ByKey(items)) // sort to grant determistic parsing
+		sort.Sort(selectors.ByKey(items)) // sort to grant determistic parsing
 		return internalSelector(items), error
 	}
 	return nil, error
@@ -726,7 +610,7 @@ func SelectorFromSet(ls Set) Selector {
 	}
 	var requirements internalSelector
 	for label, value := range ls {
-		if r, err := NewRequirement(label, EqualsOperator, sets.NewString(value)); err != nil {
+		if r, err := NewRequirement(label, selectors.EqualsOperator, sets.NewString(value)); err != nil {
 			//TODO: double check errors when input comes from serialization?
 			return internalSelector{}
 		} else {
@@ -734,6 +618,6 @@ func SelectorFromSet(ls Set) Selector {
 		}
 	}
 	// sort to have deterministic string representation
-	sort.Sort(ByKey(requirements))
+	sort.Sort(selectors.ByKey(requirements))
 	return internalSelector(requirements)
 }

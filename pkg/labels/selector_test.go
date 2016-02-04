@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/util/selectors"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -287,19 +288,19 @@ func TestParserLookahead(t *testing.T) {
 func TestRequirementConstructor(t *testing.T) {
 	requirementConstructorTests := []struct {
 		Key     string
-		Op      Operator
+		Op      selectors.Operator
 		Vals    sets.String
 		Success bool
 	}{
-		{"x", InOperator, nil, false},
-		{"x", NotInOperator, sets.NewString(), false},
-		{"x", InOperator, sets.NewString("foo"), true},
-		{"x", NotInOperator, sets.NewString("foo"), true},
-		{"x", ExistsOperator, nil, true},
-		{"x", DoesNotExistOperator, nil, true},
-		{"1foo", InOperator, sets.NewString("bar"), true},
-		{"1234", InOperator, sets.NewString("bar"), true},
-		{strings.Repeat("a", 254), ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 253
+		{"x", selectors.InOperator, nil, false},
+		{"x", selectors.NotInOperator, sets.NewString(), false},
+		{"x", selectors.InOperator, sets.NewString("foo"), true},
+		{"x", selectors.NotInOperator, sets.NewString("foo"), true},
+		{"x", selectors.ExistsOperator, nil, true},
+		{"x", selectors.DoesNotExistOperator, nil, true},
+		{"1foo", selectors.InOperator, sets.NewString("bar"), true},
+		{"1234", selectors.InOperator, sets.NewString("bar"), true},
+		{strings.Repeat("a", 254), selectors.ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 253
 	}
 	for _, rc := range requirementConstructorTests {
 		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals); err == nil && !rc.Success {
@@ -311,7 +312,7 @@ func TestRequirementConstructor(t *testing.T) {
 }
 
 func TestToString(t *testing.T) {
-	var req Requirement
+	var req selectors.Requirement
 	toStringTests := []struct {
 		In    *internalSelector
 		Out   string
@@ -319,29 +320,29 @@ func TestToString(t *testing.T) {
 	}{
 
 		{&internalSelector{
-			getRequirement("x", InOperator, sets.NewString("abc", "def"), t),
-			getRequirement("y", NotInOperator, sets.NewString("jkl"), t),
-			getRequirement("z", ExistsOperator, nil, t)},
+			getRequirement("x", selectors.InOperator, sets.NewString("abc", "def"), t),
+			getRequirement("y", selectors.NotInOperator, sets.NewString("jkl"), t),
+			getRequirement("z", selectors.ExistsOperator, nil, t)},
 			"x in (abc,def),y notin (jkl),z", true},
 		{&internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString("abc", "def"), t),
-			getRequirement("y", NotEqualsOperator, sets.NewString("jkl"), t),
-			getRequirement("z", DoesNotExistOperator, nil, t)},
+			getRequirement("x", selectors.NotInOperator, sets.NewString("abc", "def"), t),
+			getRequirement("y", selectors.NotEqualsOperator, sets.NewString("jkl"), t),
+			getRequirement("z", selectors.DoesNotExistOperator, nil, t)},
 			"x notin (abc,def),y!=jkl,!z", true},
 		{&internalSelector{
-			getRequirement("x", InOperator, sets.NewString("abc", "def"), t),
+			getRequirement("x", selectors.InOperator, sets.NewString("abc", "def"), t),
 			req}, // adding empty req for the trailing ','
 			"x in (abc,def),", false},
 		{&internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString("abc"), t),
-			getRequirement("y", InOperator, sets.NewString("jkl", "mno"), t),
-			getRequirement("z", NotInOperator, sets.NewString(""), t)},
+			getRequirement("x", selectors.NotInOperator, sets.NewString("abc"), t),
+			getRequirement("y", selectors.InOperator, sets.NewString("jkl", "mno"), t),
+			getRequirement("z", selectors.NotInOperator, sets.NewString(""), t)},
 			"x notin (abc),y in (jkl,mno),z notin ()", true},
 		{&internalSelector{
-			getRequirement("x", EqualsOperator, sets.NewString("abc"), t),
-			getRequirement("y", DoubleEqualsOperator, sets.NewString("jkl"), t),
-			getRequirement("z", NotEqualsOperator, sets.NewString("a"), t),
-			getRequirement("z", ExistsOperator, nil, t)},
+			getRequirement("x", selectors.EqualsOperator, sets.NewString("abc"), t),
+			getRequirement("y", selectors.DoubleEqualsOperator, sets.NewString("jkl"), t),
+			getRequirement("z", selectors.NotEqualsOperator, sets.NewString("a"), t),
+			getRequirement("z", selectors.ExistsOperator, nil, t)},
 			"x=abc,y==jkl,z!=a,z", true},
 	}
 	for _, ts := range toStringTests {
@@ -354,7 +355,7 @@ func TestToString(t *testing.T) {
 }
 
 func TestRequirementSelectorMatching(t *testing.T) {
-	var req Requirement
+	var req selectors.Requirement
 	labelSelectorMatchingTests := []struct {
 		Set   Set
 		Sel   Selector
@@ -364,27 +365,27 @@ func TestRequirementSelectorMatching(t *testing.T) {
 			req,
 		}, false},
 		{Set{"x": "foo", "y": "baz"}, &internalSelector{
-			getRequirement("x", InOperator, sets.NewString("foo"), t),
-			getRequirement("y", NotInOperator, sets.NewString("alpha"), t),
+			getRequirement("x", selectors.InOperator, sets.NewString("foo"), t),
+			getRequirement("y", selectors.NotInOperator, sets.NewString("alpha"), t),
 		}, true},
 		{Set{"x": "foo", "y": "baz"}, &internalSelector{
-			getRequirement("x", InOperator, sets.NewString("foo"), t),
-			getRequirement("y", InOperator, sets.NewString("alpha"), t),
+			getRequirement("x", selectors.InOperator, sets.NewString("foo"), t),
+			getRequirement("y", selectors.InOperator, sets.NewString("alpha"), t),
 		}, false},
 		{Set{"y": ""}, &internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString(""), t),
-			getRequirement("y", ExistsOperator, nil, t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString(""), t),
+			getRequirement("y", selectors.ExistsOperator, nil, t),
 		}, true},
 		{Set{"y": ""}, &internalSelector{
-			getRequirement("x", DoesNotExistOperator, nil, t),
-			getRequirement("y", ExistsOperator, nil, t),
+			getRequirement("x", selectors.DoesNotExistOperator, nil, t),
+			getRequirement("y", selectors.ExistsOperator, nil, t),
 		}, true},
 		{Set{"y": ""}, &internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString(""), t),
-			getRequirement("y", DoesNotExistOperator, nil, t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString(""), t),
+			getRequirement("y", selectors.DoesNotExistOperator, nil, t),
 		}, false},
 		{Set{"y": "baz"}, &internalSelector{
-			getRequirement("x", InOperator, sets.NewString(""), t),
+			getRequirement("x", selectors.InOperator, sets.NewString(""), t),
 		}, false},
 	}
 	for _, lsm := range labelSelectorMatchingTests {
@@ -403,74 +404,74 @@ func TestSetSelectorParser(t *testing.T) {
 	}{
 		{"", NewSelector(), true, true},
 		{"\rx", internalSelector{
-			getRequirement("x", ExistsOperator, nil, t),
+			getRequirement("x", selectors.ExistsOperator, nil, t),
 		}, true, true},
 		{"this-is-a-dns.domain.com/key-with-dash", internalSelector{
-			getRequirement("this-is-a-dns.domain.com/key-with-dash", ExistsOperator, nil, t),
+			getRequirement("this-is-a-dns.domain.com/key-with-dash", selectors.ExistsOperator, nil, t),
 		}, true, true},
 		{"this-is-another-dns.domain.com/key-with-dash in (so,what)", internalSelector{
-			getRequirement("this-is-another-dns.domain.com/key-with-dash", InOperator, sets.NewString("so", "what"), t),
+			getRequirement("this-is-another-dns.domain.com/key-with-dash", selectors.InOperator, sets.NewString("so", "what"), t),
 		}, true, true},
 		{"0.1.2.domain/99 notin (10.10.100.1, tick.tack.clock)", internalSelector{
-			getRequirement("0.1.2.domain/99", NotInOperator, sets.NewString("10.10.100.1", "tick.tack.clock"), t),
+			getRequirement("0.1.2.domain/99", selectors.NotInOperator, sets.NewString("10.10.100.1", "tick.tack.clock"), t),
 		}, true, true},
 		{"foo  in	 (abc)", internalSelector{
-			getRequirement("foo", InOperator, sets.NewString("abc"), t),
+			getRequirement("foo", selectors.InOperator, sets.NewString("abc"), t),
 		}, true, true},
 		{"x notin\n (abc)", internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString("abc"), t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString("abc"), t),
 		}, true, true},
 		{"x  notin	\t	(abc,def)", internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString("abc", "def"), t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString("abc", "def"), t),
 		}, true, true},
 		{"x in (abc,def)", internalSelector{
-			getRequirement("x", InOperator, sets.NewString("abc", "def"), t),
+			getRequirement("x", selectors.InOperator, sets.NewString("abc", "def"), t),
 		}, true, true},
 		{"x in (abc,)", internalSelector{
-			getRequirement("x", InOperator, sets.NewString("abc", ""), t),
+			getRequirement("x", selectors.InOperator, sets.NewString("abc", ""), t),
 		}, true, true},
 		{"x in ()", internalSelector{
-			getRequirement("x", InOperator, sets.NewString(""), t),
+			getRequirement("x", selectors.InOperator, sets.NewString(""), t),
 		}, true, true},
 		{"x notin (abc,,def),bar,z in (),w", internalSelector{
-			getRequirement("bar", ExistsOperator, nil, t),
-			getRequirement("w", ExistsOperator, nil, t),
-			getRequirement("x", NotInOperator, sets.NewString("abc", "", "def"), t),
-			getRequirement("z", InOperator, sets.NewString(""), t),
+			getRequirement("bar", selectors.ExistsOperator, nil, t),
+			getRequirement("w", selectors.ExistsOperator, nil, t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString("abc", "", "def"), t),
+			getRequirement("z", selectors.InOperator, sets.NewString(""), t),
 		}, true, true},
 		{"x,y in (a)", internalSelector{
-			getRequirement("y", InOperator, sets.NewString("a"), t),
-			getRequirement("x", ExistsOperator, nil, t),
+			getRequirement("y", selectors.InOperator, sets.NewString("a"), t),
+			getRequirement("x", selectors.ExistsOperator, nil, t),
 		}, false, true},
 		{"x=a", internalSelector{
-			getRequirement("x", EqualsOperator, sets.NewString("a"), t),
+			getRequirement("x", selectors.EqualsOperator, sets.NewString("a"), t),
 		}, true, true},
 		{"x=a,y!=b", internalSelector{
-			getRequirement("x", EqualsOperator, sets.NewString("a"), t),
-			getRequirement("y", NotEqualsOperator, sets.NewString("b"), t),
+			getRequirement("x", selectors.EqualsOperator, sets.NewString("a"), t),
+			getRequirement("y", selectors.NotEqualsOperator, sets.NewString("b"), t),
 		}, true, true},
 		{"x=a,y!=b,z in (h,i,j)", internalSelector{
-			getRequirement("x", EqualsOperator, sets.NewString("a"), t),
-			getRequirement("y", NotEqualsOperator, sets.NewString("b"), t),
-			getRequirement("z", InOperator, sets.NewString("h", "i", "j"), t),
+			getRequirement("x", selectors.EqualsOperator, sets.NewString("a"), t),
+			getRequirement("y", selectors.NotEqualsOperator, sets.NewString("b"), t),
+			getRequirement("z", selectors.InOperator, sets.NewString("h", "i", "j"), t),
 		}, true, true},
 		{"x=a||y=b", internalSelector{}, false, false},
 		{"x,,y", nil, true, false},
 		{",x,y", nil, true, false},
 		{"x nott in (y)", nil, true, false},
 		{"x notin ( )", internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString(""), t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString(""), t),
 		}, true, true},
 		{"x notin (, a)", internalSelector{
-			getRequirement("x", NotInOperator, sets.NewString("", "a"), t),
+			getRequirement("x", selectors.NotInOperator, sets.NewString("", "a"), t),
 		}, true, true},
 		{"a in (xyz),", nil, true, false},
 		{"a in (xyz)b notin ()", nil, true, false},
 		{"a ", internalSelector{
-			getRequirement("a", ExistsOperator, nil, t),
+			getRequirement("a", selectors.ExistsOperator, nil, t),
 		}, true, true},
 		{"a in (x,y,notin, z,in)", internalSelector{
-			getRequirement("a", InOperator, sets.NewString("in", "notin", "x", "y", "z"), t),
+			getRequirement("a", selectors.InOperator, sets.NewString("in", "notin", "x", "y", "z"), t),
 		}, true, true}, // operator 'in' inside list of identifiers
 		{"a in (xyz abc)", nil, false, false}, // no comma
 		{"a notin(", nil, true, false},        // bad formed
@@ -489,11 +490,11 @@ func TestSetSelectorParser(t *testing.T) {
 	}
 }
 
-func getRequirement(key string, op Operator, vals sets.String, t *testing.T) Requirement {
+func getRequirement(key string, op selectors.Operator, vals sets.String, t *testing.T) selectors.Requirement {
 	req, err := NewRequirement(key, op, vals)
 	if err != nil {
 		t.Errorf("NewRequirement(%v, %v, %v) resulted in error:%v", key, op, vals, err)
-		return Requirement{}
+		return selectors.Requirement{}
 	}
 	return *req
 }
@@ -503,7 +504,7 @@ func TestAdd(t *testing.T) {
 		name        string
 		sel         Selector
 		key         string
-		operator    Operator
+		operator    selectors.Operator
 		values      []string
 		refSelector Selector
 	}{
@@ -511,19 +512,19 @@ func TestAdd(t *testing.T) {
 			"keyInOperator",
 			internalSelector{},
 			"key",
-			InOperator,
+			selectors.InOperator,
 			[]string{"value"},
-			internalSelector{Requirement{"key", InOperator, sets.NewString("value")}},
+			internalSelector{NewRequirementOrDie("key", selectors.InOperator, sets.NewString("value"))},
 		},
 		{
 			"keyEqualsOperator",
-			internalSelector{Requirement{"key", InOperator, sets.NewString("value")}},
+			internalSelector{NewRequirementOrDie("key", selectors.InOperator, sets.NewString("value"))},
 			"key2",
-			EqualsOperator,
+			selectors.EqualsOperator,
 			[]string{"value2"},
 			internalSelector{
-				Requirement{"key", InOperator, sets.NewString("value")},
-				Requirement{"key2", EqualsOperator, sets.NewString("value2")},
+				NewRequirementOrDie("key", selectors.InOperator, sets.NewString("value")),
+				NewRequirementOrDie("key2", selectors.EqualsOperator, sets.NewString("value2")),
 			},
 		},
 	}
