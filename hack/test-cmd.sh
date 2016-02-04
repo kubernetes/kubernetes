@@ -178,7 +178,7 @@ kube::log::status "Starting kube-apiserver"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
-KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,extensions/v1beta1,batch/v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -188,7 +188,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
-  --runtime_config="extensions/v1beta1/deployments=true" \
+  --runtime_config="extensions/v1beta1/deployments=true,batch/v1/job=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -1416,7 +1416,7 @@ kube_api_versions=(
   v1
 )
 for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1,extensions/v1beta1" runTests "${version}"
+  KUBE_API_VERSIONS="v1,extensions/v1beta1,batch/v1" runTests "${version}"
 done
 
 kube::log::status "TEST PASSED"
