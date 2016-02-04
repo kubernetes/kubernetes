@@ -242,6 +242,7 @@ runTests() {
   deployment_replicas=".spec.replicas"
   secret_data=".data"
   secret_type=".type"
+  deployment_image_field="(index .spec.template.spec.containers 0).image"
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -1078,6 +1079,35 @@ __EOF__
   kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
+
+  ### Rollback a deployment 
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  # Create a deployment (revision 1)
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  # Rollback to revision 1 - should be no-op
+  kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  # Update the deployment (revision 2)
+  kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  # Rollback to revision 1
+  kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
+  sleep 1
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  # Rollback to revision 1000000 - should be no-op
+  kubectl rollout undo deployment nginx-deployment --to-revision=1000000 "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  # Rollback to last revision
+  kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  sleep 1
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
   kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
 

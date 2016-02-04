@@ -1792,6 +1792,52 @@ _kubectl_rollout_resume()
     must_have_one_noun=()
 }
 
+_kubectl_rollout_undo()
+{
+    last_command="kubectl_rollout_undo"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
+    flags+=("--to-revision=")
+    flags+=("--alsologtostderr")
+    flags+=("--api-version=")
+    flags+=("--certificate-authority=")
+    flags+=("--client-certificate=")
+    flags+=("--client-key=")
+    flags+=("--cluster=")
+    flags+=("--context=")
+    flags+=("--insecure-skip-tls-verify")
+    flags+=("--kubeconfig=")
+    flags+=("--log-backtrace-at=")
+    flags+=("--log-dir=")
+    flags+=("--log-flush-frequency=")
+    flags+=("--logtostderr")
+    flags+=("--match-server-version")
+    flags+=("--namespace=")
+    flags+=("--password=")
+    flags+=("--server=")
+    two_word_flags+=("-s")
+    flags+=("--stderrthreshold=")
+    flags+=("--token=")
+    flags+=("--user=")
+    flags+=("--username=")
+    flags+=("--v=")
+    flags+=("--vmodule=")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
 _kubectl_rollout()
 {
     last_command="kubectl_rollout"
@@ -1799,6 +1845,7 @@ _kubectl_rollout()
     commands+=("history")
     commands+=("pause")
     commands+=("resume")
+    commands+=("undo")
 
     flags=()
     two_word_flags=()
