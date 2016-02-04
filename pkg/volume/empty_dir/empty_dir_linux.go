@@ -20,6 +20,7 @@ package empty_dir
 
 import (
 	"fmt"
+	"path"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -35,18 +36,33 @@ type realMountDetector struct {
 	mounter mount.Interface
 }
 
-func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
-	glog.V(5).Infof("Determining mount medium of %v", path)
-	notMnt, err := m.mounter.IsLikelyNotMountPoint(path)
+func (m *realMountDetector) GetMountMedium(p string) (storageMedium, bool, error) {
+	glog.V(5).Infof("Determining mount medium of %v", p)
+	notMnt, err := m.mounter.IsLikelyNotMountPoint(p)
 	if err != nil {
-		return 0, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
-	}
-	buf := syscall.Statfs_t{}
-	if err := syscall.Statfs(path, &buf); err != nil {
-		return 0, false, fmt.Errorf("statfs(%q): %v", path, err)
+		return 0, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", p, err)
 	}
 
-	glog.V(5).Info("Statfs_t of %v: %+v", path, buf)
+	// Workaround buggy filesystems like vmhgfs which fail on statfs with long
+	// file names, walk up the tree stopping just in front of the filesystem border
+	stat := syscall.Stat_t{}
+	if err = syscall.Stat(p, &stat); err != nil {
+		return 0, false, fmt.Errorf("stat(%q): %v", p, err)
+	}
+	dev := stat.Dev
+	dotdot := p
+	for dotdot != "/" && err == nil && dev == stat.Dev {
+		p, dotdot = dotdot, path.Dir(p)
+		dev = stat.Dev
+		err = syscall.Stat(dotdot, &stat)
+	}
+
+	buf := syscall.Statfs_t{}
+	if err := syscall.Statfs(p, &buf); err != nil {
+		return 0, false, fmt.Errorf("statfs(%q): %v", p, err)
+	}
+
+	glog.V(5).Info("Statfs_t of %v: %+v", p, buf)
 	if buf.Type == linuxTmpfsMagic {
 		return mediumMemory, !notMnt, nil
 	}
