@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 // To run tests in this suite
-// `$ ginkgo -- --node-name node-e2e-test-1  --api-server-address <serveraddress> --logtostderr`
+// Local: `$ ginkgo -- --logtostderr -v 2`
+// Remote: `$ ginkgo -- --node-name <hostname> --api-server-address=<hostname:api_port> --kubelet-address=<hostname=kubelet_port> --logtostderr -v 2`
 package e2e_node
 
 import (
@@ -26,9 +27,9 @@ import (
 	"testing"
 )
 
-var kubeletAddress = flag.String("kubelet-address", "localhost:10250", "Host and port of the kubelet")
-var apiServerAddress = flag.String("api-server-address", "localhost:8080", "Host and port of the api server")
-var nodeName = flag.String("node-name", "", "Name of the node")
+var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
+var apiServerAddress = flag.String("api-server-address", "http://127.0.0.1:8080", "Host and port of the api server")
+var nodeName = flag.String("node-name", "127.0.0.1", "Name of the node")
 
 func TestE2eNode(t *testing.T) {
 	flag.Parse()
