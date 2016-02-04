@@ -201,6 +201,7 @@ func NewMainKubelet(
 	flannelExperimentalOverlay bool,
 	nodeIP net.IP,
 	reservation kubetypes.Reservation,
+	dockerLabelFactory dockertools.LabelFactory,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -377,6 +378,7 @@ func NewMainKubelet(
 			klet.cpuCFSQuota,
 			imageBackOff,
 			serializeImagePulls,
+			dockerLabelFactory,
 		)
 	case "rkt":
 		conf := &rkt.Config{

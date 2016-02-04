@@ -193,6 +193,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		DockerClient:              dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
 		DockerDaemonContainer:     s.DockerDaemonContainer,
 		DockerExecHandler:         dockerExecHandler,
+		DockerLabelFactory:        dockertools.DefaultLabelFactory(),
 		EnableDebuggingHandlers:   s.EnableDebuggingHandlers,
 		EnableServer:              s.EnableServer,
 		EventBurst:                s.EventBurst,
@@ -491,6 +492,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		DockerClient:              dockerClient,
 		DockerDaemonContainer:     "/docker-daemon",
 		DockerExecHandler:         &dockertools.NativeExecHandler{},
+		DockerLabelFactory:        dockertools.DefaultLabelFactory(),
 		EnableDebuggingHandlers:   true,
 		EnableServer:              true,
 		FileCheckFrequency:        fileCheckFrequency,
@@ -665,6 +667,7 @@ type KubeletConfig struct {
 	DockerClient                   dockertools.DockerInterface
 	DockerDaemonContainer          string
 	DockerExecHandler              dockertools.ExecHandler
+	DockerLabelFactory             dockertools.LabelFactory
 	EnableDebuggingHandlers        bool
 	EnableServer                   bool
 	EventClient                    *clientset.Clientset
@@ -811,6 +814,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ExperimentalFlannelOverlay,
 		kc.NodeIP,
 		kc.Reservation,
+		kc.DockerLabelFactory,
 	)
 
 	if err != nil {

@@ -149,6 +149,9 @@ type DockerManager struct {
 
 	// Container GC manager
 	containerGC *containerGC
+
+	// build a set of labels for a pod/container
+	labelFactory LabelFactory
 }
 
 func NewDockerManager(
@@ -170,7 +173,8 @@ func NewDockerManager(
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
 	imageBackOff *util.Backoff,
-	serializeImagePulls bool) *DockerManager {
+	serializeImagePulls bool,
+	labelFactory LabelFactory) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
@@ -222,6 +226,7 @@ func NewDockerManager(
 		oomAdjuster:            oomAdjuster,
 		procFs:                 procFs,
 		cpuCFSQuota:            cpuCFSQuota,
+		labelFactory:           labelFactory,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
@@ -656,7 +661,7 @@ func (dm *DockerManager) runContainer(
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
 	// TODO: keep these labels up to date if the pod changes
-	labels := newLabels(container, pod, restartCount)
+	labels := dm.labelFactory(container, pod, restartCount)
 
 	// TODO(random-liu): Remove this when we start to use new labels for KillContainerInPod
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
