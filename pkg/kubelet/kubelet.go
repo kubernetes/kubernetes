@@ -2225,7 +2225,7 @@ func (kl *Kubelet) hasInsufficientGPU(pods []*api.Pod) bool {
 		}
 	}
 	glog.Infof("Hans: hasInsufficientGPU() totalGPUNum: %d", totalGPUNum)
-	return gpu.IsGPUAvaiable(pods, totalGPUNum)
+	return !gpu.IsGPUAvaiable(pods, totalGPUNum)
 }
 
 // matchesNodeSelector returns true if pod matches node's labels.

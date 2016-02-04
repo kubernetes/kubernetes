@@ -1,7 +1,7 @@
 package types
 
 import (
-// docker "github.com/fsouza/go-dockerclient"
+	dockerClient "github.com/fsouza/go-dockerclient"
 )
 
 type GPUDevice struct {
@@ -32,11 +32,17 @@ type GPUPlugin interface {
 	// Init plugin before use it
 	InitPlugin() error
 
+	// Rlease the plugin at last
+	ReleasePlugin() error
+
 	// detect the gpu hardware and the corresponding environment
 	Detect() (*GPUDevices, error)
 
 	// Init GPU environment before launch container
 	InitGPUEnv() error
+
+	// Generate arguments for run container
+	GenerateRunOpts(hc *dockerClient.HostConfig, gpuIdx []int, image string) error
 
 	// // parepare the overall environment
 	// Prepare(id string) (*docker.Container, error)
