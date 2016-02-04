@@ -189,13 +189,23 @@
             timeout: 300
             emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
             test-owner: 'ihmccreery'
-        - 'gke-ingress':
-            description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
+        - 'gce-reboot':
+            description: 'Run [Feature:Reboot] tests on GCE using the latest successful build.'
+            timeout: 120
+            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
+            test-owner: 'ihmccreery'
+        - 'gke-reboot':
+            description: 'Run [Feature:Reboot] tests on GKE using the latest successful build.'
+            timeout: 120
+            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
+            test-owner: 'ihmccreery'
+        - 'gce-ingress':
+            description: 'Run [Feature:Ingress] tests on GCE using the latest successful build.'
             timeout: 90
             emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
             test-owner: 'beeps'
-        - 'gce-ingress':
-            description: 'Run [Feature:Ingress] tests on GCE using the latest successful build.'
+        - 'gke-ingress':
+            description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
             timeout: 90
             emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
             test-owner: 'beeps'
