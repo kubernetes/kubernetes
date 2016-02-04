@@ -137,6 +137,10 @@ func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerI
 	return cc.GetContainerInfo(name, req)
 }
 
+func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	return cc.GetContainerInfoV2(name, options)
+}
+
 func (cc *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return cc.GetVersionInfo()
 }

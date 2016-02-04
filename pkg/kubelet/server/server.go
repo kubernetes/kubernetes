@@ -33,6 +33,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -140,6 +142,7 @@ type AuthInterface interface {
 // For testablitiy.
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetPods() []*api.Pod
@@ -154,7 +157,11 @@ type HostInterface interface {
 	StreamingConnectionIdleTimeout() time.Duration
 	ResyncInterval() time.Duration
 	GetHostname() string
+	GetNode() (*api.Node, error)
+	GetNodeConfig() cm.NodeConfig
 	LatestLoopEntryTime() time.Time
+	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
+	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.

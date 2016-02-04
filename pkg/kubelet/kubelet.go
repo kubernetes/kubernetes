@@ -34,6 +34,7 @@ import (
 
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -3413,6 +3414,19 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 	return &ci, nil
 }
 
+// GetContainerInfoV2 returns stats (from Cadvisor) for containers.
+func (kl *Kubelet) GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	return kl.cadvisor.ContainerInfoV2(name, options)
+}
+
+func (kl *Kubelet) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return kl.cadvisor.DockerImagesFsInfo()
+}
+
+func (kl *Kubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return kl.cadvisor.RootFsInfo()
+}
+
 // Returns stats (from Cadvisor) for a non-Kubernetes container.
 func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
 	if subcontainers {
@@ -3467,6 +3481,9 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
+}
+func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
+	return kl.nodeConfig
 }
 
 var minRsrc = resource.MustParse("1k")
