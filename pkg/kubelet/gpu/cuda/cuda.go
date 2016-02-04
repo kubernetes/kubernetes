@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	CudaName string = "cuda"
+	CudaName      string = "cuda"
 	CudaDeviceCtl string = "/dev/nvidiactl"
 	CudaDeviceUVM string = "/dev/nvidia-uvm"
 )
@@ -126,7 +126,7 @@ func (cuda *Cuda) createLocalVolumes() error {
 	return nil
 }
 
-func (cuda *Cuda)IsImageSupported(image string) (bool, error) {
+func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
 	cv, err := nvidia.GetCUDAVersion()
 	if err != nil {
 		return false, fmt.Errorf("Failed to detect the host cuda version(%s)", err)
@@ -139,35 +139,35 @@ func (cuda *Cuda)IsImageSupported(image string) (bool, error) {
 	return isSupported, nil
 }
 
-func (cuda *Cuda)GenerateDeviceOpts(gpuIdxs []int) ([]dockerClient.Device, error) {
+func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []int) ([]dockerClient.Device, error) {
 	devicesOpts := make([]dockerClient.Device)
 
 	for _, idx := range gpuIdxs {
- 		var device docker.Device
-        device.CgroupPermissions = "rwm"
-        if idx > 0 && idx < len(cuda.gpuDevices.Devices) {
-	        device.PathOnHost = cuda.gpuDevices.Devices[idx].Path
-        	device.PathInContainer = cuda.gpuDevices.Devices[idx].Path                                                                                                              
-        	devicesOpts = append(devicesOpts, device)      	
-        } else {
-        	return nil, fmt.Errorf("Cannot find the cuda gpu idx(%d) of total %d", idx, len(cuda.gpuDevices.Devices))
-        }
+		var device docker.Device
+		device.CgroupPermissions = "rwm"
+		if idx > 0 && idx < len(cuda.gpuDevices.Devices) {
+			device.PathOnHost = cuda.gpuDevices.Devices[idx].Path
+			device.PathInContainer = cuda.gpuDevices.Devices[idx].Path
+			devicesOpts = append(devicesOpts, device)
+		} else {
+			return nil, fmt.Errorf("Cannot find the cuda gpu idx(%d) of total %d", idx, len(cuda.gpuDevices.Devices))
+		}
 
 	}
 
 	extraDevs := []string{CudaDeviceCtl, CudaDeviceUVM}
 	for _, path := range gpuIdxs {
- 		var device docker.Device
-        device.CgroupPermissions = "rwm"   
-        device.PathOnHost = path
-        device.PathInContainer = path                                                                                                             
-        devicesOpts = append(devicesOpts, device)
+		var device docker.Device
+		device.CgroupPermissions = "rwm"
+		device.PathOnHost = path
+		device.PathInContainer = path
+		devicesOpts = append(devicesOpts, device)
 	}
 
 	return devicesOpts, nil
 }
 
-func (cuda *Cuda)GenerateVolumeOpts(image string) (map[string]struct{}, error) {
+func (cuda *Cuda) GenerateVolumeOpts(image string) (map[string]struct{}, error) {
 	result := make(map[string]struct{})
 
 	// check whether the image need cuda support
@@ -178,7 +178,7 @@ func (cuda *Cuda)GenerateVolumeOpts(image string) (map[string]struct{}, error) {
 	// the image needn't cuda support
 	if vols == nil {
 		return result, nil
-	} 
+	}
 
 	drv, err := nvidia.GetDriverVersion()
 	if err != nil {
@@ -197,80 +197,9 @@ func (cuda *Cuda)GenerateVolumeOpts(image string) (map[string]struct{}, error) {
 				break
 			}
 		}
-	}	
+	}
 
-	
 	return result, nil
-}
-
-func (cuda *Cuda) generateOptions(image string, vols []string) (deviceOptions []string, volumeOptions []string, error) {
-	cv, err := nvidia.GetCUDAVersion()
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := cudaSupported(image, cv); err != nil {
-		return nil, nil, err
-	}
-
-	deviceOptions, err := devicesOptions()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	volumeOptions, err := volumesOptions(vols)
-	if err != nil {
-		return nil, nil, err
-	}
-	return deviceOptions, volumeOptions, nil
-}
-
-func (cuda *Cuda) devicesOptions() ([]string, error) {
-	args := []string{"--device=/dev/nvidiactl", "--device=/dev/nvidia-uvm"}
-
-	devs, err := nvidia.LookupDevicePaths()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(GPU) == 0 {
-		for i := range devs {
-			args = append(args, fmt.Sprintf("--device=%s", devs[i]))
-		}
-	} else {
-		for _, id := range GPU {
-			i, err := strconv.Atoi(id)
-			if err != nil || i < 0 || i >= len(devs) {
-				return nil, fmt.Errorf("invalid device: %s", id)
-			}
-			args = append(args, fmt.Sprintf("--device=%s", devs[i]))
-		}
-	}
-	return args, nil
-}
-
-func (cuda *Cuda) volumesOptions(vols []string) ([]string, error) {
-	args := make([]string, 0, len(vols))
-
-	drv, err := nvidia.GetDriverVersion()
-	if err != nil {
-		return nil, err
-	}
-	for _, vol := range nvidia.Volumes {
-		for _, v := range vols {
-			if v == vol.Name {
-				// Check if the volume exists locally otherwise fallback to using the plugin
-				n := fmt.Sprintf("%s_%s", vol.Name, drv)
-				if _, err := docker.InspectVolume(n); err == nil {
-					args = append(args, fmt.Sprintf("--volume=%s:%s:ro", n, vol.Mountpoint))
-				} else {
-					args = append(args, fmt.Sprintf("--volume-driver=%s", nvidia.DockerPlugin))
-					args = append(args, fmt.Sprintf("--volume=%s:%s:ro", n, vol.Mountpoint))
-				}
-				break
-			}
-		}
-	}
-	return args, nil
 }
 
 func (cuda *Cuda) volumesNeeded(image string) ([]string, error) {
@@ -304,7 +233,7 @@ func (cuda *Cuda) cudaSupported(image, version string) (bool, error) {
 	}
 	if lmaj > vmaj || (lmaj == vmaj && lmin > vmin) {
 		glog.Warnf("%s", fmt.Errorf("Unsupported CUDA version: %s < %s", label, version))
-		return false, nil 
+		return false, nil
 	}
 	return true, nil
 }
