@@ -162,42 +162,29 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	defer eventBroadcaster.StartLogging(t.Logf).Stop()
 
-	// Setup modeler so we control the contents of all 3 stores: assumed,
-	// scheduled and queued
+	// Setup modeler so we control the contents of all 2 stores: scheduled and queued
 	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	scheduledPodLister := &cache.StoreToPodLister{Store: scheduledPodStore}
 
 	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	queuedPodLister := &cache.StoreToPodLister{Store: queuedPodStore}
-
-	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
-
-	// Create a fake clock used to timestamp entries and calculate ttl. Nothing
-	// will expire till we flip to something older than the ttl, at which point
-	// all entries inserted with fakeTime will expire.
-	ttl := 30 * time.Second
-	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := util.NewFakeClock(fakeTime)
-	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
-	assumedPodsStore := cache.NewFakeExpirationStore(
-		cache.MetaNamespaceKeyFunc, nil, ttlPolicy, fakeClock)
-	modeler.assumedPods = &cache.StoreToPodLister{Store: assumedPodsStore}
 
 	// Port is the easiest way to cause a fit predicate failure
 	podPort := 8080
 	firstPod := podWithPort("foo", "", podPort)
 
+	stop := make(chan struct{})
+	defer close(stop)
+	cache := schedulercache.New(1*time.Second, 1*time.Second, stop)
 	// Create the scheduler config
 	algo := NewGenericScheduler(
+		cache,
 		map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts},
 		[]algorithm.PriorityConfig{},
 		[]algorithm.SchedulerExtender{},
-		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
 	var gotBinding *api.Binding
 	c := &Config{
-		Modeler: modeler,
+		SchedulerCache: cache,
 		NodeLister: algorithm.FakeNodeLister(
 			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 		),
@@ -244,10 +231,6 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	if exists {
 		t.Errorf("Did not expect a queued pod, found %+v", pod)
 	}
-	pod, exists, _ = assumedPodsStore.GetByKey("foo")
-	if !exists {
-		t.Errorf("Assumed pod store should contain stale pod")
-	}
 
 	expectBind := &api.Binding{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -261,10 +244,6 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	events.Stop()
 
 	scheduledPodStore.Delete(pod)
-	_, exists, _ = assumedPodsStore.Get(pod)
-	if !exists {
-		t.Errorf("Expected pod %#v in assumed pod store", pod)
-	}
 
 	secondPod := podWithPort("bar", "", podPort)
 	queuedPodStore.Add(secondPod)
@@ -274,8 +253,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 	// Second scheduling pass will fail to schedule if the store hasn't expired
 	// the deleted pod. This would normally happen with a timeout.
-	//expirationPolicy.NeverExpire = util.NewStringSet()
-	fakeClock.Step(ttl + 1)
+	time.Sleep(2 * time.Second)
 
 	called = make(chan struct{})
 	events = eventBroadcaster.StartEventWatcher(func(e *api.Event) {
