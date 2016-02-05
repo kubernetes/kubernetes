@@ -139,7 +139,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// we're trying to register here
 	fqKindToRegister := unversioned.GroupVersionKind{}
 	for _, fqKind := range fqKinds {
-		if fqKind.Group == a.group.GroupVersion.Group {
+		if fqKind.Group == a.group.GroupVersion.Group || (fqKind.Group == extensions.GroupName && fqKind.Kind == "ScaleTwo") {
 			fqKindToRegister = fqKind
 			break
 		}
@@ -158,13 +158,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
 
-	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(kind))
+	versionedPtr, err := a.group.Creater.New(fqKindToRegister)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), a.group.GroupVersion.Version)
+	mapper := a.group.Mapper
+	if fqKindToRegister.Group == extensions.GroupName && fqKindToRegister.Kind == "ScaleTwo" {
+		mapper = a.group.SubresourceMapper
+	}
+	mapping, err := mapper.RESTMapping(fqKindToRegister.GroupKind(), fqKindToRegister.Version)
 	if err != nil {
 		return nil, err
 	}

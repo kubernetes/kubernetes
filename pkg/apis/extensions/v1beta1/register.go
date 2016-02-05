@@ -48,6 +48,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&JobList{},
 		&ReplicationControllerDummy{},
 		&Scale{},
+		&ScaleTwo{},
 		&ThirdPartyResource{},
 		&ThirdPartyResourceList{},
 		&DaemonSetList{},
@@ -74,6 +75,7 @@ func (obj *Job) GetObjectKind() unversioned.ObjectKind                         {
 func (obj *JobList) GetObjectKind() unversioned.ObjectKind                     { return &obj.TypeMeta }
 func (obj *ReplicationControllerDummy) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }
 func (obj *Scale) GetObjectKind() unversioned.ObjectKind                       { return &obj.TypeMeta }
+func (obj *ScaleTwo) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
 func (obj *ThirdPartyResource) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *ThirdPartyResourceList) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
 func (obj *DaemonSet) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }

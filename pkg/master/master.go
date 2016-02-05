@@ -27,10 +27,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -165,6 +167,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
 		// Install v1 API.
 		m.initV1ResourcesStorage(c)
+		api.Scheme.AddSubresourceTypes(v1beta1.SchemeGroupVersion, &v1beta1.ScaleTwo{})
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *registered.GroupOrDie(api.GroupName),
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
@@ -174,6 +177,7 @@ func (m *Master) InstallAPIs(c *Config) {
 			Scheme:               api.Scheme,
 			ParameterCodec:       api.ParameterCodec,
 			NegotiatedSerializer: api.Codecs,
+			SubresourceMapper:    scaleSubresourceMapper(),
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
@@ -687,4 +691,27 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 		return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
 	}
 	return nil
+}
+
+func scaleSubresourceMapper() meta.RESTMapper {
+	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+	// string, or an error if the version is not known.
+	interfacesFunc := func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+		switch version {
+		case v1beta1.SchemeGroupVersion:
+			return &meta.VersionInterfaces{
+				ObjectConvertor:  api.Scheme,
+				MetadataAccessor: meta.NewAccessor(),
+			}, nil
+		default:
+			g, _ := registered.Group(extensions.GroupName)
+			return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
+		}
+	}
+
+	scaleGV := v1beta1.SchemeGroupVersion
+	scaleGVK := scaleGV.WithKind("ScaleTwo")
+	scaleMapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{scaleGV}, interfacesFunc)
+	scaleMapper.Add(scaleGVK, meta.RESTScopeNamespace, false)
+	return scaleMapper
 }

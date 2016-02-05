@@ -93,7 +93,8 @@ type APIGroupVersion struct {
 	// empty, defaults to GroupVersion.
 	OptionsExternalVersion *unversioned.GroupVersion
 
-	Mapper meta.RESTMapper
+	Mapper            meta.RESTMapper
+	SubresourceMapper meta.RESTMapper
 
 	Serializer     runtime.NegotiatedSerializer
 	ParameterCodec runtime.ParameterCodec
