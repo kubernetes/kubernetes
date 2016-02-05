@@ -66,8 +66,8 @@ cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e 
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--global_housekeeping_interval="+ms.globalHousekeepingInterval)
-contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--housekeeping_interval="+ms.housekeepingInterval)
+contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--global_housekeeping_interval="+ms.globalHousekeepingInterval.String())
+contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--housekeeping_interval="+ms.housekeepingInterval.String())
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
