@@ -123,6 +123,12 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		// convert to internal by default
 		targetGV.Group = group
 		targetGV.Version = runtime.APIVersionInternal
+/*		if targetGV.Group == "batch" {
+			// Batch has internal repr in old location: extensions
+			targetGV.Group = "extensions"
+			targetGV.Version = runtime.APIVersionInternal
+		}
+*/
 	} else {
 		gv, ok := c.decodeVersion[group]
 		if !ok {
