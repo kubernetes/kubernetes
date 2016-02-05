@@ -32,8 +32,8 @@ import (
 // stop channel is closed. The worker uses the probe Manager's statusManager to get up-to-date
 // container IDs.
 type worker struct {
-	// Channel for stopping the probe, it should be closed to trigger a stop.
-	stop chan struct{}
+	// Channel for stopping the probe.
+	stopCh chan struct{}
 
 	// The pod containing this probe (read-only)
 	pod *api.Pod
@@ -70,7 +70,7 @@ func newWorker(
 	container api.Container) *worker {
 
 	w := &worker{
-		stop:         make(chan struct{}),
+		stopCh:       make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
 		pod:          pod,
 		container:    container,
 		probeType:    probeType,
@@ -109,11 +109,20 @@ probeLoop:
 	for w.doProbe() {
 		// Wait for next probe tick.
 		select {
-		case <-w.stop:
+		case <-w.stopCh:
 			break probeLoop
 		case <-probeTicker.C:
 			// continue
 		}
+	}
+}
+
+// stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
+// It is safe to call stop multiple times.
+func (w *worker) stop() {
+	select {
+	case w.stopCh <- struct{}{}:
+	default: // Non-blocking.
 	}
 }
 
