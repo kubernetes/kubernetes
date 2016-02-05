@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -161,7 +162,7 @@ func testNewDeployment(f *Framework) {
 	replicas := 1
 	Logf("Creating simple deployment %s", deploymentName)
 	d := newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
-	d.Annotations = map[string]string{"test": "annotation-should-copy-to-RC"}
+	d.Annotations = map[string]string{"test": "should-copy-to-RC", kubectl.LastAppliedConfigAnnotation: "should-not-copy-to-RC"}
 	_, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
@@ -192,7 +193,11 @@ func testNewDeployment(f *Framework) {
 
 	// Check if it's updated to revision 1 correctly
 	_, newRC := checkDeploymentRevision(c, ns, deploymentName, "1", "nginx", "nginx")
-	Expect(newRC.Annotations["test"]).Should(Equal("annotation-should-copy-to-RC"))
+	// Check other annotations
+	Expect(newRC.Annotations["test"]).Should(Equal("should-copy-to-RC"))
+	Expect(newRC.Annotations[kubectl.LastAppliedConfigAnnotation]).Should(Equal(""))
+	Expect(deployment.Annotations["test"]).Should(Equal("should-copy-to-RC"))
+	Expect(deployment.Annotations[kubectl.LastAppliedConfigAnnotation]).Should(Equal("should-not-copy-to-RC"))
 }
 
 func testRollingUpdateDeployment(f *Framework) {

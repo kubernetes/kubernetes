@@ -34,6 +34,7 @@ import (
 	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -675,24 +676,8 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 	if err != nil {
 		return nil, err
 	} else if existingNewRC != nil {
-		if existingNewRC.Annotations == nil {
-			existingNewRC.Annotations = make(map[string]string)
-		}
-		// Copy deployment's annotations to existing new RC
-		annotationChanged := false
-		for k, v := range deployment.Annotations {
-			if existingNewRC.Annotations[k] != v {
-				annotationChanged = true
-				existingNewRC.Annotations[k] = v
-			}
-		}
-		// Update existing new RC's revision annotation
-		if existingNewRC.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
-			existingNewRC.Annotations[deploymentutil.RevisionAnnotation] = newRevision
-			annotationChanged = true
-			glog.V(4).Infof("update existingNewRC %s revision to %s - %+v\n", existingNewRC.Name, newRevision)
-		}
-		if annotationChanged {
+		// Set existing new RC's annotation
+		if setNewRCAnnotations(&deployment, existingNewRC, newRevision) {
 			return dc.client.Core().ReplicationControllers(deployment.ObjectMeta.Namespace).Update(existingNewRC)
 		}
 		return existingNewRC, nil
@@ -719,20 +704,11 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 		return nil, fmt.Errorf("couldn't get key for deployment controller %#v: %v", deployment, err)
 	}
 	dc.rcExpectations.ExpectCreations(dKey, 1)
-	// Copy deployment's annotations to new RC
-	annotations := deployment.Annotations
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	// Set new RC's revision annotation
-	annotations[deploymentutil.RevisionAnnotation] = newRevision
-
 	// Create new RC
 	newRC := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: deployment.Name + "-",
 			Namespace:    namespace,
-			Annotations:  annotations,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 0,
@@ -740,6 +716,8 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 			Template: &newRCTemplate,
 		},
 	}
+	// Set new RC's annotation
+	setNewRCAnnotations(&deployment, &newRC, newRevision)
 	createdRC, err := dc.client.Core().ReplicationControllers(namespace).Create(&newRC)
 	if err != nil {
 		dc.rcExpectations.DeleteExpectations(dKey)
@@ -750,21 +728,49 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 	return createdRC, err
 }
 
+// setNewRCAnnotations sets new rc's annotations appropriately by updating its revision and
+// copying required deployment annotations to it; it returns true if rc's annotation is changed.
+func setNewRCAnnotations(deployment *extensions.Deployment, rc *api.ReplicationController, newRevision string) bool {
+	// First, copy deployment's annotations
+	annotationChanged := copyDeploymentAnnotationsToRC(deployment, rc)
+	// Then, update RC's revision annotation
+	if rc.Annotations == nil {
+		rc.Annotations = make(map[string]string)
+	}
+	if rc.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
+		rc.Annotations[deploymentutil.RevisionAnnotation] = newRevision
+		annotationChanged = true
+		glog.V(4).Infof("updating RC %q's revision to %s - %+v\n", rc.Name, newRevision)
+	}
+	return annotationChanged
+}
+
+// copyDeploymentAnnotationsToRC copies deployment's annotations to rc's annotations,
+// and returns true if rc's annotation is changed
+func copyDeploymentAnnotationsToRC(deployment *extensions.Deployment, rc *api.ReplicationController) bool {
+	rcAnnotationsChanged := false
+	if rc.Annotations == nil {
+		rc.Annotations = make(map[string]string)
+	}
+	for k, v := range deployment.Annotations {
+		// Skip apply annotations
+		// TODO: How to decide which annotations should / should not be copied?
+		// See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
+		if k == kubectl.LastAppliedConfigAnnotation || rc.Annotations[k] == v {
+			continue
+		}
+		rc.Annotations[k] = v
+		rcAnnotationsChanged = true
+	}
+	return rcAnnotationsChanged
+}
+
 func (dc *DeploymentController) updateDeploymentRevision(deployment extensions.Deployment, revision string) error {
 	if deployment.Annotations == nil {
 		deployment.Annotations = make(map[string]string)
 	}
 	deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
 	_, err := dc.updateDeployment(&deployment)
-	return err
-}
-
-func (dc *DeploymentController) updateRCRevision(rc api.ReplicationController, revision string) error {
-	if rc.Annotations == nil {
-		rc.Annotations = make(map[string]string)
-	}
-	rc.Annotations[deploymentutil.RevisionAnnotation] = revision
-	_, err := dc.client.Core().ReplicationControllers(rc.ObjectMeta.Namespace).Update(&rc)
 	return err
 }
 
