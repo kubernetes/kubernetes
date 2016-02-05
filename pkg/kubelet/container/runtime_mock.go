@@ -77,11 +77,6 @@ func (r *Mock) KillContainerInPod(container api.Container, pod *api.Pod) error {
 	return args.Error(0)
 }
 
-func (r *Mock) GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error) {
-	args := r.Called(pod)
-	return args.Get(0).(*api.PodStatus), args.Error(1)
-}
-
 func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
 	args := r.Called(uid, name, namespace)
 	return args.Get(0).(*PodStatus), args.Error(1)

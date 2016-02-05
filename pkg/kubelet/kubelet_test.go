@@ -4220,13 +4220,13 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 }
 
 func TestCleanupBandwidthLimits(t *testing.T) {
+	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
+	// layer status getter function and test that function instead.
 	tests := []struct {
 		status           *api.PodStatus
 		pods             []*api.Pod
 		inputCIDRs       []string
 		expectResetCIDRs []string
-		cacheStatus      bool
-		expectedCalls    []string
 		name             string
 	}{
 		{
@@ -4251,34 +4251,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			},
 			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
 			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetAPIPodStatus"},
 			name:             "pod running",
-		},
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{},
-			cacheStatus:      true,
-			name:             "pod running with cache",
 		},
 		{
 			status: &api.PodStatus{
@@ -4302,39 +4275,12 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			},
 			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
 			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetAPIPodStatus"},
 			name:             "pod not running",
 		},
 		{
 			status: &api.PodStatus{
 				PodIP: "1.2.3.4",
 				Phase: api.PodFailed,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "foo",
-						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name: "bar",
-					},
-				},
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{},
-			cacheStatus:      true,
-			name:             "pod not running with cache",
-		},
-		{
-			status: &api.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
 			},
 			pods: []*api.Pod{
 				{
@@ -4360,12 +4306,9 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 
 		testKube := newTestKubelet(t)
 		testKube.kubelet.shaper = shaper
-		testKube.fakeRuntime.APIPodStatus = *test.status
 
-		if test.cacheStatus {
-			for _, pod := range test.pods {
-				testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
-			}
+		for _, pod := range test.pods {
+			testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
 		}
 
 		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
@@ -4374,14 +4317,6 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 		}
 		if !reflect.DeepEqual(shaper.ResetCIDRs, test.expectResetCIDRs) {
 			t.Errorf("[%s]\nexpected: %v, saw: %v", test.name, test.expectResetCIDRs, shaper.ResetCIDRs)
-		}
-
-		if test.cacheStatus {
-			if len(testKube.fakeRuntime.CalledFunctions) != 0 {
-				t.Errorf("unexpected function calls: %v", testKube.fakeRuntime.CalledFunctions)
-			}
-		} else if !reflect.DeepEqual(testKube.fakeRuntime.CalledFunctions, test.expectedCalls) {
-			t.Errorf("[%s], expected %v, saw %v", test.name, test.expectedCalls, testKube.fakeRuntime.CalledFunctions)
 		}
 	}
 }
@@ -4515,3 +4450,5 @@ func TestGetPodsToSync(t *testing.T) {
 		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
 	}
 }
+
+// TODO(random-liu): Add unit test for convertStatusToAPIStatus (issue #20478)
