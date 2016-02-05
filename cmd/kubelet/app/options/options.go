@@ -77,6 +77,7 @@ func NewKubeletServer() *KubeletServer {
 			DockerExecHandlerName:       "native",
 			EventBurst:                  10,
 			EventRecordQPS:              5.0,
+			EnableCustomMetrics:         false,
 			EnableDebuggingHandlers:     true,
 			EnableServer:                true,
 			FileCheckFrequency:          unversioned.Duration{20 * time.Second},
@@ -214,4 +215,5 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
+	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
 }

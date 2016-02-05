@@ -202,6 +202,7 @@ func NewMainKubelet(
 	flannelExperimentalOverlay bool,
 	nodeIP net.IP,
 	reservation kubetypes.Reservation,
+	enableCustomMetrics bool,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -326,6 +327,7 @@ func NewMainKubelet(
 		clock:                          util.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
+		enableCustomMetrics:          enableCustomMetrics,
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -378,6 +380,7 @@ func NewMainKubelet(
 			klet.cpuCFSQuota,
 			imageBackOff,
 			serializeImagePulls,
+			enableCustomMetrics,
 		)
 	case "rkt":
 		conf := &rkt.Config{
@@ -684,6 +687,9 @@ type Kubelet struct {
 	// reservation specifies resources which are reserved for non-pod usage, including kubernetes and
 	// non-kubernetes system processes.
 	reservation kubetypes.Reservation
+
+	// support gathering custom metrics.
+	enableCustomMetrics bool
 }
 
 // Validate given node IP belongs to the current host
