@@ -327,3 +327,59 @@ func TestDeltaFIFO_KeyOf(t *testing.T) {
 		}
 	}
 }
+
+func TestDeltaFIFO_HasSynced(t *testing.T) {
+	tests := []struct {
+		actions        []func(f *DeltaFIFO)
+		expectedSynced bool
+	}{
+		{
+			actions:        []func(f *DeltaFIFO){},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Add(mkFifoObj("a", 1)) },
+			},
+			expectedSynced: true,
+		},
+		{
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Replace([]interface{}{}, "0") },
+			},
+			expectedSynced: true,
+		},
+		{
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *DeltaFIFO) { f.Pop() },
+			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *DeltaFIFO) { f.Pop() },
+				func(f *DeltaFIFO) { f.Pop() },
+			},
+			expectedSynced: true,
+		},
+	}
+
+	for i, test := range tests {
+		f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
+
+		for _, action := range test.actions {
+			action(f)
+		}
+		if e, a := test.expectedSynced, f.HasSynced(); a != e {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
+		}
+	}
+}
