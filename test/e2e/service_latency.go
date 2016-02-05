@@ -66,7 +66,7 @@ var _ = Describe("Service endpoints latency", func() {
 
 		// Turn off rate limiting--it interferes with our measurements.
 		oldThrottle := f.Client.RESTClient.Throttle
-		f.Client.RESTClient.Throttle = util.NewFakeRateLimiter()
+		f.Client.RESTClient.Throttle = util.NewFakeAlwaysRateLimiter()
 		defer func() { f.Client.RESTClient.Throttle = oldThrottle }()
 
 		failing := sets.NewString()
