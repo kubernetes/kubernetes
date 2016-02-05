@@ -545,15 +545,15 @@ type RBDVolumeSource struct {
 	// The rados pool name.
 	// Default is rbd.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it.
-	RBDPool string `json:"pool"`
+	RBDPool string `json:"pool,omitempty"`
 	// The rados user name.
 	// Default is admin.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
-	RadosUser string `json:"user"`
+	RadosUser string `json:"user,omitempty"`
 	// Keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
-	Keyring string `json:"keyring"`
+	Keyring string `json:"keyring,omitempty"`
 	// SecretRef is name of the authentication secret for RBDUser. If provided
 	// overrides keyring.
 	// Default is empty.

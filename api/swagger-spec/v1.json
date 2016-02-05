@@ -15048,9 +15048,6 @@
     "required": [
      "monitors",
      "image",
-     "pool",
-     "user",
-     "keyring",
      "secretRef"
     ],
     "properties": {
