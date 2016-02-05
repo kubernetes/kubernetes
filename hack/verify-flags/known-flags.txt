@@ -45,8 +45,10 @@ cluster-dns
 cluster-domain
 cluster-name
 cluster-tag
+concurrent-daemonset-controller-syncs
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
+concurrent-job-syncs
 concurrent-resource-quota-syncs
 config-sync-period
 configure-cbr0

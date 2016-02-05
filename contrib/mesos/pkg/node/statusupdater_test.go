@@ -48,15 +48,15 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 
 	cm := cmoptions.NewCMServer()
 	kubecfg := kubeletoptions.NewKubeletServer()
-	assert.True(t, kubecfg.NodeStatusUpdateFrequency.Duration*3 < cm.NodeMonitorGracePeriod) // sanity check for defaults
+	assert.True(t, kubecfg.NodeStatusUpdateFrequency.Duration*3 < cm.NodeControllerOptions.NodeMonitorGracePeriod) // sanity check for defaults
 
 	n := testNode(0, api.ConditionTrue, "KubeletReady")
-	su := NewStatusUpdater(nil, cm.NodeMonitorPeriod, func() time.Time { return now })
+	su := NewStatusUpdater(nil, cm.NodeControllerOptions.NodeMonitorPeriod, func() time.Time { return now })
 	_, updated, err := su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.False(t, updated, "no update expected b/c kubelet updated heartbeat just now")
 
-	n = testNode(-cm.NodeMonitorGracePeriod, api.ConditionTrue, "KubeletReady")
+	n = testNode(-cm.NodeControllerOptions.NodeMonitorGracePeriod, api.ConditionTrue, "KubeletReady")
 	n2, updated, err := su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.True(t, updated, "update expected b/c kubelet's update is older than DefaultNodeMonitorGracePeriod")
