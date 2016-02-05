@@ -2083,6 +2083,14 @@ func ValidateSecret(secret *api.Secret) field.ErrorList {
 			break
 		}
 
+	case api.SecretTypeTLS:
+		if _, exists := secret.Data[api.TLSCertKey]; !exists {
+			allErrs = append(allErrs, field.Required(dataPath.Key(api.TLSCertKey), ""))
+		}
+		if _, exists := secret.Data[api.TLSPrivateKeyKey]; !exists {
+			allErrs = append(allErrs, field.Required(dataPath.Key(api.TLSPrivateKeyKey), ""))
+		}
+		// TODO: Verify that the key matches the cert.
 	default:
 		// no-op
 	}

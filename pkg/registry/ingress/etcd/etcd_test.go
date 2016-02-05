@@ -45,6 +45,9 @@ var (
 	defaultLoadBalancer = "127.0.0.1"
 	defaultPath         = "/foo"
 	defaultPathMap      = map[string]string{defaultPath: defaultBackendName}
+	defaultTLS          = []extensions.IngressTLS{
+		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
+	}
 )
 
 type IngressRuleValues map[string]string
@@ -92,6 +95,7 @@ func newIngress(pathMap map[string]string) *extensions.Ingress {
 			Rules: toIngressRules(map[string]IngressRuleValues{
 				defaultHostname: pathMap,
 			}),
+			TLS: defaultTLS,
 		},
 		Status: extensions.IngressStatus{
 			LoadBalancer: api.LoadBalancerStatus{
@@ -139,6 +143,10 @@ func TestUpdate(t *testing.T) {
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 				"bar.foo.com": {"/bar": defaultBackendName},
 			})
+			object.Spec.TLS = append(object.Spec.TLS, extensions.IngressTLS{
+				Hosts:      []string{"*.google.com"},
+				SecretName: "googleSecret",
+			})
 			return object
 		},
 		// invalid updateFunc: ObjeceMeta is not to be tampered with.
@@ -158,6 +166,15 @@ func TestUpdate(t *testing.T) {
 			object := obj.(*extensions.Ingress)
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 				"foo.bar.com": {"/invalid[": "svc"}})
+			return object
+		},
+
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.Ingress)
+			object.Spec.TLS = append(object.Spec.TLS, extensions.IngressTLS{
+				Hosts:      []string{"foo.bar.com"},
+				SecretName: "",
+			})
 			return object
 		},
 	)
