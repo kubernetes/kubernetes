@@ -36,7 +36,6 @@ function stop-proxy()
   PROXY_PORT_FILE=
 }
 
-
 # Starts "kubect proxy" to test the client proxy. $1: api_prefix
 function start-proxy()
 {
@@ -250,34 +249,32 @@ runTests() {
   #######################
   # kubectl local proxy #
   #######################
-# This next block disabled until non-racy solution to 
-# port allocation can be found (#19999).
-#
-#  # Make sure the UI can be proxied
-#  start-proxy
-#  check-curl-proxy-code /ui 301
-#  check-curl-proxy-code /metrics 200
-#  check-curl-proxy-code /api/ui 404
-#  if [[ -n "${version}" ]]; then
-#    check-curl-proxy-code /api/${version}/namespaces 200
-#  fi
-#  check-curl-proxy-code /static/ 200
-#  stop-proxy
-#
-#  # Make sure the in-development api is accessible by default
-#  start-proxy
-#  check-curl-proxy-code /apis 200
-#  check-curl-proxy-code /apis/extensions/ 200
-#  stop-proxy
-#
-#  # Custom paths let you see everything.
-#  start-proxy /custom
-#  check-curl-proxy-code /custom/ui 301
-#  check-curl-proxy-code /custom/metrics 200
-#  if [[ -n "${version}" ]]; then
-#    check-curl-proxy-code /custom/api/${version}/namespaces 200
-#  fi
-#  stop-proxy
+
+  # Make sure the UI can be proxied
+  start-proxy
+  check-curl-proxy-code /ui 301
+  check-curl-proxy-code /metrics 200
+  check-curl-proxy-code /api/ui 404
+  if [[ -n "${version}" ]]; then
+    check-curl-proxy-code /api/${version}/namespaces 200
+  fi
+  check-curl-proxy-code /static/ 200
+  stop-proxy
+
+  # Make sure the in-development api is accessible by default
+  start-proxy
+  check-curl-proxy-code /apis 200
+  check-curl-proxy-code /apis/extensions/ 200
+  stop-proxy
+
+  # Custom paths let you see everything.
+  start-proxy /custom
+  check-curl-proxy-code /custom/ui 301
+  check-curl-proxy-code /custom/metrics 200
+  if [[ -n "${version}" ]]; then
+    check-curl-proxy-code /custom/api/${version}/namespaces 200
+  fi
+  stop-proxy
 
   ###########################
   # POD creation / deletion #
