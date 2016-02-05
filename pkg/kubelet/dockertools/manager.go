@@ -666,51 +666,17 @@ func (dm *DockerManager) runContainer(
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
 
-	_, containerName := BuildDockerName(dockerName, container)
-	dockerOpts := docker.CreateContainerOptions{
-		Name: containerName,
-		Config: &docker.Config{
-			Env:          makeEnvList(opts.Envs),
-			ExposedPorts: exposedPorts,
-			Hostname:     containerHostname,
-			Image:        container.Image,
-			// Memory and CPU are set here for older versions of Docker (pre-1.6).
-			Memory:     memoryLimit,
-			MemorySwap: -1,
-			CPUShares:  cpuShares,
-			WorkingDir: container.WorkingDir,
-			Labels:     labels,
-			// Interactive containers:
-			OpenStdin: container.Stdin,
-			StdinOnce: container.StdinOnce,
-			Tty:       container.TTY,
-		},
-	}
-
-	setEntrypointAndCommand(container, opts, &dockerOpts)
-
-	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
-
-	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
-	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
-	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
-	if err != nil {
-		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
-		return kubecontainer.ContainerID{}, err
-	}
-
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
-
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
 
-	// The reason we create and mount the log file in here (not in kubelet) is because
-	// the file's location depends on the ID of the container, and we need to create and
-	// mount the file before actually starting the container.
-	// TODO(yifan): Consider to pull this logic out since we might need to reuse it in
-	// other container runtime.
+	_, containerName, cid := BuildDockerName(dockerName, container)
 	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 {
-		containerLogPath := path.Join(opts.PodContainerDir, dockerContainer.ID)
+		// Because the PodContainerDir contains pod uid and container name which is unique enough,
+		// here we just add an unique container id to make the path unique for different instances
+		// of the same container.
+		// Notice that the "container id" is just a unique number generated in BuildDockerName(),
+		// it is not the real docker container id.
+		containerLogPath := path.Join(opts.PodContainerDir, cid)
 		fs, err := os.Create(containerLogPath)
 		if err != nil {
 			// TODO: Clean up the previouly created dir? return the error?
@@ -721,7 +687,6 @@ func (dm *DockerManager) runContainer(
 			binds = append(binds, b)
 		}
 	}
-
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
@@ -752,9 +717,43 @@ func (dm *DockerManager) runContainer(
 	if len(opts.CgroupParent) > 0 {
 		hc.CgroupParent = opts.CgroupParent
 	}
-	securityContextProvider.ModifyHostConfig(pod, container, hc)
 
-	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
+	dockerOpts := docker.CreateContainerOptions{
+		Name: containerName,
+		Config: &docker.Config{
+			Env:          makeEnvList(opts.Envs),
+			ExposedPorts: exposedPorts,
+			Hostname:     containerHostname,
+			Image:        container.Image,
+			// Memory and CPU are set here for older versions of Docker (pre-1.6).
+			Memory:     memoryLimit,
+			MemorySwap: -1,
+			CPUShares:  cpuShares,
+			WorkingDir: container.WorkingDir,
+			Labels:     labels,
+			// Interactive containers:
+			OpenStdin: container.Stdin,
+			StdinOnce: container.StdinOnce,
+			Tty:       container.TTY,
+		},
+		HostConfig: hc,
+	}
+
+	setEntrypointAndCommand(container, opts, &dockerOpts)
+
+	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
+
+	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
+	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
+	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig)
+	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
+	if err != nil {
+		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+		return kubecontainer.ContainerID{}, err
+	}
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
+
+	if err = dm.client.StartContainer(dockerContainer.ID, nil); err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToStartContainer,
 			"Failed to start container with docker id %v with error: %v", utilstrings.ShortenString(dockerContainer.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
@@ -2065,7 +2064,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 			PodUID:        pod.UID,
 			ContainerName: container.Name,
 		}
-		stableName, _ := BuildDockerName(dockerName, container)
+		stableName, _, _ := BuildDockerName(dockerName, container)
 		if backOff.IsInBackOffSince(stableName, ts) {
 			if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 				dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.BackOffStartContainer, "Back-off restarting failed docker container")
