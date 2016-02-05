@@ -23,7 +23,7 @@ import (
 
 	"fmt"
 
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	"k8s.io/kubernetes/pkg/controller/persistentvolume/options"
 
 	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
