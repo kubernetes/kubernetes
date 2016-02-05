@@ -752,16 +752,27 @@ type SecretKeySelector struct {
 	Key string `json:"key"`
 }
 
+// HTTPHeader describes a custom header to be used in HTTP probes
+type HTTPHeader struct {
+	// The header field name
+	Name string `json:"name"`
+	// The header field value
+	Value string `json:"value"`
+}
+
 // HTTPGetAction describes an action based on HTTP Get requests.
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty"`
 	// Required: Name or number of the port to access on the container.
 	Port intstr.IntOrString `json:"port,omitempty"`
-	// Optional: Host name to connect to, defaults to the pod IP.
+	// Optional: Host name to connect to, defaults to the pod IP. You
+	// probably want to set "Host" in httpHeaders instead.
 	Host string `json:"host,omitempty"`
 	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
 	Scheme URIScheme `json:"scheme,omitempty"`
+	// Optional: Custom headers to set in the request. HTTP allows repeated headers.
+	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty"`
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions

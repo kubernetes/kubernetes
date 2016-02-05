@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/probe"
+	"net/http"
 	"net/url"
 	"time"
 )
@@ -32,7 +33,7 @@ type fakeHttpProber struct {
 	err    error
 }
 
-func (f *fakeHttpProber) Probe(*url.URL, time.Duration) (probe.Result, string, error) {
+func (f *fakeHttpProber) Probe(*url.URL, http.Header, time.Duration) (probe.Result, string, error) {
 	return f.result, f.body, f.err
 }
 
