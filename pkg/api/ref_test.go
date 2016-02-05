@@ -36,6 +36,11 @@ type ExtensionAPIObject struct {
 func (obj *ExtensionAPIObject) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestGetReference(t *testing.T) {
+	// when vendoring kube, if you don't force the set of registered versions (like this hack/test-go.sh does)
+	// then you run into trouble because the types aren't registered in the scheme by anything.  This does the
+	// register manually to allow unit test execution
+	AddToScheme(Scheme)
+
 	table := map[string]struct {
 		obj       runtime.Object
 		ref       *ObjectReference
