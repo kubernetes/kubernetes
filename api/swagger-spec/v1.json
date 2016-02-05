@@ -16173,6 +16173,10 @@
       "format": "int32",
       "description": "The number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed. Note that this is calculated from dead containers. But those containers are subject to garbage collection. This value will get capped at 5 by GC."
      },
+     "containerID": {
+      "type": "string",
+      "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information"
+     },
      "image": {
       "type": "string",
       "description": "The image the container is running. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md"
@@ -16181,9 +16185,19 @@
       "type": "string",
       "description": "ImageID of the container's image."
      },
-     "containerID": {
+     "imageCreationTime": {
       "type": "string",
-      "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information"
+      "description": "The image creation time from docker image inspection"
+     },
+     "imageSize": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The image size from docker image inspection"
+     },
+     "imageVirtualSize": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The image virtual size time from docker image inspection"
      }
     }
    },

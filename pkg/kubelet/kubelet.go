@@ -3182,11 +3182,14 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 	convertContainerStatus := func(cs *kubecontainer.ContainerStatus) *api.ContainerStatus {
 		cid := cs.ID.String()
 		status := &api.ContainerStatus{
-			Name:         cs.Name,
-			RestartCount: cs.RestartCount,
-			Image:        cs.Image,
-			ImageID:      cs.ImageID,
-			ContainerID:  cid,
+			Name:              cs.Name,
+			RestartCount:      cs.RestartCount,
+			Image:             cs.Image,
+			ImageID:           cs.ImageID,
+			ContainerID:       cid,
+			ImageCreationTime: unversioned.NewTime(cs.ImageCreationTime),
+			ImageSize:         cs.ImageSize,
+			ImageVirtualSize:  cs.ImageVirtualSize,
 		}
 		switch cs.State {
 		case kubecontainer.ContainerStateRunning:

@@ -412,9 +412,14 @@ func deepCopy_v1_ContainerStatus(in ContainerStatus, out *ContainerStatus, c *co
 	}
 	out.Ready = in.Ready
 	out.RestartCount = in.RestartCount
+	out.ContainerID = in.ContainerID
 	out.Image = in.Image
 	out.ImageID = in.ImageID
-	out.ContainerID = in.ContainerID
+	if err := deepCopy_unversioned_Time(in.ImageCreationTime, &out.ImageCreationTime, c); err != nil {
+		return err
+	}
+	out.ImageSize = in.ImageSize
+	out.ImageVirtualSize = in.ImageVirtualSize
 	return nil
 }
 

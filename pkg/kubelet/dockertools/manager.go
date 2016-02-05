@@ -344,15 +344,24 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 	var containerInfo *labelledContainerInfo
 	containerInfo = getContainerInfoFromLabel(iResult.Config.Labels)
 
+	iImageResult, err := dm.client.InspectImage(iResult.Config.Image)
+	if err != nil {
+		return nil, ip, err
+	}
+	glog.V(4).Infof("Container Image inspect result: %+v", *iImageResult)
+
 	status := kubecontainer.ContainerStatus{
-		Name:         containerName,
-		RestartCount: containerInfo.RestartCount,
-		Image:        iResult.Config.Image,
-		ImageID:      DockerPrefix + iResult.Image,
-		ID:           kubecontainer.DockerID(id).ContainerID(),
-		ExitCode:     iResult.State.ExitCode,
-		CreatedAt:    iResult.Created,
-		Hash:         hash,
+		Name:              containerName,
+		RestartCount:      containerInfo.RestartCount,
+		Image:             iResult.Config.Image,
+		ImageID:           DockerPrefix + iResult.Image,
+		ID:                kubecontainer.DockerID(id).ContainerID(),
+		ExitCode:          iResult.State.ExitCode,
+		CreatedAt:         iResult.Created,
+		Hash:              hash,
+		ImageCreationTime: iImageResult.Created,
+		ImageSize:         iImageResult.Size,
+		ImageVirtualSize:  iImageResult.VirtualSize,
 	}
 	if iResult.State.Running {
 		status.State = kubecontainer.ContainerStateRunning

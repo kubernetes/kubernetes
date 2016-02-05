@@ -88,11 +88,14 @@ func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
 func containerStatusToAPIContainerStatus(containerStatus *kubecontainer.ContainerStatus) *api.ContainerStatus {
 	containerID := DockerPrefix + containerStatus.ID.ID
 	status := api.ContainerStatus{
-		Name:         containerStatus.Name,
-		RestartCount: containerStatus.RestartCount,
-		Image:        containerStatus.Image,
-		ImageID:      containerStatus.ImageID,
-		ContainerID:  containerID,
+		Name:              containerStatus.Name,
+		RestartCount:      containerStatus.RestartCount,
+		Image:             containerStatus.Image,
+		ImageID:           containerStatus.ImageID,
+		ContainerID:       containerID,
+		ImageCreationTime: unversioned.NewTime(containerStatus.ImageCreationTime),
+		ImageSize:         containerStatus.ImageSize,
+		ImageVirtualSize:  containerStatus.ImageVirtualSize,
 	}
 	switch containerStatus.State {
 	case kubecontainer.ContainerStateRunning:

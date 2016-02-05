@@ -1181,15 +1181,21 @@ type ContainerStatus struct {
 	// Note that this is calculated from dead containers. But those containers are subject to
 	// garbage collection. This value will get capped at 5 by GC.
 	RestartCount int32 `json:"restartCount"`
+	// Container's ID in the format 'docker://<container_id>'.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information
+	ContainerID string `json:"containerID,omitempty"`
 	// The image the container is running.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md
 	// TODO(dchen1107): Which image the container is running with?
 	Image string `json:"image"`
 	// ImageID of the container's image.
 	ImageID string `json:"imageID"`
-	// Container's ID in the format 'docker://<container_id>'.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information
-	ContainerID string `json:"containerID,omitempty"`
+	// The image creation time from docker image inspection
+	ImageCreationTime unversioned.Time `json:"imageCreationTime,omitempty"`
+	// The image size from docker image inspection
+	ImageSize int64 `json:"imageSize,omitempty"`
+	// The image virtual size time from docker image inspection
+	ImageVirtualSize int64 `json:"imageVirtualSize,omitempty"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
