@@ -220,13 +220,13 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64) ([]interface{
 	}()
 
 	w.RLock()
+	defer w.RUnlock()
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= MaximumListWait {
 			return nil, 0, fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
 		}
 		w.cond.Wait()
 	}
-	defer w.RUnlock()
 	return w.store.List(), w.resourceVersion, nil
 }
 
