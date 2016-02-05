@@ -74,4 +74,3 @@ spec:
       - name: grafana-persistent-storage
         emptyDir: {}
 
-
