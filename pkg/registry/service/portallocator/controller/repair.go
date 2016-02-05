@@ -88,8 +88,12 @@ func (c *Repair) runOnce() error {
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	options := &api.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
-	list, err := c.registry.ListServices(ctx, options)
+	// We explicitly send no resource version, since the resource version
+	// of 'latest' is from a different collection, it's not comparable to
+	// the service collection. The caching layer keeps per-collection RVs,
+	// and this is proper, since in theory the collections could be hosted
+	// in separate etcd (or even non-etcd) instances.
+	list, err := c.registry.ListServices(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
