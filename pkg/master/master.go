@@ -260,9 +260,12 @@ func (m *Master) InstallAPIs(c *Config) {
 	// Install batch unless disabled.
 	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
 		batchResources := m.getBatchResources(c)
+		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
 		// Update the prefered version as per StorageVersions in the config.
-		storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
+		//storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
+		// XXX sort out which preferred storage version?
+		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
 		if !found {
 			glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
 		}
