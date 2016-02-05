@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	// Need import here.
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -251,6 +253,44 @@ func (m *Master) InstallAPIs(c *Config) {
 			Name:             extensionsGroupMeta.GroupVersion.Group,
 			Versions:         []unversioned.GroupVersionForDiscovery{extensionsGVForDiscovery},
 			PreferredVersion: extensionsGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+	// Install batch unless disabled.
+	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
+		batchResources := m.getBatchResources(c)
+		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
+		// Update the prefered version as per StorageVersions in the config.
+		storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
+		}
+		preferedGroupVersion, err := unversioned.ParseGroupVersion(storageVersion)
+		if err != nil {
+			glog.Fatalf("Error in parsing group version %s: %v", storageVersion, err)
+		}
+		batchGroupMeta.GroupVersion = preferedGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *batchGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": batchResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		batchGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: batchGroupMeta.GroupVersion.String(),
+			Version:      batchGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             batchGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{batchGVForDiscovery},
+			PreferredVersion: batchGVForDiscovery,
 		}
 		allGroups = append(allGroups, group)
 	}
@@ -641,6 +681,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["deployments/scale"] = deploymentStorage.Scale
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
+	// XXX Need something like this for new api group, with just job.
 	if isEnabled("jobs") {
 		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
 		storage["jobs"] = jobStorage
@@ -659,6 +700,32 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
+// getBatchlResources returns the resources for batch api
+func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
+	// All resources except these are disabled by default.
+	enabledResources := sets.NewString("jobs")
+	resourceOverrides := m.ApiGroupVersionOverrides["batch/v1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		enabled, ok := resourceOverrides[resource]
+		if !ok {
+			return enabledResources.Has(resource)
+		}
+		return enabled
+	}
+	storageDecorator := m.StorageDecorator()
+	dbClient := func(resource string) storage.Interface {
+		return c.StorageDestinations.Get(batch.GroupName, resource)
+	}
+
+	storage := map[string]rest.Storage{}
+	if isEnabled("jobs") {
+		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
+		storage["jobs"] = jobStorage
+		storage["jobs/status"] = jobStatusStorage
+	}
+	return storage
+}
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
 func findExternalAddress(node *api.Node) (string, error) {
 	var fallback string

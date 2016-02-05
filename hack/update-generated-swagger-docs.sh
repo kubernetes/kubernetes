@@ -56,7 +56,7 @@ EOF
   mv "$TMPFILE" "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 }
 
-GROUP_VERSIONS=(unversioned v1 authorization/v1beta1 extensions/v1beta1)
+GROUP_VERSIONS=(unversioned v1 authorization/v1beta1 extensions/v1beta1 batch/v1)
 # To avoid compile errors, remove the currently existing files.
 for group_version in "${GROUP_VERSIONS[@]}"; do
   rm -f "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"

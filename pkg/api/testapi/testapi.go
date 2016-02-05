@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -33,6 +34,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 )
 
 var (
