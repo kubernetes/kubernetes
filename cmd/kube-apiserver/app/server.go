@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
@@ -401,10 +402,16 @@ func Run(s *options.APIServer) error {
 
 		Tunneler: tunneler,
 	}
+
+	if s.EnableWatchCache {
+		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
+	}
+
 	m, err := master.New(config)
 	if err != nil {
 		return err
 	}
+
 	m.Run(s.ServerRunOptions)
 	return nil
 }

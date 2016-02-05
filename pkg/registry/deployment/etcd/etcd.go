@@ -27,6 +27,7 @@ import (
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/deployment"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
@@ -64,7 +65,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
 	storageInterface := storageDecorator(
-		s, 100, &extensions.Deployment{}, prefix, deployment.Strategy, newListFunc)
+		s, cachesize.GetWatchCacheSizeByResource(cachesize.Deployments), &extensions.Deployment{}, prefix, deployment.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Deployment{} },
