@@ -1734,6 +1734,28 @@ func deepCopy_v1beta1_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversio
 	return nil
 }
 
+func deepCopy_v1beta1_ScaleTwo(in ScaleTwo, out *ScaleTwo, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1beta1_ScaleSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1beta1_ScaleTwoStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1beta1_ScaleTwoStatus(in ScaleTwoStatus, out *ScaleTwoStatus, c *conversion.Cloner) error {
+	out.Replicas = in.Replicas
+	out.Selector = in.Selector
+	return nil
+}
+
 func deepCopy_v1beta1_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -1928,6 +1950,8 @@ func init() {
 		deepCopy_v1beta1_Scale,
 		deepCopy_v1beta1_ScaleSpec,
 		deepCopy_v1beta1_ScaleStatus,
+		deepCopy_v1beta1_ScaleTwo,
+		deepCopy_v1beta1_ScaleTwoStatus,
 		deepCopy_v1beta1_SubresourceReference,
 		deepCopy_v1beta1_ThirdPartyResource,
 		deepCopy_v1beta1_ThirdPartyResourceData,

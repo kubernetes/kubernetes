@@ -565,11 +565,32 @@ func (ScaleSpec) SwaggerDoc() map[string]string {
 var map_ScaleStatus = map[string]string{
 	"":         "represents the current status of a scale subresource.",
 	"replicas": "actual number of observed instances of the scaled object.",
-	"selector": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+	"selector": "label query over pods that should match the replicas count. More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
 }
 
 func (ScaleStatus) SwaggerDoc() map[string]string {
 	return map_ScaleStatus
+}
+
+var map_ScaleTwo = map[string]string{
+	"":         "represents a scaling request for a resource. from the original Scale type. The name of this resource will still be Scale, but in a different APIVersion group. Once the APIVersion group is decided, this type should be moved to that group and called Scale.",
+	"metadata": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
+	"spec":     "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+	"status":   "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.",
+}
+
+func (ScaleTwo) SwaggerDoc() map[string]string {
+	return map_ScaleTwo
+}
+
+var map_ScaleTwoStatus = map[string]string{
+	"":         "represents the current status of a scale subresource.",
+	"replicas": "actual number of observed instances of the scaled object.",
+	"selector": "label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+}
+
+func (ScaleTwoStatus) SwaggerDoc() map[string]string {
+	return map_ScaleTwoStatus
 }
 
 var map_SubresourceReference = map[string]string{

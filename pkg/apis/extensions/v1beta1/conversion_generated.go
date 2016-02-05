@@ -3489,6 +3489,42 @@ func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleS
 	return autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in, out, s)
 }
 
+func autoConvert_extensions_ScaleTwo_To_v1beta1_ScaleTwo(in *extensions.ScaleTwo, out *ScaleTwo, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.ScaleTwo))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_ScaleTwoStatus_To_v1beta1_ScaleTwoStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_ScaleTwo_To_v1beta1_ScaleTwo(in *extensions.ScaleTwo, out *ScaleTwo, s conversion.Scope) error {
+	return autoConvert_extensions_ScaleTwo_To_v1beta1_ScaleTwo(in, out, s)
+}
+
+func autoConvert_extensions_ScaleTwoStatus_To_v1beta1_ScaleTwoStatus(in *extensions.ScaleTwoStatus, out *ScaleTwoStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.ScaleTwoStatus))(in)
+	}
+	out.Replicas = int32(in.Replicas)
+	out.Selector = in.Selector
+	return nil
+}
+
+func Convert_extensions_ScaleTwoStatus_To_v1beta1_ScaleTwoStatus(in *extensions.ScaleTwoStatus, out *ScaleTwoStatus, s conversion.Scope) error {
+	return autoConvert_extensions_ScaleTwoStatus_To_v1beta1_ScaleTwoStatus(in, out, s)
+}
+
 func autoConvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *extensions.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.SubresourceReference))(in)
@@ -4667,6 +4703,42 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 	return autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in, out, s)
 }
 
+func autoConvert_v1beta1_ScaleTwo_To_extensions_ScaleTwo(in *ScaleTwo, out *extensions.ScaleTwo, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ScaleTwo))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_ScaleTwoStatus_To_extensions_ScaleTwoStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_ScaleTwo_To_extensions_ScaleTwo(in *ScaleTwo, out *extensions.ScaleTwo, s conversion.Scope) error {
+	return autoConvert_v1beta1_ScaleTwo_To_extensions_ScaleTwo(in, out, s)
+}
+
+func autoConvert_v1beta1_ScaleTwoStatus_To_extensions_ScaleTwoStatus(in *ScaleTwoStatus, out *extensions.ScaleTwoStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ScaleTwoStatus))(in)
+	}
+	out.Replicas = int(in.Replicas)
+	out.Selector = in.Selector
+	return nil
+}
+
+func Convert_v1beta1_ScaleTwoStatus_To_extensions_ScaleTwoStatus(in *ScaleTwoStatus, out *extensions.ScaleTwoStatus, s conversion.Scope) error {
+	return autoConvert_v1beta1_ScaleTwoStatus_To_extensions_ScaleTwoStatus(in, out, s)
+}
+
 func autoConvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in *SubresourceReference, out *extensions.SubresourceReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SubresourceReference))(in)
@@ -4878,6 +4950,8 @@ func init() {
 		autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
 		autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
+		autoConvert_extensions_ScaleTwoStatus_To_v1beta1_ScaleTwoStatus,
+		autoConvert_extensions_ScaleTwo_To_v1beta1_ScaleTwo,
 		autoConvert_extensions_Scale_To_v1beta1_Scale,
 		autoConvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference,
 		autoConvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList,
@@ -4975,6 +5049,8 @@ func init() {
 		autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec,
 		autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
+		autoConvert_v1beta1_ScaleTwoStatus_To_extensions_ScaleTwoStatus,
+		autoConvert_v1beta1_ScaleTwo_To_extensions_ScaleTwo,
 		autoConvert_v1beta1_Scale_To_extensions_Scale,
 		autoConvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference,
 		autoConvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList,

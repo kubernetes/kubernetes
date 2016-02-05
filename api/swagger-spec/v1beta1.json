@@ -87,7 +87,7 @@
       ]
      },
      {
-      "type": "v1beta1.HorizontalPodAutoscaler",
+      "type": "extensions.HorizontalPodAutoscaler",
       "method": "POST",
       "summary": "create a HorizontalPodAutoscaler",
       "nickname": "createNamespacedHorizontalPodAutoscaler",
@@ -101,7 +101,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.HorizontalPodAutoscaler",
+        "type": "extensions.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -121,7 +121,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.HorizontalPodAutoscaler"
+        "responseModel": "extensions.HorizontalPodAutoscaler"
        }
       ],
       "produces": [
@@ -300,7 +300,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.HorizontalPodAutoscaler",
+      "type": "extensions.HorizontalPodAutoscaler",
       "method": "GET",
       "summary": "read the specified HorizontalPodAutoscaler",
       "nickname": "readNamespacedHorizontalPodAutoscaler",
@@ -350,7 +350,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.HorizontalPodAutoscaler"
+        "responseModel": "extensions.HorizontalPodAutoscaler"
        }
       ],
       "produces": [
@@ -362,7 +362,7 @@
       ]
      },
      {
-      "type": "v1beta1.HorizontalPodAutoscaler",
+      "type": "extensions.HorizontalPodAutoscaler",
       "method": "PUT",
       "summary": "replace the specified HorizontalPodAutoscaler",
       "nickname": "replaceNamespacedHorizontalPodAutoscaler",
@@ -376,7 +376,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.HorizontalPodAutoscaler",
+        "type": "extensions.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -404,7 +404,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.HorizontalPodAutoscaler"
+        "responseModel": "extensions.HorizontalPodAutoscaler"
        }
       ],
       "produces": [
@@ -416,7 +416,7 @@
       ]
      },
      {
-      "type": "v1beta1.HorizontalPodAutoscaler",
+      "type": "extensions.HorizontalPodAutoscaler",
       "method": "PATCH",
       "summary": "partially update the specified HorizontalPodAutoscaler",
       "nickname": "patchNamespacedHorizontalPodAutoscaler",
@@ -458,7 +458,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.HorizontalPodAutoscaler"
+        "responseModel": "extensions.HorizontalPodAutoscaler"
        }
       ],
       "produces": [
@@ -774,7 +774,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.HorizontalPodAutoscaler",
+      "type": "extensions.HorizontalPodAutoscaler",
       "method": "PUT",
       "summary": "replace status of the specified HorizontalPodAutoscaler",
       "nickname": "replaceNamespacedHorizontalPodAutoscalerStatus",
@@ -788,7 +788,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.HorizontalPodAutoscaler",
+        "type": "extensions.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -816,7 +816,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.HorizontalPodAutoscaler"
+        "responseModel": "extensions.HorizontalPodAutoscaler"
        }
       ],
       "produces": [
@@ -912,7 +912,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.Ingress",
       "method": "POST",
       "summary": "create a Ingress",
       "nickname": "createNamespacedIngress",
@@ -926,7 +926,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -946,7 +946,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.Ingress"
        }
       ],
       "produces": [
@@ -1125,7 +1125,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.Ingress",
       "method": "GET",
       "summary": "read the specified Ingress",
       "nickname": "readNamespacedIngress",
@@ -1175,7 +1175,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.Ingress"
        }
       ],
       "produces": [
@@ -1187,7 +1187,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.Ingress",
       "method": "PUT",
       "summary": "replace the specified Ingress",
       "nickname": "replaceNamespacedIngress",
@@ -1201,7 +1201,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1229,7 +1229,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.Ingress"
        }
       ],
       "produces": [
@@ -1241,7 +1241,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.Ingress",
       "method": "PATCH",
       "summary": "partially update the specified Ingress",
       "nickname": "patchNamespacedIngress",
@@ -1283,7 +1283,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.Ingress"
        }
       ],
       "produces": [
@@ -1599,7 +1599,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.Ingress",
       "method": "PUT",
       "summary": "replace status of the specified Ingress",
       "nickname": "replaceNamespacedIngressStatus",
@@ -1613,7 +1613,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1641,7 +1641,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.Ingress"
        }
       ],
       "produces": [
@@ -1737,7 +1737,7 @@
       ]
      },
      {
-      "type": "v1beta1.Job",
+      "type": "extensions.Job",
       "method": "POST",
       "summary": "create a Job",
       "nickname": "createNamespacedJob",
@@ -1751,7 +1751,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Job",
+        "type": "extensions.Job",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1771,7 +1771,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Job"
+        "responseModel": "extensions.Job"
        }
       ],
       "produces": [
@@ -1950,7 +1950,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Job",
+      "type": "extensions.Job",
       "method": "GET",
       "summary": "read the specified Job",
       "nickname": "readNamespacedJob",
@@ -2000,7 +2000,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Job"
+        "responseModel": "extensions.Job"
        }
       ],
       "produces": [
@@ -2012,7 +2012,7 @@
       ]
      },
      {
-      "type": "v1beta1.Job",
+      "type": "extensions.Job",
       "method": "PUT",
       "summary": "replace the specified Job",
       "nickname": "replaceNamespacedJob",
@@ -2026,7 +2026,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Job",
+        "type": "extensions.Job",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2054,7 +2054,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Job"
+        "responseModel": "extensions.Job"
        }
       ],
       "produces": [
@@ -2066,7 +2066,7 @@
       ]
      },
      {
-      "type": "v1beta1.Job",
+      "type": "extensions.Job",
       "method": "PATCH",
       "summary": "partially update the specified Job",
       "nickname": "patchNamespacedJob",
@@ -2108,7 +2108,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Job"
+        "responseModel": "extensions.Job"
        }
       ],
       "produces": [
@@ -2424,7 +2424,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Job",
+      "type": "extensions.Job",
       "method": "PUT",
       "summary": "replace status of the specified Job",
       "nickname": "replaceNamespacedJobStatus",
@@ -2438,7 +2438,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Job",
+        "type": "extensions.Job",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2466,7 +2466,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Job"
+        "responseModel": "extensions.Job"
        }
       ],
       "produces": [
@@ -2484,7 +2484,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.Scale",
       "method": "GET",
       "summary": "read scale of the specified Scale",
       "nickname": "readNamespacedScaleScale",
@@ -2518,7 +2518,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.Scale"
        }
       ],
       "produces": [
@@ -2530,7 +2530,7 @@
       ]
      },
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.Scale",
       "method": "PUT",
       "summary": "replace scale of the specified Scale",
       "nickname": "replaceNamespacedScaleScale",
@@ -2544,7 +2544,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Scale",
+        "type": "extensions.Scale",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2572,7 +2572,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.Scale"
        }
       ],
       "produces": [
@@ -2584,7 +2584,7 @@
       ]
      },
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.Scale",
       "method": "PATCH",
       "summary": "partially update scale of the specified Scale",
       "nickname": "patchNamespacedScaleScale",
@@ -2626,7 +2626,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.Scale"
        }
       ],
       "produces": [
@@ -2882,6 +2882,152 @@
       "type": "integer",
       "format": "int32",
       "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
+     }
+    }
+   },
+   "extensions.HorizontalPodAutoscaler": {
+    "id": "extensions.HorizontalPodAutoscaler",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "extensions.HorizontalPodAutoscalerSpec"
+     },
+     "status": {
+      "$ref": "extensions.HorizontalPodAutoscalerStatus"
+     }
+    }
+   },
+   "api.ObjectMeta": {
+    "id": "api.ObjectMeta",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "generateName": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "uid": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "generation": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "deletionTimestamp": {
+      "type": "string"
+     },
+     "deletionGracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "labels": {
+      "type": "any"
+     },
+     "annotations": {
+      "type": "any"
+     }
+    }
+   },
+   "extensions.HorizontalPodAutoscalerSpec": {
+    "id": "extensions.HorizontalPodAutoscalerSpec",
+    "required": [
+     "scaleRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "scaleRef": {
+      "$ref": "extensions.SubresourceReference"
+     },
+     "minReplicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "maxReplicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "cpuUtilization": {
+      "$ref": "extensions.CPUTargetUtilization"
+     }
+    }
+   },
+   "extensions.SubresourceReference": {
+    "id": "extensions.SubresourceReference",
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "subresource": {
+      "type": "string"
+     }
+    }
+   },
+   "extensions.CPUTargetUtilization": {
+    "id": "extensions.CPUTargetUtilization",
+    "required": [
+     "targetPercentage"
+    ],
+    "properties": {
+     "targetPercentage": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "extensions.HorizontalPodAutoscalerStatus": {
+    "id": "extensions.HorizontalPodAutoscalerStatus",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "lastScaleTime": {
+      "type": "string"
+     },
+     "currentReplicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "desiredReplicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "currentCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
@@ -3181,6 +3327,127 @@
      "hostname": {
       "type": "string",
       "description": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)"
+     }
+    }
+   },
+   "extensions.Ingress": {
+    "id": "extensions.Ingress",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "extensions.IngressSpec"
+     },
+     "status": {
+      "$ref": "extensions.IngressStatus"
+     }
+    }
+   },
+   "extensions.IngressSpec": {
+    "id": "extensions.IngressSpec",
+    "properties": {
+     "backend": {
+      "$ref": "extensions.IngressBackend"
+     },
+     "rules": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.IngressRule"
+      }
+     }
+    }
+   },
+   "extensions.IngressBackend": {
+    "id": "extensions.IngressBackend",
+    "required": [
+     "serviceName",
+     "servicePort"
+    ],
+    "properties": {
+     "serviceName": {
+      "type": "string"
+     },
+     "servicePort": {
+      "type": "string"
+     }
+    }
+   },
+   "extensions.IngressRule": {
+    "id": "extensions.IngressRule",
+    "properties": {
+     "host": {
+      "type": "string"
+     },
+     "http": {
+      "$ref": "extensions.HTTPIngressRuleValue"
+     }
+    }
+   },
+   "extensions.HTTPIngressRuleValue": {
+    "id": "extensions.HTTPIngressRuleValue",
+    "required": [
+     "paths"
+    ],
+    "properties": {
+     "paths": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.HTTPIngressPath"
+      }
+     }
+    }
+   },
+   "extensions.HTTPIngressPath": {
+    "id": "extensions.HTTPIngressPath",
+    "required": [
+     "backend"
+    ],
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "backend": {
+      "$ref": "extensions.IngressBackend"
+     }
+    }
+   },
+   "extensions.IngressStatus": {
+    "id": "extensions.IngressStatus",
+    "properties": {
+     "loadBalancer": {
+      "$ref": "api.LoadBalancerStatus"
+     }
+    }
+   },
+   "api.LoadBalancerStatus": {
+    "id": "api.LoadBalancerStatus",
+    "properties": {
+     "ingress": {
+      "type": "array",
+      "items": {
+       "$ref": "api.LoadBalancerIngress"
+      }
+     }
+    }
+   },
+   "api.LoadBalancerIngress": {
+    "id": "api.LoadBalancerIngress",
+    "properties": {
+     "ip": {
+      "type": "string"
+     },
+     "hostname": {
+      "type": "string"
      }
     }
    },
@@ -4470,9 +4737,9 @@
      }
     }
    },
-   "v1beta1.Scale": {
-    "id": "v1beta1.Scale",
-    "description": "represents a scaling request for a resource.",
+   "extensions.Job": {
+    "id": "extensions.Job",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
     "properties": {
      "kind": {
       "type": "string",
@@ -4483,45 +4750,1044 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ObjectMeta",
-      "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
+      "$ref": "api.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1beta1.ScaleSpec",
-      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+      "$ref": "extensions.JobSpec"
      },
      "status": {
-      "$ref": "v1beta1.ScaleStatus",
-      "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
+      "$ref": "extensions.JobStatus"
      }
     }
    },
-   "v1beta1.ScaleSpec": {
-    "id": "v1beta1.ScaleSpec",
-    "description": "describes the attributes of a scale subresource",
+   "extensions.JobSpec": {
+    "id": "extensions.JobSpec",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "parallelism": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "completions": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "activeDeadlineSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "selector": {
+      "$ref": "extensions.LabelSelector"
+     },
+     "template": {
+      "$ref": "api.PodTemplateSpec"
+     }
+    }
+   },
+   "extensions.LabelSelector": {
+    "id": "extensions.LabelSelector",
+    "properties": {
+     "matchLabels": {
+      "type": "any"
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.LabelSelectorRequirement"
+      }
+     }
+    }
+   },
+   "extensions.LabelSelectorRequirement": {
+    "id": "extensions.LabelSelectorRequirement",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string"
+     },
+     "operator": {
+      "type": "string"
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "api.PodTemplateSpec": {
+    "id": "api.PodTemplateSpec",
+    "properties": {
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.PodSpec"
+     }
+    }
+   },
+   "api.PodSpec": {
+    "id": "api.PodSpec",
+    "required": [
+     "volumes",
+     "containers",
+     "serviceAccountName"
+    ],
+    "properties": {
+     "volumes": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Volume"
+      }
+     },
+     "containers": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Container"
+      }
+     },
+     "restartPolicy": {
+      "type": "string"
+     },
+     "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "activeDeadlineSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "dnsPolicy": {
+      "type": "string"
+     },
+     "nodeSelector": {
+      "type": "any"
+     },
+     "serviceAccountName": {
+      "type": "string"
+     },
+     "nodeName": {
+      "type": "string"
+     },
+     "securityContext": {
+      "$ref": "api.PodSecurityContext"
+     },
+     "imagePullSecrets": {
+      "type": "array",
+      "items": {
+       "$ref": "api.LocalObjectReference"
+      }
+     }
+    }
+   },
+   "api.Volume": {
+    "id": "api.Volume",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "hostPath": {
+      "$ref": "api.HostPathVolumeSource"
+     },
+     "emptyDir": {
+      "$ref": "api.EmptyDirVolumeSource"
+     },
+     "gcePersistentDisk": {
+      "$ref": "api.GCEPersistentDiskVolumeSource"
+     },
+     "awsElasticBlockStore": {
+      "$ref": "api.AWSElasticBlockStoreVolumeSource"
+     },
+     "gitRepo": {
+      "$ref": "api.GitRepoVolumeSource"
+     },
+     "secret": {
+      "$ref": "api.SecretVolumeSource"
+     },
+     "nfs": {
+      "$ref": "api.NFSVolumeSource"
+     },
+     "iscsi": {
+      "$ref": "api.ISCSIVolumeSource"
+     },
+     "glusterfs": {
+      "$ref": "api.GlusterfsVolumeSource"
+     },
+     "persistentVolumeClaim": {
+      "$ref": "api.PersistentVolumeClaimVolumeSource"
+     },
+     "rbd": {
+      "$ref": "api.RBDVolumeSource"
+     },
+     "flexVolume": {
+      "$ref": "api.FlexVolumeSource"
+     },
+     "cinder": {
+      "$ref": "api.CinderVolumeSource"
+     },
+     "cephfs": {
+      "$ref": "api.CephFSVolumeSource"
+     },
+     "flocker": {
+      "$ref": "api.FlockerVolumeSource"
+     },
+     "downwardAPI": {
+      "$ref": "api.DownwardAPIVolumeSource"
+     },
+     "fc": {
+      "$ref": "api.FCVolumeSource"
+     }
+    }
+   },
+   "api.HostPathVolumeSource": {
+    "id": "api.HostPathVolumeSource",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string"
+     }
+    }
+   },
+   "api.EmptyDirVolumeSource": {
+    "id": "api.EmptyDirVolumeSource",
+    "properties": {
+     "medium": {
+      "type": "string"
+     }
+    }
+   },
+   "api.GCEPersistentDiskVolumeSource": {
+    "id": "api.GCEPersistentDiskVolumeSource",
+    "required": [
+     "pdName"
+    ],
+    "properties": {
+     "pdName": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.AWSElasticBlockStoreVolumeSource": {
+    "id": "api.AWSElasticBlockStoreVolumeSource",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.GitRepoVolumeSource": {
+    "id": "api.GitRepoVolumeSource",
+    "required": [
+     "repository"
+    ],
+    "properties": {
+     "repository": {
+      "type": "string"
+     },
+     "revision": {
+      "type": "string"
+     },
+     "directory": {
+      "type": "string"
+     }
+    }
+   },
+   "api.SecretVolumeSource": {
+    "id": "api.SecretVolumeSource",
+    "properties": {
+     "secretName": {
+      "type": "string"
+     }
+    }
+   },
+   "api.NFSVolumeSource": {
+    "id": "api.NFSVolumeSource",
+    "required": [
+     "server",
+     "path"
+    ],
+    "properties": {
+     "server": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.ISCSIVolumeSource": {
+    "id": "api.ISCSIVolumeSource",
+    "properties": {
+     "targetPortal": {
+      "type": "string"
+     },
+     "iqn": {
+      "type": "string"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "iscsiInterface": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.GlusterfsVolumeSource": {
+    "id": "api.GlusterfsVolumeSource",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.PersistentVolumeClaimVolumeSource": {
+    "id": "api.PersistentVolumeClaimVolumeSource",
+    "required": [
+     "claimName"
+    ],
+    "properties": {
+     "claimName": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.RBDVolumeSource": {
+    "id": "api.RBDVolumeSource",
+    "required": [
+     "monitors",
+     "image",
+     "pool",
+     "user",
+     "keyring",
+     "secretRef"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "image": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "pool": {
+      "type": "string"
+     },
+     "user": {
+      "type": "string"
+     },
+     "keyring": {
+      "type": "string"
+     },
+     "secretRef": {
+      "$ref": "api.LocalObjectReference"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.LocalObjectReference": {
+    "id": "api.LocalObjectReference",
+    "required": [
+     "Name"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     }
+    }
+   },
+   "api.FlexVolumeSource": {
+    "id": "api.FlexVolumeSource",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "secretRef": {
+      "$ref": "api.LocalObjectReference"
+     },
+     "readOnly": {
+      "type": "boolean"
+     },
+     "options": {
+      "type": "any"
+     }
+    }
+   },
+   "api.CinderVolumeSource": {
+    "id": "api.CinderVolumeSource",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.CephFSVolumeSource": {
+    "id": "api.CephFSVolumeSource",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "path": {
+      "type": "string"
+     },
+     "user": {
+      "type": "string"
+     },
+     "secretFile": {
+      "type": "string"
+     },
+     "secretRef": {
+      "$ref": "api.LocalObjectReference"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.FlockerVolumeSource": {
+    "id": "api.FlockerVolumeSource",
+    "required": [
+     "datasetName"
+    ],
+    "properties": {
+     "datasetName": {
+      "type": "string"
+     }
+    }
+   },
+   "api.DownwardAPIVolumeSource": {
+    "id": "api.DownwardAPIVolumeSource",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "api.DownwardAPIVolumeFile"
+      }
+     }
+    }
+   },
+   "api.DownwardAPIVolumeFile": {
+    "id": "api.DownwardAPIVolumeFile",
+    "required": [
+     "path",
+     "fieldRef"
+    ],
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "fieldRef": {
+      "$ref": "api.ObjectFieldSelector"
+     }
+    }
+   },
+   "api.ObjectFieldSelector": {
+    "id": "api.ObjectFieldSelector",
+    "required": [
+     "apiVersion",
+     "fieldPath"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "fieldPath": {
+      "type": "string"
+     }
+    }
+   },
+   "api.FCVolumeSource": {
+    "id": "api.FCVolumeSource",
+    "required": [
+     "targetWWNs",
+     "lun",
+     "fsType"
+    ],
+    "properties": {
+     "targetWWNs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.Container": {
+    "id": "api.Container",
+    "required": [
+     "name",
+     "image",
+     "imagePullPolicy"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "image": {
+      "type": "string"
+     },
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "args": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "workingDir": {
+      "type": "string"
+     },
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ContainerPort"
+      }
+     },
+     "env": {
+      "type": "array",
+      "items": {
+       "$ref": "api.EnvVar"
+      }
+     },
+     "resources": {
+      "$ref": "api.ResourceRequirements"
+     },
+     "volumeMounts": {
+      "type": "array",
+      "items": {
+       "$ref": "api.VolumeMount"
+      }
+     },
+     "livenessProbe": {
+      "$ref": "api.Probe"
+     },
+     "readinessProbe": {
+      "$ref": "api.Probe"
+     },
+     "lifecycle": {
+      "$ref": "api.Lifecycle"
+     },
+     "terminationMessagePath": {
+      "type": "string"
+     },
+     "imagePullPolicy": {
+      "type": "string"
+     },
+     "securityContext": {
+      "$ref": "api.SecurityContext"
+     },
+     "stdin": {
+      "type": "boolean"
+     },
+     "stdinOnce": {
+      "type": "boolean"
+     },
+     "tty": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.ContainerPort": {
+    "id": "api.ContainerPort",
+    "required": [
+     "containerPort"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "hostPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "containerPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "protocol": {
+      "type": "string"
+     },
+     "hostIP": {
+      "type": "string"
+     }
+    }
+   },
+   "api.EnvVar": {
+    "id": "api.EnvVar",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     },
+     "valueFrom": {
+      "$ref": "api.EnvVarSource"
+     }
+    }
+   },
+   "api.EnvVarSource": {
+    "id": "api.EnvVarSource",
+    "properties": {
+     "fieldRef": {
+      "$ref": "api.ObjectFieldSelector"
+     },
+     "configMapKeyRef": {
+      "$ref": "api.ConfigMapKeySelector"
+     },
+     "secretKeyRef": {
+      "$ref": "api.SecretKeySelector"
+     }
+    }
+   },
+   "api.ConfigMapKeySelector": {
+    "id": "api.ConfigMapKeySelector",
+    "required": [
+     "Name",
+     "key"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     },
+     "key": {
+      "type": "string"
+     }
+    }
+   },
+   "api.SecretKeySelector": {
+    "id": "api.SecretKeySelector",
+    "required": [
+     "Name",
+     "key"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     },
+     "key": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ResourceRequirements": {
+    "id": "api.ResourceRequirements",
+    "properties": {
+     "limits": {
+      "type": "any"
+     },
+     "requests": {
+      "type": "any"
+     }
+    }
+   },
+   "api.VolumeMount": {
+    "id": "api.VolumeMount",
+    "required": [
+     "name",
+     "mountPath"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     },
+     "mountPath": {
+      "type": "string"
+     }
+    }
+   },
+   "api.Probe": {
+    "id": "api.Probe",
+    "properties": {
+     "exec": {
+      "$ref": "api.ExecAction"
+     },
+     "httpGet": {
+      "$ref": "api.HTTPGetAction"
+     },
+     "tcpSocket": {
+      "$ref": "api.TCPSocketAction"
+     },
+     "initialDelaySeconds": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "timeoutSeconds": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "periodSeconds": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "successThreshold": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "failureThreshold": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "api.ExecAction": {
+    "id": "api.ExecAction",
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "api.HTTPGetAction": {
+    "id": "api.HTTPGetAction",
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "port": {
+      "type": "string"
+     },
+     "host": {
+      "type": "string"
+     },
+     "scheme": {
+      "type": "string"
+     }
+    }
+   },
+   "api.TCPSocketAction": {
+    "id": "api.TCPSocketAction",
+    "properties": {
+     "port": {
+      "type": "string"
+     }
+    }
+   },
+   "api.Lifecycle": {
+    "id": "api.Lifecycle",
+    "properties": {
+     "postStart": {
+      "$ref": "api.Handler"
+     },
+     "preStop": {
+      "$ref": "api.Handler"
+     }
+    }
+   },
+   "api.Handler": {
+    "id": "api.Handler",
+    "properties": {
+     "exec": {
+      "$ref": "api.ExecAction"
+     },
+     "httpGet": {
+      "$ref": "api.HTTPGetAction"
+     },
+     "tcpSocket": {
+      "$ref": "api.TCPSocketAction"
+     }
+    }
+   },
+   "api.SecurityContext": {
+    "id": "api.SecurityContext",
+    "properties": {
+     "capabilities": {
+      "$ref": "api.Capabilities"
+     },
+     "privileged": {
+      "type": "boolean"
+     },
+     "seLinuxOptions": {
+      "$ref": "api.SELinuxOptions"
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "runAsNonRoot": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.Capabilities": {
+    "id": "api.Capabilities",
+    "properties": {
+     "add": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Capability"
+      }
+     },
+     "drop": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Capability"
+      }
+     }
+    }
+   },
+   "api.Capability": {
+    "id": "api.Capability",
+    "properties": {}
+   },
+   "api.SELinuxOptions": {
+    "id": "api.SELinuxOptions",
+    "properties": {
+     "user": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     },
+     "level": {
+      "type": "string"
+     }
+    }
+   },
+   "api.PodSecurityContext": {
+    "id": "api.PodSecurityContext",
+    "properties": {
+     "hostNetwork": {
+      "type": "boolean"
+     },
+     "hostPID": {
+      "type": "boolean"
+     },
+     "hostIPC": {
+      "type": "boolean"
+     },
+     "seLinuxOptions": {
+      "$ref": "api.SELinuxOptions"
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "runAsNonRoot": {
+      "type": "boolean"
+     },
+     "supplementalGroups": {
+      "type": "array",
+      "items": {
+       "$ref": "integer"
+      }
+     },
+     "fsGroup": {
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
+   "extensions.JobStatus": {
+    "id": "extensions.JobStatus",
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.JobCondition"
+      }
+     },
+     "startTime": {
+      "type": "string"
+     },
+     "completionTime": {
+      "type": "string"
+     },
+     "active": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "succeeded": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "failed": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "extensions.JobCondition": {
+    "id": "extensions.JobCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastProbeTime": {
+      "type": "string"
+     },
+     "lastTransitionTime": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     }
+    }
+   },
+   "extensions.Scale": {
+    "id": "extensions.Scale",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "extensions.ScaleSpec"
+     },
+     "status": {
+      "$ref": "extensions.ScaleStatus"
+     }
+    }
+   },
+   "extensions.ScaleSpec": {
+    "id": "extensions.ScaleSpec",
     "properties": {
      "replicas": {
       "type": "integer",
-      "format": "int32",
-      "description": "desired number of instances for the scaled object."
+      "format": "int32"
      }
     }
    },
-   "v1beta1.ScaleStatus": {
-    "id": "v1beta1.ScaleStatus",
-    "description": "represents the current status of a scale subresource.",
+   "extensions.ScaleStatus": {
+    "id": "extensions.ScaleStatus",
     "required": [
      "replicas"
     ],
     "properties": {
      "replicas": {
       "type": "integer",
-      "format": "int32",
-      "description": "actual number of observed instances of the scaled object."
+      "format": "int32"
      },
      "selector": {
-      "type": "any",
-      "description": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+      "type": "any"
      }
     }
    }

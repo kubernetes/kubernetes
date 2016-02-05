@@ -9,7 +9,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Binding",
+      "type": "api.Binding",
       "method": "POST",
       "summary": "create a Binding",
       "nickname": "createNamespacedBinding",
@@ -23,7 +23,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Binding",
+        "type": "api.Binding",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -43,7 +43,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Binding"
+        "responseModel": "api.Binding"
        }
       ],
       "produces": [
@@ -137,7 +137,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ComponentStatus",
+      "type": "api.ComponentStatus",
       "method": "GET",
       "summary": "read the specified ComponentStatus",
       "nickname": "readNamespacedComponentStatus",
@@ -163,7 +163,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ComponentStatus"
+        "responseModel": "api.ComponentStatus"
        }
       ],
       "produces": [
@@ -259,7 +259,7 @@
       ]
      },
      {
-      "type": "v1.ConfigMap",
+      "type": "api.ConfigMap",
       "method": "POST",
       "summary": "create a ConfigMap",
       "nickname": "createNamespacedConfigMap",
@@ -273,7 +273,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ConfigMap",
+        "type": "api.ConfigMap",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -293,7 +293,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ConfigMap"
+        "responseModel": "api.ConfigMap"
        }
       ],
       "produces": [
@@ -472,7 +472,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ConfigMap",
+      "type": "api.ConfigMap",
       "method": "GET",
       "summary": "read the specified ConfigMap",
       "nickname": "readNamespacedConfigMap",
@@ -522,7 +522,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ConfigMap"
+        "responseModel": "api.ConfigMap"
        }
       ],
       "produces": [
@@ -534,7 +534,7 @@
       ]
      },
      {
-      "type": "v1.ConfigMap",
+      "type": "api.ConfigMap",
       "method": "PUT",
       "summary": "replace the specified ConfigMap",
       "nickname": "replaceNamespacedConfigMap",
@@ -548,7 +548,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ConfigMap",
+        "type": "api.ConfigMap",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -576,7 +576,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ConfigMap"
+        "responseModel": "api.ConfigMap"
        }
       ],
       "produces": [
@@ -588,7 +588,7 @@
       ]
      },
      {
-      "type": "v1.ConfigMap",
+      "type": "api.ConfigMap",
       "method": "PATCH",
       "summary": "partially update the specified ConfigMap",
       "nickname": "patchNamespacedConfigMap",
@@ -630,7 +630,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ConfigMap"
+        "responseModel": "api.ConfigMap"
        }
       ],
       "produces": [
@@ -1024,7 +1024,7 @@
       ]
      },
      {
-      "type": "v1.Endpoints",
+      "type": "api.Endpoints",
       "method": "POST",
       "summary": "create a Endpoints",
       "nickname": "createNamespacedEndpoints",
@@ -1038,7 +1038,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Endpoints",
+        "type": "api.Endpoints",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1058,7 +1058,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Endpoints"
+        "responseModel": "api.Endpoints"
        }
       ],
       "produces": [
@@ -1237,7 +1237,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Endpoints",
+      "type": "api.Endpoints",
       "method": "GET",
       "summary": "read the specified Endpoints",
       "nickname": "readNamespacedEndpoints",
@@ -1287,7 +1287,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Endpoints"
+        "responseModel": "api.Endpoints"
        }
       ],
       "produces": [
@@ -1299,7 +1299,7 @@
       ]
      },
      {
-      "type": "v1.Endpoints",
+      "type": "api.Endpoints",
       "method": "PUT",
       "summary": "replace the specified Endpoints",
       "nickname": "replaceNamespacedEndpoints",
@@ -1313,7 +1313,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Endpoints",
+        "type": "api.Endpoints",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1341,7 +1341,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Endpoints"
+        "responseModel": "api.Endpoints"
        }
       ],
       "produces": [
@@ -1353,7 +1353,7 @@
       ]
      },
      {
-      "type": "v1.Endpoints",
+      "type": "api.Endpoints",
       "method": "PATCH",
       "summary": "partially update the specified Endpoints",
       "nickname": "patchNamespacedEndpoints",
@@ -1395,7 +1395,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Endpoints"
+        "responseModel": "api.Endpoints"
        }
       ],
       "produces": [
@@ -1789,7 +1789,7 @@
       ]
      },
      {
-      "type": "v1.Event",
+      "type": "api.Event",
       "method": "POST",
       "summary": "create a Event",
       "nickname": "createNamespacedEvent",
@@ -1803,7 +1803,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Event",
+        "type": "api.Event",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1823,7 +1823,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Event"
+        "responseModel": "api.Event"
        }
       ],
       "produces": [
@@ -2002,7 +2002,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Event",
+      "type": "api.Event",
       "method": "GET",
       "summary": "read the specified Event",
       "nickname": "readNamespacedEvent",
@@ -2052,7 +2052,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Event"
+        "responseModel": "api.Event"
        }
       ],
       "produces": [
@@ -2064,7 +2064,7 @@
       ]
      },
      {
-      "type": "v1.Event",
+      "type": "api.Event",
       "method": "PUT",
       "summary": "replace the specified Event",
       "nickname": "replaceNamespacedEvent",
@@ -2078,7 +2078,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Event",
+        "type": "api.Event",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2106,7 +2106,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Event"
+        "responseModel": "api.Event"
        }
       ],
       "produces": [
@@ -2118,7 +2118,7 @@
       ]
      },
      {
-      "type": "v1.Event",
+      "type": "api.Event",
       "method": "PATCH",
       "summary": "partially update the specified Event",
       "nickname": "patchNamespacedEvent",
@@ -2160,7 +2160,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Event"
+        "responseModel": "api.Event"
        }
       ],
       "produces": [
@@ -2554,7 +2554,7 @@
       ]
      },
      {
-      "type": "v1.LimitRange",
+      "type": "api.LimitRange",
       "method": "POST",
       "summary": "create a LimitRange",
       "nickname": "createNamespacedLimitRange",
@@ -2568,7 +2568,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.LimitRange",
+        "type": "api.LimitRange",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2588,7 +2588,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.LimitRange"
+        "responseModel": "api.LimitRange"
        }
       ],
       "produces": [
@@ -2767,7 +2767,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.LimitRange",
+      "type": "api.LimitRange",
       "method": "GET",
       "summary": "read the specified LimitRange",
       "nickname": "readNamespacedLimitRange",
@@ -2817,7 +2817,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.LimitRange"
+        "responseModel": "api.LimitRange"
        }
       ],
       "produces": [
@@ -2829,7 +2829,7 @@
       ]
      },
      {
-      "type": "v1.LimitRange",
+      "type": "api.LimitRange",
       "method": "PUT",
       "summary": "replace the specified LimitRange",
       "nickname": "replaceNamespacedLimitRange",
@@ -2843,7 +2843,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.LimitRange",
+        "type": "api.LimitRange",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2871,7 +2871,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.LimitRange"
+        "responseModel": "api.LimitRange"
        }
       ],
       "produces": [
@@ -2883,7 +2883,7 @@
       ]
      },
      {
-      "type": "v1.LimitRange",
+      "type": "api.LimitRange",
       "method": "PATCH",
       "summary": "partially update the specified LimitRange",
       "nickname": "patchNamespacedLimitRange",
@@ -2925,7 +2925,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.LimitRange"
+        "responseModel": "api.LimitRange"
        }
       ],
       "produces": [
@@ -3311,7 +3311,7 @@
       ]
      },
      {
-      "type": "v1.Namespace",
+      "type": "api.Namespace",
       "method": "POST",
       "summary": "create a Namespace",
       "nickname": "createNamespacedNamespace",
@@ -3325,7 +3325,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Namespace",
+        "type": "api.Namespace",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3337,7 +3337,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "api.Namespace"
        }
       ],
       "produces": [
@@ -3500,7 +3500,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Namespace",
+      "type": "api.Namespace",
       "method": "GET",
       "summary": "read the specified Namespace",
       "nickname": "readNamespacedNamespace",
@@ -3542,7 +3542,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "api.Namespace"
        }
       ],
       "produces": [
@@ -3554,7 +3554,7 @@
       ]
      },
      {
-      "type": "v1.Namespace",
+      "type": "api.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespacedNamespace",
@@ -3568,7 +3568,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Namespace",
+        "type": "api.Namespace",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3588,7 +3588,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "api.Namespace"
        }
       ],
       "produces": [
@@ -3600,7 +3600,7 @@
       ]
      },
      {
-      "type": "v1.Namespace",
+      "type": "api.Namespace",
       "method": "PATCH",
       "summary": "partially update the specified Namespace",
       "nickname": "patchNamespacedNamespace",
@@ -3634,7 +3634,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "api.Namespace"
        }
       ],
       "produces": [
@@ -3783,7 +3783,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Namespace",
+      "type": "api.Namespace",
       "method": "PUT",
       "summary": "replace finalize of the specified Namespace",
       "nickname": "replaceNamespacedNamespaceFinalize",
@@ -3797,7 +3797,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Namespace",
+        "type": "api.Namespace",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3817,7 +3817,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "api.Namespace"
        }
       ],
       "produces": [
@@ -3835,7 +3835,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Namespace",
+      "type": "api.Namespace",
       "method": "PUT",
       "summary": "replace status of the specified Namespace",
       "nickname": "replaceNamespacedNamespaceStatus",
@@ -3849,7 +3849,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Namespace",
+        "type": "api.Namespace",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3869,7 +3869,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "api.Namespace"
        }
       ],
       "produces": [
@@ -3957,7 +3957,7 @@
       ]
      },
      {
-      "type": "v1.Node",
+      "type": "api.Node",
       "method": "POST",
       "summary": "create a Node",
       "nickname": "createNamespacedNode",
@@ -3971,7 +3971,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Node",
+        "type": "api.Node",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3983,7 +3983,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "api.Node"
        }
       ],
       "produces": [
@@ -4146,7 +4146,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Node",
+      "type": "api.Node",
       "method": "GET",
       "summary": "read the specified Node",
       "nickname": "readNamespacedNode",
@@ -4188,7 +4188,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "api.Node"
        }
       ],
       "produces": [
@@ -4200,7 +4200,7 @@
       ]
      },
      {
-      "type": "v1.Node",
+      "type": "api.Node",
       "method": "PUT",
       "summary": "replace the specified Node",
       "nickname": "replaceNamespacedNode",
@@ -4214,7 +4214,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Node",
+        "type": "api.Node",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4234,7 +4234,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "api.Node"
        }
       ],
       "produces": [
@@ -4246,7 +4246,7 @@
       ]
      },
      {
-      "type": "v1.Node",
+      "type": "api.Node",
       "method": "PATCH",
       "summary": "partially update the specified Node",
       "nickname": "patchNamespacedNode",
@@ -4280,7 +4280,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "api.Node"
        }
       ],
       "produces": [
@@ -4753,7 +4753,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Node",
+      "type": "api.Node",
       "method": "PUT",
       "summary": "replace status of the specified Node",
       "nickname": "replaceNamespacedNodeStatus",
@@ -4767,7 +4767,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Node",
+        "type": "api.Node",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4787,7 +4787,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "api.Node"
        }
       ],
       "produces": [
@@ -4883,7 +4883,7 @@
       ]
      },
      {
-      "type": "v1.PersistentVolumeClaim",
+      "type": "api.PersistentVolumeClaim",
       "method": "POST",
       "summary": "create a PersistentVolumeClaim",
       "nickname": "createNamespacedPersistentVolumeClaim",
@@ -4897,7 +4897,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PersistentVolumeClaim",
+        "type": "api.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4917,7 +4917,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolumeClaim"
+        "responseModel": "api.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -5096,7 +5096,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.PersistentVolumeClaim",
+      "type": "api.PersistentVolumeClaim",
       "method": "GET",
       "summary": "read the specified PersistentVolumeClaim",
       "nickname": "readNamespacedPersistentVolumeClaim",
@@ -5146,7 +5146,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolumeClaim"
+        "responseModel": "api.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -5158,7 +5158,7 @@
       ]
      },
      {
-      "type": "v1.PersistentVolumeClaim",
+      "type": "api.PersistentVolumeClaim",
       "method": "PUT",
       "summary": "replace the specified PersistentVolumeClaim",
       "nickname": "replaceNamespacedPersistentVolumeClaim",
@@ -5172,7 +5172,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PersistentVolumeClaim",
+        "type": "api.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5200,7 +5200,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolumeClaim"
+        "responseModel": "api.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -5212,7 +5212,7 @@
       ]
      },
      {
-      "type": "v1.PersistentVolumeClaim",
+      "type": "api.PersistentVolumeClaim",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolumeClaim",
       "nickname": "patchNamespacedPersistentVolumeClaim",
@@ -5254,7 +5254,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolumeClaim"
+        "responseModel": "api.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -5570,7 +5570,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.PersistentVolumeClaim",
+      "type": "api.PersistentVolumeClaim",
       "method": "PUT",
       "summary": "replace status of the specified PersistentVolumeClaim",
       "nickname": "replaceNamespacedPersistentVolumeClaimStatus",
@@ -5584,7 +5584,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PersistentVolumeClaim",
+        "type": "api.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5612,7 +5612,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolumeClaim"
+        "responseModel": "api.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -5700,7 +5700,7 @@
       ]
      },
      {
-      "type": "v1.PersistentVolume",
+      "type": "api.PersistentVolume",
       "method": "POST",
       "summary": "create a PersistentVolume",
       "nickname": "createNamespacedPersistentVolume",
@@ -5714,7 +5714,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PersistentVolume",
+        "type": "api.PersistentVolume",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5726,7 +5726,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolume"
+        "responseModel": "api.PersistentVolume"
        }
       ],
       "produces": [
@@ -5889,7 +5889,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.PersistentVolume",
+      "type": "api.PersistentVolume",
       "method": "GET",
       "summary": "read the specified PersistentVolume",
       "nickname": "readNamespacedPersistentVolume",
@@ -5931,7 +5931,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolume"
+        "responseModel": "api.PersistentVolume"
        }
       ],
       "produces": [
@@ -5943,7 +5943,7 @@
       ]
      },
      {
-      "type": "v1.PersistentVolume",
+      "type": "api.PersistentVolume",
       "method": "PUT",
       "summary": "replace the specified PersistentVolume",
       "nickname": "replaceNamespacedPersistentVolume",
@@ -5957,7 +5957,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PersistentVolume",
+        "type": "api.PersistentVolume",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5977,7 +5977,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolume"
+        "responseModel": "api.PersistentVolume"
        }
       ],
       "produces": [
@@ -5989,7 +5989,7 @@
       ]
      },
      {
-      "type": "v1.PersistentVolume",
+      "type": "api.PersistentVolume",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolume",
       "nickname": "patchNamespacedPersistentVolume",
@@ -6023,7 +6023,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolume"
+        "responseModel": "api.PersistentVolume"
        }
       ],
       "produces": [
@@ -6172,7 +6172,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.PersistentVolume",
+      "type": "api.PersistentVolume",
       "method": "PUT",
       "summary": "replace status of the specified PersistentVolume",
       "nickname": "replaceNamespacedPersistentVolumeStatus",
@@ -6186,7 +6186,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PersistentVolume",
+        "type": "api.PersistentVolume",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6206,7 +6206,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PersistentVolume"
+        "responseModel": "api.PersistentVolume"
        }
       ],
       "produces": [
@@ -6302,7 +6302,7 @@
       ]
      },
      {
-      "type": "v1.Pod",
+      "type": "api.Pod",
       "method": "POST",
       "summary": "create a Pod",
       "nickname": "createNamespacedPod",
@@ -6316,7 +6316,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Pod",
+        "type": "api.Pod",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6336,7 +6336,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "api.Pod"
        }
       ],
       "produces": [
@@ -6515,7 +6515,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Pod",
+      "type": "api.Pod",
       "method": "GET",
       "summary": "read the specified Pod",
       "nickname": "readNamespacedPod",
@@ -6565,7 +6565,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "api.Pod"
        }
       ],
       "produces": [
@@ -6577,7 +6577,7 @@
       ]
      },
      {
-      "type": "v1.Pod",
+      "type": "api.Pod",
       "method": "PUT",
       "summary": "replace the specified Pod",
       "nickname": "replaceNamespacedPod",
@@ -6591,7 +6591,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Pod",
+        "type": "api.Pod",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6619,7 +6619,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "api.Pod"
        }
       ],
       "produces": [
@@ -6631,7 +6631,7 @@
       ]
      },
      {
-      "type": "v1.Pod",
+      "type": "api.Pod",
       "method": "PATCH",
       "summary": "partially update the specified Pod",
       "nickname": "patchNamespacedPod",
@@ -6673,7 +6673,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "api.Pod"
        }
       ],
       "produces": [
@@ -7555,7 +7555,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Binding",
+      "type": "api.Binding",
       "method": "POST",
       "summary": "create binding of a Binding",
       "nickname": "createNamespacedBindingBinding",
@@ -7569,7 +7569,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Binding",
+        "type": "api.Binding",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7597,7 +7597,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Binding"
+        "responseModel": "api.Binding"
        }
       ],
       "produces": [
@@ -7777,7 +7777,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Pod",
+      "type": "api.Pod",
       "method": "GET",
       "summary": "read log of the specified Pod",
       "nickname": "readNamespacedPodLog",
@@ -7875,7 +7875,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "api.Pod"
        }
       ],
       "produces": [
@@ -8475,7 +8475,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Pod",
+      "type": "api.Pod",
       "method": "PUT",
       "summary": "replace status of the specified Pod",
       "nickname": "replaceNamespacedPodStatus",
@@ -8489,7 +8489,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Pod",
+        "type": "api.Pod",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8517,7 +8517,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "api.Pod"
        }
       ],
       "produces": [
@@ -8613,7 +8613,7 @@
       ]
      },
      {
-      "type": "v1.PodTemplate",
+      "type": "api.PodTemplate",
       "method": "POST",
       "summary": "create a PodTemplate",
       "nickname": "createNamespacedPodTemplate",
@@ -8627,7 +8627,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PodTemplate",
+        "type": "api.PodTemplate",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8647,7 +8647,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PodTemplate"
+        "responseModel": "api.PodTemplate"
        }
       ],
       "produces": [
@@ -8826,7 +8826,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.PodTemplate",
+      "type": "api.PodTemplate",
       "method": "GET",
       "summary": "read the specified PodTemplate",
       "nickname": "readNamespacedPodTemplate",
@@ -8876,7 +8876,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PodTemplate"
+        "responseModel": "api.PodTemplate"
        }
       ],
       "produces": [
@@ -8888,7 +8888,7 @@
       ]
      },
      {
-      "type": "v1.PodTemplate",
+      "type": "api.PodTemplate",
       "method": "PUT",
       "summary": "replace the specified PodTemplate",
       "nickname": "replaceNamespacedPodTemplate",
@@ -8902,7 +8902,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.PodTemplate",
+        "type": "api.PodTemplate",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8930,7 +8930,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PodTemplate"
+        "responseModel": "api.PodTemplate"
        }
       ],
       "produces": [
@@ -8942,7 +8942,7 @@
       ]
      },
      {
-      "type": "v1.PodTemplate",
+      "type": "api.PodTemplate",
       "method": "PATCH",
       "summary": "partially update the specified PodTemplate",
       "nickname": "patchNamespacedPodTemplate",
@@ -8984,7 +8984,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.PodTemplate"
+        "responseModel": "api.PodTemplate"
        }
       ],
       "produces": [
@@ -9378,7 +9378,7 @@
       ]
      },
      {
-      "type": "v1.ReplicationController",
+      "type": "api.ReplicationController",
       "method": "POST",
       "summary": "create a ReplicationController",
       "nickname": "createNamespacedReplicationController",
@@ -9392,7 +9392,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ReplicationController",
+        "type": "api.ReplicationController",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9412,7 +9412,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ReplicationController"
+        "responseModel": "api.ReplicationController"
        }
       ],
       "produces": [
@@ -9591,7 +9591,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ReplicationController",
+      "type": "api.ReplicationController",
       "method": "GET",
       "summary": "read the specified ReplicationController",
       "nickname": "readNamespacedReplicationController",
@@ -9641,7 +9641,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ReplicationController"
+        "responseModel": "api.ReplicationController"
        }
       ],
       "produces": [
@@ -9653,7 +9653,7 @@
       ]
      },
      {
-      "type": "v1.ReplicationController",
+      "type": "api.ReplicationController",
       "method": "PUT",
       "summary": "replace the specified ReplicationController",
       "nickname": "replaceNamespacedReplicationController",
@@ -9667,7 +9667,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ReplicationController",
+        "type": "api.ReplicationController",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9695,7 +9695,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ReplicationController"
+        "responseModel": "api.ReplicationController"
        }
       ],
       "produces": [
@@ -9707,7 +9707,7 @@
       ]
      },
      {
-      "type": "v1.ReplicationController",
+      "type": "api.ReplicationController",
       "method": "PATCH",
       "summary": "partially update the specified ReplicationController",
       "nickname": "patchNamespacedReplicationController",
@@ -9749,7 +9749,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ReplicationController"
+        "responseModel": "api.ReplicationController"
        }
       ],
       "produces": [
@@ -10061,11 +10061,173 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{namespace}/replicationcontrollers/{name}/scale",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "extensions.ScaleTwo",
+      "method": "GET",
+      "summary": "read scale of the specified ScaleTwo",
+      "nickname": "readNamespacedScaleTwoScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ScaleTwo",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "extensions.ScaleTwo"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "extensions.ScaleTwo",
+      "method": "PUT",
+      "summary": "replace scale of the specified ScaleTwo",
+      "nickname": "replaceNamespacedScaleTwoScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "extensions.ScaleTwo",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ScaleTwo",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "extensions.ScaleTwo"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "extensions.ScaleTwo",
+      "method": "PATCH",
+      "summary": "partially update scale of the specified ScaleTwo",
+      "nickname": "patchNamespacedScaleTwoScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ScaleTwo",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "extensions.ScaleTwo"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/replicationcontrollers/{name}/status",
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ReplicationController",
+      "type": "api.ReplicationController",
       "method": "PUT",
       "summary": "replace status of the specified ReplicationController",
       "nickname": "replaceNamespacedReplicationControllerStatus",
@@ -10079,7 +10241,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ReplicationController",
+        "type": "api.ReplicationController",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -10107,7 +10269,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ReplicationController"
+        "responseModel": "api.ReplicationController"
        }
       ],
       "produces": [
@@ -10203,7 +10365,7 @@
       ]
      },
      {
-      "type": "v1.ResourceQuota",
+      "type": "api.ResourceQuota",
       "method": "POST",
       "summary": "create a ResourceQuota",
       "nickname": "createNamespacedResourceQuota",
@@ -10217,7 +10379,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ResourceQuota",
+        "type": "api.ResourceQuota",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -10237,7 +10399,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ResourceQuota"
+        "responseModel": "api.ResourceQuota"
        }
       ],
       "produces": [
@@ -10416,7 +10578,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ResourceQuota",
+      "type": "api.ResourceQuota",
       "method": "GET",
       "summary": "read the specified ResourceQuota",
       "nickname": "readNamespacedResourceQuota",
@@ -10466,7 +10628,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ResourceQuota"
+        "responseModel": "api.ResourceQuota"
        }
       ],
       "produces": [
@@ -10478,7 +10640,7 @@
       ]
      },
      {
-      "type": "v1.ResourceQuota",
+      "type": "api.ResourceQuota",
       "method": "PUT",
       "summary": "replace the specified ResourceQuota",
       "nickname": "replaceNamespacedResourceQuota",
@@ -10492,7 +10654,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ResourceQuota",
+        "type": "api.ResourceQuota",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -10520,7 +10682,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ResourceQuota"
+        "responseModel": "api.ResourceQuota"
        }
       ],
       "produces": [
@@ -10532,7 +10694,7 @@
       ]
      },
      {
-      "type": "v1.ResourceQuota",
+      "type": "api.ResourceQuota",
       "method": "PATCH",
       "summary": "partially update the specified ResourceQuota",
       "nickname": "patchNamespacedResourceQuota",
@@ -10574,7 +10736,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ResourceQuota"
+        "responseModel": "api.ResourceQuota"
        }
       ],
       "produces": [
@@ -10890,7 +11052,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ResourceQuota",
+      "type": "api.ResourceQuota",
       "method": "PUT",
       "summary": "replace status of the specified ResourceQuota",
       "nickname": "replaceNamespacedResourceQuotaStatus",
@@ -10904,7 +11066,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ResourceQuota",
+        "type": "api.ResourceQuota",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -10932,7 +11094,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ResourceQuota"
+        "responseModel": "api.ResourceQuota"
        }
       ],
       "produces": [
@@ -11028,7 +11190,7 @@
       ]
      },
      {
-      "type": "v1.Secret",
+      "type": "api.Secret",
       "method": "POST",
       "summary": "create a Secret",
       "nickname": "createNamespacedSecret",
@@ -11042,7 +11204,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Secret",
+        "type": "api.Secret",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -11062,7 +11224,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Secret"
+        "responseModel": "api.Secret"
        }
       ],
       "produces": [
@@ -11241,7 +11403,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Secret",
+      "type": "api.Secret",
       "method": "GET",
       "summary": "read the specified Secret",
       "nickname": "readNamespacedSecret",
@@ -11291,7 +11453,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Secret"
+        "responseModel": "api.Secret"
        }
       ],
       "produces": [
@@ -11303,7 +11465,7 @@
       ]
      },
      {
-      "type": "v1.Secret",
+      "type": "api.Secret",
       "method": "PUT",
       "summary": "replace the specified Secret",
       "nickname": "replaceNamespacedSecret",
@@ -11317,7 +11479,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Secret",
+        "type": "api.Secret",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -11345,7 +11507,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Secret"
+        "responseModel": "api.Secret"
        }
       ],
       "produces": [
@@ -11357,7 +11519,7 @@
       ]
      },
      {
-      "type": "v1.Secret",
+      "type": "api.Secret",
       "method": "PATCH",
       "summary": "partially update the specified Secret",
       "nickname": "patchNamespacedSecret",
@@ -11399,7 +11561,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Secret"
+        "responseModel": "api.Secret"
        }
       ],
       "produces": [
@@ -11793,7 +11955,7 @@
       ]
      },
      {
-      "type": "v1.ServiceAccount",
+      "type": "api.ServiceAccount",
       "method": "POST",
       "summary": "create a ServiceAccount",
       "nickname": "createNamespacedServiceAccount",
@@ -11807,7 +11969,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ServiceAccount",
+        "type": "api.ServiceAccount",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -11827,7 +11989,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ServiceAccount"
+        "responseModel": "api.ServiceAccount"
        }
       ],
       "produces": [
@@ -12006,7 +12168,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.ServiceAccount",
+      "type": "api.ServiceAccount",
       "method": "GET",
       "summary": "read the specified ServiceAccount",
       "nickname": "readNamespacedServiceAccount",
@@ -12056,7 +12218,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ServiceAccount"
+        "responseModel": "api.ServiceAccount"
        }
       ],
       "produces": [
@@ -12068,7 +12230,7 @@
       ]
      },
      {
-      "type": "v1.ServiceAccount",
+      "type": "api.ServiceAccount",
       "method": "PUT",
       "summary": "replace the specified ServiceAccount",
       "nickname": "replaceNamespacedServiceAccount",
@@ -12082,7 +12244,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.ServiceAccount",
+        "type": "api.ServiceAccount",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -12110,7 +12272,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ServiceAccount"
+        "responseModel": "api.ServiceAccount"
        }
       ],
       "produces": [
@@ -12122,7 +12284,7 @@
       ]
      },
      {
-      "type": "v1.ServiceAccount",
+      "type": "api.ServiceAccount",
       "method": "PATCH",
       "summary": "partially update the specified ServiceAccount",
       "nickname": "patchNamespacedServiceAccount",
@@ -12164,7 +12326,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.ServiceAccount"
+        "responseModel": "api.ServiceAccount"
        }
       ],
       "produces": [
@@ -12558,7 +12720,7 @@
       ]
      },
      {
-      "type": "v1.Service",
+      "type": "api.Service",
       "method": "POST",
       "summary": "create a Service",
       "nickname": "createNamespacedService",
@@ -12572,7 +12734,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Service",
+        "type": "api.Service",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -12592,7 +12754,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Service"
+        "responseModel": "api.Service"
        }
       ],
       "produces": [
@@ -12693,7 +12855,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Service",
+      "type": "api.Service",
       "method": "GET",
       "summary": "read the specified Service",
       "nickname": "readNamespacedService",
@@ -12727,7 +12889,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Service"
+        "responseModel": "api.Service"
        }
       ],
       "produces": [
@@ -12739,7 +12901,7 @@
       ]
      },
      {
-      "type": "v1.Service",
+      "type": "api.Service",
       "method": "PUT",
       "summary": "replace the specified Service",
       "nickname": "replaceNamespacedService",
@@ -12753,7 +12915,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Service",
+        "type": "api.Service",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -12781,7 +12943,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Service"
+        "responseModel": "api.Service"
        }
       ],
       "produces": [
@@ -12793,7 +12955,7 @@
       ]
      },
      {
-      "type": "v1.Service",
+      "type": "api.Service",
       "method": "PATCH",
       "summary": "partially update the specified Service",
       "nickname": "patchNamespacedService",
@@ -12835,7 +12997,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Service"
+        "responseModel": "api.Service"
        }
       ],
       "produces": [
@@ -13563,7 +13725,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Service",
+      "type": "api.Service",
       "method": "PUT",
       "summary": "replace status of the specified Service",
       "nickname": "replaceNamespacedServiceStatus",
@@ -13577,7 +13739,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Service",
+        "type": "api.Service",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -13605,7 +13767,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Service"
+        "responseModel": "api.Service"
        }
       ],
       "produces": [
@@ -13641,9 +13803,9 @@
    }
   ],
   "models": {
-   "v1.Binding": {
-    "id": "v1.Binding",
-    "description": "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
+   "api.Binding": {
+    "id": "api.Binding",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
     "required": [
      "target"
     ],
@@ -13657,102 +13819,79 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "$ref": "api.ObjectMeta"
      },
      "target": {
-      "$ref": "v1.ObjectReference",
-      "description": "The target object that you want to bind to the standard object."
+      "$ref": "api.ObjectReference"
      }
     }
    },
-   "v1.ObjectMeta": {
-    "id": "v1.ObjectMeta",
-    "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
+   "api.ObjectMeta": {
+    "id": "api.ObjectMeta",
     "properties": {
      "name": {
-      "type": "string",
-      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "type": "string"
      },
      "generateName": {
-      "type": "string",
-      "description": "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#idempotency"
+      "type": "string"
      },
      "namespace": {
-      "type": "string",
-      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
+      "type": "string"
      },
      "selfLink": {
-      "type": "string",
-      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+      "type": "string"
      },
      "uid": {
-      "type": "string",
-      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+      "type": "string"
      },
      "resourceVersion": {
-      "type": "string",
-      "description": "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+      "type": "string"
      },
      "generation": {
       "type": "integer",
-      "format": "int64",
-      "description": "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only."
+      "format": "int64"
      },
      "creationTimestamp": {
-      "type": "string",
-      "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "type": "string"
      },
      "deletionTimestamp": {
-      "type": "string",
-      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "type": "string"
      },
      "deletionGracePeriodSeconds": {
       "type": "integer",
-      "format": "int64",
-      "description": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only."
+      "format": "int64"
      },
      "labels": {
-      "type": "any",
-      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+      "type": "any"
      },
      "annotations": {
-      "type": "any",
-      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
+      "type": "any"
      }
     }
    },
-   "v1.ObjectReference": {
-    "id": "v1.ObjectReference",
-    "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
+   "api.ObjectReference": {
+    "id": "api.ObjectReference",
     "properties": {
      "kind": {
-      "type": "string",
-      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "type": "string"
      },
      "namespace": {
-      "type": "string",
-      "description": "Namespace of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
+      "type": "string"
      },
      "name": {
-      "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "type": "string"
      },
      "uid": {
-      "type": "string",
-      "description": "UID of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "API version of the referent."
+      "type": "string"
      },
      "resourceVersion": {
-      "type": "string",
-      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+      "type": "string"
      },
      "fieldPath": {
-      "type": "string",
-      "description": "If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object."
+      "type": "string"
      }
     }
    },
@@ -13823,6 +13962,62 @@
      }
     }
    },
+   "v1.ObjectMeta": {
+    "id": "v1.ObjectMeta",
+    "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#idempotency"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "generation": {
+      "type": "integer",
+      "format": "int64",
+      "description": "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only."
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "deletionGracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only."
+     },
+     "labels": {
+      "type": "any",
+      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+     },
+     "annotations": {
+      "type": "any",
+      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
+     }
+    }
+   },
    "v1.ComponentCondition": {
     "id": "v1.ComponentCondition",
     "description": "Information about the condition of a component.",
@@ -13846,6 +14041,50 @@
      "error": {
       "type": "string",
       "description": "Condition error code for a component. For example, a health check error code."
+     }
+    }
+   },
+   "api.ComponentStatus": {
+    "id": "api.ComponentStatus",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ComponentCondition"
+      }
+     }
+    }
+   },
+   "api.ComponentCondition": {
+    "id": "api.ComponentCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "error": {
+      "type": "string"
      }
     }
    },
@@ -13893,6 +14132,26 @@
      "data": {
       "type": "any",
       "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
+     }
+    }
+   },
+   "api.ConfigMap": {
+    "id": "api.ConfigMap",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "data": {
+      "type": "any"
      }
     }
    },
@@ -14123,6 +14382,40 @@
      }
     }
    },
+   "v1.ObjectReference": {
+    "id": "v1.ObjectReference",
+    "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object."
+     }
+    }
+   },
    "v1.EndpointPort": {
     "id": "v1.EndpointPort",
     "description": "EndpointPort is a tuple that describes a single port.",
@@ -14142,6 +14435,95 @@
      "protocol": {
       "type": "string",
       "description": "The IP protocol for this port. Must be UDP or TCP. Default is TCP."
+     }
+    }
+   },
+   "api.Endpoints": {
+    "id": "api.Endpoints",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "required": [
+     "Subsets"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "Subsets": {
+      "type": "array",
+      "items": {
+       "$ref": "api.EndpointSubset"
+      }
+     }
+    }
+   },
+   "api.EndpointSubset": {
+    "id": "api.EndpointSubset",
+    "required": [
+     "Addresses",
+     "NotReadyAddresses",
+     "Ports"
+    ],
+    "properties": {
+     "Addresses": {
+      "type": "array",
+      "items": {
+       "$ref": "api.EndpointAddress"
+      }
+     },
+     "NotReadyAddresses": {
+      "type": "array",
+      "items": {
+       "$ref": "api.EndpointAddress"
+      }
+     },
+     "Ports": {
+      "type": "array",
+      "items": {
+       "$ref": "api.EndpointPort"
+      }
+     }
+    }
+   },
+   "api.EndpointAddress": {
+    "id": "api.EndpointAddress",
+    "required": [
+     "IP",
+     "TargetRef"
+    ],
+    "properties": {
+     "IP": {
+      "type": "string"
+     },
+     "TargetRef": {
+      "$ref": "api.ObjectReference"
+     }
+    }
+   },
+   "api.EndpointPort": {
+    "id": "api.EndpointPort",
+    "required": [
+     "Name",
+     "Port",
+     "Protocol"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     },
+     "Port": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "Protocol": {
+      "type": "string"
      }
     }
    },
@@ -14242,6 +14624,59 @@
      }
     }
    },
+   "api.Event": {
+    "id": "api.Event",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "involvedObject": {
+      "$ref": "api.ObjectReference"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "source": {
+      "$ref": "api.EventSource"
+     },
+     "firstTimestamp": {
+      "type": "string"
+     },
+     "lastTimestamp": {
+      "type": "string"
+     },
+     "count": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
+   "api.EventSource": {
+    "id": "api.EventSource",
+    "properties": {
+     "component": {
+      "type": "string"
+     },
+     "host": {
+      "type": "string"
+     }
+    }
+   },
    "v1.LimitRangeList": {
     "id": "v1.LimitRangeList",
     "description": "LimitRangeList is a list of LimitRange items.",
@@ -14338,6 +14773,63 @@
      }
     }
    },
+   "api.LimitRange": {
+    "id": "api.LimitRange",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.LimitRangeSpec"
+     }
+    }
+   },
+   "api.LimitRangeSpec": {
+    "id": "api.LimitRangeSpec",
+    "required": [
+     "limits"
+    ],
+    "properties": {
+     "limits": {
+      "type": "array",
+      "items": {
+       "$ref": "api.LimitRangeItem"
+      }
+     }
+    }
+   },
+   "api.LimitRangeItem": {
+    "id": "api.LimitRangeItem",
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "max": {
+      "type": "any"
+     },
+     "min": {
+      "type": "any"
+     },
+     "default": {
+      "type": "any"
+     },
+     "defaultRequest": {
+      "type": "any"
+     },
+     "maxLimitRequestRatio": {
+      "type": "any"
+     }
+    }
+   },
    "v1.NamespaceList": {
     "id": "v1.NamespaceList",
     "description": "NamespaceList is a list of Namespaces.",
@@ -14416,6 +14908,55 @@
      "phase": {
       "type": "string",
       "description": "Phase is the current lifecycle phase of the namespace. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#phases"
+     }
+    }
+   },
+   "api.Namespace": {
+    "id": "api.Namespace",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.NamespaceSpec"
+     },
+     "status": {
+      "$ref": "api.NamespaceStatus"
+     }
+    }
+   },
+   "api.NamespaceSpec": {
+    "id": "api.NamespaceSpec",
+    "required": [
+     "Finalizers"
+    ],
+    "properties": {
+     "Finalizers": {
+      "type": "array",
+      "items": {
+       "$ref": "api.FinalizerName"
+      }
+     }
+    }
+   },
+   "api.FinalizerName": {
+    "id": "api.FinalizerName",
+    "properties": {}
+   },
+   "api.NamespaceStatus": {
+    "id": "api.NamespaceStatus",
+    "properties": {
+     "phase": {
+      "type": "string"
      }
     }
    },
@@ -14690,6 +15231,206 @@
      }
     }
    },
+   "api.Node": {
+    "id": "api.Node",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.NodeSpec"
+     },
+     "status": {
+      "$ref": "api.NodeStatus"
+     }
+    }
+   },
+   "api.NodeSpec": {
+    "id": "api.NodeSpec",
+    "properties": {
+     "podCIDR": {
+      "type": "string"
+     },
+     "externalID": {
+      "type": "string"
+     },
+     "providerID": {
+      "type": "string"
+     },
+     "unschedulable": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.NodeStatus": {
+    "id": "api.NodeStatus",
+    "required": [
+     "images"
+    ],
+    "properties": {
+     "capacity": {
+      "type": "any"
+     },
+     "allocatable": {
+      "type": "any"
+     },
+     "phase": {
+      "type": "string"
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "api.NodeCondition"
+      }
+     },
+     "addresses": {
+      "type": "array",
+      "items": {
+       "$ref": "api.NodeAddress"
+      }
+     },
+     "daemonEndpoints": {
+      "$ref": "api.NodeDaemonEndpoints"
+     },
+     "nodeInfo": {
+      "$ref": "api.NodeSystemInfo"
+     },
+     "images": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ContainerImage"
+      }
+     }
+    }
+   },
+   "api.NodeCondition": {
+    "id": "api.NodeCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastHeartbeatTime": {
+      "type": "string"
+     },
+     "lastTransitionTime": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     }
+    }
+   },
+   "api.NodeAddress": {
+    "id": "api.NodeAddress",
+    "required": [
+     "type",
+     "address"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "address": {
+      "type": "string"
+     }
+    }
+   },
+   "api.NodeDaemonEndpoints": {
+    "id": "api.NodeDaemonEndpoints",
+    "properties": {
+     "kubeletEndpoint": {
+      "$ref": "api.DaemonEndpoint"
+     }
+    }
+   },
+   "api.DaemonEndpoint": {
+    "id": "api.DaemonEndpoint",
+    "required": [
+     "Port"
+    ],
+    "properties": {
+     "Port": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "api.NodeSystemInfo": {
+    "id": "api.NodeSystemInfo",
+    "required": [
+     "machineID",
+     "systemUUID",
+     "bootID",
+     "kernelVersion",
+     "osImage",
+     "containerRuntimeVersion",
+     "kubeletVersion",
+     "kubeProxyVersion"
+    ],
+    "properties": {
+     "machineID": {
+      "type": "string"
+     },
+     "systemUUID": {
+      "type": "string"
+     },
+     "bootID": {
+      "type": "string"
+     },
+     "kernelVersion": {
+      "type": "string"
+     },
+     "osImage": {
+      "type": "string"
+     },
+     "containerRuntimeVersion": {
+      "type": "string"
+     },
+     "kubeletVersion": {
+      "type": "string"
+     },
+     "kubeProxyVersion": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ContainerImage": {
+    "id": "api.ContainerImage",
+    "required": [
+     "repoTags"
+    ],
+    "properties": {
+     "repoTags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "size": {
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
    "v1.PersistentVolumeClaimList": {
     "id": "v1.PersistentVolumeClaimList",
     "description": "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
@@ -14801,6 +15542,78 @@
      "capacity": {
       "type": "any",
       "description": "Represents the actual resources of the underlying volume."
+     }
+    }
+   },
+   "api.PersistentVolumeClaim": {
+    "id": "api.PersistentVolumeClaim",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.PersistentVolumeClaimSpec"
+     },
+     "status": {
+      "$ref": "api.PersistentVolumeClaimStatus"
+     }
+    }
+   },
+   "api.PersistentVolumeClaimSpec": {
+    "id": "api.PersistentVolumeClaimSpec",
+    "properties": {
+     "accessModes": {
+      "type": "array",
+      "items": {
+       "$ref": "api.PersistentVolumeAccessMode"
+      }
+     },
+     "resources": {
+      "$ref": "api.ResourceRequirements"
+     },
+     "volumeName": {
+      "type": "string"
+     }
+    }
+   },
+   "api.PersistentVolumeAccessMode": {
+    "id": "api.PersistentVolumeAccessMode",
+    "properties": {}
+   },
+   "api.ResourceRequirements": {
+    "id": "api.ResourceRequirements",
+    "properties": {
+     "limits": {
+      "type": "any"
+     },
+     "requests": {
+      "type": "any"
+     }
+    }
+   },
+   "api.PersistentVolumeClaimStatus": {
+    "id": "api.PersistentVolumeClaimStatus",
+    "properties": {
+     "phase": {
+      "type": "string"
+     },
+     "accessModes": {
+      "type": "array",
+      "items": {
+       "$ref": "api.PersistentVolumeAccessMode"
+      }
+     },
+     "capacity": {
+      "type": "any"
      }
     }
    },
@@ -15283,6 +16096,372 @@
      "reason": {
       "type": "string",
       "description": "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI."
+     }
+    }
+   },
+   "api.PersistentVolume": {
+    "id": "api.PersistentVolume",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.PersistentVolumeSpec"
+     },
+     "status": {
+      "$ref": "api.PersistentVolumeStatus"
+     }
+    }
+   },
+   "api.PersistentVolumeSpec": {
+    "id": "api.PersistentVolumeSpec",
+    "required": [
+     "capacity"
+    ],
+    "properties": {
+     "capacity": {
+      "type": "any"
+     },
+     "gcePersistentDisk": {
+      "$ref": "api.GCEPersistentDiskVolumeSource"
+     },
+     "awsElasticBlockStore": {
+      "$ref": "api.AWSElasticBlockStoreVolumeSource"
+     },
+     "hostPath": {
+      "$ref": "api.HostPathVolumeSource"
+     },
+     "glusterfs": {
+      "$ref": "api.GlusterfsVolumeSource"
+     },
+     "nfs": {
+      "$ref": "api.NFSVolumeSource"
+     },
+     "rbd": {
+      "$ref": "api.RBDVolumeSource"
+     },
+     "iscsi": {
+      "$ref": "api.ISCSIVolumeSource"
+     },
+     "flexVolume": {
+      "$ref": "api.FlexVolumeSource"
+     },
+     "cinder": {
+      "$ref": "api.CinderVolumeSource"
+     },
+     "cephfs": {
+      "$ref": "api.CephFSVolumeSource"
+     },
+     "fc": {
+      "$ref": "api.FCVolumeSource"
+     },
+     "flocker": {
+      "$ref": "api.FlockerVolumeSource"
+     },
+     "accessModes": {
+      "type": "array",
+      "items": {
+       "$ref": "api.PersistentVolumeAccessMode"
+      }
+     },
+     "claimRef": {
+      "$ref": "api.ObjectReference"
+     },
+     "persistentVolumeReclaimPolicy": {
+      "type": "string"
+     }
+    }
+   },
+   "api.GCEPersistentDiskVolumeSource": {
+    "id": "api.GCEPersistentDiskVolumeSource",
+    "required": [
+     "pdName"
+    ],
+    "properties": {
+     "pdName": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.AWSElasticBlockStoreVolumeSource": {
+    "id": "api.AWSElasticBlockStoreVolumeSource",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.HostPathVolumeSource": {
+    "id": "api.HostPathVolumeSource",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string"
+     }
+    }
+   },
+   "api.GlusterfsVolumeSource": {
+    "id": "api.GlusterfsVolumeSource",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.NFSVolumeSource": {
+    "id": "api.NFSVolumeSource",
+    "required": [
+     "server",
+     "path"
+    ],
+    "properties": {
+     "server": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.RBDVolumeSource": {
+    "id": "api.RBDVolumeSource",
+    "required": [
+     "monitors",
+     "image",
+     "pool",
+     "user",
+     "keyring",
+     "secretRef"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "image": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "pool": {
+      "type": "string"
+     },
+     "user": {
+      "type": "string"
+     },
+     "keyring": {
+      "type": "string"
+     },
+     "secretRef": {
+      "$ref": "api.LocalObjectReference"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.LocalObjectReference": {
+    "id": "api.LocalObjectReference",
+    "required": [
+     "Name"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ISCSIVolumeSource": {
+    "id": "api.ISCSIVolumeSource",
+    "properties": {
+     "targetPortal": {
+      "type": "string"
+     },
+     "iqn": {
+      "type": "string"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "iscsiInterface": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.FlexVolumeSource": {
+    "id": "api.FlexVolumeSource",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "secretRef": {
+      "$ref": "api.LocalObjectReference"
+     },
+     "readOnly": {
+      "type": "boolean"
+     },
+     "options": {
+      "type": "any"
+     }
+    }
+   },
+   "api.CinderVolumeSource": {
+    "id": "api.CinderVolumeSource",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.CephFSVolumeSource": {
+    "id": "api.CephFSVolumeSource",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "path": {
+      "type": "string"
+     },
+     "user": {
+      "type": "string"
+     },
+     "secretFile": {
+      "type": "string"
+     },
+     "secretRef": {
+      "$ref": "api.LocalObjectReference"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.FCVolumeSource": {
+    "id": "api.FCVolumeSource",
+    "required": [
+     "targetWWNs",
+     "lun",
+     "fsType"
+    ],
+    "properties": {
+     "targetWWNs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "fsType": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.FlockerVolumeSource": {
+    "id": "api.FlockerVolumeSource",
+    "required": [
+     "datasetName"
+    ],
+    "properties": {
+     "datasetName": {
+      "type": "string"
+     }
+    }
+   },
+   "api.PersistentVolumeStatus": {
+    "id": "api.PersistentVolumeStatus",
+    "properties": {
+     "phase": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
      }
     }
    },
@@ -16268,6 +17447,767 @@
      }
     }
    },
+   "api.Pod": {
+    "id": "api.Pod",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.PodSpec"
+     },
+     "status": {
+      "$ref": "api.PodStatus"
+     }
+    }
+   },
+   "api.PodSpec": {
+    "id": "api.PodSpec",
+    "required": [
+     "volumes",
+     "containers",
+     "serviceAccountName"
+    ],
+    "properties": {
+     "volumes": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Volume"
+      }
+     },
+     "containers": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Container"
+      }
+     },
+     "restartPolicy": {
+      "type": "string"
+     },
+     "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "activeDeadlineSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "dnsPolicy": {
+      "type": "string"
+     },
+     "nodeSelector": {
+      "type": "any"
+     },
+     "serviceAccountName": {
+      "type": "string"
+     },
+     "nodeName": {
+      "type": "string"
+     },
+     "securityContext": {
+      "$ref": "api.PodSecurityContext"
+     },
+     "imagePullSecrets": {
+      "type": "array",
+      "items": {
+       "$ref": "api.LocalObjectReference"
+      }
+     }
+    }
+   },
+   "api.Volume": {
+    "id": "api.Volume",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "hostPath": {
+      "$ref": "api.HostPathVolumeSource"
+     },
+     "emptyDir": {
+      "$ref": "api.EmptyDirVolumeSource"
+     },
+     "gcePersistentDisk": {
+      "$ref": "api.GCEPersistentDiskVolumeSource"
+     },
+     "awsElasticBlockStore": {
+      "$ref": "api.AWSElasticBlockStoreVolumeSource"
+     },
+     "gitRepo": {
+      "$ref": "api.GitRepoVolumeSource"
+     },
+     "secret": {
+      "$ref": "api.SecretVolumeSource"
+     },
+     "nfs": {
+      "$ref": "api.NFSVolumeSource"
+     },
+     "iscsi": {
+      "$ref": "api.ISCSIVolumeSource"
+     },
+     "glusterfs": {
+      "$ref": "api.GlusterfsVolumeSource"
+     },
+     "persistentVolumeClaim": {
+      "$ref": "api.PersistentVolumeClaimVolumeSource"
+     },
+     "rbd": {
+      "$ref": "api.RBDVolumeSource"
+     },
+     "flexVolume": {
+      "$ref": "api.FlexVolumeSource"
+     },
+     "cinder": {
+      "$ref": "api.CinderVolumeSource"
+     },
+     "cephfs": {
+      "$ref": "api.CephFSVolumeSource"
+     },
+     "flocker": {
+      "$ref": "api.FlockerVolumeSource"
+     },
+     "downwardAPI": {
+      "$ref": "api.DownwardAPIVolumeSource"
+     },
+     "fc": {
+      "$ref": "api.FCVolumeSource"
+     }
+    }
+   },
+   "api.EmptyDirVolumeSource": {
+    "id": "api.EmptyDirVolumeSource",
+    "properties": {
+     "medium": {
+      "type": "string"
+     }
+    }
+   },
+   "api.GitRepoVolumeSource": {
+    "id": "api.GitRepoVolumeSource",
+    "required": [
+     "repository"
+    ],
+    "properties": {
+     "repository": {
+      "type": "string"
+     },
+     "revision": {
+      "type": "string"
+     },
+     "directory": {
+      "type": "string"
+     }
+    }
+   },
+   "api.SecretVolumeSource": {
+    "id": "api.SecretVolumeSource",
+    "properties": {
+     "secretName": {
+      "type": "string"
+     }
+    }
+   },
+   "api.PersistentVolumeClaimVolumeSource": {
+    "id": "api.PersistentVolumeClaimVolumeSource",
+    "required": [
+     "claimName"
+    ],
+    "properties": {
+     "claimName": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.DownwardAPIVolumeSource": {
+    "id": "api.DownwardAPIVolumeSource",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "api.DownwardAPIVolumeFile"
+      }
+     }
+    }
+   },
+   "api.DownwardAPIVolumeFile": {
+    "id": "api.DownwardAPIVolumeFile",
+    "required": [
+     "path",
+     "fieldRef"
+    ],
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "fieldRef": {
+      "$ref": "api.ObjectFieldSelector"
+     }
+    }
+   },
+   "api.ObjectFieldSelector": {
+    "id": "api.ObjectFieldSelector",
+    "required": [
+     "apiVersion",
+     "fieldPath"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "fieldPath": {
+      "type": "string"
+     }
+    }
+   },
+   "api.Container": {
+    "id": "api.Container",
+    "required": [
+     "name",
+     "image",
+     "imagePullPolicy"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "image": {
+      "type": "string"
+     },
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "args": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "workingDir": {
+      "type": "string"
+     },
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ContainerPort"
+      }
+     },
+     "env": {
+      "type": "array",
+      "items": {
+       "$ref": "api.EnvVar"
+      }
+     },
+     "resources": {
+      "$ref": "api.ResourceRequirements"
+     },
+     "volumeMounts": {
+      "type": "array",
+      "items": {
+       "$ref": "api.VolumeMount"
+      }
+     },
+     "livenessProbe": {
+      "$ref": "api.Probe"
+     },
+     "readinessProbe": {
+      "$ref": "api.Probe"
+     },
+     "lifecycle": {
+      "$ref": "api.Lifecycle"
+     },
+     "terminationMessagePath": {
+      "type": "string"
+     },
+     "imagePullPolicy": {
+      "type": "string"
+     },
+     "securityContext": {
+      "$ref": "api.SecurityContext"
+     },
+     "stdin": {
+      "type": "boolean"
+     },
+     "stdinOnce": {
+      "type": "boolean"
+     },
+     "tty": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.ContainerPort": {
+    "id": "api.ContainerPort",
+    "required": [
+     "containerPort"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "hostPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "containerPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "protocol": {
+      "type": "string"
+     },
+     "hostIP": {
+      "type": "string"
+     }
+    }
+   },
+   "api.EnvVar": {
+    "id": "api.EnvVar",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     },
+     "valueFrom": {
+      "$ref": "api.EnvVarSource"
+     }
+    }
+   },
+   "api.EnvVarSource": {
+    "id": "api.EnvVarSource",
+    "properties": {
+     "fieldRef": {
+      "$ref": "api.ObjectFieldSelector"
+     },
+     "configMapKeyRef": {
+      "$ref": "api.ConfigMapKeySelector"
+     },
+     "secretKeyRef": {
+      "$ref": "api.SecretKeySelector"
+     }
+    }
+   },
+   "api.ConfigMapKeySelector": {
+    "id": "api.ConfigMapKeySelector",
+    "required": [
+     "Name",
+     "key"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     },
+     "key": {
+      "type": "string"
+     }
+    }
+   },
+   "api.SecretKeySelector": {
+    "id": "api.SecretKeySelector",
+    "required": [
+     "Name",
+     "key"
+    ],
+    "properties": {
+     "Name": {
+      "type": "string"
+     },
+     "key": {
+      "type": "string"
+     }
+    }
+   },
+   "api.VolumeMount": {
+    "id": "api.VolumeMount",
+    "required": [
+     "name",
+     "mountPath"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     },
+     "mountPath": {
+      "type": "string"
+     }
+    }
+   },
+   "api.Probe": {
+    "id": "api.Probe",
+    "properties": {
+     "exec": {
+      "$ref": "api.ExecAction"
+     },
+     "httpGet": {
+      "$ref": "api.HTTPGetAction"
+     },
+     "tcpSocket": {
+      "$ref": "api.TCPSocketAction"
+     },
+     "initialDelaySeconds": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "timeoutSeconds": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "periodSeconds": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "successThreshold": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "failureThreshold": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "api.ExecAction": {
+    "id": "api.ExecAction",
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "api.HTTPGetAction": {
+    "id": "api.HTTPGetAction",
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "port": {
+      "type": "string"
+     },
+     "host": {
+      "type": "string"
+     },
+     "scheme": {
+      "type": "string"
+     }
+    }
+   },
+   "api.TCPSocketAction": {
+    "id": "api.TCPSocketAction",
+    "properties": {
+     "port": {
+      "type": "string"
+     }
+    }
+   },
+   "api.Lifecycle": {
+    "id": "api.Lifecycle",
+    "properties": {
+     "postStart": {
+      "$ref": "api.Handler"
+     },
+     "preStop": {
+      "$ref": "api.Handler"
+     }
+    }
+   },
+   "api.Handler": {
+    "id": "api.Handler",
+    "properties": {
+     "exec": {
+      "$ref": "api.ExecAction"
+     },
+     "httpGet": {
+      "$ref": "api.HTTPGetAction"
+     },
+     "tcpSocket": {
+      "$ref": "api.TCPSocketAction"
+     }
+    }
+   },
+   "api.SecurityContext": {
+    "id": "api.SecurityContext",
+    "properties": {
+     "capabilities": {
+      "$ref": "api.Capabilities"
+     },
+     "privileged": {
+      "type": "boolean"
+     },
+     "seLinuxOptions": {
+      "$ref": "api.SELinuxOptions"
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "runAsNonRoot": {
+      "type": "boolean"
+     }
+    }
+   },
+   "api.Capabilities": {
+    "id": "api.Capabilities",
+    "properties": {
+     "add": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Capability"
+      }
+     },
+     "drop": {
+      "type": "array",
+      "items": {
+       "$ref": "api.Capability"
+      }
+     }
+    }
+   },
+   "api.Capability": {
+    "id": "api.Capability",
+    "properties": {}
+   },
+   "api.SELinuxOptions": {
+    "id": "api.SELinuxOptions",
+    "properties": {
+     "user": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     },
+     "level": {
+      "type": "string"
+     }
+    }
+   },
+   "api.PodSecurityContext": {
+    "id": "api.PodSecurityContext",
+    "properties": {
+     "hostNetwork": {
+      "type": "boolean"
+     },
+     "hostPID": {
+      "type": "boolean"
+     },
+     "hostIPC": {
+      "type": "boolean"
+     },
+     "seLinuxOptions": {
+      "$ref": "api.SELinuxOptions"
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "runAsNonRoot": {
+      "type": "boolean"
+     },
+     "supplementalGroups": {
+      "type": "array",
+      "items": {
+       "$ref": "integer"
+      }
+     },
+     "fsGroup": {
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
+   "api.PodStatus": {
+    "id": "api.PodStatus",
+    "properties": {
+     "phase": {
+      "type": "string"
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "api.PodCondition"
+      }
+     },
+     "message": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "hostIP": {
+      "type": "string"
+     },
+     "podIP": {
+      "type": "string"
+     },
+     "startTime": {
+      "type": "string"
+     },
+     "containerStatuses": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ContainerStatus"
+      }
+     }
+    }
+   },
+   "api.PodCondition": {
+    "id": "api.PodCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastProbeTime": {
+      "type": "string"
+     },
+     "lastTransitionTime": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ContainerStatus": {
+    "id": "api.ContainerStatus",
+    "required": [
+     "name",
+     "ready",
+     "restartCount",
+     "image",
+     "imageID"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "state": {
+      "$ref": "api.ContainerState"
+     },
+     "lastState": {
+      "$ref": "api.ContainerState"
+     },
+     "ready": {
+      "type": "boolean"
+     },
+     "restartCount": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "image": {
+      "type": "string"
+     },
+     "imageID": {
+      "type": "string"
+     },
+     "containerID": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ContainerState": {
+    "id": "api.ContainerState",
+    "properties": {
+     "waiting": {
+      "$ref": "api.ContainerStateWaiting"
+     },
+     "running": {
+      "$ref": "api.ContainerStateRunning"
+     },
+     "terminated": {
+      "$ref": "api.ContainerStateTerminated"
+     }
+    }
+   },
+   "api.ContainerStateWaiting": {
+    "id": "api.ContainerStateWaiting",
+    "properties": {
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ContainerStateRunning": {
+    "id": "api.ContainerStateRunning",
+    "properties": {
+     "startedAt": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ContainerStateTerminated": {
+    "id": "api.ContainerStateTerminated",
+    "required": [
+     "exitCode"
+    ],
+    "properties": {
+     "exitCode": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "signal": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "startedAt": {
+      "type": "string"
+     },
+     "finishedAt": {
+      "type": "string"
+     },
+     "containerID": {
+      "type": "string"
+     }
+    }
+   },
    "v1.PodTemplateList": {
     "id": "v1.PodTemplateList",
     "description": "PodTemplateList is a list of PodTemplates.",
@@ -16329,6 +18269,37 @@
      "spec": {
       "$ref": "v1.PodSpec",
       "description": "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "api.PodTemplate": {
+    "id": "api.PodTemplate",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "template": {
+      "$ref": "api.PodTemplateSpec"
+     }
+    }
+   },
+   "api.PodTemplateSpec": {
+    "id": "api.PodTemplateSpec",
+    "properties": {
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.PodSpec"
      }
     }
    },
@@ -16424,6 +18395,111 @@
      }
     }
    },
+   "api.ReplicationController": {
+    "id": "api.ReplicationController",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.ReplicationControllerSpec"
+     },
+     "status": {
+      "$ref": "api.ReplicationControllerStatus"
+     }
+    }
+   },
+   "api.ReplicationControllerSpec": {
+    "id": "api.ReplicationControllerSpec",
+    "required": [
+     "replicas",
+     "selector"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "type": "any"
+     },
+     "template": {
+      "$ref": "api.PodTemplateSpec"
+     }
+    }
+   },
+   "api.ReplicationControllerStatus": {
+    "id": "api.ReplicationControllerStatus",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
+   "extensions.ScaleTwo": {
+    "id": "extensions.ScaleTwo",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "extensions.ScaleSpec"
+     },
+     "status": {
+      "$ref": "extensions.ScaleTwoStatus"
+     }
+    }
+   },
+   "extensions.ScaleSpec": {
+    "id": "extensions.ScaleSpec",
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "extensions.ScaleTwoStatus": {
+    "id": "extensions.ScaleTwoStatus",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "type": "string"
+     }
+    }
+   },
    "v1.ResourceQuotaList": {
     "id": "v1.ResourceQuotaList",
     "description": "ResourceQuotaList is a list of ResourceQuota items.",
@@ -16502,6 +18578,48 @@
      }
     }
    },
+   "api.ResourceQuota": {
+    "id": "api.ResourceQuota",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.ResourceQuotaSpec"
+     },
+     "status": {
+      "$ref": "api.ResourceQuotaStatus"
+     }
+    }
+   },
+   "api.ResourceQuotaSpec": {
+    "id": "api.ResourceQuotaSpec",
+    "properties": {
+     "hard": {
+      "type": "any"
+     }
+    }
+   },
+   "api.ResourceQuotaStatus": {
+    "id": "api.ResourceQuotaStatus",
+    "properties": {
+     "hard": {
+      "type": "any"
+     },
+     "used": {
+      "type": "any"
+     }
+    }
+   },
    "v1.SecretList": {
     "id": "v1.SecretList",
     "description": "SecretList is a list of Secret.",
@@ -16553,6 +18671,29 @@
      "type": {
       "type": "string",
       "description": "Used to facilitate programmatic handling of secret data."
+     }
+    }
+   },
+   "api.Secret": {
+    "id": "api.Secret",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "data": {
+      "type": "any"
+     },
+     "type": {
+      "type": "string"
      }
     }
    },
@@ -16613,6 +18754,38 @@
        "$ref": "v1.LocalObjectReference"
       },
       "description": "ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet. More info: http://releases.k8s.io/HEAD/docs/user-guide/secrets.md#manually-specifying-an-imagepullsecret"
+     }
+    }
+   },
+   "api.ServiceAccount": {
+    "id": "api.ServiceAccount",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "required": [
+     "secrets"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "secrets": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ObjectReference"
+      }
+     },
+     "imagePullSecrets": {
+      "type": "array",
+      "items": {
+       "$ref": "api.LocalObjectReference"
+      }
      }
     }
    },
@@ -16785,6 +18958,124 @@
      "hostname": {
       "type": "string",
       "description": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)"
+     }
+    }
+   },
+   "api.Service": {
+    "id": "api.Service",
+    "description": "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "api.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "api.ServiceSpec"
+     },
+     "status": {
+      "$ref": "api.ServiceStatus"
+     }
+    }
+   },
+   "api.ServiceSpec": {
+    "id": "api.ServiceSpec",
+    "required": [
+     "ports",
+     "selector"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "api.ServicePort"
+      }
+     },
+     "selector": {
+      "type": "any"
+     },
+     "clusterIP": {
+      "type": "string"
+     },
+     "externalIPs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "loadBalancerIP": {
+      "type": "string"
+     },
+     "sessionAffinity": {
+      "type": "string"
+     }
+    }
+   },
+   "api.ServicePort": {
+    "id": "api.ServicePort",
+    "required": [
+     "name",
+     "protocol",
+     "port",
+     "targetPort",
+     "nodePort"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "protocol": {
+      "type": "string"
+     },
+     "port": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "targetPort": {
+      "type": "string"
+     },
+     "nodePort": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "api.ServiceStatus": {
+    "id": "api.ServiceStatus",
+    "properties": {
+     "loadBalancer": {
+      "$ref": "api.LoadBalancerStatus"
+     }
+    }
+   },
+   "api.LoadBalancerStatus": {
+    "id": "api.LoadBalancerStatus",
+    "properties": {
+     "ingress": {
+      "type": "array",
+      "items": {
+       "$ref": "api.LoadBalancerIngress"
+      }
+     }
+    }
+   },
+   "api.LoadBalancerIngress": {
+    "id": "api.LoadBalancerIngress",
+    "properties": {
+     "ip": {
+      "type": "string"
+     },
+     "hostname": {
+      "type": "string"
      }
     }
    }
