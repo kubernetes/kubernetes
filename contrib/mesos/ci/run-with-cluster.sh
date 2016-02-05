@@ -58,7 +58,7 @@ echo "${DOCKER_BIN_PATH}"
 cd "${KUBE_ROOT}"
 docker run \
   --rm \
-  -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
+  -v "${KUBE_ROOT}:/go/src/k8s.io/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
   -v "${MESOS_DOCKER_WORK_DIR}/auth:${MESOS_DOCKER_WORK_DIR}/auth" \

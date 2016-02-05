@@ -46,9 +46,10 @@ echo "${DOCKER_BIN_PATH}"
 cd "${KUBE_ROOT}"
 exec docker run \
   --rm \
-  -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
+  -v "${KUBE_ROOT}:/go/src/k8s.io/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
+  $(test -d /teamcity/system/git && echo "-v /teamcity/system/git:/teamcity/system/git" || true) \
   -e "KUBERNETES_CONTRIB=mesos" \
   -e "USER=root" \
   -t $(tty &>/dev/null && echo "-i") \
