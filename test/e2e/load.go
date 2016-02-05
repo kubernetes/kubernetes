@@ -70,7 +70,17 @@ var _ = Describe("Load capacity", func() {
 	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		c = framework.Client
+		// Explicitly create a client with higher QPS limits.
+		config, err := loadConfig()
+		Expect(err).NotTo(HaveOccurred())
+		config.QPS = 50
+		config.Burst = 100
+		c, err = client.New(config)
+		Expect(err).NotTo(HaveOccurred())
+		if c.Client.Timeout == 0 {
+			c.Client.Timeout = singleCallTimeout
+		}
+
 		ns = framework.Namespace.Name
 		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
@@ -79,7 +89,7 @@ var _ = Describe("Load capacity", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err := checkTestingNSDeletedExcept(c, ns)
+		err = checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
