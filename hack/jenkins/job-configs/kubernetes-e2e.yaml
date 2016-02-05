@@ -199,6 +199,16 @@
             timeout: 90
             emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
             test-owner: 'beeps'
+        - 'gke-deployment':
+            description: 'Run [Feature:Deployment] tests on GKE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, chiachenk@google.com'
+            test-owner: 'chiachenk'
+        - 'gce-deployment':
+            description: 'Run [Feature:Deployment] tests on GCE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, chiachenk@google.com'
+            test-owner: 'chiachenk'
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
