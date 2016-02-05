@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package release_1_2
+package internalclientset
 
 import (
 	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
