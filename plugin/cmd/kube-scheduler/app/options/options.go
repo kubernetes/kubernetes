@@ -21,7 +21,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/spf13/pflag"
@@ -66,5 +65,5 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringVar(&s.SchedulerName, "scheduler-name", s.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's annotation with key 'scheduler.alpha.kubernetes.io/name'")
-	leaderelection.BindFlags(&s.LeaderElection, fs)
+	s.LeaderElection.AddFlags(fs)
 }

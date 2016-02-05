@@ -65,7 +65,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -340,25 +339,4 @@ func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfigur
 		RenewDeadline: unversioned.Duration{DefaultRenewDeadline},
 		RetryPeriod:   unversioned.Duration{DefaultRetryPeriod},
 	}
-}
-
-// BindFlags binds the common LeaderElectionCLIConfig flags to a flagset
-func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
-	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
-		"Start a leader election client and gain leadership before "+
-		"executing the main loop. Enable this when running replicated "+
-		"components for high availability.")
-	fs.DurationVar(&l.LeaseDuration.Duration, "leader-elect-lease-duration", l.LeaseDuration.Duration, ""+
-		"The duration that non-leader candidates will wait after observing a leadership "+
-		"renewal until attempting to acquire leadership of a led but unrenewed leader "+
-		"slot. This is effectively the maximum duration that a leader can be stopped "+
-		"before it is replaced by another candidate. This is only applicable if leader "+
-		"election is enabled.")
-	fs.DurationVar(&l.RenewDeadline.Duration, "leader-elect-renew-deadline", l.RenewDeadline.Duration, ""+
-		"The interval between attempts by the acting master to renew a leadership slot "+
-		"before it stops leading. This must be less than or equal to the lease duration. "+
-		"This is only applicable if leader election is enabled.")
-	fs.DurationVar(&l.RetryPeriod.Duration, "leader-elect-retry-period", l.RetryPeriod.Duration, ""+
-		"The duration the clients should wait between attempting acquisition and renewal "+
-		"of a leadership. This is only applicable if leader election is enabled.")
 }
