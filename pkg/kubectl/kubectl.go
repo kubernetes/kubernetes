@@ -119,6 +119,7 @@ func expandResourceShortcut(resource unversioned.GroupVersionResource) unversion
 		"quota":  api.SchemeGroupVersion.WithResource("resourcequotas"),
 		"rc":     api.SchemeGroupVersion.WithResource("replicationcontrollers"),
 		"svc":    api.SchemeGroupVersion.WithResource("services"),
+		"cm":     api.SchemeGroupVersion.WithResource("configmaps"),
 	}
 	if expanded, ok := shortForms[resource.Resource]; ok {
 		return expanded
