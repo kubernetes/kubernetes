@@ -40,8 +40,8 @@ func (k *notRegisteredErr) Error() string {
 	if len(k.gvk.Kind) == 0 {
 		return fmt.Sprintf("no version %q has been registered", k.gvk.GroupVersion())
 	}
-	if len(k.gvk.Version) == 0 {
-		return fmt.Sprintf("no kind %q is registered for the default version of group %q", k.gvk.Kind, k.gvk.Group)
+	if k.gvk.Version == APIVersionInternal {
+		return fmt.Sprintf("no kind %q is registered for the internal version of group %q", k.gvk.Kind, k.gvk.Group)
 	}
 
 	return fmt.Sprintf("no kind %q is registered for version %q", k.gvk.Kind, k.gvk.GroupVersion())
