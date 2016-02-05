@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/serviceaccount"
@@ -37,7 +38,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 	newListFunc := func() runtime.Object { return &api.ServiceAccountList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.ServiceAccount{}, prefix, serviceaccount.Strategy, newListFunc)
+		s, cachesize.GetWatchCacheSizeByResource(cachesize.ServiceAccounts), &api.ServiceAccount{}, prefix, serviceaccount.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ServiceAccount{} },
