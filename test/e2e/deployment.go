@@ -386,8 +386,8 @@ func testRecreateDeployment(f *Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 3", newRS.Name)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 3", newRS.Name)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
 
 	// Check if it's updated to revision 1 correctly
 	checkDeploymentRevision(c, ns, deploymentName, "1", "redis", "redis")
