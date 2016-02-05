@@ -18,7 +18,7 @@ package normalization
 
 func Group(group string) string {
 	if group == "api" {
-		return "legacy"
+		return "core"
 	}
 	return group
 }

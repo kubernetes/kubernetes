@@ -723,7 +723,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	if err != nil {
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
-	nodeLW := cache.NewListWatchFromClient(nodesClient.LegacyClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			node := obj.(*api.Node)
@@ -797,7 +797,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	broadcaster.StartRecordingToSink(client.Events(""))
 
 	// create scheduler core with all components arranged around it
-	lw := cache.NewListWatchFromClient(client.LegacyClient, "pods", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(
 		sc,
 		framework,

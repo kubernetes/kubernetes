@@ -98,10 +98,10 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 func NewLimitRanger(client clientset.Interface, limitFunc LimitFunc) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Legacy().LimitRanges(api.NamespaceAll).List(options)
+			return client.Core().LimitRanges(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Legacy().LimitRanges(api.NamespaceAll).Watch(options)
+			return client.Core().LimitRanges(api.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)

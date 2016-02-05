@@ -220,10 +220,10 @@ func NewMainKubelet(
 		// than an interface. There is no way to construct a list+watcher using resource name.
 		listWatch := &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Legacy().Services(api.NamespaceAll).List(options)
+				return kubeClient.Core().Services(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Legacy().Services(api.NamespaceAll).Watch(options)
+				return kubeClient.Core().Services(api.NamespaceAll).Watch(options)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
@@ -238,11 +238,11 @@ func NewMainKubelet(
 		listWatch := &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
-				return kubeClient.Legacy().Nodes().List(options)
+				return kubeClient.Core().Nodes().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fieldSelector
-				return kubeClient.Legacy().Nodes().Watch(options)
+				return kubeClient.Core().Nodes().Watch(options)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
@@ -1062,12 +1062,12 @@ func (kl *Kubelet) registerWithApiserver() {
 			continue
 		}
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
-		if _, err := kl.kubeClient.Legacy().Nodes().Create(node); err != nil {
+		if _, err := kl.kubeClient.Core().Nodes().Create(node); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
 				continue
 			}
-			currentNode, err := kl.kubeClient.Legacy().Nodes().Get(kl.nodeName)
+			currentNode, err := kl.kubeClient.Core().Nodes().Get(kl.nodeName)
 			if err != nil {
 				glog.Errorf("error getting node %q: %v", kl.nodeName, err)
 				continue
@@ -1085,7 +1085,7 @@ func (kl *Kubelet) registerWithApiserver() {
 				"Previously %q had externalID %q; now it is %q; will delete and recreate.",
 				kl.nodeName, node.Spec.ExternalID, currentNode.Spec.ExternalID,
 			)
-			if err := kl.kubeClient.Legacy().Nodes().Delete(node.Name, nil); err != nil {
+			if err := kl.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
 				glog.Errorf("Unable to delete old node: %v", err)
 			} else {
 				glog.Errorf("Deleted old node object %q", kl.nodeName)
@@ -1417,7 +1417,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				key := envVar.ValueFrom.ConfigMapKeyRef.Key
 				configMap, ok := configMaps[name]
 				if !ok {
-					configMap, err = kl.kubeClient.Legacy().ConfigMaps(pod.Namespace).Get(name)
+					configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name)
 					if err != nil {
 						return result, err
 					}
@@ -1431,7 +1431,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				key := envVar.ValueFrom.SecretKeyRef.Key
 				secret, ok := secrets[name]
 				if !ok {
-					secret, err = kl.kubeClient.Legacy().Secrets(pod.Namespace).Get(name)
+					secret, err = kl.kubeClient.Core().Secrets(pod.Namespace).Get(name)
 					if err != nil {
 						return result, err
 					}
@@ -1723,7 +1723,7 @@ func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	pullSecrets := []api.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
-		secret, err := kl.kubeClient.Legacy().Secrets(pod.Namespace).Get(secretRef.Name)
+		secret, err := kl.kubeClient.Core().Secrets(pod.Namespace).Get(secretRef.Name)
 		if err != nil {
 			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
 			continue
@@ -1742,7 +1742,7 @@ func (kl *Kubelet) resolveVolumeName(pod *api.Pod, volume *api.Volume) (string, 
 	claimSource := volume.VolumeSource.PersistentVolumeClaim
 	if claimSource != nil {
 		// resolve real volume behind the claim
-		claim, err := kl.kubeClient.Legacy().PersistentVolumeClaims(pod.Namespace).Get(claimSource.ClaimName)
+		claim, err := kl.kubeClient.Core().PersistentVolumeClaims(pod.Namespace).Get(claimSource.ClaimName)
 		if err != nil {
 			return "", fmt.Errorf("Cannot find claim %s/%s for volume %s", pod.Namespace, claimSource.ClaimName, volume.Name)
 		}
@@ -3013,7 +3013,7 @@ func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
-	node, err := kl.kubeClient.Legacy().Nodes().Get(kl.nodeName)
+	node, err := kl.kubeClient.Core().Nodes().Get(kl.nodeName)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
@@ -3028,7 +3028,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		if node.Spec.PodCIDR != flannelPodCIDR {
 			node.Spec.PodCIDR = flannelPodCIDR
 			glog.Infof("Updating podcidr to %v", node.Spec.PodCIDR)
-			if updatedNode, err := kl.kubeClient.Legacy().Nodes().Update(node); err != nil {
+			if updatedNode, err := kl.kubeClient.Core().Nodes().Update(node); err != nil {
 				glog.Warningf("Failed to update podCIDR: %v", err)
 			} else {
 				// Update the node resourceVersion so the status update doesn't fail.
@@ -3043,7 +3043,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return err
 	}
 	// Update the current status on the API server
-	_, err = kl.kubeClient.Legacy().Nodes().UpdateStatus(node)
+	_, err = kl.kubeClient.Core().Nodes().UpdateStatus(node)
 	return err
 }
 

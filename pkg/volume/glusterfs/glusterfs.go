@@ -85,7 +85,7 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	ns := pod.Namespace
-	ep, err := plugin.host.GetKubeClient().Legacy().Endpoints(ns).Get(ep_name)
+	ep, err := plugin.host.GetKubeClient().Core().Endpoints(ns).Get(ep_name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err

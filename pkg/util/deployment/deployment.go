@@ -44,10 +44,10 @@ const (
 func GetOldRCs(deployment extensions.Deployment, c clientset.Interface) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	return GetOldRCsFromLists(deployment, c,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			return c.Legacy().Pods(namespace).List(options)
+			return c.Core().Pods(namespace).List(options)
 		},
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			rcList, err := c.Legacy().ReplicationControllers(namespace).List(options)
+			rcList, err := c.Core().ReplicationControllers(namespace).List(options)
 			return rcList.Items, err
 		})
 }
@@ -104,7 +104,7 @@ func GetOldRCsFromLists(deployment extensions.Deployment, c clientset.Interface,
 func GetNewRC(deployment extensions.Deployment, c clientset.Interface) (*api.ReplicationController, error) {
 	return GetNewRCFromList(deployment, c,
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
-			rcList, err := c.Legacy().ReplicationControllers(namespace).List(options)
+			rcList, err := c.Core().ReplicationControllers(namespace).List(options)
 			return rcList.Items, err
 		})
 }
@@ -200,7 +200,7 @@ func getPodsForRCs(c clientset.Interface, replicationControllers []*api.Replicat
 	for _, rc := range replicationControllers {
 		selector := labels.SelectorFromSet(rc.Spec.Selector)
 		options := api.ListOptions{LabelSelector: selector}
-		podList, err := c.Legacy().Pods(rc.ObjectMeta.Namespace).List(options)
+		podList, err := c.Core().Pods(rc.ObjectMeta.Namespace).List(options)
 		if err != nil {
 			return allPods, fmt.Errorf("error listing pods: %v", err)
 		}
