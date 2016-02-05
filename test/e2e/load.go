@@ -56,8 +56,6 @@ var _ = Describe("Load capacity", func() {
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
-		deleteAllRC(configs)
-
 		// Verify latency metrics
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err, "Too many instances metrics above the threshold")
@@ -75,11 +73,8 @@ var _ = Describe("Load capacity", func() {
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = 50
 		config.Burst = 100
-		c, err = client.New(config)
+		c, err = loadClientFromConfig(config)
 		Expect(err).NotTo(HaveOccurred())
-		if c.Client.Timeout == 0 {
-			c.Client.Timeout = singleCallTimeout
-		}
 
 		ns = framework.Namespace.Name
 		nodes := ListSchedulableNodesOrDie(c)
@@ -117,7 +112,8 @@ var _ = Describe("Load capacity", func() {
 		itArg := testArg
 
 		It(name, func() {
-			configs = generateRCConfigs(itArg.podsPerNode*nodeCount, itArg.image, itArg.command, c, ns)
+			totalPods := itArg.podsPerNode * nodeCount
+			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, c, ns)
 
 			// Simulate lifetime of RC:
 			//  * create with initial size
@@ -126,16 +122,28 @@ var _ = Describe("Load capacity", func() {
 			//  * delete it
 			//
 			// This will generate ~5 creations/deletions per second assuming:
-			//  - 300 small RCs each 5 pods
-			//  - 25 medium RCs each 30 pods
-			//  - 3 big RCs each 250 pods
-			createAllRC(configs)
-			// TODO add reseting latency metrics here, once it would be supported.
+			//  - X small RCs each 5 pods   [ 5 * X = totalPods / 2 ]
+			//  - Y medium RCs each 30 pods [ 30 * Y = totalPods / 4 ]
+			//  - Z big RCs each 250 pods   [ 250 * Z = totalPods / 4]
+
+			// We would like to spread creating replication controllers over time
+			// to make it possible to create/schedule them in the meantime.
+			// Currently we assume 5 pods/second average throughput.
+			// We may want to revisit it in the future.
+			creatingTime := time.Duration(totalPods/5) * time.Second
+			createAllRC(configs, creatingTime)
+
 			By("============================================================================")
 			scaleAllRC(configs)
 			By("============================================================================")
 			scaleAllRC(configs)
 			By("============================================================================")
+
+			// Cleanup all created replication controllers.
+			// Currently we assume 5 pods/second average deletion throughput.
+			// We may want to revisit it in the future.
+			deletingTime := time.Duration(totalPods/5) * time.Second
+			deleteAllRC(configs, deletingTime)
 		})
 	}
 })
@@ -186,19 +194,18 @@ func sleepUpTo(d time.Duration) {
 	time.Sleep(time.Duration(rand.Int63n(d.Nanoseconds())))
 }
 
-func createAllRC(configs []*RCConfig) {
+func createAllRC(configs []*RCConfig, creatingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
-		go createRC(&wg, config)
+		go createRC(&wg, config, creatingTime)
 	}
 	wg.Wait()
 }
 
-func createRC(wg *sync.WaitGroup, config *RCConfig) {
+func createRC(wg *sync.WaitGroup, config *RCConfig, creatingTime time.Duration) {
 	defer GinkgoRecover()
 	defer wg.Done()
-	creatingTime := 10 * time.Minute
 
 	sleepUpTo(creatingTime)
 	expectNoError(RunRC(*config), fmt.Sprintf("creating rc %s", config.Name))
@@ -233,19 +240,18 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 	expectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }
 
-func deleteAllRC(configs []*RCConfig) {
+func deleteAllRC(configs []*RCConfig, deletingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
-		go deleteRC(&wg, config)
+		go deleteRC(&wg, config, deletingTime)
 	}
 	wg.Wait()
 }
 
-func deleteRC(wg *sync.WaitGroup, config *RCConfig) {
+func deleteRC(wg *sync.WaitGroup, config *RCConfig, deletingTime time.Duration) {
 	defer GinkgoRecover()
 	defer wg.Done()
-	deletingTime := 10 * time.Minute
 
 	sleepUpTo(deletingTime)
 	expectNoError(DeleteRC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
