@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: glbc
-    version: v0.5.1
+    version: v0.5.2
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
 spec:
@@ -13,12 +13,12 @@ spec:
   replicas: 1
   selector:
     k8s-app: glbc
-    version: v0.5.1
+    version: v0.5.2
   template:
     metadata:
       labels:
         k8s-app: glbc
-        version: v0.5.1
+        version: v0.5.2
         name: glbc
         kubernetes.io/cluster-service: "true"
     spec:
@@ -45,7 +45,7 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-      - image: gcr.io/google_containers/glbc:0.5.1
+      - image: gcr.io/google_containers/glbc:0.5.2
         livenessProbe:
           httpGet:
             path: /healthz
