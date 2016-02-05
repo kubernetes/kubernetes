@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -47,7 +48,7 @@ type SSHTunneler struct {
 	InstallSSHKey  InstallSSHKey
 	HealthCheckURL *url.URL
 
-	tunnels        *util.SSHTunnelList
+	tunnels        *ssh.SSHTunnelList
 	lastSync       int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
 	clock          util.Clock
@@ -97,7 +98,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 		}
 	}
 
-	c.tunnels = util.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
+	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
 	// Sync loop to ensure that the SSH key has been installed.
 	c.installSSHKeySyncLoop(c.SSHUser, publicKeyFile)
 	// Sync tunnelList w/ nodes.
@@ -129,12 +130,12 @@ func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 			glog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
 			return
 		}
-		key, err := util.ParsePublicKeyFromFile(publicKeyfile)
+		key, err := ssh.ParsePublicKeyFromFile(publicKeyfile)
 		if err != nil {
 			glog.Errorf("Failed to load public key: %v", err)
 			return
 		}
-		keyData, err := util.EncodeSSHKey(key)
+		keyData, err := ssh.EncodeSSHKey(key)
 		if err != nil {
 			glog.Errorf("Failed to encode public key: %v", err)
 			return
@@ -161,7 +162,7 @@ func (c *SSHTunneler) nodesSyncLoop() {
 }
 
 func generateSSHKey(privateKeyfile, publicKeyfile string) error {
-	private, public, err := util.GenerateKey(2048)
+	private, public, err := ssh.GenerateKey(2048)
 	if err != nil {
 		return err
 	}
@@ -176,10 +177,10 @@ func generateSSHKey(privateKeyfile, publicKeyfile string) error {
 			glog.Errorf("Failed to remove stale private key: %v", err)
 		}
 	}
-	if err := ioutil.WriteFile(privateKeyfile, util.EncodePrivateKey(private), 0600); err != nil {
+	if err := ioutil.WriteFile(privateKeyfile, ssh.EncodePrivateKey(private), 0600); err != nil {
 		return err
 	}
-	publicKeyBytes, err := util.EncodePublicKey(public)
+	publicKeyBytes, err := ssh.EncodePublicKey(public)
 	if err != nil {
 		return err
 	}

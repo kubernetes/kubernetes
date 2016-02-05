@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -2227,7 +2228,7 @@ func SSH(cmd, host, provider string) (SSHResult, error) {
 		result.User = os.Getenv("USER")
 	}
 
-	stdout, stderr, code, err := util.RunSSHCommand(cmd, result.User, host, signer)
+	stdout, stderr, code, err := sshutil.RunSSHCommand(cmd, result.User, host, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code
@@ -2332,7 +2333,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 		// If there is an env. variable override, use that.
 		aws_keyfile := os.Getenv("AWS_SSH_KEY")
 		if len(aws_keyfile) != 0 {
-			return util.MakePrivateKeySignerFromFile(aws_keyfile)
+			return sshutil.MakePrivateKeySignerFromFile(aws_keyfile)
 		}
 		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
@@ -2341,7 +2342,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	}
 	key := filepath.Join(keydir, keyfile)
 
-	return util.MakePrivateKeySignerFromFile(key)
+	return sshutil.MakePrivateKeySignerFromFile(key)
 }
 
 // checkPodsRunning returns whether all pods whose names are listed in podNames
