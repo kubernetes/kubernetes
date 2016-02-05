@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package ssh
 
 import (
 	"bytes"
@@ -39,8 +39,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
+	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var (
@@ -166,11 +168,11 @@ func (d *realSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*s
 // host as specific user, along with any SSH-level error.
 // If user=="", it will default (like SSH) to os.Getenv("USER")
 func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
-	return runSSHCommand(&realSSHDialer{}, cmd, user, host, signer)
+	return runSSHCommand(&realSSHDialer{}, cmd, user, host, signer, true)
 }
 
 // Internal implementation of runSSHCommand, for testing
-func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, retry bool) (string, string, int, error) {
 	if user == "" {
 		user = os.Getenv("USER")
 	}
@@ -180,6 +182,15 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) 
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
 	client, err := dialer.Dial("tcp", host, config)
+	if err != nil && retry {
+		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
+			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
+			if client, err = dialer.Dial("tcp", host, config); err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
+	}
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
 	}
@@ -286,7 +297,7 @@ func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan ch
 		healthCheckURL: healthCheckURL,
 	}
 	healthCheckPoll := 1 * time.Minute
-	go Until(func() {
+	go util.Until(func() {
 		l.tunnelsLock.Lock()
 		defer l.tunnelsLock.Unlock()
 		// Healthcheck each tunnel every minute

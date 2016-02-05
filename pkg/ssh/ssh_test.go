@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package ssh
 
 import (
 	"fmt"
@@ -304,7 +304,7 @@ func TestSSHUser(t *testing.T) {
 	for _, item := range table {
 		dialer := &mockSSHDialer{}
 
-		_, _, _, err := runSSHCommand(dialer, item.command, item.user, item.host, item.signer)
+		_, _, _, err := runSSHCommand(dialer, item.command, item.user, item.host, item.signer, false)
 		if err == nil {
 			t.Errorf("expected error (as mock returns error); did not get one")
 		}
