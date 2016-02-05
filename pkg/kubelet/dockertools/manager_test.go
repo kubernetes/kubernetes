@@ -550,17 +550,14 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	var apiPodStatus *api.PodStatus
-	apiPodStatus, err = dm.ConvertPodStatusToAPIPodStatus(pod, podStatus)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 
 	fakeDocker.ClearCalls()
 	if backOff == nil {
 		backOff = util.NewBackOff(time.Second, time.Minute)
 	}
-	result := dm.SyncPod(pod, *apiPodStatus, podStatus, []api.Secret{}, backOff)
+	// TODO(random-liu): Add test for PodSyncResult
+	// api.PodStatus is not used in SyncPod now, pass in an empty one.
+	result := dm.SyncPod(pod, api.PodStatus{}, podStatus, []api.Secret{}, backOff)
 	err = result.Error()
 	if err != nil && !expectErr {
 		t.Errorf("unexpected error: %v", err)
