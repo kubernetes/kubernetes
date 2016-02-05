@@ -87,6 +87,9 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*docker.Container) {
 		if c.Config == nil {
 			c.Config = &docker.Config{}
 		}
+		if c.HostConfig == nil {
+			c.HostConfig = &docker.HostConfig{}
+		}
 		f.ContainerMap[c.ID] = c
 		apiContainer := docker.APIContainers{
 			Names: []string{c.Name},
@@ -251,7 +254,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	f.ContainerList = append([]docker.APIContainers{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
 	}, f.ContainerList...)
-	container := docker.Container{ID: name, Name: name, Config: c.Config, HostConfig: c.HostConfig}
+	container := docker.Container{ID: name, Name: name, Config: c.Config}
 	containerCopy := container
 	f.ContainerMap[name] = &containerCopy
 	f.normalSleep(100, 25, 25)
@@ -260,11 +263,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
 // It adds an entry "start" to the internal method call record.
-// The HostConfig at StartContainer will be deprecated from docker 1.10. Now in
-// docker manager the HostConfig is set when CreateContainer().
-// TODO(random-liu): Remove the HostConfig here when it is completely removed in
-// docker 1.12.
-func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error {
+func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
@@ -275,6 +274,7 @@ func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error
 	if !ok {
 		container = &docker.Container{ID: id, Name: id}
 	}
+	container.HostConfig = hostConfig
 	container.State = docker.State{
 		Running:   true,
 		Pid:       os.Getpid(),
