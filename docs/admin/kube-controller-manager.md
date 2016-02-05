@@ -91,6 +91,7 @@ kube-controller-manager
       --port=10252: The port that the controller-manager's http service runs on
       --profiling[=true]: Enable profiling via web interface host:port/debug/pprof/
       --pv-recycler-increment-timeout-nfs=30: the increment of time added per Gi to ActiveDeadlineSeconds for an NFS scrubber pod
+      --pv-recycler-maximum-retry=3: Maximum number of attempts to recycle or delete a persistent volume
       --pv-recycler-minimum-timeout-hostpath=60: The minimum ActiveDeadlineSeconds to use for a HostPath Recycler pod. This is for development and testing only and will not work in a multi-node cluster.
       --pv-recycler-minimum-timeout-nfs=300: The minimum ActiveDeadlineSeconds to use for an NFS Recycler pod
       --pv-recycler-pod-template-filepath-hostpath="": The file path to a pod definition used as a template for HostPath persistent volume recycling. This is for development and testing only and will not work in a multi-node cluster.

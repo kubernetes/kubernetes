@@ -256,6 +256,7 @@ func (s *CMServer) Run(_ []string) error {
 	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
 		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
 		s.PersistentVolumeControllerOptions.PVClaimBinderSyncPeriod,
+		s.PersistentVolumeControllerOptions.VolumeConfigFlags.PersistentVolumeRecyclerMaximumRetry,
 		kubecontrollermanager.ProbeRecyclableVolumePlugins(s.PersistentVolumeControllerOptions.VolumeConfigFlags), cloud)
 	if err != nil {
 		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
