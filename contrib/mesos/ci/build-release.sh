@@ -43,11 +43,11 @@ kube::contrib::mesos::build_release() {
 
   kube::build::verify_prereqs
   kube::build::build_image
-  kube::build::run_build_command contrib/mesos/ci/build-cross.sh
+  "${KUBE_ROOT}/contrib/mesos/ci/run.sh" contrib/mesos/ci/build-cross.sh
 
   if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
-    kube::build::run_build_command hack/test-go.sh
-    kube::build::run_build_command hack/test-integration.sh
+    "${KUBE_ROOT}/contrib/mesos/ci/run.sh" hack/test-go.sh
+    "${KUBE_ROOT}/contrib/mesos/ci/run.sh" hack/test-integration.sh
   fi
 
   kube::build::copy_output
