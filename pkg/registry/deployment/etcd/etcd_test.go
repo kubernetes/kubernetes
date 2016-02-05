@@ -67,8 +67,7 @@ func validNewDeployment() *extensions.Deployment {
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
-			UniqueLabelKey: "my-label",
-			Replicas:       7,
+			Replicas: 7,
 		},
 		Status: extensions.DeploymentStatus{
 			Replicas: 5,

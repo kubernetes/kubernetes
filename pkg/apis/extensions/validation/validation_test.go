@@ -872,7 +872,6 @@ func validDeployment() *extensions.Deployment {
 					},
 				},
 			},
-			UniqueLabelKey: "my-label",
 			RollbackTo: &extensions.RollbackConfig{
 				Revision: 1,
 			},
@@ -907,11 +906,6 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRestartPolicyDeployment := validDeployment()
 	invalidRestartPolicyDeployment.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
 	errorCases["Unsupported value: \"Never\""] = invalidRestartPolicyDeployment
-
-	// invalid unique label key.
-	invalidUniqueLabelDeployment := validDeployment()
-	invalidUniqueLabelDeployment.Spec.UniqueLabelKey = "abc/def/ghi"
-	errorCases["spec.uniqueLabel: Invalid value"] = invalidUniqueLabelDeployment
 
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()

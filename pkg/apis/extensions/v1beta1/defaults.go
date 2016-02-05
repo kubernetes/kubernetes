@@ -100,10 +100,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 					strategy.RollingUpdate.MaxSurge = &maxSurge
 				}
 			}
-			if obj.Spec.UniqueLabelKey == nil {
-				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = DefaultDeploymentUniqueLabelKey
-			}
 		},
 		func(obj *Job) {
 			labels := obj.Spec.Template.Labels

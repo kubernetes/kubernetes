@@ -121,8 +121,6 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 		out.RevisionHistoryLimit = new(int32)
 		*out.RevisionHistoryLimit = int32(*in.RevisionHistoryLimit)
 	}
-	out.UniqueLabelKey = new(string)
-	*out.UniqueLabelKey = in.UniqueLabelKey
 	out.MinReadySeconds = int32(in.MinReadySeconds)
 	out.Paused = in.Paused
 	if in.RollbackTo != nil {
@@ -158,9 +156,6 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if in.RevisionHistoryLimit != nil {
 		out.RevisionHistoryLimit = new(int)
 		*out.RevisionHistoryLimit = int(*in.RevisionHistoryLimit)
-	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = *in.UniqueLabelKey
 	}
 	out.MinReadySeconds = int(in.MinReadySeconds)
 	out.Paused = in.Paused

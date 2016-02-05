@@ -101,7 +101,6 @@ func newDeployment(deploymentName string, replicas int, podLabels map[string]str
 				Type: strategyType,
 			},
 			RevisionHistoryLimit: revisionHistoryLimit,
-			UniqueLabelKey:       extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,

@@ -2830,9 +2830,6 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	} else {
 		out.RevisionHistoryLimit = nil
 	}
-	if err := api.Convert_string_To_string_ref(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
-		return err
-	}
 	out.Paused = in.Paused
 	// unable to generate simple pointer conversion for extensions.RollbackConfig -> v1beta1.RollbackConfig
 	if in.RollbackTo != nil {
@@ -4147,9 +4144,6 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 		*out.RevisionHistoryLimit = int(*in.RevisionHistoryLimit)
 	} else {
 		out.RevisionHistoryLimit = nil
-	}
-	if err := api.Convert_string_ref_To_string(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
-		return err
 	}
 	out.Paused = in.Paused
 	// unable to generate simple pointer conversion for v1beta1.RollbackConfig -> extensions.RollbackConfig
