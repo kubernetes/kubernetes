@@ -57,6 +57,14 @@ type Scheme struct {
 	// TODO: resolve the status of unversioned types.
 	unversionedKinds map[string]reflect.Type
 
+	// unversionedTypes are transformed without conversion in ConvertToVersion.
+	subresourceTypes map[reflect.Type]unversioned.GroupVersionKind
+
+	// unversionedKinds are the names of kinds that can be created in the context of any group
+	// or version
+	// TODO: resolve the status of unversioned types.
+	subresourceKinds map[unversioned.GroupVersionKind]reflect.Type
+
 	// Map from version and resource to the corresponding func to convert
 	// resource field labels in that version to internal version.
 	fieldLabelConversionFuncs map[string]map[string]FieldLabelConversionFunc
@@ -80,6 +88,8 @@ func NewScheme() *Scheme {
 		typeToGVK:        map[reflect.Type][]unversioned.GroupVersionKind{},
 		unversionedTypes: map[reflect.Type]unversioned.GroupVersionKind{},
 		unversionedKinds: map[string]reflect.Type{},
+		subresourceTypes: map[reflect.Type]unversioned.GroupVersionKind{},
+		subresourceKinds: map[unversioned.GroupVersionKind]reflect.Type{},
 		cloner:           conversion.NewCloner(),
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
 	}
@@ -153,6 +163,18 @@ func (s *Scheme) AddUnversionedTypes(version unversioned.GroupVersion, types ...
 			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
 		}
 		s.unversionedKinds[gvk.Kind] = t
+	}
+}
+
+func (s *Scheme) AddSubresourceTypes(gv unversioned.GroupVersion, types ...Object) {
+	for _, obj := range types {
+		t := reflect.TypeOf(obj).Elem()
+		gvk := gv.WithKind(t.Name())
+		s.subresourceTypes[t] = gvk
+		if _, ok := s.subresourceKinds[gvk]; ok {
+			panic(fmt.Sprintf("%v has already been registered as a subresource kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
+		}
+		s.subresourceKinds[gvk] = t
 	}
 }
 
@@ -237,6 +259,9 @@ func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, error)
 	if !ok {
 		return nil, &notRegisteredErr{t: t}
 	}
+	if subgvk, ok := s.subresourceTypes[t]; ok {
+		gvks = append(gvks, subgvk)
+	}
 
 	return gvks, nil
 }
@@ -270,6 +295,10 @@ func (s *Scheme) New(kind unversioned.GroupVersionKind) (Object, error) {
 	}
 
 	if t, exists := s.unversionedKinds[kind.Kind]; exists {
+		return reflect.New(t).Interface().(Object), nil
+	}
+
+	if t, exists := s.subresourceKinds[kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
 	return nil, &notRegisteredErr{gvk: kind}

@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
@@ -137,6 +138,11 @@ type APIGroupVersionOverride struct {
 	ResourceOverrides map[string]bool
 }
 
+// Info about the subresources in an API group.
+type SubresourceGroupInfo struct {
+	Scheme *runtime.Scheme
+}
+
 // Info about an API group.
 type APIGroupInfo struct {
 	GroupMeta apimachinery.GroupMeta
@@ -159,6 +165,8 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
+
+	SubresourceMapper meta.RESTMapper
 }
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -711,6 +719,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	version.Creater = apiGroupInfo.Scheme
 	version.Convertor = apiGroupInfo.Scheme
 	version.Typer = apiGroupInfo.Scheme
+	version.SubresourceMapper = apiGroupInfo.SubresourceMapper
 	return version, err
 }
 
