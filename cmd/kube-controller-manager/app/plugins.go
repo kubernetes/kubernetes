@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/rbd"
 
 	"github.com/golang/glog"
 )
@@ -72,6 +73,19 @@ func ProbeRecyclableVolumePlugins(flags options.VolumeConfigFlags) []volume.Volu
 		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutNFS,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
+
+	rbdConfig := volume.VolumeConfig{
+		RecyclerMinimumTimeout:   flags.PersistentVolumeRecyclerMinimumTimeoutNFS,
+		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutNFS,
+		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+	}
+
+	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathRBD, &rbdConfig); err != nil {
+		glog.Fatalf("Could not create RBD recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathRBD, err)
+	}
+
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins(rbdConfig)...)
+
 	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, &nfsConfig); err != nil {
 		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, err)
 	}
