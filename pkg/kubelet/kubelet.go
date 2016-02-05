@@ -1629,10 +1629,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 		}
 	}
 
-	apiPodStatus, err := kl.generatePodStatus(pod, podStatus)
-	if err != nil {
-		return err
-	}
+	apiPodStatus := kl.generatePodStatus(pod, podStatus)
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
@@ -1836,11 +1833,12 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 		}
 		status, found := kl.statusManager.GetPodStatus(pod.UID)
 		if !found {
-			statusPtr, err := kl.containerRuntime.GetAPIPodStatus(pod)
+			// TODO(random-liu): Cleanup status get functions. (issue #20477)
+			s, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 			if err != nil {
 				return err
 			}
-			status = *statusPtr
+			status = kl.generatePodStatus(pod, s)
 		}
 		if status.Phase == api.PodRunning {
 			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
@@ -3138,7 +3136,7 @@ func (kl *Kubelet) getRuntimePodStatus(pod *api.Pod) (*kubecontainer.PodStatus, 
 	return kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 }
 
-func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) (api.PodStatus, error) {
+func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
@@ -3147,7 +3145,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodS
 		return api.PodStatus{
 			Phase:   api.PodFailed,
 			Reason:  reason,
-			Message: "Pod was active on the node longer than specified deadline"}, nil
+			Message: "Pod was active on the node longer than specified deadline"}
 	}
 
 	s := kl.convertStatusToAPIStatus(pod, podStatus)
@@ -3170,7 +3168,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodS
 		}
 	}
 
-	return *s, nil
+	return *s
 }
 
 // TODO(random-liu): Move this to some better place.

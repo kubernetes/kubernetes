@@ -109,8 +109,7 @@ type DockerManager struct {
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
 	reasonCache reasonInfoCache
-	// TODO(yifan): Record the pull failure so we can eliminate the image checking
-	// in GetAPIPodStatus()?
+	// TODO(yifan): Record the pull failure so we can eliminate the image checking?
 	// Lower level docker image puller.
 	dockerPuller DockerPuller
 
@@ -409,17 +408,6 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateUnknown
 	}
 	return &status, "", nil
-}
-
-// GetAPIPodStatus returns docker related status for all containers in the pod
-// spec.
-func (dm *DockerManager) GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error) {
-	// Get the pod status.
-	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		return nil, err
-	}
-	return dm.ConvertPodStatusToAPIPodStatus(pod, podStatus)
 }
 
 func (dm *DockerManager) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) (*api.PodStatus, error) {

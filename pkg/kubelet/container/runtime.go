@@ -69,11 +69,6 @@ type Runtime interface {
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	KillPod(pod *api.Pod, runningPod Pod) error
-	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
-	// all containers in the pod. Clients of this interface assume the
-	// containers' statuses in a pod always have a deterministic ordering
-	// (e.g., sorted by name).
-	GetAPIPodStatus(*api.Pod) (*api.PodStatus, error)
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)

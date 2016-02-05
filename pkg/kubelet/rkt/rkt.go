@@ -1054,16 +1054,6 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	return nil
 }
 
-// GetAPIPodStatus returns the status of the given pod.
-func (r *Runtime) GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error) {
-	// Get the pod status.
-	podStatus, err := r.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		return nil, err
-	}
-	return r.ConvertPodStatusToAPIPodStatus(pod, podStatus)
-}
-
 func (r *Runtime) Type() string {
 	return RktType
 }
