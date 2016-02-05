@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -375,7 +376,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -383,7 +384,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -393,7 +394,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -401,7 +402,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector2},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector2},
 					Template:       validPodTemplateAbc2.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -411,7 +412,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -419,7 +420,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateNodeSelector.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -438,7 +439,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -446,7 +447,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -456,7 +457,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -464,7 +465,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: invalidSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: invalidSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -474,7 +475,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -482,7 +483,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       invalidPodTemplate.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -492,7 +493,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -500,7 +501,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateDef.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -510,7 +511,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -518,7 +519,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       readWriteVolumePodTemplate.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -528,7 +529,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 					Template:       validPodTemplateAbc.Template,
 					UpdateStrategy: validUpdateStrategy,
 				},
@@ -536,7 +537,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: invalidSelector},
+					Selector: &unversioned.LabelSelector{MatchLabels: invalidSelector},
 					Template: validPodTemplateAbc.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type:          extensions.RollingUpdateDaemonSetStrategyType,
@@ -589,7 +590,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template:       validPodTemplate.Template,
 				UpdateStrategy: validUpdateStrategy,
 			},
@@ -597,7 +598,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector:       &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template:       validPodTemplate.Template,
 				UpdateStrategy: validUpdateStrategy,
 			},
@@ -613,14 +614,14 @@ func TestValidateDaemonSet(t *testing.T) {
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -633,14 +634,14 @@ func TestValidateDaemonSet(t *testing.T) {
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"invalid template": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 			},
 		},
 		"invalid_label": {
@@ -652,7 +653,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				},
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -677,7 +678,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				},
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -687,7 +688,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -706,7 +707,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyNever,
@@ -725,7 +726,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: "",
@@ -741,7 +742,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type:          extensions.RollingUpdateDaemonSetStrategyType,
@@ -755,7 +756,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
@@ -772,7 +773,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
@@ -789,7 +790,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
@@ -806,7 +807,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validSelector},
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 					Type: extensions.RollingUpdateDaemonSetStrategyType,
@@ -1007,7 +1008,7 @@ func TestValidateDeploymentRollback(t *testing.T) {
 }
 
 func TestValidateJob(t *testing.T) {
-	validSelector := &extensions.LabelSelector{
+	validSelector := &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
 	validPodTemplateSpec := api.PodTemplateSpec{
@@ -1529,7 +1530,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 				Status: extensions.ReplicaSetStatus{
@@ -1540,7 +1541,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 3,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 				Status: extensions.ReplicaSetStatus{
@@ -1561,7 +1562,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 				Status: extensions.ReplicaSetStatus{
@@ -1572,7 +1573,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 				Status: extensions.ReplicaSetStatus{
@@ -1637,7 +1638,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1645,7 +1646,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 3,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1654,7 +1655,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1662,7 +1663,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 1,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &readWriteVolumePodTemplate.Template,
 				},
 			},
@@ -1680,7 +1681,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1688,7 +1689,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &readWriteVolumePodTemplate.Template,
 				},
 			},
@@ -1697,7 +1698,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1705,7 +1706,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Selector: &extensions.LabelSelector{MatchLabels: invalidLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: invalidLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1714,7 +1715,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1722,7 +1723,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &invalidPodTemplate.Template,
 				},
 			},
@@ -1731,7 +1732,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			old: extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1739,7 +1740,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: -1,
-					Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: &validPodTemplate.Template,
 				},
 			},
@@ -1795,14 +1796,14 @@ func TestValidateReplicaSet(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &validPodTemplate.Template,
 			},
 		},
@@ -1810,7 +1811,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: 1,
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &readWriteVolumePodTemplate.Template,
 			},
 		},
@@ -1825,14 +1826,14 @@ func TestValidateReplicaSet(t *testing.T) {
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &validPodTemplate.Template,
 			},
 		},
@@ -1845,21 +1846,21 @@ func TestValidateReplicaSet(t *testing.T) {
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"read-write persistent disk with > 1 pod": {
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: 2,
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &readWriteVolumePodTemplate.Template,
 			},
 		},
@@ -1867,7 +1868,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: -1,
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"invalid_label": {
@@ -1879,7 +1880,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				},
 			},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &validPodTemplate.Template,
 			},
 		},
@@ -1904,7 +1905,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				},
 			},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &validPodTemplate.Template,
 			},
 		},
@@ -1914,7 +1915,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -1933,7 +1934,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.ReplicaSetSpec{
-				Selector: &extensions.LabelSelector{MatchLabels: validLabels},
+				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyNever,

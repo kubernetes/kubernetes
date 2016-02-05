@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -258,7 +259,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -297,13 +298,13 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -384,7 +385,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -423,13 +424,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -513,7 +514,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "baz"},
 						},
 					},
@@ -556,7 +557,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -564,7 +565,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -589,7 +590,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -597,7 +598,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},

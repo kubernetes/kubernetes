@@ -267,7 +267,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Namespace: "default",
 					},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"daemon": "yes"},
 						},
 					},
