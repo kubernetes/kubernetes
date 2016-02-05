@@ -417,7 +417,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *api.Pod {
 					Name:    "pv-recycler",
 					Image:   "gcr.io/google_containers/busybox",
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/* ; echo $(date) > /scrub/trash.txt && exit 0 "},
+					Args:    []string{"-c", "test -e /scrub && echo $(date) > /scrub/trash.txt && find /scrub -mindepth 1 -maxdepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "vol",
