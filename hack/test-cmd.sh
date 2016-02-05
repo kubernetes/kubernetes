@@ -174,10 +174,15 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
+
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
+
 KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
+  --admission-control="${ADMISSION_CONTROL}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public-address-override="127.0.0.1" \
   --kubelet-port=${KUBELET_PORT} \
@@ -681,7 +686,7 @@ runTests() {
 
   ### Create a new namespace
   # Pre-condition: only the "default" namespace exists
-  kube::test::get_object_assert 'namespaces' "{{range.items}}{{$id_field}}:{{end}}" 'default:'
+  kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:'
   # Command
   kubectl create namespace my-namespace
   # Post-condition: namespace 'my-namespace' is created.
@@ -692,6 +697,14 @@ runTests() {
   ##############
   # Pods in Namespaces #
   ##############
+
+  ### Create a new namespace
+  # Pre-condition: the other namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"other\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace other
+  # Post-condition: namespace 'other' is created.
+  kube::test::get_object_assert 'namespaces/other' "{{$id_field}}" 'other'
 
   ### Create POD valid-pod in specific namespace
   # Pre-condition: no POD exists
@@ -707,11 +720,21 @@ runTests() {
   # Command
   kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod --grace-period=0
   # Post-condition: valid-pod POD doesn't exist
-  kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''  
+  # Clean up
+  kubectl delete namespace other
 
   ##############
   # Secrets #
   ##############
+
+  ### Create a new namespace
+  # Pre-condition: the test-secrets namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-secrets\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-secrets
+  # Post-condition: namespace 'test-secrets' is created.
+  kube::test::get_object_assert 'namespaces/test-secrets' "{{$id_field}}" 'test-secrets'
 
   ### Create a generic secret in a specific namespace
   # Pre-condition: no SECRET exists
@@ -736,6 +759,8 @@ runTests() {
   [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep '.dockercfg:')" ]]
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
+  # Clean up
+  kubectl delete namespace test-secrets
 
   #################
   # Pod templates #
