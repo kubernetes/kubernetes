@@ -489,19 +489,19 @@ func TestValidateJob(t *testing.T) {
 }
 
 type ErrorScales struct {
-	testclient.FakeScales
+	testclient.FakeScaleTwos
 	invalid bool
 }
 
-func (c *ErrorScales) Update(kind string, scale *extensions.Scale) (*extensions.Scale, error) {
+func (c *ErrorScales) Update(kind string, scale *extensions.ScaleTwo) (*extensions.ScaleTwo, error) {
 	if c.invalid {
 		return nil, kerrors.NewInvalid(extensions.Kind(scale.Kind), scale.Name, nil)
 	}
 	return nil, errors.New("scale update failure")
 }
 
-func (c *ErrorScales) Get(kind, name string) (*extensions.Scale, error) {
-	return &extensions.Scale{
+func (c *ErrorScales) Get(kind, name string) (*extensions.ScaleTwo, error) {
+	return &extensions.ScaleTwo{
 		Spec: extensions.ScaleSpec{
 			Replicas: 0,
 		},
@@ -537,8 +537,8 @@ func (c *ErrorDeploymentClient) Deployments(namespace string) client.DeploymentI
 	return &ErrorDeployments{testclient.FakeDeployments{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
 }
 
-func (c *ErrorDeploymentClient) Scales(namespace string) client.ScaleInterface {
-	return &ErrorScales{testclient.FakeScales{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
+func (c *ErrorDeploymentClient) ScaleTwos(namespace string) client.ScaleTwoInterface {
+	return &ErrorScales{testclient.FakeScaleTwos{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
 }
 
 func TestDeploymentScaleRetry(t *testing.T) {
@@ -581,7 +581,7 @@ func TestDeploymentScale(t *testing.T) {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
 	// TODO: The testclient needs to support subresources
-	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "Deployment" || action.GetObject().(*extensions.Scale).Spec.Replicas != int(count) {
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "Deployment" || action.GetObject().(*extensions.ScaleTwo).Spec.Replicas != int(count) {
 		t.Errorf("unexpected action %v, expected update-deployment-scale with replicas = %d", actions[1], count)
 	}
 }

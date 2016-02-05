@@ -158,7 +158,7 @@ func (tc *testCase) runTest(t *testing.T) {
 		fval := float64(val)
 		tc.verifyResults(t, &fval, timestamp, err)
 	} else {
-		val, timestamp, err := metricsClient.GetCustomMetric(tc.targetResource, tc.namespace, tc.selector)
+		val, timestamp, err := metricsClient.GetCustomMetric(tc.targetResource, tc.namespace, labels.SelectorFromSet(tc.selector).String())
 		tc.verifyResults(t, val, timestamp, err)
 	}
 }

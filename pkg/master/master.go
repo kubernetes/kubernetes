@@ -333,9 +333,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 		"podTemplates": podTemplateStorage,
 
+		// TODO(madhusudancs): "replicationControllers/scale": controllerStorage.Scale needs to be installed when APIInstaller changes specific to Scale are merged.
 		"replicationControllers":        controllerStorage.Controller,
 		"replicationControllers/status": controllerStorage.Status,
-		"replicationControllers/scale":  controllerStorage.Scale,
 		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
 		"services/status":               serviceStatusStorage,
 		"endpoints":                     endpointsStorage,

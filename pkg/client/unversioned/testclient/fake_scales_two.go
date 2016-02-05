@@ -22,12 +22,12 @@ import (
 
 // FakeScales implements ScaleInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
-type FakeScalesTwo struct {
+type FakeScaleTwos struct {
 	Fake      *FakeExperimental
 	Namespace string
 }
 
-func (c *FakeScalesTwo) Get(kind string, name string) (result *extensions.ScaleTwo, err error) {
+func (c *FakeScaleTwos) Get(kind string, name string) (result *extensions.ScaleTwo, err error) {
 	action := GetActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.Namespace
@@ -39,7 +39,7 @@ func (c *FakeScalesTwo) Get(kind string, name string) (result *extensions.ScaleT
 	return
 }
 
-func (c *FakeScalesTwo) Update(kind string, scale *extensions.ScaleTwo) (result *extensions.ScaleTwo, err error) {
+func (c *FakeScaleTwos) Update(kind string, scale *extensions.ScaleTwo) (result *extensions.ScaleTwo, err error) {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
 	action.Namespace = c.Namespace

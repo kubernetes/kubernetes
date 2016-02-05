@@ -325,8 +325,8 @@ func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
 	return &FakeScales{Fake: c, Namespace: namespace}
 }
 
-func (c *FakeExperimental) ScalesTwo(namespace string) client.ScaleTwoInterface {
-	return &FakeScalesTwo{Fake: c, Namespace: namespace}
+func (c *FakeExperimental) ScaleTwos(namespace string) client.ScaleTwoInterface {
+	return &FakeScaleTwos{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
