@@ -35,6 +35,7 @@ type ExtensionsInterface interface {
 	IngressNamespacer
 	ThirdPartyResourceNamespacer
 	ReplicaSetsNamespacer
+	PodSecurityPoliciesInterface
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
@@ -42,6 +43,10 @@ type ExtensionsInterface interface {
 // incompatible ways at any time.
 type ExtensionsClient struct {
 	*RESTClient
+}
+
+func (c *ExtensionsClient) PodSecurityPolicies() PodSecurityPolicyInterface {
+	return newPodSecurityPolicy(c)
 }
 
 func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {

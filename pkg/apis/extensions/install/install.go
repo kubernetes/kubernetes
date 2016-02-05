@@ -90,7 +90,9 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString()
+	rootScoped := sets.NewString(
+		"PodSecurityPolicy",
+	)
 
 	ignoredKinds := sets.NewString()
 
