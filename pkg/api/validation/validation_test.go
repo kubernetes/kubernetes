@@ -1082,6 +1082,8 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP"}},
 		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65535), Host: "host", Scheme: "HTTP"}},
 		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"Host", "foo.example.com"}}}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"X-Forwarded-For", "1.2.3.4"}, {"X-Forwarded-For", "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
 		if errs := validateHandler(&h, field.NewPath("field")); len(errs) != 0 {
@@ -1095,6 +1097,8 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &api.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
 		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65536), Host: "host"}},
 		{HTTPGet: &api.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"Host:", "foo.example.com"}}}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"X_Forwarded_For", "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
 		if errs := validateHandler(&h, field.NewPath("field")); len(errs) == 0 {

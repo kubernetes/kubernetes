@@ -19,6 +19,7 @@ package prober
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -126,6 +127,16 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 	return result, output, err
 }
 
+// buildHeaderMap takes a list of HTTPHeader <name, value> string
+// pairs and returns a a populated string->[]string http.Header map.
+func buildHeader(headerList []api.HTTPHeader) http.Header {
+	headers := make(http.Header)
+	for _, header := range headerList {
+		headers[header.Name] = append(headers[header.Name], header.Value)
+	}
+	return headers
+}
+
 func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
@@ -145,7 +156,9 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		path := p.HTTPGet.Path
 		glog.V(4).Infof("HTTP-Probe Host: %v://%v, Port: %v, Path: %v", scheme, host, port, path)
 		url := formatURL(scheme, host, port, path)
-		return pb.http.Probe(url, timeout)
+		headers := buildHeader(p.HTTPGet.HTTPHeaders)
+		glog.V(4).Infof("HTTP-Probe Headers: %v", headers)
+		return pb.http.Probe(url, headers, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)

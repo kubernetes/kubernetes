@@ -509,15 +509,26 @@ func (GlusterfsVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_HTTPGetAction = map[string]string{
-	"":       "HTTPGetAction describes an action based on HTTP Get requests.",
-	"path":   "Path to access on the HTTP server.",
-	"port":   "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
-	"host":   "Host name to connect to, defaults to the pod IP.",
-	"scheme": "Scheme to use for connecting to the host. Defaults to HTTP.",
+	"":            "HTTPGetAction describes an action based on HTTP Get requests.",
+	"path":        "Path to access on the HTTP server.",
+	"port":        "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+	"host":        "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
+	"scheme":      "Scheme to use for connecting to the host. Defaults to HTTP.",
+	"httpHeaders": "Custom headers to set in the request. HTTP allows repeated headers.",
 }
 
 func (HTTPGetAction) SwaggerDoc() map[string]string {
 	return map_HTTPGetAction
+}
+
+var map_HTTPHeader = map[string]string{
+	"":      "HTTPHeader describes a custom header to be used in HTTP probes",
+	"name":  "The header field name",
+	"value": "The header field value",
+}
+
+func (HTTPHeader) SwaggerDoc() map[string]string {
+	return map_HTTPHeader
 }
 
 var map_Handler = map[string]string{
