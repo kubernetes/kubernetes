@@ -94,7 +94,6 @@ type DockerManager struct {
 	machineInfo         *cadvisorapi.MachineInfo
 	gpuPlugins          []gpuTypes.GPUPlugin
 
-	gpuStates map[string]*gpuTypes.GPUState
 	// The image name of the pod infra container.
 	podInfraContainerImage string
 	// reasonCache stores the failure reason of the last container creation
@@ -209,7 +208,6 @@ func NewDockerManager(
 		os:                     osInterface,
 		machineInfo:            machineInfo,
 		gpuPlugins:             gpuPlugins,
-		gpuStates:              initGPUState(gpuPlugins),
 		podInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
 		dockerPuller:           newDockerPuller(client, qps, burst),
@@ -706,6 +704,31 @@ func (dm *DockerManager) runContainer(
 		},
 	}
 
+	gpuRequest := uint(milliCPUToShares(container.Resources.Requests.Gpu().MilliValue()))
+	glog.Errorf("Hans: runContainer(): gpuRequest: %f", gpuRequest)
+	if gpuRequest > 0 {
+		// Init GPU environment if need
+		if err := dm.gpuPlugins[0].InitGPUEnv(); err != nil {
+			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+			return kubecontainer.ContainerID{}, err
+		}
+
+		// check whether the host gpu computing environment support this image.
+		if isSupported, err := dm.gpuPlugins[0].IsImageSupported(container.Image); err != nil {
+			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+			return kubecontainer.ContainerID{}, err
+		}
+
+		// if the image need host platform, do it
+		if isSupported {
+			if volOpts, err := dm.gpuPlugins[0].GenerateVolumeOpts(container.Image); err != nil {
+				dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+				return kubecontainer.ContainerID{}, err
+			}
+			dockerOpts.Config.Volumes = volOpts
+		}
+	}
+
 	setEntrypointAndCommand(container, opts, &dockerOpts)
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
@@ -752,6 +775,28 @@ func (dm *DockerManager) runContainer(
 		Memory:     memoryLimit,
 		MemorySwap: -1,
 		CPUShares:  cpuShares,
+	}
+
+	if gpuRequest > 0 {
+		var gpuIdxs []uint
+		// alloc gpu device for this container
+		if gpuIdxs, err := dm.gpuPlugins[0].AllocGPU(gpuRequest)([]uint, error); err != nil {
+			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+			return kubecontainer.ContainerID{}, err
+		}
+
+		// add device options when launch container
+		if devOpts, err := dm.gpuPlugins[0].GenerateDeviceOpts(gpuIdxs); err != nil {
+			dm.gpuPlugins[0].FreeGPU(gpuIdxs)
+			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+			return kubecontainer.ContainerID{}, err
+		}
+
+		hc.Devices = devOpts
+		hc.CapAdd = append(hc.CapAdd, "MKNOD")
+
+		// keep gpu device usage status
+		container.GPUIndexs = gpuIdxs
 	}
 
 	if dm.cpuCFSQuota {
@@ -1409,6 +1454,15 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		glog.V(4).Infof("Container %q has already exited", name)
 		return nil
 	}
+
+	// free gpu resource for the container
+	if len(container.GPUIndexs) > 0 {
+		if err := dm.gpuPlugins[0].FreeGPU(container.GPUIndexs); err != nil {
+			glog.Warnf("Failed to free the gpu resource(%s)", err)
+		}
+		container.GPUIndexs = []uint{}
+	}
+
 	if err == nil {
 		glog.V(2).Infof("Container %q exited after %s", name, unversioned.Now().Sub(start.Time))
 	} else {

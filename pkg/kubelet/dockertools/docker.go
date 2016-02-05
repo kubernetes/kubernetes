@@ -115,33 +115,6 @@ func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	}
 }
 
-func initGPUState(gpuPlugins []gpuTypes.GPUPlugin) map[string]*gpuTypes.GPUState {
-	gpuStates := make(map[string]*gpuTypes.GPUState)
-	for _, gpuPlugin := range gpuPlugins {
-		var gpuState gpuTypes.GPUState
-		gpuState.IsInit = false
-
-		if gpuDevices, err := gpuPlugin.Detect(); err != nil {
-			gpuDevicesState := make([]*gpuTypes.GPUDeviceState, len(gpuDevices.Devices))
-			for _, dev := range gpuDevices.Devices {
-				var devState gpuTypes.GPUDeviceState
-				devState.IsOccupied = false
-				devState.Device = &dev
-				gpuDevicesState = append(gpuDevicesState, &devState)
-			}
-			gpuState.DevsState = gpuDevicesState
-		} else {
-			glog.Errorln("Failed to init GPU state.")
-			return map[string]*gpuTypes.GPUState{}
-		}
-
-		gpuStates[gpuPlugin.Name()] = &gpuState
-
-	}
-
-	return gpuStates
-}
-
 func filterHTTPError(err error, image string) error {
 	// docker/docker/pull/11314 prints detailed error info for docker pull.
 	// When it hits 502, it returns a verbose html output including an inline svg,

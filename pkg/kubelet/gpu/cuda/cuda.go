@@ -8,6 +8,7 @@ import (
 	"github.com/haniceboy/nvidia-docker/tools/src/nvidia"
 	"github.com/haniceboy/nvidia-docker/tools/src/nvml"
 	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu/types"
+	"sync"
 
 	dockerClient "github.com/fsouza/go-dockerclient"
 )
@@ -19,38 +20,112 @@ const (
 )
 
 type Cuda struct {
-	commonInfo gpuTypes.GPUCommonInfo
-	gpuDevices *gpuTypes.GPUDevices
+	gpuInfo gpuTypes.GPUInfo
 }
 
 func ProbeGPUPlugin() gpuTypes.GPUPlugin {
 	glog.Infof("Hans: cuda.ProbeGPUPlugin()")
 	return &Cuda{
-		commonInfo: gpuTypes.GPUCommonInfo{Name: CudaName},
+		gpuInfo: gpuTypes.GPUInfo{commonInfo: gpuTypes.GPUCommonInfo{Name: CudaName}},
 	}
 }
 
 func (cuda *Cuda) Name() string {
-	return cuda.commonInfo.Name
+	glog.Infof("Hans: cuda.Name()")
+	cuda.gpuInfo.lock.RLock()
+	def cuda.gpuInfo.lock.RUnlock()
+	return cuda.gpuInfo.commonInfo.Name
 }
 
 func (cuda *Cuda) InitPlugin() error {
+	glog.Infof("Hans: cuda.InitPlugin()")
 	nvidia.LoadUVM()
 	return nvidia.Init()
 }
 
 func (cuda *Cuda) ReleasePlugin() error {
+	glog.Infof("Hans: cuda.ReleasePlugin()")
 	return nvidia.Shutdown()
+}
+
+func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
+	glog.Infof("Hans: cuda.AllocGPU()")
+	totalGPUNum := len(cuda.gpuInfo.gpuDevices.Devices)
+	if gpuReqs >  totalGPUNum{
+		return []uint{}, fmt.Errorf("Cannot alloc %d cuda gpu, because there are %d", gpuReqs, totalGPUNum)
+	}
+
+	cuda.gpuInfo.lock.Lock()
+	def cuda.gpuInfo.lock.Unlock()
+
+	// check whether there are enough free gpus
+	freeGPUIdx := []uint{}
+	freedGPUNum := uint(0)
+	for idx, gpuDevice :=range cuda.gpuInfo.gpuDevices.Devices {
+		if !gpuDevice.GPUDeviceState.IsOccupied {
+			freedGPUNum++
+			freeGPUIdx = append(freeGPUIdx, idx)
+		}
+	}
+
+	if freedGPUNum >= gpuReqs {
+		var result =make([]uint, gpuReqs);
+		cc := copy(result, freeGPUIdx[:gpuReqs])
+		if cc == gpuReqs {
+			for _, idx := range result {
+				cuda.gpuInfo.gpuDevices.Devices[idx].GPUDeviceState.IsOccupied = true
+			}
+			return result, nil
+		} else {
+			return []uint{}, fmt.Errorf("Failed to generate gpu index slice")
+		}
+	} else {
+		return []uint{}, fmt.Errorf("Cannot meet the required gpu number %d and only have %d freed gpus", gpuReqs, freedGPUNum)
+	}
+
+
+}
+
+func (cuda *Cuda) FreeGPU(gpuIdxs []uint) error {
+	defer func(){
+        if err:=recover();err!=nil{
+            glog.Errf("Failed to free GPU(%s). Reason: %s",gpuIdxs, err)
+        }
+    }()
+
+	glog.Infof("Hans: cuda.FreeGPU()")
+	if len(gpuIdxs) == 0 {
+		return nil
+	}
+
+	cuda.gpuInfo.lock.Lock()
+	def cuda.gpuInfo.lock.Unlock()
+
+	// check whether the passed gpuIdxs is valid or not
+	for _, idx := range gpuIdxs {
+		if !cuda.gpuInfo.gpuDevices.Devices[idx].GPUDeviceState.IsOccupied {
+			return fmt.Errorf("Failed to free gpu %d, because it is not occupied", idx)
+		}
+	}
+
+	// remove the occupy flag
+	for _, idx := range gpuIdxs {
+		cuda.gpuInfo.gpuDevices.Devices[idx].GPUDeviceState.IsOccupied  = false
+	}
+
+	return nil
 }
 
 func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 	glog.Infof("Hans: cuda.Detect()")
 
+	cuda.gpuInfo.lock.Lock()
+	def cuda.gpuInfo.lock.Unlock()
 	if cuda.gpuDevices != nil {
 		return cuda.gpuDevices, nil
 	}
 
-	gpuDevices := gpuTypes.GPUDevices{}
+	gpuDevices := gpuTypes.GPUDevices{GPUState: gpuTypes.GPUState{IsInit: false}}
 
 	cudaDevices, err := nvidia.LookupDevices()
 	if err != nil {
@@ -65,6 +140,10 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 		dev.Cores = cudaDevice.CUDADev.Cores
 		dev.Memory = cudaDevice.CUDADev.Memory.Global
 		dev.Family = cudaDevice.CUDADev.Family
+
+		// init gpu device state
+		dev.GPUDeviceState = gpuTypes.GPUDeviceState{IsOccupied: false}
+
 		gpuDevs = append(gpuDevs, dev)
 	}
 
@@ -82,16 +161,31 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 
 	gpuDevices.GPUPlatform.Name = cuda.commonInfo.Name
 
-	cuda.gpuDevices = &gpuDevices
+	cuda.gpuInfo.gpuDevices = &gpuDevices
 	glog.Infof("Hans: cuda.Detect(): gpuDevices:%+v", gpuDevices)
-	return cuda.gpuDevices, nil
+	return cuda.gpuInfo.gpuDevices, nil
 }
 
 func (cuda *Cuda) InitGPUEnv(client DockerInterface) error {
-	return createLocalVolumes()
+	glog.Infof("Hans: cuda.InitGPUEnv()")
+	cuda.gpuInfo.lock.Lock()
+	def cuda.gpuInfo.lock.Unlock()
+	// check whether it already done init
+	if cuda.gpuInfo.gpuDevices.GPUState.IsInit {
+		return nil
+	}
+
+	if err:= cuda.createLocalVolumes(); err == nil {
+		cuda.gpuInfo.lock.Lock()
+		def cuda.gpuInfo.lock.Unlock()
+		cuda.gpuInfo.gpuDevices.GPUState.IsInit = true;
+	}
+
+	return err
 }
 
 func (cuda *Cuda) createLocalVolumes() error {
+	glog.Infof("Hans: cuda.createLocalVolumes()")
 	drv, err := nvidia.GetDriverVersion()
 	if err != nil {
 		return err
@@ -127,6 +221,7 @@ func (cuda *Cuda) createLocalVolumes() error {
 }
 
 func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
+	glog.Infof("Hans: cuda.IsImageSupported()")
 	cv, err := nvidia.GetCUDAVersion()
 	if err != nil {
 		return false, fmt.Errorf("Failed to detect the host cuda version(%s)", err)
@@ -139,13 +234,17 @@ func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
 	return isSupported, nil
 }
 
-func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []int) ([]dockerClient.Device, error) {
+func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []uint) ([]dockerClient.Device, error) {
+	glog.Infof("Hans: cuda.GenerateDeviceOpts()")
 	devicesOpts := make([]dockerClient.Device)
+
+	cuda.gpuInfo.lock.RLock()
+	def cuda.gpuInfo.lock.RUnlock()
 
 	for _, idx := range gpuIdxs {
 		var device docker.Device
 		device.CgroupPermissions = "rwm"
-		if idx > 0 && idx < len(cuda.gpuDevices.Devices) {
+		if idx < len(cuda.gpuDevices.Devices) {
 			device.PathOnHost = cuda.gpuDevices.Devices[idx].Path
 			device.PathInContainer = cuda.gpuDevices.Devices[idx].Path
 			devicesOpts = append(devicesOpts, device)
@@ -168,6 +267,7 @@ func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []int) ([]dockerClient.Device, erro
 }
 
 func (cuda *Cuda) GenerateVolumeOpts(image string) (map[string]struct{}, error) {
+	glog.Infof("Hans: cuda.GenerateVolumeOpts()")
 	result := make(map[string]struct{})
 
 	// check whether the image need cuda support
@@ -203,6 +303,7 @@ func (cuda *Cuda) GenerateVolumeOpts(image string) (map[string]struct{}, error) 
 }
 
 func (cuda *Cuda) volumesNeeded(image string) ([]string, error) {
+	glog.Infof("Hans: cuda.volumesNeeded()")
 	// it already pulled image.
 	label, err := docker.Label(image, labelVolumesNeeded)
 	if err != nil {
@@ -215,6 +316,7 @@ func (cuda *Cuda) volumesNeeded(image string) ([]string, error) {
 }
 
 func (cuda *Cuda) cudaSupported(image, version string) (bool, error) {
+	glog.Infof("Hans: cuda.cudaSupported()")
 	var vmaj, vmin int
 	var lmaj, lmin int
 

@@ -4,13 +4,23 @@ import (
 	dockerClient "github.com/fsouza/go-dockerclient"
 )
 
-type GPUDevice struct {
-	Path string
+type GPUDeviceState struct {
+	IsOccupied bool
+	// ContainerId string
+	// PodId       string
+}
 
+type GPUState struct {
+	IsInit bool
+}
+
+type GPUDevice struct {
+	Path   string
 	Cores  uint
 	Memory uint
-
 	Family string
+
+	GPUDeviceState
 }
 
 type GPUPlatform struct {
@@ -20,12 +30,10 @@ type GPUPlatform struct {
 }
 
 type GPUDevices struct {
+	GPUState
 	GPUPlatform
 	Devices []GPUDevice
 }
-
-// type GPUOptions struct {
-// }
 
 // GPUInterface is an abstract interface for gpu related operatons.
 type GPUPlugin interface {
@@ -35,19 +43,26 @@ type GPUPlugin interface {
 	// Rlease the plugin at last
 	ReleasePlugin() error
 
-	// detect the gpu hardware and the corresponding environment
+	// Detect the gpu hardware and the corresponding environment
 	Detect() (*GPUDevices, error)
 
 	// Init GPU environment before launch container
 	InitGPUEnv() error
 
-	// Generate arguments for run container
-	GenerateRunOpts(hc *dockerClient.HostConfig, gpuIdx []int, image string) error
+	// Alloc gpu device for container
+	AllocGPU(gpuReqs uint) ([]uint, error)
 
-	// // parepare the overall environment
-	// Prepare(id string) (*docker.Container, error)
-	// // setup the launched parameter for each container
-	// SetUpEnvForEachContainer(*docker.HostConfig) error
+	// Free gpu device from container
+	FreeGPU(gpuIdxs []uint) error
+
+	// Whether the host environment match the image request
+	IsImageSupported(image string) (bool, error)
+
+	// Generate Device Options
+	GenerateDeviceOpts(gpuIdxs []uint) ([]dockerClient.Device, error)
+
+	// Generate Volume Options
+	GenerateVolumeOpts(image string) (map[string]struct{}, error)
 
 	// Name returns the plugin's name. This will be used when searching
 	// for a plugin by name, e.g.
@@ -58,12 +73,8 @@ type GPUCommonInfo struct {
 	Name string
 }
 
-type GPUDeviceState struct {
-	IsOccupied bool
-	Device     *GPUDevice
-}
-
-type GPUState struct {
-	IsInit    bool
-	DevsState []*GPUDeviceState
+type GPUInfo struct {
+	lock       sync.RWMutex
+	commonInfo GPUCommonInfo
+	gpuDevices *GPUDevices
 }
