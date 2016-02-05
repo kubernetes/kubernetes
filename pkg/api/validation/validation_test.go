@@ -4583,6 +4583,52 @@ func TestValidateEndpoints(t *testing.T) {
 	}
 }
 
+func TestValidateTLSSecret(t *testing.T) {
+	successCases := map[string]api.Secret{
+		"emtpy certificate chain": {
+			ObjectMeta: api.ObjectMeta{Name: "tls-cert", Namespace: "namespace"},
+			Data: map[string][]byte{
+				api.TLSCertKey:       []byte("public key"),
+				api.TLSPrivateKeyKey: []byte("private key"),
+			},
+		},
+	}
+	for k, v := range successCases {
+		if errs := ValidateSecret(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+	errorCases := map[string]struct {
+		secrets     api.Secret
+		errorType   field.ErrorType
+		errorDetail string
+	}{
+		"missing public key": {
+			secrets: api.Secret{
+				ObjectMeta: api.ObjectMeta{Name: "tls-cert"},
+				Data: map[string][]byte{
+					api.TLSCertKey: []byte("public key"),
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+		"missing private key": {
+			secrets: api.Secret{
+				ObjectMeta: api.ObjectMeta{Name: "tls-cert"},
+				Data: map[string][]byte{
+					api.TLSCertKey: []byte("public key"),
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+	}
+	for k, v := range errorCases {
+		if errs := ValidateSecret(&v.secrets); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+			t.Errorf("[%s] Expected error type %s with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+		}
+	}
+}
+
 func TestValidateSecurityContext(t *testing.T) {
 	priv := false
 	var runAsUser int64 = 1
