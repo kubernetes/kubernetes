@@ -86,10 +86,8 @@ func (c *Repair) runOnce() error {
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
-
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	options := &api.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
-	list, err := c.registry.ListServices(ctx, options)
+	list, err := c.registry.ListServices(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
