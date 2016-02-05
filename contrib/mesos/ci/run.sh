@@ -42,6 +42,21 @@ else
 fi
 echo "${DOCKER_BIN_PATH}"
 
+# from hack/lib/golang.sh and build/common.sh
+readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
+
+readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/_output"
+readonly LOCAL_OUTPUT_SUBPATH="${LOCAL_OUTPUT_ROOT}/dockerized"
+readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
+
+readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
+
+readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
+readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
+readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
+
+readonly DOCKER_MOUNT_ARGS=(--volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}")
+
 # Clean (k8s output & images) & Build
 cd "${KUBE_ROOT}"
 exec docker run \
@@ -49,6 +64,7 @@ exec docker run \
   -v "${KUBE_ROOT}:/go/src/k8s.io/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
+  "${DOCKER_MOUNT_ARGS[@]}" \
   $(test -d /teamcity/system/git && echo "-v /teamcity/system/git:/teamcity/system/git" || true) \
   -e "KUBERNETES_CONTRIB=mesos" \
   -e "USER=root" \
