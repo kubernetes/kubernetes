@@ -103,7 +103,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 // extensions.CustomMetricsTargetList.
 // Returns number of replicas, status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
 // last timestamp of the metrics involved in computations or error, if occurred.
-func (a *HorizontalController) computeReplicasForCustomMetrics(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale,
+func (a *HorizontalController) computeReplicasForCustomMetrics(hpa extensions.HorizontalPodAutoscaler, scale *extensions.ScaleTwo,
 	cmAnnotation string) (int, string, time.Time, error) {
 
 	currentReplicas := scale.Status.Replicas
@@ -167,7 +167,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa extensions.Ho
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Namespace, hpa.Spec.ScaleRef.Name)
 
-	scale, err := a.scaleNamespacer.ScalesTwo(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+	scale, err := a.scaleNamespacer.ScaleTwos(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
@@ -244,7 +244,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.ScalesTwo(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+		_, err = a.scaleNamespacer.ScaleTwos(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
 		if err != nil {
 			a.eventRecorder.Eventf(&hpa, api.EventTypeWarning, "FailedRescale", "New size: %d; error: %v", desiredReplicas, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)

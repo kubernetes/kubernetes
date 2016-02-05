@@ -53,8 +53,8 @@ func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
 }
 
-func (c *ExtensionsClient) ScalesTwo(namespace string) ScaleTwoInterface {
-	return newScalesTwo(c, namespace)
+func (c *ExtensionsClient) ScaleTwos(namespace string) ScaleTwoInterface {
+	return newScaleTwos(c, namespace)
 }
 
 func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {

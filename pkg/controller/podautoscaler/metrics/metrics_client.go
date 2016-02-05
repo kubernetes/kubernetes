@@ -48,7 +48,7 @@ type MetricsClient interface {
 
 	// GetCustomMetric returns the average value of the given custom metrics from the
 	// pods picked using the namespace and selector passed as arguments.
-	GetCustomMetric(customMetricName string, namespace string, selector map[string]string) (*float64, time.Time, error)
+	GetCustomMetric(customMetricName string, namespace string, selector string) (*float64, time.Time, error)
 }
 
 type intAndFloat struct {
@@ -115,7 +115,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	// TODO: Eliminate deserialization/reserialization of the selector.
 	selectorObj, err := labels.Parse(selector)
 	if err != nil {
-		return nil, nil, time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
+		return 0, 0, time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
 	}
 	podList, err := h.client.Legacy().Pods(namespace).
 		List(api.ListOptions{LabelSelector: selectorObj})
@@ -152,11 +152,15 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 
 // GetCustomMetric returns the average value of the given custom metric from the
 // pods picked using the namespace and selector passed as arguments.
-func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespace string, selector map[string]string) (*float64, time.Time, error) {
+func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespace string, selector string) (*float64, time.Time, error) {
 	metricSpec := getHeapsterCustomMetricDefinition(customMetricName)
 
-	labelSelector := labels.SelectorFromSet(labels.Set(selector))
-	podList, err := h.client.Legacy().Pods(namespace).List(api.ListOptions{LabelSelector: labelSelector})
+	// TODO: Eliminate deserialization/reserialization of the selector.
+	selectorObj, err := labels.Parse(selector)
+	if err != nil {
+		return nil, time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
+	}
+	podList, err := h.client.Legacy().Pods(namespace).List(api.ListOptions{LabelSelector: selectorObj})
 
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)

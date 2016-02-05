@@ -53,6 +53,10 @@ func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
+func (c *FakeExtensions) ScaleTwos(namespace string) unversioned.ScaleTwoInterface {
+	return &FakeScaleTwos{c, namespace}
+}
+
 func (c *FakeExtensions) ThirdPartyResources(namespace string) unversioned.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{c, namespace}
 }

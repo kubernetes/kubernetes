@@ -30,6 +30,7 @@ type ExtensionsInterface interface {
 	JobsGetter
 	ReplicaSetsGetter
 	ScalesGetter
+	ScaleTwosGetter
 	ThirdPartyResourcesGetter
 }
 
@@ -64,6 +65,10 @@ func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 
 func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
+}
+
+func (c *ExtensionsClient) ScaleTwos(namespace string) ScaleTwoInterface {
+	return newScaleTwos(c, namespace)
 }
 
 func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
