@@ -81,7 +81,7 @@ const (
 	k8sRktCreationTimeAnno           = "rkt.kubernetes.io/created"
 	k8sRktContainerHashAnno          = "rkt.kubernetes.io/containerhash"
 	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restartcount"
-	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/terminationMessagePath"
+	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/terminationmessagepath"
 	dockerPrefix                     = "docker://"
 
 	authDir            = "auth.d"
