@@ -19,8 +19,10 @@ package v1alpha1
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -42,6 +44,38 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			}
 			if obj.IPTablesSyncPeriod.Duration == 0 {
 				obj.IPTablesSyncPeriod = unversioned.Duration{5 * time.Second}
+			}
+		},
+		func(obj *KubeSchedulerConfiguration) {
+			if obj.Port == 0 {
+				obj.Port = ports.SchedulerPort
+			}
+			if obj.Address == "" {
+				obj.Address = "0.0.0.0"
+			}
+			if obj.AlgorithmProvider == "" {
+				obj.AlgorithmProvider = "DefaultProvider"
+			}
+			if obj.KubeAPIQPS == 0 {
+				obj.KubeAPIQPS = 50.0
+			}
+			if obj.KubeAPIBurst == 0 {
+				obj.KubeAPIBurst = 100
+			}
+			if obj.SchedulerName == "" {
+				obj.SchedulerName = api.DefaultSchedulerName
+			}
+		},
+		func(obj *LeaderElectionConfiguration) {
+			zero := unversioned.Duration{}
+			if obj.LeaseDuration == zero {
+				obj.LeaseDuration = unversioned.Duration{15 * time.Second}
+			}
+			if obj.RenewDeadline == zero {
+				obj.RenewDeadline = unversioned.Duration{10 * time.Second}
+			}
+			if obj.RetryPeriod == zero {
+				obj.RetryPeriod = unversioned.Duration{2 * time.Second}
 			}
 		},
 	)
