@@ -109,7 +109,11 @@ func TestDoRequestFailed(t *testing.T) {
 		t.Errorf("unexpected error type %v", err)
 	}
 	actual := ss.Status()
-	if !reflect.DeepEqual(status, &actual) {
+	expected := *status
+	// The decoder will apply the default Version and Kind to the Status.
+	expected.APIVersion = "v1"
+	expected.Kind = "Status"
+	if !reflect.DeepEqual(&expected, &actual) {
 		t.Errorf("Unexpected mis-match: %s", util.ObjectDiff(status, &actual))
 	}
 }
