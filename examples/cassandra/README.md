@@ -53,54 +53,48 @@ This is a somewhat long tutorial.  If you want to jump straight to the "do it no
 In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
 In this simple case, we define a single container running Cassandra for our pod:
 
-<!-- BEGIN MUNGE: EXAMPLE cassandra-controller.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE cassandra.yaml -->
 
 ```yaml
 apiVersion: v1
-kind: ReplicationController
+kind: Pod
 metadata:
   labels:
     app: cassandra
   name: cassandra
 spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: cassandra
-    spec:
-      containers:
-        - command:
-            - /run.sh
-          resources:
-            limits:
-              cpu: 0.1
-          env:
-            - name: MAX_HEAP_SIZE
-              value: 512M
-            - name: HEAP_NEWSIZE
-              value: 100M
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v7
-          name: cassandra
-          ports:
-            - containerPort: 9042
-              name: cql
-            - containerPort: 9160
-              name: thrift
-          volumeMounts:
-            - mountPath: /cassandra_data
-              name: data
-      volumes:
-        - name: data
-          emptyDir: {}
+  containers:
+  - args:
+    - /run.sh
+    resources:
+      limits:
+        cpu: "0.1"
+    image: gcr.io/google_containers/cassandra:v6
+    name: cassandra
+    ports:
+    - name: cql
+      containerPort: 9042
+    - name: thrift
+      containerPort: 9160
+    volumeMounts:
+    - name: data
+      mountPath: /cassandra_data
+    env:
+    - name: MAX_HEAP_SIZE
+      value: 512M
+    - name: HEAP_NEWSIZE
+      value: 100M
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+  volumes:
+    - name: data
+      emptyDir: {}
 ```
 
-[Download example](cassandra-controller.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE cassandra-controller.yaml -->
+[Download example](cassandra.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra.yaml -->
 
 There are a few things to note in this description.  First is that we are running the [```gcr.io/google_containers/cassandra:v6```](image/Dockerfile) image from Google's [container registry](https://cloud.google.com/container-registry/docs/).  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The [```KubernetesSeedProvider```](#seed-provider-source) discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
 
@@ -223,7 +217,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v7
+          image: gcr.io/google_containers/cassandra:v6
           name: cassandra
           ports:
             - containerPort: 9042
@@ -340,7 +334,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: "gcr.io/google_containers/cassandra:v7"
+          image: "gcr.io/google_containers/cassandra:v6"
           name: cassandra
           ports:
             - containerPort: 9042
