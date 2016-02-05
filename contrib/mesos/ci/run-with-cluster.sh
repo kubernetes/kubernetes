@@ -78,7 +78,6 @@ docker run \
   -t $(tty &>/dev/null && echo "-i") \
   mesosphere/kubernetes-mesos-test \
   -ceux "\
-    git fetch --tags --verbose && \
     make clean all && \
     trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
     ./cluster/kube-down.sh && \
