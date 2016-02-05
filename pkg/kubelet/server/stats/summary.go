@@ -120,7 +120,7 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 
 	systemContainers := map[string]string{
 		SystemContainerKubelet: sb.nodeConfig.KubeletContainerName,
-		SystemContainerRuntime: sb.nodeConfig.DockerDaemonContainerName, // TODO: add support for other runtimes
+		SystemContainerRuntime: sb.nodeConfig.RuntimeContainerName,
 		SystemContainerMisc:    sb.nodeConfig.SystemContainerName,
 	}
 	for sys, name := range systemContainers {

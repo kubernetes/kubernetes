@@ -47,8 +47,7 @@ type KubeletServer struct {
 	KubeConfig    util.StringFlag
 	APIServerList []string
 
-	DockerDaemonContainer string
-	RunOnce               bool
+	RunOnce bool
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -61,9 +60,8 @@ type KubeletServer struct {
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
-		AuthPath:              util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		KubeConfig:            util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-		DockerDaemonContainer: "/docker-daemon",
+		AuthPath:   util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		KubeConfig: util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 
 		SystemReserved: make(util.ConfigurationMap),
 		KubeReserved:   make(util.ConfigurationMap),
@@ -117,6 +115,7 @@ func NewKubeletServer() *KubeletServer {
 			RktPath:                        "",
 			RktStage1Image:                 "",
 			RootDirectory:                  defaultRootDir,
+			RuntimeContainer:               "/docker-daemon",
 			SerializeImagePulls:            true,
 			StreamingConnectionIdleTimeout: unversioned.Duration{4 * time.Hour},
 			SyncFrequency:                  unversioned.Duration{1 * time.Minute},
@@ -223,4 +222,5 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
+	fs.StringVar(&s.RuntimeContainer, "runtime-container", s.RuntimeContainer, "Absolute name of the cgroups to create (if required) and run the runtime in (Default: /docker-daemon).")
 }

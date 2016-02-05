@@ -25,15 +25,19 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(NodeConfig) error
+	Start() error
 
 	// Returns resources allocated to system containers in the machine.
 	// These containers include the system and Kubernetes services.
 	SystemContainersLimit() api.ResourceList
+
+	// Returns a NodeConfig that is being used by the container manager.
+	GetNodeConfig() NodeConfig
 }
 
 type NodeConfig struct {
-	DockerDaemonContainerName string
-	SystemContainerName       string
-	KubeletContainerName      string
+	RuntimeContainerName string
+	SystemContainerName  string
+	KubeletContainerName string
+	ContainerRuntime     string
 }

@@ -180,7 +180,7 @@ func (s *KubeletExecutorServer) runKubelet(
 
 		return decorated, pc, nil
 	}
-	kcfg.DockerDaemonContainer = "" // don't move the docker daemon into a cgroup
+	kcfg.RuntimeContainer = "" // don't move the docker daemon into a cgroup
 	kcfg.Hostname = kcfg.HostnameOverride
 	kcfg.KubeClient = apiclient
 
@@ -216,7 +216,12 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	kcfg.CAdvisorInterface = cAdvisorInterface
-	kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, cAdvisorInterface)
+	kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, cAdvisorInterface, cm.NodeConfig{
+		RuntimeContainerName: kcfg.RuntimeContainer,
+		SystemContainerName:  kcfg.SystemContainer,
+		KubeletContainerName: kcfg.ResourceContainer,
+		ContainerRuntime:     kcfg.ContainerRuntime,
+	})
 	if err != nil {
 		return err
 	}

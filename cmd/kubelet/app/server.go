@@ -194,7 +194,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		CPUCFSQuota:               s.CPUCFSQuota,
 		DiskSpacePolicy:           diskSpacePolicy,
 		DockerClient:              dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		DockerDaemonContainer:     s.DockerDaemonContainer,
+		RuntimeContainer:          s.RuntimeContainer,
 		DockerExecHandler:         dockerExecHandler,
 		EnableCustomMetrics:       s.EnableCustomMetrics,
 		EnableDebuggingHandlers:   s.EnableDebuggingHandlers,
@@ -306,7 +306,16 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	}
 
 	if kcfg.ContainerManager == nil {
-		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface)
+		if kcfg.SystemContainer != "" && kcfg.CgroupRoot == "" {
+			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+		}
+
+		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface, cm.NodeConfig{
+			RuntimeContainerName: kcfg.RuntimeContainer,
+			SystemContainerName:  kcfg.SystemContainer,
+			KubeletContainerName: kcfg.ResourceContainer,
+			ContainerRuntime:     kcfg.ContainerRuntime,
+		})
 		if err != nil {
 			return err
 		}
@@ -501,7 +510,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		CPUCFSQuota:               true,
 		DiskSpacePolicy:           diskSpacePolicy,
 		DockerClient:              dockerClient,
-		DockerDaemonContainer:     "/docker-daemon",
+		RuntimeContainer:          "/docker-daemon",
 		DockerExecHandler:         &dockertools.NativeExecHandler{},
 		EnableCustomMetrics:       false,
 		EnableDebuggingHandlers:   true,
@@ -677,7 +686,7 @@ type KubeletConfig struct {
 	CPUCFSQuota                    bool
 	DiskSpacePolicy                kubelet.DiskSpacePolicy
 	DockerClient                   dockertools.DockerInterface
-	DockerDaemonContainer          string
+	RuntimeContainer               string
 	DockerExecHandler              dockertools.ExecHandler
 	EnableCustomMetrics            bool
 	EnableDebuggingHandlers        bool
@@ -802,7 +811,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.Cloud,
 		kc.NodeLabels,
 		kc.NodeStatusUpdateFrequency,
-		kc.ResourceContainer,
 		kc.OSInterface,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
@@ -810,8 +818,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,
-		kc.DockerDaemonContainer,
-		kc.SystemContainer,
 		kc.ConfigureCBR0,
 		kc.NonMasqueradeCIDR,
 		kc.PodCIDR,
