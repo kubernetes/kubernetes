@@ -306,7 +306,7 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		log.Infof("Binding task %v pod '%v/%v' to '%v' with annotations %+v...",
 			taskID, pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
 		ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-		err := r.client.LegacyClient.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+		err := r.client.CoreClient.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 		if err != nil {
 			log.Warningf("failed to bind task %v pod %v/%v: %v", taskID, pod.Namespace, pod.Name, err)
 			return errCreateBindingFailed
@@ -321,7 +321,7 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		patch.Metadata.Annotations = pod.Annotations
 		patchJson, _ := json.Marshal(patch)
 		log.V(4).Infof("Patching annotations %v of task %v pod %v/%v: %v", pod.Annotations, taskID, pod.Namespace, pod.Name, string(patchJson))
-		err := r.client.LegacyClient.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
+		err := r.client.CoreClient.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
 		if err != nil {
 			log.Errorf("Error updating annotations of ready-to-launch task %v pod %v/%v: %v", taskID, pod.Namespace, pod.Name, err)
 			return errAnnotationUpdateFailure

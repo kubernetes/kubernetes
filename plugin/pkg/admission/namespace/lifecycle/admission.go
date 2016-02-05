@@ -73,7 +73,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	// refuse to operate on non-existent namespaces
 	if !exists {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespaceObj, err = l.client.Legacy().Namespaces().Get(a.GetNamespace())
+		namespaceObj, err = l.client.Core().Namespaces().Get(a.GetNamespace())
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return err
@@ -102,10 +102,10 @@ func NewLifecycle(c clientset.Interface) admission.Interface {
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Legacy().Namespaces().List(options)
+				return c.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Legacy().Namespaces().Watch(options)
+				return c.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},

@@ -17,15 +17,15 @@ limitations under the License.
 package fake
 
 import (
+	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	core_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned/fake"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	extensions_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned/fake"
-	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
-	legacy_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned/fake"
 )
 
-// Legacy retrieves the LegacyClient
-func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
-	return &legacy_unversioned_fake.FakeLegacy{&c.Fake}
+// Core retrieves the CoreClient
+func (c *Clientset) Core() core_unversioned.CoreInterface {
+	return &core_unversioned_fake.FakeCore{&c.Fake}
 }
 
 // Extensions retrieves the ExtensionsClient

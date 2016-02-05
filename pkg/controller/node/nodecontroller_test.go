@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/testing/fake"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -63,15 +63,15 @@ type FakeNodeHandler struct {
 }
 
 type FakeLegacyHandler struct {
-	unversioned_legacy.LegacyInterface
+	unversioned_core.CoreInterface
 	n *FakeNodeHandler
 }
 
-func (c *FakeNodeHandler) Legacy() unversioned_legacy.LegacyInterface {
-	return &FakeLegacyHandler{c.Clientset.Legacy(), c}
+func (c *FakeNodeHandler) Core() unversioned_core.CoreInterface {
+	return &FakeLegacyHandler{c.Clientset.Core(), c}
 }
 
-func (m *FakeLegacyHandler) Nodes() unversioned_legacy.NodeInterface {
+func (m *FakeLegacyHandler) Nodes() unversioned_core.NodeInterface {
 	return m.n
 }
 

@@ -300,7 +300,7 @@ func TestExampleObjects(t *testing.T) {
 		clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolumeClaim{}) {
-			pvc, err := clientset.Legacy().PersistentVolumeClaims("ns").Get("doesntmatter")
+			pvc, err := clientset.Core().PersistentVolumeClaims("ns").Get("doesntmatter")
 			if err != nil {
 				t.Fatalf("Error retrieving object: %v", err)
 			}
@@ -321,7 +321,7 @@ func TestExampleObjects(t *testing.T) {
 		}
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolume{}) {
-			pv, err := clientset.Legacy().PersistentVolumes().Get("doesntmatter")
+			pv, err := clientset.Core().PersistentVolumes().Get("doesntmatter")
 			if err != nil {
 				t.Fatalf("Error retrieving object: %v", err)
 			}
@@ -366,7 +366,7 @@ func TestBindingWithExamples(t *testing.T) {
 	clientset := &fake.Clientset{}
 	clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
 
-	pv, err := clientset.Legacy().PersistentVolumes().Get("any")
+	pv, err := clientset.Core().PersistentVolumes().Get("any")
 	if err != nil {
 		t.Errorf("Unexpected error getting PV from client: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestBindingWithExamples(t *testing.T) {
 	// Test that !Pending gets correctly added
 	pv.Status.Phase = api.VolumeAvailable
 
-	claim, error := clientset.Legacy().PersistentVolumeClaims("ns").Get("any")
+	claim, error := clientset.Core().PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
 		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}

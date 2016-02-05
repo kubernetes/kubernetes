@@ -600,7 +600,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	c.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &api.ReplicationController{}, fmt.Errorf("Fake error")
 	})
-	fakeRCClient := c.Legacy().ReplicationControllers("default")
+	fakeRCClient := c.Core().ReplicationControllers("default")
 	numReplicas := 10
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0
