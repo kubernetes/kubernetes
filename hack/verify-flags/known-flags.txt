@@ -279,6 +279,7 @@ pv-recycler-minimum-timeout-hostpath
 pv-recycler-minimum-timeout-nfs
 pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
+pv-recycler-maximum-retry
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
 read-only-port

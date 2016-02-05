@@ -58,7 +58,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	binder.Run()
 	defer binder.Stop()
 
-	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 30*time.Second, plugins, cloud)
+	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 30*time.Second, 3, plugins, cloud)
 	recycler.Run()
 	defer recycler.Stop()
 
