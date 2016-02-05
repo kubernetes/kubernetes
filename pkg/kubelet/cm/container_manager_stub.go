@@ -25,13 +25,17 @@ type containerManagerStub struct{}
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ NodeConfig) error {
+func (cm *containerManagerStub) Start() error {
 	glog.V(2).Infof("Starting stub container manager")
 	return nil
 }
 
 func (cm *containerManagerStub) SystemContainersLimit() api.ResourceList {
 	return api.ResourceList{}
+}
+
+func (cm *containerManagerStub) GetNodeConfig() NodeConfig {
+	return NodeConfig{}
 }
 
 func NewStubContainerManager() ContainerManager {

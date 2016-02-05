@@ -311,6 +311,7 @@ root-ca-file
 root-dir
 run-proxy
 runtime-config
+runtime-container
 save-config
 scheduler-config
 scheduler-name

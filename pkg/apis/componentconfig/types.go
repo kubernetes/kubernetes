@@ -304,6 +304,8 @@ type KubeletConfiguration struct {
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool `json:"enableCustomMetrics"`
+	// The cgroup that container runtime is expected to be isolated in.
+	RuntimeContainer string `json:"runtimeContainer,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {

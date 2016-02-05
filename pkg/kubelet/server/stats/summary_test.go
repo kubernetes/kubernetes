@@ -48,9 +48,9 @@ func TestBuildSummary(t *testing.T) {
 	node := api.Node{}
 	node.Name = "FooNode"
 	nodeConfig := cm.NodeConfig{
-		DockerDaemonContainerName: "/docker-daemon",
-		SystemContainerName:       "/system",
-		KubeletContainerName:      "/kubelet",
+		RuntimeContainerName: "/docker-daemon",
+		SystemContainerName:  "/system",
+		KubeletContainerName: "/kubelet",
 	}
 	const (
 		namespace0 = "test0"
