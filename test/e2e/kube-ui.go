@@ -39,7 +39,7 @@ var _ = Describe("kube-ui", func() {
 
 	f := NewFramework("kube-ui")
 
-	It("should check that the kube-ui instance is alive [Conformance]", func() {
+	It("should check that the kube-ui instance is alive", func() {
 		By("Checking the kube-ui service exists.")
 		err := waitForService(f.Client, uiNamespace, uiServiceName, true, poll, serviceStartTimeout)
 		Expect(err).NotTo(HaveOccurred())
