@@ -163,6 +163,7 @@ function get_security_group_id {
 # Finds the master ip, if it is saved (tagged on the master disk)
 # Sets KUBE_MASTER_IP
 function find-tagged-master-ip {
+  find-master-pd
   if [[ -n "${MASTER_DISK_ID:-}" ]]; then
     KUBE_MASTER_IP=$(get-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP})
   fi
@@ -178,6 +179,7 @@ function get-tag {
 }
 
 # Gets an existing master, exiting if not found
+# Note that this is called directly by the e2e tests
 function detect-master() {
   find-tagged-master-ip
   KUBE_MASTER=${MASTER_NAME}
