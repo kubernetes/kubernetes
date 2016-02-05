@@ -849,6 +849,63 @@ func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
 	}
 }
 
+func TestIpPermissionExistsHandlesRangeSubsets(t *testing.T) {
+	// Two existing scenarios we'll test against
+	emptyIpPermission := ec2.IpPermission{}
+
+	oldIpPermission := ec2.IpPermission{
+		IpRanges: []*ec2.IpRange{
+			{CidrIp: aws.String("10.0.0.0/8")},
+			{CidrIp: aws.String("192.168.1.0/24")},
+		},
+	}
+
+	// Two already existing ranges and a new one
+	existingIpPermission := ec2.IpPermission{
+		IpRanges: []*ec2.IpRange{
+			{CidrIp: aws.String("10.0.0.0/8")},
+		},
+	}
+	existingIpPermission2 := ec2.IpPermission{
+		IpRanges: []*ec2.IpRange{
+			{CidrIp: aws.String("192.168.1.0/24")},
+		},
+	}
+
+	newIpPermission := ec2.IpPermission{
+		IpRanges: []*ec2.IpRange{
+			{CidrIp: aws.String("172.16.0.0/16")},
+		},
+	}
+
+	exists := ipPermissionExists(&emptyIpPermission, &emptyIpPermission, false)
+	if !exists {
+		t.Errorf("Should have been considered existing since we're comparing a range array against itself")
+	}
+	exists = ipPermissionExists(&oldIpPermission, &oldIpPermission, false)
+	if !exists {
+		t.Errorf("Should have been considered existing since we're comparing a range array against itself")
+	}
+
+	exists = ipPermissionExists(&existingIpPermission, &oldIpPermission, false)
+	if !exists {
+		t.Errorf("Should have been considered existing since 10.* is in oldIpPermission's array of ranges")
+	}
+	exists = ipPermissionExists(&existingIpPermission2, &oldIpPermission, false)
+	if !exists {
+		t.Errorf("Should have been considered existing since 192.* is in oldIpPermission2's array of ranges")
+	}
+
+	exists = ipPermissionExists(&newIpPermission, &emptyIpPermission, false)
+	if exists {
+		t.Errorf("Should have not been considered existing since we compared against a missing array of ranges")
+	}
+	exists = ipPermissionExists(&newIpPermission, &oldIpPermission, false)
+	if exists {
+		t.Errorf("Should have not been considered existing since 172.* is not in oldIpPermission's array of ranges")
+	}
+}
+
 func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 	oldIpPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{

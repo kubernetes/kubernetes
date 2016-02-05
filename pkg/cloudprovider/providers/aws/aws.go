@@ -1525,15 +1525,25 @@ func ipPermissionExists(newPermission, existing *ec2.IpPermission, compareGroupU
 	if !isEqualStringPointer(newPermission.IpProtocol, existing.IpProtocol) {
 		return false
 	}
-	if len(newPermission.IpRanges) != len(existing.IpRanges) {
+	// Check only if newPermission is a subset of existing. Usually it has zero or one elements.
+	// Not doing actual CIDR math yet; not clear it's needed, either.
+	glog.V(4).Infof("Comparing %v to %v", newPermission, existing)
+	if len(newPermission.IpRanges) > len(existing.IpRanges) {
 		return false
 	}
+
 	for j := range newPermission.IpRanges {
-		if !isEqualStringPointer(newPermission.IpRanges[j].CidrIp, existing.IpRanges[j].CidrIp) {
+		found := false
+		for k := range existing.IpRanges {
+			if isEqualStringPointer(newPermission.IpRanges[j].CidrIp, existing.IpRanges[k].CidrIp) {
+				found = true
+				break
+			}
+		}
+		if found == false {
 			return false
 		}
 	}
-
 	for _, leftPair := range newPermission.UserIdGroupPairs {
 		for _, rightPair := range existing.UserIdGroupPairs {
 			if isEqualUserGroupPair(leftPair, rightPair, compareGroupUserIDs) {
