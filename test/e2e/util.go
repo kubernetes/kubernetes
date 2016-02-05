@@ -1115,11 +1115,7 @@ func loadConfig() (*client.Config, error) {
 	}
 }
 
-func loadClient() (*client.Client, error) {
-	config, err := loadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
-	}
+func loadClientFromConfig(config *client.Config) (*client.Client, error) {
 	c, err := client.New(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
@@ -1128,6 +1124,14 @@ func loadClient() (*client.Client, error) {
 		c.Client.Timeout = singleCallTimeout
 	}
 	return c, nil
+}
+
+func loadClient() (*client.Client, error) {
+	config, err := loadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
+	}
+	return loadClientFromConfig(config)
 }
 
 // randomSuffix provides a random string to append to pods,services,rcs.
