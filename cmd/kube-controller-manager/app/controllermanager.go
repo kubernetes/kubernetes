@@ -306,7 +306,9 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
 		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
-		s.PersistentVolumeControllerOptions.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins(s.PersistentVolumeControllerOptions.VolumeConfigFlags),
+		s.PersistentVolumeControllerOptions.PVClaimBinderSyncPeriod,
+		s.PersistentVolumeControllerOptions.VolumeConfigFlags.PersistentVolumeRecyclerMaximumRetry,
+		ProbeRecyclableVolumePlugins(s.PersistentVolumeControllerOptions.VolumeConfigFlags),
 		cloud,
 	)
 	if err != nil {

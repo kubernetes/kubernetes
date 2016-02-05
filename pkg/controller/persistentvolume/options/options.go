@@ -27,6 +27,7 @@ import (
 // of volume.VolumeConfig which are then passed to the appropriate plugin. The ControllerManager binary is the only
 // part of the code which knows what plugins are supported and which CLI flags correspond to each plugin.
 type VolumeConfigFlags struct {
+	PersistentVolumeRecyclerMaximumRetry                int
 	PersistentVolumeRecyclerMinimumTimeoutNFS           int
 	PersistentVolumeRecyclerPodTemplateFilePathNFS      string
 	PersistentVolumeRecyclerIncrementTimeoutNFS         int
@@ -46,6 +47,7 @@ func NewPersistentVolumeControllerOptions() PersistentVolumeControllerOptions {
 		PVClaimBinderSyncPeriod: 10 * time.Minute,
 		VolumeConfigFlags: VolumeConfigFlags{
 			// default values here
+			PersistentVolumeRecyclerMaximumRetry:             3,
 			PersistentVolumeRecyclerMinimumTimeoutNFS:        300,
 			PersistentVolumeRecyclerIncrementTimeoutNFS:      30,
 			PersistentVolumeRecyclerMinimumTimeoutHostPath:   60,
@@ -76,6 +78,9 @@ func (o *PersistentVolumeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		o.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutHostPath,
 		"the increment of time added per Gi to ActiveDeadlineSeconds for a HostPath scrubber pod. "+
 			"This is for development and testing only and will not work in a multi-node cluster.")
+	fs.IntVar(&o.VolumeConfigFlags.PersistentVolumeRecyclerMaximumRetry, "pv-recycler-maximum-retry",
+		o.VolumeConfigFlags.PersistentVolumeRecyclerMaximumRetry,
+		"Maximum number of attempts to recycle or delete a persistent volume")
 	fs.BoolVar(&o.VolumeConfigFlags.EnableHostPathProvisioning, "enable-hostpath-provisioner", o.VolumeConfigFlags.EnableHostPathProvisioning,
 		"Enable HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features. "+
 			"HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.")
