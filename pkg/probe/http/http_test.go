@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 const FailureCode int = -1
@@ -109,5 +110,24 @@ func TestHTTPProbeChecker(t *testing.T) {
 		if !containsAny(output, test.accBodies) {
 			t.Errorf("Expected one of %#v, got %v", test.accBodies, output)
 		}
+	}
+}
+
+func TestHTTPProbeCheckerUserAgent(t *testing.T) {
+	expected := fmt.Sprintf("Kubernetes/%s HTTP-Prober", version.Get())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := r.UserAgent()
+		if got != expected {
+			t.Errorf("User Agent mismatch, expected: %q got: %q", expected, got)
+		}
+	}))
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	prober := New()
+	_, _, err = prober.Probe(u, 1*time.Second)
+	if err != nil {
+		t.Errorf("Expected error: %v", err)
 	}
 }

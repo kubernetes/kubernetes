@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 )
@@ -48,16 +49,21 @@ func (pr httpProber) Probe(url *url.URL, timeout time.Duration) (probe.Result, s
 	return DoHTTPProbe(url, &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
-type HTTPGetInterface interface {
-	Get(u string) (*http.Response, error)
+type HTTPDoInterface interface {
+	Do(r *http.Request) (*http.Response, error)
 }
 
 // DoHTTPProbe checks if a GET request to the url succeeds.
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url *url.URL, client HTTPGetInterface) (probe.Result, string, error) {
-	res, err := client.Get(url.String())
+func DoHTTPProbe(url *url.URL, client HTTPDoInterface) (probe.Result, string, error) {
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return probe.Failure, err.Error(), nil
+	}
+	req.Header.Set("User-Agent", fmt.Sprintf("Kubernetes/%s HTTP-Prober", version.Get()))
+	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
