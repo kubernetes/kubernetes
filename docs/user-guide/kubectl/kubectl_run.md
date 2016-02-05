@@ -108,6 +108,7 @@ $ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'pri
       --service-generator="service/v2": The name of the generator to use for creating a service.  Only used if --expose is true
       --service-overrides="": An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
+      --show-labels[=false]: When printing, show all labels as the last column (default hide labels column)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
   -i, --stdin[=false]: Keep stdin open on the container(s) in the pod, even if nothing is attached.
       --template="": Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
