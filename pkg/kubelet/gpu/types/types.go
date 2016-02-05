@@ -2,6 +2,7 @@ package types
 
 import (
 	dockerClient "github.com/fsouza/go-dockerclient"
+	"sync"
 )
 
 type GPUDeviceState struct {
@@ -74,7 +75,7 @@ type GPUCommonInfo struct {
 }
 
 type GPUInfo struct {
-	lock       sync.RWMutex
-	commonInfo GPUCommonInfo
-	gpuDevices *GPUDevices
+	Lock       sync.RWMutex
+	CommonInfo GPUCommonInfo
+	GPUDevices *GPUDevices
 }

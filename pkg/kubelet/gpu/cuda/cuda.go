@@ -8,15 +8,19 @@ import (
 	"github.com/haniceboy/nvidia-docker/tools/src/nvidia"
 	"github.com/haniceboy/nvidia-docker/tools/src/nvml"
 	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu/types"
-	"sync"
+	"strings"
 
 	dockerClient "github.com/fsouza/go-dockerclient"
 )
 
 const (
-	CudaName      string = "cuda"
-	CudaDeviceCtl string = "/dev/nvidiactl"
-	CudaDeviceUVM string = "/dev/nvidia-uvm"
+	CudaName string = "cuda"
+
+	cudaDeviceCtl string = "/dev/nvidiactl"
+	cudaDeviceUVM string = "/dev/nvidia-uvm"
+
+	labelCUDAVersion   string = "com.nvidia.cuda.version"
+	labelVolumesNeeded string = "com.nvidia.volumes.needed"
 )
 
 type Cuda struct {
@@ -26,15 +30,15 @@ type Cuda struct {
 func ProbeGPUPlugin() gpuTypes.GPUPlugin {
 	glog.Infof("Hans: cuda.ProbeGPUPlugin()")
 	return &Cuda{
-		gpuInfo: gpuTypes.GPUInfo{commonInfo: gpuTypes.GPUCommonInfo{Name: CudaName}},
+		gpuInfo: gpuTypes.GPUInfo{CommonInfo: gpuTypes.GPUCommonInfo{Name: CudaName}},
 	}
 }
 
 func (cuda *Cuda) Name() string {
 	glog.Infof("Hans: cuda.Name()")
-	cuda.gpuInfo.lock.RLock()
-	def cuda.gpuInfo.lock.RUnlock()
-	return cuda.gpuInfo.commonInfo.Name
+	cuda.gpuInfo.Lock.RLock()
+	defer cuda.gpuInfo.Lock.RUnlock()
+	return cuda.gpuInfo.CommonInfo.Name
 }
 
 func (cuda *Cuda) InitPlugin() error {
@@ -50,30 +54,30 @@ func (cuda *Cuda) ReleasePlugin() error {
 
 func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
 	glog.Infof("Hans: cuda.AllocGPU()")
-	totalGPUNum := len(cuda.gpuInfo.gpuDevices.Devices)
-	if gpuReqs >  totalGPUNum{
+	totalGPUNum := uint(len(cuda.gpuInfo.GPUDevices.Devices))
+	if gpuReqs > totalGPUNum {
 		return []uint{}, fmt.Errorf("Cannot alloc %d cuda gpu, because there are %d", gpuReqs, totalGPUNum)
 	}
 
-	cuda.gpuInfo.lock.Lock()
-	def cuda.gpuInfo.lock.Unlock()
+	cuda.gpuInfo.Lock.Lock()
+	defer cuda.gpuInfo.Lock.Unlock()
 
 	// check whether there are enough free gpus
 	freeGPUIdx := []uint{}
 	freedGPUNum := uint(0)
-	for idx, gpuDevice :=range cuda.gpuInfo.gpuDevices.Devices {
+	for idx, gpuDevice := range cuda.gpuInfo.GPUDevices.Devices {
 		if !gpuDevice.GPUDeviceState.IsOccupied {
 			freedGPUNum++
-			freeGPUIdx = append(freeGPUIdx, idx)
+			freeGPUIdx = append(freeGPUIdx, uint(idx))
 		}
 	}
 
 	if freedGPUNum >= gpuReqs {
-		var result =make([]uint, gpuReqs);
+		var result = make([]uint, gpuReqs)
 		cc := copy(result, freeGPUIdx[:gpuReqs])
-		if cc == gpuReqs {
+		if uint(cc) == gpuReqs {
 			for _, idx := range result {
-				cuda.gpuInfo.gpuDevices.Devices[idx].GPUDeviceState.IsOccupied = true
+				cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied = true
 			}
 			return result, nil
 		} else {
@@ -83,34 +87,33 @@ func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
 		return []uint{}, fmt.Errorf("Cannot meet the required gpu number %d and only have %d freed gpus", gpuReqs, freedGPUNum)
 	}
 
-
 }
 
 func (cuda *Cuda) FreeGPU(gpuIdxs []uint) error {
-	defer func(){
-        if err:=recover();err!=nil{
-            glog.Errf("Failed to free GPU(%s). Reason: %s",gpuIdxs, err)
-        }
-    }()
+	defer func() {
+		if err := recover(); err != nil {
+			glog.Errorf("Failed to free GPU(%s). Reason: %s", gpuIdxs, err)
+		}
+	}()
 
 	glog.Infof("Hans: cuda.FreeGPU()")
 	if len(gpuIdxs) == 0 {
 		return nil
 	}
 
-	cuda.gpuInfo.lock.Lock()
-	def cuda.gpuInfo.lock.Unlock()
+	cuda.gpuInfo.Lock.Lock()
+	defer cuda.gpuInfo.Lock.Unlock()
 
 	// check whether the passed gpuIdxs is valid or not
 	for _, idx := range gpuIdxs {
-		if !cuda.gpuInfo.gpuDevices.Devices[idx].GPUDeviceState.IsOccupied {
+		if !cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied {
 			return fmt.Errorf("Failed to free gpu %d, because it is not occupied", idx)
 		}
 	}
 
 	// remove the occupy flag
 	for _, idx := range gpuIdxs {
-		cuda.gpuInfo.gpuDevices.Devices[idx].GPUDeviceState.IsOccupied  = false
+		cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied = false
 	}
 
 	return nil
@@ -119,10 +122,10 @@ func (cuda *Cuda) FreeGPU(gpuIdxs []uint) error {
 func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 	glog.Infof("Hans: cuda.Detect()")
 
-	cuda.gpuInfo.lock.Lock()
-	def cuda.gpuInfo.lock.Unlock()
-	if cuda.gpuDevices != nil {
-		return cuda.gpuDevices, nil
+	cuda.gpuInfo.Lock.Lock()
+	defer cuda.gpuInfo.Lock.Unlock()
+	if cuda.gpuInfo.GPUDevices != nil {
+		return cuda.gpuInfo.GPUDevices, nil
 	}
 
 	gpuDevices := gpuTypes.GPUDevices{GPUState: gpuTypes.GPUState{IsInit: false}}
@@ -159,29 +162,29 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 		gpuDevices.GPUPlatform.PlatformVersion = platformVersion
 	}
 
-	gpuDevices.GPUPlatform.Name = cuda.commonInfo.Name
+	gpuDevices.GPUPlatform.Name = cuda.gpuInfo.CommonInfo.Name
 
-	cuda.gpuInfo.gpuDevices = &gpuDevices
+	cuda.gpuInfo.GPUDevices = &gpuDevices
 	glog.Infof("Hans: cuda.Detect(): gpuDevices:%+v", gpuDevices)
-	return cuda.gpuInfo.gpuDevices, nil
+	return cuda.gpuInfo.GPUDevices, nil
 }
 
-func (cuda *Cuda) InitGPUEnv(client DockerInterface) error {
+func (cuda *Cuda) InitGPUEnv() error {
 	glog.Infof("Hans: cuda.InitGPUEnv()")
-	cuda.gpuInfo.lock.Lock()
-	def cuda.gpuInfo.lock.Unlock()
+	cuda.gpuInfo.Lock.Lock()
+	defer cuda.gpuInfo.Lock.Unlock()
 	// check whether it already done init
-	if cuda.gpuInfo.gpuDevices.GPUState.IsInit {
+	if cuda.gpuInfo.GPUDevices.GPUState.IsInit {
 		return nil
 	}
 
-	if err:= cuda.createLocalVolumes(); err == nil {
-		cuda.gpuInfo.lock.Lock()
-		def cuda.gpuInfo.lock.Unlock()
-		cuda.gpuInfo.gpuDevices.GPUState.IsInit = true;
+	if err := cuda.createLocalVolumes(); err == nil {
+		cuda.gpuInfo.GPUDevices.GPUState.IsInit = true
+	} else {
+		return err
 	}
 
-	return err
+	return nil
 }
 
 func (cuda *Cuda) createLocalVolumes() error {
@@ -227,7 +230,8 @@ func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
 		return false, fmt.Errorf("Failed to detect the host cuda version(%s)", err)
 	}
 
-	if isSupported, err := cuda.cudaSupported(image, cv); err != nil {
+	isSupported, err := cuda.cudaSupported(image, cv)
+	if err != nil {
 		return false, fmt.Errorf("Failed to compare the cuda version of image(%s): %s", image, err)
 	}
 
@@ -236,27 +240,27 @@ func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
 
 func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []uint) ([]dockerClient.Device, error) {
 	glog.Infof("Hans: cuda.GenerateDeviceOpts()")
-	devicesOpts := make([]dockerClient.Device)
+	devicesOpts := []dockerClient.Device{}
 
-	cuda.gpuInfo.lock.RLock()
-	def cuda.gpuInfo.lock.RUnlock()
+	cuda.gpuInfo.Lock.RLock()
+	defer cuda.gpuInfo.Lock.RUnlock()
 
 	for _, idx := range gpuIdxs {
-		var device docker.Device
+		var device dockerClient.Device
 		device.CgroupPermissions = "rwm"
-		if idx < len(cuda.gpuDevices.Devices) {
-			device.PathOnHost = cuda.gpuDevices.Devices[idx].Path
-			device.PathInContainer = cuda.gpuDevices.Devices[idx].Path
+		if idx < uint(len(cuda.gpuInfo.GPUDevices.Devices)) {
+			device.PathOnHost = cuda.gpuInfo.GPUDevices.Devices[idx].Path
+			device.PathInContainer = cuda.gpuInfo.GPUDevices.Devices[idx].Path
 			devicesOpts = append(devicesOpts, device)
 		} else {
-			return nil, fmt.Errorf("Cannot find the cuda gpu idx(%d) of total %d", idx, len(cuda.gpuDevices.Devices))
+			return nil, fmt.Errorf("Cannot find the cuda gpu idx(%d) of total %d", idx, len(cuda.gpuInfo.GPUDevices.Devices))
 		}
 
 	}
 
-	extraDevs := []string{CudaDeviceCtl, CudaDeviceUVM}
-	for _, path := range gpuIdxs {
-		var device docker.Device
+	extraDevs := []string{cudaDeviceCtl, cudaDeviceUVM}
+	for _, path := range extraDevs {
+		var device dockerClient.Device
 		device.CgroupPermissions = "rwm"
 		device.PathOnHost = path
 		device.PathInContainer = path
@@ -334,7 +338,7 @@ func (cuda *Cuda) cudaSupported(image, version string) (bool, error) {
 		return false, err
 	}
 	if lmaj > vmaj || (lmaj == vmaj && lmin > vmin) {
-		glog.Warnf("%s", fmt.Errorf("Unsupported CUDA version: %s < %s", label, version))
+		glog.Warningf("%s", fmt.Errorf("Unsupported CUDA version: %s < %s", label, version))
 		return false, nil
 	}
 	return true, nil

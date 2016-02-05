@@ -714,14 +714,16 @@ func (dm *DockerManager) runContainer(
 		}
 
 		// check whether the host gpu computing environment support this image.
-		if isSupported, err := dm.gpuPlugins[0].IsImageSupported(container.Image); err != nil {
+		isSupported, err := dm.gpuPlugins[0].IsImageSupported(container.Image)
+		if err != nil {
 			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 			return kubecontainer.ContainerID{}, err
 		}
 
 		// if the image need host platform, do it
 		if isSupported {
-			if volOpts, err := dm.gpuPlugins[0].GenerateVolumeOpts(container.Image); err != nil {
+			volOpts, err := dm.gpuPlugins[0].GenerateVolumeOpts(container.Image)
+			if err != nil {
 				dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 				return kubecontainer.ContainerID{}, err
 			}
@@ -778,15 +780,16 @@ func (dm *DockerManager) runContainer(
 	}
 
 	if gpuRequest > 0 {
-		var gpuIdxs []uint
 		// alloc gpu device for this container
-		if gpuIdxs, err := dm.gpuPlugins[0].AllocGPU(gpuRequest)([]uint, error); err != nil {
+		gpuIdxs, err := dm.gpuPlugins[0].AllocGPU(gpuRequest)
+		if err != nil {
 			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 			return kubecontainer.ContainerID{}, err
 		}
 
 		// add device options when launch container
-		if devOpts, err := dm.gpuPlugins[0].GenerateDeviceOpts(gpuIdxs); err != nil {
+		devOpts, err := dm.gpuPlugins[0].GenerateDeviceOpts(gpuIdxs)
+		if err != nil {
 			dm.gpuPlugins[0].FreeGPU(gpuIdxs)
 			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 			return kubecontainer.ContainerID{}, err
@@ -1458,7 +1461,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 	// free gpu resource for the container
 	if len(container.GPUIndexs) > 0 {
 		if err := dm.gpuPlugins[0].FreeGPU(container.GPUIndexs); err != nil {
-			glog.Warnf("Failed to free the gpu resource(%s)", err)
+			glog.Warningf("Failed to free the gpu resource(%s)", err)
 		}
 		container.GPUIndexs = []uint{}
 	}
