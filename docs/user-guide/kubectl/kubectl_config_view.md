@@ -68,6 +68,7 @@ $ kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'
       --output-version="": Output the formatted object with the given version (default api-version).
       --raw[=false]: display raw byte data
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
+      --show-labels[=false]: When printing, show all labels as the last column (default hide labels column)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
       --template="": Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
 ```
