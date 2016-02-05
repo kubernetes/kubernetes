@@ -91,8 +91,6 @@ export KUBE_DOCKER_REGISTRY="gcr.io/google_containers"
 export KUBE_DOCKER_IMAGE_TAG="${KUBE_RELEASE_VERSION}"
 
 make release
-# We don't want to include this in 'make release' as it'd slow down every day development cycle.
-REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" make -C cluster/images/hyperkube/ build
 
 if ${KUBE_BUILD_DIR}/cluster/kubectl.sh version | grep Client | grep dirty; then
   echo "!!! Tag at invalid point, or something else is bad. Build is dirty. Don't push this build." >&2
