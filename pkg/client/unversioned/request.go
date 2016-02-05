@@ -841,10 +841,13 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status *unversioned.Status
-	result, err := runtime.Decode(r.content.Codec, body)
-	if out, ok := result.(*unversioned.Status); err == nil && ok && len(out.Status) > 0 {
-		status = out
+	// Because release-1.1 server returns Status with empty APIVersion at paths
+	// to the Extensions resources, we need to use DecodeInto here to provide
+	// default groupVersion, otherwise a status response won't be correctly
+	// decoded.
+	status := &unversioned.Status{}
+	err := runtime.DecodeInto(r.content.Codec, body, status)
+	if err == nil && len(status.Status) > 0 {
 		isStatusResponse = true
 	}
 
