@@ -180,26 +180,8 @@ func NewDockerManager(
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
 		glog.Warningf("Using fallback default of /var/lib/docker for location of Docker runtime")
 	} else {
-		driverStatus := dockerInfo.Get("DriverStatus")
-		// The DriverStatus is a*string* which represents a list of list of strings (pairs) e.g.
-		// DriverStatus=[["Root Dir","/var/lib/docker/aufs"],["Backing Filesystem","extfs"],["Dirs","279"]]
-		// Strip out the square brakcets and quotes.
-		s := strings.Replace(driverStatus, "[", "", -1)
-		s = strings.Replace(s, "]", "", -1)
-		s = strings.Replace(s, `"`, "", -1)
-		// Separate by commas.
-		ss := strings.Split(s, ",")
-		// Search for the Root Dir string
-		for i, k := range ss {
-			if k == "Root Dir" && i+1 < len(ss) {
-				// Discard the /aufs suffix.
-				dockerRoot, _ = path.Split(ss[i+1])
-				// Trim the last slash.
-				dockerRoot = strings.TrimSuffix(dockerRoot, "/")
-				glog.Infof("Setting dockerRoot to %s", dockerRoot)
-			}
-
-		}
+		dockerRoot = dockerInfo.Get("DockerRootDir")
+		glog.Infof("Setting dockerRoot to %s", dockerRoot)
 	}
 
 	reasonCache := reasonInfoCache{cache: lru.New(maxReasonCacheEntries)}
