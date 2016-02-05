@@ -18,7 +18,6 @@ package batch
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -39,15 +38,5 @@ func Resource(resource string) unversioned.GroupResource {
 }
 
 func AddToScheme(scheme *runtime.Scheme) {
-	// Add the API to Scheme.
-	addKnownTypes(scheme)
-}
-
-// Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
-	// TODO this gets cleaned up when the types are fixed
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&extensions.Job{},
-		&extensions.JobList{},
-	)
+	// We don't want to add batch/__internal to the scheme because there is not such thing.
 }
