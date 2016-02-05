@@ -284,7 +284,7 @@ func TestJobStop(t *testing.T) {
 					},
 					Spec: extensions.JobSpec{
 						Parallelism: &zero,
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"k1": "v1"},
 						},
 					},
@@ -298,7 +298,7 @@ func TestJobStop(t *testing.T) {
 							},
 							Spec: extensions.JobSpec{
 								Parallelism: &zero,
-								Selector: &extensions.LabelSelector{
+								Selector: &unversioned.LabelSelector{
 									MatchLabels: map[string]string{"k1": "v1"},
 								},
 							},
@@ -320,7 +320,7 @@ func TestJobStop(t *testing.T) {
 					},
 					Spec: extensions.JobSpec{
 						Parallelism: &zero,
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"k1": "v1"},
 						},
 					},
@@ -334,7 +334,7 @@ func TestJobStop(t *testing.T) {
 							},
 							Spec: extensions.JobSpec{
 								Parallelism: &zero,
-								Selector: &extensions.LabelSelector{
+								Selector: &unversioned.LabelSelector{
 									MatchLabels: map[string]string{"k1": "v1"},
 								},
 							},

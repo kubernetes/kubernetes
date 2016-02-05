@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -304,7 +305,7 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensi
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			err = fmt.Errorf("failed to convert pod selector to selector: %v", err)
 			return
@@ -361,7 +362,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = extensions.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -483,7 +484,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 			continue
 		}
 
-		selector, _ = extensions.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
