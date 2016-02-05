@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	etcd "github.com/coreos/etcd/client"
+	oldetcd "github.com/coreos/go-etcd/etcd"
 )
 
 // IsEtcdNotFound returns true if and only if err is an etcd not found error.
@@ -58,6 +59,9 @@ func isEtcdErrorNum(err error, errorCode int) bool {
 	if err != nil {
 		if etcdError, ok := err.(etcd.Error); ok {
 			return etcdError.Code == errorCode
+		}
+		if etcdError, ok := err.(*oldetcd.EtcdError); ok {
+			return etcdError.ErrorCode == errorCode
 		}
 		// NOTE: There are other error types returned
 	}
