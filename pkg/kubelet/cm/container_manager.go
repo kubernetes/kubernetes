@@ -18,22 +18,15 @@ package cm
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 )
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
-	// - Ensures that the Docker daemon is in a container.
-	// - Creates the system container where all non-containerized processes run.
-	Start(NodeConfig) error
+	Start(bootstrap.NodeConfig) error
 
 	// Returns resources allocated to system containers in the machine.
 	// These containers include the system and Kubernetes services.
 	SystemContainersLimit() api.ResourceList
-}
-
-type NodeConfig struct {
-	DockerDaemonContainerName string
-	SystemContainerName       string
-	KubeletContainerName      string
 }

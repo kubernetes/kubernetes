@@ -19,13 +19,14 @@ package cm
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 )
 
 type containerManagerStub struct{}
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ NodeConfig) error {
+func (cm *containerManagerStub) Start(_ bootstrap.NodeConfig) error {
 	glog.V(2).Infof("Starting stub container manager")
 	return nil
 }

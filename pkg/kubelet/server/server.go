@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -158,7 +158,7 @@ type HostInterface interface {
 	ResyncInterval() time.Duration
 	GetHostname() string
 	GetNode() (*api.Node, error)
-	GetNodeConfig() cm.NodeConfig
+	GetNodeConfig() bootstrap.NodeConfig
 	LatestLoopEntryTime() time.Time
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
