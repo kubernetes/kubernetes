@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -946,7 +947,14 @@ type dockerVersion struct {
 	*semver.Version
 }
 
+// oldFedoraDockerVersion matches the suffix that old levesl of docker were built with on fedora
+// For example, "1.8.2.fc21".  This is a very simple expression to allow us to strip it.
+var oldFedoraDockerVersion = regexp.MustCompile(`.*\.fc[\d][\d]$`)
+
 func newDockerVersion(version string) (dockerVersion, error) {
+	if oldFedoraDockerVersion.MatchString(version) {
+		version = version[0 : len(version)-5]
+	}
 	sem, err := semver.NewVersion(version)
 	if err != nil {
 		return dockerVersion{}, err
