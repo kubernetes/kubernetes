@@ -248,20 +248,17 @@ type DeploymentConfig struct {
 	RCConfig
 }
 
-func nowStamp() string {
-	return time.Now().Format(time.StampMilli)
-}
-
 func Logf(format string, a ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, nowStamp()+": INFO: "+format+"\n", a...)
+	fmt.Fprintf(GinkgoWriter, format+"\n", a...)
 }
 
 func Failf(format string, a ...interface{}) {
-	Fail(nowStamp()+": "+fmt.Sprintf(format, a...), 1)
+	Logf("FAIL: "+format+"\n", a...)
+	Fail(fmt.Sprintf(format, a...), 1)
 }
 
 func Skipf(format string, args ...interface{}) {
-	Skip(nowStamp() + ": " + fmt.Sprintf(format, args...))
+	Skip(fmt.Sprintf(format, args...))
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
