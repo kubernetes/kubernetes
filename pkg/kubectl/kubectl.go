@@ -113,6 +113,7 @@ func expandResourceShortcut(resource unversioned.GroupVersionResource) unversion
 		"no":     api.SchemeGroupVersion.WithResource("nodes"),
 		"ns":     api.SchemeGroupVersion.WithResource("namespaces"),
 		"po":     api.SchemeGroupVersion.WithResource("pods"),
+		"psp":    api.SchemeGroupVersion.WithResource("podSecurityPolicies"),
 		"pvc":    api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 		"pv":     api.SchemeGroupVersion.WithResource("persistentvolumes"),
 		"quota":  api.SchemeGroupVersion.WithResource("resourcequotas"),
