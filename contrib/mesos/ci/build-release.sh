@@ -29,9 +29,7 @@ set -o errtrace
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
-"${KUBE_ROOT}/contrib/mesos/ci/run.sh" make clean
-
-export KUBERNETES_CONTRIB=mesos
+export KUBERNETES_CONTRIB="${KUBERNETES_CONTRIB:-mesos}"
 export KUBE_RELEASE_RUN_TESTS="${KUBE_RELEASE_RUN_TESTS:-N}"
 export KUBE_SKIP_CONFIRMATIONS=Y
 
@@ -43,16 +41,16 @@ kube::contrib::mesos::build_release() {
 
   kube::build::verify_prereqs
   kube::build::build_image
-  "${KUBE_ROOT}/contrib/mesos/ci/run.sh" contrib/mesos/ci/build-cross.sh
+  kube::build::run_build_command contrib/mesos/ci/build-cross.sh
 
   if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
-    "${KUBE_ROOT}/contrib/mesos/ci/run.sh" hack/test-go.sh
-    "${KUBE_ROOT}/contrib/mesos/ci/run.sh" hack/test-integration.sh
+    kube::build::run_build_command hack/test-go.sh
+    kube::build::run_build_command hack/test-integration.sh
   fi
 
   kube::build::copy_output
   kube::release::package_tarballs
-  kube::release::gcs::release
+  ## kube::release::gcs::release
 }
 
 kube::contrib::mesos::build_release
