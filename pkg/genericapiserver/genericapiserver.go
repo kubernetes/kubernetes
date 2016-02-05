@@ -678,6 +678,15 @@ func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		// Add a handler at /api to enumerate the supported api versions.
 		apiserver.AddApiWebService(s.Serializer, s.HandlerContainer, apiPrefix, apiVersions)
 	} else {
+		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
+		// Catching these here places the error  much closer to its origin
+		if len(apiGroupInfo.GroupMeta.GroupVersion.Group) == 0 {
+			return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
+		}
+		if len(apiGroupInfo.GroupMeta.GroupVersion.Version) == 0 {
+			return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
+		}
+
 		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
 		apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
 		for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
