@@ -138,7 +138,7 @@ func GetNewRCTemplate(deployment extensions.Deployment) api.PodTemplateSpec {
 	}
 	newRCTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
-		deployment.Spec.UniqueLabelKey,
+		extensions.DefaultDeploymentUniqueLabelKey,
 		podutil.GetPodTemplateSpecHash(newRCTemplate))
 	return newRCTemplate
 }
@@ -149,7 +149,7 @@ func SetFromRCTemplate(deployment *extensions.Deployment, template api.PodTempla
 	deployment.Spec.Template.Spec = template.Spec
 	deployment.Spec.Template.ObjectMeta.Labels = labelsutil.CloneAndRemoveLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
-		deployment.Spec.UniqueLabelKey)
+		extensions.DefaultDeploymentUniqueLabelKey)
 	return deployment
 }
 

@@ -186,7 +186,6 @@ var map_DeploymentSpec = map[string]string{
 	"strategy":             "The deployment strategy to use to replace existing pods with new ones.",
 	"minReadySeconds":      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"revisionHistoryLimit": "The number of old ReplicationControllers to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
-	"uniqueLabelKey":       "Key of the selector that is added to existing RCs (and label key that is added to its pods) to prevent the existing RCs to select new pods (and old pods being selected by new RC). Users can set this to an empty string to indicate that the system should not add any selector and label. If unspecified, system uses DefaultDeploymentUniqueLabelKey(\"deployment.kubernetes.io/podTemplateHash\"). Value of this key is hash of DeploymentSpec.PodTemplateSpec. No label is added if this is set to empty string.",
 	"paused":               "Indicates that the deployment is paused and will not be processed by the deployment controller.",
 	"rollbackTo":           "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 }

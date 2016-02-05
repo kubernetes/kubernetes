@@ -159,9 +159,8 @@ func generateDeployment(image string) extensions.Deployment {
 			Name: image,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas:       1,
-			Selector:       podLabels,
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			Replicas: 1,
+			Selector: podLabels,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,
