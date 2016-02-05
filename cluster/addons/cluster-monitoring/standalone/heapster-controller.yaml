@@ -7,26 +7,26 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: heapster-v13
+  name: heapster-v14
   namespace: kube-system
   labels:
     k8s-app: heapster
-    version: v13
+    version: v14
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
     k8s-app: heapster
-    version: v13
+    version: v14
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v13
+        version: v14
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v0.20.0-alpha3
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha4
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
