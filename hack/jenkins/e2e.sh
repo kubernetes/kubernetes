@@ -620,7 +620,7 @@ case ${JOB_NAME} in
     # Temporarily switch of Heapster, as this will not schedule anywhere.
     # TODO: Think of a solution to enable it.
     ENABLE_CLUSTER_MONITORING="none"
-    E2E_ZONE="asia-east1-a"
+    E2E_ZONE="us-east1-b"
     MASTER_SIZE="n1-standard-32"
     NODE_SIZE="n1-standard-1"
     NODE_DISK_SIZE="50GB"
