@@ -206,6 +206,7 @@ func NewMainKubelet(
 	reservation kubetypes.Reservation,
 	enableCustomMetrics bool,
 	volumeStatsAggPeriod time.Duration,
+	containerRuntimeOptions []kubecontainer.Option,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -387,6 +388,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
+			containerRuntimeOptions...,
 		)
 	case "rkt":
 		conf := &rkt.Config{
