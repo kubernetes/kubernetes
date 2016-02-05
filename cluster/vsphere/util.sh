@@ -188,6 +188,7 @@ function kube-up-vm {
   govc vm.ip "${vm_name}" > /dev/null
 
   govc guest.mkdir \
+    -l "kube:kube" \
     -vm="${vm_name}" \
     -p \
     /home/kube/.ssh
@@ -195,6 +196,7 @@ function kube-up-vm {
   ssh-add -L > "${KUBE_TEMP}/${vm_name}-authorized_keys"
 
   govc guest.upload \
+    -l "kube:kube" \
     -vm="${vm_name}" \
     -f \
     "${KUBE_TEMP}/${vm_name}-authorized_keys" \
@@ -209,7 +211,7 @@ function kube-run {
   local vm_name="$1"
   local file="$2"
   local dst="/tmp/$(basename "${file}")"
-  govc guest.upload -vm="${vm_name}" -f -perm=0755 "${file}" "${dst}"
+  govc guest.upload -l "kube:kube" -vm="${vm_name}" -f -perm=0755 "${file}" "${dst}"
   echo "uploaded ${file} to ${dst}"
   local vm_ip
   vm_ip=$(govc vm.ip "${vm_name}")
