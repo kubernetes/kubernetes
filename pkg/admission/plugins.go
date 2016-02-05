@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 // Factory is a function that returns an Interface for admission decisions.
