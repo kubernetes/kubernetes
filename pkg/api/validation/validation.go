@@ -1835,13 +1835,19 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 		addresses[address] = true
 	}
 
+	if len(oldNode.Spec.PodCIDR) == 0 {
+		// Allow the controller manager to assign a CIDR to a node if it doesn't have one.
+		oldNode.Spec.PodCIDR = node.Spec.PodCIDR
+	} else {
+		if oldNode.Spec.PodCIDR != node.Spec.PodCIDR {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDR"), "node updates may not change podCIDR except from \"\" to valid"))
+		}
+	}
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested
 	oldNode.ObjectMeta = node.ObjectMeta
 	// Allow users to update capacity
 	oldNode.Status.Capacity = node.Status.Capacity
-	// Allow the controller manager to assign a CIDR to a node.
-	oldNode.Spec.PodCIDR = node.Spec.PodCIDR
 	// Allow users to unschedule node
 	oldNode.Spec.Unschedulable = node.Spec.Unschedulable
 	// Clear status
