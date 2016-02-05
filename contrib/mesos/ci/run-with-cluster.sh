@@ -67,6 +67,7 @@ docker run \
   -v "${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos" \
   -v "${MESOS_DOCKER_WORK_DIR}/overlay:${MESOS_DOCKER_WORK_DIR}/overlay" \
   -v "${MESOS_DOCKER_WORK_DIR}/reports:${MESOS_DOCKER_WORK_DIR}/reports" \
+  $(test -d /teamcity/system/git && echo "-v /teamcity/system/git:/teamcity/system/git" || true) \
   -e "MESOS_DOCKER_WORK_DIR=${MESOS_DOCKER_WORK_DIR}" \
   -e "MESOS_DOCKER_IMAGE_DIR=/var/tmp/kubernetes" \
   -e "MESOS_DOCKER_OVERLAY_DIR=${MESOS_DOCKER_WORK_DIR}/overlay" \
