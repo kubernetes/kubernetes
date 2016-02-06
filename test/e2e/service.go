@@ -54,9 +54,6 @@ const loadBalancerLagTimeout = 2 * time.Minute
 //TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 const loadBalancerCreateTimeout = 20 * time.Minute
 
-// How long to wait for a namespace to be deleted.
-const namespaceDeleteTimeout = 5 * time.Minute
-
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
@@ -64,26 +61,11 @@ var _ = Describe("Services", func() {
 	f := NewFramework("services")
 
 	var c *client.Client
-	var extraNamespaces []string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		if testContext.DeleteNamespace {
-			for _, ns := range extraNamespaces {
-				By(fmt.Sprintf("Destroying namespace %v", ns))
-				if err := deleteNS(c, ns, namespaceDeleteTimeout); err != nil {
-					Failf("Couldn't delete namespace %s: %s", ns, err)
-				}
-			}
-			extraNamespaces = nil
-		} else {
-			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-		}
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -429,11 +411,10 @@ var _ = Describe("Services", func() {
 		Logf("namespace for TCP test: %s", ns1)
 
 		By("creating a second namespace")
-		namespacePtr, err := createTestingNS("services", c, nil)
+		namespacePtr, err := f.CreateNamespace("services", nil)
 		Expect(err).NotTo(HaveOccurred())
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		Logf("namespace for UDP test: %s", ns2)
-		extraNamespaces = append(extraNamespaces, ns2)
 
 		jig := NewServiceTestJig(c, serviceName)
 		nodeIP := pickNodeIP(jig.Client) // for later
