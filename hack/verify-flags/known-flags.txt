@@ -45,10 +45,9 @@ cluster-dns
 cluster-domain
 cluster-name
 cluster-tag
-concurrent-daemonset-controller-syncs
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
-concurrent-job-syncs
+concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
 config-sync-period
 configure-cbr0
@@ -141,6 +140,7 @@ host-pid-sources
 hostname-override
 http-check-frequency
 http-port
+ignore-daemonsets
 ignore-not-found
 image-gc-high-threshold
 image-gc-low-threshold
@@ -279,6 +279,7 @@ pv-recycler-minimum-timeout-hostpath
 pv-recycler-minimum-timeout-nfs
 pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
+pv-recycler-maximum-retry
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
 read-only-port
@@ -326,6 +327,7 @@ service-overrides
 service-sync-period
 session-affinity
 show-all
+show-labels
 shutdown-fd
 shutdown-fifo
 since-seconds
@@ -363,6 +365,7 @@ use-kubernetes-cluster-service
 user-whitelist
 verify-only
 volume-plugin-dir
+volume-stats-agg-period
 watch-cache
 watch-only
 whitelist-override-label
@@ -375,3 +378,4 @@ leader-elect
 leader-elect-lease-duration
 leader-elect-renew-deadline
 leader-elect-retry-period
+watch-cache-sizes

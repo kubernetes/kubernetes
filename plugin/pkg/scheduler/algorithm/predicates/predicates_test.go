@@ -44,6 +44,28 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
 }
 
+type FakePersistentVolumeClaimInfo []api.PersistentVolumeClaim
+
+func (pvcs FakePersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace string, pvcID string) (*api.PersistentVolumeClaim, error) {
+	for _, pvc := range pvcs {
+		if pvc.Name == pvcID && pvc.Namespace == namespace {
+			return &pvc, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find persistent volume claim: %s/%s", namespace, pvcID)
+}
+
+type FakePersistentVolumeInfo []api.PersistentVolume
+
+func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*api.PersistentVolume, error) {
+	for _, pv := range pvs {
+		if pv.Name == pvID {
+			return &pv, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
+}
+
 func makeResources(milliCPU int64, memory int64, pods int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
@@ -1173,6 +1195,227 @@ func TestServiceAffinity(t *testing.T) {
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
+
+func TestEBSVolumeCountConflicts(t *testing.T) {
+	oneVolPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
+					},
+				},
+			},
+		},
+	}
+	ebsPVCPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol",
+						},
+					},
+				},
+			},
+		},
+	}
+	splitPVCPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someNonEBSVol",
+						},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol",
+						},
+					},
+				},
+			},
+		},
+	}
+	twoVolPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
+					},
+				},
+			},
+		},
+	}
+	splitVolsPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
+					},
+				},
+			},
+		},
+	}
+	nonApplicablePod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	emptyPod := &api.Pod{
+		Spec: api.PodSpec{},
+	}
+
+	tests := []struct {
+		newPod       *api.Pod
+		existingPods []*api.Pod
+		maxVols      int
+		fits         bool
+		test         string
+	}{
+		{
+			newPod:       oneVolPod,
+			existingPods: []*api.Pod{twoVolPod, oneVolPod},
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{oneVolPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "doesn't fit when node capacity < new pod's EBS volumes",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*api.Pod{twoVolPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores non-EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts ignore non-EBS volumes",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*api.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count considers PVCs backed by EBS volumes",
+		},
+		{
+			newPod:       splitPVCPod,
+			existingPods: []*api.Pod{splitVolsPod, oneVolPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores PVCs not backed by EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{oneVolPod, ebsPVCPod},
+			maxVols:      3,
+			fits:         false,
+			test:         "existing pods' counts considers PVCs backed by EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{oneVolPod, twoVolPod, ebsPVCPod},
+			maxVols:      4,
+			fits:         true,
+			test:         "already-mounted EBS volumes are always ok to allow",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*api.Pod{oneVolPod, oneVolPod, ebsPVCPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "the same EBS volumes are not counted multiple times",
+		},
+	}
+
+	pvInfo := FakePersistentVolumeInfo{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someEBSVol"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someNonEBSVol"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{},
+			},
+		},
+	}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someEBSVol"},
+			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "someEBSVol"},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someNonEBSVol"},
+			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
+		},
+	}
+
+	filter := VolumeFilter{
+		FilterVolume: func(vol *api.Volume) (string, bool) {
+			if vol.AWSElasticBlockStore != nil {
+				return vol.AWSElasticBlockStore.VolumeID, true
+			}
+			return "", false
+		},
+
+		FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
+			if pv.Spec.AWSElasticBlockStore != nil {
+				return pv.Spec.AWSElasticBlockStore.VolumeID, true
+			}
+			return "", false
+		},
+	}
+
+	for _, test := range tests {
+		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
+		fits, err := pred(test.newPod, test.existingPods, "some-node")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if fits != test.fits {
+			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
 		}
 	}
 }

@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,15 +46,33 @@ type PersistentVolumeRecycler struct {
 	kubeClient       clientset.Interface
 	pluginMgr        volume.VolumePluginMgr
 	cloud            cloudprovider.Interface
+	maximumRetry     int
+	syncPeriod       time.Duration
+	// Local cache of failed recycle / delete operations. Map volume.Name -> status of the volume.
+	// Only PVs in Released state have an entry here.
+	releasedVolumes map[string]releasedVolumeStatus
 }
 
-// PersistentVolumeRecycler creates a new PersistentVolumeRecycler
-func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time.Duration, plugins []volume.VolumePlugin, cloud cloudprovider.Interface) (*PersistentVolumeRecycler, error) {
+// releasedVolumeStatus holds state of failed delete/recycle operation on a
+// volume. The controller re-tries the operation several times and it stores
+// retry count + timestamp of the last attempt here.
+type releasedVolumeStatus struct {
+	// How many recycle/delete operations failed.
+	retryCount int
+	// Timestamp of the last attempt.
+	lastAttempt time.Time
+}
+
+// NewPersistentVolumeRecycler creates a new PersistentVolumeRecycler
+func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time.Duration, maximumRetry int, plugins []volume.VolumePlugin, cloud cloudprovider.Interface) (*PersistentVolumeRecycler, error) {
 	recyclerClient := NewRecyclerClient(kubeClient)
 	recycler := &PersistentVolumeRecycler{
-		client:     recyclerClient,
-		kubeClient: kubeClient,
-		cloud:      cloud,
+		client:          recyclerClient,
+		kubeClient:      kubeClient,
+		cloud:           cloud,
+		maximumRetry:    maximumRetry,
+		syncPeriod:      syncPeriod,
+		releasedVolumes: make(map[string]releasedVolumeStatus),
 	}
 
 	if err := recycler.pluginMgr.InitPlugins(plugins, recycler); err != nil {
@@ -89,6 +107,14 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 				}
 				recycler.reclaimVolume(pv)
 			},
+			DeleteFunc: func(obj interface{}) {
+				pv, ok := obj.(*api.PersistentVolume)
+				if !ok {
+					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
+					return
+				}
+				recycler.removeReleasedVolume(pv)
+			},
 		},
 	)
 
@@ -96,17 +122,50 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 	return recycler, nil
 }
 
-func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume) error {
-	if pv.Status.Phase == api.VolumeReleased && pv.Spec.ClaimRef != nil {
-		glog.V(5).Infof("Reclaiming PersistentVolume[%s]\n", pv.Name)
+// shouldRecycle checks a volume and returns nil, if the volume should be
+// recycled right now. Otherwise it returns an error with reason why it should
+// not be recycled.
+func (recycler *PersistentVolumeRecycler) shouldRecycle(pv *api.PersistentVolume) error {
+	if pv.Spec.ClaimRef == nil {
+		return fmt.Errorf("Volume does not have a reference to claim")
+	}
+	if pv.Status.Phase != api.VolumeReleased {
+		return fmt.Errorf("The volume is not in 'Released' phase")
+	}
 
-		latest, err := recycler.client.GetPersistentVolume(pv.Name)
-		if err != nil {
-			return fmt.Errorf("Could not find PersistentVolume %s", pv.Name)
-		}
-		if latest.Status.Phase != api.VolumeReleased {
-			return fmt.Errorf("PersistentVolume[%s] phase is %s, expected %s.  Skipping.", pv.Name, latest.Status.Phase, api.VolumeReleased)
-		}
+	// The volume is Released, should we retry recycling?
+	status, found := recycler.releasedVolumes[pv.Name]
+	if !found {
+		// We don't know anything about this volume. The controller has been
+		// restarted or the volume has been marked as Released by another
+		// controller. Recycle/delete this volume as if it was just Released.
+		glog.V(5).Infof("PersistentVolume[%s] not found in local cache, recycling", pv.Name)
+		return nil
+	}
+
+	// Check the timestamp
+	expectedRetry := status.lastAttempt.Add(recycler.syncPeriod)
+	if time.Now().After(expectedRetry) {
+		glog.V(5).Infof("PersistentVolume[%s] retrying recycle after timeout", pv.Name)
+		return nil
+	}
+	// It's too early
+	glog.V(5).Infof("PersistentVolume[%s] skipping recycle, it's too early: now: %v, next retry: %v", pv.Name, time.Now(), expectedRetry)
+	return fmt.Errorf("Too early after previous failure")
+}
+
+func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume) error {
+	glog.V(5).Infof("Recycler: checking PersistentVolume[%s]\n", pv.Name)
+	// Always load the latest version of the volume
+	newPV, err := recycler.client.GetPersistentVolume(pv.Name)
+	if err != nil {
+		return fmt.Errorf("Could not find PersistentVolume %s", pv.Name)
+	}
+	pv = newPV
+
+	err = recycler.shouldRecycle(pv)
+	if err == nil {
+		glog.V(5).Infof("Reclaiming PersistentVolume[%s]\n", pv.Name)
 
 		// both handleRecycle and handleDelete block until completion
 		// TODO: allow parallel recycling operations to increase throughput
@@ -125,8 +184,39 @@ func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume
 			glog.Errorf(errMsg)
 			return fmt.Errorf(errMsg)
 		}
+		return nil
 	}
+	glog.V(3).Infof("PersistentVolume[%s] phase %s - skipping: %v", pv.Name, pv.Status.Phase, err)
 	return nil
+}
+
+// handleReleaseFailure evaluates a failed Recycle/Delete operation, updates
+// internal controller state with new nr. of attempts and timestamp of the last
+// attempt. Based on the number of failures it returns the next state of the
+// volume (Released / Failed).
+func (recycler *PersistentVolumeRecycler) handleReleaseFailure(pv *api.PersistentVolume) api.PersistentVolumePhase {
+	status, found := recycler.releasedVolumes[pv.Name]
+	if !found {
+		// First failure, set retryCount to 0 (will be inceremented few lines below)
+		status = releasedVolumeStatus{}
+	}
+	status.retryCount += 1
+
+	if status.retryCount > recycler.maximumRetry {
+		// This was the last attempt. Remove any internal state and mark the
+		// volume as Failed.
+		glog.V(3).Infof("PersistentVolume[%s] failed %d times - marking Failed", pv.Name, status.retryCount)
+		recycler.removeReleasedVolume(pv)
+		return api.VolumeFailed
+	}
+
+	status.lastAttempt = time.Now()
+	recycler.releasedVolumes[pv.Name] = status
+	return api.VolumeReleased
+}
+
+func (recycler *PersistentVolumeRecycler) removeReleasedVolume(pv *api.PersistentVolume) {
+	delete(recycler.releasedVolumes, pv.Name)
 }
 
 func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume) error {
@@ -154,9 +244,12 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 		if err := volRecycler.Recycle(); err != nil {
 			glog.Errorf("PersistentVolume[%s] failed recycling: %+v", pv.Name, err)
 			pv.Status.Message = fmt.Sprintf("Recycling error: %s", err)
-			nextPhase = api.VolumeFailed
+			nextPhase = recycler.handleReleaseFailure(pv)
 		} else {
 			glog.V(5).Infof("PersistentVolume[%s] successfully recycled\n", pv.Name)
+			// The volume has been recycled. Remove any internal state to make
+			// any subsequent bind+recycle cycle working.
+			recycler.removeReleasedVolume(pv)
 			nextPhase = api.VolumePending
 		}
 	}
@@ -200,9 +293,10 @@ func (recycler *PersistentVolumeRecycler) handleDelete(pv *api.PersistentVolume)
 		if err != nil {
 			glog.Errorf("PersistentVolume[%s] failed deletion: %+v", pv.Name, err)
 			pv.Status.Message = fmt.Sprintf("Deletion error: %s", err)
-			nextPhase = api.VolumeFailed
+			nextPhase = recycler.handleReleaseFailure(pv)
 		} else {
 			glog.V(5).Infof("PersistentVolume[%s] successfully deleted through plugin\n", pv.Name)
+			recycler.removeReleasedVolume(pv)
 			// after successful deletion through the plugin, we can also remove the PV from the cluster
 			if err := recycler.client.DeletePersistentVolume(pv); err != nil {
 				return fmt.Errorf("error deleting persistent volume: %+v", err)

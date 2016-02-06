@@ -133,6 +133,141 @@ func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, e
 	return true, nil
 }
 
+type MaxPDVolumeCountChecker struct {
+	filter     VolumeFilter
+	maxVolumes int
+	pvInfo     PersistentVolumeInfo
+	pvcInfo    PersistentVolumeClaimInfo
+}
+
+// VolumeFilter contains information on how to filter PD Volumes when checking PD Volume caps
+type VolumeFilter struct {
+	// Filter normal volumes
+	FilterVolume           func(vol *api.Volume) (id string, relevant bool)
+	FilterPersistentVolume func(pv *api.PersistentVolume) (id string, relevant bool)
+}
+
+// NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
+// number of volumes which match a filter that it requests, and those that are already present.  The
+// maximum number is configurable to accommodate different systems.
+//
+// The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
+// types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
+// the maximum.
+func NewMaxPDVolumeCountPredicate(filter VolumeFilter, maxVolumes int, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+	c := &MaxPDVolumeCountChecker{
+		filter:     filter,
+		maxVolumes: maxVolumes,
+		pvInfo:     pvInfo,
+		pvcInfo:    pvcInfo,
+	}
+
+	return c.predicate
+}
+
+func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace string, filteredVolumes map[string]bool) error {
+	for _, vol := range volumes {
+		if id, ok := c.filter.FilterVolume(&vol); ok {
+			filteredVolumes[id] = true
+		} else if vol.PersistentVolumeClaim != nil {
+			pvcName := vol.PersistentVolumeClaim.ClaimName
+			if pvcName == "" {
+				return fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+			}
+			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+			if err != nil {
+				return err
+			}
+
+			pvName := pvc.Spec.VolumeName
+			if pvName == "" {
+				return fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+			}
+
+			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+			if err != nil {
+				return err
+			}
+
+			if id, ok := c.filter.FilterPersistentVolume(pv); ok {
+				filteredVolumes[id] = true
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *MaxPDVolumeCountChecker) predicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	newVolumes := make(map[string]bool)
+	if err := c.filterVolumes(pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
+		return false, err
+	}
+
+	// quick return
+	if len(newVolumes) == 0 {
+		return true, nil
+	}
+
+	// count unique volumes
+	existingVolumes := make(map[string]bool)
+	for _, existingPod := range existingPods {
+		if err := c.filterVolumes(existingPod.Spec.Volumes, existingPod.Namespace, existingVolumes); err != nil {
+			return false, err
+		}
+	}
+	numExistingVolumes := len(existingVolumes)
+
+	// filter out already-mounted volumes
+	for k := range existingVolumes {
+		if _, ok := newVolumes[k]; ok {
+			delete(newVolumes, k)
+		}
+	}
+
+	numNewVolumes := len(newVolumes)
+
+	if numExistingVolumes+numNewVolumes > c.maxVolumes {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// EBSVolumeFilter is a VolumeFilter for filtering AWS ElasticBlockStore Volumes
+var EBSVolumeFilter VolumeFilter = VolumeFilter{
+	FilterVolume: func(vol *api.Volume) (string, bool) {
+		if vol.AWSElasticBlockStore != nil {
+			return vol.AWSElasticBlockStore.VolumeID, true
+		}
+		return "", false
+	},
+
+	FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
+		if pv.Spec.AWSElasticBlockStore != nil {
+			return pv.Spec.AWSElasticBlockStore.VolumeID, true
+		}
+		return "", false
+	},
+}
+
+// GCEPDVolumeFilter is a VolumeFilter for filtering GCE PersistentDisk Volumes
+var GCEPDVolumeFilter VolumeFilter = VolumeFilter{
+	FilterVolume: func(vol *api.Volume) (string, bool) {
+		if vol.GCEPersistentDisk != nil {
+			return vol.GCEPersistentDisk.PDName, true
+		}
+		return "", false
+	},
+
+	FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
+		if pv.Spec.GCEPersistentDisk != nil {
+			return pv.Spec.GCEPersistentDisk.PDName, true
+		}
+		return "", false
+	},
+}
+
 type VolumeZoneChecker struct {
 	nodeInfo NodeInfo
 	pvInfo   PersistentVolumeInfo

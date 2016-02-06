@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Host methods required by stats handlers.
@@ -45,6 +46,8 @@ type StatsProvider interface {
 	GetNodeConfig() cm.NodeConfig
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
+	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
+	GetPods() []*api.Pod
 }
 
 type handler struct {
@@ -52,8 +55,8 @@ type handler struct {
 	summaryProvider SummaryProvider
 }
 
-func CreateHandlers(provider StatsProvider) *restful.WebService {
-	h := &handler{provider, NewSummaryProvider(provider)}
+func CreateHandlers(provider StatsProvider, resourceAnalyzer ResourceAnalyzer) *restful.WebService {
+	h := &handler{provider, NewSummaryProvider(provider, resourceAnalyzer)}
 
 	ws := &restful.WebService{}
 	ws.Path("/stats/").

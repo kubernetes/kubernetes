@@ -59,7 +59,7 @@ func (server *Server) DoServerCheck(prober httpprober.HTTPProber) (probe.Result,
 	}
 	url := utilnet.FormatURL(scheme, server.Addr, server.Port, server.Path)
 
-	result, data, err := prober.Probe(url, probeTimeOut)
+	result, data, err := prober.Probe(url, nil, probeTimeOut)
 
 	if err != nil {
 		return probe.Unknown, "", err

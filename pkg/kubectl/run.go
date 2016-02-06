@@ -110,7 +110,6 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 				},
 				Spec: *podSpec,
 			},
-			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 		},
 	}
 	return &deployment, nil

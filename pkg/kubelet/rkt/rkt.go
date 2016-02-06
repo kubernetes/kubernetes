@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -39,7 +38,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1054,16 +1052,6 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	return nil
 }
 
-// GetAPIPodStatus returns the status of the given pod.
-func (r *Runtime) GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error) {
-	// Get the pod status.
-	podStatus, err := r.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		return nil, err
-	}
-	return r.ConvertPodStatusToAPIPodStatus(pod, podStatus)
-}
-
 func (r *Runtime) Type() string {
 	return RktType
 }
@@ -1500,77 +1488,3 @@ type sortByRestartCount []*kubecontainer.ContainerStatus
 func (s sortByRestartCount) Len() int           { return len(s) }
 func (s sortByRestartCount) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s sortByRestartCount) Less(i, j int) bool { return s[i].RestartCount < s[j].RestartCount }
-
-// TODO(yifan): Delete this function when the logic is moved to kubelet.
-func (r *Runtime) ConvertPodStatusToAPIPodStatus(pod *api.Pod, status *kubecontainer.PodStatus) (*api.PodStatus, error) {
-	apiPodStatus := &api.PodStatus{PodIP: status.IP}
-
-	// Sort in the reverse order of the restart count because the
-	// lastest one will have the largest restart count.
-	sort.Sort(sort.Reverse(sortByRestartCount(status.ContainerStatuses)))
-
-	containerStatuses := make(map[string]*api.ContainerStatus)
-	for _, c := range status.ContainerStatuses {
-		var st api.ContainerState
-		switch c.State {
-		case kubecontainer.ContainerStateRunning:
-			st.Running = &api.ContainerStateRunning{
-				StartedAt: unversioned.NewTime(c.StartedAt),
-			}
-		case kubecontainer.ContainerStateExited:
-			if pod.Spec.RestartPolicy == api.RestartPolicyAlways ||
-				pod.Spec.RestartPolicy == api.RestartPolicyOnFailure && c.ExitCode != 0 {
-				// TODO(yifan): Add reason and message.
-				st.Waiting = &api.ContainerStateWaiting{}
-				break
-			}
-			st.Terminated = &api.ContainerStateTerminated{
-				ExitCode:  c.ExitCode,
-				StartedAt: unversioned.NewTime(c.StartedAt),
-				Reason:    c.Reason,
-				Message:   c.Message,
-				// TODO(yifan): Add finishedAt, signal.
-				ContainerID: c.ID.String(),
-			}
-		default:
-			// Unknown state.
-			// TODO(yifan): Add reason and message.
-			st.Waiting = &api.ContainerStateWaiting{}
-		}
-
-		status, ok := containerStatuses[c.Name]
-		if !ok {
-			containerStatuses[c.Name] = &api.ContainerStatus{
-				Name:         c.Name,
-				Image:        c.Image,
-				ImageID:      c.ImageID,
-				ContainerID:  c.ID.String(),
-				RestartCount: c.RestartCount,
-				State:        st,
-			}
-			continue
-		}
-
-		// Found multiple container statuses, fill that as last termination state.
-		if status.LastTerminationState.Waiting == nil &&
-			status.LastTerminationState.Running == nil &&
-			status.LastTerminationState.Terminated == nil {
-			status.LastTerminationState = st
-		}
-	}
-
-	for _, c := range pod.Spec.Containers {
-		cs, ok := containerStatuses[c.Name]
-		if !ok {
-			cs = &api.ContainerStatus{
-				Name:  c.Name,
-				Image: c.Image,
-				// TODO(yifan): Add reason and message.
-				State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
-			}
-		}
-		apiPodStatus.ContainerStatuses = append(apiPodStatus.ContainerStatuses, *cs)
-	}
-
-	return apiPodStatus, nil
-}

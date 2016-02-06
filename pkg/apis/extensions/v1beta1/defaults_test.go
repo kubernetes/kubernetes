@@ -198,7 +198,6 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromInt(1)
 	differentIntOrString := intstr.FromInt(5)
-	deploymentLabelKey := DefaultDeploymentUniqueLabelKey
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -224,8 +223,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template:       defaultTemplate,
-					UniqueLabelKey: newString(deploymentLabelKey),
+					Template: defaultTemplate,
 				},
 			},
 		},
@@ -250,8 +248,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template:       defaultTemplate,
-					UniqueLabelKey: newString(deploymentLabelKey),
+					Template: defaultTemplate,
 				},
 			},
 		},
@@ -270,8 +267,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					Template:       defaultTemplate,
-					UniqueLabelKey: newString(deploymentLabelKey),
+					Template: defaultTemplate,
 				},
 			},
 		},
@@ -282,7 +278,6 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					UniqueLabelKey: newString("customDeploymentKey"),
 				},
 			},
 			expected: &Deployment{
@@ -291,8 +286,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					Template:       defaultTemplate,
-					UniqueLabelKey: newString("customDeploymentKey"),
+					Template: defaultTemplate,
 				},
 			},
 		},

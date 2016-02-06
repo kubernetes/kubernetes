@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -230,6 +230,12 @@ func deleteAllContent(kubeClient clientset.Interface, versions *unversioned.APIV
 		}
 		if containsResource(resources, "deployments") {
 			err = deleteDeployments(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
+		}
+		if containsResource(resources, "replicasets") {
+			err = deleteReplicaSets(kubeClient.Extensions(), namespace)
 			if err != nil {
 				return estimate, err
 			}
@@ -531,6 +537,20 @@ func deleteIngress(expClient extensions_unversioned.ExtensionsInterface, ns stri
 	}
 	for i := range items.Items {
 		err := expClient.Ingresses(ns).Delete(items.Items[i].Name, nil)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteReplicaSets(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+	items, err := expClient.ReplicaSets(ns).List(api.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.ReplicaSets(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

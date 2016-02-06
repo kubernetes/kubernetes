@@ -1,4 +1,4 @@
-From nobody Tue Dec 22 10:13:54 2015
+From nobody Tue Feb 1 11:33:00 2016
 Content-Type: multipart/mixed; boundary="===================================="
 MIME-Version: 1.0
 
@@ -240,15 +240,10 @@ script
 	set -o nounset
 
 	# Kube-system pod manifest files are located at /run/kube-manifests/kubernetes.
+	. /etc/kube-configure.sh
 	. /etc/kube-env
 	# Fluentd
-	if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
-		if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
-			cp /run/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
-		elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
-			cp /run/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
-		fi
-	fi
+	start_fluentd
 	# Kube-registry-proxy
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
 		cp /run/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
@@ -275,28 +270,9 @@ script
 	# TODO(andyzheng0831): replace it with a more reliable method if possible.
 	sleep 60
 
+	. /etc/kube-configure.sh
 	. /etc/kube-env
-	sleep_seconds=10
-	max_seconds=10
-	# We simply kill the process when there is a failure. Another upstart job will automatically
-	# restart the process.
-	while [ 1 ]; do
-		if ! timeout 20 docker ps > /dev/null; then
-			echo "Docker daemon failed!"
-			pkill docker
-		fi
-		if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
-			echo "Kubelet is unhealthy!"
-			pkill kubelet
-		fi
-		if ! curl -m ${max_seconds} -f -s http://127.0.0.1:10249/healthz > /dev/null; then
-			echo "Kube-proxy is unhealthy!"
-			# Get the ID of kube-proxy container and then kill it.
-			container=$(docker ps -q --filter name='k8s_kube-proxy')
-			docker kill ${container}
-		fi
-		sleep ${sleep_seconds}
-	done
+	health_monitoring
 end script
 
 --====================================--

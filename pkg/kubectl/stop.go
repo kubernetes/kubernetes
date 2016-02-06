@@ -63,6 +63,9 @@ func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
 
+	case extensions.Kind("ReplicaSet"):
+		return &ReplicaSetReaper{c, Interval, Timeout}, nil
+
 	case extensions.Kind("DaemonSet"):
 		return &DaemonSetReaper{c, Interval, Timeout}, nil
 
@@ -84,6 +87,10 @@ func ReaperForReplicationController(c client.Interface, timeout time.Duration) (
 }
 
 type ReplicationControllerReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+type ReplicaSetReaper struct {
 	client.Interface
 	pollInterval, timeout time.Duration
 }
@@ -185,6 +192,81 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 		}
 	}
 	if err := rc.Delete(name); err != nil {
+		return err
+	}
+	return nil
+}
+
+// TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
+// getOverlappingReplicaSets finds ReplicaSets that this ReplicaSet overlaps, as well as ReplicaSets overlapping this ReplicaSet.
+func getOverlappingReplicaSets(c client.ReplicaSetInterface, rs *extensions.ReplicaSet) ([]extensions.ReplicaSet, []extensions.ReplicaSet, error) {
+	var overlappingRSs, exactMatchRSs []extensions.ReplicaSet
+	return overlappingRSs, exactMatchRSs, nil
+}
+
+func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
+	rsc := reaper.Extensions().ReplicaSets(namespace)
+	scaler, err := ScalerFor(extensions.Kind("ReplicaSet"), *reaper)
+	if err != nil {
+		return err
+	}
+	rs, err := rsc.Get(name)
+	if err != nil {
+		return err
+	}
+	if timeout == 0 {
+		timeout = Timeout + time.Duration(10*rs.Spec.Replicas)*time.Second
+	}
+
+	// The ReplicaSet controller will try and detect all matching ReplicaSets
+	// for a pod's labels, and only sync the oldest one. This means if we have
+	// a pod with labels [(k1: v1), (k2: v2)] and two ReplicaSets: rs1 with
+	// selector [(k1=v1)], and rs2 with selector [(k1=v1),(k2=v2)], the
+	// ReplicaSet controller will sync the older of the two ReplicaSets.
+	//
+	// If there are ReplicaSets with a superset of labels, eg:
+	// deleting: (k1=v1), superset: (k2=v2, k1=v1)
+	//	- It isn't safe to delete the ReplicaSet because there could be a pod
+	//    with labels (k1=v1) that isn't managed by the superset ReplicaSet.
+	//    We can't scale it down either, because there could be a pod
+	//    (k2=v2, k1=v1) that it deletes causing a fight with the superset
+	//    ReplicaSet.
+	// If there are ReplicaSets with a subset of labels, eg:
+	// deleting: (k2=v2, k1=v1), subset: (k1=v1), superset: (k2=v2, k1=v1, k3=v3)
+	//  - Even if it's safe to delete this ReplicaSet without a scale down because
+	//    all it's pods are being controlled by the subset ReplicaSet the code
+	//    returns an error.
+
+	// In theory, creating overlapping ReplicaSets is user error, so the loop below
+	// tries to account for this logic only in the common case, where we end up
+	// with multiple ReplicaSets that have an exact match on selectors.
+
+	// TODO(madhusudancs): Re-evaluate again when controllerRef is implemented -
+	// https://github.com/kubernetes/kubernetes/issues/2210
+	overlappingRSs, exactMatchRSs, err := getOverlappingReplicaSets(rsc, rs)
+	if err != nil {
+		return fmt.Errorf("error getting ReplicaSets: %v", err)
+	}
+
+	if len(overlappingRSs) > 0 {
+		var names []string
+		for _, overlappingRS := range overlappingRSs {
+			names = append(names, overlappingRS.Name)
+		}
+		return fmt.Errorf(
+			"Detected overlapping ReplicaSets for ReplicaSet %v: %v, please manage deletion individually with --cascade=false.",
+			rs.Name, strings.Join(names, ","))
+	}
+	if len(exactMatchRSs) == 0 {
+		// No overlapping ReplicaSets.
+		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
+		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
+			return err
+		}
+	}
+
+	if err := rsc.Delete(name, gracePeriod); err != nil {
 		return err
 	}
 	return nil

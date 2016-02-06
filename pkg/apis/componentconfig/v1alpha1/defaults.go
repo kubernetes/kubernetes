@@ -42,8 +42,21 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				temp := int32(qos.KubeProxyOOMScoreAdj)
 				obj.OOMScoreAdj = &temp
 			}
+			if obj.ResourceContainer == "" {
+				obj.ResourceContainer = "/kube-proxy"
+			}
 			if obj.IPTablesSyncPeriod.Duration == 0 {
-				obj.IPTablesSyncPeriod = unversioned.Duration{5 * time.Second}
+				obj.IPTablesSyncPeriod = unversioned.Duration{30 * time.Second}
+			}
+			zero := unversioned.Duration{}
+			if obj.UDPIdleTimeout == zero {
+				obj.UDPIdleTimeout = unversioned.Duration{250 * time.Millisecond}
+			}
+			if obj.ConntrackMax == 0 {
+				obj.ConntrackMax = 256 * 1024 // 4x default (64k)
+			}
+			if obj.ConntrackTCPEstablishedTimeout == zero {
+				obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
 			}
 		},
 		func(obj *KubeSchedulerConfiguration) {

@@ -736,3 +736,161 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		}
 	}
 }
+
+func TestImageLocalityPriority(t *testing.T) {
+	test_40_250 := api.PodSpec{
+		Containers: []api.Container{
+			{
+				Image: "gcr.io/40",
+			},
+			{
+				Image: "gcr.io/250",
+			},
+		},
+	}
+
+	test_40_140 := api.PodSpec{
+		Containers: []api.Container{
+			{
+				Image: "gcr.io/40",
+			},
+			{
+				Image: "gcr.io/140",
+			},
+		},
+	}
+
+	test_min_max := api.PodSpec{
+		Containers: []api.Container{
+			{
+				Image: "gcr.io/10",
+			},
+			{
+				Image: "gcr.io/2000",
+			},
+		},
+	}
+
+	node_40_140_2000 := api.NodeStatus{
+		Images: []api.ContainerImage{
+			{
+				RepoTags: []string{
+					"gcr.io/40",
+					"gcr.io/40:v1",
+					"gcr.io/40:v1",
+				},
+				Size: int64(40 * mb),
+			},
+			{
+				RepoTags: []string{
+					"gcr.io/140",
+					"gcr.io/140:v1",
+				},
+				Size: int64(140 * mb),
+			},
+			{
+				RepoTags: []string{
+					"gcr.io/2000",
+				},
+				Size: int64(2000 * mb),
+			},
+		},
+	}
+
+	node_250_10 := api.NodeStatus{
+		Images: []api.ContainerImage{
+			{
+				RepoTags: []string{
+					"gcr.io/250",
+				},
+				Size: int64(250 * mb),
+			},
+			{
+				RepoTags: []string{
+					"gcr.io/10",
+					"gcr.io/10:v1",
+				},
+				Size: int64(10 * mb),
+			},
+		},
+	}
+
+	tests := []struct {
+		pod          *api.Pod
+		pods         []*api.Pod
+		nodes        []api.Node
+		expectedList schedulerapi.HostPriorityList
+		test         string
+	}{
+		{
+			// Pod: gcr.io/40 gcr.io/250
+
+			// Node1
+			// Image: gcr.io/40 40MB
+			// Score: (40M-23M)/97.7M + 1 = 1
+
+			// Node2
+			// Image: gcr.io/250 250MB
+			// Score: (250M-23M)/97.7M + 1 = 3
+			pod:          &api.Pod{Spec: test_40_250},
+			nodes:        []api.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			expectedList: []schedulerapi.HostPriority{{"machine1", 1}, {"machine2", 3}},
+			test:         "two images spread on two nodes, prefer the larger image one",
+		},
+		{
+			// Pod: gcr.io/40 gcr.io/140
+
+			// Node1
+			// Image: gcr.io/40 40MB, gcr.io/140 140MB
+			// Score: (40M+140M-23M)/97.7M + 1 = 2
+
+			// Node2
+			// Image: not present
+			// Score: 0
+			pod:          &api.Pod{Spec: test_40_140},
+			nodes:        []api.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			expectedList: []schedulerapi.HostPriority{{"machine1", 2}, {"machine2", 0}},
+			test:         "two images on one node, prefer this node",
+		},
+		{
+			// Pod: gcr.io/2000 gcr.io/10
+
+			// Node1
+			// Image: gcr.io/2000 2000MB
+			// Score: 2000 > max score = 10
+
+			// Node2
+			// Image: gcr.io/10 10MB
+			// Score: 10 < min score = 0
+			pod:          &api.Pod{Spec: test_min_max},
+			nodes:        []api.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}},
+			test:         "if exceed limit, use limit",
+		},
+	}
+
+	for _, test := range tests {
+		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		list, err := ImageLocalityPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		sort.Sort(test.expectedList)
+		sort.Sort(list)
+
+		if !reflect.DeepEqual(test.expectedList, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		}
+	}
+}
+
+func makeImageNode(node string, status api.NodeStatus) api.Node {
+	return api.Node{
+		ObjectMeta: api.ObjectMeta{Name: node},
+		Status:     status,
+	}
+}

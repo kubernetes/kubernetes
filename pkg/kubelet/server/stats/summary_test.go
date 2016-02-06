@@ -104,7 +104,8 @@ func TestBuildSummary(t *testing.T) {
 	rootfs := v2.FsInfo{}
 	imagefs := v2.FsInfo{}
 
-	sb := &summaryBuilder{&node, nodeConfig, rootfs, imagefs, infos}
+	sb := &summaryBuilder{
+		newFsResourceAnalyzer(&MockStatsProvider{}, time.Minute*5), &node, nodeConfig, rootfs, imagefs, infos}
 	summary, err := sb.build()
 
 	assert.NoError(t, err)

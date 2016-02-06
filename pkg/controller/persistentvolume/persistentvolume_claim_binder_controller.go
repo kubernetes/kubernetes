@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -281,13 +281,19 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
 		} else {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+
+			// A volume is Released when its bound claim cannot be found in the API server.
+			// A claim by the same name can be found if deleted and recreated before this controller can release
+			// the volume from the original claim, so a UID check is necessary.
 			if err != nil {
 				if errors.IsNotFound(err) {
 					nextPhase = api.VolumeReleased
 				} else {
 					return err
 				}
+			} else if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
+				nextPhase = api.VolumeReleased
 			}
 		}
 

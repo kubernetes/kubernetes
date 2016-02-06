@@ -314,7 +314,8 @@ func createPD() (string, error) {
 			return "", err
 		}
 
-		err = gceCloud.CreateDisk(pdName, testContext.CloudConfig.Zone, 10 /* sizeGb */)
+		tags := map[string]string{}
+		err = gceCloud.CreateDisk(pdName, testContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
 		if err != nil {
 			return "", err
 		}

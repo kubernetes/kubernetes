@@ -99,12 +99,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 // Returns true once this controller has completed an initial resource listing
 func (c *Controller) HasSynced() bool {
-	c.reflectorMutex.RLock()
-	defer c.reflectorMutex.RUnlock()
-	if c.reflector == nil {
-		return false
-	}
-	return c.reflector.LastSyncResourceVersion() != ""
+	return c.config.Queue.HasSynced()
 }
 
 // Requeue adds the provided object back into the queue if it does not already exist.

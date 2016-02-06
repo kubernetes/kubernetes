@@ -59,6 +59,7 @@ import (
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
+	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
@@ -257,23 +258,6 @@ func (m *Master) InstallAPIs(c *Config) {
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
-
-	// This should be done after all groups are registered
-	// TODO: replace the hardcoded "apis".
-	apiserver.AddApisWebService(m.Serializer, m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
-		groups := []unversioned.APIGroup{}
-		for ix := range allGroups {
-			groups = append(groups, allGroups[ix])
-		}
-		m.thirdPartyResourcesLock.Lock()
-		defer m.thirdPartyResourcesLock.Unlock()
-		if m.thirdPartyResources != nil {
-			for key := range m.thirdPartyResources {
-				groups = append(groups, m.thirdPartyResources[key].group)
-			}
-		}
-		return groups
-	})
 }
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
@@ -462,6 +446,7 @@ func (m *Master) removeThirdPartyStorage(path string) error {
 			return err
 		}
 		delete(m.thirdPartyResources, path)
+		m.RemoveAPIGroupForDiscovery(getThirdPartyGroupName(path))
 	}
 	return nil
 }
@@ -516,6 +501,7 @@ func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyre
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
 	m.thirdPartyResources[path] = thirdPartyEntry{storage, apiGroup}
+	m.AddAPIGroupForDiscovery(apiGroup)
 }
 
 // InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
@@ -654,6 +640,11 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	if isEnabled("podsecuritypolicy") {
 		podSecurityPolicyStorage := pspetcd.NewREST(dbClient("podsecuritypolicy"), storageDecorator)
 		storage["podSecurityPolicies"] = podSecurityPolicyStorage
+	}
+	if isEnabled("replicasets") {
+		replicaSetStorage := replicasetetcd.NewStorage(dbClient("replicasets"), storageDecorator)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets/status"] = replicaSetStorage.Status
 	}
 
 	return storage

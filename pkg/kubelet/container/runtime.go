@@ -69,20 +69,9 @@ type Runtime interface {
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	KillPod(pod *api.Pod, runningPod Pod) error
-	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
-	// all containers in the pod. Clients of this interface assume the
-	// containers' statuses in a pod always have a deterministic ordering
-	// (e.g., sorted by name).
-	GetAPIPodStatus(*api.Pod) (*api.PodStatus, error)
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
-	// ConvertPodStatusToAPIPodStatus converts the PodStatus object to api.PodStatus.
-	// This function is needed because Docker generates some high-level and/or
-	// pod-level information for api.PodStatus (e.g., check whether the image
-	// exists to determine the reason). We should try generalizing the logic
-	// for all container runtimes in kubelet and remove this funciton.
-	ConvertPodStatusToAPIPodStatus(*api.Pod, *PodStatus) (*api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error

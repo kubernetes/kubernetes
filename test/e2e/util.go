@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -788,6 +789,22 @@ func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	})
 }
 
+// waitForPodTerminatedInNamespace returns an error if it took too long for the pod
+// to terminate or if the pod terminated with an unexpected reason.
+func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespace string) error {
+	return waitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", podStartTimeout, func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase == api.PodFailed {
+			if pod.Status.Reason == reason {
+				return true, nil
+			} else {
+				return true, fmt.Errorf("Expected pod %n/%n to be terminated with reason %v, got reason: ", namespace, podName, reason, pod.Status.Reason)
+			}
+		}
+
+		return false, nil
+	})
+}
+
 // waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", podStartTimeout, func(pod *api.Pod) (bool, error) {
@@ -1510,7 +1527,6 @@ func (config *DeploymentConfig) create() error {
 			Selector: map[string]string{
 				"name": config.Name,
 			},
-			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
@@ -2227,7 +2243,7 @@ func SSH(cmd, host, provider string) (SSHResult, error) {
 		result.User = os.Getenv("USER")
 	}
 
-	stdout, stderr, code, err := util.RunSSHCommand(cmd, result.User, host, signer)
+	stdout, stderr, code, err := sshutil.RunSSHCommand(cmd, result.User, host, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code
@@ -2332,7 +2348,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 		// If there is an env. variable override, use that.
 		aws_keyfile := os.Getenv("AWS_SSH_KEY")
 		if len(aws_keyfile) != 0 {
-			return util.MakePrivateKeySignerFromFile(aws_keyfile)
+			return sshutil.MakePrivateKeySignerFromFile(aws_keyfile)
 		}
 		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
@@ -2341,7 +2357,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	}
 	key := filepath.Join(keydir, keyfile)
 
-	return util.MakePrivateKeySignerFromFile(key)
+	return sshutil.MakePrivateKeySignerFromFile(key)
 }
 
 // checkPodsRunning returns whether all pods whose names are listed in podNames
