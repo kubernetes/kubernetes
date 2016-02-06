@@ -54,6 +54,9 @@ const loadBalancerLagTimeout = 2 * time.Minute
 //TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 const loadBalancerCreateTimeout = 20 * time.Minute
 
+// How long to wait for a namespace to be deleted.
+const namespaceDeleteTimeout = 5 * time.Minute
+
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
@@ -73,7 +76,7 @@ var _ = Describe("Services", func() {
 		if testContext.DeleteNamespace {
 			for _, ns := range extraNamespaces {
 				By(fmt.Sprintf("Destroying namespace %v", ns))
-				if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
+				if err := deleteNS(c, ns, namespaceDeleteTimeout); err != nil {
 					Failf("Couldn't delete namespace %s: %s", ns, err)
 				}
 			}
@@ -327,9 +330,9 @@ var _ = Describe("Services", func() {
 
 		By("Removing iptable rules")
 		result, err := SSH(`
-					sudo iptables -t nat -F KUBE-SERVICES || true;
-					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
+			sudo iptables -t nat -F KUBE-SERVICES || true;
+			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
+			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
 		if err != nil || result.Code != 0 {
 			LogSSHResult(result)
 			Failf("couldn't remove iptable rules: %v", err)
