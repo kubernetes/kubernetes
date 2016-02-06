@@ -584,6 +584,58 @@ var _ = Describe("Pods", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
+	It("should be able to resolve the metadata server", func() {
+		SkipUnlessProviderIs("gce", "gke")
+
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+
+		By("creating the pod")
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: "pod-metadata-" + string(util.NewUUID()),
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers: []api.Container{
+					{
+						Name:    "main",
+						Image:   "busybox",
+						Command: []string{"/bin/sh", "-c", "if nslookup metadata; then echo PASSED; else echo FAILED; fi;"},
+					},
+				},
+			},
+		}
+
+		defer func() {
+			if err := podClient.Delete(pod.Name, &api.DeleteOptions{}); err != nil {
+				Logf("Error deleting pod: %s, %v", pod.Name, err)
+			}
+		}()
+		pod, err := podClient.Create(pod)
+		if err != nil {
+			Failf("unexpected error creating pod: %v", err)
+		}
+		doneCondition := func(pod *api.Pod) (bool, error) {
+			return pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed, nil
+		}
+
+		waitForPodCondition(framework.Client, framework.Namespace.Name, pod.Name, "Pod metadata lookup", podStartTimeout, doneCondition)
+
+		req := framework.Client.Get().
+			Namespace(framework.Namespace.Name).
+			Resource("pods").
+			Name(pod.Name).
+			Suffix("log").
+			Param("container", pod.Spec.Containers[0].Name)
+
+		data, err := req.DoRaw()
+		if err != nil {
+			Failf("unexpected error getting logs: %v", err)
+		}
+
+		Expect(string(data)).Should(ContainSubstring("PASSED"))
+	})
+
 	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
