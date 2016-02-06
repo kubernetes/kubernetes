@@ -21,8 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -40,21 +39,34 @@ var _ = Describe("ServiceAccounts", func() {
 		// Standard get, update retry loop
 		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("getting the auto-created API token")
-			tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
-			options := api.ListOptions{FieldSelector: tokenSelector}
-			secrets, err := f.Client.Secrets(f.Namespace.Name).List(options)
-			if err != nil {
-				return false, err
-			}
-			if len(secrets.Items) == 0 {
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			if apierrors.IsNotFound(err) {
+				Logf("default service account was not found")
 				return false, nil
 			}
-			if len(secrets.Items) > 1 {
-				return false, fmt.Errorf("Expected 1 token secret, got %d", len(secrets.Items))
+			if err != nil {
+				Logf("error getting default service account: %v", err)
+				return false, err
 			}
-			tokenContent = string(secrets.Items[0].Data[api.ServiceAccountTokenKey])
-			rootCAContent = string(secrets.Items[0].Data[api.ServiceAccountRootCAKey])
-			return true, nil
+			if len(sa.Secrets) == 0 {
+				Logf("default service account has no secret references")
+				return false, nil
+			}
+			for _, secretRef := range sa.Secrets {
+				secret, err := f.Client.Secrets(f.Namespace.Name).Get(secretRef.Name)
+				if err != nil {
+					Logf("Error getting secret %s: %v", secretRef.Name, err)
+					continue
+				}
+				if secret.Type == api.SecretTypeServiceAccountToken {
+					tokenContent = string(secret.Data[api.ServiceAccountTokenKey])
+					rootCAContent = string(secret.Data[api.ServiceAccountRootCAKey])
+					return true, nil
+				}
+			}
+
+			Logf("default service account has no secret references to valid service account tokens")
+			return false, nil
 		}))
 
 		pod := &api.Pod{
