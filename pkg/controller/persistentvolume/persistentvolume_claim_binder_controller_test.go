@@ -152,6 +152,68 @@ func TestClaimRace(t *testing.T) {
 	}
 }
 
+func TestNewClaimWithSameNameAsOldClaim(t *testing.T) {
+	c1 := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "c1",
+			Namespace: "foo",
+			UID:       "12345",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
+				},
+			},
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+	c1.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", "")
+
+	v := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{
+				Name:      c1.Name,
+				Namespace: c1.Namespace,
+				UID:       "45678",
+			},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/tmp/data01",
+				},
+			},
+		},
+		Status: api.PersistentVolumeStatus{
+			Phase: api.VolumeBound,
+		},
+	}
+
+	volumeIndex := NewPersistentVolumeOrderedIndex()
+	mockClient := &mockBinderClient{
+		claim:  c1,
+		volume: v,
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	syncVolume(volumeIndex, mockClient, v)
+	if mockClient.volume.Status.Phase != api.VolumeReleased {
+		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, mockClient.volume.Status.Phase)
+	}
+
+}
+
 func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
 	if err != nil {

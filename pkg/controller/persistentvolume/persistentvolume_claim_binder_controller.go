@@ -281,13 +281,19 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
 		} else {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+
+			// A volume is Released when its bound claim cannot be found in the API server.
+			// A claim by the same name can be found if deleted and recreated before this controller can release
+			// the volume from the original claim, so a UID check is necessary.
 			if err != nil {
 				if errors.IsNotFound(err) {
 					nextPhase = api.VolumeReleased
 				} else {
 					return err
 				}
+			} else if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
+				nextPhase = api.VolumeReleased
 			}
 		}
 
