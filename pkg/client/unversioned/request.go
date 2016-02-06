@@ -361,6 +361,7 @@ var fieldMappings = versionToResourceToFieldMapping{
 			ObjectNameField:              ObjectNameField,
 			EventReason:                  EventReason,
 			EventSource:                  EventSource,
+			EventType:                    EventType,
 			EventInvolvedKind:            EventInvolvedKind,
 			EventInvolvedNamespace:       EventInvolvedNamespace,
 			EventInvolvedName:            EventInvolvedName,
