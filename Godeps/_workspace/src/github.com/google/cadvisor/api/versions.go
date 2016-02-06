@@ -467,7 +467,7 @@ func (self *version2_1) Version() string {
 }
 
 func (self *version2_1) SupportedRequestTypes() []string {
-	return self.baseVersion.SupportedRequestTypes()
+	return append([]string{machineStatsApi}, self.baseVersion.SupportedRequestTypes()...)
 }
 
 func (self *version2_1) HandleRequest(requestType string, request []string, m manager.Manager, w http.ResponseWriter, r *http.Request) error {
@@ -492,9 +492,16 @@ func (self *version2_1) HandleRequest(requestType string, request []string, m ma
 		if err != nil {
 			return err
 		}
-		contStats := make(map[string][]*v2.ContainerStats, len(conts))
+		contStats := make(map[string]v2.ContainerInfo, len(conts))
 		for name, cont := range conts {
-			contStats[name] = v2.ContainerStatsFromV1(&cont.Spec, cont.Stats)
+			if name == "/" {
+				// Root cgroup stats should be exposed as machine stats
+				continue
+			}
+			contStats[name] = v2.ContainerInfo{
+				Spec:  v2.ContainerSpecFromV1(&cont.Spec, cont.Aliases, cont.Namespace),
+				Stats: v2.ContainerStatsFromV1(&cont.Spec, cont.Stats),
+			}
 		}
 		return writeResult(contStats, w)
 	default:
