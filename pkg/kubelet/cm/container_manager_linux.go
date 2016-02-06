@@ -405,7 +405,7 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 		// Remove kernel pids and other protected PIDs (pid 1, PIDs already in system & kubelet containers)
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
-			if isKernelPid(pid) {
+			if pid == 1 || isKernelPid(pid) {
 				continue
 			}
 
