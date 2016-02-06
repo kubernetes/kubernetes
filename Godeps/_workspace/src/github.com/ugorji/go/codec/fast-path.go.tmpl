@@ -165,7 +165,11 @@ func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool {
 {{range .Values}}{{if not .Primitive}}{{if not .MapKey }} 
 
 func (f *encFnInfo) {{ .MethodNamePfx "fastpathEnc" false }}R(rv reflect.Value) {
-	fastpathTV.{{ .MethodNamePfx "Enc" false }}V(rv.Interface().([]{{ .Elem }}), fastpathCheckNilFalse, f.e)
+	if f.ti.mbs {
+		fastpathTV.{{ .MethodNamePfx "EncAsMap" false }}V(rv.Interface().([]{{ .Elem }}), fastpathCheckNilFalse, f.e)
+	} else {
+		fastpathTV.{{ .MethodNamePfx "Enc" false }}V(rv.Interface().([]{{ .Elem }}), fastpathCheckNilFalse, f.e)
+	}
 }
 func (_ fastpathT) {{ .MethodNamePfx "Enc" false }}V(v []{{ .Elem }}, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -180,6 +184,31 @@ func (_ fastpathT) {{ .MethodNamePfx "Enc" false }}V(v []{{ .Elem }}, checkNil b
 		{{ encmd .Elem "v2"}}
 	}
 	if cr != nil { cr.sendContainerState(containerArrayEnd) }{{/* ee.EncodeEnd() */}}
+}
+
+func (_ fastpathT) {{ .MethodNamePfx "EncAsMap" false }}V(v []{{ .Elem }}, checkNil bool, e *Encoder) {
+	ee := e.e
+	cr := e.cr
+	if checkNil && v == nil {
+		ee.EncodeNil()
+		return
+	}
+	if len(v)%2 == 1 {
+		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
+		return
+	}
+	ee.EncodeMapStart(len(v) / 2)
+	for j, v2 := range v {
+		if cr != nil {
+			if j%2 == 0 {
+				cr.sendContainerState(containerMapKey)
+			} else {
+				cr.sendContainerState(containerMapValue)
+			}
+		}
+		{{ encmd .Elem "v2"}}
+	}
+	if cr != nil { cr.sendContainerState(containerMapEnd) }
 }
 
 {{end}}{{end}}{{end}}
