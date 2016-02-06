@@ -118,7 +118,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 1,
-			Selector: &extensions.LabelSelector{MatchLabels: labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: &api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -145,7 +145,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Template: &template,
-			Selector: &extensions.LabelSelector{MatchLabels: template.Labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: template.Labels},
 		},
 	}
 }
@@ -160,7 +160,7 @@ func generateDeployment(image string) extensions.Deployment {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
-			Selector: &extensions.LabelSelector{MatchLabels: podLabels},
+			Selector: &unversioned.LabelSelector{MatchLabels: podLabels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,

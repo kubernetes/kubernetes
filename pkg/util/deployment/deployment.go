@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
@@ -56,9 +57,9 @@ func GetOldReplicaSets(deployment extensions.Deployment, c clientset.Interface) 
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	namespace := deployment.ObjectMeta.Namespace
-	selector, err := extensions.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
 	}
 
 	// 1. Find all pods whose labels match deployment.Spec.Selector
@@ -79,7 +80,10 @@ func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.In
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rs := range rsList {
-			rsLabelsSelector := labels.SelectorFromSet(rs.Spec.Selector)
+			rsLabelsSelector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+			}
 			// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
 			if api.Semantic.DeepEqual(rs.Spec.Template, &newRSTemplate) {
 				continue
@@ -117,7 +121,12 @@ func GetNewReplicaSet(deployment extensions.Deployment, c clientset.Interface) (
 // Returns nil if the new replica set doesnt exist yet.
 func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Interface, getRcList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) (*extensions.ReplicaSet, error) {
 	namespace := deployment.ObjectMeta.Namespace
-	rsList, err := getRcList(namespace, api.ListOptions{LabelSelector: labels.SelectorFromSet(deployment.Spec.Selector)})
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+	}
+
+	rsList, err := getRcList(namespace, api.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, fmt.Errorf("error listing ReplicaSets: %v", err)
 	}
@@ -158,7 +167,7 @@ func SetFromReplicaSetTemplate(deployment *extensions.Deployment, template api.P
 }
 
 // Returns the sum of Replicas of the given replica sets.
-func GetReplicaCountForReplicaSets(replicationControllers []*extensions.ReplicaSet) int {
+func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 	totalReplicaCount := 0
 	for _, rs := range replicaSets {
 		totalReplicaCount += rs.Spec.Replicas
@@ -199,10 +208,10 @@ func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 	return readyPodCount
 }
 
-func getPodsForReplicaSets(c clientset.Interface, replicationControllers []*extensions.ReplicaSet) ([]api.Pod, error) {
+func getPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.ReplicaSet) ([]api.Pod, error) {
 	allPods := []api.Pod{}
 	for _, rs := range replicaSets {
-		selector, err := extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
 		}

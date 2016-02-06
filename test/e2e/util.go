@@ -1529,7 +1529,7 @@ func (config *DeploymentConfig) create() error {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: config.Replicas,
-			Selector: &extensions.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
 				},

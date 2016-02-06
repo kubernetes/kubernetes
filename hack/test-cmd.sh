@@ -943,6 +943,7 @@ __EOF__
   kubectl scale  --replicas=2 -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
   # Post-condition: 2 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kubectl delete rc frontend "${kube_flags[@]}"
 
   ### Scale multiple replication controllers
   kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
@@ -963,16 +964,16 @@ __EOF__
   kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
   # Clean-up
   kubectl delete job/pi "${kube_flags[@]}"
-  ### Scale a deployment
-  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
-  # Command
-  kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
-  # Post-condition: 1 replica for nginx-deployment
-  kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
-  # Clean-up
-  kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
-  # TODO: Remove once deployment reaping is implemented
-  kubectl delete rc --all "${kube_flags[@]}"
+  # ### Scale a deployment
+  # kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  # # Command
+  # kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
+  # # Post-condition: 1 replica for nginx-deployment
+  # kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
+  # # Clean-up
+  # kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
+  # # TODO: Remove once deployment reaping is implemented
+  # kubectl delete rs --all "${kube_flags[@]}"
 
   ### Expose a deployment as a service
   kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
@@ -985,7 +986,7 @@ __EOF__
   # Clean-up
   kubectl delete deployment/nginx-deployment service/nginx-deployment "${kube_flags[@]}"
   # TODO: Remove once deployment reaping is implemented
-  kubectl delete rc --all "${kube_flags[@]}"
+  kubectl delete rs --all "${kube_flags[@]}"
 
   ### Expose replication controller as service
   kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
@@ -1102,7 +1103,7 @@ __EOF__
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
-  kubectl delete rc -l pod-template-hash "${kube_flags[@]}"
+  kubectl delete rs -l pod-template-hash "${kube_flags[@]}"
 
   ### Rollback a deployment 
   # Pre-condition: no deployment exists
@@ -1131,7 +1132,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
-  kubectl delete rc -l pod-template-hash "${kube_flags[@]}"
+  kubectl delete rs -l pod-template-hash "${kube_flags[@]}"
 
   ######################
   # ConfigMap          #

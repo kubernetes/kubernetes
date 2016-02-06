@@ -1020,14 +1020,14 @@ func (dc *DeploymentController) cleanupOldReplicaSets(oldRSs []*extensions.Repli
 		return nil
 	}
 
-	sort.Sort(controller.ControllersByCreationTimestamp(oldRSs))
+	sort.Sort(controller.ReplicaSetsByCreationTimestamp(oldRSs))
 
 	var errList []error
 	// TODO: This should be parallelized.
 	for i := 0; i < diff; i++ {
-		controller := oldRSs[i]
+		rs := oldRSs[i]
 		// Avoid delete replica set with non-zero replica counts
-		if controller.Spec.Replicas != 0 || controller.Generation > controller.Status.ObservedGeneration {
+		if rs.Spec.Replicas != 0 || rs.Generation > rs.Status.ObservedGeneration {
 			continue
 		}
 		if err := dc.client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
@@ -1076,7 +1076,7 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 	}
 	newRS, err := dc.scaleReplicaSet(rs, newScale)
 	if err == nil {
-		dc.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s ReplicaSet %s to %d", scalingOperation, rs.Name, newScale)
+		dc.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 	}
 	return newRS, err
 }

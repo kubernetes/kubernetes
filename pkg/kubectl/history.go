@@ -67,11 +67,11 @@ func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, 
 	if err != nil {
 		return historyInfo, fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRCs, err := deploymentutil.GetOldRCs(*deployment, h.c)
+	_, allOldRCs, err := deploymentutil.GetOldReplicaSets(*deployment, h.c)
 	if err != nil {
 		return historyInfo, fmt.Errorf("failed to retrieve old RCs from deployment %s: %v", name, err)
 	}
-	newRC, err := deploymentutil.GetNewRC(*deployment, h.c)
+	newRC, err := deploymentutil.GetNewReplicaSet(*deployment, h.c)
 	if err != nil {
 		return historyInfo, fmt.Errorf("failed to retrieve new RC from deployment %s: %v", name, err)
 	}

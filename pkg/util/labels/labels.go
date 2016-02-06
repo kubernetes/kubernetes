@@ -19,7 +19,7 @@ package labels
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Clones the given map and returns a new map with the given key and value added.
@@ -56,14 +56,14 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 
 // Clones the given selector and returns a new selector with the given key and value added.
 // Returns the given selector, if labelKey is empty.
-func CloneSelectorAndAddLabel(selector *extensions.LabelSelector, labelKey string, labelValue uint32) *extensions.LabelSelector {
+func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
 	if labelKey == "" {
 		// Dont need to add a label.
 		return selector
 	}
 
 	// Clone.
-	newSelector := new(extensions.LabelSelector)
+	newSelector := new(unversioned.LabelSelector)
 
 	// TODO(madhusudancs): Check if you can use deepCopy_extensions_LabelSelector here.
 	newSelector.MatchLabels = make(map[string]string)
@@ -75,7 +75,7 @@ func CloneSelectorAndAddLabel(selector *extensions.LabelSelector, labelKey strin
 	newSelector.MatchLabels[labelKey] = fmt.Sprintf("%d", labelValue)
 
 	if selector.MatchExpressions != nil {
-		newMExps := make([]extensions.LabelSelectorRequirement, len(selector.MatchExpressions))
+		newMExps := make([]unversioned.LabelSelectorRequirement, len(selector.MatchExpressions))
 		for i, me := range selector.MatchExpressions {
 			newMExps[i].Key = me.Key
 			newMExps[i].Operator = me.Operator
