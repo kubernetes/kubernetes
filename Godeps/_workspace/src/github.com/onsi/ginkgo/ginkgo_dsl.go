@@ -347,6 +347,28 @@ func XIt(text string, _ ...interface{}) bool {
 	return true
 }
 
+//Specify blocks are aliases for It blocks and allow for more natural wording in situations
+//which "It" does not fit into a natural sentence flow. All the same protocols apply for Specify blocks
+//which apply to It blocks.
+func Specify(text string, body interface{}, timeout ...float64) bool {
+	return It(text, body, timeout...)
+}
+
+//You can focus individual Specifys using FSpecify
+func FSpecify(text string, body interface{}, timeout ...float64) bool {
+	return FIt(text, body, timeout...)
+}
+
+//You can mark Specifys as pending using PSpecify
+func PSpecify(text string, is ...interface{}) bool {
+	return PIt(text, is...)
+}
+
+//You can mark Specifys as pending using XSpecify
+func XSpecify(text string, is ...interface{}) bool {
+	return XIt(text, is...)
+}
+
 //By allows you to better document large Its.
 //
 //Generally you should try to keep your Its short and to the point.  This is not always possible, however,
