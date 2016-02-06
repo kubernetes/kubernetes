@@ -629,3 +629,75 @@ function sha1sum-file() {
     sha1sum "$1" | awk '{ print $1 }'
   fi
 }
+
+# Create certificate pairs for the cluster.
+# $1: The public IP for the master.
+#
+# These are used for static cert distribution (e.g. static clustering) at
+# cluster creation time. This will be obsoleted once we implement dynamic
+# clustering.
+#
+# The following certificate pairs are created:
+#
+#  - ca (the cluster's certificate authority)
+#  - server
+#  - kubelet
+#  - kubecfg (for kubectl)
+#
+# TODO(roberthbailey): Replace easyrsa with a simple Go program to generate
+# the certs that we need.
+#
+# Assumed vars
+#   KUBE_TEMP
+#
+# Vars set:
+#   CERT_DIR
+#   CA_CERT_BASE64
+#   MASTER_CERT_BASE64
+#   MASTER_KEY_BASE64
+#   KUBELET_CERT_BASE64
+#   KUBELET_KEY_BASE64
+#   KUBECFG_CERT_BASE64
+#   KUBECFG_KEY_BASE64
+function create-certs {
+  local -r cert_ip="${1}"
+
+  # Determine extra certificate names for master
+  local octets=($(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g'))
+  ((octets[3]+=1))
+  local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+  local sans=""
+  if [[ -n "${cert_ip}" ]]; then
+    sans="IP:${cert_ip},"
+  fi
+  sans="${sans}IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
+
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    cd "${KUBE_TEMP}"
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+    tar xzf easy-rsa.tar.gz
+    cd easy-rsa-master/easyrsa3
+    ./easyrsa init-pki
+    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
+    ./easyrsa build-client-full kubelet nopass
+    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
+    # If there was an error in the subshell, just die.
+    # TODO(roberthbailey): add better error handling here
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate certificates: Aborting ===" >&2
+    exit 2
+  }
+  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
+  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
+  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
+  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
+  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64 | tr -d '\r\n')
+  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
+  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
+  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+}
