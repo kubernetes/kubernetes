@@ -9,6 +9,8 @@
 #   sudo apt-get install python-pip
 #   pip install --user msgpack-python msgpack-rpc-python cbor
 
+# Ensure all "string" keys are utf strings (else encoded as bytes)
+
 import cbor, msgpack, msgpackrpc, sys, os, threading
 
 def get_test_data_list():
@@ -26,35 +28,39 @@ def get_test_data_list():
          -3232.0,
          -6464646464.0,
          3232.0,
+         6464.0,
          6464646464.0,
          False,
          True,
+         u"null",
          None,
          u"someday",
-         u"",
-         u"bytestring",
          1328176922000002000,
+         u"",
          -2206187877999998000,
+         u"bytestring",
          270,
+         u"none",
         -2013855847999995777,
          #-6795364578871345152,
          ]
     l1 = [
         { "true": True,
           "false": False },
-        { "true": "True",
+        { "true": u"True",
           "false": False,
           "uint16(1616)": 1616 },
         { "list": [1616, 32323232, True, -3232.0, {"TRUE":True, "FALSE":False}, [True, False] ],
           "int32":32323232, "bool": True, 
-          "LONG STRING": "123456789012345678901234567890123456789012345678901234567890",
-          "SHORT STRING": "1234567890" },	
-        { True: "true", 8: False, "false": 0 }
+          "LONG STRING": u"123456789012345678901234567890123456789012345678901234567890",
+          "SHORT STRING": u"1234567890" },
+        { True: "true", 138: False, "false": 200 }
         ]
     
     l = []
     l.extend(l0)
     l.append(l0)
+    l.append(1)
     l.extend(l1)
     return l
 
