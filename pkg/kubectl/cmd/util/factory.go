@@ -54,6 +54,12 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
+func init() {
+	// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
+	flag.Set("logtostderr", "true")
+	pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
+}
+
 const (
 	FlagMatchBinaryVersion = "match-server-version"
 )

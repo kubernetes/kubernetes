@@ -28,6 +28,9 @@ import (
 	"strconv"
 	"strings"
 
+	"flag"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -58,6 +61,12 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
+
+func init() {
+	// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
+	flag.Set("logtostderr", "true")
+	pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
+}
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {

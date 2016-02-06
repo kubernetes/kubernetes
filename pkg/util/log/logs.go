@@ -14,24 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package log
 
 import (
-	"flag"
 	"log"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/util/wait"
 )
-
-var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
-
-// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
-func init() {
-	flag.Set("logtostderr", "true")
-}
 
 // GlogWriter serves as a bridge between the standard log package and the glog package.
 type GlogWriter struct{}
@@ -47,6 +40,7 @@ func InitLogs() {
 	log.SetOutput(GlogWriter{})
 	log.SetFlags(0)
 	// The default glog flush interval is 30 seconds, which is frighteningly long.
+	var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 	go wait.Until(glog.Flush, *logFlushFreq, wait.NeverStop)
 }
 

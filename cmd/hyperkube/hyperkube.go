@@ -29,6 +29,7 @@ import (
 	"runtime"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -166,8 +167,8 @@ func (hk *HyperKube) Run(args []string) error {
 
 	verflag.PrintAndExitIfRequested()
 
-	util.InitLogs()
-	defer util.FlushLogs()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {

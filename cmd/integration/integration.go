@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/log"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -973,11 +974,11 @@ func main() {
 
 	util.InitFlags()
 	utilruntime.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	go func() {
-		defer util.FlushLogs()
+		defer log.FlushLogs()
 		time.Sleep(maxTestTimeout)
 		glog.Fatalf("This test has timed out.")
 	}()
