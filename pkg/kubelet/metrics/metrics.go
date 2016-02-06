@@ -37,6 +37,7 @@ const (
 	PodWorkerStartLatencyKey      = "pod_worker_start_latency_microseconds"
 	PLEGRelistLatencyKey          = "pleg_relist_latency_microseconds"
 	PLEGRelistIntervalKey         = "pleg_relist_interval_microseconds"
+	MetricsVolumeCalcLatencyKey   = "metrics_volume_calc_microseconds"
 )
 
 var (
@@ -121,6 +122,13 @@ var (
 			Help:      "Interval in microseconds between relisting in PLEG.",
 		},
 	)
+	MetricsVolumeCalcLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      MetricsVolumeCalcLatencyKey,
+			Help:      "Latency in microseconds for calculating volume metrics.",
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -141,6 +149,7 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 		prometheus.MustRegister(PLEGRelistLatency)
 		prometheus.MustRegister(PLEGRelistInterval)
+		prometheus.MustRegister(MetricsVolumeCalcLatency)
 	})
 }
 

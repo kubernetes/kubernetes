@@ -166,6 +166,19 @@ type volumeTuple struct {
 	Name string
 }
 
+// ListVolumesForPod returns a map of the volumes associated with the given pod
+func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
+	result := map[string]volume.Volume{}
+	vm, ok := kl.volumeManager.GetVolumes(podUID)
+	if !ok {
+		return result, false
+	}
+	for name, info := range vm {
+		result[name] = info.Builder
+	}
+	return result, true
+}
+
 func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 	var volumes []*volumeTuple
 	podVolDir := kl.getPodVolumesDir(podUID)

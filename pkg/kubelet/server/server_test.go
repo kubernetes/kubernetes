@@ -41,11 +41,13 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type fakeKubelet struct {
@@ -147,6 +149,10 @@ func (_ *fakeKubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 func (_ *fakeKubelet) GetNode() (*api.Node, error)  { return nil, nil }
 func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig { return cm.NodeConfig{} }
 
+func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
+	return map[string]volume.Volume{}, true
+}
+
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (user.Info, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
@@ -196,7 +202,11 @@ func newServerTest() *serverTestFramework {
 			return nil
 		},
 	}
-	server := NewServer(fw.fakeKubelet, fw.fakeAuth, true)
+	server := NewServer(
+		fw.fakeKubelet,
+		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
+		fw.fakeAuth,
+		true)
 	fw.serverUnderTest = &server
 	// TODO: Close() this when fix #19254
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)

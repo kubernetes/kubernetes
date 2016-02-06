@@ -205,6 +205,8 @@ type KubeletConfiguration struct {
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
 	LowDiskSpaceThresholdMB int `json:"lowDiskSpaceThresholdMB"`
+	// How frequently to calculate and cache volume disk usage for all pods
+	VolumeStatsAggPeriod unversioned.Duration `json:volumeStatsAggPeriod`
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
