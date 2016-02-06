@@ -2809,10 +2809,11 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := s.Convert(&in.Replicas, &out.Replicas, 0); err != nil {
 		return err
 	}
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil
@@ -4124,10 +4125,11 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 		defaulting.(func(*DeploymentSpec))(in)
 	}
 	// in.Replicas has no peer in out
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil
