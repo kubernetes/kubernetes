@@ -75,15 +75,8 @@ var _ = Describe("ClusterDns [Feature:Example]", func() {
 		namespaces := []*api.Namespace{nil, nil}
 		for i := range namespaces {
 			var err error
-			namespaces[i], err = createTestingNS(fmt.Sprintf("dnsexample%d", i), c, nil)
-			if testContext.DeleteNamespace {
-				if namespaces[i] != nil {
-					defer deleteNS(c, namespaces[i].Name, 5*time.Minute /* namespace deletion timeout */)
-				}
-				Expect(err).NotTo(HaveOccurred())
-			} else {
-				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-			}
+			namespaces[i], err = framework.CreateNamespace(fmt.Sprintf("dnsexample%d", i), nil)
+			Expect(err).NotTo(HaveOccurred())
 		}
 
 		for _, ns := range namespaces {

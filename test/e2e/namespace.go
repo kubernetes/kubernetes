@@ -23,14 +23,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
+func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
 	var err error
 
 	By("Creating testing namespaces")
@@ -40,7 +39,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 		go func(n int) {
 			defer wg.Done()
 			defer GinkgoRecover()
-			_, err = createTestingNS(fmt.Sprintf("nslifetest-%v", n), c, nil)
+			_, err = f.CreateNamespace(fmt.Sprintf("nslifetest-%v", n), nil)
 			Expect(err).NotTo(HaveOccurred())
 		}(n)
 	}
@@ -49,7 +48,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	//Wait 10 seconds, then SEND delete requests for all the namespaces.
 	By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
-	deleted, err := deleteNamespaces(c, []string{"nslifetest"}, nil /* skipFilter */)
+	deleted, err := deleteNamespaces(f.Client, []string{"nslifetest"}, nil /* skipFilter */)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(deleted)).To(Equal(totalNS))
 
@@ -58,7 +57,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
-			nsList, err := c.Namespaces().List(api.ListOptions{})
+			nsList, err := f.Client.Namespaces().List(api.ListOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -108,9 +107,9 @@ var _ = Describe("Namespaces [Serial]", func() {
 	f := NewFramework("namespaces")
 
 	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
-		func() { extinguish(f.Client, 100, 10, 150) })
+		func() { extinguish(f, 100, 10, 150) })
 
 	// On hold until etcd3; see #7372
 	It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
-		func() { extinguish(f.Client, 100, 0, 150) })
+		func() { extinguish(f, 100, 0, 150) })
 })

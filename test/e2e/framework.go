@@ -43,9 +43,11 @@ const (
 type Framework struct {
 	BaseName string
 
-	Namespace                *api.Namespace
-	Client                   *client.Client
-	Clientset_1_2            *release_1_2.Clientset
+	Client        *client.Client
+	Clientset_1_2 *release_1_2.Clientset
+
+	Namespace                *api.Namespace   // Every test has at least one namespace
+	namespacesToDelete       []*api.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
 	gatherer containerResourceGatherer
@@ -97,7 +99,7 @@ func (f *Framework) beforeEach() {
 	f.Clientset_1_2 = release_1_2.FromUnversionedClient(c)
 
 	By("Building a namespace api object")
-	namespace, err := createTestingNS(f.BaseName, f.Client, map[string]string{
+	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
 		"e2e-framework": f.BaseName,
 	})
 	Expect(err).NotTo(HaveOccurred())
@@ -177,15 +179,18 @@ func (f *Framework) afterEach() {
 	}
 
 	if testContext.DeleteNamespace {
-		By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
+		for _, ns := range f.namespacesToDelete {
+			By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 
-		timeout := 5 * time.Minute
-		if f.NamespaceDeletionTimeout != 0 {
-			timeout = f.NamespaceDeletionTimeout
+			timeout := 5 * time.Minute
+			if f.NamespaceDeletionTimeout != 0 {
+				timeout = f.NamespaceDeletionTimeout
+			}
+			if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
+				Failf("Couldn't delete ns %q: %s", ns.Name, err)
+			}
 		}
-		if err := deleteNS(f.Client, f.Namespace.Name, timeout); err != nil {
-			Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
-		}
+		f.namespacesToDelete = nil
 	} else {
 		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
@@ -218,6 +223,14 @@ func (f *Framework) afterEach() {
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
 	f.Client = nil
+}
+
+func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
+	ns, err := createTestingNS(baseName, f.Client, labels)
+	if err == nil {
+		f.namespacesToDelete = append(f.namespacesToDelete, ns)
+	}
+	return ns, err
 }
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
