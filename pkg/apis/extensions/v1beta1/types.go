@@ -237,16 +237,6 @@ type DeploymentSpec struct {
 	// This is a pointer to distinguish between explicit zero and not specified.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
 
-	// Key of the selector that is added to existing RCs (and label key that is
-	// added to its pods) to prevent the existing RCs to select new pods (and old
-	// pods being selected by new RC).
-	// Users can set this to an empty string to indicate that the system should
-	// not add any selector and label. If unspecified, system uses
-	// DefaultDeploymentUniqueLabelKey("deployment.kubernetes.io/podTemplateHash").
-	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
-	// No label is added if this is set to empty string.
-	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
-
 	// Indicates that the deployment is paused and will not be processed by the
 	// deployment controller.
 	Paused bool `json:"paused,omitempty"`
@@ -273,9 +263,8 @@ type RollbackConfig struct {
 const (
 	// DefaultDeploymentUniqueLabelKey is the default key of the selector that is added
 	// to existing RCs (and label key that is added to its pods) to prevent the existing RCs
-	// to select new pods (and old pods being select by new RC). See DeploymentSpec's UniqueLabelKey
-	// field for more information.
-	DefaultDeploymentUniqueLabelKey string = "deployment.kubernetes.io/podTemplateHash"
+	// to select new pods (and old pods being select by new RC).
+	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
 // DeploymentStrategy describes how to replace existing pods with new ones.

@@ -47,7 +47,6 @@ Documentation for other releases can be found at
     - [Pod Template](#pod-template)
     - [Replicas](#replicas)
     - [Selector](#selector)
-    - [Unique Label Key](#unique-label-key)
     - [Strategy](#strategy)
       - [Recreate Deployment](#recreate-deployment)
       - [Rolling Update Deployment](#rolling-update-deployment)
@@ -153,7 +152,7 @@ Running ```kubectl get rc``` and ```kubectl get pods``` will show the replicatio
 $ kubectl get rc
 CONTROLLER                      CONTAINER(S)   IMAGE(S)      SELECTOR                                                        REPLICAS   AGE
 REPLICAS   AGE
-deploymentrc-1975012602         nginx          nginx:1.7.9   deployment.kubernetes.io/podTemplateHash=1975012602,app=nginx   3          2m
+deploymentrc-1975012602         nginx          nginx:1.7.9   pod-template-hash=1975012602,app=nginx   3          2m
 ```
 
 ```console
@@ -237,8 +236,8 @@ which it scaled up to 3 replicas, and has scaled down the old RC to 0 replicas.
 ```console
 kubectl get rc
 CONTROLLER                CONTAINER(S)   IMAGE(S)      SELECTOR                                                         REPLICAS   AGE
-deploymentrc-1562004724   nginx          nginx:1.9.1   deployment.kubernetes.io/podTemplateHash=1562004724,app=nginx   3          5m
-deploymentrc-1975012602   nginx          nginx:1.7.9   deployment.kubernetes.io/podTemplateHash=1975012602,app=nginx   0          7m
+deploymentrc-1562004724   nginx          nginx:1.9.1   pod-template-hash=1562004724,app=nginx   3          5m
+deploymentrc-1975012602   nginx          nginx:1.7.9   pod-template-hash=1975012602,app=nginx   0          7m
 ```
 
 Running `get pods` should now show only the new pods:
@@ -334,17 +333,6 @@ targeted by this deployment. Deployment kills some of these pods, if their
 template is different than `.spec.template` or if the total number of such pods
 exceeds `.spec.replicas`. It will bring up new pods with `.spec.template` if
 number of pods are less than the desired number.
-
-### Unique Label Key
-
-`.spec.uniqueLabelKey` is an optional field specifying key of the selector that
-is added to existing RCs (and label key that is added to its pods) to prevent
-the existing RCs to select new pods (and old pods being selected by new RC).
-Users can set this to an empty string to indicate that the system should
-not add any selector and label. If unspecified, the system uses
-`deployment.kubernetes.io/podTemplateHash`.
-The value of this key is the hash of `.spec.template`.
-No label is added if this is set to the empty string.
 
 ### Strategy
 

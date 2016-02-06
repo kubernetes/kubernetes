@@ -695,8 +695,8 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 	namespace := deployment.ObjectMeta.Namespace
 	podTemplateSpecHash := podutil.GetPodTemplateSpecHash(deployment.Spec.Template)
 	newRCTemplate := deploymentutil.GetNewRCTemplate(deployment)
-	// Add podTemplateHash label to selector.
-	newRCSelector := labelsutil.CloneAndAddLabel(deployment.Spec.Selector, deployment.Spec.UniqueLabelKey, podTemplateSpecHash)
+	// Add pod-template-hash label to selector.
+	newRCSelector := labelsutil.CloneAndAddLabel(deployment.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 
 	// Set RC expectations (1 rc should be created)
 	dKey, err = controller.KeyFunc(&deployment)

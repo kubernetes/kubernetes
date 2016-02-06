@@ -1190,12 +1190,6 @@ func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *
 	} else {
 		out.RevisionHistoryLimit = nil
 	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
-	} else {
-		out.UniqueLabelKey = nil
-	}
 	out.Paused = in.Paused
 	if in.RollbackTo != nil {
 		out.RollbackTo = new(RollbackConfig)

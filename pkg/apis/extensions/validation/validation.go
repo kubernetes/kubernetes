@@ -328,10 +328,6 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path
 		// zero is a valid RevisionHistoryLimit
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.RevisionHistoryLimit), fldPath.Child("revisionHistoryLimit"))...)
 	}
-	// empty string is a valid UniqueLabelKey
-	if len(spec.UniqueLabelKey) > 0 {
-		allErrs = append(allErrs, apivalidation.ValidateLabelName(spec.UniqueLabelKey, fldPath.Child("uniqueLabel"))...)
-	}
 	if spec.RollbackTo != nil {
 		allErrs = append(allErrs, ValidateRollback(spec.RollbackTo, fldPath.Child("rollback"))...)
 	}
