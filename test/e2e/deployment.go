@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/labels"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -64,14 +64,14 @@ var _ = Describe("Deployment [Feature:Deployment]", func() {
 	})
 })
 
-func newReplicaSet(rsName string, replicas int, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
+func newRS(rsName string, replicas int, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
 			Name: rsName,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: replicas,
-			Selector: &extensions.LabelSelector{MatchLabels: rsPodLabels},
+			Selector: &unversioned.LabelSelector{MatchLabels: rsPodLabels},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: rsPodLabels,
@@ -96,7 +96,7 @@ func newDeployment(deploymentName string, replicas int, podLabels map[string]str
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: replicas,
-			Selector: &extensions.LabelSelector{MatchLabels: podLabels},
+			Selector: &unversioned.LabelSelector{MatchLabels: podLabels},
 			Strategy: extensions.DeploymentStrategy{
 				Type: strategyType,
 			},
@@ -214,7 +214,7 @@ func testRollingUpdateDeployment(f *Framework) {
 
 	rsName := "nginx-controller"
 	replicas := 3
-	_, err := c.Extensions().ReplicaSets(ns).Create(newReplicaSet(rsName, replicas, rsPodLabels, "nginx", "nginx"))
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replica set %s", rsName)
@@ -557,7 +557,11 @@ func testPausedDeployment(f *Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Update(deployment)
 	Expect(err).NotTo(HaveOccurred())
 
-	opts := api.ListOptions{LabelSelector: labels.Set(deployment.Spec.Selector).AsSelector()}
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred())
+	}
+	opts := api.ListOptions{LabelSelector: selector}
 	w, err := c.Extensions().ReplicaSets(ns).Watch(opts)
 	Expect(err).NotTo(HaveOccurred())
 

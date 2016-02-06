@@ -252,7 +252,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 			continue
 		}
 
-		selector, err := extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
 		}
@@ -289,6 +289,27 @@ func (s *StoreToReplicaSetLister) List() (rss []extensions.ReplicaSet, err error
 		rss = append(rss, *(rs.(*extensions.ReplicaSet)))
 	}
 	return rss, nil
+}
+
+type storeReplicaSetsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s storeReplicaSetsNamespacer) List(selector labels.Selector) (rss []extensions.ReplicaSet, err error) {
+	for _, c := range s.store.List() {
+		rs := *(c.(*extensions.ReplicaSet))
+		if s.namespace == api.NamespaceAll || s.namespace == rs.Namespace {
+			if selector.Matches(labels.Set(rs.Labels)) {
+				rss = append(rss, rs)
+			}
+		}
+	}
+	return
+}
+
+func (s *StoreToReplicaSetLister) ReplicaSets(namespace string) storeReplicaSetsNamespacer {
+	return storeReplicaSetsNamespacer{s.Store, namespace}
 }
 
 // GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.

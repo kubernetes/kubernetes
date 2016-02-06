@@ -89,12 +89,11 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		t.Logf("executing scenario %d", i)
 		newRS := rs("foo-v2", test.newReplicas, nil)
 		oldRS := rs("foo-v2", test.oldReplicas, nil)
-		allRSs := []*extensions.ReplicaSet{newRS, oldRS}
+		allRSs := []*exp.ReplicaSet{newRS, oldRS}
 		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fake,
-			expClient:     fake.Extensions(),
 			eventRecorder: &record.FakeRecorder{},
 		}
 		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
@@ -430,8 +429,8 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil)
-		allRSs := []*extensions.ReplicaSet{oldRS}
-		oldRSs := []*extensions.ReplicaSet{oldRS}
+		allRSs := []*exp.ReplicaSet{oldRS}
+		oldRSs := []*exp.ReplicaSet{oldRS}
 		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -460,7 +459,6 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		})
 		controller := &DeploymentController{
 			client:        &fakeClientset,
-			expClient:     fake.Extensions(),
 			eventRecorder: &record.FakeRecorder{},
 		}
 		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
@@ -506,12 +504,12 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 	selector := map[string]string{"foo": "bar"}
 
 	tests := []struct {
-		oldRSs               []*extensions.ReplicaSet
+		oldRSs               []*exp.ReplicaSet
 		revisionHistoryLimit int
 		expectedDeletions    int
 	}{
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*exp.ReplicaSet{
 				rs("foo-1", 0, selector),
 				rs("foo-2", 0, selector),
 				rs("foo-3", 0, selector),
@@ -520,7 +518,7 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 			expectedDeletions:    2,
 		},
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*exp.ReplicaSet{
 				rs("foo-1", 0, selector),
 				rs("foo-2", 0, selector),
 			},
@@ -528,7 +526,7 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 			expectedDeletions:    2,
 		},
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*exp.ReplicaSet{
 				rs("foo-1", 1, selector),
 				rs("foo-2", 1, selector),
 			},
@@ -564,14 +562,14 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 	}
 }
 
-func rs(name string, replicas int, selector map[string]string) *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
+func rs(name string, replicas int, selector map[string]string) *exp.ReplicaSet {
+	return &exp.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
 		Spec: exp.ReplicaSetSpec{
 			Replicas: replicas,
-			Selector: &exp.LabelSelector{MatchLabels: selector},
+			Selector: &unversioned.LabelSelector{MatchLabels: selector},
 			Template: &api.PodTemplateSpec{},
 		},
 	}
@@ -612,7 +610,7 @@ func newDeployment(replicas int, revisionHistoryLimit *int) *exp.Deployment {
 				RollingUpdate: &exp.RollingUpdateDeployment{},
 			},
 			Replicas: replicas,
-			Selector: &exp.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -681,12 +679,12 @@ func (f *fixture) expectUpdateDeploymentAction(d *exp.Deployment) {
 	f.objects.Items = append(f.objects.Items, d)
 }
 
-func (f *fixture) expectCreateRSAction(rs *extensions.ReplicaSet) {
+func (f *fixture) expectCreateRSAction(rs *exp.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction("replicasets", rs.Namespace, rs))
 	f.objects.Items = append(f.objects.Items, rs)
 }
 
-func (f *fixture) expectUpdateRSAction(rs *extensions.ReplicaSet) {
+func (f *fixture) expectUpdateRSAction(rs *exp.ReplicaSet) {
 	f.actions = append(f.actions, core.NewUpdateAction("replicasets", rs.Namespace, rs))
 	f.objects.Items = append(f.objects.Items, rs)
 }

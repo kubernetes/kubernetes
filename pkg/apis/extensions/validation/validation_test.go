@@ -952,7 +952,7 @@ func validDeployment() *extensions.Deployment {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.DeploymentSpec{
-			Selector: &extensions.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": "abc",
 				},
@@ -1002,7 +1002,7 @@ func TestValidateDeployment(t *testing.T) {
 	}
 	// selector should match the labels in pod template.
 	invalidSelectorDeployment := validDeployment()
-	invalidSelectorDeployment.Spec.Selector = &extensions.LabelSelector{
+	invalidSelectorDeployment.Spec.Selector = &unversioned.LabelSelector{
 		MatchLabels: map[string]string{
 			"name": "def",
 		},

@@ -103,7 +103,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: count,
-			Selector: &extensions.LabelSelector{MatchLabels: labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labels,
