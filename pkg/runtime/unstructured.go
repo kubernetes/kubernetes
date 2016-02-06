@@ -26,11 +26,9 @@ import (
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
 // type, which can be used for generic access to objects without a predefined scheme.
 // TODO: move into serializer/json.
-var UnstructuredJSONScheme Decoder = unstructuredJSONScheme{}
+var UnstructuredJSONScheme Codec = unstructuredJSONScheme{}
 
 type unstructuredJSONScheme struct{}
-
-var _ Codec = unstructuredJSONScheme{}
 
 func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionKind, _ Object) (Object, *unversioned.GroupVersionKind, error) {
 	unstruct := &Unstructured{}
