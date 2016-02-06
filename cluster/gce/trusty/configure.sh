@@ -15,10 +15,10 @@
 # limitations under the License.
 
 # This script contains functions for configuring instances to run kubernetes
-# nodes. It is uploaded to GCE metadata server when a VM instance is created,
-# and then downloaded by the instance. The upstart jobs in
-# cluster/gce/trusty/node.yaml source this script to make use of needed
-# functions. The script itself is not supposed to be executed in other manners.
+# master and nodes. It is uploaded as GCE instance metadata. The upstart jobs
+# in cluster/gce/trusty/<node.yaml, master.yaml> download it and make use
+# of needed functions. The script itself is not supposed to be executed in
+# other manners.
 
 config_hostname() {
   # Set the hostname to the short version.
@@ -441,10 +441,6 @@ compute_master_manifest_variables() {
   if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
     DOCKER_REGISTRY=${KUBE_DOCKER_REGISTRY}
   fi
-  KUBECTL_BIN="/usr/bin/kubectl"
-  if [ "${TEST_CLUSTER:-}" = "true" ]; then
-    KUBECTL_BIN="/usr/local/bin/kubectl"
-  fi
 }
 
 # Starts k8s apiserver.
@@ -621,13 +617,7 @@ setup_addon_manifests() {
 }
 
 # Start k8s addons static pods.
-#
-# Assumed vars (which are calculated in function compute_master_manifest_variables)
-#   KUBECTL_BIN
-start_kube_addons() {
-  # Fluentd
-  start_fluentd
-
+prepare_kube_addons() {
   addon_src_dir="/run/kube-manifests/kubernetes/trusty"
   addon_dst_dir="/etc/kubernetes/addons"
   # Set up manifests of other addons.
@@ -684,27 +674,19 @@ start_kube_addons() {
     setup_addon_manifests "addons" "fluentd-elasticsearch"
   fi
   if [ "${ENABLE_CLUSTER_UI:-}" = "true" ]; then
-    setup_addon_manifests "addons" "kube-ui"
+    setup_addon_manifests "addons" "dashboard"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup_addon_manifests "admission-controls" "limit-range"
   fi
 
-  # Run scripts to start addons placed in /etc/kubernetes/addons
+  # Prepare the scripts for running addons.
   addon_script_dir="/var/lib/cloud/scripts/kubernetes"
   mkdir -p "${addon_script_dir}"
   cp "${addon_src_dir}/kube-addons.sh" "${addon_script_dir}"
   cp "${addon_src_dir}/kube-addon-update.sh" "${addon_script_dir}"
   chmod 544 "${addon_script_dir}/"*.sh
-  # In case that upstart does not set the HOME variable or sometimes
-  # GCE customized trusty has a read-only /root.
-  export HOME="/root"
-  mount -t tmpfs tmpfs "${HOME}"
-  mount --bind -o remount,rw,noexec "${HOME}"
-  export KUBECTL_BIN
-  export TOKEN_DIR="/etc/srv/kubernetes"
-  export kubelet_kubeconfig_file="/var/lib/kubelet/kubeconfig"
-  export TRUSTY_MASTER="true"
-  # Run the script to start and monitoring addon manifest changes.
-  /bin/bash "${addon_script_dir}/kube-addons.sh"
+  # In case that some GCE customized trusty may have a read-only /root.
+  mount -t tmpfs tmpfs /root
+  mount --bind -o remount,rw,noexec /root
 }
