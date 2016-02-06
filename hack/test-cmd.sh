@@ -678,7 +678,7 @@ runTests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   # Clean up 
   kubectl delete deployment nginx "${kube_flags[@]}"
-  kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
+  kubectl delete rc -l pod-template-hash "${kube_flags[@]}"
 
   ##############
   # Namespaces #
@@ -1102,7 +1102,7 @@ __EOF__
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
-  kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
+  kubectl delete rc -l pod-template-hash "${kube_flags[@]}"
 
   ### Rollback a deployment 
   # Pre-condition: no deployment exists
@@ -1131,7 +1131,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
-  kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
+  kubectl delete rc -l pod-template-hash "${kube_flags[@]}"
 
   ######################
   # ConfigMap          #
