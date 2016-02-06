@@ -410,6 +410,8 @@ type BuildImageOptions struct {
 	Memory              int64              `qs:"memory"`
 	Memswap             int64              `qs:"memswap"`
 	CPUShares           int64              `qs:"cpushares"`
+	CPUQuota            int64              `qs:"cpuquota"`
+	CPUPeriod           int64              `qs:"cpuperiod"`
 	CPUSetCPUs          string             `qs:"cpusetcpus"`
 	InputStream         io.Reader          `qs:"-"`
 	OutputStream        io.Writer          `qs:"-"`
