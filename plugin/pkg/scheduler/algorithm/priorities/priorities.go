@@ -170,6 +170,78 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machines
 	return result, nil
 }
 
+// This is a reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
+const (
+	mb         int64 = 1024 * 1024
+	minImgSize int64 = 23 * mb
+	maxImgSize int64 = 1000 * mb
+)
+
+// ImageLocalityPriority is a priority function that favors nodes that already have requested pod container's images.
+// It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
+// based on the total size of those images.
+// - If none of the images are present, this node will be given the lowest priority.
+// - If some of the images are present on a node, the larger their sizes' sum, the higher the node's priority.
+func ImageLocalityPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+	sumSizeMap := make(map[string]int64)
+
+	nodes, err := nodeLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for _, node := range nodes.Items {
+			// Check if this container's image is present and get its size.
+			imageSize := checkContainerImageOnNode(node, container)
+			// Add this size to the total result of this node.
+			sumSizeMap[node.Name] += imageSize
+		}
+	}
+
+	result := []schedulerapi.HostPriority{}
+	// score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest.
+	for nodeName, sumSize := range sumSizeMap {
+		result = append(result, schedulerapi.HostPriority{Host: nodeName,
+			Score: calculateScoreFromSize(sumSize)})
+	}
+	return result, nil
+}
+
+// checkContainerImageOnNode checks if a container image is present on a node and returns its size.
+func checkContainerImageOnNode(node api.Node, container api.Container) int64 {
+	for _, image := range node.Status.Images {
+		for _, repoTag := range image.RepoTags {
+			if container.Image == repoTag {
+				// Should return immediately.
+				return image.Size
+			}
+		}
+	}
+	return 0
+}
+
+// calculateScoreFromSize calculates the priority of a node. sumSize is sum size of requested images on this node.
+// 1. Split image size range into 10 buckets.
+// 2. Decide the priority of a given sumSize based on which bucket it belongs to.
+func calculateScoreFromSize(sumSize int64) int {
+	var score int
+	switch {
+	case sumSize == 0 || sumSize < minImgSize:
+		// score == 0 means none of the images required by this pod are present on this
+		// node or the total size of the images present is too small to be taken into further consideration.
+		score = 0
+	// If existing images' total size is larger than max, just make it highest priority.
+	case sumSize >= maxImgSize:
+		score = 10
+	default:
+		score = int((10 * (sumSize - minImgSize) / (maxImgSize - minImgSize)) + 1)
+	}
+	// Return which bucket the given size belongs to
+	return score
+}
+
 // BalancedResourceAllocation favors nodes with balanced resource usage rate.
 // BalancedResourceAllocation should **NOT** be used alone, and **MUST** be used together with LeastRequestedPriority.
 // It calculates the difference between the cpu and memory fracion of capacity, and prioritizes the host based on how
