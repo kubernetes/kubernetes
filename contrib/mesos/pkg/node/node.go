@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -42,7 +42,7 @@ const (
 // Create creates a new node api object with the given hostname,
 // slave attribute labels and annotations
 func Create(
-	client *clientset.Clientset,
+	client core_unversioned.NodesGetter,
 	hostName string,
 	slaveAttrLabels,
 	annotations map[string]string,
@@ -88,7 +88,7 @@ func Create(
 // The updated node merges the given slave attribute labels
 // and annotations with the found api object.
 func Update(
-	client *clientset.Clientset,
+	client core_unversioned.NodesGetter,
 	hostname string,
 	slaveAttrLabels,
 	annotations map[string]string,
@@ -123,7 +123,7 @@ func Update(
 
 // CreateOrUpdate creates a node api object or updates an existing one
 func CreateOrUpdate(
-	client *clientset.Clientset,
+	client core_unversioned.NodesGetter,
 	hostname string,
 	slaveAttrLabels,
 	annotations map[string]string,

@@ -19,7 +19,7 @@ package executor
 import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 )
 
 type kubeAPI interface {
@@ -33,11 +33,11 @@ type nodeAPI interface {
 // clientAPIWrapper implements kubeAPI and node API, which serve to isolate external dependencies
 // such that they're easier to mock in unit test.
 type clientAPIWrapper struct {
-	client *clientset.Clientset
+	client core_unversioned.CoreInterface
 }
 
 func (cw *clientAPIWrapper) killPod(ns, name string) error {
-	return cw.client.Core().Pods(ns).Delete(name, api.NewDeleteOptions(0))
+	return cw.client.Pods(ns).Delete(name, api.NewDeleteOptions(0))
 }
 
 func (cw *clientAPIWrapper) createOrUpdate(hostname string, slaveAttrLabels, annotations map[string]string) (*api.Node, error) {
