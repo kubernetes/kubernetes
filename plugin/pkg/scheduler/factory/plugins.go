@@ -33,13 +33,13 @@ import (
 
 // PluginFactoryArgs are passed to all plugin factory functions.
 type PluginFactoryArgs struct {
-	algorithm.PodLister
-	algorithm.ServiceLister
-	algorithm.ControllerLister
-	NodeLister algorithm.NodeLister
-	NodeInfo   predicates.NodeInfo
-	PVInfo     predicates.PersistentVolumeInfo
-	PVCInfo    predicates.PersistentVolumeClaimInfo
+	PodLister        algorithm.PodLister
+	ServiceLister    algorithm.ServiceLister
+	ControllerLister algorithm.ControllerLister
+	NodeLister       algorithm.NodeLister
+	NodeInfo         predicates.NodeInfo
+	PVInfo           predicates.PersistentVolumeInfo
+	PVCInfo          predicates.PersistentVolumeClaimInfo
 }
 
 // A FitPredicateFactory produces a FitPredicate from the given args.
