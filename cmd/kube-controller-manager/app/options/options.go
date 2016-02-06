@@ -39,6 +39,7 @@ type CMServer struct {
 	CloudConfigFile                   string
 	ConcurrentEndpointSyncs           int
 	ConcurrentRCSyncs                 int
+	ConcurrentRSSyncs                 int
 	ConcurrentDSCSyncs                int
 	ConcurrentJobSyncs                int
 	ConcurrentResourceQuotaSyncs      int
@@ -99,6 +100,7 @@ func NewCMServer() *CMServer {
 		Address:                           net.ParseIP("0.0.0.0"),
 		ConcurrentEndpointSyncs:           5,
 		ConcurrentRCSyncs:                 5,
+		ConcurrentRSSyncs:                 5,
 		ConcurrentDSCSyncs:                2,
 		ConcurrentJobSyncs:                5,
 		ConcurrentResourceQuotaSyncs:      5,
@@ -142,6 +144,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
+	fs.IntVar(&s.ConcurrentRSSyncs, "concurrent-replicaset-syncs", s.ConcurrentRSSyncs, "The number of replica sets that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentResourceQuotaSyncs, "concurrent-resource-quota-syncs", s.ConcurrentResourceQuotaSyncs, "The number of resource quotas that are allowed to sync concurrently. Larger number = more responsive quota management, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", s.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more reponsive deployments, but more CPU (and network) load")
 	fs.DurationVar(&s.ServiceSyncPeriod, "service-sync-period", s.ServiceSyncPeriod, "The period for syncing services with their external load balancers")

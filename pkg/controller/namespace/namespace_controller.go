@@ -234,6 +234,12 @@ func deleteAllContent(kubeClient clientset.Interface, versions *unversioned.APIV
 				return estimate, err
 			}
 		}
+		if containsResource(resources, "replicasets") {
+			err = deleteReplicaSets(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
+		}
 	}
 	return estimate, nil
 }
@@ -531,6 +537,20 @@ func deleteIngress(expClient extensions_unversioned.ExtensionsInterface, ns stri
 	}
 	for i := range items.Items {
 		err := expClient.Ingresses(ns).Delete(items.Items[i].Name, nil)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteReplicaSets(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+	items, err := expClient.ReplicaSets(ns).List(api.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.ReplicaSets(ns).Delete(items.Items[i].Name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
