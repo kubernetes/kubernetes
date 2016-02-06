@@ -325,6 +325,12 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
+	// API server will delete the pod. To avoid a race condition, node controller
+	// shouldn't try to delete the pod.
+	if pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 {
+		return
+	}
+
 	// delete terminating pods that have not yet been scheduled
 	if len(pod.Spec.NodeName) == 0 {
 		nc.forcefullyDeletePod(pod)

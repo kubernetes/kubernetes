@@ -382,6 +382,11 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
+			if pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 {
+				// To avoid race condition, kubelet shoulnd't do anything.
+				glog.V(3).Infof("Pod %q fully terminated, API server is responsible to remove it from etcd", format.Pod(pod))
+				return
+			}
 			if err := m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
