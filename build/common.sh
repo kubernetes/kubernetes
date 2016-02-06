@@ -209,14 +209,14 @@ function kube::build::is_osx() {
 
 function kube::build::update_dockerfile() {
   if kube::build::is_osx; then
-    sed_arg=\"\"
+    sed_opts=("-i ''")
   else
-    sed_arg=""
+    sed_opts=(-i)
   fi
-  sed -i $sed_arg "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
-  sed -i $sed_arg "s#KUBE_BUILD_HTTP_PROXY#"`echo ${KUBE_BUILD_HTTP_PROXY:-\"\"}`"#" ${build_context_dir}/Dockerfile
-  sed -i $sed_arg "s#KUBE_BUILD_HTTPS_PROXY#"`echo ${KUBE_BUILD_HTTPS_PROXY:-\"\"}`"#" ${build_context_dir}/Dockerfile
-  sed -i $sed_arg "s#KUBE_BUILD_NO_PROXY#"`echo ${KUBE_BUILD_NO_PROXY:-127.0.0.1}`"#" ${build_context_dir}/Dockerfile
+  sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTP_PROXY#${KUBE_BUILD_HTTP_PROXY:-\"\"}#" ${build_context_dir}/Dockerfile
+  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTPS_PROXY#${KUBE_BUILD_HTTPS_PROXY:-\"\"}#" ${build_context_dir}/Dockerfile
+  sed ${sed_opts[@]} "s#KUBE_BUILD_NO_PROXY#${KUBE_BUILD_NO_PROXY:-127.0.0.1}#" ${build_context_dir}/Dockerfile
 }
 
 function kube::build::ensure_docker_in_path() {
