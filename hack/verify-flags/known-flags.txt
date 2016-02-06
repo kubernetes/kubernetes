@@ -47,6 +47,7 @@ cluster-name
 cluster-tag
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
+concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
 config-sync-period
 configure-cbr0

@@ -53,6 +53,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
@@ -277,6 +278,12 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			glog.Infof("Starting deployment controller")
 			go deployment.NewDeploymentController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "deployment-controller")), ResyncPeriod(s)).
 				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
+		}
+
+		if containsResource(resources, "replicasets") {
+			glog.Infof("Starting ReplicaSet controller")
+			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas).
+				Run(s.ConcurrentRSSyncs, util.NeverStop)
 		}
 	}
 
