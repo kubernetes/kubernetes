@@ -140,6 +140,7 @@ host-pid-sources
 hostname-override
 http-check-frequency
 http-port
+ignore-daemonsets
 ignore-not-found
 image-gc-high-threshold
 image-gc-low-threshold
