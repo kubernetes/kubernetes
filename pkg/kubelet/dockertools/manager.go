@@ -643,15 +643,6 @@ func (dm *DockerManager) runContainer(
 		PodUID:        pod.UID,
 		ContainerName: container.Name,
 	}
-	exposedPorts, portBindings := makePortsAndBindings(opts.PortMappings)
-
-	// TODO(vmarmol): Handle better.
-	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
-	const hostnameMaxLen = 63
-	containerHostname := pod.Name
-	if len(containerHostname) > hostnameMaxLen {
-		containerHostname = containerHostname[:hostnameMaxLen]
-	}
 
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
@@ -707,13 +698,13 @@ func (dm *DockerManager) runContainer(
 			binds = append(binds, b)
 		}
 	}
+
 	hc := &docker.HostConfig{
-		PortBindings: portBindings,
-		Binds:        binds,
-		NetworkMode:  netMode,
-		IpcMode:      ipcMode,
-		UTSMode:      utsMode,
-		PidMode:      pidMode,
+		Binds:       binds,
+		NetworkMode: netMode,
+		IpcMode:     ipcMode,
+		UTSMode:     utsMode,
+		PidMode:     pidMode,
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
 		Memory:     memoryLimit,
 		MemorySwap: -1,
@@ -728,12 +719,6 @@ func (dm *DockerManager) runContainer(
 		hc.CPUPeriod = cpuPeriod
 	}
 
-	if len(opts.DNS) > 0 {
-		hc.DNS = opts.DNS
-	}
-	if len(opts.DNSSearch) > 0 {
-		hc.DNSSearch = opts.DNSSearch
-	}
 	if len(opts.CgroupParent) > 0 {
 		hc.CgroupParent = opts.CgroupParent
 	}
@@ -741,10 +726,8 @@ func (dm *DockerManager) runContainer(
 	dockerOpts := docker.CreateContainerOptions{
 		Name: containerName,
 		Config: &docker.Config{
-			Env:          makeEnvList(opts.Envs),
-			ExposedPorts: exposedPorts,
-			Hostname:     containerHostname,
-			Image:        container.Image,
+			Env:   makeEnvList(opts.Envs),
+			Image: container.Image,
 			// Memory and CPU are set here for older versions of Docker (pre-1.6).
 			Memory:     memoryLimit,
 			MemorySwap: -1,
@@ -757,6 +740,11 @@ func (dm *DockerManager) runContainer(
 			Tty:       container.TTY,
 		},
 		HostConfig: hc,
+	}
+
+	// Set network configuration for infra-container
+	if container.Name == PodInfraContainerName {
+		setInfraContainerNetworkConfig(pod, netMode, opts, dockerOpts)
 	}
 
 	setEntrypointAndCommand(container, opts, &dockerOpts)
@@ -781,6 +769,31 @@ func (dm *DockerManager) runContainer(
 	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
 
 	return kubecontainer.DockerID(dockerContainer.ID).ContainerID(), nil
+}
+
+// setInfraContainerNetworkConfig sets the network configuration for the infra-container. We only set network configuration for infra-container, all
+// the user containers will share the same network namespace with infra-container.
+func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecontainer.RunContainerOptions, dockerOpts docker.CreateContainerOptions) {
+	exposedPorts, portBindings := makePortsAndBindings(opts.PortMappings)
+	dockerOpts.Config.ExposedPorts = exposedPorts
+	dockerOpts.HostConfig.PortBindings = portBindings
+
+	if netMode != namespaceModeHost {
+		// TODO(vmarmol): Handle better.
+		// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
+		const hostnameMaxLen = 63
+		containerHostname := pod.Name
+		if len(containerHostname) > hostnameMaxLen {
+			containerHostname = containerHostname[:hostnameMaxLen]
+		}
+		dockerOpts.Config.Hostname = containerHostname
+		if len(opts.DNS) > 0 {
+			dockerOpts.HostConfig.DNS = opts.DNS
+		}
+		if len(opts.DNSSearch) > 0 {
+			dockerOpts.HostConfig.DNSSearch = opts.DNSSearch
+		}
+	}
 }
 
 func setEntrypointAndCommand(container *api.Container, opts *kubecontainer.RunContainerOptions, dockerOpts *docker.CreateContainerOptions) {
