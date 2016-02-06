@@ -25,7 +25,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
@@ -81,7 +81,7 @@ func (sp *summaryProviderImpl) Get() (*Summary, error) {
 // summaryBuilder aggregates the datastructures provided by cadvisor into a Summary result
 type summaryBuilder struct {
 	node        *api.Node
-	nodeConfig  cm.NodeConfig
+	nodeConfig  bootstrap.NodeConfig
 	rootFsInfo  cadvisorapiv2.FsInfo
 	imageFsInfo cadvisorapiv2.FsInfo
 	infos       map[string]cadvisorapiv2.ContainerInfo

@@ -30,7 +30,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -42,7 +42,7 @@ type StatsProvider interface {
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetNode() (*api.Node, error)
-	GetNodeConfig() cm.NodeConfig
+	GetNodeConfig() bootstrap.NodeConfig
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 }

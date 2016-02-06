@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -31,7 +32,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ NodeConfig) error {
+func (unsupportedContainerManager) Start(_ bootstrap.NodeConfig) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 

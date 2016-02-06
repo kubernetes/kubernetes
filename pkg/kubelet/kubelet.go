@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/bootstrap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -428,11 +429,12 @@ func NewMainKubelet(
 
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
-	klet.nodeConfig = cm.NodeConfig{
+	klet.nodeConfig = bootstrap.NodeConfig{
 		DockerDaemonContainerName: dockerDaemonContainer,
 		SystemContainerName:       systemContainer,
 		KubeletContainerName:      resourceContainer,
 	}
+
 	klet.runtimeState.setRuntimeSync(klet.clock.Now())
 
 	klet.runner = klet.containerRuntime
@@ -621,7 +623,7 @@ type Kubelet struct {
 
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager
-	nodeConfig       cm.NodeConfig
+	nodeConfig       bootstrap.NodeConfig
 
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
@@ -913,27 +915,17 @@ func (kl *Kubelet) initializeModules() error {
 		}
 	}
 
-	// Step 3: Move Kubelet to a container, if required.
-	if kl.resourceContainer != "" {
-		// Fixme: I need to reside inside ContainerManager interface.
-		err := util.RunInResourceContainer(kl.resourceContainer)
-		if err != nil {
-			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
-		}
-		glog.Infof("Running in container %q", kl.resourceContainer)
-	}
-
-	// Step 4: Start the image manager.
+	// Step 3: Start the image manager.
 	if err := kl.imageManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
-	// Step 5: Start container manager.
+	// Step 4: Start container manager.
 	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 6: Start out of memory watcher.
+	// Step 5: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
@@ -3486,7 +3478,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
 }
-func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
+func (kl *Kubelet) GetNodeConfig() bootstrap.NodeConfig {
 	return kl.nodeConfig
 }
 
