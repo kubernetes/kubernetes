@@ -1527,7 +1527,6 @@ func (config *DeploymentConfig) create() error {
 			Selector: map[string]string{
 				"name": config.Name,
 			},
-			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},

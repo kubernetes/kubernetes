@@ -655,9 +655,8 @@ func TestGenerateDeployment(t *testing.T) {
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: extensions.DeploymentSpec{
-					Replicas:       3,
-					Selector:       map[string]string{"foo": "bar", "baz": "blah"},
-					UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
+					Replicas: 3,
+					Selector: map[string]string{"foo": "bar", "baz": "blah"},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
