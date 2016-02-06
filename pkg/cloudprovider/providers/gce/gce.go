@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -1856,12 +1857,36 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 	}, nil
 }
 
-// Create a new Persistent Disk, with the specified name & size, in the specified zone.
-func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64) error {
-	diskToCreate := &compute.Disk{
-		Name:   name,
-		SizeGb: sizeGb,
+// encodeDiskTags encodes requested volume tags into JSON string, as GCE does
+// not support tags on GCE PDs and we use Description field as fallback.
+func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
+	if len(tags) == 0 {
+		// No tags -> empty JSON
+		return "", nil
 	}
+
+	enc, err := json.Marshal(tags)
+	if err != nil {
+		return "", err
+	}
+	return string(enc), nil
+}
+
+// CreateDisk creates a new Persistent Disk, with the specified name & size, in
+// the specified zone. It stores specified tags endoced in JSON in Description
+// field.
+func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error {
+	tagsStr, err := gce.encodeDiskTags(tags)
+	if err != nil {
+		return err
+	}
+
+	diskToCreate := &compute.Disk{
+		Name:        name,
+		SizeGb:      sizeGb,
+		Description: tagsStr,
+	}
+
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
 	if err != nil {
 		return err
