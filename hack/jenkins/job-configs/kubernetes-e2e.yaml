@@ -363,7 +363,7 @@
                 # TODO: Move this into a different project. Currently, since this test
                 # shares resources with various other networking tests, it's easier to
                 # zero in on the source of a leak if it's run in isolation.
-                export PROJECT="kubernetes-flannel"
+                export PROJECT="kubernetes-ingress"
         - 'gce-ingress':
             description: 'Run [Feature:Ingress] tests on GCE.'
             timeout: 90
@@ -377,10 +377,12 @@
                 # TODO: Move this into a different project. Currently, since this test
                 # shares resources with various other networking tests, so it's easier
                 # to zero in on the source of a leak if it's run in isolation.
-                export PROJECT="kubernetes-flannel"
+                export PROJECT="kubernetes-ingress"
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
-            timeout: 90
+            # We don't really care to enforce a timeout for flannel tests. Any performance issues will show up in the other GCE builders.
+            # This suite is to continuously check that flannel + Kubernetes works.
+            timeout: 120
             emails: 'beeps@google.com'
             test-owner: 'beeps'
             provider-env: '{gce-provider-env}'
