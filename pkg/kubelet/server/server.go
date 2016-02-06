@@ -58,13 +58,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/limitwriter"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	auth        AuthInterface
-	host        HostInterface
-	restfulCont containerInterface
+	auth             AuthInterface
+	host             HostInterface
+	restfulCont      containerInterface
+	resourceAnalyzer stats.ResourceAnalyzer
 }
 
 type TLSOptions struct {
@@ -102,9 +104,9 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
+func ListenAndServeKubeletServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, auth, enableDebuggingHandlers)
+	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -119,9 +121,9 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, port uint) {
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, nil, false)
+	s := NewServer(host, resourceAnalyzer, nil, false)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -162,14 +164,16 @@ type HostInterface interface {
 	LatestLoopEntryTime() time.Time
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
+	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, auth AuthInterface, enableDebuggingHandlers bool) Server {
+func NewServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, auth AuthInterface, enableDebuggingHandlers bool) Server {
 	server := Server{
-		host:        host,
-		auth:        auth,
-		restfulCont: &filteringContainer{Container: restful.NewContainer()},
+		host:             host,
+		resourceAnalyzer: resourceAnalyzer,
+		auth:             auth,
+		restfulCont:      &filteringContainer{Container: restful.NewContainer()},
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
@@ -229,7 +233,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Add(stats.CreateHandlers(s.host))
+	s.restfulCont.Add(stats.CreateHandlers(s.host, s.resourceAnalyzer))
 	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	ws = new(restful.WebService)
