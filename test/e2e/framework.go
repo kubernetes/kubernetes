@@ -57,6 +57,11 @@ type Framework struct {
 	logsSizeWaitGroup    sync.WaitGroup
 	logsSizeCloseChannel chan bool
 	logsSizeVerifier     *LogsSizeVerifier
+
+	// To make sure that this framework cleans up after itself, no matter what,
+	// we install a cleanup action before each test and clear it after.  If we
+	// should abort, the AfterSuite hook should run all cleanup actions.
+	cleanupHandle CleanupActionHandle
 }
 
 type TestDataSummary interface {
@@ -80,6 +85,10 @@ func NewFramework(baseName string) *Framework {
 
 // beforeEach gets a client and makes a namespace.
 func (f *Framework) beforeEach() {
+	// The fact that we need this feels like a bug in ginkgo.
+	// https://github.com/onsi/ginkgo/issues/222
+	f.cleanupHandle = AddCleanupAction(f.afterEach)
+
 	By("Creating a kubernetes client")
 	c, err := loadClient()
 	Expect(err).NotTo(HaveOccurred())
@@ -121,6 +130,8 @@ func (f *Framework) beforeEach() {
 
 // afterEach deletes the namespace, after reading its events.
 func (f *Framework) afterEach() {
+	RemoveCleanupAction(f.cleanupHandle)
+
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
