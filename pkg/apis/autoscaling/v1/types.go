@@ -21,36 +21,27 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// SubresourceReference contains enough information to let you inspect or modify the referred subresource.
-type SubresourceReference struct {
+// CrossVersionObjectReference contains enough information to let you identify the referred resource.
+type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-	Kind string `json:"kind,omitempty"`
+	Kind string `json:"kind"`
 	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 	// API version of the referent
 	APIVersion string `json:"apiVersion,omitempty"`
-	// Subresource name of the referent
-	Subresource string `json:"subresource,omitempty"`
-}
-
-type CPUTargetUtilization struct {
-	// fraction of the requested CPU that should be utilized/used,
-	// e.g. 70 means that 70% of the requested CPU should be in use.
-	TargetPercentage int32 `json:"targetPercentage"`
 }
 
 // specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpec struct {
-	// reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status,
-	// and will set the desired number of pods by modifying its spec.
-	ScaleRef SubresourceReference `json:"scaleRef"`
+	// reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
+	// and will set the desired number of pods by using its Scale subresource.
+	ScaleTargetRef CrossVersionObjectReference `json:"scaleTargetRef"`
 	// lower limit for the number of pods that can be set by the autoscaler, default 1.
 	MinReplicas *int32 `json:"minReplicas,omitempty"`
 	// upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
 	MaxReplicas int32 `json:"maxReplicas"`
 	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
-	// if not specified it defaults to the target CPU utilization at 80% of the requested resources.
-	CPUUtilization *CPUTargetUtilization `json:"cpuUtilization,omitempty"`
+	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
 }
 
 // current status of a horizontal pod autoscaler
