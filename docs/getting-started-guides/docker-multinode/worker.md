@@ -47,6 +47,7 @@ export MASTER_IP=<the_master_ip_here>
 export K8S_VERSION=<your_k8s_version (e.g. 1.2.0-alpha.6)>
 export FLANNEL_VERSION=<your_flannel_version (e.g. 0.5.5)>
 export FLANNEL_IFACE=<flannel_interface (defaults to eth0)>
+export FLANNEL_IPMASQ=<flannel_ipmasq_flag (defaults to true)>
 ```
 
 For each worker node, there are three steps:
@@ -105,7 +106,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock run -d \
     -v /dev/net:/dev/net \
     quay.io/coreos/flannel:${FLANNEL_VERSION} \
     /opt/bin/flanneld \
-        --ip-masq \
+        --ip-masq=${FLANNEL_IPMASQ} \
         --etcd-endpoints=http://${MASTER_IP}:4001 \
         --iface=${FLANNEL_IFACE}
 ```
