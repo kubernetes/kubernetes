@@ -317,6 +317,10 @@ type PersistentVolumeStatus struct {
 	Message string `json:"message,omitempty"`
 	// Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI
 	Reason string `json:"reason,omitempty"`
+	// Current service state of volume.
+	// TODO: replace with real docs
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Conditions []PersistentVolumeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 type PersistentVolumeList struct {
@@ -363,6 +367,10 @@ type PersistentVolumeClaimStatus struct {
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty"`
+	// Current service state of claim.
+	// TODO: replace with real docs
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 type PersistentVolumeAccessMode string
@@ -402,6 +410,43 @@ const (
 	// used for PersistentVolumeClaims that are bound
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
+
+type PersistentVolumeConditionType string
+
+// These are valid conditions of PersistentVolume.
+const (
+	// PersistentVolumeBound means the volume is bound to a claim for storage and can be
+	// consumed as a storage resource by the claimant
+	PersistentVolumeBound PersistentVolumeConditionType = "Bound"
+	// PersistentVolumeRecycled is the recycled state of a PersistentVolume per the volume's reclaim policy
+	PersistentVolumeRecycled PersistentVolumeConditionType = "Recycled"
+)
+
+type PersistentVolumeCondition struct {
+	Type               PersistentVolumeConditionType `json:"type"`
+	Status             ConditionStatus               `json:"status"`
+	LastProbeTime      unversioned.Time              `json:"lastProbeTime,omitempty"`
+	LastTransitionTime unversioned.Time              `json:"lastTransitionTime,omitempty"`
+	Reason             string                        `json:"reason,omitempty"`
+	Message            string                        `json:"message,omitempty"`
+}
+
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of PersistentVolumeClaim.
+const (
+	// PersistentVolumeClaimBound means the claim is bound to persistent storage and can be consumed as a resource
+	PersistentVolumeClaimBound PersistentVolumeClaimConditionType = "Bound"
+)
+
+type PersistentVolumeClaimCondition struct {
+	Type               PersistentVolumeClaimConditionType `json:"type"`
+	Status             ConditionStatus                    `json:"status"`
+	LastProbeTime      unversioned.Time                   `json:"lastProbeTime,omitempty"`
+	LastTransitionTime unversioned.Time                   `json:"lastTransitionTime,omitempty"`
+	Reason             string                             `json:"reason,omitempty"`
+	Message            string                             `json:"message,omitempty"`
+}
 
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
@@ -1791,7 +1836,8 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
-	// Number of Pods that may be running on this Node: see ResourcePods
+
+// Number of Pods that may be running on this Node: see ResourcePods
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

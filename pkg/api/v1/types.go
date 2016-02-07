@@ -397,6 +397,10 @@ type PersistentVolumeStatus struct {
 	// Reason is a brief CamelCase string that describes any failure and is meant
 	// for machine parsing and tidy display in the CLI.
 	Reason string `json:"reason,omitempty"`
+	// Current service state of volume
+	// TODO: replace with real docs
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Conditions []PersistentVolumeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // PersistentVolumeList is a list of PersistentVolume items.
@@ -460,6 +464,10 @@ type PersistentVolumeClaimStatus struct {
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume.
 	Capacity ResourceList `json:"capacity,omitempty"`
+	// Current service state of claim.
+	// TODO: replace with real docs
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 type PersistentVolumeAccessMode string
@@ -499,6 +507,67 @@ const (
 	// used for PersistentVolumeClaims that are bound
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
+
+// PersistentVolumeConditionType is a valid value for PersistentVolumeCondition.Type
+type PersistentVolumeConditionType string
+
+// These are valid conditions of PersistentVolume.
+const (
+	// PersistentVolumeBound means the volume is bound to a claim for storage and can be
+	// consumed as a storage resource by the claimant
+	PersistentVolumeBound PersistentVolumeConditionType = "Bound"
+	// PersistentVolumeRecycled is the recycled state of a PersistentVolume per the volume's reclaim policy
+	PersistentVolumeRecycled PersistentVolumeConditionType = "Recycled"
+)
+
+// PersistentVolumeCondition contains the details for the current condition of this volume
+type PersistentVolumeCondition struct {
+	// Type is the type of the condition.
+	// TODO: add appropriate docs link!
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Type PersistentVolumeConditionType `json:"type"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Status ConditionStatus `json:"status"`
+	// Last time we probed the condition.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}
+
+// PersistentVolumeClaimConditionType is a valid value for PersistentVolumeClaimCondition.Type
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of PersistentVolumeClaim.
+const (
+	// PersistentVolumeClaimBound means the claim is bound to persistent storage and can be consumed as a resource
+	PersistentVolumeClaimBound PersistentVolumeClaimConditionType = "Bound"
+)
+
+// PersistentVolumeClaim contains the details for the current condition of this claim
+type PersistentVolumeClaimCondition struct {
+	// Type is the type of the condition.
+	// TODO: add appropriate docs link!
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Type PersistentVolumeClaimConditionType `json:"type"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	Status ConditionStatus `json:"status"`
+	// Last time we probed the condition.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}
 
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.

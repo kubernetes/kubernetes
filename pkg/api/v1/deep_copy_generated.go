@@ -1344,6 +1344,20 @@ func deepCopy_v1_PersistentVolumeClaim(in PersistentVolumeClaim, out *Persistent
 	return nil
 }
 
+func deepCopy_v1_PersistentVolumeClaimCondition(in PersistentVolumeClaimCondition, out *PersistentVolumeClaimCondition, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Status = in.Status
+	if err := deepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
 func deepCopy_v1_PersistentVolumeClaimList(in PersistentVolumeClaimList, out *PersistentVolumeClaimList, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1402,12 +1416,36 @@ func deepCopy_v1_PersistentVolumeClaimStatus(in PersistentVolumeClaimStatus, out
 	} else {
 		out.Capacity = nil
 	}
+	if in.Conditions != nil {
+		out.Conditions = make([]PersistentVolumeClaimCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := deepCopy_v1_PersistentVolumeClaimCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
 func deepCopy_v1_PersistentVolumeClaimVolumeSource(in PersistentVolumeClaimVolumeSource, out *PersistentVolumeClaimVolumeSource, c *conversion.Cloner) error {
 	out.ClaimName = in.ClaimName
 	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func deepCopy_v1_PersistentVolumeCondition(in PersistentVolumeCondition, out *PersistentVolumeCondition, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Status = in.Status
+	if err := deepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
@@ -1579,6 +1617,16 @@ func deepCopy_v1_PersistentVolumeStatus(in PersistentVolumeStatus, out *Persiste
 	out.Phase = in.Phase
 	out.Message = in.Message
 	out.Reason = in.Reason
+	if in.Conditions != nil {
+		out.Conditions = make([]PersistentVolumeCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := deepCopy_v1_PersistentVolumeCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
@@ -2696,10 +2744,12 @@ func init() {
 		deepCopy_v1_ObjectReference,
 		deepCopy_v1_PersistentVolume,
 		deepCopy_v1_PersistentVolumeClaim,
+		deepCopy_v1_PersistentVolumeClaimCondition,
 		deepCopy_v1_PersistentVolumeClaimList,
 		deepCopy_v1_PersistentVolumeClaimSpec,
 		deepCopy_v1_PersistentVolumeClaimStatus,
 		deepCopy_v1_PersistentVolumeClaimVolumeSource,
+		deepCopy_v1_PersistentVolumeCondition,
 		deepCopy_v1_PersistentVolumeList,
 		deepCopy_v1_PersistentVolumeSource,
 		deepCopy_v1_PersistentVolumeSpec,

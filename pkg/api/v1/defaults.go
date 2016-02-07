@@ -158,10 +158,28 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			if obj.Spec.PersistentVolumeReclaimPolicy == "" {
 				obj.Spec.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimRetain
 			}
+			if len(obj.Status.Conditions) == 0 {
+				obj.Status.Conditions = []PersistentVolumeCondition{
+					{
+						Type:   PersistentVolumeBound,
+						Status: ConditionFalse,
+						Reason: "New",
+					},
+				}
+			}
 		},
 		func(obj *PersistentVolumeClaim) {
 			if obj.Status.Phase == "" {
 				obj.Status.Phase = ClaimPending
+			}
+			if len(obj.Status.Conditions) == 0 {
+				obj.Status.Conditions = []PersistentVolumeClaimCondition{
+					{
+						Type:   PersistentVolumeClaimBound,
+						Status: ConditionFalse,
+						Reason: "New",
+					},
+				}
 			}
 		},
 		func(obj *ISCSIVolumeSource) {
