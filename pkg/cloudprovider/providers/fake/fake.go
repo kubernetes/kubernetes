@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "fake"
@@ -130,7 +131,7 @@ func (f *FakeCloud) GetLoadBalancer(name, region string) (*api.LoadBalancerStatu
 
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)

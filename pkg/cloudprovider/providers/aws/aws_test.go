@@ -30,6 +30,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const TestClusterId = "clusterid.test"
@@ -698,7 +699,9 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 		t.Errorf("Expected GetLoadBalancer region mismatch error.")
 	}
 
-	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
+	serviceName := types.NamespacedName{Namespace: "foo", Name: "bar"}
+
+	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, serviceName, api.ServiceAffinityNone)
 	if err == nil || err.Error() != errorMessage {
 		t.Errorf("Expected EnsureLoadBalancer region mismatch error.")
 	}
