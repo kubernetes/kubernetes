@@ -560,7 +560,7 @@ one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
   "containers": [
     {
       "name": "db-client-container",
-      "image": "myClientImage",
+      "image": "myClientImage"
     }
   ]
 }
