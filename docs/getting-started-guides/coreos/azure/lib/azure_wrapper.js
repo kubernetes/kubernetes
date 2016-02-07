@@ -13,9 +13,9 @@ var inspect = require('util').inspect;
 var util = require('./util.js');
 
 var coreos_image_ids = {
-  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-766.4.0',
-  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-766.4.0', // untested
-  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-815.0.0' // untested
+  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-835.12.0', // untested
+  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-899.6.0',
+  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-942.0.0' // untested
 };
 
 var conf = {};
@@ -159,11 +159,18 @@ var get_vm_size = function () {
   }
 }
 
+var get_subscription= function () {
+  if (process.env['AZ_SUBSCRIPTION']) {
+    return '--subscription=' + process.env['AZ_SUBSCRIPTION'];
+  }
+}
+
 exports.queue_default_network = function () {
   task_queue.push([
     'network', 'vnet', 'create',
     get_location(),
     '--address-space=172.16.0.0',
+    get_subscription(),
     conf.resources['vnet'],
   ]);
 }
@@ -175,6 +182,7 @@ exports.queue_storage_if_needed = function() {
       'storage', 'account', 'create',
       '--type=LRS',
       get_location(),
+      get_subscription(),
       conf.resources['storage_account'],
     ]);
     process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
@@ -195,6 +203,7 @@ exports.queue_machines = function (name_prefix, coreos_update_channel, cloud_con
     '--virtual-network-name=' + conf.resources['vnet'],
     '--no-ssh-password',
     '--ssh-cert=' + conf.resources['ssh_key']['pem'],
+    get_subscription(),
   ];
 
   var cloud_config = cloud_config_creator(x, conf);
@@ -219,6 +228,9 @@ exports.queue_machines = function (name_prefix, coreos_update_channel, cloud_con
     if (conf.resizing && n < conf.old_size) {
       return [];
     } else {
+      if (process.env['AZ_VM_COREOS_CHANNEL']) {
+        coreos_update_channel = process.env['AZ_VM_COREOS_CHANNEL']
+      }
       return vm_create_base_args.concat(next_host(n), [
         coreos_image_ids[coreos_update_channel], 'core',
       ]);
@@ -249,11 +261,11 @@ exports.destroy_cluster = function (state_file) {
 
   conf.destroying = true;
   task_queue = _.map(conf.hosts, function (host) {
-    return ['vm', 'delete', '--quiet', '--blob-delete', host.name];
+    return ['vm', 'delete', '--quiet', '--blob-delete', host.name, get_subscription()];
   });
 
-  task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet']]);
-  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.resources['storage_account']]);
+  task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet'], get_subscription()]);
+  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.resources['storage_account'], get_subscription()]);
 
   exports.run_task_queue();
 };
