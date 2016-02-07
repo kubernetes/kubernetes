@@ -83,6 +83,10 @@ type DefaultRESTMapper struct {
 	interfacesFunc VersionInterfacesFunc
 }
 
+func (m *DefaultRESTMapper) String() string {
+	return fmt.Sprintf("DefaultRESTMapper{kindToPluralResource=%v}", m.kindToPluralResource)
+}
+
 var _ RESTMapper = &DefaultRESTMapper{}
 
 // VersionInterfacesFunc returns the appropriate typer, and metadata accessor for a
@@ -510,6 +514,17 @@ func (m *DefaultRESTMapper) ResourceIsValid(resource unversioned.GroupVersionRes
 
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
 type MultiRESTMapper []RESTMapper
+
+func (m MultiRESTMapper) String() string {
+	nested := []string{}
+	for _, t := range m {
+		currString := fmt.Sprintf("%v", t)
+		splitStrings := strings.Split(currString, "\n")
+		nested = append(nested, strings.Join(splitStrings, "\n\t"))
+	}
+
+	return fmt.Sprintf("MultiRESTMapper{\n\t%s\n}", strings.Join(nested, "\n\t"))
+}
 
 // ResourceSingularizer converts a REST resource name from plural to singular (e.g., from pods to pod)
 // This implementation supports multiple REST schemas and return the first match.
