@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	. "k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const TomcatPort int = 8080
@@ -76,7 +76,7 @@ func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []a
 			}
 		// Unittests will hard timeout in 5m with a stack trace, prevent that
 		// and surface a clearer reason for failure.
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Timed out. Expected %#v, Got %#v", expectedServices, services)
 			return
 		}
@@ -122,7 +122,7 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 			}
 		// Unittests will hard timeout in 5m with a stack trace, prevent that
 		// and surface a clearer reason for failure.
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Timed out. Expected %#v, Got %#v", expectedEndpoints, endpoints)
 			return
 		}

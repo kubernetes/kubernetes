@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -125,7 +126,7 @@ func (c *SSHTunneler) SecondsSinceSync() int64 {
 }
 
 func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
-	go util.Until(func() {
+	go wait.Until(func() {
 		if c.InstallSSHKey == nil {
 			glog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
 			return
@@ -150,7 +151,7 @@ func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 // each time (Update() is a noop if no changes are necessary).
 func (c *SSHTunneler) nodesSyncLoop() {
 	// TODO (cjcullen) make this watch.
-	go util.Until(func() {
+	go wait.Until(func() {
 		addrs, err := c.getAddresses()
 		glog.Infof("Calling update w/ addrs: %v", addrs)
 		if err != nil {

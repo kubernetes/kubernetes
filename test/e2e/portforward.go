@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -150,7 +150,7 @@ var _ = Describe("Port forwarding", func() {
 			By("Closing the connection to the local port")
 			conn.Close()
 
-			logOutput := runKubectlWithTimeout(util.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
+			logOutput := runKubectlWithTimeout(wait.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Expected to read 3 bytes from client, but got 0 instead")
 		})
@@ -195,7 +195,7 @@ var _ = Describe("Port forwarding", func() {
 				Failf("Expected %q from server, got %q", e, a)
 			}
 
-			logOutput := runKubectlWithTimeout(util.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
+			logOutput := runKubectlWithTimeout(wait.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
 			verifyLogMessage(logOutput, "^Accepted client connection$")
 			verifyLogMessage(logOutput, "^Received expected client data$")
 			verifyLogMessage(logOutput, "^Done$")
@@ -232,7 +232,7 @@ var _ = Describe("Port forwarding", func() {
 				Failf("Expected %q from server, got %q", e, a)
 			}
 
-			logOutput := runKubectlWithTimeout(util.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
+			logOutput := runKubectlWithTimeout(wait.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Done")
 		})

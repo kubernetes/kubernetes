@@ -63,6 +63,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -322,12 +323,12 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 
 	if s.HealthzPort > 0 {
 		healthz.DefaultHealthz()
-		go util.Until(func() {
+		go wait.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(s.HealthzPort)), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second, util.NeverStop)
+		}, 5*time.Second, wait.NeverStop)
 	}
 
 	if s.RunOnce {
@@ -611,18 +612,18 @@ func RunKubelet(kcfg *KubeletConfig) error {
 
 func startKubelet(k KubeletBootstrap, podCfg *config.PodConfig, kc *KubeletConfig) {
 	// start the kubelet
-	go util.Until(func() { k.Run(podCfg.Updates()) }, 0, util.NeverStop)
+	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
 	// start the kubelet server
 	if kc.EnableServer {
-		go util.Until(func() {
+		go wait.Until(func() {
 			k.ListenAndServe(kc.Address, kc.Port, kc.TLSOptions, kc.Auth, kc.EnableDebuggingHandlers)
-		}, 0, util.NeverStop)
+		}, 0, wait.NeverStop)
 	}
 	if kc.ReadOnlyPort > 0 {
-		go util.Until(func() {
+		go wait.Until(func() {
 			k.ListenAndServeReadOnly(kc.Address, kc.ReadOnlyPort)
-		}, 0, util.NeverStop)
+		}, 0, wait.NeverStop)
 	}
 }
 

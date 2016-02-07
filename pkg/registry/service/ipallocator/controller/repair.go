@@ -26,7 +26,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -66,7 +65,7 @@ func NewRepair(interval time.Duration, registry service.Registry, network *net.I
 
 // RunUntil starts the controller until the provided ch is closed.
 func (c *Repair) RunUntil(ch chan struct{}) {
-	util.Until(func() {
+	wait.Until(func() {
 		if err := c.RunOnce(); err != nil {
 			runtime.HandleError(err)
 		}

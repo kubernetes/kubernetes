@@ -42,6 +42,7 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -192,7 +193,7 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	go dc.rcController.Run(stopCh)
 	go dc.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(dc.worker, time.Second, stopCh)
+		go wait.Until(dc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down deployment controller")

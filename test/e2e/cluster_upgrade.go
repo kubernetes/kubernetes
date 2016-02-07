@@ -30,7 +30,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -290,7 +289,7 @@ func testMasterUpgrade(ip, v string, mUp func(v string) error) {
 	done := make(chan struct{}, 1)
 	// Let's make sure we've finished the heartbeat before shutting things down.
 	var wg sync.WaitGroup
-	go util.Until(func() {
+	go wait.Until(func() {
 		defer GinkgoRecover()
 		wg.Add(1)
 		defer wg.Done()
