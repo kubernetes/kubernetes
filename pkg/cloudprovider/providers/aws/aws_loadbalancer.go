@@ -24,10 +24,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
+func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return nil, err
@@ -47,7 +48,12 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 
 		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
 
-		glog.Info("Creating load balancer with name: ", name)
+		createRequest.Tags = []*elb.Tag{
+			{Key: aws.String(TagNameKubernetesCluster), Value: aws.String(s.getClusterName())},
+			{Key: aws.String(TagNameKubernetesService), Value: aws.String(namespacedName.String())},
+		}
+
+		glog.Infof("Creating load balancer for %v with name: ", namespacedName, name)
 		_, err := s.elb.CreateLoadBalancer(createRequest)
 		if err != nil {
 			return nil, err
