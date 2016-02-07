@@ -20,8 +20,6 @@ FROM KUBE_BUILD_IMAGE_CROSS
 
 MAINTAINER  Joe Beda <jbeda@google.com>
 
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
 ENV GOOS    linux
 ENV GOARCH  amd64
 
@@ -34,8 +32,10 @@ RUN mkdir $TMPDIR && \
 
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`
-RUN rm -rf /var/lib/apt/lists/
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
+RUN rm -rf /var/lib/apt/lists/ \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y rsync \
+    && rm -rf /var/lib/apt/lists/
 
 # Download and symlink etcd.  We need this for our integration tests.
 RUN export ETCD_VERSION=v2.2.1; \

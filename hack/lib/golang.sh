@@ -60,6 +60,18 @@ readonly KUBE_CLIENT_TARGETS=(
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
+# If we update this we should also update the set of golang compilers we build
+# in 'build/build-image/cross/Dockerfile'. However, it's only a bit faster since go 1.5, not mandatory 
+readonly KUBE_CLIENT_PLATFORMS=(
+  linux/amd64
+  linux/386
+  linux/arm
+  darwin/amd64
+  darwin/386
+  windows/amd64
+  windows/386
+)
+
 # The set of test targets that we are building for all platforms
 kube::golang::test_targets() {
   local targets=(
@@ -97,14 +109,10 @@ readonly KUBE_TEST_PORTABLE=(
   hack/lib
 )
 
-# If we update this we need to also update the set of golang compilers we build
-# in 'build/build-image/Dockerfile'
-readonly KUBE_CLIENT_PLATFORMS=(
+# Which platforms we should compile test targets for. Not all client platforms need these tests
+readonly KUBE_TEST_PLATFORMS=(
   linux/amd64
-  linux/386
-  linux/arm
   darwin/amd64
-  darwin/386
   windows/amd64
 )
 
@@ -161,7 +169,7 @@ kube::golang::binaries_from_targets() {
   done
 }
 
-# Asks golang what it thinks the host platform is.  The go tool chain does some
+# Asks golang what it thinks the host platform is. The go tool chain does some
 # slightly different things when the target platform matches the host platform.
 kube::golang::host_platform() {
   echo "$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
@@ -190,11 +198,26 @@ kube::golang::set_platform_envs() {
 
   export GOOS=${platform%/*}
   export GOARCH=${platform##*/}
+
+  # Dynamic CGO linking for other server architectures than linux/amd64 goes here
+  # If you want to include support for more server platforms than these, add arch-specific gcc names here
+  if [[ ${platform} == "linux/arm" ]]; then
+    export CGO_ENABLED=1
+    export CC=arm-linux-gnueabi-gcc
+  elif [[ ${platform} == "linux/arm64" ]]; then
+    export CGO_ENABLED=1
+    export CC=aarch64-linux-gnu-gcc
+  elif [[ ${platform} == "linux/ppc64le" ]]; then
+    export CGO_ENABLED=1
+    export CC=powerpc64le-linux-gnu-gcc
+  fi
 }
 
 kube::golang::unset_platform_envs() {
   unset GOOS
   unset GOARCH
+  unset CGO_ENABLED
+  unset CC
 }
 
 # Create the GOPATH tree under $KUBE_OUTPUT
