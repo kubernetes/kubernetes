@@ -461,7 +461,7 @@ var _ = Describe("Services", func() {
 
 		// Change the services to NodePort.
 
-		By("changing the TCP service " + serviceName + " to type=NodePort")
+		By("changing the TCP service to type=NodePort")
 		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeNodePort
 		})
@@ -469,7 +469,7 @@ var _ = Describe("Services", func() {
 		tcpNodePort := tcpService.Spec.Ports[0].NodePort
 		Logf("TCP node port: %d", tcpNodePort)
 
-		By("changing the UDP service " + serviceName + " to type=NodePort")
+		By("changing the UDP service to type=NodePort")
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeNodePort
 		})
@@ -499,18 +499,18 @@ var _ = Describe("Services", func() {
 			Logf("Allocated static load balancer IP: %s", requestedIP)
 		}
 
-		By("changing the TCP service " + serviceName + " to type=LoadBalancer")
+		By("changing the TCP service to type=LoadBalancer")
 		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *api.Service) {
 			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = api.ServiceTypeLoadBalancer
 		})
 
-		By("changing the UDP service " + serviceName + " to type=LoadBalancer")
+		By("changing the UDP service to type=LoadBalancer")
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeLoadBalancer
 		})
 
-		By("waiting for the TCP service " + serviceName + " to have a load balancer")
+		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
 		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
@@ -523,7 +523,7 @@ var _ = Describe("Services", func() {
 		tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 		Logf("TCP load balancer: %s", tcpIngressIP)
 
-		By("waiting for the UDP service " + serviceName + " to have a load balancer")
+		By("waiting for the UDP service to have a load balancer")
 		// 2nd one should be faster since they ran in parallel.
 		udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
 		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
@@ -552,7 +552,7 @@ var _ = Describe("Services", func() {
 
 		// Change the services' node ports.
 
-		By("changing the TCP service's " + serviceName + " NodePort")
+		By("changing the TCP service's NodePort")
 		tcpService = jig.ChangeServiceNodePortOrFail(ns1, tcpService.Name, tcpNodePort)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 		tcpNodePortOld := tcpNodePort
@@ -565,7 +565,7 @@ var _ = Describe("Services", func() {
 		}
 		Logf("TCP node port: %d", tcpNodePort)
 
-		By("changing the UDP service's " + serviceName + " NodePort")
+		By("changing the UDP service's NodePort")
 		udpService = jig.ChangeServiceNodePortOrFail(ns2, udpService.Name, udpNodePort)
 		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
 		udpNodePortOld := udpNodePort
@@ -645,7 +645,7 @@ var _ = Describe("Services", func() {
 
 		// Change the services back to ClusterIP.
 
-		By("changing TCP service " + serviceName + " back to type=ClusterIP")
+		By("changing TCP service back to type=ClusterIP")
 		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
@@ -654,7 +654,7 @@ var _ = Describe("Services", func() {
 		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort)
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
 
-		By("changing UDP service " + serviceName + " back to type=ClusterIP")
+		By("changing UDP service back to type=ClusterIP")
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
