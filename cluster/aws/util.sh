@@ -74,15 +74,7 @@ export AWS_DEFAULT_OUTPUT=text
 AWS_CMD="aws ec2"
 AWS_ASG_CMD="aws autoscaling"
 
-VPC_CIDR_BASE=172.20
 MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
-VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
-SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
-if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
-  echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
-  SUBNET_CIDR=${KUBE_SUBNET_CIDR}
-fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
@@ -767,12 +759,31 @@ function vpc-setup {
     VPC_ID=$(get_vpc_id)
   fi
   if [[ -z "$VPC_ID" ]]; then
-	  echo "Creating vpc."
-	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
-	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
-	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  add-tag $VPC_ID Name kubernetes-vpc
-	  add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
+    VPC_CIDR_BASE=172.20
+    VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
+    echo "Creating VPC with CIDR ${VPC_CIDR}"
+    VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
+    $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
+    $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
+    add-tag $VPC_ID Name kubernetes-vpc
+    add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
+    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+  else
+    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock)
+    echo "VPC CIDR is $VPC_CIDR"
+    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
+
+    if [[ -z "${MASTER_INTERNAL_IP:-}" ]]; then
+      MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+      echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
+    fi
+  fi
+
+  # TODO: We still assume that VPC_CIDR_BASE is a /16
+  SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
+  if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
+    echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
+    SUBNET_CIDR=${KUBE_SUBNET_CIDR}
   fi
 
   echo "Using VPC $VPC_ID"
@@ -790,11 +801,6 @@ function subnet-setup {
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock)
     echo "Using existing subnet with CIDR $EXISTING_CIDR"
-    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock)
-    echo "VPC CIDR is $VPC_CIDR"
-    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
-    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
-    echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
   fi
 
   echo "Using subnet $SUBNET_ID"
