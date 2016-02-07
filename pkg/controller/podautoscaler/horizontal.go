@@ -39,8 +39,8 @@ const (
 	// TODO: make it a flag or HPA spec element.
 	tolerance = 0.1
 
-	HpaCustomMetricsDefinitionAnnotationName = "alpha/definiton.custom-metrics.podautoscaler.kubernetes.io"
-	HpaCustomMetricsStatusAnnotationName     = "alpha/status.custom-metrics.podautoscaler.kubernetes.io"
+	HpaCustomMetricsTargetAnnotationName = "alpha/target.custom-metrics.podautoscaler.kubernetes.io"
+	HpaCustomMetricsStatusAnnotationName = "alpha/status.custom-metrics.podautoscaler.kubernetes.io"
 )
 
 type HorizontalController struct {
@@ -190,7 +190,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		}
 	}
 
-	if cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsDefinitionAnnotationName]; cmAnnotationFound {
+	if cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]; cmAnnotationFound {
 		cmDesiredReplicas, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
 		if err != nil {
 			a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())

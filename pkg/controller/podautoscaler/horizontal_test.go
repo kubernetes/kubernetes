@@ -110,7 +110,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 				t.Fatalf("Failed to marshal cm: %v", err)
 			}
 			obj.Items[0].Annotations = make(map[string]string)
-			obj.Items[0].Annotations[HpaCustomMetricsDefinitionAnnotationName] = string(b)
+			obj.Items[0].Annotations[HpaCustomMetricsTargetAnnotationName] = string(b)
 		}
 		return true, obj, nil
 	})
