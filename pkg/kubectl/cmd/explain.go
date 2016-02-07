@@ -98,7 +98,7 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		}
 	}
 
-	schema, err := f.SwaggerSchema(apiVersion)
+	schema, err := f.SwaggerSchema(apiVersion.WithKind(gvk.Kind))
 	if err != nil {
 		return err
 	}
