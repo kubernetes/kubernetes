@@ -47,19 +47,20 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
     - [Built-in Secrets](#built-in-secrets)
       - [Service Accounts Automatically Create and Attach Secrets with API Credentials](#service-accounts-automatically-create-and-attach-secrets-with-api-credentials)
     - [Creating your own Secrets](#creating-your-own-secrets)
-      - [Creating a Secret Using kubectl secret](#creating-a-secret-using-kubectl-secret)
+      - [Creating a Secret Using kubectl create secret](#creating-a-secret-using-kubectl-create-secret)
       - [Creating a Secret Manually](#creating-a-secret-manually)
       - [Decoding a Secret](#decoding-a-secret)
-    - [Manually specifying a Secret to be Mounted on a Pod](#manually-specifying-a-secret-to-be-mounted-on-a-pod)
     - [Using Secrets](#using-secrets)
+      - [Using Secrets as Files from a Pod](#using-secrets-as-files-from-a-pod)
+        - [Consuming Secret Values from Volumes](#consuming-secret-values-from-volumes)
+      - [Using Secrets as Environment Variables](#using-secrets-as-environment-variables)
+        - [Consuming Secret Values from Environment Variables](#consuming-secret-values-from-environment-variables)
       - [Using imagePullSecrets](#using-imagepullsecrets)
         - [Manually specifying an imagePullSecret](#manually-specifying-an-imagepullsecret)
         - [Arranging for imagePullSecrets to be Automatically Attached](#arranging-for-imagepullsecrets-to-be-automatically-attached)
-      - [Using Secrets as Files from a Pod](#using-secrets-as-files-from-a-pod)
       - [Automatic Mounting of Manually Created Secrets](#automatic-mounting-of-manually-created-secrets)
   - [Details](#details)
     - [Restrictions](#restrictions)
-    - [Consuming Secret Values](#consuming-secret-values)
     - [Secret and Pod Lifetime interaction](#secret-and-pod-lifetime-interaction)
   - [Use cases](#use-cases)
     - [Use-Case: Pod with ssh keys](#use-case-pod-with-ssh-keys)
@@ -82,8 +83,8 @@ more control over how it is used, and reduces the risk of accidental exposure.
 Users can create secrets, and the system also creates some secrets.
 
 To use a secret, a pod needs to reference the secret.
-A secret can be used with a pod in two ways: either as files in a [volume](volumes.md) mounted on one or more of
-its containers, or used by kubelet when pulling images for the pod.
+A secret can be used with a pod in two ways: as files in a [volume](volumes.md) mounted on one or more of
+its containers, in environment variables, or used by kubelet when pulling images for the pod.
 
 ### Built-in Secrets
 
@@ -102,7 +103,7 @@ information on how Service Accounts work.
 
 ### Creating your own Secrets
 
-#### Creating a Secret Using kubectl secret
+#### Creating a Secret Using kubectl create secret
 
 Say that some pods need to access a database.  The
 username and password that the pods should use is in the files
@@ -219,9 +220,22 @@ $ echo "MWYyZDFlMmU2N2RmCg==" | base64 -D
 1f2d1e2e67df
 ```
 
-### Manually specifying a Secret to be Mounted on a Pod
+### Using Secrets
 
-Once the secret is created, you can create a pod that consumes that secret.
+Secrets can be mounted as data volumes or be exposed as environment variables to
+be used by a container in a pod.  They can also be used by other parts of the
+system, without being directly exposed to the pod.  For example, they can hold
+credentials that other parts of the system should use to interact with external
+systems on your behalf.
+
+#### Using Secrets as Files from a Pod
+
+To consume a Secret in a volume in a Pod:
+
+1. Create a secret or use an existing one.  Multiple pods can reference the same secret.
+1. Modify your Pod definition to add a volume under `spec.volumes[]`.  Name the volume anything, and have a `spec.volumes[].secret.secretName` field equal to the name of the secret object.
+1. Add a `spec.containers[].volumeMounts[]` to each container that needs the secret.  Specify `spec.containers[].volumeMounts[].readOnly = true` and `spec.containers[].volumeMounts[].mountPath` to an unused directory name where you would like the secrets to appear.
+1. Modify your image and/or command line so that the the program looks for files in that directory.  Each key in the secret `data` map becomes the filename under `mountPath`.
 
 This is an example of a pod that mounts a secret in a volume:
 
@@ -253,22 +267,80 @@ This is an example of a pod that mounts a secret in a volume:
 }
 ```
 
-Each secret you want to use needs its own `spec.volumes`.
+Each secret you want to use needs to be referred to in `spec.volumes`.
 
 If there are multiple containers in the pod, then each container needs its
 own `volumeMounts` block, but only one `spec.volumes` is needed per secret.
 
-You can package many files into one secret, or use many secrets,
-whichever is convenient.
+You can package many files into one secret, or use many secrets, whichever is convenient.
 
 See another example of creating a secret and a pod that consumes that secret in a volume [here](secrets/).
 
-### Using Secrets
+##### Consuming Secret Values from Volumes
 
-Secrets can be mounted as data volumes to be used by a container in a pod.
-They can also be used by other parts of the system, without being directly
-exposed to the pod.  For example, they can hold credentials that other
-parts of the system should use to interact with external systems on your behalf.
+Inside the container that mounts a secret volume, the secret keys appear as
+files and the secret values are base-64 decoded and stored inside these files.
+This is the result of commands
+executed inside the container from the example above:
+
+```console
+$ ls /etc/foo/
+username
+password
+$ cat /etc/foo/username
+admin
+$ cat /etc/foo/password
+1f2d1e2e67df
+```
+
+The program in a container is responsible for reading the secret(s) from the
+files.
+
+#### Using Secrets as Environment Variables
+
+To use a secret in an environment variable in a pod:
+
+1. Create a secret or use an existing one.  Multiple pods can reference the same secret.
+1. Modify your Pod definition in each container that you wish to consume the value of a secret key to add an environment variable for each secret key you wish to consume.  The environment variable that consumes the secret key should populate the secret's name and key in `env[x].valueFrom.secretKeyRef`.
+1. Modify your image and/or command line so that the the program looks for values in the specified environment variabless
+
+This is an example of a pod that mounts a secret in a volume:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-env-pod
+spec:
+  containers:
+    - name: mycontainer
+      image: redis
+      env:
+        - name: SECRET_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: username
+        - name: SECRET_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: password
+  restartPolicy: Never
+```
+
+##### Consuming Secret Values from Environment Variables
+
+Inside a container that consumes a secret in an environment variables, the secret keys appear as
+normal environment variables containing the base-64 decoded values of the secret data.
+This is the result of commands executed inside the container from the example above:
+
+```console
+$ echo $SECRET_USERNAME
+admin
+$ cat /etc/foo/password
+1f2d1e2e67df
+```
 
 #### Using imagePullSecrets
 
@@ -287,17 +359,6 @@ or that default to use that serviceAccount, will get their imagePullSecret
 field set to that of the service account.
 See [here](service-accounts.md#adding-imagepullsecrets-to-a-service-account)
  for a detailed explanation of that process.
-
-#### Using Secrets as Files from a Pod
-
-To use a secret from a Pod:
-
-1. Create a secret or use an existing one.  Multiple pods can reference the same secret.
-1. Modify your Pod definition to add a volume under `spec.volumes[]`.  Name the volume anything, and have a `spec.volumes[].secret.secretName` field equal to the name of the secret object.
-1. Add a `spec.containers[].volumeMounts[]` to each container that needs the secret.  Specify `spec.containers[].volumeMounts[].readOnly = true` and `spec.containers[].volumeMounts[].mountPath` to an unused directory name where you would like the secrets to appear.
-1. Modify your image and/or command line so that the the program looks for files in that directory.  Each key in the secret `data` map becomes the filename under `mountPath`.
-
-See the [Use Cases](#use-cases) section for detailed examples.
 
 #### Automatic Mounting of Manually Created Secrets
 
@@ -327,31 +388,6 @@ This includes any pods created using kubectl, or indirectly via a replication
 controller.  It does not include pods created via the kubelets
 `--manifest-url` flag, its `--config` flag, or its REST API (these are
 not common ways to create pods.)
-
-### Consuming Secret Values
-
-Inside the container that mounts a secret volume, the secret keys appear as
-files and the secret values are base-64 decoded and stored inside these files.
-This is the result of commands
-executed inside the container from the example above:
-
-```console
-$ ls /etc/foo/
-username
-password
-$ cat /etc/foo/username
-value-1
-$ cat /etc/foo/password
-value-2
-```
-
-The program in a container is responsible for reading the secret(s) from the
-files.  Currently, if a program expects a secret to be stored in an environment
-variable, then the user needs to modify the image to populate the environment
-variable from the file as an step before running the main program.  Future
-versions of Kubernetes are expected to provide more automation for populating
-environment variables from files.
-
 
 ### Secret and Pod Lifetime interaction
 
