@@ -191,11 +191,11 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpointcontroller.NewEndpointController(clientset, controller.NoResyncPeriodFunc).
-		Run(3, util.NeverStop)
+		Run(3, wait.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
 	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
-		Run(3, util.NeverStop)
+		Run(3, wait.NeverStop)
 
 	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)

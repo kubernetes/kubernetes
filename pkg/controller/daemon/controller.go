@@ -36,10 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -192,7 +192,7 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(dsc.worker, time.Second, stopCh)
+		go wait.Until(dsc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down Daemon Set Controller")

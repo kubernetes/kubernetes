@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -166,9 +166,9 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	go rq.rqController.Run(stopCh)
 	go rq.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(rq.worker, time.Second, stopCh)
+		go wait.Until(rq.worker, time.Second, stopCh)
 	}
-	go util.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
+	go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
 	<-stopCh
 	glog.Infof("Shutting down ResourceQuotaController")
 	rq.queue.ShutDown()

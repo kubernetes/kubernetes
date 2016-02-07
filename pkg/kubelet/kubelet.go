@@ -82,6 +82,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
@@ -890,17 +891,17 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
-	go util.Until(func() {
+	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, time.Minute, util.NeverStop)
+	}, time.Minute, wait.NeverStop)
 
-	go util.Until(func() {
+	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
-	}, 5*time.Minute, util.NeverStop)
+	}, 5*time.Minute, wait.NeverStop)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
@@ -974,14 +975,14 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	if kl.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
-		go util.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, util.NeverStop)
+		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
 	}
-	go util.Until(kl.syncNetworkStatus, 30*time.Second, util.NeverStop)
-	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
+	go wait.Until(kl.syncNetworkStatus, 30*time.Second, wait.NeverStop)
+	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
 	// Start a goroutine responsible for killing pods (that are not properly
 	// handled by pod workers).
-	go util.Until(kl.podKiller, 1*time.Second, util.NeverStop)
+	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
 
 	// Start component sync loops.
 	kl.statusManager.Start()

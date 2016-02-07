@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type RouteController struct {
@@ -45,11 +45,11 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 }
 
 func (rc *RouteController) Run(syncPeriod time.Duration) {
-	go util.Until(func() {
+	go wait.Until(func() {
 		if err := rc.reconcileNodeRoutes(); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
-	}, syncPeriod, util.NeverStop)
+	}, syncPeriod, wait.NeverStop)
 }
 
 func (rc *RouteController) reconcileNodeRoutes() error {

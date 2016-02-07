@@ -128,14 +128,14 @@ func (s *CMServer) Run(_ []string) error {
 	}()
 
 	endpoints := s.createEndpointController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "endpoint-controller")))
-	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+	go endpoints.Run(s.ConcurrentEndpointSyncs, wait.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replication-controller")), s.resyncPeriod, replicationcontroller.BurstReplicas).
-		Run(s.ConcurrentRCSyncs, util.NeverStop)
+		Run(s.ConcurrentRCSyncs, wait.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
 		go gc.New(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "garbage-collector")), s.resyncPeriod, s.TerminatedPodGCThreshold).
-			Run(util.NeverStop)
+			Run(wait.NeverStop)
 	}
 
 	//TODO(jdef) should eventually support more cloud providers here
@@ -154,7 +154,7 @@ func (s *CMServer) Run(_ []string) error {
 	nodeController.Run(s.NodeSyncPeriod)
 
 	nodeStatusUpdaterController := node.NewStatusUpdater(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "node-status-controller")), s.NodeMonitorPeriod, time.Now)
-	if err := nodeStatusUpdaterController.Run(util.NeverStop); err != nil {
+	if err := nodeStatusUpdaterController.Run(wait.NeverStop); err != nil {
 		glog.Fatalf("Failed to start node status update controller: %v", err)
 	}
 
@@ -173,7 +173,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(
-		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "resource-quota-controller")), controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
+		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "resource-quota-controller")), controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -220,19 +220,19 @@ func (s *CMServer) Run(_ []string) error {
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
 			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod).
-				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+				Run(s.ConcurrentDSCSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
 			go job.NewJobController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "job-controller")), s.resyncPeriod).
-				Run(s.ConcurrentJobSyncs, util.NeverStop)
+				Run(s.ConcurrentJobSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
 			go deployment.NewDeploymentController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "deployment-controller")), s.resyncPeriod).
-				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
+				Run(s.ConcurrentDeploymentSyncs, wait.NeverStop)
 		}
 	}
 

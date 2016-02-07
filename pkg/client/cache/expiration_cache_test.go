@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestTTLExpirationBasic(t *testing.T) {
@@ -55,7 +56,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 		if delKey != key {
 			t.Errorf("Unexpected delete for key %s", key)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Unexpected timeout waiting on delete")
 	}
 	close(deleteChan)
@@ -100,7 +101,7 @@ func TestTTLList(t *testing.T) {
 				t.Errorf("Unexpected delete for key %s", delKey)
 			}
 			expireKeys.Delete(delKey)
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Unexpected timeout waiting on delete")
 			return
 		}

@@ -32,10 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -123,7 +123,7 @@ func (e *endpointController) Run(workers int, stopCh <-chan struct{}) {
 	go e.serviceController.Run(stopCh)
 	go e.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(e.worker, time.Second, stopCh)
+		go wait.Until(e.worker, time.Second, stopCh)
 	}
 	go func() {
 		defer utilruntime.HandleCrash()

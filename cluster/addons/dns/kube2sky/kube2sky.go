@@ -515,7 +515,7 @@ func watchForServices(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
 			UpdateFunc: ks.updateService,
 		},
 	)
-	go serviceController.Run(util.NeverStop)
+	go serviceController.Run(wait.NeverStop)
 	return serviceStore
 }
 
@@ -533,7 +533,7 @@ func watchEndpoints(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
 		},
 	)
 
-	go eController.Run(util.NeverStop)
+	go eController.Run(wait.NeverStop)
 	return eStore
 }
 
@@ -551,7 +551,7 @@ func watchPods(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
 		},
 	)
 
-	go eController.Run(util.NeverStop)
+	go eController.Run(wait.NeverStop)
 	return eStore
 }
 

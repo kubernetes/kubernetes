@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestCacheOperations(t *testing.T) {
@@ -58,7 +58,7 @@ func TestUpdates(t *testing.T) {
 			if expected != u {
 				t.Errorf("Expected update %v, recieved %v: %s %s", expected, u, msg)
 			}
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Timed out waiting for update %v: %s", expected, msg)
 		}
 	}
