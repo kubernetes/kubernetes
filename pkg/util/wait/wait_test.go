@@ -56,6 +56,65 @@ func TestUntilReturnsImmediately(t *testing.T) {
 	}
 }
 
+func TestJitterUntil(t *testing.T) {
+	ch := make(chan struct{})
+	// if a channel is closed JitterUntil never calls function f
+	// and returns imidiatelly
+	close(ch)
+	JitterUntil(func() {
+		t.Fatal("should not have been invoked")
+	}, 0, 1.0, ch)
+
+	ch = make(chan struct{})
+	called := make(chan struct{})
+	go func() {
+		JitterUntil(func() {
+			called <- struct{}{}
+		}, 0, 1.0, ch)
+		close(called)
+	}()
+	<-called
+	close(ch)
+	<-called
+}
+
+func TestJitterUntilReturnsImmediately(t *testing.T) {
+	now := time.Now()
+	ch := make(chan struct{})
+	JitterUntil(func() {
+		close(ch)
+	}, 30*time.Second, 1.0, ch)
+	if now.Add(25 * time.Second).Before(time.Now()) {
+		t.Errorf("JitterUntil did not return immediately when the stop chan was closed inside the func")
+	}
+}
+
+func TestJitterUntilNegativeFactor(t *testing.T) {
+	now := time.Now()
+	ch := make(chan struct{})
+	called := make(chan struct{})
+	received := make(chan struct{})
+	go func() {
+		JitterUntil(func() {
+			called <- struct{}{}
+			<-received
+		}, time.Second, -30.0, ch)
+	}()
+	// first loop
+	<-called
+	received <- struct{}{}
+	// second loop
+	<-called
+	close(ch)
+	received <- struct{}{}
+
+	// it should take at most 2 seconds + some overhead, not 3
+	if now.Add(3 * time.Second).Before(time.Now()) {
+		t.Errorf("JitterUntil did not returned after predefined period with negative jitter factor when the stop chan was closed inside the func")
+	}
+
+}
+
 func TestExponentialBackoff(t *testing.T) {
 	opts := Backoff{Factor: 1.0, Steps: 3}
 

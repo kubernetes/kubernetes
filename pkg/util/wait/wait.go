@@ -42,10 +42,18 @@ func Forever(f func(), period time.Duration) {
 }
 
 // Until loops until stop channel is closed, running f every period.
+// Until is syntactic sugar on top of JitterUntil with zero jitter factor
+func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
+	JitterUntil(f, period, 0.0, stopCh)
+}
+
+// JitterUntil loops until stop channel is closed, running f every period.
+// If jitterFactor is positive, the period is jittered before every run of f.
+// If jitterFactor is not positive, the period is unchanged.
 // Catches any panics, and keeps going. f may not be invoked if
 // stop channel is already closed. Pass NeverStop to Until if you
 // don't want it stop.
-func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
+func JitterUntil(f func(), period time.Duration, jitterFactor float64, stopCh <-chan struct{}) {
 	select {
 	case <-stopCh:
 		return
@@ -57,10 +65,16 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 			defer runtime.HandleCrash()
 			f()
 		}()
+
+		jitteredPeriod := period
+		if jitterFactor > 0.0 {
+			jitteredPeriod = Jitter(period, jitterFactor)
+		}
+
 		select {
 		case <-stopCh:
 			return
-		case <-time.After(period):
+		case <-time.After(jitteredPeriod):
 		}
 	}
 }
