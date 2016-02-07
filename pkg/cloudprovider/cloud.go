@@ -83,7 +83,7 @@ type LoadBalancer interface {
 	// if so, what its status is.
 	GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer, or updates an existing one. Returns the status of the balancer
-	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(name, namespace string, friendlyName string, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	UpdateLoadBalancer(name, region string, hosts []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it

@@ -27,7 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
+func (s *AWSCloud) ensureLoadBalancer(name string, namespace string, friendlyName string, listeners []*elb.Listener,
+	subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return nil, err
@@ -46,6 +47,15 @@ func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, su
 		createRequest.Subnets = stringPointerArray(subnetIDs)
 
 		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
+
+		tags := s.getFriendlyELBTagsForLoadBalancer(namespace, friendlyName)
+		for k, v := range s.filterTags {
+			tag := &elb.Tag{}
+			tag.Key = aws.String(k)
+			tag.Value = aws.String(v)
+			tags = append(tags, tag)
+		}
+		createRequest.Tags = tags
 
 		glog.Info("Creating load balancer with name: ", name)
 		_, err := s.elb.CreateLoadBalancer(createRequest)

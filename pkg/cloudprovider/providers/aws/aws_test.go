@@ -698,7 +698,7 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 		t.Errorf("Expected GetLoadBalancer region mismatch error.")
 	}
 
-	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
+	_, err = c.EnsureLoadBalancer("elb-name", "default", "elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
 	if err == nil || err.Error() != errorMessage {
 		t.Errorf("Expected EnsureLoadBalancer region mismatch error.")
 	}
