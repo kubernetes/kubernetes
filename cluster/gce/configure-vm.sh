@@ -395,6 +395,11 @@ EOF
 terminated_pod_gc_threshold: '$(echo "${TERMINATED_POD_GC_THRESHOLD}" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls       
+enable_custom_metrics: '$(echo "${ENABLE_CUSTOM_METRICS}" | sed -e "s/'/''/g")'
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
