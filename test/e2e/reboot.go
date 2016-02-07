@@ -45,7 +45,9 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Reboot [Disruptive]", func() {
+// Reboot tests are flaky, and when they break, they break the whole cluster.
+// They need to run in a separate suite until we can make them better.
+var _ = Describe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	var f *Framework
 
 	BeforeEach(func() {
