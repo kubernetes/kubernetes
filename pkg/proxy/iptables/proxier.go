@@ -68,12 +68,18 @@ type IptablesVersioner interface {
 	GetVersion() (string, error)
 }
 
+// KernelCompatTester tests whether the required kernel capabilities are
+// present to run the iptables proxier.
+type KernelCompatTester interface {
+	IsCompatible() error
+}
+
 // CanUseIptablesProxier returns true if we should use the iptables Proxier
 // instead of the "classic" userspace Proxier.  This is determined by checking
 // the iptables version and for the existence of kernel features. It may return
 // an error if it fails to get the iptables version without error, in which
 // case it will also return false.
-func CanUseIptablesProxier(iptver IptablesVersioner) (bool, error) {
+func CanUseIptablesProxier(iptver IptablesVersioner, kcompat KernelCompatTester) (bool, error) {
 	minVersion, err := semver.NewVersion(iptablesMinVersion)
 	if err != nil {
 		return false, err
@@ -91,16 +97,21 @@ func CanUseIptablesProxier(iptver IptablesVersioner) (bool, error) {
 		return false, nil
 	}
 
-	// Check for the required sysctls.  We don't care about the value, just
-	// that it exists.  If this Proxier is chosen, we'll iniialize it as we
-	// need.
-	// TODO: we should inject a sysctl.Interface like we do for iptables
-	_, err = utilsysctl.GetSysctl(sysctlRouteLocalnet)
-	if err != nil {
+	// Check that the kernel supports what we need.
+	if err := kcompat.IsCompatible(); err != nil {
 		return false, err
 	}
-
 	return true, nil
+}
+
+type LinuxKernelCompatTester struct{}
+
+func (lkct LinuxKernelCompatTester) IsCompatible() error {
+	// Check for the required sysctls.  We don't care about the value, just
+	// that it exists.  If this Proxier is chosen, we'll initialize it as we
+	// need.
+	_, err := utilsysctl.GetSysctl(sysctlRouteLocalnet)
+	return err
 }
 
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"

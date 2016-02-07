@@ -188,7 +188,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var proxier proxy.ProxyProvider
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
 
-	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface)
+	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIptables {
 		glog.V(2).Info("Using iptables Proxier.")
 		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll)
@@ -308,28 +308,28 @@ type nodeGetter interface {
 	Get(hostname string) (*api.Node, error)
 }
 
-func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IptablesVersioner) string {
+func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IptablesVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
 	} else if proxyMode == proxyModeIptables {
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	} else if proxyMode != "" {
 		glog.V(1).Infof("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	// proxyMode == "" - choose the best option.
 	if client == nil {
 		glog.Errorf("nodeGetter is nil: assuming iptables proxy")
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	node, err := client.Get(hostname)
 	if err != nil {
 		glog.Errorf("Can't get Node %q, assuming iptables proxy: %v", hostname, err)
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	if node == nil {
 		glog.Errorf("Got nil Node %q, assuming iptables proxy: %v", hostname)
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	proxyMode, found := node.Annotations[betaProxyModeAnnotation]
 	if found {
@@ -345,13 +345,13 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 		glog.V(1).Infof("Annotation demands userspace proxy")
 		return proxyModeUserspace
 	}
-	return tryIptablesProxy(iptver)
+	return tryIptablesProxy(iptver, kcompat)
 }
 
-func tryIptablesProxy(iptver iptables.IptablesVersioner) string {
+func tryIptablesProxy(iptver iptables.IptablesVersioner, kcompat iptables.KernelCompatTester) string {
 	var err error
 	// guaranteed false on error, error only necessary for debugging
-	useIptablesProxy, err := iptables.CanUseIptablesProxier(iptver)
+	useIptablesProxy, err := iptables.CanUseIptablesProxier(iptver, kcompat)
 	if err != nil {
 		glog.Errorf("Can't determine whether to use iptables proxy, using userspace proxier: %v", err)
 		return proxyModeUserspace
