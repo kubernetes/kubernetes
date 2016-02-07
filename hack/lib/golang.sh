@@ -409,6 +409,7 @@ kube::golang::build_binaries_for_platform() {
     # Go 1.4 added -o to control where the binary is saved, but Go 1.3 doesn't
     # have this flag. Whenever we deprecate go 1.3, update to use -o instead of
     # changing into the output directory.
+    mkdir -p "$(dirname ${outfile})"
     pushd "$(dirname ${outfile})" >/dev/null
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
