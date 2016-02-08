@@ -48,11 +48,17 @@ Make it really hard to accidentally create a job which has an overlapping select
 
 # Proposed changes
 
-## APIserver
+## API
 
 `extensions/v1beta1 Job` remains the same. `batch/v1 Job` changes change as follows.
 
-There are two allowed usage modes:
+Field `job.spec.noAutoSelector` is added.  It controls whether selectors are automatically
+generated.  In automatic mode, user cannot make the mistake of creating non-unique selectors.
+In manual mode, certain rare use cases are supported.
+
+Validation is not changed.  A selector must be provided, and it must select the pod template.
+
+Defaulting changes.  Defaulting happens in one of two modes:
 
 ### Automatic Mode
 
@@ -72,10 +78,6 @@ There are two allowed usage modes:
 - User puts a unique label or label(s) on pod template (required).  user does think carefully about uniqueness.
 - No defaulting of pod labels or the selector happen.
 
-### Common to both modes
-
-- Validation code ensures that the selector on the job selects the labels on the pod template, and rejects if not.
-
 ### Rationale
 
 UID is better than Name in that:
@@ -88,6 +90,10 @@ Job name is more user friendly.  It is self documenting
 Commands like  `kubectl get pods -l job-name=myjob` should do exactly what is wanted 99.9% of the time.  Automated control loops should still use the controller-uid=label.
 
 Using both gets the benefits of both, at the cost of some label verbosity.
+
+The field is a `*bool`.  Since false is expected to be much more common,
+and since the feature is complex, it is better to leave it unspecified so that
+users looking at a stored pod spec do not need to be aware of this field.
 
 ### Overriding Unique Labels
 
@@ -128,6 +134,8 @@ We probably want as much as possible the same behavior for Job and ReplicationCo
 
 
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/selector-generation.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/selector-generation.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
