@@ -16,7 +16,7 @@ limitations under the License.
 
 package extensions
 
-// TODO(madhusudancs): Fix this when Scale group issues are resolved.
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 // import (
 // 	"fmt"
 

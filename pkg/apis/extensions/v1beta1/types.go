@@ -199,7 +199,7 @@ type ThirdPartyResourceData struct {
 	Data []byte `json:"data,omitempty"`
 }
 
-// Deployment enables declarative updates for Pods and ReplicationControllers.
+// Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata.
@@ -218,7 +218,7 @@ type DeploymentSpec struct {
 	// zero and not specified. Defaults to 1.
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Label selector for pods. Existing ReplicationControllers whose pods are
+	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
 	Selector *LabelSelector `json:"selector,omitempty"`
 
@@ -233,7 +233,7 @@ type DeploymentSpec struct {
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 
-	// The number of old ReplicationControllers to retain to allow rollback.
+	// The number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
 

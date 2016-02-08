@@ -55,7 +55,7 @@ func GetOldReplicaSets(deployment extensions.Deployment, c clientset.Interface) 
 
 // GetOldReplicaSetsFromLists returns two sets of old replica sets targeted by the given Deployment; get PodList and ReplicaSetList with input functions.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRSList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
@@ -72,7 +72,7 @@ func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.In
 	// TODO: Right now we list all replica sets and then filter. We should add an API for this.
 	oldRSs := map[string]extensions.ReplicaSet{}
 	allOldRSs := map[string]extensions.ReplicaSet{}
-	rsList, err := getRcList(namespace, options)
+	rsList, err := getRSList(namespace, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing replica sets: %v", err)
 	}
@@ -119,14 +119,14 @@ func GetNewReplicaSet(deployment extensions.Deployment, c clientset.Interface) (
 
 // GetNewReplicaSetFromList returns a replica set that matches the intent of the given deployment; get ReplicaSetList with the input function.
 // Returns nil if the new replica set doesnt exist yet.
-func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Interface, getRcList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) (*extensions.ReplicaSet, error) {
+func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Interface, getRSList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) (*extensions.ReplicaSet, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
 	}
 
-	rsList, err := getRcList(namespace, api.ListOptions{LabelSelector: selector})
+	rsList, err := getRSList(namespace, api.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, fmt.Errorf("error listing ReplicaSets: %v", err)
 	}

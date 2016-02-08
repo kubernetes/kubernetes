@@ -964,6 +964,7 @@ __EOF__
   kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
   # Clean-up
   kubectl delete job/pi "${kube_flags[@]}"
+  # TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
   # ### Scale a deployment
   # kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
   # # Command
