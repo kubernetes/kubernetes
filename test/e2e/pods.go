@@ -618,7 +618,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "env3cont",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -647,7 +647,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -674,7 +674,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -799,7 +799,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -878,7 +878,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -943,7 +943,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},
@@ -994,7 +994,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 5; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -1035,7 +1035,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},

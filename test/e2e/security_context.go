@@ -47,7 +47,7 @@ func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:  "test-container",
-					Image: "gcr.io/google_containers/busybox",
+					Image: "gcr.io/google_containers/busybox:1.24",
 				},
 			},
 			RestartPolicy: api.RestartPolicyNever,
