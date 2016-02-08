@@ -17,22 +17,26 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
+// As of v1.2.0-alpha.7.297, we now use kubernetes-dashboard as the default UI
+// addon.
+var kubeDashboardVersion = version.MustParse("v1.2.0-alpha.7.297")
+
 var _ = Describe("kube-ui", func() {
 	const (
-		uiServiceName = "kube-ui"
-		uiAppName     = uiServiceName
-		uiNamespace   = api.NamespaceSystem
+		uiNamespace = api.NamespaceSystem
 
 		serverStartTimeout = 1 * time.Minute
 	)
@@ -40,19 +44,27 @@ var _ = Describe("kube-ui", func() {
 	f := NewFramework("kube-ui")
 
 	It("should check that the kube-ui instance is alive", func() {
-		By("Checking the kube-ui service exists.")
-		err := waitForService(f.Client, uiNamespace, uiServiceName, true, poll, serviceStartTimeout)
+		uiServiceName := "kube-ui"
+		serverVersionGTEDashboardVersion, err := serverVersionGTE(kubeDashboardVersion, f.Client)
+		if err == nil && serverVersionGTEDashboardVersion {
+			By("Verifying kubernetes-dashboard (not kube-ui).")
+			uiServiceName = "kubernetes-dashboard"
+		}
+		uiAppName := uiServiceName
+
+		By(fmt.Sprintf("Checking the %v service exists.", uiServiceName))
+		err = waitForService(f.Client, uiNamespace, uiServiceName, true, poll, serviceStartTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Checking to make sure the kube-ui pods are running")
+		By(fmt.Sprintf("Checking to make sure the %v pods are running", uiServiceName))
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
 		err = waitForPodsWithLabelRunning(f.Client, uiNamespace, selector)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Checking to make sure we get a response from the kube-ui.")
+		By(fmt.Sprintf("Checking to make sure we get a response from the %v.", uiServiceName))
 		err = wait.Poll(poll, serverStartTimeout, func() (bool, error) {
 			var status int
-			// Query against the proxy URL for the kube-ui service.
+			// Query against the proxy URL for the service.
 			err := f.Client.Get().
 				Namespace(uiNamespace).
 				Prefix("proxy").
@@ -63,9 +75,9 @@ var _ = Describe("kube-ui", func() {
 				StatusCode(&status).
 				Error()
 			if status != http.StatusOK {
-				Logf("Unexpected status from kube-ui: %v", status)
+				Logf("Unexpected status from %v: %v", uiServiceName, status)
 			} else if err != nil {
-				Logf("Request to kube-ui failed: %v", err)
+				Logf("Request to %v failed: %v", uiServiceName, err)
 			}
 			// Don't return err here as it aborts polling.
 			return status == http.StatusOK, nil

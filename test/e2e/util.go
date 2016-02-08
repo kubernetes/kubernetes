@@ -905,7 +905,7 @@ var multiSchedulerVersion = version.MustParse("v1.2.0-alpha.6")
 
 func getSchedulerName(c client.VersionInterface) string {
 	serverVersionGTEMultiSchedulerVersion, err := serverVersionGTE(multiSchedulerVersion, c)
-	if err != nil && serverVersionGTEMultiSchedulerVersion {
+	if err == nil && serverVersionGTEMultiSchedulerVersion {
 		return "default-scheduler"
 	}
 	return "scheduler"
