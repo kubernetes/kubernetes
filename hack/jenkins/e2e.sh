@@ -27,7 +27,7 @@ function join_regex_allow_empty() {
     echo "$*"
 }
 
-# Join all args with |, butin case of empty result prints "EMPTY\sSET" instead.
+# Join all args with |, but in case of empty result prints "EMPTY\sSET" instead.
 #   Example: join_regex_no_empty a b "c d" e  =>  a|b|c d|e
 #            join_regex_no_empty => EMPTY\sSET
 function join_regex_no_empty() {
@@ -40,7 +40,12 @@ function join_regex_no_empty() {
 }
 
 # GCP Project to fetch Trusty images.
-TRUSTY_IMAGE_PROJECT="${TRUSTY_IMAGE_PROJECT:-}"
+function get_trusty_image_project() {
+  gsutil cat "gs://trusty-images/image-project.txt"
+  # Clean up gsutil artifacts otherwise the later test stage will complain.
+  rm -rf .config &> /dev/null
+  rm -rf .gsutil &> /dev/null
+}
 
 # Get the latest Trusty image for a Jenkins job.
 function get_latest_trusty_image() {
@@ -424,6 +429,11 @@ TRUSTY_BETA_SKIP_TESTS=(
 TRUSTY_STABLE_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
 )
+
+# The project to fetch Trusty images.
+if [[ "${JOB_NAME}" =~ kubernetes-e2e-gce-trusty ]]; then
+  TRUSTY_IMAGE_PROJECT="$(get_trusty_image_project)"
+fi
 
 # Define environment variables based on the Jenkins project name.
 # NOTE: Not all jobs are defined here. The hack/jenkins/e2e.sh in master and
