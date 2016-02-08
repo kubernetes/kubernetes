@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -349,9 +350,7 @@ func TestExecutorInitializeStaticPodsSource(t *testing.T) {
 	}
 
 	// extract the pods into staticPodsConfigPath
-	hostname := "h1"
-	err = executor.initializeStaticPodsSource(hostname, gzipped)
-	assert.NoError(t, err)
+	executor.initializeStaticPodsSource(&mesosproto.ExecutorInfo{Data: gzipped})
 
 	actualpods, errs := podutil.ReadFromDir(staticPodsConfigPath)
 	reportErrors(errs)
@@ -359,6 +358,19 @@ func TestExecutorInitializeStaticPodsSource(t *testing.T) {
 	list := podutil.List(actualpods)
 	assert.NotNil(t, list)
 	assert.Equal(t, expectedStaticPodsNum, len(list.Items))
+
+	var (
+		expectedNames = map[string]struct{}{
+			"spod-01": {},
+			"spod-02": {},
+		}
+		actualNames = map[string]struct{}{}
+	)
+	for _, pod := range list.Items {
+		actualNames[pod.Name] = struct{}{}
+	}
+	assert.True(t, reflect.DeepEqual(expectedNames, actualNames), "expected %v instead of %v", expectedNames, actualNames)
+
 	wg.Wait()
 }
 
