@@ -166,18 +166,12 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
 func attachDiskAndVerify(b *gcePersistentDiskMounter, sdBeforeSet sets.String) (string, error) {
 	devicePaths := getDiskByIdPaths(b.gcePersistentDisk)
-	var gceCloud *gcecloud.GCECloud
+	gceCloud, err := getCloudProvider(b.gcePersistentDisk.plugin)
+	if err != nil {
+		return "", err
+	}
+
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		var err error
-		if gceCloud == nil {
-			gceCloud, err = getCloudProvider(b.gcePersistentDisk.plugin)
-			if err != nil || gceCloud == nil {
-				// Retry on error. See issue #11321
-				glog.Errorf("Error getting GCECloudProvider while detaching PD %q: %v", b.pdName, err)
-				time.Sleep(errorSleepDuration)
-				continue
-			}
-		}
 
 		if numRetries > 0 {
 			glog.Warningf("Retrying attach for GCE PD %q (retry count=%v).", b.pdName, numRetries)
@@ -240,18 +234,13 @@ func detachDiskAndVerify(c *gcePersistentDiskUnmounter) {
 	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Awake and ready to execute.", c.pdName)
 
 	devicePaths := getDiskByIdPaths(c.gcePersistentDisk)
-	var gceCloud *gcecloud.GCECloud
+	gceCloud, err := getCloudProvider(c.gcePersistentDisk.plugin)
+	if err != nil {
+		glog.Errorf("Failed to get GCECloudProvider while detaching %v ", err)
+		return
+	}
+
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		var err error
-		if gceCloud == nil {
-			gceCloud, err = getCloudProvider(c.gcePersistentDisk.plugin)
-			if err != nil || gceCloud == nil {
-				// Retry on error. See issue #11321
-				glog.Errorf("Error getting GCECloudProvider while detaching PD %q: %v", c.pdName, err)
-				time.Sleep(errorSleepDuration)
-				continue
-			}
-		}
 
 		if numRetries > 0 {
 			glog.Warningf("Retrying detach for GCE PD %q (retry count=%v).", c.pdName, numRetries)
@@ -349,13 +338,21 @@ func getCloudProvider(plugin *gcePersistentDiskPlugin) (*gcecloud.GCECloud, erro
 		return nil, fmt.Errorf("Failed to get GCE Cloud Provider. plugin.host object is nil.")
 	}
 
-	cloudProvider := plugin.host.GetCloudProvider()
-	gceCloudProvider, ok := cloudProvider.(*gcecloud.GCECloud)
-	if !ok || gceCloudProvider == nil {
-		return nil, fmt.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
+	var err error
+	for numRetries := 0; numRetries < maxRetries; numRetries++ {
+		cloudProvider := plugin.host.GetCloudProvider()
+		gceCloudProvider, ok := cloudProvider.(*gcecloud.GCECloud)
+		if !ok || gceCloudProvider == nil {
+			// Retry on error. See issue #11321
+			glog.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
+			time.Sleep(errorSleepDuration)
+			continue
+		}
+
+		return gceCloudProvider, nil
 	}
 
-	return gceCloudProvider, nil
+	return nil, fmt.Errorf("Failed to get GCE GCECloudProvider with error %v", err)
 }
 
 // Calls "udevadm trigger --action=change" for newly created "/dev/sd*" drives (exist only in after set).
