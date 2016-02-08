@@ -630,9 +630,9 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-enormous-startup"}
     # TODO: increase a quota for networks in kubernetes-scale and move this test to its own network
     : ${E2E_NETWORK:="e2e-enormous-cluster"}
-    : ${E2E_TEST:="false"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-enormous-startup"}
     : ${PROJECT:="kubernetes-scale"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=starting\s3\spods\sper\snode"}
     # Override GCE defaults.
     NETWORK_PROVIDER="flannel"
     # Temporarily switch of Heapster, as this will not schedule anywhere.
