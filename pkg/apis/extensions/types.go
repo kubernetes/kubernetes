@@ -248,7 +248,7 @@ type DeploymentSpec struct {
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	MinReadySeconds int `json:"minReadySeconds,omitempty"`
 
-	// The number of old ReplicationControllers to retain to allow rollback.
+	// The number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	RevisionHistoryLimit *int `json:"revisionHistoryLimit,omitempty"`
 

@@ -81,9 +81,7 @@ func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey stri
 			newMExps[i].Operator = me.Operator
 			if me.Values != nil {
 				newMExps[i].Values = make([]string, len(me.Values))
-				for j, val := range me.Values {
-					newMExps[i].Values[j] = val
-				}
+				copy(newMExps[i].Values, me.Values)
 			} else {
 				newMExps[i].Values = nil
 			}

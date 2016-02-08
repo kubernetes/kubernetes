@@ -48,7 +48,7 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 		return &ReplicaSetScaler{c.Extensions()}, nil
 	case extensions.Kind("Job"):
 		return &JobScaler{c.Extensions()}, nil
-		// TODO(madhusudancs): Fix this when Scale group issues are resolved.
+		// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 		// case extensions.Kind("Deployment"):
 		// 	return &DeploymentScaler{c.Extensions()}, nil
 	}
@@ -328,7 +328,7 @@ func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions
 	return nil
 }
 
-// TODO(madhusudancs): Fix this when Scale group issues are resolved.
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 // type DeploymentScaler struct {
 // 	c client.ExtensionsInterface
 // }

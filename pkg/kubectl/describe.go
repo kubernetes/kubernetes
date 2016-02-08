@@ -1607,12 +1607,16 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", d.ObjectMeta.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(d.Labels))
-		fmt.Fprintf(out, "Selector:\t%s\n", d.Spec.Selector)
+		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
 		fmt.Fprintf(out, "MinReadySeconds:\t%s\n", d.Spec.MinReadySeconds)

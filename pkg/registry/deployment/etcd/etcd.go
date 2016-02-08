@@ -183,7 +183,7 @@ type ScaleREST struct {
 	registry *deployment.Registry
 }
 
-// TODO(madhusudancs): Fix this when Scale group issues are resolved.
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 
 //  // ScaleREST implements Patcher
 // var _ = rest.Patcher(&ScaleREST{})

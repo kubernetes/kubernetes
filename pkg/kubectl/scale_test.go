@@ -488,7 +488,7 @@ func TestValidateJob(t *testing.T) {
 	}
 }
 
-// TODO(madhusudancs): Fix this when Scale group issues are resolved.
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 
 // type ErrorScales struct {
 // 	testclient.FakeScales
