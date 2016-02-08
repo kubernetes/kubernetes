@@ -43,6 +43,12 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
+	if in.IPTablesMasqueradeBit != nil {
+		out.IPTablesMasqueradeBit = new(int32)
+		*out.IPTablesMasqueradeBit = *in.IPTablesMasqueradeBit
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
 	if err := deepCopy_unversioned_Duration(in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, c); err != nil {
 		return err
 	}
