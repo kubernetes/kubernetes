@@ -52,6 +52,11 @@
   {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
 {% endif -%}
 
+{% set service_node_port_range = "" -%}
+{% if pillar['service_node_port_range'] is defined -%}
+  {% set service_node_port_range = "--service-node-port-range=" + pillar['service_node_port_range'] -%}
+{% endif -%}
+
 {% set cert_file = "--tls-cert-file=/srv/kubernetes/server.cert" -%}
 {% set key_file = "--tls-private-key-file=/srv/kubernetes/server.key" -%}
 {% set client_ca_file = "" -%}
@@ -95,7 +100,7 @@
   {% set log_level = pillar['api_server_test_log_level'] -%}
 {% endif -%}
 
-{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
+{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_node_port_range + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 {% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
