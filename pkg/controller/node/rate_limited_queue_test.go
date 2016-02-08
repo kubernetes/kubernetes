@@ -39,7 +39,7 @@ func CheckSetEq(lhs, rhs sets.String) bool {
 }
 
 func TestAddNode(t *testing.T) {
-	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor := NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
@@ -62,7 +62,7 @@ func TestAddNode(t *testing.T) {
 }
 
 func TestDelNode(t *testing.T) {
-	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor := NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
@@ -84,7 +84,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid map. Got %v, expected %v", evictor.queue.set, setPattern)
 	}
 
-	evictor = NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor = NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
@@ -106,7 +106,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid map. Got %v, expected %v", evictor.queue.set, setPattern)
 	}
 
-	evictor = NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor = NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
@@ -130,7 +130,7 @@ func TestDelNode(t *testing.T) {
 }
 
 func TestTry(t *testing.T) {
-	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor := NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
@@ -152,7 +152,7 @@ func TestTry(t *testing.T) {
 }
 
 func TestTryOrdering(t *testing.T) {
-	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor := NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
@@ -184,7 +184,7 @@ func TestTryOrdering(t *testing.T) {
 }
 
 func TestTryRemovingWhileTry(t *testing.T) {
-	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter())
+	evictor := NewRateLimitedTimedQueue(util.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
 	evictor.Add("third")
