@@ -78,7 +78,7 @@ var _ = Describe("Variable Expansion", func() {
 					{
 						Name:    "dapi-container",
 						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""},
+						Command: []string{"sh", "-c", "TEST_VAR=wrong echo \"${TEST_VAR}\""},
 						Env: []api.EnvVar{
 							{
 								Name:  "TEST_VAR",
@@ -109,7 +109,7 @@ var _ = Describe("Variable Expansion", func() {
 						Name:    "dapi-container",
 						Image:   "gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c"},
-						Args:    []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""},
+						Args:    []string{"TEST_VAR=wrong echo \"${TEST_VAR}\""},
 						Env: []api.EnvVar{
 							{
 								Name:  "TEST_VAR",
