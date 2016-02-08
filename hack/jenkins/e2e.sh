@@ -625,6 +625,35 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
+  # Clone of kubernetes-soak-weekly-deploy-gce. Issue #20832.
+  kubernetes-soak-weekly-deploy-gce-2)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-2"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-soak-weekly-2"}
+    : ${E2E_TEST:="false"}
+    : ${E2E_UP:="true"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-2"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
+  # Clone of kubernetes-soak-continuous-e2e-gce. Issue #20832.
+  kubernetes-soak-continuous-e2e-gce-2)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-2"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-soak-weekly-2"}
+    : ${E2E_UP:="false"}
+    # Clear out any orphaned namespaces in case previous run was interrupted.
+    : ${E2E_CLEAN_START:="true"}
+    # We should be testing the reliability of a long-running cluster. The
+    # [Disruptive] tests kill/restart components or nodes in the cluster,
+    # defeating the purpose of a soak cluster. (#15722)
+    #
+    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-2"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
   # Sets up the GKE soak cluster weekly using the latest CI release.
   kubernetes-soak-weekly-deploy-gke)
     : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
