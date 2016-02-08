@@ -100,9 +100,8 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	}
 }
 
-func TestExperimentalEncodeDecodeStatus(t *testing.T) {
-	extensionCodec := Extensions.Codec()
-	encoded, err := runtime.Encode(extensionCodec, status)
+func testEncodeDecodeStatus(t *testing.T, codec runtime.Codec) {
+	encoded, err := runtime.Encode(codec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -116,11 +115,19 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
-	decoded, err := runtime.Decode(extensionCodec, encoded)
+	decoded, err := runtime.Decode(codec, encoded)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !reflect.DeepEqual(status, decoded) {
 		t.Errorf("expected: %v, got: %v", status, decoded)
 	}
+}
+
+func TestAutoscalingEncodeDecodeStatus(t *testing.T) {
+	testEncodeDecodeStatus(t, Autoscaling.Codec())
+}
+
+func TestExperimentalEncodeDecodeStatus(t *testing.T) {
+	testEncodeDecodeStatus(t, Extensions.Codec())
 }
