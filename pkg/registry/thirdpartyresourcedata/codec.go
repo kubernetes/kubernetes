@@ -126,10 +126,6 @@ func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (si
 	return t.mapper.ResourceSingularizer(resource)
 }
 
-func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
-	return t.isThirdPartyResource(resource) || t.mapper.ResourceIsValid(resource)
-}
-
 func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMapper {
 	return &thirdPartyResourceDataMapper{
 		mapper:  mapper,

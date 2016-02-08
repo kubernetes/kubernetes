@@ -119,13 +119,3 @@ func (m MultiRESTMapper) AliasesForResource(alias string) (aliases []string, ok 
 	}
 	return nil, false
 }
-
-// ResourceIsValid takes a string (either group/kind or kind) and checks if it's a valid resource
-func (m MultiRESTMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
-	for _, t := range m {
-		if t.ResourceIsValid(resource) {
-			return true
-		}
-	}
-	return false
-}
