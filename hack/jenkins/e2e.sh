@@ -607,6 +607,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${E2E_UP:="true"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
+    : ${HAIRPIN_MODE:="false"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
@@ -625,6 +626,7 @@ case ${JOB_NAME} in
     # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
+    : ${HAIRPIN_MODE:="false"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 

@@ -207,6 +207,7 @@ func NewMainKubelet(
 	enableCustomMetrics bool,
 	volumeStatsAggPeriod time.Duration,
 	containerRuntimeOptions []kubecontainer.Option,
+	hairpinMode bool,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -366,6 +367,7 @@ func NewMainKubelet(
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
+		glog.Infof("Hairpin mode set to %v", hairpinMode)
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
@@ -388,9 +390,11 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
+			hairpinMode,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
+		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
 			Path:            rktPath,
 			Stage1Image:     rktStage1Image,

@@ -244,6 +244,11 @@ type KubeletConfiguration struct {
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`
+	// Should the kubelet set the hairpin flag on veth interfaces for containers
+	// it creates? Setting this flag allows endpoints in a Service to
+	// loadbalance back to themselves if they should try to access their own
+	// Service.
+	HairpinMode bool `json:"configureHairpinMode"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int `json:"maxPods"`
 	// dockerExecHandlerName is the handler to use when executing a command
