@@ -476,6 +476,8 @@ type binderClient interface {
 	GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
+	// provided to give VolumeHost and plugins access to the kube client
+	GetKubeClient() clientset.Interface
 }
 
 func NewBinderClient(c clientset.Interface) binderClient {
@@ -484,6 +486,10 @@ func NewBinderClient(c clientset.Interface) binderClient {
 
 type realBinderClient struct {
 	client clientset.Interface
+}
+
+func (c *realBinderClient) GetKubeClient() clientset.Interface {
+	return c.client
 }
 
 func (c *realBinderClient) GetPersistentVolume(name string) (*api.PersistentVolume, error) {

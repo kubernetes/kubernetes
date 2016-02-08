@@ -518,6 +518,8 @@ const (
 	PersistentVolumeBound PersistentVolumeConditionType = "Bound"
 	// PersistentVolumeRecycled is the recycled state of a PersistentVolume per the volume's reclaim policy
 	PersistentVolumeRecycled PersistentVolumeConditionType = "Recycled"
+	// PersistentVolumeProvisioned is the provisioned state of a PersistentVolume
+	PersistentVolumeProvisioned PersistentVolumeConditionType = "Provisioned"
 )
 
 // PersistentVolumeCondition contains the details for the current condition of this volume

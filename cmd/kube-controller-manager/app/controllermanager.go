@@ -290,34 +290,39 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		}
 	}
 
-	volumePlugins := ProbeRecyclableVolumePlugins(s.VolumeConfiguration)
-	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
+	pvcontroller, err := persistentvolumecontroller.NewPersistentVolumeController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-binder")), s.PVClaimBinderSyncPeriod.Duration, ProbeRecyclableVolumePlugins(s.VolumeConfiguration), cloud)
 	if err != nil {
-		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
+		glog.Fatal("Error creating persistent volume controller: %v", err)
 	}
-
-	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-binder")), s.PVClaimBinderSyncPeriod.Duration)
-	pvclaimBinder.Run()
-
-	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
-		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
-		s.PVClaimBinderSyncPeriod.Duration,
-		s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MaximumRetry,
-		ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
-		cloud,
-	)
-	if err != nil {
-		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
-	}
-	pvRecycler.Run()
-
-	if provisioner != nil {
-		pvController, err := persistentvolumecontroller.NewPersistentVolumeProvisionerController(persistentvolumecontroller.NewControllerClient(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-provisioner"))), s.PVClaimBinderSyncPeriod.Duration, s.ClusterName, volumePlugins, provisioner, cloud)
-		if err != nil {
-			glog.Fatalf("Failed to start persistent volume provisioner controller: %+v", err)
-		}
-		pvController.Run()
-	}
+	pvcontroller.Run(5, wait.NeverStop)
+	//
+	//	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
+	//	if err != nil {
+	//		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
+	//	}
+	//
+	//	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-binder")), s.PVClaimBinderSyncPeriod.Duration)
+	//	pvclaimBinder.Run()
+	//
+	//	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
+	//		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
+	//		s.PVClaimBinderSyncPeriod.Duration,
+	//		s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MaximumRetry,
+	//		ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
+	//		cloud,
+	//	)
+	//	if err != nil {
+	//		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
+	//	}
+	//	pvRecycler.Run()
+	//
+	//	if provisioner != nil {
+	//		pvController, err := persistentvolumecontroller.NewPersistentVolumeProvisionerController(persistentvolumecontroller.NewControllerClient(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-provisioner"))), s.PVClaimBinderSyncPeriod.Duration, volumePlugins, provisioner, cloud)
+	//		if err != nil {
+	//			glog.Fatalf("Failed to start persistent volume provisioner controller: %+v", err)
+	//		}
+	//		pvController.Run()
+	//	}
 
 	var rootCA []byte
 
