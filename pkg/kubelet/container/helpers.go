@@ -72,34 +72,6 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	return true
 }
 
-// TODO(random-liu): This should be removed soon after rkt implements GetPodStatus.
-func ShouldContainerBeRestartedOldVersion(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
-	// Get all dead container status.
-	var resultStatus []*api.ContainerStatus
-	for i, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.Name == container.Name && containerStatus.State.Terminated != nil {
-			resultStatus = append(resultStatus, &podStatus.ContainerStatuses[i])
-		}
-	}
-
-	// Check RestartPolicy for dead container.
-	if len(resultStatus) > 0 {
-		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-			glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
-			return false
-		}
-		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
-			// Check the exit code of last run. Note: This assumes the result is sorted
-			// by the created time in reverse order.
-			if resultStatus[0].State.Terminated.ExitCode == 0 {
-				glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
-				return false
-			}
-		}
-	}
-	return true
-}
-
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
 func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
 	runningPod := Pod{
