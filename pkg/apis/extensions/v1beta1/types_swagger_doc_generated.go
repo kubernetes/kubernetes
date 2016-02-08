@@ -497,7 +497,7 @@ func (NodeUtilization) SwaggerDoc() map[string]string {
 var map_PodSecurityPolicy = map[string]string{
 	"":         "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec defines the policy enforced.",
+	"spec":     "spec defines the policy enforced.",
 }
 
 func (PodSecurityPolicy) SwaggerDoc() map[string]string {

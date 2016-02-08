@@ -938,7 +938,7 @@ type PodSecurityPolicy struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the policy enforced.
+	// spec defines the policy enforced.
 	Spec PodSecurityPolicySpec `json:"spec,omitempty"`
 }
 
