@@ -171,7 +171,7 @@ func (m *manager) RemovePod(pod *api.Pod) {
 		for _, probeType := range [...]probeType{readiness, liveness} {
 			key.probeType = probeType
 			if worker, ok := m.workers[key]; ok {
-				close(worker.stop)
+				worker.stop()
 			}
 		}
 	}
@@ -188,7 +188,7 @@ func (m *manager) CleanupPods(activePods []*api.Pod) {
 
 	for key, worker := range m.workers {
 		if _, ok := desiredPods[key.podUID]; !ok {
-			close(worker.stop)
+			worker.stop()
 		}
 	}
 }
