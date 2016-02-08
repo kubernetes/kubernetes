@@ -28,8 +28,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -285,6 +287,43 @@ func TestCheckInvalidErr(t *testing.T) {
 		{
 			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
 			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+		},
+	}
+
+	var errReturned string
+	errHandle := func(err string) {
+		errReturned = err
+	}
+
+	for _, test := range tests {
+		checkErr(test.err, errHandle)
+
+		if errReturned != test.expected {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
+		}
+	}
+}
+
+func TestCheckNoResourceMatchError(t *testing.T) {
+	tests := []struct {
+		err      error
+		expected string
+	}{
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			`the server doesn't have a resource type "foo"`,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Version: "theversion", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in version "theversion"`,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in group "thegroup"`,
 		},
 	}
 
