@@ -13,7 +13,14 @@
     speaker: ""
     url: "https://kubecon.io/" 
 -
-    date: 2016-02-17 00:18:30 -0800
+    date: 2016-02-25 19:00 +0100
+    title: "Kubernetes Paris Meetup"
+    location: "Paris, France"
+    venue: "Google, Paris"
+    speaker: ""
+    url: "http://www.meetup.com/Kubernetes-Paris/events/228698679/"
+-
+    date: 2016-02-17 18:30:00 -0800
     title: "Kubernetes San Francisco Meetup"
     location: "San Francisco, California"
     venue: "Engineyard/Deis"
@@ -27,21 +34,21 @@
     speaker: "Craig McLuckie"
     url: "http://containerevent.com/"
 -
-    date: 2016-02-11 00:18:30 -0800
+    date: 2016-02-11 18:30:00 -0800
     title: "Kubernetes Bay Area Meetup"
     location: "Santa Clara, Washington"
     venue: "Ooyala"
     speaker: "Tim Hockin, Chris Marino, Mike Danese and Xiang Li"
     url: "http://www.meetup.com/Bay-Area-Kubernetes-Meetup/events/228213245/"
 -
-    date: 2016-02-04 00:19:30 -0500
+    date: 2016-02-04 19:30:00 -0500
     title: "DC Linux Users Group Meetup"
     location: "Washington DC"
     venue: "Google Washington DC"
     speaker: ""
     url: "http://www.meetup.com/DC-Linux-Users-Group/events/228060751/"
 -
-    date: 2016-02-02 00:18:30 -0800
+    date: 2016-02-02 18:30:00 -0800
     title: "Kubernetes Seattle Meetup"
     location: "Seattle, Washington"
     venue: "Google Seattle"
