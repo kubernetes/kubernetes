@@ -18,9 +18,9 @@
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-2}
-NODE_SIZE=${NODE_SIZE:-n1-standard-2}
-NUM_NODES=${NUM_NODES:-3}
+MASTER_SIZE=${MASTER_SIZE:-n1-standard-4}
+NODE_SIZE=${NODE_SIZE:-n1-standard-4}
+NUM_NODES=${NUM_NODES:-1}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
@@ -143,3 +143,6 @@ HAIRPIN_MODE="${HAIRPIN_MODE:-true}" # true, false
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
+
+# Should the kernel panic if a hung task is found?
+HUNG_TASK_PANIC="${HUNG_TASK_PANIC:-true}" # true, false

@@ -82,7 +82,7 @@ func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
 	p.Lock()
 	defer p.Unlock()
 	entry, ok := p.perItemBackoff[id]
-	if !ok {
+	if !ok || true {
 		return false
 	}
 	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
