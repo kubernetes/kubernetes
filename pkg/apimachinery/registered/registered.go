@@ -114,22 +114,24 @@ func IsEnabledVersion(v unversioned.GroupVersion) bool {
 	return found
 }
 
-// EnabledVersions returns all enabled versions.
-func EnabledVersions() (ret []unversioned.GroupVersion) {
-	for v := range enabledVersions {
-		ret = append(ret, v)
+// EnabledVersions returns all enabled versions.  Groups are randomly ordered, but versions within groups
+// are priority order from best to worst
+func EnabledVersions() []unversioned.GroupVersion {
+	ret := []unversioned.GroupVersion{}
+	for _, groupMeta := range groupMetaMap {
+		ret = append(ret, groupMeta.GroupVersions...)
 	}
-	return
+	return ret
 }
 
-// EnabledVersionsForGroup returns all enabled versions for a group.
-func EnabledVersionsForGroup(group string) (ret []unversioned.GroupVersion) {
-	for v := range enabledVersions {
-		if v.Group == group {
-			ret = append(ret, v)
-		}
+// EnabledVersionsForGroup returns all enabled versions for a group in order of best to worst
+func EnabledVersionsForGroup(group string) []unversioned.GroupVersion {
+	groupMeta, ok := groupMetaMap[group]
+	if !ok {
+		return []unversioned.GroupVersion{}
 	}
-	return
+
+	return append([]unversioned.GroupVersion{}, groupMeta.GroupVersions...)
 }
 
 // Group returns the metadata of a group if the gruop is registered, otherwise
