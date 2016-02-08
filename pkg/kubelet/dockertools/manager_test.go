@@ -115,6 +115,35 @@ func matchString(t *testing.T, pattern, str string) bool {
 	return match
 }
 
+func TestNewDockerVersion(t *testing.T) {
+	cases := []struct {
+		value string
+		out   string
+		err   bool
+	}{
+		{value: "1", err: true},
+		{value: "1.8", err: true},
+		{value: "1.8.1", out: "1.8.1"},
+		{value: "1.8.1.fc21", out: "1.8.1-fc21"},
+		{value: "1.8.1.fc21.other", out: "1.8.1-fc21.other"},
+		{value: "1.8.1-fc21.other", out: "1.8.1-fc21.other"},
+		{value: "1.8.1-beta.12", out: "1.8.1-beta.12"},
+	}
+	for _, test := range cases {
+		v, err := newDockerVersion(test.value)
+		switch {
+		case err != nil && test.err:
+			continue
+		case (err != nil) != test.err:
+			t.Errorf("error for %q: expected %t, got %v", test.value, test.err, err)
+			continue
+		}
+		if v.String() != test.out {
+			t.Errorf("unexpected parsed version %q for %q", v, test.value)
+		}
+	}
+}
+
 func TestSetEntrypointAndCommand(t *testing.T) {
 	cases := []struct {
 		name      string
