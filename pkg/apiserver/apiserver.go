@@ -225,7 +225,7 @@ func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restf
 }
 
 func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-	errorNegotiated(apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, response.ResponseWriter, request.Request)
+	errorNegotiated(apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, response, request.Request)
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
@@ -286,20 +286,20 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 
 // handleVersion writes the server's version information.
 func handleVersion(req *restful.Request, resp *restful.Response) {
-	writeRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
+	writeRawJSON(http.StatusOK, version.Get(), resp)
 }
 
 // APIVersionHandler returns a handler which will list the provided versions as available.
 func APIVersionHandler(s runtime.NegotiatedSerializer, versions ...string) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIVersions{Versions: versions})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp, req.Request, http.StatusOK, &unversioned.APIVersions{Versions: versions})
 	}
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
 func RootAPIHandler(s runtime.NegotiatedSerializer, f func() []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: f()})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: f()})
 	}
 }
 
@@ -307,14 +307,14 @@ func RootAPIHandler(s runtime.NegotiatedSerializer, f func() []unversioned.APIGr
 // the group.
 func GroupHandler(s runtime.NegotiatedSerializer, group unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &group)
+		writeNegotiated(s, unversioned.GroupVersion{}, resp, req.Request, http.StatusOK, &group)
 	}
 }
 
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
 func SupportedResourcesHandler(s runtime.NegotiatedSerializer, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources})
 	}
 }
 

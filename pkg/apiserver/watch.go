@@ -68,12 +68,12 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
 	s, mediaType, err := negotiateOutputSerializer(req.Request, scope.Serializer)
 	if err != nil {
-		scope.err(err, res.ResponseWriter, req.Request)
+		scope.err(err, res, req.Request)
 		return
 	}
 	// TODO: replace with typed serialization
 	if mediaType != "application/json" {
-		writeRawJSON(http.StatusNotAcceptable, (errNotAcceptable{[]string{"application/json"}}).Status(), res.ResponseWriter)
+		writeRawJSON(http.StatusNotAcceptable, (errNotAcceptable{[]string{"application/json"}}).Status(), res)
 		return
 	}
 	encoder := scope.Serializer.EncoderForVersion(s, scope.Kind.GroupVersion())
