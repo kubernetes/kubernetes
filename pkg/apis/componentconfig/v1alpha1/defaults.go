@@ -55,6 +55,10 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			if obj.ConntrackMax == 0 {
 				obj.ConntrackMax = 256 * 1024 // 4x default (64k)
 			}
+			if obj.IPTablesMasqueradeBit == nil {
+				temp := int32(14)
+				obj.IPTablesMasqueradeBit = &temp
+			}
 			if obj.ConntrackTCPEstablishedTimeout == zero {
 				obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
 			}
