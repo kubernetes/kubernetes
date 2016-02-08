@@ -364,6 +364,7 @@ upgrade-target
 use-kubernetes-cluster-service
 user-whitelist
 verify-only
+volume-dir
 volume-plugin-dir
 volume-stats-agg-period
 watch-cache

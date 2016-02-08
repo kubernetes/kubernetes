@@ -139,6 +139,7 @@ var runId = util.NewUUID()
 type TestContextType struct {
 	KubeConfig            string
 	KubeContext           string
+	KubeVolumeDir         string
 	CertDir               string
 	Host                  string
 	RepoRoot              string
