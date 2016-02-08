@@ -66,7 +66,8 @@ const kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
 const kubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
 // the mark we apply to traffic needing SNAT
-const iptablesMasqueradeMark = "0x4d415351"
+// TODO(thockin): Remove this for v1.3 or v1.4.
+const oldIptablesMasqueradeMark = "0x4d415351"
 
 // IptablesVersioner can query the current iptables version.
 type IptablesVersioner interface {
@@ -143,9 +144,10 @@ type Proxier struct {
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
 
 	// These are effectively const and do not need the mutex to be held.
-	syncPeriod    time.Duration
-	iptables      utiliptables.Interface
-	masqueradeAll bool
+	syncPeriod     time.Duration
+	iptables       utiliptables.Interface
+	masqueradeAll  bool
+	masqueradeMark string
 }
 
 type localPort struct {
@@ -171,7 +173,7 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := utilsysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -185,13 +187,21 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 
+	// Generate the masquerade mark to use for SNAT rules.
+	if masqueradeBit < 0 || masqueradeBit > 31 {
+		return nil, fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
+	}
+	masqueradeValue := 1 << uint(masqueradeBit)
+	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
+
 	return &Proxier{
-		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
-		endpointsMap:  make(map[proxy.ServicePortName][]string),
-		portsMap:      make(map[localPort]closeable),
-		syncPeriod:    syncPeriod,
-		iptables:      ipt,
-		masqueradeAll: masqueradeAll,
+		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
+		endpointsMap:   make(map[proxy.ServicePortName][]string),
+		portsMap:       make(map[localPort]closeable),
+		syncPeriod:     syncPeriod,
+		iptables:       ipt,
+		masqueradeAll:  masqueradeAll,
+		masqueradeMark: masqueradeMark,
 	}, nil
 }
 
@@ -283,7 +293,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	// TODO(thockin): Remove this for v1.3 or v1.4.
 	args = []string{
 		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", iptablesMasqueradeMark,
+		"-m", "mark", "--mark", oldIptablesMasqueradeMark,
 		"-j", "MASQUERADE",
 	}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
@@ -577,7 +587,7 @@ func (proxier *Proxier) syncProxyRules() {
 		comment := "kubernetes postrouting rules"
 		args := []string{"-m", "comment", "--comment", comment, "-j", string(kubePostroutingChain)}
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, kubeServicesChain, err)
+			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, err)
 			return
 		}
 	}
@@ -643,7 +653,7 @@ func (proxier *Proxier) syncProxyRules() {
 	writeLine(natRules, []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-m", "mark", "--mark", iptablesMasqueradeMark,
+		"-m", "mark", "--mark", proxier.masqueradeMark,
 		"-j", "MASQUERADE",
 	}...)
 
@@ -652,7 +662,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// value should ever change.
 	writeLine(natRules, []string{
 		"-A", string(kubeMarkMasqChain),
-		"-j", "MARK", "--set-xmark", fmt.Sprintf("%s/0xffffffff", iptablesMasqueradeMark),
+		"-j", "MARK", "--set-xmark", proxier.masqueradeMark,
 	}...)
 
 	// Accumulate NAT chains to keep.
@@ -931,7 +941,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// TODO(thockin): Remove this for v1.3 or v1.4.
 	args := []string{
 		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", iptablesMasqueradeMark,
+		"-m", "mark", "--mark", oldIptablesMasqueradeMark,
 		"-j", "MASQUERADE",
 	}
 	if err := proxier.iptables.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
