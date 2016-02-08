@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Implements RESTScope interface
@@ -268,6 +267,11 @@ func (m *DefaultRESTMapper) ResourceFor(resource unversioned.GroupVersionResourc
 		return resources[0], nil
 	}
 
+	preferredResources := getMostPreferredVersionForResource(resources)
+	if len(preferredResources) == 1 {
+		return preferredResources[0], nil
+	}
+
 	return unversioned.GroupVersionResource{}, &AmbiguousResourceError{PartialResource: resource, MatchingResources: resources}
 }
 
@@ -334,22 +338,60 @@ func (m *DefaultRESTMapper) KindFor(resource unversioned.GroupVersionResource) (
 	// TODO for each group, choose the most preferred (first) version.  This keeps us consistent with code today.
 	// eventually, we'll need a RESTMapper that is aware of what's available server-side and deconflicts that with
 	// user preferences
-	oneKindPerGroup := []unversioned.GroupVersionKind{}
-	groupsAdded := sets.String{}
-	for _, kind := range kinds {
-		if groupsAdded.Has(kind.Group) {
-			continue
-		}
-
-		oneKindPerGroup = append(oneKindPerGroup, kind)
-		groupsAdded.Insert(kind.Group)
-	}
-
-	if len(oneKindPerGroup) == 1 {
-		return oneKindPerGroup[0], nil
+	preferredKinds := getMostPreferredVersionForKind(kinds)
+	if len(preferredKinds) == 1 {
+		return preferredKinds[0], nil
 	}
 
 	return unversioned.GroupVersionKind{}, &AmbiguousResourceError{PartialResource: resource, MatchingKinds: kinds}
+}
+
+// getMostPreferredVersionForKind chooses the first group,version,kind for a given group,kind and skips the rest
+// this has the effect of choose the most preferred
+func getMostPreferredVersionForKind(kinds []unversioned.GroupVersionKind) []unversioned.GroupVersionKind {
+	observedGroupKinds := []unversioned.GroupKind{}
+	oneVersionPerGroupKind := []unversioned.GroupVersionKind{}
+	for _, kind := range kinds {
+		alreadyObserved := false
+		for _, currObserved := range observedGroupKinds {
+			if kind.GroupKind() == currObserved {
+				alreadyObserved = true
+				break
+			}
+		}
+		if alreadyObserved {
+			continue
+		}
+
+		observedGroupKinds = append(observedGroupKinds, kind.GroupKind())
+		oneVersionPerGroupKind = append(oneVersionPerGroupKind, kind)
+	}
+
+	return oneVersionPerGroupKind
+}
+
+// getMostPreferredVersionForResource chooses the first group,version,resource for a given group,resource and skips the rest
+// this has the effect of choose the most preferred
+func getMostPreferredVersionForResource(resources []unversioned.GroupVersionResource) []unversioned.GroupVersionResource {
+	observedGroupResources := []unversioned.GroupResource{}
+	oneVersionPerGroupResource := []unversioned.GroupVersionResource{}
+	for _, resource := range resources {
+		alreadyObserved := false
+		for _, currObserved := range observedGroupResources {
+			if resource.GroupResource() == currObserved {
+				alreadyObserved = true
+				break
+			}
+		}
+		if alreadyObserved {
+			continue
+		}
+
+		observedGroupResources = append(observedGroupResources, resource.GroupResource())
+		oneVersionPerGroupResource = append(oneVersionPerGroupResource, resource)
+	}
+
+	return oneVersionPerGroupResource
 }
 
 type kindByPreferredGroupVersion struct {
