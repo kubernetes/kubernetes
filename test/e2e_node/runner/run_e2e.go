@@ -52,7 +52,7 @@ var kubeOutputRelPath = flag.String("k8s-build-output", "_output/local/bin/linux
 var kubeRoot = ""
 
 const buildScriptRelPath = "hack/build-go.sh"
-const ginkoTestRelPath = "test/e2e_node"
+const ginkgoTestRelPath = "test/e2e_node"
 const healthyTimeoutDuration = time.Minute * 3
 
 func main() {
@@ -158,9 +158,9 @@ func runTests(fullhost string) ([]byte, error) {
 	glog.Infof("Kubelet host %s tunnel running on port %s", host, ah.LPort)
 	u.Wait()
 	glog.Infof("Running ginkgo tests against host %s", host)
-	ginkoTests := filepath.Join(kubeRoot, ginkoTestRelPath)
+	ginkgoTests := filepath.Join(kubeRoot, ginkgoTestRelPath)
 	return exec.Command(
-		"ginkgo", ginkoTests, "--",
+		"ginkgo", ginkgoTests, "--",
 		"--kubelet-address", fmt.Sprintf("http://127.0.0.1:%s", kh.LPort),
 		"--api-server-address", fmt.Sprintf("http://127.0.0.1:%s", ah.LPort),
 		"--node-name", fullhost,
