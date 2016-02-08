@@ -27,25 +27,26 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func falsePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func falsePredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return false, nil
 }
 
-func truePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func truePredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return true, nil
 }
 
-func matchesPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func matchesPredicate(pod *api.Pod, node string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return pod.Name == node, nil
 }
 
-func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	return len(existingPods) == 0, nil
+func hasNoPodsPredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+	return len(nodeInfo.Pods()) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	result := []schedulerapi.HostPriority{}
 
@@ -65,11 +66,11 @@ func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podListe
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []schedulerapi.HostPriority{}
-	result, err := numericPriority(pod, machineToPods, podLister, nodeLister)
+	result, err := numericPriority(pod, nodeNameToInfo, nodeLister)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +257,7 @@ func TestGenericScheduler(t *testing.T) {
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, algorithm.FakePodLister(test.pods), random)
+		scheduler := NewGenericScheduler(schedulercache.PodsToCache(test.pods), test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, random)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
@@ -276,12 +277,12 @@ func TestGenericScheduler(t *testing.T) {
 func TestFindFitAllError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate}
-	machineToPods := map[string][]*api.Pod{
-		"3": {},
-		"2": {},
-		"1": {},
+	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
+		"3": schedulercache.NewNodeInfo(),
+		"2": schedulercache.NewNodeInfo(),
+		"1": schedulercache.NewNodeInfo(),
 	}
-	_, predicateMap, err := findNodesThatFit(&api.Pod{}, machineToPods, predicates, makeNodeList(nodes), nil)
+	_, predicateMap, err := findNodesThatFit(&api.Pod{}, nodeNameToInfo, predicates, makeNodeList(nodes), nil)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -306,12 +307,12 @@ func TestFindFitSomeError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}}
-	machineToPods := map[string][]*api.Pod{
-		"3": {},
-		"2": {},
-		"1": {pod},
+	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
+		"3": schedulercache.NewNodeInfo(),
+		"2": schedulercache.NewNodeInfo(),
+		"1": schedulercache.NewNodeInfo(pod),
 	}
-	_, predicateMap, err := findNodesThatFit(pod, machineToPods, predicates, makeNodeList(nodes), nil)
+	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, predicates, makeNodeList(nodes), nil)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
