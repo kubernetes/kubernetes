@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/pampassword"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/keystone"
@@ -44,6 +45,7 @@ type AuthenticatorConfig struct {
 	ServiceAccountLookup      bool
 	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
 	KeystoneURL               string
+	PamPassword               bool
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -53,6 +55,14 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, basicAuth)
+	}
+
+	if config.PamPassword {
+		basicAuth, err := newAuthenticatorFromPamPassword(config.BasicAuthFile)
 		if err != nil {
 			return nil, err
 		}
@@ -177,4 +187,9 @@ func newAuthenticatorFromKeystoneURL(keystoneConfigFile string) (authenticator.R
 	}
 
 	return basicauth.New(keystoneAuthenticator), nil
+}
+
+// newAuthenticatorFromPamPassword returns an authenticator.Request or an error
+func newAuthenticatorFromPamPassword(basicAuthFile string) (authenticator.Request, error) {
+	return basicauth.New(pampassword.NewPamPassword()), nil
 }

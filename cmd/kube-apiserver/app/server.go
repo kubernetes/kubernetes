@@ -318,6 +318,7 @@ func Run(s *options.APIServer) error {
 		ServiceAccountLookup:      s.ServiceAccountLookup,
 		ServiceAccountTokenGetter: serviceAccountGetter,
 		KeystoneURL:               s.KeystoneURL,
+		PamPassword:               s.PamPassword,
 	})
 
 	if err != nil {
@@ -374,7 +375,7 @@ func Run(s *options.APIServer) error {
 			ReadWritePort:             s.SecurePort,
 			PublicAddress:             s.AdvertiseAddress,
 			Authenticator:             authenticator,
-			SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
+			SupportsBasicAuth:         len(s.BasicAuthFile) > 0 || s.PamPassword,
 			Authorizer:                authorizer,
 			AdmissionControl:          admissionController,
 			APIGroupVersionOverrides:  apiGroupVersionOverrides,
