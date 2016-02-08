@@ -37,6 +37,12 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = int32(in.HealthzPort)
 	out.HostnameOverride = in.HostnameOverride
+	if in.IPTablesMasqueradeBit != nil {
+		out.IPTablesMasqueradeBit = new(int32)
+		*out.IPTablesMasqueradeBit = int32(*in.IPTablesMasqueradeBit)
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
 	if err := s.Convert(&in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, 0); err != nil {
 		return err
 	}
@@ -127,6 +133,12 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = int(in.HealthzPort)
 	out.HostnameOverride = in.HostnameOverride
+	if in.IPTablesMasqueradeBit != nil {
+		out.IPTablesMasqueradeBit = new(int)
+		*out.IPTablesMasqueradeBit = int(*in.IPTablesMasqueradeBit)
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
 	if err := s.Convert(&in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, 0); err != nil {
 		return err
 	}
