@@ -66,13 +66,17 @@ type Client struct {
 	// Maps from query arg key to validator.
 	// If no validator is present, string equality is used.
 	QueryValidator map[string]func(string, string) bool
+
+	// If your object could exist in multiple groups, set this to
+	// correspond to the URL you're testing it with.
+	ResourceGroup string
 }
 
 func (c *Client) Setup(t *testing.T) *Client {
 	c.handler = &utiltesting.FakeHandler{
 		StatusCode: c.Response.StatusCode,
 	}
-	if responseBody := body(t, c.Response.Body, c.Response.RawBody); responseBody != nil {
+	if responseBody := c.body(t, c.Response.Body, c.Response.RawBody); responseBody != nil {
 		c.handler.ResponseBody = *responseBody
 	}
 	c.server = httptest.NewServer(c.handler)
@@ -142,7 +146,7 @@ func (c *Client) ValidateCommon(t *testing.T, err error) {
 		return
 	}
 
-	requestBody := body(t, c.Request.Body, c.Request.RawBody)
+	requestBody := c.body(t, c.Request.Body, c.Request.RawBody)
 	actualQuery := c.handler.RequestReceived.URL.Query()
 	t.Logf("got query: %v", actualQuery)
 	t.Logf("path: %v", c.Request.Path)
@@ -210,16 +214,20 @@ func validateFields(a, b string) bool {
 	return sA.String() == sB.String()
 }
 
-func body(t *testing.T, obj runtime.Object, raw *string) *string {
+func (c *Client) body(t *testing.T, obj runtime.Object, raw *string) *string {
 	if obj != nil {
 		fqKind, err := api.Scheme.ObjectKind(obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}
+		groupName := fqKind.GroupVersion().Group
+		if c.ResourceGroup != "" {
+			groupName = c.ResourceGroup
+		}
 		var bs []byte
-		g, found := testapi.Groups[fqKind.GroupVersion().Group]
+		g, found := testapi.Groups[groupName]
 		if !found {
-			t.Errorf("Group %s is not registered in testapi", fqKind.GroupVersion().Group)
+			t.Errorf("Group %s is not registered in testapi", groupName)
 		}
 		bs, err = runtime.Encode(g.Codec(), obj)
 		if err != nil {
