@@ -397,7 +397,7 @@ kube::golang::build_binaries_for_platform() {
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
-      CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+      CGO_ENABLED=1 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
     fi
