@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -231,6 +232,15 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Conte
 	return loc, rt, nil
 }
 
+// getContainerNames returns a formatted string containing the container names
+func getContainerNames(pod *api.Pod) string {
+	names := []string{}
+	for _, c := range pod.Spec.Containers {
+		names = append(names, c.Name)
+	}
+	return strings.Join(names, " ")
+}
+
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func LogLocation(
@@ -249,10 +259,14 @@ func LogLocation(
 	// If a container was provided, it must be valid
 	container := opts.Container
 	if len(container) == 0 {
-		if len(pod.Spec.Containers) == 1 {
+		switch len(pod.Spec.Containers) {
+		case 1:
 			container = pod.Spec.Containers[0].Name
-		} else {
+		case 0:
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
+		default:
+			containerNames := getContainerNames(pod)
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames))
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
@@ -386,10 +400,14 @@ func streamLocation(
 	// Try to figure out a container
 	// If a container was provided, it must be valid
 	if container == "" {
-		if len(pod.Spec.Containers) == 1 {
+		switch len(pod.Spec.Containers) {
+		case 1:
 			container = pod.Spec.Containers[0].Name
-		} else {
+		case 0:
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
+		default:
+			containerNames := getContainerNames(pod)
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames))
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
