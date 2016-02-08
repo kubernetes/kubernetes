@@ -124,9 +124,8 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
 
-			mixedCase := false
 			scope := meta.RESTScopeNamespace
-			mapper.Add(gvk, scope, mixedCase)
+			mapper.Add(gvk, scope)
 		}
 	}
 
