@@ -191,18 +191,23 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIptables {
-		glog.V(2).Info("Using iptables Proxier.")
-		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll)
+		glog.V(0).Info("Using iptables Proxier.")
+		if config.IPTablesMasqueradeBit == nil {
+			// IPTablesMasqueradeBit must be specified or defaulted.
+			return nil, fmt.Errorf("Unable to read IPTablesMasqueradeBit from config")
+		}
+
+		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, *config.IPTablesMasqueradeBit)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierIptables
 		endpointsHandler = proxierIptables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
-		glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
+		glog.V(0).Info("Tearing down userspace rules.")
 		userspace.CleanupLeftovers(iptInterface)
 	} else {
-		glog.V(2).Info("Using userspace Proxier.")
+		glog.V(0).Info("Using userspace Proxier.")
 		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 		// our config.EndpointsConfigHandler.
 		loadBalancer := userspace.NewLoadBalancerRR()
@@ -222,7 +227,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
-		glog.V(2).Info("Tearing down pure-iptables proxy rules. Errors here are acceptable.")
+		glog.V(0).Info("Tearing down pure-iptables proxy rules.")
 		iptables.CleanupLeftovers(iptInterface)
 	}
 	iptInterface.AddReloadFunc(proxier.Sync)

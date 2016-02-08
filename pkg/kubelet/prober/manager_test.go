@@ -18,6 +18,7 @@ package prober
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -170,6 +172,31 @@ func TestCleanupPods(t *testing.T) {
 	}
 	if err := expectProbes(m, expectedProbes); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestCleanupRepeated(t *testing.T) {
+	m := newTestManager()
+	defer cleanup(t, m)
+	podTemplate := api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{{
+				Name:           "prober1",
+				ReadinessProbe: defaultProbe,
+				LivenessProbe:  defaultProbe,
+			}},
+		},
+	}
+
+	const numTestPods = 100
+	for i := 0; i < numTestPods; i++ {
+		pod := podTemplate
+		pod.UID = types.UID(strconv.Itoa(i))
+		m.AddPod(&pod)
+	}
+
+	for i := 0; i < 10; i++ {
+		m.CleanupPods([]*api.Pod{})
 	}
 }
 

@@ -296,6 +296,7 @@ func (runner *runner) Save(table Table) ([]byte, error) {
 
 	// run and return
 	args := []string{"-t", string(table)}
+	glog.V(4).Infof("running iptables-save %v", args)
 	return runner.exec.Command(cmdIptablesSave, args...).CombinedOutput()
 }
 
@@ -305,6 +306,7 @@ func (runner *runner) SaveAll() ([]byte, error) {
 	defer runner.mu.Unlock()
 
 	// run and return
+	glog.V(4).Infof("running iptables-save")
 	return runner.exec.Command(cmdIptablesSave, []string{}...).CombinedOutput()
 }
 
@@ -354,6 +356,7 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		return err
 	}
 	// run the command and return the output or an error including the output and error
+	glog.V(4).Infof("running iptables-restore %v", args)
 	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v (%s)", err, b)
@@ -575,4 +578,18 @@ func (runner *runner) reload() {
 	for _, f := range runner.reloadFuncs {
 		f()
 	}
+}
+
+// IsNotFoundError returns true if the error indicates "not found".  It parses
+// the error string looking for known values, which is imperfect but works in
+// practice.
+func IsNotFoundError(err error) bool {
+	es := err.Error()
+	if strings.Contains(es, "No such file or directory") {
+		return true
+	}
+	if strings.Contains(es, "No chain/target/match by that name") {
+		return true
+	}
+	return false
 }

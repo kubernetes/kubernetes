@@ -196,27 +196,37 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	// Delete Rules first, then Flush and Delete Chains
 	args := []string{"-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules"}
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostPortalChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-		encounteredError = true
+		if !iptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing userspace rule: %v", err)
+			encounteredError = true
+		}
 	}
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerPortalChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-		encounteredError = true
+		if !iptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing userspace rule: %v", err)
+			encounteredError = true
+		}
 	}
 	args = []string{"-m", "addrtype", "--dst-type", "LOCAL"}
 	args = append(args, "-m", "comment", "--comment", "handle service NodePorts; NOTE: this must be the last rule in the chain")
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostNodePortChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-		encounteredError = true
+		if !iptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing userspace rule: %v", err)
+			encounteredError = true
+		}
 	}
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerNodePortChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-		encounteredError = true
+		if !iptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing userspace rule: %v", err)
+			encounteredError = true
+		}
 	}
 	args = []string{"-m", "comment", "--comment", "Ensure that non-local NodePort traffic can flow"}
 	if err := ipt.DeleteRule(iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-		encounteredError = true
+		if !iptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing userspace rule: %v", err)
+			encounteredError = true
+		}
 	}
 
 	// flush and delete chains.
@@ -228,12 +238,16 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 		for _, c := range chains {
 			// flush chain, then if successful delete, delete will fail if flush fails.
 			if err := ipt.FlushChain(table, c); err != nil {
-				glog.Errorf("Error flushing userspace chain: %v", err)
-				encounteredError = true
+				if !iptables.IsNotFoundError(err) {
+					glog.Errorf("Error flushing userspace chain: %v", err)
+					encounteredError = true
+				}
 			} else {
 				if err = ipt.DeleteChain(table, c); err != nil {
-					glog.Errorf("Error deleting userspace chain: %v", err)
-					encounteredError = true
+					if !iptables.IsNotFoundError(err) {
+						glog.Errorf("Error deleting userspace chain: %v", err)
+						encounteredError = true
+					}
 				}
 			}
 		}
