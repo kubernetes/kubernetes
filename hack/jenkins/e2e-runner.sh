@@ -115,6 +115,11 @@ fi
 
 cd kubernetes
 
+# Upload build start time and k8s version to GCS, but not on PR Jenkins.
+if [[ ! "${JOB_NAME}" =~ -pull- ]]; then
+    bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")
+fi
+
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
 ARTIFACTS=${WORKSPACE}/_artifacts
 mkdir -p ${ARTIFACTS}

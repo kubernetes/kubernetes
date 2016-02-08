@@ -29,6 +29,33 @@
                     else
                       curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
                     fi
+                - shell: |
+                    curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-finished.sh" > upload-finished.sh
+                    chmod +x upload-finished.sh
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: SUCCESS
+                    condition-best: SUCCESS
+                    steps:
+                        - shell: './upload-finished.sh SUCCESS'
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: UNSTABLE
+                    condition-best: UNSTABLE
+                    steps:
+                        - shell: './upload-finished.sh UNSTABLE'
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: FAILURE
+                    condition-best: FAILURE
+                    steps:
+                        - shell: './upload-finished.sh FAILURE'
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: ABORTED
+                    condition-best: ABORTED
+                    steps:
+                        - shell: './upload-finished.sh ABORTED'
             script-only-if-succeeded: False
             script-only-if-failed: False
 

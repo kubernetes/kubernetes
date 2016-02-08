@@ -4,6 +4,7 @@
     logrotate:
         numToKeep: 200
     builders:
+        - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
         - shell: './hack/jenkins/build.sh'
     properties:
         - mail-watcher
