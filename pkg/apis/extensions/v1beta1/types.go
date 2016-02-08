@@ -38,6 +38,8 @@ type ScaleStatus struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient=true,noMethods=true
+
 // represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -131,6 +133,8 @@ type HorizontalPodAutoscalerStatus struct {
 	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
+// +genclient=true
+
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -153,6 +157,8 @@ type HorizontalPodAutoscalerList struct {
 	// list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items"`
 }
+
+// +genclient=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -198,6 +204,8 @@ type ThirdPartyResourceData struct {
 	// Data is the raw JSON data for this data.
 	Data []byte `json:"data,omitempty"`
 }
+
+// +genclient=true
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
@@ -439,6 +447,8 @@ type DaemonSetStatus struct {
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
 }
 
+// +genclient=true
+
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -479,6 +489,8 @@ type ThirdPartyResourceDataList struct {
 	// Items is the list of ThirdpartyResourceData.
 	Items []ThirdPartyResourceData `json:"items"`
 }
+
+// +genclient=true
 
 // Job represents the configuration of a single job.
 type Job struct {
@@ -590,6 +602,8 @@ type JobCondition struct {
 	// Human readable message indicating details about last transition.
 	Message string `json:"message,omitempty"`
 }
+
+// +genclient=true
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
@@ -866,6 +880,8 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// +genclient=true
 
 // ReplicaSet represents the configuration of a ReplicaSet.
 type ReplicaSet struct {
