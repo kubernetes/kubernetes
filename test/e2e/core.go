@@ -57,6 +57,7 @@ func CoreDump(dir string) {
 		cmds = append(cmds, []command{
 			{"cat /var/log/kubelet.log", "kubelet"},
 			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
+			{"cat /var/log/dmesg", "dmesg"},
 		}...)
 	}
 
