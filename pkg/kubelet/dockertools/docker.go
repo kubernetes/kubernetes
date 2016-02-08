@@ -81,6 +81,17 @@ type KubeletContainerName struct {
 	ContainerName string
 }
 
+// containerNamePrefix is used to identify the containers on the node managed by this
+// process.
+var containerNamePrefix = "k8s"
+
+// SetContainerNamePrefix allows the container prefix name for this process to be changed.
+// This is intended to support testing and bootstrapping experimentation. It cannot be
+// changed once the Kubelet starts.
+func SetContainerNamePrefix(prefix string) {
+	containerNamePrefix = prefix
+}
+
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string, secrets []api.Secret) error
@@ -208,8 +219,6 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 	return p.puller.IsImagePresent(name)
 }
-
-const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both full pod name and container name.
 func BuildDockerName(dockerName KubeletContainerName, container *api.Container) (string, string) {
