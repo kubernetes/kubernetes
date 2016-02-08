@@ -464,3 +464,7 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 	}
 	return parts[0], parts[1], nil
 }
+
+// Option is a functional option type for Runtime, useful for
+// completely optional settings.
+type Option func(Runtime)

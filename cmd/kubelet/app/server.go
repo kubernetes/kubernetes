@@ -733,6 +733,7 @@ type KubeletConfig struct {
 
 	ExperimentalFlannelOverlay bool
 	NodeIP                     net.IP
+	ContainerRuntimeOptions    []kubecontainer.Option
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -820,6 +821,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.Reservation,
 		kc.EnableCustomMetrics,
 		kc.VolumeStatsAggPeriod,
+		kc.ContainerRuntimeOptions,
 	)
 
 	if err != nil {

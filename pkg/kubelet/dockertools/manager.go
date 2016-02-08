@@ -95,6 +95,8 @@ type DockerManager struct {
 
 	// The image name of the pod infra container.
 	podInfraContainerImage string
+	// (Optional) Additional environment variables to be set for the pod infra container.
+	podInfraContainerEnv []api.EnvVar
 
 	// TODO(yifan): Record the pull failure so we can eliminate the image checking?
 	// Lower level docker image puller.
@@ -140,6 +142,18 @@ type DockerManager struct {
 	enableCustomMetrics bool
 }
 
+func PodInfraContainerEnv(env map[string]string) kubecontainer.Option {
+	return func(rt kubecontainer.Runtime) {
+		dm := rt.(*DockerManager)
+		for k, v := range env {
+			dm.podInfraContainerEnv = append(dm.podInfraContainerEnv, api.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
+}
+
 func NewDockerManager(
 	client DockerInterface,
 	recorder record.EventRecorder,
@@ -160,7 +174,8 @@ func NewDockerManager(
 	cpuCFSQuota bool,
 	imageBackOff *util.Backoff,
 	serializeImagePulls bool,
-	enableCustomMetrics bool) *DockerManager {
+	enableCustomMetrics bool,
+	options ...kubecontainer.Option) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
@@ -200,6 +215,11 @@ func NewDockerManager(
 		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
 	}
 	dm.containerGC = NewContainerGC(client, containerLogsDir)
+
+	// apply optional settings..
+	for _, optf := range options {
+		optf(dm)
+	}
 
 	return dm
 }
@@ -763,6 +783,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 		Image:           dm.podInfraContainerImage,
 		Ports:           ports,
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
+		Env:             dm.podInfraContainerEnv,
 	}
 	return podInfraContainerStatus.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
 }
@@ -1489,6 +1510,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 		Image:           dm.podInfraContainerImage,
 		Ports:           ports,
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
+		Env:             dm.podInfraContainerEnv,
 	}
 
 	// No pod secrets for the infra container.
