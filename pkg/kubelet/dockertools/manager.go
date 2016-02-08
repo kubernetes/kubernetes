@@ -141,6 +141,11 @@ type DockerManager struct {
 
 	// Support for gathering custom metrics.
 	enableCustomMetrics bool
+
+	// If true, the "hairpin mode" flag is set on container interfaces.
+	// A false value means the kubelet just backs off from setting it,
+	// it might already be true.
+	configureHairpinMode bool
 }
 
 func PodInfraContainerEnv(env map[string]string) kubecontainer.Option {
@@ -176,6 +181,7 @@ func NewDockerManager(
 	imageBackOff *util.Backoff,
 	serializeImagePulls bool,
 	enableCustomMetrics bool,
+	hairpinMode bool,
 	options ...kubecontainer.Option) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
@@ -208,6 +214,7 @@ func NewDockerManager(
 		procFs:                 procFs,
 		cpuCFSQuota:            cpuCFSQuota,
 		enableCustomMetrics:    enableCustomMetrics,
+		configureHairpinMode:   hairpinMode,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
@@ -1790,7 +1797,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			result.Fail(err)
 			return
 		}
-		if !usesHostNetwork(pod) {
+		if !usesHostNetwork(pod) && dm.configureHairpinMode {
 			if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
 				glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
 			}
