@@ -473,6 +473,9 @@ function kube-up {
   find-release-tars
   upload-server-tars
 
+  # ensure that environmental variables specifying number of migs to create
+  set_num_migs
+
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     create-nodes
     create-autoscaler
@@ -616,21 +619,35 @@ function create-nodes-template() {
   create-node-instance-template $template_name
 }
 
-function create-nodes() {
-  local template_name="${NODE_INSTANCE_PREFIX}-template"
-
+# Assumes:
+# - MAX_INSTANCES_PER_MIG
+# - NUM_NODES
+# exports: 
+# - NUM_MIGS
+function set_num_migs() {
   local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
 
   if [[ ${defaulted_max_instances_per_mig} -le "0" ]]; then
     echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 500"
     defaulted_max_instances_per_mig=500
   fi
-  local num_migs=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
-  local instances_per_mig=$(((${NUM_NODES} + ${num_migs} - 1) / ${num_migs}))
-  local last_mig_size=$((${NUM_NODES} - (${num_migs} - 1) * ${instances_per_mig}))
+  export NUM_MIGS=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
+}
+
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - NUM_NODES
+# - PROJECT
+# - ZONE
+function create-nodes() {
+  local template_name="${NODE_INSTANCE_PREFIX}-template"
+
+  local instances_per_mig=$(((${NUM_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+  local last_mig_size=$((${NUM_NODES} - (${NUM_MIGS} - 1) * ${instances_per_mig}))
 
   #TODO: parallelize this loop to speed up the process
-  for i in $(seq $((${num_migs} - 1))); do
+  for i in $(seq $((${NUM_MIGS} - 1))); do
     gcloud compute instance-groups managed \
         create "${NODE_INSTANCE_PREFIX}-group-$i" \
         --project "${PROJECT}" \
@@ -659,35 +676,44 @@ function create-nodes() {
       --project "${PROJECT}" || true;
 }
 
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - PROJECT
+# - ZONE
+# - ENABLE_NODE_AUTOSCALER
+# - TARGET_NODE_UTILIZATION\
+# - AUTOSCALER_MAX_NODES
+# - AUTOSCALER_MIN_NODES
 function create-autoscaler() {
   # Create autoscaler for nodes if requested
   if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-    METRICS=""
+    local metrics=""
     # Current usage
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
     # Reservation
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
     echo "Creating node autoscalers."
 
-    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${num_migs} - 1) * ${max_instances_per_mig}))
-    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${num_migs} - 1) * ${min_instances_per_mig}))
+    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${NUM_MIGS} - 1) * ${max_instances_per_mig}))
+    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${NUM_MIGS} - 1) * ${min_instances_per_mig}))
 
-    for i in $(seq $((${num_migs} - 1))); do
+    for i in $(seq $((${NUM_MIGS} - 1))); do
       gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
-          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${METRICS} || true
+          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${metrics} || true
     done
     gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${METRICS} || true
+      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${metrics} || true
   fi
 }
 
