@@ -20,8 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/goauth2/oauth"
-	compute "code.google.com/p/google-api-go-client/compute/v1"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	compute "google.golang.org/api/compute/v1"
 )
 
 var (
@@ -44,19 +45,18 @@ func readFile(v string) string {
 	return strings.TrimSpace(string(slurp))
 }
 
-var config = &oauth.Config{
+var config = &oauth2.Config{
 	// The client-id and secret should be for an "Installed Application" when using
 	// the CLI. Later we'll use a web application with a callback.
-	ClientId:     readFile("client-id.dat"),
+	ClientID:     readFile("client-id.dat"),
 	ClientSecret: readFile("client-secret.dat"),
-	Scope: strings.Join([]string{
+	Endpoint:     google.Endpoint,
+	Scopes: []string{
 		compute.DevstorageFull_controlScope,
 		compute.ComputeScope,
 		"https://www.googleapis.com/auth/sqlservice",
 		"https://www.googleapis.com/auth/sqlservice.admin",
-	}, " "),
-	AuthURL:     "https://accounts.google.com/o/oauth2/auth",
-	TokenURL:    "https://accounts.google.com/o/oauth2/token",
+	},
 	RedirectURL: "urn:ietf:wg:oauth:2.0:oob",
 }
 
@@ -88,31 +88,32 @@ func main() {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + *proj
 	machType := prefix + "/zones/" + *zone + "/machineTypes/" + *mach
 
-	tr := &oauth.Transport{
-		Config: config,
-	}
-
-	tokenCache := oauth.CacheFile("token.dat")
-	token, err := tokenCache.Token()
+	const tokenFileName = "token.dat"
+	tokenFile := tokenCacheFile(tokenFileName)
+	tokenSource := oauth2.ReuseTokenSource(nil, tokenFile)
+	token, err := tokenSource.Token()
 	if err != nil {
 		if *writeObject != "" {
 			log.Fatalf("Can't use --write_object without a valid token.dat file already cached.")
 		}
-		log.Printf("Error getting token from %s: %v", string(tokenCache), err)
+		log.Printf("Error getting token from %s: %v", tokenFileName, err)
 		log.Printf("Get auth code from %v", config.AuthCodeURL("my-state"))
 		fmt.Print("\nEnter auth code: ")
 		sc := bufio.NewScanner(os.Stdin)
 		sc.Scan()
 		authCode := strings.TrimSpace(sc.Text())
-		token, err = tr.Exchange(authCode)
+		token, err = config.Exchange(oauth2.NoContext, authCode)
 		if err != nil {
 			log.Fatalf("Error exchanging auth code for a token: %v", err)
 		}
-		tokenCache.PutToken(token)
+		if err := tokenFile.WriteToken(token); err != nil {
+			log.Fatalf("Error writing to %s: %v", tokenFileName, err)
+		}
+		tokenSource = oauth2.ReuseTokenSource(token, nil)
 	}
 
-	tr.Token = token
-	oauthClient := &http.Client{Transport: tr}
+	oauthClient := oauth2.NewClient(oauth2.NoContext, tokenSource)
+
 	if *writeObject != "" {
 		writeCloudStorageObject(oauthClient)
 		return
@@ -276,4 +277,26 @@ func writeCloudStorageObject(httpClient *http.Client) {
 	}
 	log.Printf("Success.")
 	os.Exit(0)
+}
+
+type tokenCacheFile string
+
+func (f tokenCacheFile) Token() (*oauth2.Token, error) {
+	slurp, err := ioutil.ReadFile(string(f))
+	if err != nil {
+		return nil, err
+	}
+	t := new(oauth2.Token)
+	if err := json.Unmarshal(slurp, t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func (f tokenCacheFile) WriteToken(t *oauth2.Token) error {
+	jt, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(string(f), jt, 0600)
 }

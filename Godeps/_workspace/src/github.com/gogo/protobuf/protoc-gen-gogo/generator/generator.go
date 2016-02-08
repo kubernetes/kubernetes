@@ -601,7 +601,7 @@ func (g *Generator) CommandLineParameters(parameter string) {
 	if pluginList == "none" {
 		pluginList = ""
 	}
-	gogoPluginNames := []string{"unmarshal", "unsafeunmarshaler", "union", "stringer", "size", "populate", "marshalto", "unsafemarshaler", "gostring", "face", "equal", "enumstringer", "embedcheck", "description", "defaultcheck", "oneofcheck"}
+	gogoPluginNames := []string{"unmarshal", "unsafeunmarshaler", "union", "stringer", "size", "protosizer", "populate", "marshalto", "unsafemarshaler", "gostring", "face", "equal", "enumstringer", "embedcheck", "description", "defaultcheck", "oneofcheck"}
 	pluginList = strings.Join(append(gogoPluginNames, pluginList), "+")
 	if pluginList != "" {
 		// Amend the set of plugins.
@@ -1857,11 +1857,11 @@ var methodNames = [...]string{
 	"ExtensionRangeArray",
 	"ExtensionMap",
 	"Descriptor",
-	"Size",
 	"MarshalTo",
 	"Equal",
 	"VerboseEqual",
 	"GoString",
+	"ProtoSize",
 }
 
 // Generate the type and default constant definitions for this Descriptor.
@@ -1874,6 +1874,9 @@ func (g *Generator) generateMessage(message *Descriptor) {
 	usedNames := make(map[string]bool)
 	for _, n := range methodNames {
 		usedNames[n] = true
+	}
+	if !gogoproto.IsProtoSizer(message.file, message.DescriptorProto) {
+		usedNames["Size"] = true
 	}
 	fieldNames := make(map[*descriptor.FieldDescriptorProto]string)
 	fieldGetterNames := make(map[*descriptor.FieldDescriptorProto]string)
@@ -2209,6 +2212,9 @@ func (g *Generator) generateMessage(message *Descriptor) {
 			}
 			if gogoproto.IsSizer(g.file.FileDescriptorProto, message.DescriptorProto) {
 				g.P(`Size() int`)
+			}
+			if gogoproto.IsProtoSizer(g.file.FileDescriptorProto, message.DescriptorProto) {
+				g.P(`ProtoSize() int`)
 			}
 			g.Out()
 			g.P("}")

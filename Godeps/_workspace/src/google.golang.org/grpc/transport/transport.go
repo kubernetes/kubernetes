@@ -47,6 +47,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -169,11 +170,13 @@ type Stream struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	// method records the associated RPC method of the stream.
-	method    string
-	buf       *recvBuffer
-	dec       io.Reader
-	fc        *inFlow
-	recvQuota uint32
+	method       string
+	recvCompress string
+	sendCompress string
+	buf          *recvBuffer
+	dec          io.Reader
+	fc           *inFlow
+	recvQuota    uint32
 	// The accumulated inbound quota pending for window update.
 	updateQuota uint32
 	// The handler to control the window update procedure for both this
@@ -198,6 +201,17 @@ type Stream struct {
 	// the status received from the server.
 	statusCode codes.Code
 	statusDesc string
+}
+
+// RecvCompress returns the compression algorithm applied to the inbound
+// message. It is empty string if there is no compression applied.
+func (s *Stream) RecvCompress() string {
+	return s.recvCompress
+}
+
+// SetSendCompress sets the compression algorithm to the stream.
+func (s *Stream) SetSendCompress(str string) {
+	s.sendCompress = str
 }
 
 // Header acquires the key-value pairs of header metadata once it
@@ -230,6 +244,11 @@ func (s *Stream) ServerTransport() ServerTransport {
 // Context returns the context of the stream.
 func (s *Stream) Context() context.Context {
 	return s.ctx
+}
+
+// TraceContext recreates the context of s with a trace.Trace.
+func (s *Stream) TraceContext(tr trace.Trace) {
+	s.ctx = trace.NewContext(s.ctx, tr)
 }
 
 // Method returns the method for the stream.
@@ -342,8 +361,18 @@ type Options struct {
 
 // CallHdr carries the information of a particular RPC.
 type CallHdr struct {
-	Host   string // peer host
-	Method string // the operation to perform on the specified host
+	// Host specifies peer host.
+	Host string
+	// Method specifies the operation to perform.
+	Method string
+	// RecvCompress specifies the compression algorithm applied on inbound messages.
+	RecvCompress string
+	// SendCompress specifies the compression algorithm applied on outbound message.
+	SendCompress string
+	// Flush indicates if new stream command should be sent to the peer without
+	// waiting for the first data. This is a hint though. The transport may modify
+	// the flush decision for performance purpose.
+	Flush bool
 }
 
 // ClientTransport is the common interface for all gRPC client side transport
@@ -390,6 +419,8 @@ type ServerTransport interface {
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
 	Close() error
+	// RemoteAddr returns the remote network address.
+	RemoteAddr() net.Addr
 }
 
 // StreamErrorf creates an StreamError with the specified error code and description.

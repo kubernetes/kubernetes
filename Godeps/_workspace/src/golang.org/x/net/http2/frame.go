@@ -85,8 +85,8 @@ const (
 	// Continuation Frame
 	FlagContinuationEndHeaders Flags = 0x4
 
-	FlagPushPromiseEndHeaders = 0x4
-	FlagPushPromisePadded     = 0x8
+	FlagPushPromiseEndHeaders Flags = 0x4
+	FlagPushPromisePadded     Flags = 0x8
 )
 
 var flagName = map[FrameType]map[Flags]string{
