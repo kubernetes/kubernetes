@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
@@ -294,6 +295,31 @@ func Run(s *options.APIServer) error {
 		storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
 	}
 
+	// batch/v1/job is a move from extensions/v1beta1/job. The storage
+	// version needs to be either extensions/v1beta1 or batch/v1. Users
+	// must roll forward while using 1.2, because we will require the
+	// latter for 1.3.
+	if !apiGroupVersionOverrides["batch/v1"].Disable {
+		batchGroup, err := registered.Group(batch.GroupName)
+		if err != nil {
+			glog.Fatalf("Batch API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		}
+		// Figure out what storage group/version we should use.
+		storageGroupVersion, found := storageVersions[batchGroup.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", batchGroup.GroupVersion.Group, storageVersions)
+		}
+
+		if storageGroupVersion != "batch/v1" && storageGroupVersion != "extensions/v1beta1" {
+			glog.Fatalf("The storage version for batch must be either 'batch/v1' or 'extensions/v1beta1'")
+		}
+		batchEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, s.EtcdPathPrefix, s.EtcdQuorumRead)
+		if err != nil {
+			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
+		}
+		storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
+	}
+
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd)
 
 	n := s.ServiceClusterIPRange
@@ -471,7 +497,8 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 			Disable: true,
 		}
 	}
-        disableBatch := disableAllAPIs
+
+	disableBatch := disableAllAPIs
 	batchGroupVersion := "batch/v1"
 	disableBatch = !getRuntimeConfigValue(s, batchGroupVersion, !disableBatch)
 	if disableBatch {

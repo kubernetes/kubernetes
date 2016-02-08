@@ -262,22 +262,6 @@ func (m *Master) InstallAPIs(c *Config) {
 		batchResources := m.getBatchResources(c)
 		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
 
-		if false {
-			// TODO: Here, read the storage version for batch. If it is v1beta1, then use extensions/v1beta1. If it is v1, then use batch/v1.
-			// Figure out what storage group/version we should use.
-			storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
-			if !found {
-				glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
-			}
-
-			// Since this is moved from extensions v1beta1, the storage group changes as well as its version.
-			storageGroup := "batch"
-			if storageVersion == "v1beta1" {
-				storageGroup = "extensions"
-			}
-			_ = storageGroup
-		}
-
 		// Hard code preferred group version to batch/v1
 		batchGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "batch", Version: "v1"}
 		glog.Infof("batch setup: \n\n%#v\n\n", batchGroupMeta)
@@ -308,8 +292,6 @@ func (m *Master) InstallAPIs(c *Config) {
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
-	// Fixup the storageDestination to be extensions/v1beta1
-	c.StorageDestinations.APIGroups["batch/v1"] = c.StorageDestinations.APIGroups["extensions/v1beta1"]
 }
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
