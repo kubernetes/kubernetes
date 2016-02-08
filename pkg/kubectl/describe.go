@@ -641,6 +641,14 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(pv.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
+		if len(pv.Status.Conditions) > 0 {
+			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
+			for _, c := range pv.Status.Conditions {
+				fmt.Fprintf(out, "  %v \t%v \n",
+					c.Type,
+					c.Status)
+			}
+		}
 		if pv.Spec.ClaimRef != nil {
 			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
 		} else {
@@ -699,6 +707,14 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
 		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
+		if len(pvc.Status.Conditions) > 0 {
+			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
+			for _, c := range pvc.Status.Conditions {
+				fmt.Fprintf(out, "  %v \t%v \n",
+					c.Type,
+					c.Status)
+			}
+		}
 		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels)
 		fmt.Fprintf(out, "Capacity:\t%s\n", capacity)
