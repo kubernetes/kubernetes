@@ -7,6 +7,7 @@
         numToKeep: 200
     node: unittest
     builders:
+        - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
         - shell: './hack/jenkins/gotest-dockerized.sh'
     publishers:
         - claim-build
