@@ -76,12 +76,14 @@ AWS_ASG_CMD="aws autoscaling"
 
 VPC_CIDR_BASE=172.20
 MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
 VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
 SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
 if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
   echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
   SUBNET_CIDR=${KUBE_SUBNET_CIDR}
+fi
+if [[ -z "${MASTER_INTERNAL_IP-}" ]]; then
+  MASTER_INTERNAL_IP="${SUBNET_CIDR%.*}${MASTER_IP_SUFFIX}"
 fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
@@ -506,13 +508,13 @@ function ensure-master-ip {
     else
       KUBE_MASTER_IP=`$AWS_CMD allocate-address --domain vpc --query PublicIp`
       echo "Allocated Elastic IP for master: ${KUBE_MASTER_IP}"
-
-      # We can't tag elastic ips.  Instead we put the tag on the persistent disk.
-      # It is a little weird, perhaps, but it sort of makes sense...
-      # The master mounts the master PD, and whoever mounts the master PD should also
-      # have the master IP
-      add-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP} ${KUBE_MASTER_IP}
     fi
+
+    # We can't tag elastic ips.  Instead we put the tag on the persistent disk.
+    # It is a little weird, perhaps, but it sort of makes sense...
+    # The master mounts the master PD, and whoever mounts the master PD should also
+    # have the master IP
+    add-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP} ${KUBE_MASTER_IP}
   fi
 }
 
@@ -790,11 +792,10 @@ function subnet-setup {
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock)
     echo "Using existing subnet with CIDR $EXISTING_CIDR"
-    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock)
-    echo "VPC CIDR is $VPC_CIDR"
-    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
-    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
-    echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
+    if [ ! $SUBNET_CIDR = $EXISTING_CIDR ]; then
+      MASTER_INTERNAL_IP="${EXISTING_CIDR%.*}${MASTER_IP_SUFFIX}"
+      echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
+    fi
   fi
 
   echo "Using subnet $SUBNET_ID"
