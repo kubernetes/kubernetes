@@ -162,6 +162,11 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			parallelism := int(c.Rand.Int31())
 			j.Completions = &completions
 			j.Parallelism = &parallelism
+			if c.Rand.Int31()%2 == 0 {
+				j.ManualSelector = newBool(true)
+			} else {
+				j.ManualSelector = nil
+			}
 		},
 		func(j *api.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
@@ -410,4 +415,10 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 	)
 	return f
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }

@@ -543,6 +543,7 @@ type JobSpec struct {
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
 	Completions *int32 `json:"completions,omitempty"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
@@ -550,8 +551,16 @@ type JobSpec struct {
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
+	// Normally, the system sets this field for you.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
+
+	// AutoSelector controls generation of pod labels and pod selectors.
+	// It was not present in the original extensions/v1beta1 Job definition, but exists
+	// to allow conversion from batch/v1 Jobs, where it corresponds to, but has the opposite
+	// meaning as, ManualSelector.
+	// More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md
+	AutoSelector *bool `json:"autoSelector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
