@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	// Note that if your project uses Godep to manage dependencies, then
-	// you need to change following the import paths.
 	"github.com/coreos/rkt/api/v1alpha"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

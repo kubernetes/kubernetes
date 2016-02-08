@@ -55,7 +55,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bradfitz/http2/hpack"
+	"golang.org/x/net/http2/hpack"
 )
 
 const (
@@ -631,6 +631,9 @@ func (sc *serverConn) serve() {
 		case wm := <-sc.wantWriteFrameCh:
 			sc.writeFrame(wm)
 		case <-sc.wroteFrameCh:
+			if sc.writingFrame != true {
+				panic("internal error: expected to be already writing a frame")
+			}
 			sc.writingFrame = false
 			sc.scheduleFrameWrite()
 		case fg, ok := <-sc.readFrameCh:
@@ -752,6 +755,7 @@ func (sc *serverConn) startFrameWrite(wm frameWriteMsg) {
 	if sc.writingFrame {
 		panic("internal error: can only be writing one frame at a time")
 	}
+	sc.writingFrame = true
 
 	st := wm.stream
 	if st != nil {
@@ -768,7 +772,6 @@ func (sc *serverConn) startFrameWrite(wm frameWriteMsg) {
 		}
 	}
 
-	sc.writingFrame = true
 	sc.needsFrameFlush = true
 	if endsStream(wm.write) {
 		if st == nil {

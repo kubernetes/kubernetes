@@ -1,6 +1,6 @@
 # Authentication
 
-As outlined <a href="https://github.com/grpc/grpc/blob/master/doc/grpc-auth-support.md">here</a> gRPC supports a number of different mechanisms for asserting identity between an client and server. We'll present some code-samples here demonstrating how to provide TLS support encryption and identity assertions as well as passing OAuth2 tokens to services that support it.
+As outlined in the [gRPC authentication guide](http://www.grpc.io/docs/guides/auth.html) there are a number of different mechanisms for asserting identity between an client and server. We'll present some code-samples here demonstrating how to provide TLS support encryption and identity assertions as well as passing OAuth2 tokens to services that support it.
 
 # Enabling TLS on a gRPC client
 

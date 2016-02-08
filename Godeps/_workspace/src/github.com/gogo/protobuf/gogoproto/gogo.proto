@@ -67,6 +67,8 @@ extend google.protobuf.FileOptions {
 	optional bool goproto_extensions_map_all = 63025;
 	optional bool goproto_unrecognized_all = 63026;
 	optional bool gogoproto_import = 63027;
+
+	optional bool protosizer_all = 63028;
 }
 
 extend google.protobuf.MessageOptions {
@@ -93,6 +95,8 @@ extend google.protobuf.MessageOptions {
 
 	optional bool goproto_extensions_map = 64025;
 	optional bool goproto_unrecognized = 64026;
+
+	optional bool protosizer = 64028;
 }
 
 extend google.protobuf.FieldOptions {

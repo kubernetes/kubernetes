@@ -21,17 +21,19 @@ import (
 	"time"
 )
 
-// NewKeepAliveListener returns a listener that listens on the given address.
-// http://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html
-func NewKeepAliveListener(addr string, scheme string, info TLSInfo) (net.Listener, error) {
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
+type keepAliveConn interface {
+	SetKeepAlive(bool) error
+	SetKeepAlivePeriod(d time.Duration) error
+}
 
+// NewKeepAliveListener returns a listener that listens on the given address.
+// Be careful when wrap around KeepAliveListener with another Listener if TLSInfo is not nil.
+// Some pkgs (like go/http) might expect Listener to return TLSConn type to start TLS handshake.
+// http://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html
+func NewKeepAliveListener(l net.Listener, scheme string, info TLSInfo) (net.Listener, error) {
 	if scheme == "https" {
 		if info.Empty() {
-			return nil, fmt.Errorf("cannot listen on TLS for %s: KeyFile and CertFile are not presented", scheme+"://"+addr)
+			return nil, fmt.Errorf("cannot listen on TLS for given listener: KeyFile and CertFile are not presented")
 		}
 		cfg, err := info.ServerConfig()
 		if err != nil {
@@ -53,13 +55,13 @@ func (kln *keepaliveListener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	tcpc := c.(*net.TCPConn)
+	kac := c.(keepAliveConn)
 	// detection time: tcp_keepalive_time + tcp_keepalive_probes + tcp_keepalive_intvl
 	// default on linux:  30 + 8 * 30
 	// default on osx:    30 + 8 * 75
-	tcpc.SetKeepAlive(true)
-	tcpc.SetKeepAlivePeriod(30 * time.Second)
-	return tcpc, nil
+	kac.SetKeepAlive(true)
+	kac.SetKeepAlivePeriod(30 * time.Second)
+	return c, nil
 }
 
 // A tlsKeepaliveListener implements a network listener (net.Listener) for TLS connections.
@@ -75,12 +77,12 @@ func (l *tlsKeepaliveListener) Accept() (c net.Conn, err error) {
 	if err != nil {
 		return
 	}
-	tcpc := c.(*net.TCPConn)
+	kac := c.(keepAliveConn)
 	// detection time: tcp_keepalive_time + tcp_keepalive_probes + tcp_keepalive_intvl
 	// default on linux:  30 + 8 * 30
 	// default on osx:    30 + 8 * 75
-	tcpc.SetKeepAlive(true)
-	tcpc.SetKeepAlivePeriod(30 * time.Second)
+	kac.SetKeepAlive(true)
+	kac.SetKeepAlivePeriod(30 * time.Second)
 	c = tls.Server(c, l.config)
 	return
 }

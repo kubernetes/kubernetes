@@ -33,7 +33,7 @@ You also should have the relevant tools installed to generate the server and cli
 
 ## Defining the service
 
-Our first step (as you'll know from [Getting started](https://github.com/grpc/grpc/tree/master/examples)) is to define the gRPC *service* and the method *request* and *response* types using [protocol buffers] (https://developers.google.com/protocol-buffers/docs/overview). You can see the complete .proto file in [`examples/route_guide/proto/route_guide.proto`](examples/route_guide/proto/route_guide.proto).
+Our first step (as you'll know from the [quick start](http://www.grpc.io/docs/#quick-start)) is to define the gRPC *service* and the method *request* and *response* types using [protocol buffers] (https://developers.google.com/protocol-buffers/docs/overview). You can see the complete .proto file in [`examples/route_guide/proto/route_guide.proto`](examples/route_guide/proto/route_guide.proto).
 
 To define a service, you specify a named `service` in your .proto file:
 
@@ -227,7 +227,7 @@ func (s *routeGuideServer) RecordRoute(stream pb.RouteGuide_RecordRouteServer) e
 }
 ```
 
-In the method body we use the `RouteGuide_RecordRouteServer`s `Recv()` method to repeatedly read in our client's requests to a request object (in this case a `Point`) until there are no more messages: the server needs to check the the error returned from `Read()` after each call. If this is `nil`, the stream is still good and it can continue reading; if it's `io.EOF` the message stream has ended and the server can return its `RouteSummary`. If it has any other value, we return the error "as is" so that it'll be translated to an RPC status by the gRPC layer.
+In the method body we use the `RouteGuide_RecordRouteServer`s `Recv()` method to repeatedly read in our client's requests to a request object (in this case a `Point`) until there are no more messages: the server needs to check the the error returned from `Recv()` after each call. If this is `nil`, the stream is still good and it can continue reading; if it's `io.EOF` the message stream has ended and the server can return its `RouteSummary`. If it has any other value, we return the error "as is" so that it'll be translated to an RPC status by the gRPC layer.
 
 #### Bidirectional streaming RPC
 Finally, let's look at our bidirectional streaming RPC `RouteChat()`.

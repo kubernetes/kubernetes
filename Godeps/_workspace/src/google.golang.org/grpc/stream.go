@@ -34,6 +34,7 @@
 package grpc
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"sync"
@@ -96,35 +97,63 @@ type ClientStream interface {
 // NewClientStream creates a new Stream for the client side. This is called
 // by generated code.
 func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (ClientStream, error) {
+	var (
+		t   transport.ClientTransport
+		err error
+	)
+	t, err = cc.dopts.picker.Pick(ctx)
+	if err != nil {
+		return nil, toRPCErr(err)
+	}
 	// TODO(zhaoq): CallOption is omitted. Add support when it is needed.
 	callHdr := &transport.CallHdr{
 		Host:   cc.authority,
 		Method: method,
+		Flush:  desc.ServerStreams&&desc.ClientStreams,
+	}
+	if cc.dopts.cp != nil {
+		callHdr.SendCompress = cc.dopts.cp.Type()
 	}
 	cs := &clientStream{
 		desc:    desc,
 		codec:   cc.dopts.codec,
+		cp:      cc.dopts.cp,
+		dc:      cc.dopts.dc,
 		tracing: EnableTracing,
 	}
-	if cs.tracing {
-		cs.traceInfo.tr = trace.New("grpc.Sent."+methodFamily(method), method)
-		cs.traceInfo.firstLine.client = true
-		if deadline, ok := ctx.Deadline(); ok {
-			cs.traceInfo.firstLine.deadline = deadline.Sub(time.Now())
-		}
-		cs.traceInfo.tr.LazyLog(&cs.traceInfo.firstLine, false)
+	if cc.dopts.cp != nil {
+		callHdr.SendCompress = cc.dopts.cp.Type()
+		cs.cbuf = new(bytes.Buffer)
 	}
-	t, _, err := cc.wait(ctx, 0)
-	if err != nil {
-		return nil, toRPCErr(err)
+	if cs.tracing {
+		cs.trInfo.tr = trace.New("grpc.Sent."+methodFamily(method), method)
+		cs.trInfo.firstLine.client = true
+		if deadline, ok := ctx.Deadline(); ok {
+			cs.trInfo.firstLine.deadline = deadline.Sub(time.Now())
+		}
+		cs.trInfo.tr.LazyLog(&cs.trInfo.firstLine, false)
+		ctx = trace.NewContext(ctx, cs.trInfo.tr)
 	}
 	s, err := t.NewStream(ctx, callHdr)
 	if err != nil {
+		cs.finish(err)
 		return nil, toRPCErr(err)
 	}
 	cs.t = t
 	cs.s = s
 	cs.p = &parser{s: s}
+	// Listen on ctx.Done() to detect cancellation when there is no pending
+	// I/O operations on this stream.
+	go func() {
+		select {
+		case <-t.Error():
+			// Incur transport error, simply exit.
+		case <-s.Context().Done():
+			err := s.Context().Err()
+			cs.finish(err)
+			cs.closeTransportStream(transport.ContextErr(err))
+		}
+	}()
 	return cs, nil
 }
 
@@ -135,13 +164,17 @@ type clientStream struct {
 	p     *parser
 	desc  *StreamDesc
 	codec Codec
+	cp    Compressor
+	cbuf  *bytes.Buffer
+	dc    Decompressor
 
 	tracing bool // set to EnableTracing when the clientStream is created.
 
-	mu sync.Mutex // protects traceInfo
-	// traceInfo.tr is set when the clientStream is created (if EnableTracing is true),
+	mu     sync.Mutex
+	closed bool
+	// trInfo.tr is set when the clientStream is created (if EnableTracing is true),
 	// and is set to nil when the clientStream's finish method is called.
-	traceInfo traceInfo
+	trInfo traceInfo
 }
 
 func (cs *clientStream) Context() context.Context {
@@ -152,7 +185,7 @@ func (cs *clientStream) Header() (metadata.MD, error) {
 	m, err := cs.s.Header()
 	if err != nil {
 		if _, ok := err.(transport.ConnectionError); !ok {
-			cs.t.CloseStream(cs.s, err)
+			cs.closeTransportStream(err)
 		}
 	}
 	return m, err
@@ -165,8 +198,8 @@ func (cs *clientStream) Trailer() metadata.MD {
 func (cs *clientStream) SendMsg(m interface{}) (err error) {
 	if cs.tracing {
 		cs.mu.Lock()
-		if cs.traceInfo.tr != nil {
-			cs.traceInfo.tr.LazyLog(&payload{sent: true, msg: m}, true)
+		if cs.trInfo.tr != nil {
+			cs.trInfo.tr.LazyLog(&payload{sent: true, msg: m}, true)
 		}
 		cs.mu.Unlock()
 	}
@@ -175,11 +208,16 @@ func (cs *clientStream) SendMsg(m interface{}) (err error) {
 			return
 		}
 		if _, ok := err.(transport.ConnectionError); !ok {
-			cs.t.CloseStream(cs.s, err)
+			cs.closeTransportStream(err)
 		}
 		err = toRPCErr(err)
 	}()
-	out, err := encode(cs.codec, m, compressionNone)
+	out, err := encode(cs.codec, m, cs.cp, cs.cbuf)
+	defer func() {
+		if cs.cbuf != nil {
+			cs.cbuf.Reset()
+		}
+	}()
 	if err != nil {
 		return transport.StreamErrorf(codes.Internal, "grpc: %v", err)
 	}
@@ -187,7 +225,7 @@ func (cs *clientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (cs *clientStream) RecvMsg(m interface{}) (err error) {
-	err = recv(cs.p, cs.codec, m)
+	err = recv(cs.p, cs.codec, cs.s, cs.dc, m)
 	defer func() {
 		// err != nil indicates the termination of the stream.
 		if err != nil {
@@ -197,8 +235,8 @@ func (cs *clientStream) RecvMsg(m interface{}) (err error) {
 	if err == nil {
 		if cs.tracing {
 			cs.mu.Lock()
-			if cs.traceInfo.tr != nil {
-				cs.traceInfo.tr.LazyLog(&payload{sent: false, msg: m}, true)
+			if cs.trInfo.tr != nil {
+				cs.trInfo.tr.LazyLog(&payload{sent: false, msg: m}, true)
 			}
 			cs.mu.Unlock()
 		}
@@ -206,8 +244,8 @@ func (cs *clientStream) RecvMsg(m interface{}) (err error) {
 			return
 		}
 		// Special handling for client streaming rpc.
-		err = recv(cs.p, cs.codec, m)
-		cs.t.CloseStream(cs.s, err)
+		err = recv(cs.p, cs.codec, cs.s, cs.dc, m)
+		cs.closeTransportStream(err)
 		if err == nil {
 			return toRPCErr(errors.New("grpc: client streaming protocol violation: get <nil>, want <EOF>"))
 		}
@@ -220,7 +258,7 @@ func (cs *clientStream) RecvMsg(m interface{}) (err error) {
 		return toRPCErr(err)
 	}
 	if _, ok := err.(transport.ConnectionError); !ok {
-		cs.t.CloseStream(cs.s, err)
+		cs.closeTransportStream(err)
 	}
 	if err == io.EOF {
 		if cs.s.StatusCode() == codes.OK {
@@ -238,10 +276,21 @@ func (cs *clientStream) CloseSend() (err error) {
 		return
 	}
 	if _, ok := err.(transport.ConnectionError); !ok {
-		cs.t.CloseStream(cs.s, err)
+		cs.closeTransportStream(err)
 	}
 	err = toRPCErr(err)
 	return
+}
+
+func (cs *clientStream) closeTransportStream(err error) {
+	cs.mu.Lock()
+	if cs.closed {
+		cs.mu.Unlock()
+		return
+	}
+	cs.closed = true
+	cs.mu.Unlock()
+	cs.t.CloseStream(cs.s, err)
 }
 
 func (cs *clientStream) finish(err error) {
@@ -250,15 +299,15 @@ func (cs *clientStream) finish(err error) {
 	}
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	if cs.traceInfo.tr != nil {
+	if cs.trInfo.tr != nil {
 		if err == nil || err == io.EOF {
-			cs.traceInfo.tr.LazyPrintf("RPC: [OK]")
+			cs.trInfo.tr.LazyPrintf("RPC: [OK]")
 		} else {
-			cs.traceInfo.tr.LazyPrintf("RPC: [%v]", err)
-			cs.traceInfo.tr.SetError()
+			cs.trInfo.tr.LazyPrintf("RPC: [%v]", err)
+			cs.trInfo.tr.SetError()
 		}
-		cs.traceInfo.tr.Finish()
-		cs.traceInfo.tr = nil
+		cs.trInfo.tr.Finish()
+		cs.trInfo.tr = nil
 	}
 }
 
@@ -280,15 +329,14 @@ type serverStream struct {
 	s          *transport.Stream
 	p          *parser
 	codec      Codec
+	cp         Compressor
+	dc         Decompressor
+	cbuf       *bytes.Buffer
 	statusCode codes.Code
 	statusDesc string
+	trInfo     *traceInfo
 
-	tracing bool // set to EnableTracing when the serverStream is created.
-
-	mu sync.Mutex // protects traceInfo
-	// traceInfo.tr is set when the serverStream is created (if EnableTracing is true),
-	// and is set to nil when the serverStream's finish method is called.
-	traceInfo traceInfo
+	mu sync.Mutex // protects trInfo.tr after the service handler runs.
 }
 
 func (ss *serverStream) Context() context.Context {
@@ -309,19 +357,25 @@ func (ss *serverStream) SetTrailer(md metadata.MD) {
 
 func (ss *serverStream) SendMsg(m interface{}) (err error) {
 	defer func() {
-		if ss.tracing {
+		if ss.trInfo != nil {
 			ss.mu.Lock()
-			if err == nil {
-				ss.traceInfo.tr.LazyLog(&payload{sent: true, msg: m}, true)
-			} else {
-				ss.traceInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
-				ss.traceInfo.tr.SetError()
+			if ss.trInfo.tr != nil {
+				if err == nil {
+					ss.trInfo.tr.LazyLog(&payload{sent: true, msg: m}, true)
+				} else {
+					ss.trInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
+					ss.trInfo.tr.SetError()
+				}
 			}
-
 			ss.mu.Unlock()
 		}
 	}()
-	out, err := encode(ss.codec, m, compressionNone)
+	out, err := encode(ss.codec, m, ss.cp, ss.cbuf)
+	defer func() {
+		if ss.cbuf != nil {
+			ss.cbuf.Reset()
+		}
+	}()
 	if err != nil {
 		err = transport.StreamErrorf(codes.Internal, "grpc: %v", err)
 		return err
@@ -331,16 +385,18 @@ func (ss *serverStream) SendMsg(m interface{}) (err error) {
 
 func (ss *serverStream) RecvMsg(m interface{}) (err error) {
 	defer func() {
-		if ss.tracing {
+		if ss.trInfo != nil {
 			ss.mu.Lock()
-			if err == nil {
-				ss.traceInfo.tr.LazyLog(&payload{sent: false, msg: m}, true)
-			} else if err != io.EOF {
-				ss.traceInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
-				ss.traceInfo.tr.SetError()
+			if ss.trInfo.tr != nil {
+				if err == nil {
+					ss.trInfo.tr.LazyLog(&payload{sent: false, msg: m}, true)
+				} else if err != io.EOF {
+					ss.trInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
+					ss.trInfo.tr.SetError()
+				}
 			}
 			ss.mu.Unlock()
 		}
 	}()
-	return recv(ss.p, ss.codec, m)
+	return recv(ss.p, ss.codec, ss.s, ss.dc, m)
 }
