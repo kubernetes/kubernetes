@@ -117,57 +117,50 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f Ver
 	}
 }
 
-func (m *DefaultRESTMapper) Add(kind unversioned.GroupVersionKind, scope RESTScope, mixedCase bool) {
-	plural, singular := KindToResource(kind, mixedCase)
-	lowerPlural := plural.GroupVersion().WithResource(strings.ToLower(plural.Resource))
-	lowerSingular := singular.GroupVersion().WithResource(strings.ToLower(singular.Resource))
+func (m *DefaultRESTMapper) Add(kind unversioned.GroupVersionKind, scope RESTScope) {
+	plural, singular := KindToResource(kind)
 
 	m.singularToPlural[singular] = plural
 	m.pluralToSingular[plural] = singular
-	m.singularToPlural[lowerSingular] = lowerPlural
-	m.pluralToSingular[lowerPlural] = lowerSingular
 
-	if _, mixedCaseExists := m.resourceToKind[plural]; !mixedCaseExists {
-		m.resourceToKind[plural] = kind
-		m.resourceToKind[singular] = kind
-	}
-
-	if _, lowerCaseExists := m.resourceToKind[lowerPlural]; !lowerCaseExists && (lowerPlural != plural) {
-		m.resourceToKind[lowerPlural] = kind
-		m.resourceToKind[lowerSingular] = kind
-	}
+	m.resourceToKind[singular] = kind
+	m.resourceToKind[plural] = kind
 
 	m.kindToPluralResource[kind] = plural
 	m.kindToScope[kind] = scope
 }
 
+// unpluralizedSuffixes is a list of resource suffixes that are the same plural and singular
+// This is only is only necessary because some bits of code are lazy and don't actually use the RESTMapper like they should.
+// TODO eliminate this so that different callers can correctly map to resources.  This probably means updating all
+// callers to use the RESTMapper they mean.
+var unpluralizedSuffixes = []string{
+	"endpoints",
+}
+
 // KindToResource converts Kind to a resource name.
-func KindToResource(kind unversioned.GroupVersionKind, mixedCase bool) (plural, singular unversioned.GroupVersionResource) {
+func KindToResource(kind unversioned.GroupVersionKind) ( /*plural*/ unversioned.GroupVersionResource /*singular*/, unversioned.GroupVersionResource) {
 	kindName := kind.Kind
 	if len(kindName) == 0 {
-		return
+		return unversioned.GroupVersionResource{}, unversioned.GroupVersionResource{}
 	}
-	if mixedCase {
-		// Legacy support for mixed case names
-		singular = kind.GroupVersion().WithResource(strings.ToLower(kindName[:1]) + kindName[1:])
-	} else {
-		singular = kind.GroupVersion().WithResource(strings.ToLower(kindName))
-	}
+	singularName := strings.ToLower(kindName)
+	singular := kind.GroupVersion().WithResource(singularName)
 
-	singularName := singular.Resource
-	if strings.HasSuffix(singularName, "endpoints") {
-		plural = singular
-	} else {
-		switch string(singularName[len(singularName)-1]) {
-		case "s":
-			plural = kind.GroupVersion().WithResource(singularName + "es")
-		case "y":
-			plural = kind.GroupVersion().WithResource(strings.TrimSuffix(singularName, "y") + "ies")
-		default:
-			plural = kind.GroupVersion().WithResource(singularName + "s")
+	for _, skip := range unpluralizedSuffixes {
+		if strings.HasSuffix(singularName, skip) {
+			return singular, singular
 		}
 	}
-	return
+
+	switch string(singularName[len(singularName)-1]) {
+	case "s":
+		return kind.GroupVersion().WithResource(singularName + "es"), singular
+	case "y":
+		return kind.GroupVersion().WithResource(strings.TrimSuffix(singularName, "y") + "ies"), singular
+	}
+
+	return kind.GroupVersion().WithResource(singularName + "s"), singular
 }
 
 // ResourceSingularizer implements RESTMapper

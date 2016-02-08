@@ -53,7 +53,7 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, inter
 			if rootScoped.Has(kind) {
 				scope = meta.RESTScopeRoot
 			}
-			mapper.Add(gvk, scope, false)
+			mapper.Add(gvk, scope)
 		}
 	}
 	return mapper

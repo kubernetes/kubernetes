@@ -234,7 +234,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 
 	if gvk != nil {
 		// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
-		_, resource := meta.KindToResource(*gvk, false)
+		_, resource := meta.KindToResource(*gvk)
 
 		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
 	} else {
