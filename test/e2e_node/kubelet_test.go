@@ -184,13 +184,9 @@ var _ = Describe("Kubelet", func() {
 						Expect(vs.CapacityBytes).NotTo(BeZero())
 						Expect(vs.AvailableBytes).NotTo(BeZero())
 						Expect(vs.UsedBytes).NotTo(BeZero())
-						if strings.HasPrefix(vs.Name, "default-token-") {
-							volumeNames = append(volumeNames, "default-token-")
-						} else {
-							volumeNames = append(volumeNames, vs.Name)
-						}
+						volumeNames = append(volumeNames, vs.Name)
 					}
-					Expect(volumeNames).To(ConsistOf("default-token-", "test-empty-dir"))
+					Expect(volumeNames).To(ConsistOf("test-empty-dir"))
 
 					// fs usage (not for system containers)
 					Expect(container.Rootfs).NotTo(BeNil(), spew.Sdump(container))
