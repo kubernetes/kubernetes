@@ -19,6 +19,7 @@ package procfs
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -48,6 +49,9 @@ func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
 	filePath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
 	content, err := ioutil.ReadFile(filePath)
 	if err != nil {
+		if e, ok := err.(*os.SyscallError); ok && os.IsNotExist(e) {
+			return "", os.ErrNotExist
+		}
 		return "", err
 	}
 	return containerNameFromProcCgroup(string(content))
