@@ -29,7 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build appengine,!appenginevm
+// +build appengine
 
 // This file contains an implementation of proto field accesses using package reflect.
 // It is slower than the code in pointer_unsafe.go but it avoids package unsafe and can
@@ -144,8 +144,8 @@ func structPointer_ExtMap(p structPointer, f field) *map[int32]Extension {
 	return structPointer_ifield(p, f).(*map[int32]Extension)
 }
 
-// Map returns the reflect.Value for the address of a map field in the struct.
-func structPointer_Map(p structPointer, f field, typ reflect.Type) reflect.Value {
+// NewAt returns the reflect.Value for a pointer to a field in the struct.
+func structPointer_NewAt(p structPointer, f field, typ reflect.Type) reflect.Value {
 	return structPointer_field(p, f).Addr()
 }
 

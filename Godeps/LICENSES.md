@@ -13,7 +13,6 @@ github.com/aws/aws-sdk-go | Apache-2
 github.com/beorn7/perks/quantile | MIT?
 github.com/blang/semver | MITname
 github.com/boltdb/bolt | MITname
-github.com/bradfitz/http2 | BSDlikeRef
 github.com/camlistore/go4 | Apache-2
 github.com/ClusterHQ/flocker-go | UNKNOWN
 github.com/codegangsta/negroni | MITname
@@ -23,14 +22,14 @@ github.com/coreos/go-oidc | Apache-2
 github.com/coreos/go-semver | Apache-2
 github.com/coreos/go-systemd | Apache-2
 github.com/coreos/pkg | Apache-2
-github.com/coreos/rkt | Apache-2
+github.com/coreos/rkt | MITname
 github.com/cpuguy83/go-md2man | MITname
 github.com/davecgh/go-spew | MIToldwithoutSellandNoDocumentationRequi
 github.com/daviddengcn/go-colortext | BSD?
 github.com/dgrijalva/jwt-go | spdxMIT
 github.com/docker/docker | Apache-2
 github.com/docker/docker/pkg/symlink | spdxBSD3
-github.com/docker/go-units | Apache-2
+github.com/docker/go-units | UNKNOWN
 github.com/docker/spdystream | SeeFile
 github.com/elazarl/go-bindata-assetfs | spdxBSD2
 github.com/elazarl/goproxy | BSDWarr

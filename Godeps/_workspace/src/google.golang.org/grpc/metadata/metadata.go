@@ -46,27 +46,16 @@ const (
 	binHdrSuffix = "-bin"
 )
 
-// grpc-http2 requires ASCII header key and value (more detail can be found in
-// "Requests" subsection in go/grpc-http2).
-func isASCII(s string) bool {
-	for _, c := range s {
-		if c > 127 {
-			return false
-		}
-	}
-	return true
-}
-
 // encodeKeyValue encodes key and value qualified for transmission via gRPC.
 // Transmitting binary headers violates HTTP/2 spec.
 // TODO(zhaoq): Maybe check if k is ASCII also.
 func encodeKeyValue(k, v string) (string, string) {
-	if isASCII(v) {
-		return k, v
+	k = strings.ToLower(k)
+	if strings.HasSuffix(k, binHdrSuffix) {
+		val := base64.StdEncoding.EncodeToString([]byte(v))
+		v = string(val)
 	}
-	key := strings.ToLower(k + binHdrSuffix)
-	val := base64.StdEncoding.EncodeToString([]byte(v))
-	return key, string(val)
+	return k, v
 }
 
 // DecodeKeyValue returns the original key and value corresponding to the
@@ -75,12 +64,11 @@ func DecodeKeyValue(k, v string) (string, string, error) {
 	if !strings.HasSuffix(k, binHdrSuffix) {
 		return k, v, nil
 	}
-	key := k[:len(k)-len(binHdrSuffix)]
 	val, err := base64.StdEncoding.DecodeString(v)
 	if err != nil {
 		return "", "", err
 	}
-	return key, string(val), nil
+	return k, string(val), nil
 }
 
 // MD is a mapping from metadata keys to values. Users should use the following

@@ -17,7 +17,7 @@ enum PayloadType {
 
 message StatsRequest {
     // run number
-    optional int32 test_num = 1;
+    int32 test_num = 1;
 }
 
 message ServerStats {

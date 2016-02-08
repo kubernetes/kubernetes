@@ -13,7 +13,7 @@
 // ConfigureServer. That ConfigureServer call will likely be automatic
 // or available via an empty import in the future.
 //
-// This package currently targets draft-14. See http://http2.github.io/
+// See http://http2.github.io/
 package http2
 
 import (
