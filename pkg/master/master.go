@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	// Need import here.
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
@@ -259,21 +259,28 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 	// Install batch unless disabled.
 	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
-
-
-
-		batchResources := m.getBatchResources(c) // TODO: Here, read the storage version for batch. If it is v1beta1, then use extensions/v1beta1. If it is v1, then use batch/v1.
+		batchResources := m.getBatchResources(c)
 		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
-		// Update the prefered version as per StorageVersions in the config.
-		storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
-		glog.Fatalf("Using %#v as key to StorageVersions, getting value %#v\n", batchGroupMeta.GroupVersion, batchResources)
-		// Preferred storage version is extensions/v1beta1, unless 
-		// XXX sort out which preferred storage version?
-		// storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
-		// if !found {
-		// 	glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
-		// }
-		// batchGroupMeta.GroupVersion = batchGroupMeta.GroupVersion
+
+		if false {
+			// TODO: Here, read the storage version for batch. If it is v1beta1, then use extensions/v1beta1. If it is v1, then use batch/v1.
+			// Figure out what storage group/version we should use.
+			storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
+			if !found {
+				glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
+			}
+
+			// Since this is moved from extensions v1beta1, the storage group changes as well as its version.
+			storageGroup := "batch"
+			if storageVersion == "v1beta1" {
+				storageGroup = "extensions"
+			}
+			_ = storageGroup
+		}
+
+		// Hard code preferred group version to batch/v1
+		batchGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "batch", Version: "v1"}
+		glog.Infof("batch setup: \n\n%#v\n\n", batchGroupMeta)
 
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *batchGroupMeta,
@@ -722,6 +729,7 @@ func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
 	}
 	return storage
 }
+
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
 func findExternalAddress(node *api.Node) (string, error) {
 	var fallback string
