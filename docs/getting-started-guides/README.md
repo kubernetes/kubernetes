@@ -173,14 +173,14 @@ Bare-metal           | custom       | Fedora | _none_      | [docs](fedora/fedor
 Bare-metal           | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 libvirt              | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           | [✓][4]  | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           | [✓][4]   | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 DCOS                 | Marathon   | CoreOS/Alpine | custom | [docs](dcos.md)                                   |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community
 GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires))
 Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles))
 Bare-metal (Offline) | CoreOS       | CoreOS | flannel     | [docs](coreos/bare_metal_offline.md)              |          | Community ([@jeffbean](https://github.com/jeffbean))
-Bare-metal           | CoreOS       | CoreOS | Calico      | [docs](coreos/bare_metal_calico.md)               |          | Community ([@caseydavenport](https://github.com/caseydavenport))
+Bare-metal           | CoreOS       | CoreOS | Calico      | [docs](coreos/bare_metal_calico.md)               | [✓][5]   | Community ([@caseydavenport](https://github.com/caseydavenport))
 CloudStack           | Ansible      | CoreOS | flannel     | [docs](cloudstack.md)                             |          | Community ([@runseb](https://github.com/runseb))
 Vmware               |              | Debian | OVS         | [docs](vsphere.md)                                |          | Community ([@pietern](https://github.com/pietern))
 Bare-metal           | custom       | CentOS | _none_      | [docs](centos/centos_manual_config.md)            |          | Community ([@coolsvap](https://github.com/coolsvap))
@@ -226,6 +226,8 @@ Definition of columns:
 [3]: https://gist.github.com/erictune/2f39b22f72565365e59b
 <!-- Mesos/Docker conformance test result -->
 [4]: https://gist.github.com/sttts/d27f3b879223895494d4
+<!-- Calico/CoreOS conformance test result -->
+[5]: https://gist.github.com/caseydavenport/98ca87e709b21f03d195
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
