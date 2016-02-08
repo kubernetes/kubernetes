@@ -46,6 +46,8 @@ for ((i=0; i < NUM_NODES; i++)) do
   VAGRANT_NODE_NAMES[$i]="node-$((i+1))"
 done
 
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.246.0.0/16}"
+
 SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
 
 # Since this isn't exposed on the network, default to a simple user/passwd
