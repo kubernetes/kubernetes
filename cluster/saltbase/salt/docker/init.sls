@@ -185,6 +185,8 @@ net.ipv4.ip_forward:
 #
 # 1. Find new deb name at:
 #    http://apt.dockerproject.org/repo/pool/main/d/docker-engine
+#    For release candidate version, find new deb name at:
+#    http://apt.dockerproject.org/repo/pool/testing/d/docker-engine/
 # 2. Download based on that:
 #    curl -O http://apt.dockerproject.org/repo/pool/main/d/docker-engine/<deb>
 # 3. Upload to GCS:
@@ -195,8 +197,22 @@ net.ipv4.ip_forward:
 #    shasum <deb>
 # 6. Update override_deb, override_deb_sha1, override_docker_ver with new
 #    deb name, new hash and new version
+#    For example, for docker 1.8.3-0~wheezy_amd64.deb:
+#        docker_pkg_name - docker-engine
+#        override_deb - docker-engine_1.8.3-0~wheezy_amd64.deb
+#        override_deb_sha1 - f812e1134e7375b29886a372a6e24d04e1ee33c9
+#        override_docker_ver - 1.8.3-0~wheezy
+# 7. Sometimes debian package may not work, to use static linked binary version:
+#    * Find url of specific binary version at:
+#        https://github.com/docker/docker/releases
+#    * Download docker binary and upload to GCS, just like what we do for debian package.
+#    * Update override_bin_name with new binary name. For example, for docker 1.8.3:
+#        override_bin_name - docker-1.8.3
+#    * override_bin_name takes effect only when override_docker_ver is not set.
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
+
+{% set override_bin_name='' %}
 
 {% set override_deb_url='' %}
 
@@ -259,7 +275,16 @@ docker-upgrade:
       - {{ docker_pkg_name }}: /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
-{% endif %} # end override_docker_ver != ''
+{% elif override_bin_name != '' %} # end override_docker_ver != ''
+/usr/bin/docker:
+  file.managed:
+    - source: {{ storage_base + override_bin_name }}
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: true
+{% endif %} # end override_bin_name != ''
 
 # Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
 {% if pillar.get('is_systemd') %}
