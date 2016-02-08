@@ -14,24 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package normalization
+package v1beta1
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
-
-func Group(group string) string {
-	if group == "api" {
-		return "core"
-	}
-	return group
+// ScalesGetter has a method to return a ScaleInterface.
+// A group's client should implement this interface.
+type ScalesGetter interface {
+	Scales(namespace string) ScaleInterface
 }
 
-func Version(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
+// ScaleInterface has methods to work with Scale resources.
+type ScaleInterface interface {
+	ScaleExpansion
 }
 
-func GroupVersion(gv unversioned.GroupVersion) unversioned.GroupVersion {
-	return unversioned.GroupVersion{Group(gv.Group), Version(gv.Version)}
+// scales implements ScaleInterface
+type scales struct {
+	client *ExtensionsClient
+	ns     string
+}
+
+// newScales returns a Scales
+func newScales(c *ExtensionsClient, namespace string) *scales {
+	return &scales{
+		client: c,
+		ns:     namespace,
+	}
 }

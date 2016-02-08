@@ -325,6 +325,8 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 }
 
+// +genclient=true,nonNamespaced=true
+
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
@@ -1539,6 +1541,8 @@ type PodStatusResult struct {
 	Status PodStatus `json:"status,omitempty"`
 }
 
+// +genclient=true
+
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
 type Pod struct {
@@ -1581,6 +1585,8 @@ type PodTemplateSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Spec PodSpec `json:"spec,omitempty"`
 }
+
+// +genclient=true
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
@@ -1641,6 +1647,8 @@ type ReplicationControllerStatus struct {
 	// ObservedGeneration reflects the generation of the most recently observed replication controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
+
+// +genclient=true
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
@@ -1819,6 +1827,8 @@ type ServicePort struct {
 	NodePort int32 `json:"nodePort,omitempty"`
 }
 
+// +genclient=true
+
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
@@ -1856,6 +1866,8 @@ type ServiceList struct {
 	Items []Service `json:"items"`
 }
 
+// +genclient=true
+
 // ServiceAccount binds together:
 // * a name, understood by users, and perhaps by peripheral systems, for an identity
 // * a principal that can be authenticated and authorized
@@ -1888,6 +1900,8 @@ type ServiceAccountList struct {
 	// More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md#service-accounts
 	Items []ServiceAccount `json:"items"`
 }
+
+// +genclient=true
 
 // Endpoints is a collection of endpoints that implement the actual service. Example:
 //   Name: "mysvc",
@@ -2133,6 +2147,8 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
+// +genclient=true,nonNamespaced=true
+
 // Node is a worker node in Kubernetes, formerly known as minion.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 type Node struct {
@@ -2193,6 +2209,8 @@ const (
 	// NamespaceTerminating means the namespace is undergoing graceful termination
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
+
+// +genclient=true,nonNamespaced=true
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
@@ -2440,6 +2458,8 @@ const (
 	EventTypeWarning string = "Warning"
 )
 
+// +genclient=true
+
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
@@ -2530,6 +2550,8 @@ type LimitRangeSpec struct {
 	Limits []LimitRangeItem `json:"limits"`
 }
 
+// +genclient=true
+
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
 type LimitRange struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -2586,6 +2608,8 @@ type ResourceQuotaStatus struct {
 	Used ResourceList `json:"used,omitempty"`
 }
 
+// +genclient=true
+
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -2613,6 +2637,8 @@ type ResourceQuotaList struct {
 	// More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
 	Items []ResourceQuota `json:"items"`
 }
+
+// +genclient=true
 
 // Secret holds secret data of a certain type. The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
@@ -2697,6 +2723,8 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
+// +genclient=true
+
 // ConfigMap holds configuration data for pods to consume.
 type ConfigMap struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -2743,6 +2771,8 @@ type ComponentCondition struct {
 	// For example, a health check error code.
 	Error string `json:"error,omitempty"`
 }
+
+// +genclient=true,nonNamespaced=true
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {

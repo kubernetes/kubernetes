@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -40,6 +41,7 @@ type Framework struct {
 
 	Namespace                *api.Namespace
 	Client                   *client.Client
+	Clientset_1_2            *release_1_2.Clientset
 	NamespaceDeletionTimeout time.Duration
 
 	gatherer containerResourceGatherer
@@ -79,6 +81,7 @@ func (f *Framework) beforeEach() {
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Client = c
+	f.Clientset_1_2 = release_1_2.FromUnversionedClient(c)
 
 	By("Building a namespace api object")
 	namespace, err := createTestingNS(f.BaseName, f.Client, map[string]string{
