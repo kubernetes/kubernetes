@@ -522,9 +522,3 @@ func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
 	}
 	return nil, false
 }
-
-// ResourceIsValid takes a partial resource and checks if it's valid
-func (m *DefaultRESTMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
-	_, err := m.KindFor(resource)
-	return err == nil
-}
