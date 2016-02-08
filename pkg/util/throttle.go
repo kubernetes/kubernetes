@@ -16,7 +16,11 @@ limitations under the License.
 
 package util
 
-import "github.com/juju/ratelimit"
+import (
+	"sync"
+
+	"github.com/juju/ratelimit"
+)
 
 type RateLimiter interface {
 	// TryAccept returns true if a token is taken immediately. Otherwise,
@@ -47,12 +51,6 @@ func NewTokenBucketRateLimiter(qps float32, burst int) RateLimiter {
 	return &tokenBucketRateLimiter{limiter}
 }
 
-type fakeRateLimiter struct{}
-
-func NewFakeRateLimiter() RateLimiter {
-	return &fakeRateLimiter{}
-}
-
 func (t *tokenBucketRateLimiter) TryAccept() bool {
 	return t.limiter.TakeAvailable(1) == 1
 }
@@ -71,14 +69,48 @@ func (t *tokenBucketRateLimiter) Accept() {
 func (t *tokenBucketRateLimiter) Stop() {
 }
 
-func (t *fakeRateLimiter) TryAccept() bool {
+type fakeAlwaysRateLimiter struct{}
+
+func NewFakeAlwaysRateLimiter() RateLimiter {
+	return &fakeAlwaysRateLimiter{}
+}
+
+func (t *fakeAlwaysRateLimiter) TryAccept() bool {
 	return true
 }
 
-func (t *fakeRateLimiter) Saturation() float64 {
+func (t *fakeAlwaysRateLimiter) Saturation() float64 {
 	return 0
 }
 
-func (t *fakeRateLimiter) Stop() {}
+func (t *fakeAlwaysRateLimiter) Stop() {}
 
-func (t *fakeRateLimiter) Accept() {}
+func (t *fakeAlwaysRateLimiter) Accept() {}
+
+type fakeNeverRateLimiter struct {
+	wg sync.WaitGroup
+}
+
+func NewFakeNeverRateLimiter() RateLimiter {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	return &fakeNeverRateLimiter{
+		wg: wg,
+	}
+}
+
+func (t *fakeNeverRateLimiter) TryAccept() bool {
+	return false
+}
+
+func (t *fakeNeverRateLimiter) Saturation() float64 {
+	return 1
+}
+
+func (t *fakeNeverRateLimiter) Stop() {
+	t.wg.Done()
+}
+
+func (t *fakeNeverRateLimiter) Accept() {
+	t.wg.Wait()
+}
