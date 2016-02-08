@@ -259,21 +259,21 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 	// Install batch unless disabled.
 	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
-		batchResources := m.getBatchResources(c)
-		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
+
+
+
+		batchResources := m.getBatchResources(c) // TODO: Here, read the storage version for batch. If it is v1beta1, then use extensions/v1beta1. If it is v1, then use batch/v1.
 		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
 		// Update the prefered version as per StorageVersions in the config.
-		//storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
+		storageVersion, found := c.StorageVersions[batchGroupMeta.GroupVersion.Group]
+		glog.Fatalf("Using %#v as key to StorageVersions, getting value %#v\n", batchGroupMeta.GroupVersion, batchResources)
+		// Preferred storage version is extensions/v1beta1, unless 
 		// XXX sort out which preferred storage version?
-		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
-		if !found {
-			glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
-		}
-		preferedGroupVersion, err := unversioned.ParseGroupVersion(storageVersion)
-		if err != nil {
-			glog.Fatalf("Error in parsing group version %s: %v", storageVersion, err)
-		}
-		batchGroupMeta.GroupVersion = preferedGroupVersion
+		// storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
+		// if !found {
+		// 	glog.Fatalf("Couldn't find storage version of group %v", batchGroupMeta.GroupVersion.Group)
+		// }
+		// batchGroupMeta.GroupVersion = batchGroupMeta.GroupVersion
 
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *batchGroupMeta,
@@ -301,6 +301,8 @@ func (m *Master) InstallAPIs(c *Config) {
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
+	// Fixup the storageDestination to be extensions/v1beta1
+	c.StorageDestinations.APIGroups["batch/v1"] = c.StorageDestinations.APIGroups["extensions/v1beta1"]
 }
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
@@ -694,7 +696,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
-// getBatchlResources returns the resources for batch api
+// getBatchResources returns the resources for batch api
 func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
 	enabledResources := sets.NewString("jobs")

@@ -285,6 +285,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		GroupVersion: config.StorageVersions[extensions.GroupName],
 		Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
 	}
+	// See comment in https://mail.google.com/mail/u/0/#search/dbsmith/152b3a28f2b57032
+
 	assert.Equal(extensionsGroupName, groupList.Groups[0].Name)
 	assert.Equal(extensionsVersions, groupList.Groups[0].Versions)
 	assert.Equal(extensionsPreferredVersion, groupList.Groups[0].PreferredVersion)
