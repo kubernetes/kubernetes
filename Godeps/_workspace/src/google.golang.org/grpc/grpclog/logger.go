@@ -42,6 +42,8 @@ import (
 )
 
 // Use golang's standard logger by default.
+// Access is not mutex-protected: do not modify except in init()
+// functions.
 var logger Logger = log.New(os.Stderr, "", log.LstdFlags)
 
 // Logger mimics golang's standard Logger as an interface.
@@ -54,7 +56,8 @@ type Logger interface {
 	Println(args ...interface{})
 }
 
-// SetLogger sets the logger that is used in grpc.
+// SetLogger sets the logger that is used in grpc. Call only from
+// init() functions.
 func SetLogger(l Logger) {
 	logger = l
 }
