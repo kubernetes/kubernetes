@@ -48,10 +48,8 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_GOLANG_VERSION=1.4.2
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-2"
-readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-# KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.4.2-1"
+# KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
 # Here we map the output directories across both the local and remote _output
 # directories:
@@ -248,7 +246,7 @@ function kube::build::update_dockerfile() {
   else
     sed_opts=(-i)
   fi
-  sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   sed ${sed_opts[@]} "s#KUBE_BUILD_HTTP_PROXY#${KUBE_BUILD_HTTP_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   sed ${sed_opts[@]} "s#KUBE_BUILD_HTTPS_PROXY#${KUBE_BUILD_HTTPS_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   sed ${sed_opts[@]} "s#KUBE_BUILD_NO_PROXY#${KUBE_BUILD_NO_PROXY:-127.0.0.1}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
@@ -460,23 +458,6 @@ function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
-function kube::build::ensure_golang() {
-  kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
-    [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang:${KUBE_BUILD_GOLANG_VERSION} docker image. This image is 450MB."
-      read -p "Download it now? [y/n] " -r
-      echo
-      [[ $REPLY =~ ^[yY]$ ]] || {
-        echo "Aborting." >&2
-        exit 1
-      }
-    }
-
-    kube::log::status "Pulling docker image: golang:${KUBE_BUILD_GOLANG_VERSION}"
-    "${DOCKER[@]}" pull golang:${KUBE_BUILD_GOLANG_VERSION}
-  }
-}
-
 # The set of source targets to include in the kube-build image
 function kube::build::source_targets() {
   local targets=(
@@ -512,8 +493,6 @@ function kube::build::source_targets() {
 function kube::build::build_image() {
   kube::build::ensure_tar
 
-  kube::build::build_image_cross
-
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
   "${TAR}" czf "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-source.tar.gz" $(kube::build::source_targets)
 
@@ -523,19 +502,7 @@ function kube::build::build_image() {
   cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   kube::build::update_dockerfile
 
-  # We don't want to force-pull this image because it's based on a local image
-  # (see kube::build::build_image_cross), not upstream.
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-}
-
-# Build the kubernetes golang cross base image.
-function kube::build::build_image_cross() {
-  kube::build::ensure_golang
-
-  local -r build_context_dir="${LOCAL_OUTPUT_ROOT}/images/${KUBE_BUILD_IMAGE}/cross"
-  mkdir -p "${build_context_dir}"
-  cp build/build-image/cross/Dockerfile ${build_context_dir}/Dockerfile
-  kube::build::docker_build "${KUBE_BUILD_IMAGE_CROSS}" "${build_context_dir}"
 }
 
 # Build a docker image from a Dockerfile.
@@ -779,7 +746,7 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
-    
+
     # Only release addon images for linux/amd64. These addon images aren't necessary for other architectures
     if [[ ${platform} == "linux/amd64" ]]; then
       kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
@@ -906,7 +873,7 @@ function kube::release::write_addon_docker_images_for_server() {
     if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
       (
         kube::log::status "Building Docker python image"
-        
+
         local img_name=python:2.7-slim-pyyaml
         "${DOCKER[@]}" build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
         "${DOCKER[@]}" save "${img_name}" > "${1}/${img_name}.tar"
