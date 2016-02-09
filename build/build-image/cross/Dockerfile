@@ -18,8 +18,13 @@
 FROM  golang:1.4.2
 MAINTAINER  Joe Beda <jbeda@google.com>
 
+ENV GOARM 6
+ENV KUBE_DYNAMIC_CROSSPLATFORMS \
+  armel
+
 ENV KUBE_CROSSPLATFORMS \
-  linux/386 linux/arm \
+  linux/386 \
+  linux/arm \
   darwin/amd64 darwin/386 \
   windows/amd64 windows/386
 
@@ -38,3 +43,12 @@ RUN apt-get install -y g++ && apt-get clean && rm -rf /var/lib/apt/lists/* &&\
     rm -rf protobuf-3.0.0-beta-2 &&\
     protoc --version
 
+# Use dynamic cgo linking for architectures other than amd64 for the server platforms
+# More info here: https://wiki.debian.org/CrossToolchains
+RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
+  && curl -s http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do dpkg --add-architecture ${platform}; done \
+  && apt-get update \
+  && apt-get install -y build-essential \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
