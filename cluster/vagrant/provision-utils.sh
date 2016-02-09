@@ -14,6 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+function prepare-package-manager() {
+  echo "Prepare package manager"
+
+  # Useful if a mirror is broken or slow
+  echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+
+  # In Fedora 23, installed version does not work with Salt
+  # Cf. https://github.com/saltstack/salt/issues/31001
+  dnf update -y dnf dnf-plugins-core
+}
+
 function write-salt-config() {
   local role="$1"
 
