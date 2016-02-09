@@ -1,4 +1,3 @@
-# Copy of pod.yaml without file extension for test
 apiVersion: v1
 kind: Pod
 metadata:
