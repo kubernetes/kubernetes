@@ -216,6 +216,11 @@ func (c *MesosCloud) InstanceID(name string) (string, error) {
 	return "", nil
 }
 
+// InstanceType returns the type of the specified instance.
+func (c *MesosCloud) InstanceType(name string) (string, error) {
+	return "", nil
+}
+
 func (c *MesosCloud) listNodes() (map[string]*slaveNode, error) {
 	//TODO(jdef) use a timeout here? 15s?
 	ctx, cancel := context.WithCancel(context.TODO())

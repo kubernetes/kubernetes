@@ -18,3 +18,4 @@ package unversioned
 
 const LabelZoneFailureDomain = "failure-domain.alpha.kubernetes.io/zone"
 const LabelZoneRegion = "failure-domain.alpha.kubernetes.io/region"
+const LabelInstanceType = "beta.kubernetes.io/instance-type"
