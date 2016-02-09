@@ -186,9 +186,8 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1,batch/v1" "${KUBE_OUTPUT_HOSTBIN}/kube-
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public-address-override="127.0.0.1" \
   --kubelet-port=${KUBELET_PORT} \
-  --runtime-config=api/v1 \
+  --runtime-config="api/v1,extensions/v1beta1/deployments=true,batch/v1" \
   --cert-dir="${TMPDIR:-/tmp/}" \
-  --runtime_config="extensions/v1beta1/deployments=true,batch/v1/job=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
