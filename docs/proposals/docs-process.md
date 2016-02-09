@@ -6,7 +6,7 @@ The Kubernetes team is building a new site with a creative agency and we think i
 
 When a community is empowered to be effective contributors, great things happen. That’s why I’m proposing that we move the documentation from the docs/ folder in the core Kubernetes repo in GitHub into the GitHub pages repo itself, migrate that repo into one named kubernetes.github.io so that it will be compatible with the GitHub Pages auto-update system, and leave all munging scripts behind.
 
-TL;DR: Right now we do a lot of scripting and branching to create docs -- this proposal is about using Jekyll's native capability and GitHub Page's staging capability to create a much easier-to-edit set of documentation that will ship with our upcoming new site.
+**TL;DR: Right now we do a lot of scripting and branching to create docs -- this proposal is about using Jekyll's native capability and GitHub Page's staging capability to create a much easier-to-edit set of documentation that will ship with our upcoming new site.**
 
 Benefits:
 
