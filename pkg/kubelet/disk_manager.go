@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
-// Manages policy for diskspace management for disks holding docker images and root fs.
+// Manages policy for diskspace management for disks holding container images and root fs.
 
 // mb is used to easily convert an int to an mb
 const mb = 1024 * 1024
@@ -41,7 +41,7 @@ type diskSpaceManager interface {
 }
 
 type DiskSpacePolicy struct {
-	// free disk space threshold for filesystem holding docker images.
+	// free disk space threshold for filesystem holding container images.
 	ContainersFreeDiskMB int
 	// free disk space threshold for root filesystem. Host volumes are created on root fs.
 	RootFreeDiskMB int
@@ -61,14 +61,13 @@ type realDiskSpaceManager struct {
 	policy     DiskSpacePolicy   // thresholds. Set at creation time.
 }
 
-
 type rktDiskSpaceManager struct {
 	realDiskSpaceManager
 	rktPath string
 }
 
 func newRktDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy, rktPath string) (diskSpaceManager, error) {
-	glog.Info("newRktDiskSpaceManager: enter");
+	glog.Info("newRktDiskSpaceManager: enter")
 	// validate policy
 	err := validatePolicy(policy)
 	if err != nil {
@@ -76,7 +75,7 @@ func newRktDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpa
 	}
 
 	dm := &rktDiskSpaceManager{
-		realDiskSpaceManager: realDiskSpaceManager {
+		realDiskSpaceManager: realDiskSpaceManager{
 			cadvisor:   cadvisorInterface,
 			policy:     policy,
 			cachedInfo: map[string]fsInfo{},
@@ -88,14 +87,14 @@ func newRktDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpa
 }
 
 func getVfsStats(path string) (uint64, uint64, uint64, error) {
-	glog.Info("getVfsStats: enter");
-        var s syscall.Statfs_t
-        if err := syscall.Statfs(path, &s); err != nil {
-                return 0, 0, 0, err
-        }
-        total := uint64(s.Frsize) * s.Blocks
-        free := uint64(s.Frsize) * s.Bfree
-        avail := uint64(s.Frsize) * s.Bavail
+	glog.Info("getVfsStats: enter")
+	var s syscall.Statfs_t
+	if err := syscall.Statfs(path, &s); err != nil {
+		return 0, 0, 0, err
+	}
+	total := uint64(s.Frsize) * s.Blocks
+	free := uint64(s.Frsize) * s.Bfree
+	avail := uint64(s.Frsize) * s.Bavail
 
 	return total, free, avail, nil
 }
@@ -173,7 +172,7 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 
 func validatePolicy(policy DiskSpacePolicy) error {
 	if policy.ContainersFreeDiskMB < 0 {
-		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for docker disk space threshold.", policy.ContainersFreeDiskMB)
+		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for container disk space threshold.", policy.ContainersFreeDiskMB)
 	}
 	if policy.RootFreeDiskMB < 0 {
 		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for root disk space threshold.", policy.RootFreeDiskMB)

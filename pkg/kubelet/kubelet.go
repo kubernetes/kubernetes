@@ -2221,13 +2221,13 @@ func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
 func (kl *Kubelet) isOutOfDisk() bool {
-	outOfDockerDisk := false
+	outOfContainerDisk := false
 	outOfRootDisk := false
 	// Check disk space once globally and reject or accept all new pods.
 	withinBounds, err := kl.diskSpaceManager.IsContainerDiskSpaceAvailable()
 	// Assume enough space in case of errors.
 	if err == nil && !withinBounds {
-		outOfDockerDisk = true
+		outOfContainerDisk = true
 	}
 
 	withinBounds, err = kl.diskSpaceManager.IsRootDiskSpaceAvailable()
@@ -2235,7 +2235,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	if err == nil && !withinBounds {
 		outOfRootDisk = true
 	}
-	return outOfDockerDisk || outOfRootDisk
+	return outOfContainerDisk || outOfRootDisk
 }
 
 // matchesNodeSelector returns true if pod matches node's labels.

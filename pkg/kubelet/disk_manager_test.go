@@ -29,7 +29,7 @@ import (
 func testPolicy() DiskSpacePolicy {
 	return DiskSpacePolicy{
 		ContainersFreeDiskMB: 250,
-		RootFreeDiskMB:   250,
+		RootFreeDiskMB:       250,
 	}
 }
 
