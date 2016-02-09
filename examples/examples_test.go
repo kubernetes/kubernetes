@@ -230,6 +230,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"ingress":              &extensions.Ingress{},
 			"nginx-deployment":     &extensions.Deployment{},
 			"new-nginx-deployment": &extensions.Deployment{},
+			"replication":          &api.ReplicationController{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
