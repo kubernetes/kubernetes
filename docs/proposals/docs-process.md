@@ -1,28 +1,24 @@
 # Docs Process
 
-GitHub Pages and K8s Docs
+@johndmulhausen
 
-[johndylan@google.com](mailto:johndylan@google.com)
+The Kubernetes team is building a new site with a creative agency and we think it's a good time to streamline and simplify the docs creation process as we rebuild the site from scratch.
 
-Executive summary
+When a community is empowered to be effective contributors, great things happen. That’s why I’m proposing that we move the documentation from the docs/ folder in the core Kubernetes repo in GitHub into the GitHub pages repo itself, migrate that repo into one named kubernetes.github.io so that it will be compatible with the GitHub Pages auto-update system, and leave all munging scripts behind.
 
-When a community is empowered to be effective contributors, great things happen. That’s why I’m proposing that we move the documentation from the docs/ folder in the core Kubernetes repo in GitHub into the GitHub pages repo itself, and migrate that repo into one named kubernetes.github.io so that it will be compatible with the GitHub Pages auto-update system.
+TL;DR: Right now we do a lot of scripting and branching to create docs -- this proposal is about using Jekyll's native capability and GitHub Page's staging capability to create a much easier-to-edit set of documentation that will ship with our upcoming new site.
 
 Benefits:
 
 * Onboard contributors quickly with tech they are familiar with that is easy to use
-
 * Have in-the-cloud staging of our site on *username*.github.io
-
 * Have documentation and website material located in one place
-
 * Reduce dependency on scripts and tools that only a few people can use/understand
 
 Cost:
 
 * Migration of current head/stable release system that is done with build/integration scripts into GitHub branches
-
-* Updating of any doc generation tools so that they produce Jekyll-ready files
+* Replacing of doc-munging scripts with native Jekyll functionality and/or GitHub capability.
 
 # Github.io staging
 
