@@ -17,13 +17,13 @@ limitations under the License.
 package gcloud
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
-	"os/exec"
-
 	"net"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -54,9 +54,10 @@ type RunResult struct {
 }
 
 type CmdHandle struct {
-	TearDown TearDown
-	Output   chan RunResult
-	LPort    string
+	TearDown       TearDown
+	CombinedOutput bytes.Buffer
+	Output         chan RunResult
+	LPort          string
 }
 
 func NewGCloudClient(host string, zone string) GCloudClient {
@@ -74,7 +75,7 @@ func (gc *gCloudClientImpl) Command(cmd string, moreargs ...string) ([]byte, err
 	return exec.Command("gcloud", args...).CombinedOutput()
 }
 
-func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string, dir string, cmd string, moreargs ...string) ([]byte, error) {
+func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string, dir string, cmd string, moreargs ...string) *exec.Cmd {
 	tunnelStr := fmt.Sprintf("-L %s:localhost:%s", lPort, rPort)
 	args := []string{"compute", "ssh"}
 	if gc.zone != "" {
@@ -88,7 +89,7 @@ func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string,
 	args = append(args, cmd)
 	args = append(args, moreargs...)
 	glog.V(2).Infof("Command gcloud %s", strings.Join(args, " "))
-	return exec.Command("gcloud", args...).CombinedOutput()
+	return exec.Command("gcloud", args...)
 }
 
 func (gc *gCloudClientImpl) CopyToHost(from string, to string) ([]byte, error) {
@@ -162,13 +163,15 @@ func (gc *gCloudClientImpl) Run(
 			}
 		}
 
-		// Do the setup
+		c := gc.TunnelCommand(sudo, h.LPort, remotePort, tDir, cmd, args...)
+		c.Stdout = &h.CombinedOutput
+		c.Stderr = &h.CombinedOutput
 		go func() {
 			// Start the process
-			out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, tDir, cmd, args...)
+			err = c.Run()
 			if err != nil {
-				glog.Errorf("command failed %v %s", err, out)
-				h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))}
+				glog.Errorf("command failed %v %s", err, h.CombinedOutput.Bytes())
+				h.Output <- RunResult{h.CombinedOutput.Bytes(), err, fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))}
 				return
 			}
 		}()
