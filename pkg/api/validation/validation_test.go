@@ -509,6 +509,7 @@ func TestValidateVolumes(t *testing.T) {
 		}}}},
 		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{[]string{"some_wwn"}, &lun, "ext4", false}}},
 		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
+		{Name: "azure", VolumeSource: api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{"key", "share", false}}},
 	}
 	names, errs := validateVolumes(successCase, field.NewPath("field"))
 	if len(errs) != 0 {
@@ -557,6 +558,8 @@ func TestValidateVolumes(t *testing.T) {
 	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{[]string{}, &lun, "ext4", false}}
 	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{[]string{"wwn"}, nil, "ext4", false}}
 	slashInName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "foo/bar"}}
+	emptyAzureSecret := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{"", "share", false}}
+	emptyAzureShare := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{"name", "", false}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T field.ErrorType
@@ -677,6 +680,16 @@ func TestValidateVolumes(t *testing.T) {
 			[]api.Volume{{Name: "absolutetarget", VolumeSource: absPath}},
 			field.ErrorTypeInvalid,
 			"gitRepo.directory", "",
+		},
+		"empty secret": {
+			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureSecret}},
+			field.ErrorTypeRequired,
+			"azureFile.secretName", "",
+		},
+		"empty share": {
+			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureShare}},
+			field.ErrorTypeRequired,
+			"azureFile.shareName", "",
 		},
 	}
 	for k, v := range errorCases {

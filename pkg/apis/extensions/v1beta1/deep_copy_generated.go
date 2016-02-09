@@ -73,6 +73,13 @@ func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in v1.AWSElasticBlockStoreVolu
 	return nil
 }
 
+func deepCopy_v1_AzureFileVolumeSource(in v1.AzureFileVolumeSource, out *v1.AzureFileVolumeSource, c *conversion.Cloner) error {
+	out.SecretName = in.SecretName
+	out.ShareName = in.ShareName
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func deepCopy_v1_Capabilities(in v1.Capabilities, out *v1.Capabilities, c *conversion.Cloner) error {
 	if in.Add != nil {
 		out.Add = make([]v1.Capability, len(in.Add))
@@ -963,6 +970,14 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 		}
 	} else {
 		out.FC = nil
+	}
+	if in.AzureFile != nil {
+		out.AzureFile = new(v1.AzureFileVolumeSource)
+		if err := deepCopy_v1_AzureFileVolumeSource(*in.AzureFile, out.AzureFile, c); err != nil {
+			return err
+		}
+	} else {
+		out.AzureFile = nil
 	}
 	return nil
 }
@@ -1981,6 +1996,7 @@ func init() {
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
+		deepCopy_v1_AzureFileVolumeSource,
 		deepCopy_v1_Capabilities,
 		deepCopy_v1_CephFSVolumeSource,
 		deepCopy_v1_CinderVolumeSource,
