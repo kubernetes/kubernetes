@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
+// These tests exercise the Kubernetes expansion syntax $(VAR).
+// For more information, see: docs/design/expansion.md
 var _ = Describe("Variable Expansion", func() {
 	framework := NewFramework("var-expansion")
 
