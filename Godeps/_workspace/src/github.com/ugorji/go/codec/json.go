@@ -43,18 +43,23 @@ import (
 
 //--------------------------------
 
-var jsonLiterals = [...]byte{'t', 'r', 'u', 'e', 'f', 'a', 'l', 's', 'e', 'n', 'u', 'l', 'l'}
+var (
+	jsonLiterals = [...]byte{'t', 'r', 'u', 'e', 'f', 'a', 'l', 's', 'e', 'n', 'u', 'l', 'l'}
 
-var jsonFloat64Pow10 = [...]float64{
-	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
-	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
-	1e20, 1e21, 1e22,
-}
+	jsonFloat64Pow10 = [...]float64{
+		1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
+		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+		1e20, 1e21, 1e22,
+	}
 
-var jsonUint64Pow10 = [...]uint64{
-	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
-	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
-}
+	jsonUint64Pow10 = [...]uint64{
+		1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
+		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+	}
+
+	// jsonTabs and jsonSpaces are used as caches for indents
+	jsonTabs, jsonSpaces string
+)
 
 const (
 	// jsonUnreadAfterDecNum controls whether we unread after decoding a number.
@@ -85,7 +90,22 @@ const (
 	jsonNumUintMaxVal = 1<<uint64(64) - 1
 
 	// jsonNumDigitsUint64Largest = 19
+
+	jsonSpacesOrTabsLen = 128
 )
+
+func init() {
+	var bs [jsonSpacesOrTabsLen]byte
+	for i := 0; i < jsonSpacesOrTabsLen; i++ {
+		bs[i] = ' '
+	}
+	jsonSpaces = string(bs[:])
+
+	for i := 0; i < jsonSpacesOrTabsLen; i++ {
+		bs[i] = '\t'
+	}
+	jsonTabs = string(bs[:])
+}
 
 type jsonEncDriver struct {
 	e  *Encoder
@@ -94,9 +114,18 @@ type jsonEncDriver struct {
 	b  [64]byte // scratch
 	bs []byte   // scratch
 	se setExtWrapper
+	ds string // indent string
+	dl uint16 // indent level
+	dt bool   // indent using tabs
+	d  bool   // indent
 	c  containerState
 	noBuiltInTypes
 }
+
+// indent is done as below:
+//   - newline and indent are added before each mapKey or arrayElem
+//   - newline and indent are added before each ending,
+//     except there was no entry (so we can have {} or [])
 
 func (e *jsonEncDriver) sendContainerState(c containerState) {
 	// determine whether to output separators
@@ -104,18 +133,55 @@ func (e *jsonEncDriver) sendContainerState(c containerState) {
 		if e.c != containerMapStart {
 			e.w.writen1(',')
 		}
+		if e.d {
+			e.writeIndent()
+		}
 	} else if c == containerMapValue {
-		e.w.writen1(':')
+		if e.d {
+			e.w.writen2(':', ' ')
+		} else {
+			e.w.writen1(':')
+		}
 	} else if c == containerMapEnd {
+		if e.d {
+			e.dl--
+			if e.c != containerMapStart {
+				e.writeIndent()
+			}
+		}
 		e.w.writen1('}')
 	} else if c == containerArrayElem {
 		if e.c != containerArrayStart {
 			e.w.writen1(',')
 		}
+		if e.d {
+			e.writeIndent()
+		}
 	} else if c == containerArrayEnd {
+		if e.d {
+			e.dl--
+			if e.c != containerArrayStart {
+				e.writeIndent()
+			}
+		}
 		e.w.writen1(']')
 	}
 	e.c = c
+}
+
+func (e *jsonEncDriver) writeIndent() {
+	e.w.writen1('\n')
+	if x := len(e.ds) * int(e.dl); x <= jsonSpacesOrTabsLen {
+		if e.dt {
+			e.w.writestr(jsonTabs[:x])
+		} else {
+			e.w.writestr(jsonSpaces[:x])
+		}
+	} else {
+		for i := uint16(0); i < e.dl; i++ {
+			e.w.writestr(e.ds)
+		}
+	}
 }
 
 func (e *jsonEncDriver) EncodeNil() {
@@ -165,11 +231,17 @@ func (e *jsonEncDriver) EncodeRawExt(re *RawExt, en *Encoder) {
 }
 
 func (e *jsonEncDriver) EncodeArrayStart(length int) {
+	if e.d {
+		e.dl++
+	}
 	e.w.writen1('[')
 	e.c = containerArrayStart
 }
 
 func (e *jsonEncDriver) EncodeMapStart(length int) {
+	if e.d {
+		e.dl++
+	}
 	e.w.writen1('{')
 	e.c = containerMapStart
 }
@@ -1033,6 +1105,11 @@ type JsonHandle struct {
 	// RawBytesExt, if configured, is used to encode and decode raw bytes in a custom way.
 	// If not configured, raw bytes are encoded to/from base64 text.
 	RawBytesExt InterfaceExt
+
+	// Indent indicates how a value is encoded.
+	//   - If positive, indent by that number of spaces.
+	//   - If negative, indent by that number of tabs.
+	Indent int8
 }
 
 func (h *JsonHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {
@@ -1040,26 +1117,48 @@ func (h *JsonHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceE
 }
 
 func (h *JsonHandle) newEncDriver(e *Encoder) encDriver {
-	hd := jsonEncDriver{e: e, w: e.w, h: h}
+	hd := jsonEncDriver{e: e, h: h}
 	hd.bs = hd.b[:0]
-	hd.se.i = h.RawBytesExt
+
+	hd.reset()
+
 	return &hd
 }
 
 func (h *JsonHandle) newDecDriver(d *Decoder) decDriver {
 	// d := jsonDecDriver{r: r.(*bytesDecReader), h: h}
-	hd := jsonDecDriver{d: d, r: d.r, h: h}
+	hd := jsonDecDriver{d: d, h: h}
 	hd.bs = hd.b[:0]
-	hd.se.i = h.RawBytesExt
+	hd.reset()
 	return &hd
 }
 
 func (e *jsonEncDriver) reset() {
 	e.w = e.e.w
+	e.se.i = e.h.RawBytesExt
+	if e.bs != nil {
+		e.bs = e.bs[:0]
+	}
+	e.d, e.dt, e.dl, e.ds = false, false, 0, ""
+	e.c = 0
+	if e.h.Indent > 0 {
+		e.d = true
+		e.ds = jsonSpaces[:e.h.Indent]
+	} else if e.h.Indent < 0 {
+		e.d = true
+		e.dt = true
+		e.ds = jsonTabs[:-(e.h.Indent)]
+	}
 }
 
 func (d *jsonDecDriver) reset() {
 	d.r = d.d.r
+	d.se.i = d.h.RawBytesExt
+	if d.bs != nil {
+		d.bs = d.bs[:0]
+	}
+	d.c, d.tok = 0, 0
+	d.n.reset()
 }
 
 var jsonEncodeTerminate = []byte{' '}

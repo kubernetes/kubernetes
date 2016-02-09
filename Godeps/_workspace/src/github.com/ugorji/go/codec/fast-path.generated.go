@@ -17712,7 +17712,7 @@ func (_ fastpathT) DecSliceIntfV(v []interface{}, checkNil bool, canChange bool,
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -17771,7 +17771,7 @@ func (_ fastpathT) DecSliceIntfV(v []interface{}, checkNil bool, canChange bool,
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]interface{}, 1, 4)
@@ -17846,7 +17846,7 @@ func (_ fastpathT) DecSliceStringV(v []string, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -17905,7 +17905,7 @@ func (_ fastpathT) DecSliceStringV(v []string, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]string, 1, 4)
@@ -17979,7 +17979,7 @@ func (_ fastpathT) DecSliceFloat32V(v []float32, checkNil bool, canChange bool, 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18038,7 +18038,7 @@ func (_ fastpathT) DecSliceFloat32V(v []float32, checkNil bool, canChange bool, 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]float32, 1, 4)
@@ -18112,7 +18112,7 @@ func (_ fastpathT) DecSliceFloat64V(v []float64, checkNil bool, canChange bool, 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18171,7 +18171,7 @@ func (_ fastpathT) DecSliceFloat64V(v []float64, checkNil bool, canChange bool, 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]float64, 1, 4)
@@ -18245,7 +18245,7 @@ func (_ fastpathT) DecSliceUintV(v []uint, checkNil bool, canChange bool, d *Dec
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18304,7 +18304,7 @@ func (_ fastpathT) DecSliceUintV(v []uint, checkNil bool, canChange bool, d *Dec
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]uint, 1, 4)
@@ -18378,7 +18378,7 @@ func (_ fastpathT) DecSliceUint16V(v []uint16, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18437,7 +18437,7 @@ func (_ fastpathT) DecSliceUint16V(v []uint16, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]uint16, 1, 4)
@@ -18511,7 +18511,7 @@ func (_ fastpathT) DecSliceUint32V(v []uint32, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18570,7 +18570,7 @@ func (_ fastpathT) DecSliceUint32V(v []uint32, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]uint32, 1, 4)
@@ -18644,7 +18644,7 @@ func (_ fastpathT) DecSliceUint64V(v []uint64, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18703,7 +18703,7 @@ func (_ fastpathT) DecSliceUint64V(v []uint64, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]uint64, 1, 4)
@@ -18777,7 +18777,7 @@ func (_ fastpathT) DecSliceUintptrV(v []uintptr, checkNil bool, canChange bool, 
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18836,7 +18836,7 @@ func (_ fastpathT) DecSliceUintptrV(v []uintptr, checkNil bool, canChange bool, 
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]uintptr, 1, 4)
@@ -18910,7 +18910,7 @@ func (_ fastpathT) DecSliceIntV(v []int, checkNil bool, canChange bool, d *Decod
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -18969,7 +18969,7 @@ func (_ fastpathT) DecSliceIntV(v []int, checkNil bool, canChange bool, d *Decod
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]int, 1, 4)
@@ -19043,7 +19043,7 @@ func (_ fastpathT) DecSliceInt8V(v []int8, checkNil bool, canChange bool, d *Dec
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -19102,7 +19102,7 @@ func (_ fastpathT) DecSliceInt8V(v []int8, checkNil bool, canChange bool, d *Dec
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]int8, 1, 4)
@@ -19176,7 +19176,7 @@ func (_ fastpathT) DecSliceInt16V(v []int16, checkNil bool, canChange bool, d *D
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -19235,7 +19235,7 @@ func (_ fastpathT) DecSliceInt16V(v []int16, checkNil bool, canChange bool, d *D
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]int16, 1, 4)
@@ -19309,7 +19309,7 @@ func (_ fastpathT) DecSliceInt32V(v []int32, checkNil bool, canChange bool, d *D
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -19368,7 +19368,7 @@ func (_ fastpathT) DecSliceInt32V(v []int32, checkNil bool, canChange bool, d *D
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]int32, 1, 4)
@@ -19442,7 +19442,7 @@ func (_ fastpathT) DecSliceInt64V(v []int64, checkNil bool, canChange bool, d *D
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -19501,7 +19501,7 @@ func (_ fastpathT) DecSliceInt64V(v []int64, checkNil bool, canChange bool, d *D
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]int64, 1, 4)
@@ -19575,7 +19575,7 @@ func (_ fastpathT) DecSliceBoolV(v []bool, checkNil bool, canChange bool, d *Dec
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 
 	if containerLenS > 0 {
@@ -19634,7 +19634,7 @@ func (_ fastpathT) DecSliceBoolV(v []bool, checkNil bool, canChange bool, d *Dec
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]bool, 1, 4)
