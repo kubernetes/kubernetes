@@ -660,6 +660,7 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		}
 		return []api.NodeAddress{
 			{Type: api.NodeInternalIP, Address: internalIP},
+			{Type: api.NodeLegacyHostIP, Address: internalIP},
 			{Type: api.NodeExternalIP, Address: externalIP},
 		}, nil
 	}
@@ -1134,10 +1135,13 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
 		}
-		privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+		// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+		// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
+		instance, err := s.getInstanceByID(instanceId)
 		if err != nil {
-			return nil, fmt.Errorf("error fetching local-hostname from ec2 metadata service: %v", err)
+			return nil, fmt.Errorf("error finding instance %s: %v", instanceId, err)
 		}
+		privateDnsName := aws.StringValue(instance.PrivateDnsName)
 		availabilityZone, err := getAvailabilityZone(s.metadata)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
@@ -2183,7 +2187,6 @@ func (s *AWSCloud) UpdateLoadBalancer(name, region string, hosts []string) error
 }
 
 // Returns the instance with the specified ID
-// This function is currently unused, but seems very likely to be needed again
 func (a *AWSCloud) getInstanceByID(instanceID string) (*ec2.Instance, error) {
 	instances, err := a.getInstancesByIDs([]*string{&instanceID})
 	if err != nil {
