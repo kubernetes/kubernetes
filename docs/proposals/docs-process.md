@@ -22,7 +22,7 @@ Cost:
 
 # Github.io staging
 
-GitHub has a technology called GitHub Pages that we currently use to construct the site at kubernetes.io. GitHub Pages is essentially a system for managing and hosting Jekyll sites. When you check in a Jekyll site into a repo that is named username.github.io, then GitHub will automatically stage its contents at [http://kubernetes.github.io](http://username.github.io), and automatically update it whenever you push new changes -- no publishing required.
+GitHub has a technology called GitHub Pages that we currently use to construct the site at kubernetes.io. GitHub Pages is essentially a system for managing and hosting Jekyll sites. When you check in a Jekyll site into a repo that is named username.github.io, then GitHub will automatically stage its contents at http://username.github.io, and automatically update it whenever you push new changes -- no publishing required.
 
 This highly lubricates the ability for external users to make changes, as they can immediately see the consequences of their actions in their forked environment. 
 
