@@ -84,6 +84,10 @@ func (c *Client) Setup(t *testing.T) *Client {
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 		// We will fix this by supporting multiple group versions in Config
+		c.AutoscalingClient = client.NewAutoscalingOrDie(&client.Config{
+			Host:          c.server.URL,
+			ContentConfig: client.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
+		})
 		c.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{
 			Host:          c.server.URL,
 			ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
