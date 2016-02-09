@@ -33,6 +33,7 @@ for i in {1..3}; do
 done
 
 # gendocs takes "input.json" as the input swagger spec.
+# $1 is expected to be <group>_<version>
 cp /swagger-source/"$1".json input.json
 
 ./gradle-2.5/bin/gradle gendocs --info
@@ -41,20 +42,24 @@ cp /swagger-source/"$1".json input.json
 buf="== Top Level API Objects\n\n"
 top_level_models=$(grep GetObjectKind ./register.go | sed 's/func (obj \*\(.*\)) GetObjectKind(\(.*\)) .*/\1/g' \
     | tr -d '()' | tr -d '{}' | tr -d ' ')
+
+# check if the top level models exist in the definitions.adoc. If they exist,
+# their name will be <version>.<model_name>
+VERSION="${1#*_}"
 for m in $top_level_models
 do
-  if grep -xq "=== $1.$m" ./definitions.adoc
+  if grep -xq "=== ${VERSION}.$m" ./definitions.adoc
   then
-    buf+="* <<$1."$m">>\n"
+    buf+="* <<${VERSION}.$m>>\n"
   fi
 done
 sed -i "1i $buf" ./definitions.adoc
 
-#fix the links in .adoc, replace <<x.y>> with link:definitions.html#_x_y[x.y], and lowercase the _x_y part
+# fix the links in .adoc, replace <<x.y>> with link:definitions.html#_x_y[x.y], and lowercase the _x_y part
 sed -i -e 's|<<\(.*\)\.\(.*\)>>|link:#_\L\1_\2\E[\1.\2]|g' ./definitions.adoc
 sed -i -e 's|<<\(.*\)\.\(.*\)>>|link:definitions.html#_\L\1_\2\E[\1.\2]|g' ./paths.adoc
 
-#fix the link to <<any>>
+# fix the link to <<any>>
 sed -i -e 's|<<any>>|link:#_any[any]|g' ./definitions.adoc
 sed -i -e 's|<<any>>|link:definitions.html#_any[any]|g' ./paths.adoc
 
