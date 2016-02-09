@@ -440,6 +440,8 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${ENABLE_DEPLOYMENTS:=true}
+    # Override GCE default for cluster size autoscaling purposes.
+    ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
     ;;
 
