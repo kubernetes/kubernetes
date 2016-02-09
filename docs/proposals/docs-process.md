@@ -78,13 +78,6 @@ To make X.Y the default version of docs:
 
 [http://kubernetes.io/docs/](http://kubernetes.io/docs/) should now be redirecting to http://kubernetes.io/vX.Y/.
 
-### Updating docs in an existing collection
-
-The high level steps to update docs in an existing collection are:
-
-1. Update docs on HEAD (master branch) of kubernetes/kubernetes.github.io
-2. Cherrypick the change in by copying those changes from the newest docs folder to the folder for the target version.
-
 ## Where is <HEAD> for the docs?
 
 Essentially, the kubernetes.github.io/vX.Y folder for vLATEST operates as head. The docs should already be in their final destination and have its links pointing to the kubernetes.io URLs.
