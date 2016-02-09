@@ -58,4 +58,7 @@ env_to_salt non_masquerade_cidr
 
 install-salt
 
+# Cleanup to free some disk space.
+apt-get autoclean
+
 service salt-minion start

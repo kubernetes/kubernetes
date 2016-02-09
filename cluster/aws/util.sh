@@ -1141,9 +1141,9 @@ function wait-master() {
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
   # TODO: Can we poll here?
-  echo "Waiting 3 minutes for cluster to settle"
+  echo "Waiting 1 minute for cluster to settle"
   local i
-  for (( i=0; i < 6*3; i++)); do
+  for (( i=0; i < 6*1; i++)); do
     printf "."
     sleep 10
   done
