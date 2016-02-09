@@ -1031,7 +1031,7 @@ func createExecPodOrFail(c *client.Client, ns, name string) {
 			Containers: []api.Container{
 				{
 					Name:    "exec",
-					Image:   "gcr.io/google_containers/busybox",
+					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
 				},
 			},
