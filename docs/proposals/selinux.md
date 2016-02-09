@@ -74,9 +74,9 @@ use-cases:
 We should avoid using the `:z` flag, because it relaxes the SELinux context so that any container
 (from an SELinux standpoint) can use the volume.
 
-### Rocket
+### rkt
 
-Rocket currently reads the base SELinux context to use from `/etc/selinux/*/contexts/lxc_contexts`
+rkt currently reads the base SELinux context to use from `/etc/selinux/*/contexts/lxc_contexts`
 and allocates a unique MCS label per pod.
 
 ### Kubernetes
