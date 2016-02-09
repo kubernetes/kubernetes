@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -456,7 +457,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
-		m := monitorFilter(action.Verb, resource)
 		namespaced := ""
 		if strings.Contains(action.Path, scope.ArgumentName()) {
 			namespaced = "Namespaced"
@@ -469,12 +469,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = GetResource(getter, exporter, reqScope)
 			}
+			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
 			doc := "read the specified " + kind
 			if hasSubresource {
 				doc = "read " + subresource + " of the specified " + kind
 			}
 			route := ws.GET(action.Path).To(handler).
-				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)).
@@ -498,8 +498,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false, a.minRequestTimeout)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)).
@@ -530,8 +530,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, UpdateResource(updater, reqScope, a.group.Typer, admit))
+			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)).
@@ -546,8 +546,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
-			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor))
+			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
@@ -565,12 +565,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
 			}
+			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
 			doc := "create a " + kind
 			if hasSubresource {
 				doc = "create " + subresource + " of a " + kind
 			}
 			route := ws.POST(action.Path).To(handler).
-				Filter(m).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)).
@@ -585,8 +585,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "delete " + subresource + " of a " + kind
 			}
-			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)).
@@ -603,8 +603,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
-			route := ws.DELETE(action.Path).To(DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)).
@@ -622,8 +622,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
-			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)).
@@ -641,8 +641,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
-			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
-				Filter(m).
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List").
@@ -668,9 +668,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if hasSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
+				handler := metrics.InstrumentRouteFunc(action.Verb, resource, ConnectResource(connecter, reqScope, admit, path))
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, admit, path)).
-					Filter(m).
+					To(handler).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource)).
 					Produces("*/*").
@@ -856,8 +856,8 @@ func addProxyRoute(ws *restful.WebService, method string, prefix string, path st
 	if hasSubresource {
 		doc = "proxy " + method + " requests to " + subresource + " of " + kind
 	}
-	proxyRoute := ws.Method(method).Path(path).To(routeFunction(proxyHandler)).
-		Filter(monitorFilter("PROXY", resource)).
+	handler := metrics.InstrumentRouteFunc("PROXY", resource, routeFunction(proxyHandler))
+	proxyRoute := ws.Method(method).Path(path).To(handler).
 		Doc(doc).
 		Operation("proxy" + strings.Title(method) + namespaced + kind + strings.Title(subresource)).
 		Produces("*/*").

@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/version"
@@ -52,16 +51,6 @@ import (
 
 func init() {
 	metrics.Register()
-}
-
-// monitorFilter creates a filter that reports the metrics for a given resource and action.
-func monitorFilter(action, resource string) restful.FilterFunction {
-	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
-		reqStart := time.Now()
-		chain.ProcessFilter(req, res)
-		httpCode := res.StatusCode()
-		metrics.Monitor(&action, &resource, utilnet.GetHTTPClient(req.Request), &httpCode, reqStart)
-	}
 }
 
 // mux is an object that can register http handlers.
