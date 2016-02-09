@@ -593,7 +593,7 @@ var _ = Describe("Kubectl client", func() {
 				// events are delayed, and instead kubectl
 				// prints "No events." This string will match
 				// either way.
-				{"vents"}}
+				{"Events"}}
 			checkOutput(output, requiredStrings)
 
 			// Service
