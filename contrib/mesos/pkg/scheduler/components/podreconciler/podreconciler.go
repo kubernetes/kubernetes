@@ -19,6 +19,8 @@ package podreconciler
 import (
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // PodReconciler reconciles a pod with the apiserver
@@ -37,12 +38,12 @@ type PodReconciler interface {
 
 type podReconciler struct {
 	sched   scheduler.Scheduler
-	client  *client.Client
+	client  *clientset.Clientset
 	qr      queuer.Queuer
 	deleter deleter.Deleter
 }
 
-func New(sched scheduler.Scheduler, client *client.Client, qr queuer.Queuer, deleter deleter.Deleter) PodReconciler {
+func New(sched scheduler.Scheduler, client *clientset.Clientset, qr queuer.Queuer, deleter deleter.Deleter) PodReconciler {
 	return &podReconciler{
 		sched:   sched,
 		client:  client,
@@ -65,7 +66,7 @@ func New(sched scheduler.Scheduler, client *client.Client, qr queuer.Queuer, del
 func (s *podReconciler) Reconcile(t *podtask.T) {
 	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
-	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
+	pod, err := s.client.Core().Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// attempt to delete

@@ -26,9 +26,10 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -44,7 +45,7 @@ const (
 // PodsInterface and PodInterface to test list & delet pods, which is implemented in
 // the embedded client.Fake field.
 type FakeNodeHandler struct {
-	*testclient.Fake
+	*fake.Clientset
 
 	// Input: Hooks determine if request is valid or not
 	CreateHook func(*FakeNodeHandler, *api.Node) bool
@@ -61,8 +62,17 @@ type FakeNodeHandler struct {
 	createLock sync.Mutex
 }
 
-func (c *FakeNodeHandler) Nodes() client.NodeInterface {
-	return c
+type FakeLegacyHandler struct {
+	unversioned_core.CoreInterface
+	n *FakeNodeHandler
+}
+
+func (c *FakeNodeHandler) Core() unversioned_core.CoreInterface {
+	return &FakeLegacyHandler{c.Clientset.Core(), c}
+}
+
+func (m *FakeLegacyHandler) Nodes() unversioned_core.NodeInterface {
+	return m.n
 }
 
 func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
@@ -114,9 +124,13 @@ func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
 	return nodeList, nil
 }
 
-func (m *FakeNodeHandler) Delete(id string) error {
+func (m *FakeNodeHandler) Delete(id string, opt *api.DeleteOptions) error {
 	m.DeletedNodes = append(m.DeletedNodes, newNode(id))
 	m.RequestCount++
+	return nil
+}
+
+func (m *FakeNodeHandler) DeleteCollection(opt *api.DeleteOptions, listOpts api.ListOptions) error {
 	return nil
 }
 
@@ -144,6 +158,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 
 	table := []struct {
 		fakeNodeHandler   *FakeNodeHandler
+		daemonSets        []extensions.DaemonSet
 		timeToPass        time.Duration
 		newNodeStatus     api.NodeStatus
 		expectedEvictPods bool
@@ -160,8 +175,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets:        nil,
 			timeToPass:        0,
 			newNodeStatus:     api.NodeStatus{},
 			expectedEvictPods: false,
@@ -188,8 +204,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: evictionTimeout,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -204,6 +221,72 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			},
 			expectedEvictPods: false,
 			description:       "Node created long time ago, and kubelet posted NotReady for a short period of time.",
+		},
+		// Pod is ds-managed, and kubelet posted NotReady for a long period of time.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionFalse,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(
+					&api.PodList{
+						Items: []api.Pod{
+							{
+								ObjectMeta: api.ObjectMeta{
+									Name:      "pod0",
+									Namespace: "default",
+									Labels:    map[string]string{"daemon": "yes"},
+								},
+								Spec: api.PodSpec{
+									NodeName: "node0",
+								},
+							},
+						},
+					},
+				),
+			},
+			daemonSets: []extensions.DaemonSet{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "ds0",
+						Namespace: "default",
+					},
+					Spec: extensions.DaemonSetSpec{
+						Selector: &unversioned.LabelSelector{
+							MatchLabels: map[string]string{"daemon": "yes"},
+						},
+					},
+				},
+			},
+			timeToPass: time.Hour,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			expectedEvictPods: false,
+			description:       "Pod is ds-managed, and kubelet posted NotReady for a long period of time.",
 		},
 		// Node created long time ago, and kubelet posted NotReady for a long period of time.
 		{
@@ -226,8 +309,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: time.Hour,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -264,8 +348,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: evictionTimeout - testNodeMonitorGracePeriod,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -302,8 +387,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: 60 * time.Minute,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -323,9 +409,12 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler,
-			evictionTimeout, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
+			evictionTimeout, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
+		for _, ds := range item.daemonSets {
+			nodeController.daemonSetStore.Add(&ds)
+		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -384,7 +473,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedNodes: []*api.Node{
@@ -428,7 +517,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
@@ -470,7 +559,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 3, // (List+)List+Update
 			timeToPass:           time.Hour,
@@ -562,7 +651,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
@@ -570,8 +659,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeAlwaysRateLimiter(),
+			util.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -615,7 +704,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedPodStatusUpdate: false,
 		},
@@ -649,7 +738,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedPodStatusUpdate: false,
 		},
@@ -690,7 +779,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			timeToPass: 1 * time.Minute,
 			newNodeStatus: api.NodeStatus{
@@ -720,8 +809,8 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeAlwaysRateLimiter(),
+			util.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("Case[%d] unexpected error: %v", i, err)
@@ -799,16 +888,16 @@ func TestNodeDeletion(t *testing.T) {
 				},
 			},
 		},
-		Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
+		Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
 	}
 
-	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
+	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 	nodeController.now = func() unversioned.Time { return fakeNow }
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	fakeNodeHandler.Delete("node1")
+	fakeNodeHandler.Delete("node1", nil)
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

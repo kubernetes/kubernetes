@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -233,6 +234,118 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 	}
 }
 
+func TestStoreToReplicaSetLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	lister := StoreToReplicaSetLister{store}
+	testCases := []struct {
+		inRSs      []*extensions.ReplicaSet
+		list       func() ([]extensions.ReplicaSet, error)
+		outRSNames sets.String
+		expectErr  bool
+	}{
+		// Basic listing with all labels and no selectors
+		{
+			inRSs: []*extensions.ReplicaSet{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			},
+			list: func() ([]extensions.ReplicaSet, error) {
+				return lister.List()
+			},
+			outRSNames: sets.NewString("basic"),
+		},
+		// No pod labels
+		{
+			inRSs: []*extensions.ReplicaSet{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: extensions.ReplicaSetSpec{
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+					},
+				},
+			},
+			list: func() ([]extensions.ReplicaSet, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+				}
+				return lister.GetPodReplicaSets(pod)
+			},
+			outRSNames: sets.NewString(),
+			expectErr:  true,
+		},
+		// No ReplicaSet selectors
+		{
+			inRSs: []*extensions.ReplicaSet{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+				},
+			},
+			list: func() ([]extensions.ReplicaSet, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "ns",
+						Labels:    map[string]string{"foo": "bar"},
+					},
+				}
+				return lister.GetPodReplicaSets(pod)
+			},
+			outRSNames: sets.NewString(),
+			expectErr:  true,
+		},
+		// Matching labels to selectors and namespace
+		{
+			inRSs: []*extensions.ReplicaSet{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Spec: extensions.ReplicaSetSpec{
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: extensions.ReplicaSetSpec{
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					},
+				},
+			},
+			list: func() ([]extensions.ReplicaSet, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Labels:    map[string]string{"foo": "bar"},
+						Namespace: "ns",
+					},
+				}
+				return lister.GetPodReplicaSets(pod)
+			},
+			outRSNames: sets.NewString("bar"),
+		},
+	}
+	for _, c := range testCases {
+		for _, r := range c.inRSs {
+			store.Add(r)
+		}
+
+		gotRSs, err := c.list()
+		if err != nil && c.expectErr {
+			continue
+		} else if c.expectErr {
+			t.Error("Expected error, got none")
+			continue
+		} else if err != nil {
+			t.Errorf("Unexpected error %#v", err)
+			continue
+		}
+		gotNames := make([]string, len(gotRSs))
+		for ix := range gotRSs {
+			gotNames[ix] = gotRSs[ix].Name
+		}
+		if !c.outRSNames.HasAll(gotNames...) || len(gotNames) != len(c.outRSNames) {
+			t.Errorf("Unexpected got ReplicaSets %+v expected %+v", gotNames, c.outRSNames)
+		}
+	}
+}
+
 func TestStoreToDaemonSetLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	lister := StoreToDaemonSetLister{store}
@@ -272,7 +385,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -311,13 +424,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -401,7 +514,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "baz"},
 						},
 					},
@@ -444,7 +557,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -452,7 +565,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -477,7 +590,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -485,7 +598,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.LabelSelector{
+						Selector: &unversioned.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},

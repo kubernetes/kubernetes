@@ -17,19 +17,27 @@ limitations under the License.
 package nfs
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -49,8 +57,14 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/nfs")
 	if err != nil {
@@ -62,8 +76,14 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 func TestRecycler(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{nil, newMockRecycler, volume.VolumeConfig{}}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{nil, newMockRecycler, volume.VolumeConfig{}}}, volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -113,8 +133,14 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
+	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -130,8 +156,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Got a nil Builder")
 	}
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~nfs/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/vol1", tmpDir)
+	if path != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
@@ -184,7 +211,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 func TestPluginVolume(t *testing.T) {
 	vol := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/tmp", ReadOnly: false}},
+		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/somepath", ReadOnly: false}},
 	}
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
 }
@@ -196,7 +223,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/tmp", ReadOnly: false},
+				NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/somepath", ReadOnly: false},
 			},
 		},
 	}
@@ -205,6 +232,12 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pvA",
@@ -232,10 +265,10 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 	}
 
-	client := testclient.NewSimpleFake(pv, claim)
+	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(nfsPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes

@@ -25,5 +25,5 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
-"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-rc.yaml"
-"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-svc.yaml"
+"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml"
+"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml"

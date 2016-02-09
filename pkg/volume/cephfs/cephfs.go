@@ -19,12 +19,13 @@ package cephfs
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -73,7 +74,7 @@ func (plugin *cephfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
 
-		secretName, err := kubeClient.Secrets(pod.Namespace).Get(cephvs.SecretRef.Name)
+		secretName, err := kubeClient.Core().Secrets(pod.Namespace).Get(cephvs.SecretRef.Name)
 		if err != nil {
 			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", pod.Namespace, cephvs.SecretRef, err)
 			return nil, err
@@ -92,6 +93,13 @@ func (plugin *cephfsPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 	if id == "" {
 		id = "admin"
 	}
+	path := cephvs.Path
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
 	secret_file := cephvs.SecretFile
 	if secret_file == "" {
 		secret_file = "/etc/ceph/" + id + ".secret"
@@ -102,6 +110,7 @@ func (plugin *cephfsPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 			podUID:      podUID,
 			volName:     spec.Name(),
 			mon:         cephvs.Monitors,
+			path:        path,
 			secret:      secret,
 			id:          id,
 			secret_file: secret_file,
@@ -138,6 +147,7 @@ type cephfs struct {
 	volName     string
 	podUID      types.UID
 	mon         []string
+	path        string
 	id          string
 	secret      string
 	secret_file string
@@ -208,7 +218,7 @@ func (cephfsVolume *cephfsCleaner) TearDownAt(dir string) error {
 // GatePath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
-	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, strings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
 }
 
 func (cephfsVolume *cephfs) cleanup(dir string) error {
@@ -261,7 +271,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	for i = 0; i < l-1; i++ {
 		src += hosts[i] + ","
 	}
-	src += hosts[i] + ":/"
+	src += hosts[i] + ":" + cephfsVolume.path
 
 	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)

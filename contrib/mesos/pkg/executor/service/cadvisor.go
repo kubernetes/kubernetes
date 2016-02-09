@@ -25,10 +25,10 @@ import (
 type MesosCadvisor struct {
 	cadvisor.Interface
 	cores int
-	mem   int64
+	mem   uint64
 }
 
-func NewMesosCadvisor(cores int, mem int64, port uint) (*MesosCadvisor, error) {
+func NewMesosCadvisor(cores int, mem uint64, port uint) (*MesosCadvisor, error) {
 	c, err := cadvisor.New(port)
 	if err != nil {
 		return nil, err

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -42,7 +43,7 @@ import (
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
 func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *util.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{Time: fakeTime}
+	fakeClock := util.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
@@ -176,7 +177,7 @@ func TestControllerExpectations(t *testing.T) {
 	}
 
 	// Expectations have expired because of ttl
-	fakeClock.Time = fakeClock.Time.Add(ttl + 1)
+	fakeClock.Step(ttl + 1)
 	if !e.SatisfiedExpectations(rcKey) {
 		t.Errorf("Expectations should have expired but didn't")
 	}
@@ -192,10 +193,10 @@ func TestCreatePods(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	// TODO: Uncomment when fix #19254
 	// defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	podControl := RealPodControl{
-		KubeClient: client,
+		KubeClient: clientset,
 		Recorder:   &record.FakeRecorder{},
 	}
 

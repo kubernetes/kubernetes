@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type OOMWatcher interface {
@@ -60,7 +60,7 @@ func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 	}
 
 	go func() {
-		defer util.HandleCrash()
+		defer runtime.HandleCrash()
 
 		for event := range eventChannel.GetChannel() {
 			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)

@@ -56,10 +56,11 @@ type extendedMock struct {
 
 // Upon returns a chan that closes upon the execution of the most recently registered call.
 func (m *extendedMock) Upon() <-chan struct{} {
+	// TODO(jdef) this isn't thread safe, should make it so
 	ch := make(chan struct{})
-	call := &m.ExpectedCalls[len(m.ExpectedCalls)-1]
-	f := call.Run
-	call.Run = func(args mock.Arguments) {
+	call := m.ExpectedCalls[len(m.ExpectedCalls)-1]
+	f := call.RunFn
+	call.RunFn = func(args mock.Arguments) {
 		defer close(ch)
 		if f != nil {
 			f(args)
@@ -104,6 +105,11 @@ func (m *MockSchedulerDriver) Run() (mesos.Status, error) {
 
 func (m *MockSchedulerDriver) RequestResources(r []*mesos.Request) (mesos.Status, error) {
 	args := m.Called(r)
+	return status(args, 0), args.Error(1)
+}
+
+func (m *MockSchedulerDriver) AcceptOffers(ids []*mesos.OfferID, ops []*mesos.Offer_Operation, f *mesos.Filters) (mesos.Status, error) {
+	args := m.Called(ids, ops, f)
 	return status(args, 0), args.Error(1)
 }
 

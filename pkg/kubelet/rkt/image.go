@@ -88,7 +88,7 @@ func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
 		images[i] = kubecontainer.Image{
 			ID:       image.Id,
 			RepoTags: []string{buildImageName(image)},
-			//TODO: fill in the size of the image
+			Size:     image.Size,
 		}
 	}
 	return images, nil

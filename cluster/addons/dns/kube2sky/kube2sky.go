@@ -337,12 +337,12 @@ func (ks *kube2sky) generateSRVRecord(subdomain, portSegment, recordName, cName 
 }
 
 func (ks *kube2sky) addDNS(subdomain string, service *kapi.Service) error {
-	if len(service.Spec.Ports) == 0 {
-		glog.Fatalf("Unexpected service with no ports: %v", service)
-	}
 	// if ClusterIP is not set, a DNS entry should not be created
 	if !kapi.IsServiceIPSet(service) {
 		return ks.newHeadlessService(subdomain, service)
+	}
+	if len(service.Spec.Ports) == 0 {
+		glog.Info("Unexpected service with no ports, this should not have happend: %v", service)
 	}
 	return ks.generateRecordsForPortalService(subdomain, service)
 }
@@ -515,7 +515,7 @@ func watchForServices(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
 			UpdateFunc: ks.updateService,
 		},
 	)
-	go serviceController.Run(util.NeverStop)
+	go serviceController.Run(wait.NeverStop)
 	return serviceStore
 }
 
@@ -533,7 +533,7 @@ func watchEndpoints(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
 		},
 	)
 
-	go eController.Run(util.NeverStop)
+	go eController.Run(wait.NeverStop)
 	return eStore
 }
 
@@ -551,7 +551,7 @@ func watchPods(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
 		},
 	)
 
-	go eController.Run(util.NeverStop)
+	go eController.Run(wait.NeverStop)
 	return eStore
 }
 

@@ -17,19 +17,20 @@ var ErrNetworkAlreadyExists = errors.New("network already exists")
 
 // Network represents a network.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 type Network struct {
 	Name       string
 	ID         string `json:"Id"`
 	Scope      string
 	Driver     string
+	IPAM       IPAMOptions
 	Containers map[string]Endpoint
 	Options    map[string]string
 }
 
 // Endpoint contains network resources allocated and used for a container in a network
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 type Endpoint struct {
 	Name        string
 	ID          string `json:"EndpointID"`
@@ -40,7 +41,7 @@ type Endpoint struct {
 
 // ListNetworks returns all networks.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 func (c *Client) ListNetworks() ([]Network, error) {
 	resp, err := c.do("GET", "/networks", doOptions{})
 	if err != nil {
@@ -56,7 +57,7 @@ func (c *Client) ListNetworks() ([]Network, error) {
 
 // NetworkInfo returns information about a network by its ID.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 func (c *Client) NetworkInfo(id string) (*Network, error) {
 	path := "/networks/" + id
 	resp, err := c.do("GET", path, doOptions{})
@@ -77,7 +78,7 @@ func (c *Client) NetworkInfo(id string) (*Network, error) {
 // CreateNetworkOptions specify parameters to the CreateNetwork function and
 // (for now) is the expected body of the "create network" http request message
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 type CreateNetworkOptions struct {
 	Name           string                 `json:"Name"`
 	CheckDuplicate bool                   `json:"CheckDuplicate"`
@@ -107,7 +108,7 @@ type IPAMConfig struct {
 // CreateNetwork creates a new network, returning the network instance,
 // or an error in case of failure.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 func (c *Client) CreateNetwork(opts CreateNetworkOptions) (*Network, error) {
 	resp, err := c.do(
 		"POST",
@@ -144,7 +145,7 @@ func (c *Client) CreateNetwork(opts CreateNetworkOptions) (*Network, error) {
 
 // RemoveNetwork removes a network or returns an error in case of failure.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 func (c *Client) RemoveNetwork(id string) error {
 	resp, err := c.do("DELETE", "/networks/"+id, doOptions{})
 	if err != nil {
@@ -159,14 +160,14 @@ func (c *Client) RemoveNetwork(id string) error {
 
 // NetworkConnectionOptions specify parameters to the ConnectNetwork and DisconnectNetwork function.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 type NetworkConnectionOptions struct {
 	Container string
 }
 
 // ConnectNetwork adds a container to a network or returns an error in case of failure.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 func (c *Client) ConnectNetwork(id string, opts NetworkConnectionOptions) error {
 	resp, err := c.do("POST", "/networks/"+id+"/connect", doOptions{data: opts})
 	if err != nil {
@@ -181,7 +182,7 @@ func (c *Client) ConnectNetwork(id string, opts NetworkConnectionOptions) error 
 
 // DisconnectNetwork removes a container from a network or returns an error in case of failure.
 //
-// See https://goo.gl/1kmPKZ for more details.
+// See https://goo.gl/6GugX3 for more details.
 func (c *Client) DisconnectNetwork(id string, opts NetworkConnectionOptions) error {
 	resp, err := c.do("POST", "/networks/"+id+"/disconnect", doOptions{data: opts})
 	if err != nil {

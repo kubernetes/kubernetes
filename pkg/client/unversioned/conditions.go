@@ -101,6 +101,29 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 	}
 }
 
+// ReplicaSetHasDesiredReplicas returns a condition that will be true if and only if
+// the desired replica count for a ReplicaSet's ReplicaSelector equals the Replicas count.
+func ReplicaSetHasDesiredReplicas(c ExtensionsInterface, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
+
+	// If we're given a ReplicaSet where the status lags the spec, it either means that the
+	// ReplicaSet is stale, or that the ReplicaSet manager hasn't noticed the update yet.
+	// Polling status.Replicas is not safe in the latter case.
+	desiredGeneration := replicaSet.Generation
+
+	return func() (bool, error) {
+		rs, err := c.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name)
+		if err != nil {
+			return false, err
+		}
+		// There's a chance a concurrent update modifies the Spec.Replicas causing this check to
+		// pass, or, after this check has passed, a modification causes the ReplicaSet manager to
+		// create more pods. This will not be an issue once we've implemented graceful delete for
+		// ReplicaSets, but till then concurrent stop operations on the same ReplicaSet might have
+		// unintended side effects.
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == rs.Spec.Replicas, nil
+	}
+}
+
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
 func JobHasDesiredParallelism(c ExtensionsInterface, job *extensions.Job) wait.ConditionFunc {

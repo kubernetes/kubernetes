@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/parser"
+	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 
 	"github.com/spf13/pflag"
 )
@@ -49,6 +50,9 @@ func Default() *GeneratorArgs {
 type GeneratorArgs struct {
 	// Which directories to parse.
 	InputDirs []string
+
+	// If true, recurse into all children of InputDirs
+	Recursive bool
 
 	// Source tree to write results to.
 	OutputBase string
@@ -72,6 +76,7 @@ func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&g.OutputPackagePath, "output-package", "p", g.OutputPackagePath, "Base package path.")
 	fs.StringVarP(&g.GoHeaderFilePath, "go-header-file", "h", g.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
 	fs.BoolVar(&g.VerifyOnly, "verify-only", g.VerifyOnly, "If true, only verify existing output, do not write anything.")
+	fs.BoolVar(&g.Recursive, "recursive", g.VerifyOnly, "If true, recurse into all children of input directories.")
 }
 
 // LoadGoBoilerplate loads the boilerplate file passed to --go-header-file.
@@ -89,11 +94,28 @@ func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
 func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 	b := parser.New()
 	for _, d := range g.InputDirs {
-		if err := b.AddDir(d); err != nil {
-			return nil, fmt.Errorf("unable to add directory %q: %v", d, err)
+		if g.Recursive {
+			if err := b.AddDirRecursive(d); err != nil {
+				return nil, fmt.Errorf("unable to add directory %q: %v", d, err)
+			}
+		} else {
+			if err := b.AddDir(d); err != nil {
+				return nil, fmt.Errorf("unable to add directory %q: %v", d, err)
+			}
 		}
 	}
 	return b, nil
+}
+
+// InputIncludes returns true if the given package is a (sub) package of one of
+// the InputDirs.
+func (g *GeneratorArgs) InputIncludes(p *types.Package) bool {
+	for _, dir := range g.InputDirs {
+		if strings.HasPrefix(p.Path, dir) {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultSourceTree returns the /src directory of the first entry in $GOPATH.

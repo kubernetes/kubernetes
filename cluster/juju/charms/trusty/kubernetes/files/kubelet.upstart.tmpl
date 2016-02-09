@@ -9,6 +9,7 @@ kill timeout 60 # wait 60s between SIGTERM and SIGKILL.
 
 exec /usr/local/bin/kubelet \
      --address=%(kubelet_bind_addr)s \
+     --allow-privileged=true \
      --api-servers=%(kubeapi_server)s \
      --hostname-override=%(kubelet_bind_addr)s \
      --cadvisor-port=4193 \

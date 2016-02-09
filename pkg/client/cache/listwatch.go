@@ -51,7 +51,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
-			VersionedParams(&options, api.Scheme).
+			VersionedParams(&options, api.ParameterCodec).
 			FieldsSelectorParam(fieldSelector).
 			Do().
 			Get()
@@ -61,7 +61,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 			Prefix("watch").
 			Namespace(namespace).
 			Resource(resource).
-			VersionedParams(&options, api.Scheme).
+			VersionedParams(&options, api.ParameterCodec).
 			FieldsSelectorParam(fieldSelector).
 			Watch()
 	}

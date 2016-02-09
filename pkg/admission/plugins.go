@@ -23,14 +23,14 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 // Factory is a function that returns an Interface for admission decisions.
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
-type Factory func(client client.Interface, config io.Reader) (Interface, error)
+type Factory func(client clientset.Interface, config io.Reader) (Interface, error)
 
 // All registered admission options.
 var (
@@ -67,7 +67,7 @@ func RegisterPlugin(name string, plugin Factory) {
 // known. The error is returned only when the named provider was known but failed
 // to initialize. The config parameter specifies the io.Reader handler of the
 // configuration file for the cloud provider, or nil for no configuration.
-func GetPlugin(name string, client client.Interface, config io.Reader) (Interface, error) {
+func GetPlugin(name string, client clientset.Interface, config io.Reader) (Interface, error) {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
 	f, found := plugins[name]
@@ -78,7 +78,7 @@ func GetPlugin(name string, client client.Interface, config io.Reader) (Interfac
 }
 
 // InitPlugin creates an instance of the named interface.
-func InitPlugin(name string, client client.Interface, configFilePath string) Interface {
+func InitPlugin(name string, client clientset.Interface, configFilePath string) Interface {
 	var (
 		config *os.File
 		err    error

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -100,9 +101,11 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	if c.DeleteEtcdKeys {
 		DeleteAllEtcdKeys()
 	}
+	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
-	controllerManager := replicationcontroller.NewReplicationManager(restClient, controller.NoResyncPeriodFunc, c.Burst)
+	controllerManager := replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, c.Burst)
 
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})
@@ -132,7 +135,11 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig.EnableProfiling = true
 		masterConfig.EnableSwaggerSupport = true
 	}
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		glog.Fatalf("error in bringing up the master: %v", err)
+	}
+
 	return m, s
 }
 
@@ -141,7 +148,7 @@ func NewMasterConfig() *master.Config {
 	etcdClient := NewEtcdClient()
 	storageVersions := make(map[string]string)
 
-	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix(), false)
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
@@ -286,7 +293,11 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableProfiling = true
-	m := master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		// TODO: Return error.
+		glog.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)

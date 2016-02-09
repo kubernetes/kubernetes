@@ -85,6 +85,10 @@ Creates a replication controller or job to manage the created container(s).
     The port that this container exposes.  If \-\-expose is true, this is also the port used by the service that is created.
 
 .PP
+\fB\-\-record\fP=false
+    Record current kubectl command in the resource annotation.
+
+.PP
 \fB\-r\fP, \fB\-\-replicas\fP=1
     Number of replicas to create for this container. Default is 1.
 
@@ -115,6 +119,10 @@ Creates a replication controller or job to manage the created container(s).
 .PP
 \fB\-a\fP, \fB\-\-show\-all\fP=false
     When printing, show all resources (default hide terminated pods.)
+
+.PP
+\fB\-\-show\-labels\fP=false
+    When printing, show all labels as the last column (default hide labels column)
 
 .PP
 \fB\-\-sort\-by\fP=""

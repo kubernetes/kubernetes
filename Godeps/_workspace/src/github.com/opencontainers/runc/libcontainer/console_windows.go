@@ -1,7 +1,7 @@
 package libcontainer
 
-// newConsole returns an initalized console that can be used within a container
-func newConsole(uid, gid int) (Console, error) {
+// NewConsole returns an initalized console that can be used within a container
+func NewConsole(uid, gid int) (Console, error) {
 	return &windowsConsole{}, nil
 }
 

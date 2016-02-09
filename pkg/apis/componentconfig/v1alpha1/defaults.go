@@ -17,7 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -37,8 +42,57 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				temp := int32(qos.KubeProxyOOMScoreAdj)
 				obj.OOMScoreAdj = &temp
 			}
-			if obj.IPTablesSyncePeriodSeconds == 0 {
-				obj.IPTablesSyncePeriodSeconds = 5
+			if obj.ResourceContainer == "" {
+				obj.ResourceContainer = "/kube-proxy"
+			}
+			if obj.IPTablesSyncPeriod.Duration == 0 {
+				obj.IPTablesSyncPeriod = unversioned.Duration{30 * time.Second}
+			}
+			zero := unversioned.Duration{}
+			if obj.UDPIdleTimeout == zero {
+				obj.UDPIdleTimeout = unversioned.Duration{250 * time.Millisecond}
+			}
+			if obj.ConntrackMax == 0 {
+				obj.ConntrackMax = 256 * 1024 // 4x default (64k)
+			}
+			if obj.IPTablesMasqueradeBit == nil {
+				temp := int32(14)
+				obj.IPTablesMasqueradeBit = &temp
+			}
+			if obj.ConntrackTCPEstablishedTimeout == zero {
+				obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
+			}
+		},
+		func(obj *KubeSchedulerConfiguration) {
+			if obj.Port == 0 {
+				obj.Port = ports.SchedulerPort
+			}
+			if obj.Address == "" {
+				obj.Address = "0.0.0.0"
+			}
+			if obj.AlgorithmProvider == "" {
+				obj.AlgorithmProvider = "DefaultProvider"
+			}
+			if obj.KubeAPIQPS == 0 {
+				obj.KubeAPIQPS = 50.0
+			}
+			if obj.KubeAPIBurst == 0 {
+				obj.KubeAPIBurst = 100
+			}
+			if obj.SchedulerName == "" {
+				obj.SchedulerName = api.DefaultSchedulerName
+			}
+		},
+		func(obj *LeaderElectionConfiguration) {
+			zero := unversioned.Duration{}
+			if obj.LeaseDuration == zero {
+				obj.LeaseDuration = unversioned.Duration{15 * time.Second}
+			}
+			if obj.RenewDeadline == zero {
+				obj.RenewDeadline = unversioned.Duration{10 * time.Second}
+			}
+			if obj.RetryPeriod == zero {
+				obj.RetryPeriod = unversioned.Duration{2 * time.Second}
 			}
 		},
 	)

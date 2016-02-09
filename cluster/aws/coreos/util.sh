@@ -53,6 +53,3 @@ function check-minion() {
   echo "working"
 }
 
-function yaml-quote {
-  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
-}

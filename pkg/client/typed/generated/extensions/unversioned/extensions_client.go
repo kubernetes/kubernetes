@@ -26,8 +26,9 @@ type ExtensionsInterface interface {
 	DaemonSetsGetter
 	DeploymentsGetter
 	HorizontalPodAutoscalersGetter
-	IngressGetter
+	IngressesGetter
 	JobsGetter
+	ReplicaSetsGetter
 	ScalesGetter
 	ThirdPartyResourcesGetter
 }
@@ -49,12 +50,16 @@ func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) Horizontal
 	return newHorizontalPodAutoscalers(c, namespace)
 }
 
-func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {
-	return newIngress(c, namespace)
+func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
+	return newIngresses(c, namespace)
 }
 
 func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
+}
+
+func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
 }
 
 func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {

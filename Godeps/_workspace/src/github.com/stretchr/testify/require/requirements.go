@@ -1,6 +1,7 @@
 package require
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -118,7 +119,7 @@ func True(t TestingT, value bool, msgAndArgs ...interface{}) {
 	}
 }
 
-// False asserts that the specified value is true.
+// False asserts that the specified value is false.
 //
 //    require.False(t, myBool, "myBool should be false")
 func False(t TestingT, value bool, msgAndArgs ...interface{}) {
@@ -136,9 +137,12 @@ func NotEqual(t TestingT, expected, actual interface{}, msgAndArgs ...interface{
 	}
 }
 
-// Contains asserts that the specified string contains the specified substring.
+// Contains asserts that the specified string, list(array, slice...) or map contains the
+// specified substring or element.
 //
 //    require.Contains(t, "Hello World", "World", "But 'Hello World' does contain 'World'")
+//    require.Contains(t, ["Hello", "World"], "World", "But ["Hello", "World"] does contain 'World'")
+//    require.Contains(t, {"Hello": "World"}, "Hello", "But {'Hello': 'World'} does contain 'Hello'")
 func Contains(t TestingT, s, contains interface{}, msgAndArgs ...interface{}) {
 	if !assert.Contains(t, s, contains, msgAndArgs...) {
 		t.FailNow()
@@ -228,6 +232,25 @@ func NotRegexp(t TestingT, rx interface{}, str interface{}, msgAndArgs ...interf
 	}
 }
 
+// JSONEq asserts that two JSON strings are equivalent.
+//
+//  assert.JSONEq(t, `{"hello": "world", "foo": "bar"}`, `{"foo": "bar", "hello": "world"}`)
+//
+// Returns whether the assertion was successful (true) or not (false).
+func JSONEq(t TestingT, expected string, actual string, msgAndArgs ...interface{}) {
+	var expectedJSONAsInterface, actualJSONAsInterface interface{}
+
+	if err := json.Unmarshal([]byte(expected), &expectedJSONAsInterface); err != nil {
+		t.FailNow()
+	}
+
+	if err := json.Unmarshal([]byte(actual), &actualJSONAsInterface); err != nil {
+		t.FailNow()
+	}
+
+	Equal(t, expectedJSONAsInterface, actualJSONAsInterface, msgAndArgs...)
+}
+
 /*
 	Errors
 */
@@ -266,6 +289,20 @@ func Error(t TestingT, err error, msgAndArgs ...interface{}) {
 //   }
 func EqualError(t TestingT, theError error, errString string, msgAndArgs ...interface{}) {
 	if !assert.EqualError(t, theError, errString, msgAndArgs...) {
+		t.FailNow()
+	}
+}
+
+// Zero asserts that i is the zero value for its type and returns the truth.
+func Zero(t TestingT, i interface{}, msgAndArgs ...interface{}) {
+	if !assert.Zero(t, i, msgAndArgs...) {
+		t.FailNow()
+	}
+}
+
+// NotZero asserts that i is not the zero value for its type and returns the truth.
+func NotZero(t TestingT, i interface{}, msgAndArgs ...interface{}) {
+	if !assert.NotZero(t, i, msgAndArgs...) {
 		t.FailNow()
 	}
 }

@@ -18,14 +18,15 @@ package service
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -56,6 +57,9 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid"
+	frameworkidEtcd "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid/etcd"
+	frameworkidZk "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework/frameworkid/zk"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
@@ -66,15 +70,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	// lock to this API version, compilation will fail when this becomes unsupported
@@ -99,7 +104,9 @@ type SchedulerServer struct {
 	port                  int
 	address               net.IP
 	enableProfiling       bool
-	authPath              string
+	kubeconfig            string
+	kubeAPIQPS            float32
+	kubeAPIBurst          int
 	apiServerList         []string
 	etcdServerList        []string
 	allowPrivileged       bool
@@ -117,6 +124,7 @@ type SchedulerServer struct {
 	checkpoint            bool
 	failoverTimeout       float64
 	generateTaskDiscovery bool
+	frameworkStoreURI     string
 
 	executorLogV                   int
 	executorBindall                bool
@@ -170,7 +178,7 @@ type SchedulerServer struct {
 	conntrackTCPTimeoutEstablished int
 
 	executable  string // path to the binary running this service
-	client      *client.Client
+	client      *clientset.Clientset
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -186,9 +194,12 @@ type schedulerProcessInterface interface {
 // NewSchedulerServer creates a new SchedulerServer with default parameters
 func NewSchedulerServer() *SchedulerServer {
 	s := SchedulerServer{
-		port:            ports.SchedulerPort,
-		address:         net.ParseIP("127.0.0.1"),
-		failoverTimeout: time.Duration((1 << 62) - 1).Seconds(),
+		port:              ports.SchedulerPort,
+		address:           net.ParseIP("127.0.0.1"),
+		failoverTimeout:   time.Duration((1 << 62) - 1).Seconds(),
+		frameworkStoreURI: "etcd://",
+		kubeAPIQPS:        50.0,
+		kubeAPIBurst:      100,
 
 		runProxy:                 true,
 		executorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
@@ -249,7 +260,9 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.address, "address", s.address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.enableProfiling, "profiling", s.enableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.apiServerList, "api-servers", s.apiServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
-	fs.StringVar(&s.authPath, "auth-path", s.authPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	fs.StringVar(&s.kubeconfig, "kubeconfig", s.kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.Float32Var(&s.kubeAPIQPS, "kube-api-qps", s.kubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.kubeAPIBurst, "kube-api-burst", s.kubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
 	fs.BoolVar(&s.allowPrivileged, "allow-privileged", s.allowPrivileged, "Enable privileged containers in the kubelet (compare the same flag in the apiserver).")
 	fs.StringVar(&s.clusterDomain, "cluster-domain", s.clusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
@@ -278,6 +291,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.graceful, "graceful", s.graceful, "Indicator of a graceful failover, intended for internal use only.")
 	fs.BoolVar(&s.ha, "ha", s.ha, "Run the scheduler in high availability mode with leader election. All peers should be configured exactly the same.")
 	fs.StringVar(&s.frameworkName, "framework-name", s.frameworkName, "The framework name to register with Mesos.")
+	fs.StringVar(&s.frameworkStoreURI, "framework-store-uri", s.frameworkStoreURI, "Where the framework should store metadata, either in Zookeeper (zk://host:port/path) or in etcd (etcd://path).")
 	fs.StringVar(&s.frameworkWebURI, "framework-weburi", s.frameworkWebURI, "A URI that points to a web-based interface for interacting with the framework.")
 	fs.StringVar(&s.advertisedAddress, "advertised-address", s.advertisedAddress, "host:port address that is advertised to clients. May be used to construct artifact download URIs.")
 	fs.IPVar(&s.serviceAddress, "service-address", s.serviceAddress, "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
@@ -442,11 +456,11 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--housekeeping-interval=%v", s.housekeepingInterval))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--global-housekeeping-interval=%v", s.globalHousekeepingInterval))
 
-	if s.authPath != "" {
+	if s.kubeconfig != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
-		uri, basename := s.serveFrameworkArtifact(s.authPath)
+		uri, basename := s.serveFrameworkArtifact(s.kubeconfig)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
-		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--auth-path=%s", basename))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--kubeconfig=%s", basename))
 	}
 	appendOptional := func(name string, value string) {
 		if value != "" {
@@ -526,34 +540,17 @@ func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, stati
 	return
 }
 
-// TODO(jdef): hacked from kubelet/server/server.go
-// TODO(k8s): replace this with clientcmd
-func (s *SchedulerServer) createAPIServerClient() (*client.Client, error) {
-	authInfo, err := clientauth.LoadFromFile(s.authPath)
-	if err != nil {
-		log.Warningf("Could not load kubernetes auth path: %v. Continuing with defaults.", err)
-	}
-	if authInfo == nil {
-		// authInfo didn't load correctly - continue with defaults.
-		authInfo = &clientauth.Info{}
-	}
-	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
+// TODO(jdef): hacked from plugin/cmd/kube-scheduler/app/server.go
+func (s *SchedulerServer) createAPIServerClientConfig() (*client.Config, error) {
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.apiServerList[0], s.kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	if len(s.apiServerList) < 1 {
-		return nil, fmt.Errorf("no api servers specified")
-	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.apiServerList) > 1 {
-		log.Infof("Multiple api servers specified.  Picking first one")
-	}
-	clientConfig.Host = s.apiServerList[0]
-	c, err := client.New(&clientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = s.kubeAPIQPS
+	kubeconfig.Burst = s.kubeAPIBurst
+	return kubeconfig, nil
 }
 
 func (s *SchedulerServer) setDriver(driver bindings.SchedulerDriver) {
@@ -607,7 +604,7 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 	if s.ha {
 		validation := ha.ValidationFunc(validateLeadershipTransition)
 		srv := ha.NewCandidate(schedulerProcess, driverFactory, validation)
-		path := fmt.Sprintf(meta.DefaultElectionFormat, s.frameworkName)
+		path := meta.ElectionPath(s.frameworkName)
 		log.Infof("registering for election at %v with id %v", path, eid.GetValue())
 		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, eid.GetValue(), srv, nil)
 	} else {
@@ -697,11 +694,14 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatal("No api servers specified.")
 	}
 
-	client, err := s.createAPIServerClient()
+	clientConfig, err := s.createAPIServerClientConfig()
 	if err != nil {
-		log.Fatalf("Unable to make apiserver client: %v", err)
+		log.Fatalf("Unable to make apiserver client config: %v", err)
 	}
-	s.client = client
+	s.client, err = clientset.NewForConfig(clientConfig)
+	if err != nil {
+		log.Fatalf("Unable to make apiserver clientset: %v", err)
+	}
 
 	if s.reconcileCooldown < defaultReconcileCooldown {
 		s.reconcileCooldown = defaultReconcileCooldown
@@ -725,11 +725,12 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	// mirror all nodes into the nodeStore
 	var eiRegistry executorinfo.Registry
-	nodesClient, err := s.createAPIServerClient()
+	nodesClientConfig := *clientConfig
+	nodesClient, err := clientset.NewForConfig(&nodesClientConfig)
 	if err != nil {
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
-	nodeLW := cache.NewListWatchFromClient(nodesClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			node := obj.(*api.Node)
@@ -760,24 +761,20 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	pr := podtask.NewDefaultProcurement(eiPrototype, eiRegistry)
 	fcfs := podschedulers.NewFCFSPodScheduler(pr, lookupNode)
-
+	frameworkIDStorage, err := s.frameworkIDStorage(keysAPI)
+	if err != nil {
+		log.Fatalf("cannot init framework ID storage: %v", err)
+	}
 	framework := framework.New(framework.Config{
 		SchedulerConfig:   *sc,
-		Client:            client,
+		Client:            s.client,
 		FailoverTimeout:   s.failoverTimeout,
 		ReconcileInterval: s.reconcileInterval,
 		ReconcileCooldown: s.reconcileCooldown,
 		LookupNode:        lookupNode,
-		StoreFrameworkId: func(id string) {
-			// TODO(jdef): port FrameworkId store to generic Kubernetes config store as soon as available
-			_, err := keysAPI.Set(context.TODO(), meta.FrameworkIDKey, id, &etcd.SetOptions{TTL: time.Duration(s.failoverTimeout) * time.Second})
-			if err != nil {
-				log.Errorf("failed to renew frameworkId TTL: %v", err)
-			}
-		},
-		ExecutorId: eiPrototype.GetExecutorId(),
+		StoreFrameworkId:  frameworkIDStorage.Set,
+		ExecutorId:        eiPrototype.GetExecutorId(),
 	})
-
 	masterUri := s.mesosMaster
 	info, cred, err := s.buildFrameworkInfo()
 	if err != nil {
@@ -801,18 +798,23 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	// create event recorder sending events to the "" namespace of the apiserver
+	eventsClientConfig := *clientConfig
+	eventsClient, err := clientset.NewForConfig(&eventsClientConfig)
+	if err != nil {
+		log.Fatalf("Invalid API configuration: %v", err)
+	}
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	broadcaster.StartLogging(log.Infof)
-	broadcaster.StartRecordingToSink(client.Events(""))
+	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{eventsClient.Events("")})
 
 	// create scheduler core with all components arranged around it
-	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(
 		sc,
 		framework,
 		fcfs,
-		client,
+		s.client,
 		recorder,
 		schedulerProcess.Terminal(),
 		s.mux,
@@ -833,18 +835,33 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		if err = framework.Init(sched, schedulerProcess.Master(), s.mux); err != nil {
 			return nil, fmt.Errorf("failed to initialize pod scheduler: %v", err)
 		}
+
 		log.V(1).Infoln("deferred init complete")
-		// defer obtaining framework ID to prevent multiple schedulers
-		// from overwriting each other's framework IDs
-		dconfig.Framework.Id, err = s.fetchFrameworkID(keysAPI)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch framework ID from etcd: %v", err)
+		if s.failoverTimeout > 0 {
+			// defer obtaining framework ID to prevent multiple schedulers
+			// from overwriting each other's framework IDs
+			var frameworkID string
+			frameworkID, err = frameworkIDStorage.Get(context.TODO())
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch framework ID from storage: %v", err)
+			}
+			if frameworkID != "" {
+				log.Infof("configuring FrameworkInfo with ID found in storage: %q", frameworkID)
+				dconfig.Framework.Id = &mesos.FrameworkID{Value: &frameworkID}
+			} else {
+				log.V(1).Infof("did not find framework ID in storage")
+			}
+		} else {
+			// TODO(jdef) this is a hack, really for development, to simplify clean up of old framework IDs
+			frameworkIDStorage.Remove(context.TODO())
 		}
+
 		log.V(1).Infoln("constructing mesos scheduler driver")
 		drv, err = bindings.NewMesosSchedulerDriver(*dconfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct scheduler driver: %v", err)
 		}
+
 		log.V(1).Infoln("constructed mesos scheduler driver:", drv)
 		s.setDriver(drv)
 		return drv, nil
@@ -943,42 +960,18 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 
 	if s.mesosAuthPrincipal != "" {
 		info.Principal = proto.String(s.mesosAuthPrincipal)
-		if s.mesosAuthSecretFile == "" {
-			return nil, nil, errors.New("authentication principal specified without the required credentials file")
-		}
-		secret, err := ioutil.ReadFile(s.mesosAuthSecretFile)
-		if err != nil {
-			return nil, nil, err
-		}
 		cred = &mesos.Credential{
 			Principal: proto.String(s.mesosAuthPrincipal),
-			Secret:    secret,
+		}
+		if s.mesosAuthSecretFile != "" {
+			secret, err := ioutil.ReadFile(s.mesosAuthSecretFile)
+			if err != nil {
+				return nil, nil, err
+			}
+			cred.Secret = proto.String(string(secret))
 		}
 	}
 	return
-}
-
-func (s *SchedulerServer) fetchFrameworkID(client etcd.KeysAPI) (*mesos.FrameworkID, error) {
-	if s.failoverTimeout > 0 {
-		if response, err := client.Get(context.TODO(), meta.FrameworkIDKey, nil); err != nil {
-			if !etcdutil.IsEtcdNotFound(err) {
-				return nil, fmt.Errorf("unexpected failure attempting to load framework ID from etcd: %v", err)
-			}
-			log.V(1).Infof("did not find framework ID in etcd")
-		} else if response.Node.Value != "" {
-			log.Infof("configuring FrameworkInfo with Id found in etcd: '%s'", response.Node.Value)
-			return mutil.NewFrameworkID(response.Node.Value), nil
-		}
-	} else {
-		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
-		if _, err := client.Delete(context.TODO(), meta.FrameworkIDKey, &etcd.DeleteOptions{Recursive: true}); err != nil {
-			if !etcdutil.IsEtcdNotFound(err) {
-				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)
-			}
-			log.V(1).Infof("nothing to delete: did not find framework ID in etcd")
-		}
-	}
-	return nil, nil
 }
 
 func (s *SchedulerServer) getUsername() (username string, err error) {
@@ -992,4 +985,25 @@ func (s *SchedulerServer) getUsername() (username string, err error) {
 		}
 	}
 	return
+}
+
+func (s *SchedulerServer) frameworkIDStorage(keysAPI etcd.KeysAPI) (frameworkid.Storage, error) {
+	u, err := url.Parse(s.frameworkStoreURI)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse framework store URI: %v", err)
+	}
+
+	switch u.Scheme {
+	case "etcd":
+		idpath := meta.StoreChroot
+		if u.Path != "" {
+			idpath = path.Join("/", u.Path)
+		}
+		idpath = path.Join(idpath, s.frameworkName, "frameworkid")
+		return frameworkidEtcd.Store(keysAPI, idpath, time.Duration(s.failoverTimeout)*time.Second), nil
+	case "zk":
+		return frameworkidZk.Store(s.frameworkStoreURI, s.frameworkName), nil
+	default:
+		return nil, fmt.Errorf("unsupported framework storage scheme: %q", u.Scheme)
+	}
 }

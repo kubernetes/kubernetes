@@ -115,14 +115,6 @@ function detect-project () {
   fi
 }
 
-function sha1sum-file() {
-  if which shasum >/dev/null 2>&1; then
-    shasum -a1 "$1" | awk '{ print $1 }'
-  else
-    sha1sum "$1" | awk '{ print $1 }'
-  fi
-}
-
 function already-staged() {
   local -r file=$1
   local -r newsum=$2
@@ -465,96 +457,6 @@ function add-instance-metadata-from-file {
   done
 }
 
-# Quote something appropriate for a yaml string.
-#
-# TODO(zmerlynn): Note that this function doesn't so much "quote" as
-# "strip out quotes", and we really should be using a YAML library for
-# this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
-function yaml-quote {
-  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
-}
-
-function write-master-env {
-  # If the user requested that the master be part of the cluster, set the
-  # environment variable to program the master kubelet to register itself.
-  if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
-    KUBELET_APISERVER="${MASTER_NAME}"
-  fi
-
-  build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
-}
-
-function write-node-env {
-  build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
-}
-
-# Create certificate pairs for the cluster.
-# $1: The public IP for the master.
-#
-# These are used for static cert distribution (e.g. static clustering) at
-# cluster creation time. This will be obsoleted once we implement dynamic
-# clustering.
-#
-# The following certificate pairs are created:
-#
-#  - ca (the cluster's certificate authority)
-#  - server
-#  - kubelet
-#  - kubecfg (for kubectl)
-#
-# TODO(roberthbailey): Replace easyrsa with a simple Go program to generate
-# the certs that we need.
-#
-# Assumed vars
-#   KUBE_TEMP
-#
-# Vars set:
-#   CERT_DIR
-#   CA_CERT_BASE64
-#   MASTER_CERT_BASE64
-#   MASTER_KEY_BASE64
-#   KUBELET_CERT_BASE64
-#   KUBELET_KEY_BASE64
-#   KUBECFG_CERT_BASE64
-#   KUBECFG_KEY_BASE64
-function create-certs {
-  local -r cert_ip="${1}"
-
-  local octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-  ((octets[3]+=1))
-  local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
-  local -r sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
-
-  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
-  # Note: This was heavily cribbed from make-ca-cert.sh
-  (set -x
-    cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
-    tar xzf easy-rsa.tar.gz
-    cd easy-rsa-master/easyrsa3
-    ./easyrsa init-pki
-    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass
-    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
-    ./easyrsa build-client-full kubelet nopass
-    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
-    cat "${cert_create_debug_output}" >&2
-    echo "=== Failed to generate certificates: Aborting ===" >&2
-    exit 2
-  }
-  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
-  # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
-  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
-  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
-  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
-  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
-  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64 | tr -d '\r\n')
-  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
-  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
-  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
-}
-
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -570,6 +472,9 @@ function kube-up {
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
   upload-server-tars
+
+  # ensure that environmental variables specifying number of migs to create
+  set_num_migs
 
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     create-nodes
@@ -714,21 +619,35 @@ function create-nodes-template() {
   create-node-instance-template $template_name
 }
 
-function create-nodes() {
-  local template_name="${NODE_INSTANCE_PREFIX}-template"
-
+# Assumes:
+# - MAX_INSTANCES_PER_MIG
+# - NUM_NODES
+# exports: 
+# - NUM_MIGS
+function set_num_migs() {
   local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
 
   if [[ ${defaulted_max_instances_per_mig} -le "0" ]]; then
     echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 500"
     defaulted_max_instances_per_mig=500
   fi
-  local num_migs=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
-  local instances_per_mig=$(((${NUM_NODES} + ${num_migs} - 1) / ${num_migs}))
-  local last_mig_size=$((${NUM_NODES} - (${num_migs} - 1) * ${instances_per_mig}))
+  export NUM_MIGS=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
+}
+
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - NUM_NODES
+# - PROJECT
+# - ZONE
+function create-nodes() {
+  local template_name="${NODE_INSTANCE_PREFIX}-template"
+
+  local instances_per_mig=$(((${NUM_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+  local last_mig_size=$((${NUM_NODES} - (${NUM_MIGS} - 1) * ${instances_per_mig}))
 
   #TODO: parallelize this loop to speed up the process
-  for i in $(seq $((${num_migs} - 1))); do
+  for i in $(seq $((${NUM_MIGS} - 1))); do
     gcloud compute instance-groups managed \
         create "${NODE_INSTANCE_PREFIX}-group-$i" \
         --project "${PROJECT}" \
@@ -757,35 +676,44 @@ function create-nodes() {
       --project "${PROJECT}" || true;
 }
 
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - PROJECT
+# - ZONE
+# - ENABLE_NODE_AUTOSCALER
+# - TARGET_NODE_UTILIZATION\
+# - AUTOSCALER_MAX_NODES
+# - AUTOSCALER_MIN_NODES
 function create-autoscaler() {
   # Create autoscaler for nodes if requested
   if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-    METRICS=""
+    local metrics=""
     # Current usage
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
     # Reservation
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
     echo "Creating node autoscalers."
 
-    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${num_migs} - 1) * ${max_instances_per_mig}))
-    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${num_migs} - 1) * ${min_instances_per_mig}))
+    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${NUM_MIGS} - 1) * ${max_instances_per_mig}))
+    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${NUM_MIGS} - 1) * ${min_instances_per_mig}))
 
-    for i in $(seq $((${num_migs} - 1))); do
+    for i in $(seq $((${NUM_MIGS} - 1))); do
       gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
-          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${METRICS} || true
+          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${metrics} || true
     done
     gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${METRICS} || true
+      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${metrics} || true
   fi
 }
 
@@ -1262,11 +1190,13 @@ function test-setup {
     "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
-  do sleep 5
+  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null; do
+    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-http-alt in ${PROJECT}" >&2
+      exit 1
+    fi
+    sleep 5
   done
-  # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
@@ -1279,11 +1209,13 @@ function test-setup {
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
-  do sleep 5
+  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null; do
+    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-nodeports in ${PROJECT}" >&2
+      exit 1
+    fi
+    sleep 5
   done
-  # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
@@ -1334,191 +1266,4 @@ function restart-apiserver {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   detect-project
-}
-
-# Builds the RUNTIME_CONFIG var from other feature enable options
-function build-runtime-config() {
-  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/deployments=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
-          fi
-      fi
-  fi
-  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/daemonsets=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
-          fi
-      fi
-  fi
-}
-
-# $1: if 'true', we're building a master yaml, else a node
-function build-kube-env {
-  local master=$1
-  local file=$2
-
-  build-runtime-config
-
-  rm -f ${file}
-  cat >$file <<EOF
-ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
-INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
-NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
-CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
-SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
-SERVER_BINARY_TAR_HASH: $(yaml-quote ${SERVER_BINARY_TAR_HASH})
-SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
-SALT_TAR_HASH: $(yaml-quote ${SALT_TAR_HASH})
-SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
-KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
-ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
-ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
-ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
-ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
-ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
-ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
-LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
-ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
-ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
-ENABLE_CLUSTER_REGISTRY: $(yaml-quote ${ENABLE_CLUSTER_REGISTRY:-false})
-CLUSTER_REGISTRY_DISK: $(yaml-quote ${CLUSTER_REGISTRY_DISK})
-CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE})
-DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
-DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
-DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
-KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
-KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
-ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
-MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
-RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
-CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
-KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
-KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
-NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
-OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
-OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
-OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
-E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
-KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
-KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
-MULTIZONE: $(yaml-quote ${MULTIZONE:-})
-EOF
-  if [ -n "${KUBELET_PORT:-}" ]; then
-    cat >>$file <<EOF
-KUBELET_PORT: $(yaml-quote ${KUBELET_PORT})
-EOF
-  fi
-  if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
-    cat >>$file <<EOF
-KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
-EOF
-  fi
-  if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
-    cat >>$file <<EOF
-TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
-EOF
-  fi
-  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
-    cat >>$file <<EOF
-KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
-KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
-EOF
-  fi
-  if [ -n "${TEST_CLUSTER:-}" ]; then
-    cat >>$file <<EOF
-TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})
-EOF
-  fi
-  if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
-EOF
-  fi
-  if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
-EOF
-  fi
-  if [[ "${master}" == "true" ]]; then
-    # Master-only env vars.
-    cat >>$file <<EOF
-KUBERNETES_MASTER: $(yaml-quote "true")
-KUBE_USER: $(yaml-quote ${KUBE_USER})
-KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
-KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
-MASTER_CERT: $(yaml-quote ${MASTER_CERT_BASE64:-})
-MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
-KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
-KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
-KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
-ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
-MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
-MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
-NUM_NODES: $(yaml-quote ${NUM_NODES})
-EOF
-    if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${APISERVER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-APISERVER_TEST_LOG_LEVEL: $(yaml-quote ${APISERVER_TEST_LOG_LEVEL})
-EOF
-    fi
-    if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote ${CONTROLLER_MANAGER_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-CONTROLLER_MANAGER_TEST_LOG_LEVEL: $(yaml-quote ${CONTROLLER_MANAGER_TEST_LOG_LEVEL})
-EOF
-    fi
-    if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-SCHEDULER_TEST_ARGS: $(yaml-quote ${SCHEDULER_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-SCHEDULER_TEST_LOG_LEVEL: $(yaml-quote ${SCHEDULER_TEST_LOG_LEVEL})
-EOF
-    fi
-  else
-    # Node-only env vars.
-    cat >>$file <<EOF
-KUBERNETES_MASTER: $(yaml-quote "false")
-ZONE: $(yaml-quote ${ZONE})
-EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
-EOF
-    if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-KUBEPROXY_TEST_ARGS: $(yaml-quote ${KUBEPROXY_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
-EOF
-    fi
-  fi
-  if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
-    # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
-    cat >>$file <<EOF
-KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
-KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-docker})
-RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
-RKT_PATH: $(yaml-quote ${RKT_PATH:-})
-KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
-EOF
-  fi
 }

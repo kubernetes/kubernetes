@@ -22,10 +22,10 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// IngressGetter has a method to return a IngressInterface.
+// IngressesGetter has a method to return a IngressInterface.
 // A group's client should implement this interface.
-type IngressGetter interface {
-	Ingress(namespace string) IngressInterface
+type IngressesGetter interface {
+	Ingresses(namespace string) IngressInterface
 }
 
 // IngressInterface has methods to work with Ingress resources.
@@ -41,26 +41,26 @@ type IngressInterface interface {
 	IngressExpansion
 }
 
-// ingress implements IngressInterface
-type ingress struct {
+// ingresses implements IngressInterface
+type ingresses struct {
 	client *ExtensionsClient
 	ns     string
 }
 
-// newIngress returns a Ingress
-func newIngress(c *ExtensionsClient, namespace string) *ingress {
-	return &ingress{
+// newIngresses returns a Ingresses
+func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
+	return &ingresses{
 		client: c,
 		ns:     namespace,
 	}
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingress) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *ingresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("ingress").
+		Resource("ingresses").
 		Body(ingress).
 		Do().
 		Into(result)
@@ -68,11 +68,11 @@ func (c *ingress) Create(ingress *extensions.Ingress) (result *extensions.Ingres
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingress) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *ingresses) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("ingress").
+		Resource("ingresses").
 		Name(ingress.Name).
 		Body(ingress).
 		Do().
@@ -80,11 +80,11 @@ func (c *ingress) Update(ingress *extensions.Ingress) (result *extensions.Ingres
 	return
 }
 
-func (c *ingress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *ingresses) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("ingress").
+		Resource("ingresses").
 		Name(ingress.Name).
 		SubResource("status").
 		Body(ingress).
@@ -94,10 +94,10 @@ func (c *ingress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
-func (c *ingress) Delete(name string, options *api.DeleteOptions) error {
+func (c *ingresses) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("ingress").
+		Resource("ingresses").
 		Name(name).
 		Body(options).
 		Do().
@@ -105,46 +105,46 @@ func (c *ingress) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *ingress) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *ingresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("ingress").
-		VersionedParams(&listOptions, api.Scheme).
+		Resource("ingresses").
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
 }
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingress) Get(name string) (result *extensions.Ingress, err error) {
+func (c *ingresses) Get(name string) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("ingress").
+		Resource("ingresses").
 		Name(name).
 		Do().
 		Into(result)
 	return
 }
 
-// List takes label and field selectors, and returns the list of Ingress that match those selectors.
-func (c *ingress) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
+// List takes label and field selectors, and returns the list of Ingresses that match those selectors.
+func (c *ingresses) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
 	result = &extensions.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("ingress").
-		VersionedParams(&opts, api.Scheme).
+		Resource("ingresses").
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested ingress.
-func (c *ingress) Watch(opts api.ListOptions) (watch.Interface, error) {
+// Watch returns a watch.Interface that watches the requested ingresses.
+func (c *ingresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("ingress").
-		VersionedParams(&opts, api.Scheme).
+		Resource("ingresses").
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

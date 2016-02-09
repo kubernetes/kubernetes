@@ -177,3 +177,59 @@ func TestFIFO_addIfNotPresent(t *testing.T) {
 		}
 	}
 }
+
+func TestFIFO_HasSynced(t *testing.T) {
+	tests := []struct {
+		actions        []func(f *FIFO)
+		expectedSynced bool
+	}{
+		{
+			actions:        []func(f *FIFO){},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *FIFO){
+				func(f *FIFO) { f.Add(mkFifoObj("a", 1)) },
+			},
+			expectedSynced: true,
+		},
+		{
+			actions: []func(f *FIFO){
+				func(f *FIFO) { f.Replace([]interface{}{}, "0") },
+			},
+			expectedSynced: true,
+		},
+		{
+			actions: []func(f *FIFO){
+				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *FIFO){
+				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *FIFO) { f.Pop() },
+			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *FIFO){
+				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *FIFO) { f.Pop() },
+				func(f *FIFO) { f.Pop() },
+			},
+			expectedSynced: true,
+		},
+	}
+
+	for i, test := range tests {
+		f := NewFIFO(testFifoObjectKeyFunc)
+
+		for _, action := range test.actions {
+			action(f)
+		}
+		if e, a := test.expectedSynced, f.HasSynced(); a != e {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
+		}
+	}
+}

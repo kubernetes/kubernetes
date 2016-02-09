@@ -57,9 +57,9 @@ func (r *Mock) GetPods(all bool) ([]*Pod, error) {
 	return args.Get(0).([]*Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *api.Pod, apiStatus api.PodStatus, status *PodStatus, secrets []api.Secret, backOff *util.Backoff) error {
+func (r *Mock) SyncPod(pod *api.Pod, apiStatus api.PodStatus, status *PodStatus, secrets []api.Secret, backOff *util.Backoff) PodSyncResult {
 	args := r.Called(pod, apiStatus, status, secrets, backOff)
-	return args.Error(0)
+	return args.Get(0).(PodSyncResult)
 }
 
 func (r *Mock) KillPod(pod *api.Pod, runningPod Pod) error {
@@ -77,24 +77,9 @@ func (r *Mock) KillContainerInPod(container api.Container, pod *api.Pod) error {
 	return args.Error(0)
 }
 
-func (r *Mock) GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error) {
-	args := r.Called(pod)
-	return args.Get(0).(*api.PodStatus), args.Error(1)
-}
-
 func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
 	args := r.Called(uid, name, namespace)
 	return args.Get(0).(*PodStatus), args.Error(1)
-}
-
-func (r *Mock) GetPodStatusAndAPIPodStatus(pod *api.Pod) (*PodStatus, *api.PodStatus, error) {
-	args := r.Called(pod)
-	return args.Get(0).(*PodStatus), args.Get(0).(*api.PodStatus), args.Error(2)
-}
-
-func (r *Mock) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus *PodStatus) (*api.PodStatus, error) {
-	args := r.Called(pod, podStatus)
-	return args.Get(0).(*api.PodStatus), args.Error(1)
 }
 
 func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {

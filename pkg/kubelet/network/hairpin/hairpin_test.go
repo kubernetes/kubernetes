@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"testing"
 
@@ -84,13 +85,23 @@ func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
 	}
 }
 
-func TestSetUpInterface(t *testing.T) {
+func TestSetUpInterfaceNonExistent(t *testing.T) {
 	err := setUpInterface("non-existent")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	hairpinModeFile := fmt.Sprintf("%s/%s/%s", sysfsNetPath, "non-existent", hairpinModeRelativePath)
-	if !strings.Contains(fmt.Sprintf("%v", err), hairpinModeFile) {
-		t.Errorf("should have tried to open %s", hairpinModeFile)
+	deviceDir := fmt.Sprintf("%s/%s", sysfsNetPath, "non-existent")
+	if !strings.Contains(fmt.Sprintf("%v", err), deviceDir) {
+		t.Errorf("should have tried to open %s", deviceDir)
+	}
+}
+
+func TestSetUpInterfaceNotBridged(t *testing.T) {
+	err := setUpInterface("lo")
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Skipf("'lo' device does not exist??? (%v)", err)
+		}
+		t.Errorf("unexpected error: %v", err)
 	}
 }

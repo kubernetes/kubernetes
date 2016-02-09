@@ -51,6 +51,7 @@ var map_APIResource = map[string]string{
 	"":           "APIResource specifies the name of a resource and whether it is namespaced.",
 	"name":       "name is the name of the resource.",
 	"namespaced": "namespaced indicates if a resource is namespaced or not.",
+	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
@@ -94,6 +95,27 @@ var map_GroupVersionForDiscovery = map[string]string{
 
 func (GroupVersionForDiscovery) SwaggerDoc() map[string]string {
 	return map_GroupVersionForDiscovery
+}
+
+var map_LabelSelector = map[string]string{
+	"":                 "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+	"matchLabels":      "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+	"matchExpressions": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+}
+
+func (LabelSelector) SwaggerDoc() map[string]string {
+	return map_LabelSelector
+}
+
+var map_LabelSelectorRequirement = map[string]string{
+	"":         "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+	"key":      "key is the label key that the selector applies to.",
+	"operator": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+	"values":   "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+}
+
+func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_LabelSelectorRequirement
 }
 
 var map_ListMeta = map[string]string{

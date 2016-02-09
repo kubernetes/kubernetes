@@ -38,10 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -52,16 +51,6 @@ import (
 
 func init() {
 	metrics.Register()
-}
-
-// monitorFilter creates a filter that reports the metrics for a given resource and action.
-func monitorFilter(action, resource string) restful.FilterFunction {
-	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
-		reqStart := time.Now()
-		chain.ProcessFilter(req, res)
-		httpCode := res.StatusCode()
-		metrics.Monitor(&action, &resource, utilnet.GetHTTPClient(req.Request), &httpCode, reqStart)
-	}
 }
 
 // mux is an object that can register http handlers.
@@ -168,13 +157,10 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 
 // TODO: document all handlers
 // InstallSupport registers the APIServer support functions
-func InstallSupport(mux Mux, ws *restful.WebService, enableResettingMetrics bool, checks ...healthz.HealthzChecker) {
+func InstallSupport(mux Mux, ws *restful.WebService, checks ...healthz.HealthzChecker) {
 	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux, checks...)
 	mux.Handle("/metrics", prometheus.Handler())
-	if enableResettingMetrics {
-		mux.HandleFunc("/resetMetrics", metrics.Reset)
-	}
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")
@@ -343,7 +329,7 @@ func write(statusCode int, gv unversioned.GroupVersion, s runtime.NegotiatedSeri
 		if wsstream.IsWebSocketRequest(req) {
 			r := wsstream.NewReader(out, true)
 			if err := r.Copy(w, req); err != nil {
-				util.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
+				utilruntime.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
 			}
 			return
 		}
@@ -392,7 +378,7 @@ func errorNegotiated(err error, s runtime.NegotiatedSerializer, gv unversioned.G
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
 // Returns the HTTP status code of the error.
 func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int {
-	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
 	code := int(status.Code)
 	output, err := runtime.Encode(codec, status)

@@ -230,6 +230,10 @@ func (c *Fake) Nodes() client.NodeInterface {
 	return &FakeNodes{Fake: c}
 }
 
+func (c *Fake) PodSecurityPolicies() client.PodSecurityPolicyInterface {
+	return &FakePodSecurityPolicy{Fake: c}
+}
+
 func (c *Fake) Events(namespace string) client.EventInterface {
 	return &FakeEvents{Fake: c, Namespace: namespace}
 }
@@ -335,6 +339,10 @@ func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 
 func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterface {
+	return &FakeReplicaSets{Fake: c, Namespace: namespace}
 }
 
 type FakeDiscovery struct {

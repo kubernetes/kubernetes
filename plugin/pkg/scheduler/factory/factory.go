@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -343,7 +343,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 			podID := types.NamespacedName{
 				Namespace: pod.Namespace,
 				Name:      pod.Name,

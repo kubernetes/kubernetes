@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -429,7 +429,7 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 }
 
 func TestLimitRangerIgnoresSubresource(t *testing.T) {
-	client := testclient.NewSimpleFake()
+	client := fake.NewSimpleClientset()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	handler := &limitRanger{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),

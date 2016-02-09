@@ -28,11 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
-
-// The temp dir where test plugins will be stored.
-const testPluginPath = "/tmp/fake/plugins/volume"
 
 const execScriptTempl1 = `#!/bin/bash
 if [ "$1" == "init" -a $# -eq 1 ]; then
@@ -134,12 +132,12 @@ exit 1
 echo -n $@ &> {{.OutputFile}}
 `
 
-func installPluginUnderTest(t *testing.T, vendorName string, plugName string, execScriptTempl string, execTemplateData *map[string]interface{}) {
+func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, execScriptTempl string, execTemplateData *map[string]interface{}) {
 	vendoredName := plugName
 	if vendorName != "" {
 		vendoredName = fmt.Sprintf("%s~%s", vendorName, plugName)
 	}
-	pluginDir := path.Join(testPluginPath, vendoredName)
+	pluginDir := path.Join(tmpDir, vendoredName)
 	err := os.MkdirAll(pluginDir, 0777)
 	if err != nil {
 		t.Errorf("Failed to create plugin: %v", err)
@@ -174,9 +172,15 @@ func installPluginUnderTest(t *testing.T, vendorName string, plugName string, ex
 }
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", execScriptTempl1, nil)
-	plugMgr.InitPlugins(ProbeVolumePlugins(testPluginPath), volume.NewFakeVolumeHost("fake", nil, nil))
+	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost("fake", nil, nil))
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -196,12 +200,19 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(testPluginPath), volume.NewFakeVolumeHost("fake", nil, nil))
+	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plugin, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatalf("Can't find the plugin by name")
 	}
 	if !contains(plugin.GetAccessModes(), api.ReadWriteOnce) || !contains(plugin.GetAccessModes(), api.ReadOnlyMany) {
 		t.Errorf("Expected two AccessModeTypes:  %s and %s", api.ReadWriteOnce, api.ReadOnlyMany)
@@ -217,9 +228,10 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec) {
+func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec, tmpDir string) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(testPluginPath), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -235,8 +247,9 @@ func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Got a nil Builder")
 	}
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~fakeAttacher/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fakeAttacher/vol1", tmpDir)
+	if path != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
@@ -288,10 +301,16 @@ func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec) {
 	fake.ResetLog()
 }
 
-func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec) {
+func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	installPluginUnderTest(t, "kubernetes.io", "fakeMounter", execScriptTempl2, nil)
-	plugMgr.InitPlugins(ProbeVolumePlugins(testPluginPath), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	installPluginUnderTest(t, "kubernetes.io", "fakeMounter", tmpDir, execScriptTempl2, nil)
+	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeMounter")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -307,8 +326,9 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Got a nil Builder")
 	}
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~fakeMounter/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fakeMounter/vol1", tmpDir)
+	if path != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
@@ -343,22 +363,40 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec) {
 }
 
 func TestPluginVolumeAttacher(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	vol := &api.Volume{
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeAttacher", ReadOnly: false}},
 	}
-	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol))
+	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol), tmpDir)
 }
 
 func TestPluginVolumeMounter(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	vol := &api.Volume{
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeMounter", ReadOnly: false}},
 	}
-	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol))
+	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol), tmpDir)
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	vol := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "vol1",
@@ -370,5 +408,5 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false), tmpDir)
 }

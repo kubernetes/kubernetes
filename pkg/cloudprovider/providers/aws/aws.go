@@ -155,14 +155,18 @@ type Volumes interface {
 	// Attach the disk to the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
+	AttachDisk(diskName string, instanceName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
-	DetachDisk(instanceName string, volumeName string) error
+	// Returns the device where the volume was attached
+	DetachDisk(diskName string, instanceName string) (string, error)
 
 	// Create a volume with the specified options
-	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
-	DeleteVolume(volumeName string) error
+	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
+	// Delete the specified volume
+	// Returns true iff the volume was deleted
+	// If the was not found, returns (false, nil)
+	DeleteDisk(volumeName string) (bool, error)
 
 	// Get labels to apply to volume on creation
 	GetVolumeLabels(volumeName string) (map[string]string, error)
@@ -200,6 +204,8 @@ type AWSCloud struct {
 
 	mutex sync.Mutex
 }
+
+var _ Volumes = &AWSCloud{}
 
 type AWSCloudConfig struct {
 	Global struct {
@@ -654,6 +660,7 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		}
 		return []api.NodeAddress{
 			{Type: api.NodeInternalIP, Address: internalIP},
+			{Type: api.NodeLegacyHostIP, Address: internalIP},
 			{Type: api.NodeExternalIP, Address: externalIP},
 		}, nil
 	}
@@ -901,7 +908,7 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 // Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice.
 // If the volume is already assigned, this will return the existing mountDevice with alreadyAttached=true.
 // Otherwise the mountDevice is assigned by finding the first available mountDevice, and it is returned with alreadyAttached=false.
-func (self *awsInstance) getMountDevice(volumeID string) (assigned mountDevice, alreadyAttached bool, err error) {
+func (self *awsInstance) getMountDevice(volumeID string, assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -939,9 +946,15 @@ func (self *awsInstance) getMountDevice(volumeID string) (assigned mountDevice, 
 	// Check to see if this volume is already assigned a device on this machine
 	for mountDevice, mappingVolumeID := range self.deviceMappings {
 		if volumeID == mappingVolumeID {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			if assign {
+				glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			}
 			return mountDevice, true, nil
 		}
+	}
+
+	if !assign {
+		return mountDevice(""), false, nil
 	}
 
 	// Check all the valid mountpoints to see if any of them are free
@@ -1094,13 +1107,18 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 }
 
 // Deletes the EBS disk
-func (self *awsDisk) deleteVolume() error {
+func (self *awsDisk) deleteVolume() (bool, error) {
 	request := &ec2.DeleteVolumeInput{VolumeId: aws.String(self.awsID)}
 	_, err := self.ec2.DeleteVolume(request)
 	if err != nil {
-		return fmt.Errorf("error delete EBS volumes: %v", err)
+		if awsError, ok := err.(awserr.Error); ok {
+			if awsError.Code() == "InvalidVolume.NotFound" {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("error deleting EBS volumes: %v", err)
 	}
-	return nil
+	return true, nil
 }
 
 // Gets the awsInstance for the EC2 instance on which we are running
@@ -1117,10 +1135,13 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
 		}
-		privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+		// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+		// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
+		instance, err := s.getInstanceByID(instanceId)
 		if err != nil {
-			return nil, fmt.Errorf("error fetching local-hostname from ec2 metadata service: %v", err)
+			return nil, fmt.Errorf("error finding instance %s: %v", instanceId, err)
 		}
+		privateDnsName := aws.StringValue(instance.PrivateDnsName)
 		availabilityZone, err := getAvailabilityZone(s.metadata)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
@@ -1155,7 +1176,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 }
 
 // Implements Volumes.AttachDisk
-func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
+func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1172,7 +1193,7 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true)
 	if err != nil {
 		return "", err
 	}
@@ -1220,15 +1241,25 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 }
 
 // Implements Volumes.DetachDisk
-func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
+func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, error) {
 	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	awsInstance, err := aws.getAwsInstance(instanceName)
 	if err != nil {
-		return err
+		return "", err
+	}
+
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, false)
+	if err != nil {
+		return "", err
+	}
+
+	if !alreadyAttached {
+		glog.Warning("DetachDisk called on non-attached disk: ", diskName)
+		// TODO: Continue?  Tolerate non-attached error in DetachVolume?
 	}
 
 	request := ec2.DetachVolumeInput{
@@ -1238,11 +1269,15 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 	response, err := aws.ec2.DetachVolume(&request)
 	if err != nil {
-		return fmt.Errorf("error detaching EBS volume: %v", err)
+		return "", fmt.Errorf("error detaching EBS volume: %v", err)
 	}
 	if response == nil {
-		return errors.New("no response from DetachVolume")
+		return "", errors.New("no response from DetachVolume")
 	}
+
+	// TODO: Fix this - just remove the cache?
+	// If we don't have a cache; we don't have to wait any more (the driver does it for us)
+	// Also, maybe we could get the locally connected drivers from the AWS metadata service?
 
 	// At this point we are waiting for the volume being detached. This
 	// releases the volume and invalidates the cache even when there is a timeout.
@@ -1253,6 +1288,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 	// works though. An option would be to completely flush the cache upon timeouts.
 	//
 	defer func() {
+		// TODO: Not thread safe?
 		for mountDevice, existingVolumeID := range awsInstance.deviceMappings {
 			if existingVolumeID == disk.awsID {
 				awsInstance.releaseMountDevice(disk.awsID, mountDevice)
@@ -1263,14 +1299,15 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 	err = disk.waitForAttachmentStatus("detached")
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return err
+	hostDevicePath := "/dev/xvd" + string(mountDevice)
+	return hostDevicePath, err
 }
 
 // Implements Volumes.CreateVolume
-func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
+func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 
 	request := &ec2.CreateVolumeInput{}
@@ -1302,7 +1339,7 @@ func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 		tagRequest.Tags = tags
 		if _, err := s.createTags(tagRequest); err != nil {
 			// delete the volume and hope it succeeds
-			delerr := s.DeleteVolume(volumeName)
+			_, delerr := s.DeleteDisk(volumeName)
 			if delerr != nil {
 				// delete did not succeed, we have a stray volume!
 				return "", fmt.Errorf("error tagging volume %s, could not delete the volume: %v", volumeName, delerr)
@@ -1313,11 +1350,11 @@ func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 	return volumeName, nil
 }
 
-// Implements Volumes.DeleteVolume
-func (aws *AWSCloud) DeleteVolume(volumeName string) error {
+// Implements Volumes.DeleteDisk
+func (aws *AWSCloud) DeleteDisk(volumeName string) (bool, error) {
 	awsDisk, err := newAWSDisk(aws, volumeName)
 	if err != nil {
-		return err
+		return false, err
 	}
 	return awsDisk.deleteVolume()
 }
@@ -1427,6 +1464,7 @@ func isEqualIntPointer(l, r *int64) bool {
 	}
 	return *l == *r
 }
+
 func isEqualStringPointer(l, r *string) bool {
 	if l == nil {
 		return r == nil
@@ -1437,40 +1475,50 @@ func isEqualStringPointer(l, r *string) bool {
 	return *l == *r
 }
 
-func isEqualIPPermission(l, r *ec2.IpPermission, compareGroupUserIDs bool) bool {
-	if !isEqualIntPointer(l.FromPort, r.FromPort) {
+func ipPermissionExists(newPermission, existing *ec2.IpPermission, compareGroupUserIDs bool) bool {
+	if !isEqualIntPointer(newPermission.FromPort, existing.FromPort) {
 		return false
 	}
-	if !isEqualIntPointer(l.ToPort, r.ToPort) {
+	if !isEqualIntPointer(newPermission.ToPort, existing.ToPort) {
 		return false
 	}
-	if !isEqualStringPointer(l.IpProtocol, r.IpProtocol) {
+	if !isEqualStringPointer(newPermission.IpProtocol, existing.IpProtocol) {
 		return false
 	}
-	if len(l.IpRanges) != len(r.IpRanges) {
+	if len(newPermission.IpRanges) != len(existing.IpRanges) {
 		return false
 	}
-	for j := range l.IpRanges {
-		if !isEqualStringPointer(l.IpRanges[j].CidrIp, r.IpRanges[j].CidrIp) {
+	for j := range newPermission.IpRanges {
+		if !isEqualStringPointer(newPermission.IpRanges[j].CidrIp, existing.IpRanges[j].CidrIp) {
 			return false
 		}
 	}
 
-	if len(l.UserIdGroupPairs) != len(r.UserIdGroupPairs) {
-		return false
-	}
-	for j := range l.UserIdGroupPairs {
-		if !isEqualStringPointer(l.UserIdGroupPairs[j].GroupId, r.UserIdGroupPairs[j].GroupId) {
-			return false
-		}
-		if compareGroupUserIDs {
-			if !isEqualStringPointer(l.UserIdGroupPairs[j].UserId, r.UserIdGroupPairs[j].UserId) {
-				return false
+	for _, leftPair := range newPermission.UserIdGroupPairs {
+		for _, rightPair := range existing.UserIdGroupPairs {
+			if isEqualUserGroupPair(leftPair, rightPair, compareGroupUserIDs) {
+				return true
 			}
 		}
+		return false
 	}
 
 	return true
+}
+
+func isEqualUserGroupPair(l, r *ec2.UserIdGroupPair, compareGroupUserIDs bool) bool {
+	glog.V(2).Infof("Comparing %v to %v", *l.GroupId, *r.GroupId)
+	if isEqualStringPointer(l.GroupId, r.GroupId) {
+		if compareGroupUserIDs {
+			if isEqualStringPointer(l.UserId, r.UserId) {
+				return true
+			}
+		} else {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Makes sure the security group includes the specified permissions
@@ -1487,6 +1535,8 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 		return false, fmt.Errorf("security group not found: %s", securityGroupId)
 	}
 
+	glog.V(2).Infof("Existing security group ingress: %s %v", securityGroupId, group.IpPermissions)
+
 	changes := []*ec2.IpPermission{}
 	for _, addPermission := range addPermissions {
 		hasUserID := false
@@ -1498,7 +1548,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 
 		found := false
 		for _, groupPermission := range group.IpPermissions {
-			if isEqualIPPermission(addPermission, groupPermission, hasUserID) {
+			if ipPermissionExists(addPermission, groupPermission, hasUserID) {
 				found = true
 				break
 			}
@@ -1553,8 +1603,8 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 
 		var found *ec2.IpPermission
 		for _, groupPermission := range group.IpPermissions {
-			if isEqualIPPermission(groupPermission, removePermission, hasUserID) {
-				found = groupPermission
+			if ipPermissionExists(removePermission, groupPermission, hasUserID) {
+				found = removePermission
 				break
 			}
 		}
@@ -2137,7 +2187,6 @@ func (s *AWSCloud) UpdateLoadBalancer(name, region string, hosts []string) error
 }
 
 // Returns the instance with the specified ID
-// This function is currently unused, but seems very likely to be needed again
 func (a *AWSCloud) getInstanceByID(instanceID string) (*ec2.Instance, error) {
 	instances, err := a.getInstancesByIDs([]*string{&instanceID})
 	if err != nil {
@@ -2181,20 +2230,53 @@ func (a *AWSCloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Ins
 	return instancesByID, nil
 }
 
-// TODO: Make efficient
+// Fetches instances by node names; returns an error if any cannot be found.
+// This is currently implemented by fetching all the instances, because this is currently called for all nodes (i.e. the majority)
+// In practice, the breakeven vs looping through and calling getInstanceByNodeName is probably around N=2.
 func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
-	instances := []*ec2.Instance{}
-	for _, nodeName := range nodeNames {
-		instance, err := a.getInstanceByNodeName(nodeName)
-		if err != nil {
-			return nil, err
-		}
-		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance " + nodeName)
-		}
-		instances = append(instances, instance)
+	allInstances, err := a.getAllInstances()
+	if err != nil {
+		return nil, err
 	}
+
+	nodeNamesMap := make(map[string]int, len(nodeNames))
+	for i, nodeName := range nodeNames {
+		nodeNamesMap[nodeName] = i
+	}
+
+	instances := make([]*ec2.Instance, len(nodeNames))
+	for _, instance := range allInstances {
+		nodeName := aws.StringValue(instance.PrivateDnsName)
+		if nodeName == "" {
+			glog.V(2).Infof("ignoring ec2 instance with no PrivateDnsName: %q", aws.StringValue(instance.InstanceId))
+			continue
+		}
+		i, found := nodeNamesMap[nodeName]
+		if !found {
+			continue
+		}
+		instances[i] = instance
+	}
+
+	for i, instance := range instances {
+		if instance == nil {
+			nodeName := nodeNames[i]
+			return nil, fmt.Errorf("unable to find instance %q", nodeName)
+		}
+	}
+
 	return instances, nil
+}
+
+// Returns all instances that are tagged as being in this cluster.
+func (a *AWSCloud) getAllInstances() ([]*ec2.Instance, error) {
+	filters := []*ec2.Filter{}
+	filters = a.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	return a.ec2.DescribeInstances(request)
 }
 
 // Returns the instance with the specified node name

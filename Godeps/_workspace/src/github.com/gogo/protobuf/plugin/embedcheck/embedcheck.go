@@ -80,7 +80,8 @@ var overwriters []map[string]gogoproto.EnableFunc = []map[string]gogoproto.Enabl
 		"verboseequal": gogoproto.HasVerboseEqual,
 	},
 	{
-		"size": gogoproto.IsSizer,
+		"size":       gogoproto.IsSizer,
+		"protosizer": gogoproto.IsProtoSizer,
 	},
 	{
 		"unmarshaler":        gogoproto.IsUnmarshaler,

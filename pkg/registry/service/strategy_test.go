@@ -217,3 +217,33 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		nil,
 	)
 }
+
+func TestServiceStatusStrategy(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	if !StatusStrategy.NamespaceScoped() {
+		t.Errorf("Service must be namespace scoped")
+	}
+	oldService := makeValidService()
+	newService := makeValidService()
+	oldService.ResourceVersion = "4"
+	newService.ResourceVersion = "4"
+	newService.Spec.SessionAffinity = "ClientIP"
+	newService.Status = api.ServiceStatus{
+		LoadBalancer: api.LoadBalancerStatus{
+			Ingress: []api.LoadBalancerIngress{
+				{IP: "127.0.0.2"},
+			},
+		},
+	}
+	StatusStrategy.PrepareForUpdate(&newService, &oldService)
+	if newService.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
+		t.Errorf("Service status updates should allow change of status fields")
+	}
+	if newService.Spec.SessionAffinity != "None" {
+		t.Errorf("PrepareForUpdate should have preserved old spec")
+	}
+	errs := StatusStrategy.ValidateUpdate(ctx, &newService, &oldService)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error %v", errs)
+	}
+}

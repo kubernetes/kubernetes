@@ -17,46 +17,55 @@ limitations under the License.
 package aws_ebs
 
 import (
-	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/glog"
-	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+const (
+	diskPartitionSuffix = ""
+	diskXVDPath         = "/dev/xvd"
+	diskXVDPattern      = "/dev/xvd*"
+	maxChecks           = 60
+	maxRetries          = 10
+	checkSleepDuration  = time.Second
+	errorSleepDuration  = 5 * time.Second
+)
+
+// Singleton key mutex for keeping attach/detach operations for the same PD atomic
+var attachDetachMutex = keymutex.NewKeyMutex()
+
 type AWSDiskUtil struct{}
 
-// Attaches a disk specified by a volume.AWSElasticBlockStore to the current kubelet.
+// Attaches a disk to the current kubelet.
 // Mounts the disk to it's global path.
-func (util *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, globalPDPath string) error {
-	volumes, err := b.getVolumeProvider()
+func (diskUtil *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, globalPDPath string) error {
+	glog.V(5).Infof("AttachAndMountDisk(...) called for PD %q. Will block for existing operations, if any. (globalPDPath=%q)\r\n", b.volumeID, globalPDPath)
+
+	// Block execution until any pending detach operations for this PD have completed
+	attachDetachMutex.LockKey(b.volumeID)
+	defer attachDetachMutex.UnlockKey(b.volumeID)
+
+	glog.V(5).Infof("AttachAndMountDisk(...) called for PD %q. Awake and ready to execute. (globalPDPath=%q)\r\n", b.volumeID, globalPDPath)
+
+	xvdBefore, err := filepath.Glob(diskXVDPattern)
+	if err != nil {
+		glog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskXVDPattern, err)
+	}
+	xvdBeforeSet := sets.NewString(xvdBefore...)
+
+	devicePath, err := attachDiskAndVerify(b, xvdBeforeSet)
 	if err != nil {
 		return err
-	}
-	devicePath, err := volumes.AttachDisk("", b.volumeID, b.readOnly)
-	if err != nil {
-		return err
-	}
-	if b.partition != "" {
-		devicePath = devicePath + b.partition
-	}
-	//TODO(jonesdl) There should probably be better method than busy-waiting here.
-	numTries := 0
-	for {
-		_, err := os.Stat(devicePath)
-		if err == nil {
-			break
-		}
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		numTries++
-		if numTries == 10 {
-			return errors.New("Could not attach disk: Timeout after 10s (" + devicePath + ")")
-		}
-		time.Sleep(time.Second)
 	}
 
 	// Only mount the PD globally once.
@@ -87,64 +96,239 @@ func (util *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, glob
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
 func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreCleaner) error {
-	// Unmount the global PD mount, which should be the only one.
-	globalPDPath := makeGlobalPDPath(c.plugin.host, c.volumeID)
-	if err := c.mounter.Unmount(globalPDPath); err != nil {
-		glog.V(2).Info("Error unmount dir ", globalPDPath, ": ", err)
-		return err
+	glog.V(5).Infof("DetachDisk(...) for PD %q\r\n", c.volumeID)
+
+	if err := unmountPDAndRemoveGlobalPath(c); err != nil {
+		glog.Errorf("Error unmounting PD %q: %v", c.volumeID, err)
 	}
-	if err := os.Remove(globalPDPath); err != nil {
-		glog.V(2).Info("Error removing dir ", globalPDPath, ": ", err)
-		return err
-	}
-	// Detach the disk
-	volumes, err := c.getVolumeProvider()
-	if err != nil {
-		glog.V(2).Info("Error getting volume provider for volumeID ", c.volumeID, ": ", err)
-		return err
-	}
-	if err := volumes.DetachDisk("", c.volumeID); err != nil {
-		glog.V(2).Info("Error detaching disk ", c.volumeID, ": ", err)
-		return err
-	}
+
+	// Detach disk asynchronously so that the kubelet sync loop is not blocked.
+	go detachDiskAndVerify(c)
 	return nil
 }
 
 func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
-	volumes, err := d.getVolumeProvider()
+	cloud, err := getCloudProvider()
 	if err != nil {
-		glog.V(2).Info("Error getting volume provider: ", err)
 		return err
 	}
 
-	if err := volumes.DeleteVolume(d.volumeID); err != nil {
-		glog.V(2).Infof("Error deleting AWS EBS volume %s: %v", d.volumeID, err)
+	deleted, err := cloud.DeleteDisk(d.volumeID)
+	if err != nil {
+		glog.V(2).Infof("Error deleting EBS Disk volume %s: %v", d.volumeID, err)
 		return err
 	}
-	glog.V(2).Infof("Successfully deleted AWS EBS volume %s", d.volumeID)
+	if deleted {
+		glog.V(2).Infof("Successfully deleted EBS Disk volume %s", d.volumeID)
+	} else {
+		glog.V(2).Infof("Successfully deleted EBS Disk volume %s (actually already deleted)", d.volumeID)
+	}
 	return nil
 }
 
 func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, err error) {
-	volumes, err := c.getVolumeProvider()
+	cloud, err := getCloudProvider()
 	if err != nil {
-		glog.V(2).Info("Error getting volume provider: ", err)
 		return "", 0, err
 	}
 
 	requestBytes := c.options.Capacity.Value()
-	// AWS works with gigabytes, convert to GiB with rounding up
-	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
-	volSpec := &aws_cloud.VolumeOptions{
-		CapacityGB: requestGB,
-		Tags:       c.options.CloudTags,
-	}
+	// The cloud provider works with gigabytes, convert to GiB with rounding up
+	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
 
-	name, err := volumes.CreateVolume(volSpec)
+	volumeOptions := &aws.VolumeOptions{}
+	volumeOptions.CapacityGB = int(requestGB)
+
+	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
-		glog.V(2).Infof("Error creating AWS EBS volume: %v", err)
+		glog.V(2).Infof("Error creating EBS Disk volume: %v", err)
 		return "", 0, err
 	}
-	glog.V(2).Infof("Successfully created AWS EBS volume %s", name)
-	return name, requestGB, nil
+	glog.V(2).Infof("Successfully created EBS Disk volume %s", name)
+	return name, int(requestGB), nil
+}
+
+// Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
+func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.String) (string, error) {
+	var awsCloud *aws.AWSCloud
+	for numRetries := 0; numRetries < maxRetries; numRetries++ {
+		var err error
+		if awsCloud == nil {
+			awsCloud, err = getCloudProvider()
+			if err != nil || awsCloud == nil {
+				// Retry on error. See issue #11321
+				glog.Errorf("Error getting AWSCloudProvider while detaching PD %q: %v", b.volumeID, err)
+				time.Sleep(errorSleepDuration)
+				continue
+			}
+		}
+
+		if numRetries > 0 {
+			glog.Warningf("Retrying attach for EBS Disk %q (retry count=%v).", b.volumeID, numRetries)
+		}
+
+		devicePath, err := awsCloud.AttachDisk(b.volumeID, b.plugin.host.GetHostName(), b.readOnly)
+		if err != nil {
+			glog.Errorf("Error attaching PD %q: %v", b.volumeID, err)
+			time.Sleep(errorSleepDuration)
+			continue
+		}
+
+		devicePaths := getDiskByIdPaths(b.awsElasticBlockStore, devicePath)
+
+		for numChecks := 0; numChecks < maxChecks; numChecks++ {
+			path, err := verifyDevicePath(devicePaths)
+			if err != nil {
+				// Log error, if any, and continue checking periodically. See issue #11321
+				glog.Errorf("Error verifying EBS Disk (%q) is attached: %v", b.volumeID, err)
+			} else if path != "" {
+				// A device path has successfully been created for the PD
+				glog.Infof("Successfully attached EBS Disk %q.", b.volumeID)
+				return path, nil
+			}
+
+			// Sleep then check again
+			glog.V(3).Infof("Waiting for EBS Disk %q to attach.", b.volumeID)
+			time.Sleep(checkSleepDuration)
+		}
+	}
+
+	return "", fmt.Errorf("Could not attach EBS Disk %q. Timeout waiting for mount paths to be created.", b.volumeID)
+}
+
+// Returns the first path that exists, or empty string if none exist.
+func verifyDevicePath(devicePaths []string) (string, error) {
+	for _, path := range devicePaths {
+		if pathExists, err := pathExists(path); err != nil {
+			return "", fmt.Errorf("Error checking if path exists: %v", err)
+		} else if pathExists {
+			return path, nil
+		}
+	}
+
+	return "", nil
+}
+
+// Detaches the specified persistent disk device from node, verifies that it is detached, and retries if it fails.
+// This function is intended to be called asynchronously as a go routine.
+func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
+	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Will block for pending operations", c.volumeID)
+	defer runtime.HandleCrash()
+
+	// Block execution until any pending attach/detach operations for this PD have completed
+	attachDetachMutex.LockKey(c.volumeID)
+	defer attachDetachMutex.UnlockKey(c.volumeID)
+
+	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Awake and ready to execute.", c.volumeID)
+
+	var awsCloud *aws.AWSCloud
+	for numRetries := 0; numRetries < maxRetries; numRetries++ {
+		var err error
+		if awsCloud == nil {
+			awsCloud, err = getCloudProvider()
+			if err != nil || awsCloud == nil {
+				// Retry on error. See issue #11321
+				glog.Errorf("Error getting AWSCloudProvider while detaching PD %q: %v", c.volumeID, err)
+				time.Sleep(errorSleepDuration)
+				continue
+			}
+		}
+
+		if numRetries > 0 {
+			glog.Warningf("Retrying detach for EBS Disk %q (retry count=%v).", c.volumeID, numRetries)
+		}
+
+		devicePath, err := awsCloud.DetachDisk(c.volumeID, c.plugin.host.GetHostName())
+		if err != nil {
+			glog.Errorf("Error detaching PD %q: %v", c.volumeID, err)
+			time.Sleep(errorSleepDuration)
+			continue
+		}
+
+		devicePaths := getDiskByIdPaths(c.awsElasticBlockStore, devicePath)
+
+		for numChecks := 0; numChecks < maxChecks; numChecks++ {
+			allPathsRemoved, err := verifyAllPathsRemoved(devicePaths)
+			if err != nil {
+				// Log error, if any, and continue checking periodically.
+				glog.Errorf("Error verifying EBS Disk (%q) is detached: %v", c.volumeID, err)
+			} else if allPathsRemoved {
+				// All paths to the PD have been successfully removed
+				unmountPDAndRemoveGlobalPath(c)
+				glog.Infof("Successfully detached EBS Disk %q.", c.volumeID)
+				return
+			}
+
+			// Sleep then check again
+			glog.V(3).Infof("Waiting for EBS Disk %q to detach.", c.volumeID)
+			time.Sleep(checkSleepDuration)
+		}
+
+	}
+
+	glog.Errorf("Failed to detach EBS Disk %q. One or more mount paths was not removed.", c.volumeID)
+}
+
+// Unmount the global PD mount, which should be the only one, and delete it.
+func unmountPDAndRemoveGlobalPath(c *awsElasticBlockStoreCleaner) error {
+	globalPDPath := makeGlobalPDPath(c.plugin.host, c.volumeID)
+
+	err := c.mounter.Unmount(globalPDPath)
+	os.Remove(globalPDPath)
+	return err
+}
+
+// Returns the first path that exists, or empty string if none exist.
+func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
+	allPathsRemoved := true
+	for _, path := range devicePaths {
+		if exists, err := pathExists(path); err != nil {
+			return false, fmt.Errorf("Error checking if path exists: %v", err)
+		} else {
+			allPathsRemoved = allPathsRemoved && !exists
+		}
+	}
+
+	return allPathsRemoved, nil
+}
+
+// Returns list of all paths for given EBS mount
+// This is more interesting on GCE (where we are able to identify volumes under /dev/disk-by-id)
+// Here it is mostly about applying the partition path
+func getDiskByIdPaths(d *awsElasticBlockStore, devicePath string) []string {
+	devicePaths := []string{}
+	if devicePath != "" {
+		devicePaths = append(devicePaths, devicePath)
+	}
+
+	if d.partition != "" {
+		for i, path := range devicePaths {
+			devicePaths[i] = path + diskPartitionSuffix + d.partition
+		}
+	}
+
+	return devicePaths
+}
+
+// Checks if the specified path exists
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+// Return cloud provider
+func getCloudProvider() (*aws.AWSCloud, error) {
+	awsCloudProvider, err := cloudprovider.GetCloudProvider("aws", nil)
+	if err != nil || awsCloudProvider == nil {
+		return nil, err
+	}
+
+	// The conversion must be safe otherwise bug in GetCloudProvider()
+	return awsCloudProvider.(*aws.AWSCloud), nil
 }

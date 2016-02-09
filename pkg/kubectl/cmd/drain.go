@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -41,6 +42,7 @@ type DrainOptions struct {
 	factory            *cmdutil.Factory
 	Force              bool
 	GracePeriodSeconds int
+	IgnoreDaemonsets   bool
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
 	out                io.Writer
@@ -98,17 +100,20 @@ const (
 
 The given node will be marked unschedulable to prevent new pods from arriving.
 Then drain deletes all pods except mirror pods (which cannot be deleted through
-the API server).  If there are any pods that are neither mirror pods nor
-managed by a ReplicationController or DaemonSet, then drain will not delete any
-pods unless you use --force.
+the API server).  If there are DaemonSet-managed pods, drain will not proceed
+without --ignore-daemonsets, and regardless it will not delete any
+DaemonSet-managed pods, because those pods would be immediately replaced by the
+DaemonSet controller, which ignores unschedulable marknigs.  If there are any
+pods that are neither mirror pods nor managed--by ReplicationController,
+DaemonSet or Job--, then drain will not delete any pods unless you use --force.
 
 When you are ready to put the node back into service, use kubectl uncordon, which
 will make the node schedulable again.
 `
-	drain_example = `# Drain node "foo", even if there are pods not managed by a ReplicationController or DaemonSet on it.
+	drain_example = `# Drain node "foo", even if there are pods not managed by a ReplicationController, Job, or DaemonSet on it.
 $ kubectl drain foo --force
 
-# As above, but abort if there are pods not managed by a ReplicationController or DaemonSet, and use a grace period of 15 minutes.
+# As above, but abort if there are pods not managed by a ReplicationController, Job, or DaemonSet, and use a grace period of 15 minutes.
 $ kubectl drain foo --grace-period=900
 `
 )
@@ -126,7 +131,8 @@ func NewCmdDrain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController or DaemonSet.")
+	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController, Job, or DaemonSet.")
+	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	return cmd
 }
@@ -196,6 +202,7 @@ func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
 		return pods, err
 	}
 	unreplicatedPodNames := []string{}
+	daemonSetPodNames := []string{}
 
 	for _, pod := range podList.Items {
 		_, found := pod.ObjectMeta.Annotations[types.ConfigMirrorAnnotationKey]
@@ -204,6 +211,7 @@ func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
 			continue
 		}
 		replicated := false
+		daemonset_pod := false
 
 		creatorRef, found := pod.ObjectMeta.Annotations[controller.CreatedByAnnotation]
 		if found {
@@ -227,26 +235,78 @@ func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
 				// gone/missing, not for any other cause.  TODO(mml): something more
 				// sophisticated than this
 				if err == nil && ds != nil {
+					// Otherwise, treat daemonset-managed pods as unmanaged since
+					// DaemonSet Controller currently ignores the unschedulable bit.
+					// FIXME(mml): Add link to the issue concerning a proper way to drain
+					// daemonset pods, probably using taints.
+					daemonset_pod = true
+				}
+			} else if sr.Reference.Kind == "Job" {
+				job, err := o.client.Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
+
+				// Assume the only reason for an error is because the Job is
+				// gone/missing, not for any other cause.  TODO(mml): something more
+				// sophisticated than this
+				if err == nil && job != nil {
 					replicated = true
 				}
 			}
 		}
-		if replicated || o.Force {
-			pods = append(pods, pod)
-		}
-		if !replicated {
+
+		switch {
+		case daemonset_pod:
+			daemonSetPodNames = append(daemonSetPodNames, pod.Name)
+		case !replicated:
 			unreplicatedPodNames = append(unreplicatedPodNames, pod.Name)
+			if o.Force {
+				pods = append(pods, pod)
+			}
+		default:
+			pods = append(pods, pod)
 		}
 	}
 
-	if len(unreplicatedPodNames) > 0 {
-		joined := strings.Join(unreplicatedPodNames, ", ")
-		if !o.Force {
-			return pods, fmt.Errorf("refusing to continue due to pods managed by neither a ReplicationController nor a DaemonSet: %s (use --force to override)", joined)
-		}
-		fmt.Fprintf(o.out, "WARNING: About to delete these pods managed by neither a ReplicationController nor a DaemonSet: %s\n", joined)
+	daemonSetErrors := !o.IgnoreDaemonsets && len(daemonSetPodNames) > 0
+	unreplicatedErrors := !o.Force && len(unreplicatedPodNames) > 0
+
+	switch {
+	case daemonSetErrors && unreplicatedErrors:
+		return []api.Pod{}, errors.New(unmanagedMsg(unreplicatedPodNames, daemonSetPodNames, true))
+	case daemonSetErrors && !unreplicatedErrors:
+		return []api.Pod{}, errors.New(unmanagedMsg([]string{}, daemonSetPodNames, true))
+	case unreplicatedErrors && !daemonSetErrors:
+		return []api.Pod{}, errors.New(unmanagedMsg(unreplicatedPodNames, []string{}, true))
 	}
+
+	if len(unreplicatedPodNames) > 0 {
+		fmt.Fprintf(o.out, "WARNING: About to delete these %s\n", unmanagedMsg(unreplicatedPodNames, []string{}, false))
+	}
+	if len(daemonSetPodNames) > 0 {
+		fmt.Fprintf(o.out, "WARNING: Skipping %s\n", unmanagedMsg([]string{}, daemonSetPodNames, false))
+	}
+
 	return pods, nil
+}
+
+// Helper for generating errors or warnings about unmanaged pods.
+func unmanagedMsg(unreplicatedNames []string, daemonSetNames []string, include_guidance bool) string {
+	msgs := []string{}
+	if len(unreplicatedNames) > 0 {
+		msg := fmt.Sprintf("pods not managed by ReplicationController, Job, or DaemonSet: %s", strings.Join(unreplicatedNames, ","))
+		if include_guidance {
+			msg += " (use --force to override)"
+		}
+		msgs = append(msgs, msg)
+	}
+	if len(daemonSetNames) > 0 {
+		msg := fmt.Sprintf("DaemonSet-managed pods: %s", strings.Join(daemonSetNames, ","))
+		if include_guidance {
+			msg += " (use --ignore-daemonsets to ignore)"
+		}
+		msgs = append(msgs, msg)
+	}
+
+	return strings.Join(msgs, " and ")
 }
 
 // deletePods deletes the pods on the api server

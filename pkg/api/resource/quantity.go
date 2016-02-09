@@ -349,6 +349,11 @@ func (q *Quantity) Add(y Quantity) error {
 		q.Amount = &inf.Dec{}
 		return q.Add(y)
 	default:
+		// we want to preserve the format of the non-zero value
+		zero := &inf.Dec{}
+		if q.Amount.Cmp(zero) == 0 && y.Amount.Cmp(zero) != 0 {
+			q.Format = y.Format
+		}
 		q.Amount.Add(q.Amount, y.Amount)
 	}
 	return nil
@@ -362,7 +367,28 @@ func (q *Quantity) Sub(y Quantity) error {
 		q.Amount = &inf.Dec{}
 		return q.Sub(y)
 	default:
+		// we want to preserve the format of the non-zero value
+		zero := &inf.Dec{}
+		if q.Amount.Cmp(zero) == 0 && y.Amount.Cmp(zero) != 0 {
+			q.Format = y.Format
+		}
 		q.Amount.Sub(q.Amount, y.Amount)
+	}
+	return nil
+}
+
+// Neg sets q to the negative value of y.
+// It updates the format of q to match y.
+func (q *Quantity) Neg(y Quantity) error {
+	switch {
+	case y.Amount == nil:
+		*q = y
+	case q.Amount == nil:
+		q.Amount = &inf.Dec{}
+		fallthrough
+	default:
+		q.Amount.Neg(y.Amount)
+		q.Format = y.Format
 	}
 	return nil
 }

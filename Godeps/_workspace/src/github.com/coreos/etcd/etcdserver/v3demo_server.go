@@ -19,6 +19,7 @@ import (
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	dstorage "github.com/coreos/etcd/storage"
+	"github.com/coreos/etcd/storage/storagepb"
 	"github.com/gogo/protobuf/proto"
 	"golang.org/x/net/context"
 )
@@ -106,17 +107,24 @@ func doTxn(kv dstorage.KV, rt *pb.TxnRequest) *pb.TxnResponse {
 }
 
 func doUnion(kv dstorage.KV, union *pb.RequestUnion) *pb.ResponseUnion {
-	switch {
-	case union.RequestRange != nil:
-		return &pb.ResponseUnion{ResponseRange: doRange(kv, union.RequestRange)}
-	case union.RequestPut != nil:
-		return &pb.ResponseUnion{ResponsePut: doPut(kv, union.RequestPut)}
-	case union.RequestDeleteRange != nil:
-		return &pb.ResponseUnion{ResponseDeleteRange: doDeleteRange(kv, union.RequestDeleteRange)}
+	switch tv := union.Request.(type) {
+	case *pb.RequestUnion_RequestRange:
+		if tv.RequestRange != nil {
+			return &pb.ResponseUnion{Response: &pb.ResponseUnion_ResponseRange{ResponseRange: doRange(kv, tv.RequestRange)}}
+		}
+	case *pb.RequestUnion_RequestPut:
+		if tv.RequestPut != nil {
+			return &pb.ResponseUnion{Response: &pb.ResponseUnion_ResponsePut{ResponsePut: doPut(kv, tv.RequestPut)}}
+		}
+	case *pb.RequestUnion_RequestDeleteRange:
+		if tv.RequestDeleteRange != nil {
+			return &pb.ResponseUnion{Response: &pb.ResponseUnion_ResponseDeleteRange{ResponseDeleteRange: doDeleteRange(kv, tv.RequestDeleteRange)}}
+		}
 	default:
 		// empty union
 		return nil
 	}
+	return nil
 }
 
 func doCompare(kv dstorage.KV, c *pb.Compare) (int64, bool) {
@@ -124,20 +132,35 @@ func doCompare(kv dstorage.KV, c *pb.Compare) (int64, bool) {
 	if err != nil {
 		return rev, false
 	}
-
-	ckv := ckvs[0]
+	var ckv storagepb.KeyValue
+	if len(ckvs) != 0 {
+		ckv = ckvs[0]
+	}
 
 	// -1 is less, 0 is equal, 1 is greater
 	var result int
 	switch c.Target {
 	case pb.Compare_VALUE:
-		result = bytes.Compare(ckv.Value, c.Value)
+		tv, _ := c.TargetUnion.(*pb.Compare_Value)
+		if tv != nil {
+			result = bytes.Compare(ckv.Value, tv.Value)
+		}
 	case pb.Compare_CREATE:
-		result = compareInt64(ckv.CreateRevision, c.CreateRevision)
+		tv, _ := c.TargetUnion.(*pb.Compare_CreateRevision)
+		if tv != nil {
+			result = compareInt64(ckv.CreateRevision, tv.CreateRevision)
+		}
+
 	case pb.Compare_MOD:
-		result = compareInt64(ckv.ModRevision, c.ModRevision)
+		tv, _ := c.TargetUnion.(*pb.Compare_ModRevision)
+		if tv != nil {
+			result = compareInt64(ckv.ModRevision, tv.ModRevision)
+		}
 	case pb.Compare_VERSION:
-		result = compareInt64(ckv.Version, c.Version)
+		tv, _ := c.TargetUnion.(*pb.Compare_Version)
+		if tv != nil {
+			result = compareInt64(ckv.Version, tv.Version)
+		}
 	}
 
 	switch c.Result {

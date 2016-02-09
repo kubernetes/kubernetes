@@ -18,31 +18,34 @@ package persistent_claim
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 )
 
-func newTestHost(t *testing.T, fakeKubeClient client.Interface) volume.VolumeHost {
-	tempDir, err := ioutil.TempDir("/tmp", "persistent_volume_test.")
+// newTestHost returns the temp directory and the VolumeHost created.
+// Please be sure to cleanup the temp directory once done!
+func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
+	tempDir, err := utiltesting.MkTmpdir("persistent_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return volume.NewFakeVolumeHost(tempDir, fakeKubeClient, testProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, testProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, ProbeVolumePlugins()))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/somepath/fake", nil, ProbeVolumePlugins()))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
 	if err != nil {
@@ -119,7 +122,7 @@ func TestNewBuilder(t *testing.T) {
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						HostPath: &api.HostPathVolumeSource{Path: "/tmp"},
+						HostPath: &api.HostPathVolumeSource{Path: "/somepath"},
 					},
 					ClaimRef: &api.ObjectReference{
 						Name: "claimB",
@@ -143,8 +146,8 @@ func TestNewBuilder(t *testing.T) {
 			},
 			plugin: host_path.ProbeVolumePlugins(volume.VolumeConfig{})[0],
 			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
-				if builder.GetPath() != "/tmp" {
-					return fmt.Errorf("Expected HostPath.Path /tmp, got: %s", builder.GetPath())
+				if builder.GetPath() != "/somepath" {
+					return fmt.Errorf("Expected HostPath.Path /somepath, got: %s", builder.GetPath())
 				}
 				return nil
 			},
@@ -234,10 +237,12 @@ func TestNewBuilder(t *testing.T) {
 	}
 
 	for _, item := range tests {
-		client := testclient.NewSimpleFake(item.pv, item.claim)
+		client := fake.NewSimpleClientset(item.pv, item.claim)
 
 		plugMgr := volume.VolumePluginMgr{}
-		plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
+		tempDir, vh := newTestHost(t, client)
+		defer os.RemoveAll(tempDir)
+		plugMgr.InitPlugins(testProbeVolumePlugins(), vh)
 
 		plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
 		if err != nil {
@@ -285,10 +290,12 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 			ClaimName: "claimC",
 		},
 	}
-	client := testclient.NewSimpleFake(pv, claim)
+	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
+	tempDir, vh := newTestHost(t, client)
+	defer os.RemoveAll(tempDir)
+	plugMgr.InitPlugins(testProbeVolumePlugins(), vh)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
 	if err != nil {

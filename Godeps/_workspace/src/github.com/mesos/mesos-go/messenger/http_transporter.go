@@ -590,9 +590,11 @@ func (t *HTTPTransporter) makeLibprocessRequest(msg *Message) (*http.Request, er
 		log.Errorf("Failed to create request: %v\n", err)
 		return nil, err
 	}
-	req.Header.Add("Libprocess-From", t.upid.String())
+	if !msg.isV1API() {
+		req.Header.Add("Libprocess-From", t.upid.String())
+		req.Header.Add("Connection", "Keep-Alive")
+	}
 	req.Header.Add("Content-Type", "application/x-protobuf")
-	req.Header.Add("Connection", "Keep-Alive")
 
 	return req, nil
 }

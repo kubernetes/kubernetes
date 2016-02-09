@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	ingress "k8s.io/kubernetes/pkg/registry/ingress"
@@ -39,7 +40,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &extensions.IngressList{} }
 	storageInterface := storageDecorator(
-		s, 100, &extensions.Ingress{}, prefix, false, newListFunc)
+		s, cachesize.GetWatchCacheSizeByResource(cachesize.Ingress), &extensions.Ingress{}, prefix, ingress.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Ingress{} },

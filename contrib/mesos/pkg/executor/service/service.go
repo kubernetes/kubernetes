@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -74,7 +75,7 @@ func (s *KubeletExecutorServer) runExecutor(
 	nodeInfos chan<- executor.NodeInfo,
 	kubeletFinished <-chan struct{},
 	staticPodsConfigPath string,
-	apiclient *client.Client,
+	apiclient *clientset.Clientset,
 	registry executor.Registry,
 ) (<-chan struct{}, error) {
 	exec := executor.New(executor.Config{
@@ -116,7 +117,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	nodeInfos <-chan executor.NodeInfo,
 	kubeletDone chan<- struct{},
 	staticPodsConfigPath string,
-	apiclient *client.Client,
+	apiclient *clientset.Clientset,
 	podLW *cache.ListWatch,
 	registry executor.Registry,
 	executorDone <-chan struct{},
@@ -163,7 +164,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	// make a separate client for events
 	eventClientConfig.QPS = s.EventRecordQPS
 	eventClientConfig.Burst = s.EventBurst
-	kcfg.EventClient, err = client.New(eventClientConfig)
+	kcfg.EventClient, err = clientset.NewForConfig(eventClientConfig)
 	if err != nil {
 		return err
 	}
@@ -229,10 +230,10 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	// create apiserver client
-	var apiclient *client.Client
+	var apiclient *clientset.Clientset
 	clientConfig, err := kubeletapp.CreateAPIServerClientConfig(s.KubeletServer)
 	if err == nil {
-		apiclient, err = client.New(clientConfig)
+		apiclient, err = clientset.NewForConfig(clientConfig)
 	}
 	if err != nil {
 		// required for k8sm since we need to send api.Binding information back to the apiserver
@@ -240,7 +241,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	var (
-		pw = cache.NewListWatchFromClient(apiclient, "pods", api.NamespaceAll,
+		pw = cache.NewListWatchFromClient(apiclient.CoreClient, "pods", api.NamespaceAll,
 			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
 		)
 		reg = executor.NewRegistry(apiclient)

@@ -22,8 +22,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -88,7 +88,7 @@ func (sw *StreamWatcher) stopping() bool {
 func (sw *StreamWatcher) receive() {
 	defer close(sw.result)
 	defer sw.Stop()
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {

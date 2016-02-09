@@ -19,22 +19,26 @@ package apiserver
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
 	"golang.org/x/net/websocket"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -414,8 +418,8 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		if !watcher.Stopped {
 			t.Errorf("Leaked watch on timeout")
 		}
-	case <-time.After(util.ForeverTestTimeout):
-		t.Errorf("Failed to stop watcher after %s of timeout signal", util.ForeverTestTimeout.String())
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("Failed to stop watcher after %s of timeout signal", wait.ForeverTestTimeout.String())
 	}
 
 	// Make sure we can't receive any more events through the timeout watch
@@ -423,4 +427,102 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	if err != io.EOF {
 		t.Errorf("Unexpected non-error")
 	}
+}
+
+const benchmarkSeed = 100
+
+func benchmarkItems() []api.Pod {
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+	items := make([]api.Pod, 3)
+	for i := range items {
+		apiObjectFuzzer.Fuzz(&items[i])
+	}
+	return items
+}
+
+// BenchmarkWatchHTTP measures the cost of serving a watch.
+func BenchmarkWatchHTTP(b *testing.B) {
+	items := benchmarkItems()
+
+	simpleStorage := &SimpleRESTStorage{}
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
+	dest.RawQuery = ""
+
+	request, err := http.NewRequest("GET", dest.String(), nil)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		b.Fatalf("Unexpected response %#v", response)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer response.Body.Close()
+		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
+			b.Fatal(err)
+		}
+		wg.Done()
+	}()
+
+	actions := []watch.EventType{watch.Added, watch.Modified, watch.Deleted}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+	}
+	simpleStorage.fakeWatch.Stop()
+	wg.Wait()
+	b.StopTimer()
+}
+
+// BenchmarkWatchWebsocket measures the cost of serving a watch.
+func BenchmarkWatchWebsocket(b *testing.B) {
+	items := benchmarkItems()
+
+	simpleStorage := &SimpleRESTStorage{}
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	dest, _ := url.Parse(server.URL)
+	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
+	dest.RawQuery = ""
+
+	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer ws.Close()
+		if _, err := io.Copy(ioutil.Discard, ws); err != nil {
+			b.Fatal(err)
+		}
+		wg.Done()
+	}()
+
+	actions := []watch.EventType{watch.Added, watch.Modified, watch.Deleted}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+	}
+	simpleStorage.fakeWatch.Stop()
+	wg.Wait()
+	b.StopTimer()
 }

@@ -78,7 +78,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs := []string{}
-	p, err := f.Printer(nil, false, false, false, false, false, []string{})
+	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -243,7 +243,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	sorting, err := cmd.Flags().GetString("sort-by")
 	var sorter *kubectl.RuntimeSort
-	if err == nil && len(sorting) > 0 {
+	if err == nil && len(sorting) > 0 && len(objs) > 1 {
 		// TODO: questionable
 		if sorter, err = kubectl.SortObjects(f.Decoder(true), objs, sorting); err != nil {
 			return err

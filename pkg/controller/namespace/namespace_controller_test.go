@@ -25,8 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -46,7 +47,7 @@ func TestFinalized(t *testing.T) {
 }
 
 func TestFinalizeNamespaceFunc(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
@@ -64,7 +65,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	if !actions[0].Matches("create", "namespaces") || actions[0].GetSubresource() != "finalize" {
 		t.Errorf("Expected finalize-namespace action %v", actions[0])
 	}
-	finalizers := actions[0].(testclient.CreateAction).GetObject().(*api.Namespace).Spec.Finalizers
+	finalizers := actions[0].(core.CreateAction).GetObject().(*api.Namespace).Spec.Finalizers
 	if len(finalizers) != 1 {
 		t.Errorf("There should be a single finalizer remaining")
 	}
@@ -144,7 +145,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	}
 
 	for scenario, testInput := range scenarios {
-		mockClient := testclient.NewSimpleFake(testInput.testNamespace)
+		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		if containsVersion(versions, "extensions/v1beta1") {
 			resources := []unversioned.APIResource{}
 			for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingresses"} {
@@ -175,9 +176,9 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 }
 
 func TestRetryOnConflictError(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	numTries := 0
-	retryOnce := func(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+	retryOnce := func(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
 			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR!"))
@@ -203,7 +204,7 @@ func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
@@ -226,7 +227,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 }
 
 func TestRunStop(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 
 	nsController := NewNamespaceController(mockClient, &unversioned.APIVersions{}, 1*time.Second)
 

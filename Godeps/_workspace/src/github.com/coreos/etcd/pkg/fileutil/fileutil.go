@@ -25,6 +25,8 @@ import (
 
 const (
 	privateFileMode = 0600
+	// owner can make/remove files inside the directory
+	privateDirMode = 0700
 )
 
 var (
@@ -54,4 +56,14 @@ func ReadDir(dirpath string) ([]string, error) {
 	}
 	sort.Strings(names)
 	return names, nil
+}
+
+// TouchDirAll is simliar to os.MkdirAll. It creates directories with 0700 permission if any directory
+// does not exists. TouchDirAll also ensures the given directory is writable.
+func TouchDirAll(dir string) error {
+	err := os.MkdirAll(dir, privateDirMode)
+	if err != nil && err != os.ErrExist {
+		return err
+	}
+	return IsDirWriteable(dir)
 }

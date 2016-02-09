@@ -27,13 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -52,7 +53,7 @@ var (
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(client *client.Client, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
+func NewEndpointController(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
 	e := &EndpointController{
 		client: client,
 		queue:  workqueue.New(),
@@ -61,10 +62,10 @@ func NewEndpointController(client *client.Client, resyncPeriod controller.Resync
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Services(api.NamespaceAll).List(options)
+				return e.client.Core().Services(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Services(api.NamespaceAll).Watch(options)
+				return e.client.Core().Services(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Service{},
@@ -82,10 +83,10 @@ func NewEndpointController(client *client.Client, resyncPeriod controller.Resync
 	e.podStore.Store, e.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Pods(api.NamespaceAll).List(options)
+				return e.client.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Pods(api.NamespaceAll).Watch(options)
+				return e.client.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -102,7 +103,7 @@ func NewEndpointController(client *client.Client, resyncPeriod controller.Resync
 
 // EndpointController manages selector-based service endpoints.
 type EndpointController struct {
-	client *client.Client
+	client *clientset.Clientset
 
 	serviceStore cache.StoreToServiceLister
 	podStore     cache.StoreToPodLister
@@ -123,14 +124,14 @@ type EndpointController struct {
 // Runs e; will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	go e.serviceController.Run(stopCh)
 	go e.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(e.worker, time.Second, stopCh)
+		go wait.Until(e.worker, time.Second, stopCh)
 	}
 	go func() {
-		defer util.HandleCrash()
+		defer utilruntime.HandleCrash()
 		time.Sleep(5 * time.Minute) // give time for our cache to fill
 		e.checkLeftoverEndpoints()
 	}()
@@ -267,7 +268,7 @@ func (e *EndpointController) syncService(key string) {
 			// Don't retry, as the key isn't going to magically become understandable.
 			return
 		}
-		err = e.client.Endpoints(namespace).Delete(name)
+		err = e.client.Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			glog.Errorf("Error deleting endpoint %q: %v", key, err)
 			e.queue.Add(key) // Retry

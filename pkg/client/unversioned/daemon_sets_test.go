@@ -52,7 +52,7 @@ func TestListDaemonSets(t *testing.T) {
 							},
 						},
 						Spec: extensions.DaemonSetSpec{
-							Template: &api.PodTemplateSpec{},
+							Template: api.PodTemplateSpec{},
 						},
 					},
 				},
@@ -80,7 +80,7 @@ func TestGetDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: extensions.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -120,7 +120,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: extensions.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -148,7 +148,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 					},
 				},
 				Spec: extensions.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 				Status: extensions.DaemonSetStatus{},
 			},
@@ -188,7 +188,7 @@ func TestCreateDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: extensions.DaemonSetSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},

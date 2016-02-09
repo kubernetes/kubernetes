@@ -133,6 +133,8 @@ func NewFakeAWSServices() *FakeAWSServices {
 
 	s.instanceId = "i-self"
 	s.privateDnsName = "ip-172-20-0-100.ec2.internal"
+	s.internalIP = "192.168.0.1"
+	s.externalIP = "1.2.3.4"
 	var selfInstance ec2.Instance
 	selfInstance.InstanceId = &s.instanceId
 	selfInstance.PrivateDnsName = &s.privateDnsName
@@ -587,9 +589,10 @@ func TestNodeAddresses(t *testing.T) {
 	// (we test that this produces an error)
 	var instance0 ec2.Instance
 	var instance1 ec2.Instance
+	var instance2 ec2.Instance
 
 	//0
-	instance0.InstanceId = aws.String("instance-same")
+	instance0.InstanceId = aws.String("i-self")
 	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
 	instance0.PrivateIpAddress = aws.String("192.168.0.1")
 	instance0.PublicIpAddress = aws.String("1.2.3.4")
@@ -600,7 +603,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.State = &state0
 
 	//1
-	instance1.InstanceId = aws.String("instance-same")
+	instance1.InstanceId = aws.String("i-self")
 	instance1.PrivateDnsName = aws.String("instance-same.ec2.internal")
 	instance1.PrivateIpAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
@@ -609,7 +612,18 @@ func TestNodeAddresses(t *testing.T) {
 	}
 	instance1.State = &state1
 
-	instances := []*ec2.Instance{&instance0, &instance1}
+	//2
+	instance2.InstanceId = aws.String("i-self")
+	instance2.PrivateDnsName = aws.String("instance-other.ec2.internal")
+	instance2.PrivateIpAddress = aws.String("192.168.0.1")
+	instance2.PublicIpAddress = aws.String("1.2.3.4")
+	instance2.InstanceType = aws.String("c3.large")
+	state2 := ec2.InstanceState{
+		Name: aws.String("running"),
+	}
+	instance2.State = &state2
+
+	instances := []*ec2.Instance{&instance0, &instance1, &instance2}
 
 	aws1, _ := mockInstancesResp([]*ec2.Instance{})
 	_, err1 := aws1.NodeAddresses("instance-mismatch.ec2.internal")
@@ -798,4 +812,68 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		return
 	}
 
+}
+
+func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
+	oldIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("firstGroupId")},
+			{GroupId: aws.String("secondGroupId")},
+			{GroupId: aws.String("thirdGroupId")},
+		},
+	}
+
+	existingIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("secondGroupId")},
+		},
+	}
+
+	newIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("fourthGroupId")},
+		},
+	}
+
+	equals := ipPermissionExists(&existingIpPermission, &oldIpPermission, false)
+	if !equals {
+		t.Errorf("Should have been considered equal since first is in the second array of groups")
+	}
+
+	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, false)
+	if equals {
+		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+}
+
+func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
+	oldIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("firstGroupId"), UserId: aws.String("firstUserId")},
+			{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
+			{GroupId: aws.String("thirdGroupId"), UserId: aws.String("thirdUserId")},
+		},
+	}
+
+	existingIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
+		},
+	}
+
+	newIpPermission := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("secondGroupId"), UserId: aws.String("anotherUserId")},
+		},
+	}
+
+	equals := ipPermissionExists(&existingIpPermission, &oldIpPermission, true)
+	if !equals {
+		t.Errorf("Should have been considered equal since first is in the second array of groups")
+	}
+
+	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, true)
+	if equals {
+		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
 }

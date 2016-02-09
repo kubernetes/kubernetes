@@ -37,12 +37,16 @@ func (c *FakeExtensions) HorizontalPodAutoscalers(namespace string) unversioned.
 	return &FakeHorizontalPodAutoscalers{c, namespace}
 }
 
-func (c *FakeExtensions) Ingress(namespace string) unversioned.IngressInterface {
-	return &FakeIngress{c, namespace}
+func (c *FakeExtensions) Ingresses(namespace string) unversioned.IngressInterface {
+	return &FakeIngresses{c, namespace}
 }
 
 func (c *FakeExtensions) Jobs(namespace string) unversioned.JobInterface {
 	return &FakeJobs{c, namespace}
+}
+
+func (c *FakeExtensions) ReplicaSets(namespace string) unversioned.ReplicaSetInterface {
+	return &FakeReplicaSets{c, namespace}
 }
 
 func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {

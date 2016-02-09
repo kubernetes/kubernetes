@@ -26,17 +26,17 @@ import (
 // fakePodWorkers runs sync pod function in serial, so we can have
 // deterministic behaviour in testing.
 type fakePodWorkers struct {
-	syncPodFn    syncPodFnType
-	runtimeCache kubecontainer.RuntimeCache
-	t            TestingInterface
+	syncPodFn syncPodFnType
+	cache     kubecontainer.Cache
+	t         TestingInterface
 }
 
 func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubetypes.SyncPodType, updateComplete func()) {
-	pods, err := f.runtimeCache.GetPods()
+	status, err := f.cache.Get(pod.UID)
 	if err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
-	if err := f.syncPodFn(pod, mirrorPod, kubecontainer.Pods(pods).FindPodByID(pod.UID), kubetypes.SyncPodUpdate); err != nil {
+	if err := f.syncPodFn(pod, mirrorPod, status, kubetypes.SyncPodUpdate); err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
 }

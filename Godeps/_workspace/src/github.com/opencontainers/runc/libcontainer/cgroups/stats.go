@@ -49,6 +49,11 @@ type MemoryStats struct {
 	Stats       map[string]uint64 `json:"stats,omitempty"`
 }
 
+type PidsStats struct {
+	// number of pids in the cgroup
+	Current uint64 `json:"current,omitempty"`
+}
+
 type BlkioStatEntry struct {
 	Major uint64 `json:"major,omitempty"`
 	Minor uint64 `json:"minor,omitempty"`
@@ -80,6 +85,7 @@ type HugetlbStats struct {
 type Stats struct {
 	CpuStats    CpuStats    `json:"cpu_stats,omitempty"`
 	MemoryStats MemoryStats `json:"memory_stats,omitempty"`
+	PidsStats   PidsStats   `json:"pids_stats,omitempty"`
 	BlkioStats  BlkioStats  `json:"blkio_stats,omitempty"`
 	// the map is in the format "size of hugepage: stats of the hugepage"
 	HugetlbStats map[string]HugetlbStats `json:"hugetlb_stats,omitempty"`

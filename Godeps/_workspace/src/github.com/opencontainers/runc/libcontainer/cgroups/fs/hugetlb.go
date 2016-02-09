@@ -19,20 +19,15 @@ func (s *HugetlbGroup) Name() string {
 }
 
 func (s *HugetlbGroup) Apply(d *cgroupData) error {
-	dir, err := d.join("hugetlb")
+	_, err := d.join("hugetlb")
 	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
-
-	if err := s.Set(dir, d.config); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (s *HugetlbGroup) Set(path string, cgroup *configs.Cgroup) error {
-	for _, hugetlb := range cgroup.HugetlbLimit {
+	for _, hugetlb := range cgroup.Resources.HugetlbLimit {
 		if err := writeFile(path, strings.Join([]string{"hugetlb", hugetlb.Pagesize, "limit_in_bytes"}, "."), strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
 			return err
 		}

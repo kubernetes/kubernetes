@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -54,7 +54,7 @@ func (vh *volumeHost) GetPodPluginDir(podUID types.UID, pluginName string) strin
 	return vh.kubelet.getPodPluginDir(podUID, pluginName)
 }
 
-func (vh *volumeHost) GetKubeClient() client.Interface {
+func (vh *volumeHost) GetKubeClient() clientset.Interface {
 	return vh.kubelet.kubeClient
 }
 
@@ -164,6 +164,19 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 type volumeTuple struct {
 	Kind string
 	Name string
+}
+
+// ListVolumesForPod returns a map of the volumes associated with the given pod
+func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
+	result := map[string]volume.Volume{}
+	vm, ok := kl.volumeManager.GetVolumes(podUID)
+	if !ok {
+		return result, false
+	}
+	for name, info := range vm {
+		result[name] = info.Builder
+	}
+	return result, true
 }
 
 func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {

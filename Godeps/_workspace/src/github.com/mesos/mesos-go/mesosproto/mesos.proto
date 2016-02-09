@@ -104,6 +104,24 @@ message ContainerID {
 
 
 /**
+ * Represents time since the epoch, in nanoseconds.
+ */
+message TimeInfo {
+  required int64 nanoseconds = 1;
+
+  // TODO(josephw): Add time zone information, if necessary.
+}
+
+
+/**
+ * Represents duration in nanoseconds.
+ */
+message DurationInfo {
+  required int64 nanoseconds = 1;
+}
+
+
+/**
  * A network address.
  *
  * TODO(bmahler): Use this more widely.
@@ -126,6 +144,71 @@ message URL {
   optional string path = 3;
   repeated Parameter query = 4;
   optional string fragment = 5;
+}
+
+
+/**
+ * Represents an interval, from a given start time over a given duration.
+ * This interval pertains to an unavailability event, such as maintenance,
+ * and is not a generic interval.
+ */
+message Unavailability {
+  required TimeInfo start = 1;
+
+  // When added to `start`, this represents the end of the interval.
+  // If unspecified, the duration is assumed to be infinite.
+  optional DurationInfo duration = 2;
+
+  // TODO(josephw): Add additional fields for expressing the purpose and
+  // urgency of the unavailability event.
+}
+
+
+/**
+ * Represents a single machine, which may hold one or more slaves.
+ *
+ * NOTE: In order to match a slave to a machine, both the `hostname` and
+ * `ip` must match the values advertised by the slave to the master.
+ * Hostname is not case-sensitive.
+ */
+message MachineID {
+  optional string hostname = 1;
+  optional string ip = 2;
+}
+
+
+/**
+ * Holds information about a single machine, its `mode`, and any other
+ * relevant information which may affect the behavior of the machine.
+ */
+message MachineInfo {
+  // Describes the several states that a machine can be in.  A `Mode`
+  // applies to a machine and to all associated slaves on the machine.
+  enum Mode {
+    // In this mode, a machine is behaving normally;
+    // offering resources, executing tasks, etc.
+    UP = 1;
+
+    // In this mode, all slaves on the machine are expected to cooperate with
+    // frameworks to drain resources.  In general, draining is done ahead of
+    // a pending `unavailability`.  The resources should be drained so as to
+    // maximize utilization prior to the maintenance but without knowingly
+    // violating the frameworks' requirements.
+    DRAINING = 2;
+
+    // In this mode, a machine is not running any tasks and will not offer
+    // any of its resources.  Slaves on the machine will not be allowed to
+    // register with the master.
+    DOWN = 3;
+  }
+
+  required MachineID id = 1;
+  optional Mode mode = 2;
+
+  // Signifies that the machine may be unavailable during the given interval.
+  // See comments in `Unavailability` and for the `unavailability` fields
+  // in `Offer` and `InverseOffer` for more information.
+  optional Unavailability unavailability = 3;
 }
 
 
@@ -732,6 +815,9 @@ message ResourceUsage {
     // Current resource usage. If absent, the containerizer
     // cannot provide resource usage.
     optional ResourceStatistics statistics = 3;
+
+    // The container id for the executor specified in the executor_info field.
+    required ContainerID container_id = 4;
   }
 
   repeated Executor executors = 1;
@@ -846,6 +932,18 @@ message Offer {
   repeated Attribute attributes = 7;
   repeated ExecutorID executor_ids = 6;
 
+  // Signifies that the resources in this Offer may be unavailable during
+  // the given interval.  Any tasks launched using these resources may be
+  // killed when the interval arrives.  For example, these resources may be
+  // part of a planned maintenance schedule.
+  //
+  // This field only provides information about a planned unavailability.
+  // The unavailability interval may not necessarily start at exactly this
+  // interval, nor last for exactly the duration of this interval.
+  // The unavailability may also be forever!  See comments in
+  // `Unavailability` for more details.
+  optional Unavailability unavailability = 9;
+
   // Defines an operation that can be performed against offers.
   message Operation {
     enum Type {
@@ -883,6 +981,57 @@ message Offer {
     optional Create create = 5;
     optional Destroy destroy = 6;
   }
+}
+
+
+/**
+ * A request to return some resources occupied by a framework.
+ */
+message InverseOffer {
+  // This is the same OfferID as found in normal offers, which allows
+  // re-use of some of the OfferID-only messages.
+  required OfferID id = 1;
+
+  // URL for reaching the slave running on the host.  This enables some
+  // optimizations as described in MESOS-3012, such as allowing the
+  // scheduler driver to bypass the master and talk directly with a slave.
+  optional URL url = 2;
+
+  // The framework that should release its resources.
+  // If no specifics are provided (i.e. which slave), all the framework's
+  // resources are requested back.
+  required FrameworkID framework_id = 3;
+
+  // Specified if the resources need to be released from a particular slave.
+  // All the framework's resources on this slave are requested back,
+  // unless further qualified by the `resources` field.
+  optional SlaveID slave_id = 4;
+
+  // This InverseOffer represents a planned unavailability event in the
+  // specified interval.  Any tasks running on the given framework or slave
+  // may be killed when the interval arrives.  Therefore, frameworks should
+  // aim to gracefully terminate tasks prior to the arrival of the interval.
+  //
+  // For reserved resources, the resources are expected to be returned to the
+  // framework after the unavailability interval.  This is an expectation,
+  // not a guarantee.  For example, if the unavailability duration is not set,
+  // the resources may be removed permanently.
+  //
+  // For other resources, there is no guarantee that requested resources will
+  // be returned after the unavailability interval.  The allocator has no
+  // obligation to re-offer these resources to the prior framework after
+  // the unavailability.
+  required Unavailability unavailability = 5;
+
+  // A list of resources being requested back from the framework,
+  // on the slave identified by `slave_id`.  If no resources are specified
+  // then all resources are being requested back.  For the purpose of
+  // maintenance, this field is always empty (maintenance always requests
+  // all resources back).
+  repeated Resource resources = 6;
+
+  // TODO(josephw): Add additional options for narrowing down the resources
+  // being requested back.  Such as specific executors, tasks, etc.
 }
 
 
@@ -958,8 +1107,19 @@ message TaskStatus {
   // TODO(bmahler): Differentiate between slave removal reasons
   // (e.g. unhealthy vs. unregistered for maintenance).
   enum Reason {
+    // TODO(jieyu): The default value when a caller doesn't check for
+    // presence is 0 and so ideally the 0 reason is not a valid one.
+    // Since this is not used anywhere, consider removing this reason.
     REASON_COMMAND_EXECUTOR_FAILED = 0;
-    REASON_EXECUTOR_PREEMPTED = 17;
+
+    REASON_CONTAINER_LAUNCH_FAILED = 21;
+    REASON_CONTAINER_LIMITATION = 19;
+    REASON_CONTAINER_LIMITATION_DISK = 20;
+    REASON_CONTAINER_LIMITATION_MEMORY = 8;
+    REASON_CONTAINER_PREEMPTED = 17;
+    REASON_CONTAINER_UPDATE_FAILED = 22;
+    REASON_EXECUTOR_REGISTRATION_TIMEOUT = 23;
+    REASON_EXECUTOR_REREGISTRATION_TIMEOUT = 24;
     REASON_EXECUTOR_TERMINATED = 1;
     REASON_EXECUTOR_UNREGISTERED = 2;
     REASON_FRAMEWORK_REMOVED = 3;
@@ -967,7 +1127,6 @@ message TaskStatus {
     REASON_INVALID_FRAMEWORKID = 5;
     REASON_INVALID_OFFERS = 6;
     REASON_MASTER_DISCONNECTED = 7;
-    REASON_MEMORY_LIMIT = 8;
     REASON_RECONCILIATION = 9;
     REASON_RESOURCES_UNKNOWN = 18;
     REASON_SLAVE_DISCONNECTED = 10;
@@ -1012,6 +1171,10 @@ message TaskStatus {
   // labels should be used to tag TaskStatus message with light-weight
   // meta-data.
   optional Labels labels = 12;
+
+  // Container related information that is resolved dynamically such as
+  // network address.
+  optional ContainerStatus container_status = 13;
 }
 
 
@@ -1073,7 +1236,7 @@ message Parameters {
  */
 message Credential {
   required string principal = 1;
-  optional bytes secret = 2;
+  optional string secret = 2;
 }
 
 
@@ -1098,7 +1261,7 @@ message RateLimit {
   optional double qps = 1;
 
   // Principal of framework(s) to be throttled. Should match
-  // FrameworkInfo.princpal and Credential.principal (if using authentication).
+  // FrameworkInfo.principal and Credential.principal (if using authentication).
   required string principal = 2;
 
   // Max number of outstanding messages from frameworks of this principal
@@ -1145,7 +1308,7 @@ message Image {
 
   // Protobuf for specifying an Appc container image. See:
   // https://github.com/appc/spec/blob/master/spec/aci.md
-  message AppC {
+  message Appc {
     // The name of the image.
     required string name = 1;
 
@@ -1160,7 +1323,10 @@ message Image {
   }
 
   message Docker {
-    // The name of the image. Expected in format repository[:tag].
+    // The name of the image. Expected format:
+    //   [REGISTRY_HOST[:REGISTRY_PORT]/]REPOSITORY[:TAG|@TYPE:DIGEST]
+    //
+    // See: https://docs.docker.com/reference/commandline/pull/
     required string name = 1;
   }
 
@@ -1168,7 +1334,7 @@ message Image {
 
   // Only one of the following image messages should be set to match
   // the type.
-  optional AppC appc = 2;
+  optional Appc appc = 2;
   optional Docker docker = 3;
 }
 
@@ -1202,6 +1368,90 @@ message Volume {
   // filesystem which will be provisioned by Mesos.
   optional Image image = 4;
 }
+
+
+/**
+ * Describes a network request from a framework as well as network resolution
+ * provided by Mesos.
+ *
+ * A Framework may request the network isolator on the Agent to isolate the
+ * container in a network namespace and create a virtual network interface.
+ * The `NetworkInfo` message describes the properties of that virtual
+ * interface, including the IP addresses and network isolation policy
+ * (network group membership).
+ *
+ * The NetworkInfo message is not interpreted by the Master or Agent and is
+ * intended to be used by Agent and Master modules implementing network
+ * isolation. If the modules are missing, the message is simply ignored. In
+ * future, the task launch will fail if there is no module providing the
+ * network isolation capabilities (MESOS-3390).
+ *
+ * An executor, Agent, or an Agent module may append NetworkInfos inside
+ * TaskStatus::container_status to provide information such as the container IP
+ * address and isolation groups.
+ */
+message NetworkInfo {
+  enum Protocol {
+    IPv4 = 1;
+    IPv6 = 2;
+  }
+
+  // Specifies a request for an IP address, or reports the assigned container
+  // IP address.
+  //
+  // Users can request an automatically assigned IP (for example, via an
+  // IPAM service) or a specific IP by adding a NetworkInfo to the
+  // ContainerInfo for a task.  On a request, specifying neither `protocol`
+  // nor `ip_address` means that any available address may be assigned.
+  message IPAddress {
+    // Specify IP address requirement. Set protocol to the desired value to
+    // request the network isolator on the Agent to assign an IP address to the
+    // container being launched. If a specific IP address is specified in
+    // ip_address, this field should not be set.
+    optional Protocol protocol = 1;
+
+    // Statically assigned IP provided by the Framework. This IP will be
+    // assigned to the container by the network isolator module on the Agent.
+    // This field should not be used with the protocol field above.
+    //
+    // If an explicit address is requested but is unavailable, the network
+    // isolator should fail the task.
+    optional string ip_address = 2;
+  }
+
+  // When included in a ContainerInfo, each of these represent a
+  // request for an IP address. Each request can specify an explicit address
+  // or the IP protocol to use.
+  //
+  // When included in a TaskStatus message, these inform the framework
+  // scheduler about the IP addresses that are bound to the container
+  // interface. When there are no custom network isolator modules installed,
+  // this field is filled in automatically with the Agent IP address.
+  repeated IPAddress ip_addresses = 5;
+
+  // Specify IP address requirement. Set protocol to the desired value to
+  // request the network isolator on the Agent to assign an IP address to the
+  // container being launched. If a specific IP address is specified in
+  // ip_address, this field should not be set.
+  optional Protocol protocol = 1 [deprecated = true]; // Since 0.26.0
+
+  // Statically assigned IP provided by the Framework. This IP will be assigned
+  // to the container by the network isolator module on the Agent. This field
+  // should not be used with the protocol field above.
+  // NOTE: It is up to the networking 'provider' (IPAM/Isolator) to interpret
+  // this either as a hint of as a requirement for assigning the IP.
+  optional string ip_address = 2 [deprecated = true]; // Since 0.26.0
+
+  // A group is the name given to a set of logically-related interfaces that
+  // are allowed to communicate among themselves. Network traffic is allowed
+  // between two container interfaces that share at least one network group.
+  // For example, one might want to create separate groups for isolating dev,
+  // testing, qa and prod deployment environments.
+  repeated string groups = 3;
+
+  // To tag certain metadata to be used by Isolator/IPAM, e.g., rack, etc.
+  optional Labels labels = 4;
+};
 
 
 /**
@@ -1263,6 +1513,20 @@ message ContainerInfo {
   // the type.
   optional DockerInfo docker = 3;
   optional MesosInfo mesos = 5;
+
+  // A list of network requests. A framework can request multiple IP addresses
+  // for the container.
+  repeated NetworkInfo network_infos = 7;
+}
+
+
+/**
+ * Container related information that is resolved during container setup. The
+ * information is sent back to the framework as part of the TaskStatus message.
+ */
+message ContainerStatus {
+  // This field can be reliably used to identify the container IP address.
+  repeated NetworkInfo network_infos = 1;
 }
 
 
@@ -1290,6 +1554,7 @@ message Port {
   required uint32 number = 1;
   optional string name = 2;
   optional string protocol = 3;
+  optional DiscoveryInfo.Visibility visibility = 4;
 }
 
 
@@ -1303,15 +1568,16 @@ message Ports {
 
 /**
 * Service discovery information.
-* The visibility field restricts discovery within a framework
-* (FRAMEWORK), within a Mesos cluster (CLUSTER), or  places no
-* restrictions (EXTERNAL).
-* The environment, location, and version fields provide first class
-* support for common attributes used to differentiate between
-* similar services. The environment may receive values such as
-* PROD/QA/DEV, the location field may receive values like
-* EAST-US/WEST-US/EUROPE/AMEA, and the version field may receive
-* values like v2.0/v0.9. The exact use of these fields is up to each
+* The visibility field restricts discovery within a framework (FRAMEWORK),
+* within a Mesos cluster (CLUSTER), or places no restrictions (EXTERNAL).
+* Each port in the ports field also has an optional visibility field.
+* If visibility is specified for a port, it overrides the default service-wide
+* DiscoveryInfo.visibility for that port.
+* The environment, location, and version fields provide first class support for
+* common attributes used to differentiate between similar services. The
+* environment may receive values such as PROD/QA/DEV, the location field may
+* receive values like EAST-US/WEST-US/EUROPE/AMEA, and the version field may
+* receive values like v2.0/v0.9. The exact use of these fields is up to each
 * service discovery system.
 */
 message DiscoveryInfo {

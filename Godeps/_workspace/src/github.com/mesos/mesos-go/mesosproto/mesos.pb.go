@@ -124,6 +124,54 @@ func (x *TaskState) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Describes the several states that a machine can be in.  A `Mode`
+// applies to a machine and to all associated slaves on the machine.
+type MachineInfo_Mode int32
+
+const (
+	// In this mode, a machine is behaving normally;
+	// offering resources, executing tasks, etc.
+	MachineInfo_UP MachineInfo_Mode = 1
+	// In this mode, all slaves on the machine are expected to cooperate with
+	// frameworks to drain resources.  In general, draining is done ahead of
+	// a pending `unavailability`.  The resources should be drained so as to
+	// maximize utilization prior to the maintenance but without knowingly
+	// violating the frameworks' requirements.
+	MachineInfo_DRAINING MachineInfo_Mode = 2
+	// In this mode, a machine is not running any tasks and will not offer
+	// any of its resources.  Slaves on the machine will not be allowed to
+	// register with the master.
+	MachineInfo_DOWN MachineInfo_Mode = 3
+)
+
+var MachineInfo_Mode_name = map[int32]string{
+	1: "UP",
+	2: "DRAINING",
+	3: "DOWN",
+}
+var MachineInfo_Mode_value = map[string]int32{
+	"UP":       1,
+	"DRAINING": 2,
+	"DOWN":     3,
+}
+
+func (x MachineInfo_Mode) Enum() *MachineInfo_Mode {
+	p := new(MachineInfo_Mode)
+	*p = x
+	return p
+}
+func (x MachineInfo_Mode) String() string {
+	return proto.EnumName(MachineInfo_Mode_name, int32(x))
+}
+func (x *MachineInfo_Mode) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(MachineInfo_Mode_value, data, "MachineInfo_Mode")
+	if err != nil {
+		return err
+	}
+	*x = MachineInfo_Mode(value)
+	return nil
+}
+
 type FrameworkInfo_Capability_Type int32
 
 const (
@@ -282,30 +330,46 @@ func (x *TaskStatus_Source) UnmarshalJSON(data []byte) error {
 type TaskStatus_Reason int32
 
 const (
-	TaskStatus_REASON_COMMAND_EXECUTOR_FAILED TaskStatus_Reason = 0
-	TaskStatus_REASON_EXECUTOR_PREEMPTED      TaskStatus_Reason = 17
-	TaskStatus_REASON_EXECUTOR_TERMINATED     TaskStatus_Reason = 1
-	TaskStatus_REASON_EXECUTOR_UNREGISTERED   TaskStatus_Reason = 2
-	TaskStatus_REASON_FRAMEWORK_REMOVED       TaskStatus_Reason = 3
-	TaskStatus_REASON_GC_ERROR                TaskStatus_Reason = 4
-	TaskStatus_REASON_INVALID_FRAMEWORKID     TaskStatus_Reason = 5
-	TaskStatus_REASON_INVALID_OFFERS          TaskStatus_Reason = 6
-	TaskStatus_REASON_MASTER_DISCONNECTED     TaskStatus_Reason = 7
-	TaskStatus_REASON_MEMORY_LIMIT            TaskStatus_Reason = 8
-	TaskStatus_REASON_RECONCILIATION          TaskStatus_Reason = 9
-	TaskStatus_REASON_RESOURCES_UNKNOWN       TaskStatus_Reason = 18
-	TaskStatus_REASON_SLAVE_DISCONNECTED      TaskStatus_Reason = 10
-	TaskStatus_REASON_SLAVE_REMOVED           TaskStatus_Reason = 11
-	TaskStatus_REASON_SLAVE_RESTARTED         TaskStatus_Reason = 12
-	TaskStatus_REASON_SLAVE_UNKNOWN           TaskStatus_Reason = 13
-	TaskStatus_REASON_TASK_INVALID            TaskStatus_Reason = 14
-	TaskStatus_REASON_TASK_UNAUTHORIZED       TaskStatus_Reason = 15
-	TaskStatus_REASON_TASK_UNKNOWN            TaskStatus_Reason = 16
+	// TODO(jieyu): The default value when a caller doesn't check for
+	// presence is 0 and so ideally the 0 reason is not a valid one.
+	// Since this is not used anywhere, consider removing this reason.
+	TaskStatus_REASON_COMMAND_EXECUTOR_FAILED         TaskStatus_Reason = 0
+	TaskStatus_REASON_CONTAINER_LAUNCH_FAILED         TaskStatus_Reason = 21
+	TaskStatus_REASON_CONTAINER_LIMITATION            TaskStatus_Reason = 19
+	TaskStatus_REASON_CONTAINER_LIMITATION_DISK       TaskStatus_Reason = 20
+	TaskStatus_REASON_CONTAINER_LIMITATION_MEMORY     TaskStatus_Reason = 8
+	TaskStatus_REASON_CONTAINER_PREEMPTED             TaskStatus_Reason = 17
+	TaskStatus_REASON_CONTAINER_UPDATE_FAILED         TaskStatus_Reason = 22
+	TaskStatus_REASON_EXECUTOR_REGISTRATION_TIMEOUT   TaskStatus_Reason = 23
+	TaskStatus_REASON_EXECUTOR_REREGISTRATION_TIMEOUT TaskStatus_Reason = 24
+	TaskStatus_REASON_EXECUTOR_TERMINATED             TaskStatus_Reason = 1
+	TaskStatus_REASON_EXECUTOR_UNREGISTERED           TaskStatus_Reason = 2
+	TaskStatus_REASON_FRAMEWORK_REMOVED               TaskStatus_Reason = 3
+	TaskStatus_REASON_GC_ERROR                        TaskStatus_Reason = 4
+	TaskStatus_REASON_INVALID_FRAMEWORKID             TaskStatus_Reason = 5
+	TaskStatus_REASON_INVALID_OFFERS                  TaskStatus_Reason = 6
+	TaskStatus_REASON_MASTER_DISCONNECTED             TaskStatus_Reason = 7
+	TaskStatus_REASON_RECONCILIATION                  TaskStatus_Reason = 9
+	TaskStatus_REASON_RESOURCES_UNKNOWN               TaskStatus_Reason = 18
+	TaskStatus_REASON_SLAVE_DISCONNECTED              TaskStatus_Reason = 10
+	TaskStatus_REASON_SLAVE_REMOVED                   TaskStatus_Reason = 11
+	TaskStatus_REASON_SLAVE_RESTARTED                 TaskStatus_Reason = 12
+	TaskStatus_REASON_SLAVE_UNKNOWN                   TaskStatus_Reason = 13
+	TaskStatus_REASON_TASK_INVALID                    TaskStatus_Reason = 14
+	TaskStatus_REASON_TASK_UNAUTHORIZED               TaskStatus_Reason = 15
+	TaskStatus_REASON_TASK_UNKNOWN                    TaskStatus_Reason = 16
 )
 
 var TaskStatus_Reason_name = map[int32]string{
 	0:  "REASON_COMMAND_EXECUTOR_FAILED",
-	17: "REASON_EXECUTOR_PREEMPTED",
+	21: "REASON_CONTAINER_LAUNCH_FAILED",
+	19: "REASON_CONTAINER_LIMITATION",
+	20: "REASON_CONTAINER_LIMITATION_DISK",
+	8:  "REASON_CONTAINER_LIMITATION_MEMORY",
+	17: "REASON_CONTAINER_PREEMPTED",
+	22: "REASON_CONTAINER_UPDATE_FAILED",
+	23: "REASON_EXECUTOR_REGISTRATION_TIMEOUT",
+	24: "REASON_EXECUTOR_REREGISTRATION_TIMEOUT",
 	1:  "REASON_EXECUTOR_TERMINATED",
 	2:  "REASON_EXECUTOR_UNREGISTERED",
 	3:  "REASON_FRAMEWORK_REMOVED",
@@ -313,7 +377,6 @@ var TaskStatus_Reason_name = map[int32]string{
 	5:  "REASON_INVALID_FRAMEWORKID",
 	6:  "REASON_INVALID_OFFERS",
 	7:  "REASON_MASTER_DISCONNECTED",
-	8:  "REASON_MEMORY_LIMIT",
 	9:  "REASON_RECONCILIATION",
 	18: "REASON_RESOURCES_UNKNOWN",
 	10: "REASON_SLAVE_DISCONNECTED",
@@ -325,25 +388,31 @@ var TaskStatus_Reason_name = map[int32]string{
 	16: "REASON_TASK_UNKNOWN",
 }
 var TaskStatus_Reason_value = map[string]int32{
-	"REASON_COMMAND_EXECUTOR_FAILED": 0,
-	"REASON_EXECUTOR_PREEMPTED":      17,
-	"REASON_EXECUTOR_TERMINATED":     1,
-	"REASON_EXECUTOR_UNREGISTERED":   2,
-	"REASON_FRAMEWORK_REMOVED":       3,
-	"REASON_GC_ERROR":                4,
-	"REASON_INVALID_FRAMEWORKID":     5,
-	"REASON_INVALID_OFFERS":          6,
-	"REASON_MASTER_DISCONNECTED":     7,
-	"REASON_MEMORY_LIMIT":            8,
-	"REASON_RECONCILIATION":          9,
-	"REASON_RESOURCES_UNKNOWN":       18,
-	"REASON_SLAVE_DISCONNECTED":      10,
-	"REASON_SLAVE_REMOVED":           11,
-	"REASON_SLAVE_RESTARTED":         12,
-	"REASON_SLAVE_UNKNOWN":           13,
-	"REASON_TASK_INVALID":            14,
-	"REASON_TASK_UNAUTHORIZED":       15,
-	"REASON_TASK_UNKNOWN":            16,
+	"REASON_COMMAND_EXECUTOR_FAILED":         0,
+	"REASON_CONTAINER_LAUNCH_FAILED":         21,
+	"REASON_CONTAINER_LIMITATION":            19,
+	"REASON_CONTAINER_LIMITATION_DISK":       20,
+	"REASON_CONTAINER_LIMITATION_MEMORY":     8,
+	"REASON_CONTAINER_PREEMPTED":             17,
+	"REASON_CONTAINER_UPDATE_FAILED":         22,
+	"REASON_EXECUTOR_REGISTRATION_TIMEOUT":   23,
+	"REASON_EXECUTOR_REREGISTRATION_TIMEOUT": 24,
+	"REASON_EXECUTOR_TERMINATED":             1,
+	"REASON_EXECUTOR_UNREGISTERED":           2,
+	"REASON_FRAMEWORK_REMOVED":               3,
+	"REASON_GC_ERROR":                        4,
+	"REASON_INVALID_FRAMEWORKID":             5,
+	"REASON_INVALID_OFFERS":                  6,
+	"REASON_MASTER_DISCONNECTED":             7,
+	"REASON_RECONCILIATION":                  9,
+	"REASON_RESOURCES_UNKNOWN":               18,
+	"REASON_SLAVE_DISCONNECTED":              10,
+	"REASON_SLAVE_REMOVED":                   11,
+	"REASON_SLAVE_RESTARTED":                 12,
+	"REASON_SLAVE_UNKNOWN":                   13,
+	"REASON_TASK_INVALID":                    14,
+	"REASON_TASK_UNAUTHORIZED":               15,
+	"REASON_TASK_UNKNOWN":                    16,
 }
 
 func (x TaskStatus_Reason) Enum() *TaskStatus_Reason {
@@ -426,6 +495,39 @@ func (x *Volume_Mode) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*x = Volume_Mode(value)
+	return nil
+}
+
+type NetworkInfo_Protocol int32
+
+const (
+	NetworkInfo_IPv4 NetworkInfo_Protocol = 1
+	NetworkInfo_IPv6 NetworkInfo_Protocol = 2
+)
+
+var NetworkInfo_Protocol_name = map[int32]string{
+	1: "IPv4",
+	2: "IPv6",
+}
+var NetworkInfo_Protocol_value = map[string]int32{
+	"IPv4": 1,
+	"IPv6": 2,
+}
+
+func (x NetworkInfo_Protocol) Enum() *NetworkInfo_Protocol {
+	p := new(NetworkInfo_Protocol)
+	*p = x
+	return p
+}
+func (x NetworkInfo_Protocol) String() string {
+	return proto.EnumName(NetworkInfo_Protocol_name, int32(x))
+}
+func (x *NetworkInfo_Protocol) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(NetworkInfo_Protocol_value, data, "NetworkInfo_Protocol")
+	if err != nil {
+		return err
+	}
+	*x = NetworkInfo_Protocol(value)
 	return nil
 }
 
@@ -650,6 +752,40 @@ func (m *ContainerID) GetValue() string {
 }
 
 // *
+// Represents time since the epoch, in nanoseconds.
+type TimeInfo struct {
+	Nanoseconds      *int64 `protobuf:"varint,1,req,name=nanoseconds" json:"nanoseconds,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *TimeInfo) Reset()      { *m = TimeInfo{} }
+func (*TimeInfo) ProtoMessage() {}
+
+func (m *TimeInfo) GetNanoseconds() int64 {
+	if m != nil && m.Nanoseconds != nil {
+		return *m.Nanoseconds
+	}
+	return 0
+}
+
+// *
+// Represents duration in nanoseconds.
+type DurationInfo struct {
+	Nanoseconds      *int64 `protobuf:"varint,1,req,name=nanoseconds" json:"nanoseconds,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *DurationInfo) Reset()      { *m = DurationInfo{} }
+func (*DurationInfo) ProtoMessage() {}
+
+func (m *DurationInfo) GetNanoseconds() int64 {
+	if m != nil && m.Nanoseconds != nil {
+		return *m.Nanoseconds
+	}
+	return 0
+}
+
+// *
 // A network address.
 //
 // TODO(bmahler): Use this more widely.
@@ -732,6 +868,101 @@ func (m *URL) GetFragment() string {
 		return *m.Fragment
 	}
 	return ""
+}
+
+// *
+// Represents an interval, from a given start time over a given duration.
+// This interval pertains to an unavailability event, such as maintenance,
+// and is not a generic interval.
+type Unavailability struct {
+	Start *TimeInfo `protobuf:"bytes,1,req,name=start" json:"start,omitempty"`
+	// When added to `start`, this represents the end of the interval.
+	// If unspecified, the duration is assumed to be infinite.
+	Duration         *DurationInfo `protobuf:"bytes,2,opt,name=duration" json:"duration,omitempty"`
+	XXX_unrecognized []byte        `json:"-"`
+}
+
+func (m *Unavailability) Reset()      { *m = Unavailability{} }
+func (*Unavailability) ProtoMessage() {}
+
+func (m *Unavailability) GetStart() *TimeInfo {
+	if m != nil {
+		return m.Start
+	}
+	return nil
+}
+
+func (m *Unavailability) GetDuration() *DurationInfo {
+	if m != nil {
+		return m.Duration
+	}
+	return nil
+}
+
+// *
+// Represents a single machine, which may hold one or more slaves.
+//
+// NOTE: In order to match a slave to a machine, both the `hostname` and
+// `ip` must match the values advertised by the slave to the master.
+// Hostname is not case-sensitive.
+type MachineID struct {
+	Hostname         *string `protobuf:"bytes,1,opt,name=hostname" json:"hostname,omitempty"`
+	Ip               *string `protobuf:"bytes,2,opt,name=ip" json:"ip,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *MachineID) Reset()      { *m = MachineID{} }
+func (*MachineID) ProtoMessage() {}
+
+func (m *MachineID) GetHostname() string {
+	if m != nil && m.Hostname != nil {
+		return *m.Hostname
+	}
+	return ""
+}
+
+func (m *MachineID) GetIp() string {
+	if m != nil && m.Ip != nil {
+		return *m.Ip
+	}
+	return ""
+}
+
+// *
+// Holds information about a single machine, its `mode`, and any other
+// relevant information which may affect the behavior of the machine.
+type MachineInfo struct {
+	Id   *MachineID        `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
+	Mode *MachineInfo_Mode `protobuf:"varint,2,opt,name=mode,enum=mesosproto.MachineInfo_Mode" json:"mode,omitempty"`
+	// Signifies that the machine may be unavailable during the given interval.
+	// See comments in `Unavailability` and for the `unavailability` fields
+	// in `Offer` and `InverseOffer` for more information.
+	Unavailability   *Unavailability `protobuf:"bytes,3,opt,name=unavailability" json:"unavailability,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
+}
+
+func (m *MachineInfo) Reset()      { *m = MachineInfo{} }
+func (*MachineInfo) ProtoMessage() {}
+
+func (m *MachineInfo) GetId() *MachineID {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *MachineInfo) GetMode() MachineInfo_Mode {
+	if m != nil && m.Mode != nil {
+		return *m.Mode
+	}
+	return MachineInfo_UP
+}
+
+func (m *MachineInfo) GetUnavailability() *Unavailability {
+	if m != nil {
+		return m.Unavailability
+	}
+	return nil
 }
 
 // *
@@ -2326,8 +2557,10 @@ type ResourceUsage_Executor struct {
 	Allocated []*Resource `protobuf:"bytes,2,rep,name=allocated" json:"allocated,omitempty"`
 	// Current resource usage. If absent, the containerizer
 	// cannot provide resource usage.
-	Statistics       *ResourceStatistics `protobuf:"bytes,3,opt,name=statistics" json:"statistics,omitempty"`
-	XXX_unrecognized []byte              `json:"-"`
+	Statistics *ResourceStatistics `protobuf:"bytes,3,opt,name=statistics" json:"statistics,omitempty"`
+	// The container id for the executor specified in the executor_info field.
+	ContainerId      *ContainerID `protobuf:"bytes,4,req,name=container_id" json:"container_id,omitempty"`
+	XXX_unrecognized []byte       `json:"-"`
 }
 
 func (m *ResourceUsage_Executor) Reset()      { *m = ResourceUsage_Executor{} }
@@ -2350,6 +2583,13 @@ func (m *ResourceUsage_Executor) GetAllocated() []*Resource {
 func (m *ResourceUsage_Executor) GetStatistics() *ResourceStatistics {
 	if m != nil {
 		return m.Statistics
+	}
+	return nil
+}
+
+func (m *ResourceUsage_Executor) GetContainerId() *ContainerID {
+	if m != nil {
+		return m.ContainerId
 	}
 	return nil
 }
@@ -2836,11 +3076,22 @@ type Offer struct {
 	SlaveId     *SlaveID     `protobuf:"bytes,3,req,name=slave_id" json:"slave_id,omitempty"`
 	Hostname    *string      `protobuf:"bytes,4,req,name=hostname" json:"hostname,omitempty"`
 	// URL for reaching the slave running on the host.
-	Url              *URL          `protobuf:"bytes,8,opt,name=url" json:"url,omitempty"`
-	Resources        []*Resource   `protobuf:"bytes,5,rep,name=resources" json:"resources,omitempty"`
-	Attributes       []*Attribute  `protobuf:"bytes,7,rep,name=attributes" json:"attributes,omitempty"`
-	ExecutorIds      []*ExecutorID `protobuf:"bytes,6,rep,name=executor_ids" json:"executor_ids,omitempty"`
-	XXX_unrecognized []byte        `json:"-"`
+	Url         *URL          `protobuf:"bytes,8,opt,name=url" json:"url,omitempty"`
+	Resources   []*Resource   `protobuf:"bytes,5,rep,name=resources" json:"resources,omitempty"`
+	Attributes  []*Attribute  `protobuf:"bytes,7,rep,name=attributes" json:"attributes,omitempty"`
+	ExecutorIds []*ExecutorID `protobuf:"bytes,6,rep,name=executor_ids" json:"executor_ids,omitempty"`
+	// Signifies that the resources in this Offer may be unavailable during
+	// the given interval.  Any tasks launched using these resources may be
+	// killed when the interval arrives.  For example, these resources may be
+	// part of a planned maintenance schedule.
+	//
+	// This field only provides information about a planned unavailability.
+	// The unavailability interval may not necessarily start at exactly this
+	// interval, nor last for exactly the duration of this interval.
+	// The unavailability may also be forever!  See comments in
+	// `Unavailability` for more details.
+	Unavailability   *Unavailability `protobuf:"bytes,9,opt,name=unavailability" json:"unavailability,omitempty"`
+	XXX_unrecognized []byte          `json:"-"`
 }
 
 func (m *Offer) Reset()      { *m = Offer{} }
@@ -2898,6 +3149,13 @@ func (m *Offer) GetAttributes() []*Attribute {
 func (m *Offer) GetExecutorIds() []*ExecutorID {
 	if m != nil {
 		return m.ExecutorIds
+	}
+	return nil
+}
+
+func (m *Offer) GetUnavailability() *Unavailability {
+	if m != nil {
+		return m.Unavailability
 	}
 	return nil
 }
@@ -3029,6 +3287,93 @@ func (*Offer_Operation_Destroy) ProtoMessage() {}
 func (m *Offer_Operation_Destroy) GetVolumes() []*Resource {
 	if m != nil {
 		return m.Volumes
+	}
+	return nil
+}
+
+// *
+// A request to return some resources occupied by a framework.
+type InverseOffer struct {
+	// This is the same OfferID as found in normal offers, which allows
+	// re-use of some of the OfferID-only messages.
+	Id *OfferID `protobuf:"bytes,1,req,name=id" json:"id,omitempty"`
+	// URL for reaching the slave running on the host.  This enables some
+	// optimizations as described in MESOS-3012, such as allowing the
+	// scheduler driver to bypass the master and talk directly with a slave.
+	Url *URL `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
+	// The framework that should release its resources.
+	// If no specifics are provided (i.e. which slave), all the framework's
+	// resources are requested back.
+	FrameworkId *FrameworkID `protobuf:"bytes,3,req,name=framework_id" json:"framework_id,omitempty"`
+	// Specified if the resources need to be released from a particular slave.
+	// All the framework's resources on this slave are requested back,
+	// unless further qualified by the `resources` field.
+	SlaveId *SlaveID `protobuf:"bytes,4,opt,name=slave_id" json:"slave_id,omitempty"`
+	// This InverseOffer represents a planned unavailability event in the
+	// specified interval.  Any tasks running on the given framework or slave
+	// may be killed when the interval arrives.  Therefore, frameworks should
+	// aim to gracefully terminate tasks prior to the arrival of the interval.
+	//
+	// For reserved resources, the resources are expected to be returned to the
+	// framework after the unavailability interval.  This is an expectation,
+	// not a guarantee.  For example, if the unavailability duration is not set,
+	// the resources may be removed permanently.
+	//
+	// For other resources, there is no guarantee that requested resources will
+	// be returned after the unavailability interval.  The allocator has no
+	// obligation to re-offer these resources to the prior framework after
+	// the unavailability.
+	Unavailability *Unavailability `protobuf:"bytes,5,req,name=unavailability" json:"unavailability,omitempty"`
+	// A list of resources being requested back from the framework,
+	// on the slave identified by `slave_id`.  If no resources are specified
+	// then all resources are being requested back.  For the purpose of
+	// maintenance, this field is always empty (maintenance always requests
+	// all resources back).
+	Resources        []*Resource `protobuf:"bytes,6,rep,name=resources" json:"resources,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *InverseOffer) Reset()      { *m = InverseOffer{} }
+func (*InverseOffer) ProtoMessage() {}
+
+func (m *InverseOffer) GetId() *OfferID {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetUrl() *URL {
+	if m != nil {
+		return m.Url
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetFrameworkId() *FrameworkID {
+	if m != nil {
+		return m.FrameworkId
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetSlaveId() *SlaveID {
+	if m != nil {
+		return m.SlaveId
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetUnavailability() *Unavailability {
+	if m != nil {
+		return m.Unavailability
+	}
+	return nil
+}
+
+func (m *InverseOffer) GetResources() []*Resource {
+	if m != nil {
+		return m.Resources
 	}
 	return nil
 }
@@ -3179,8 +3524,11 @@ type TaskStatus struct {
 	// will be kept in memory on master and slave processes. Therefore,
 	// labels should be used to tag TaskStatus message with light-weight
 	// meta-data.
-	Labels           *Labels `protobuf:"bytes,12,opt,name=labels" json:"labels,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	Labels *Labels `protobuf:"bytes,12,opt,name=labels" json:"labels,omitempty"`
+	// Container related information that is resolved dynamically such as
+	// network address.
+	ContainerStatus  *ContainerStatus `protobuf:"bytes,13,opt,name=container_status" json:"container_status,omitempty"`
+	XXX_unrecognized []byte           `json:"-"`
 }
 
 func (m *TaskStatus) Reset()      { *m = TaskStatus{} }
@@ -3266,6 +3614,13 @@ func (m *TaskStatus) GetHealthy() bool {
 func (m *TaskStatus) GetLabels() *Labels {
 	if m != nil {
 		return m.Labels
+	}
+	return nil
+}
+
+func (m *TaskStatus) GetContainerStatus() *ContainerStatus {
+	if m != nil {
+		return m.ContainerStatus
 	}
 	return nil
 }
@@ -3390,7 +3745,7 @@ func (m *Parameters) GetParameter() []*Parameter {
 // framework's executors/tasks are run.
 type Credential struct {
 	Principal        *string `protobuf:"bytes,1,req,name=principal" json:"principal,omitempty"`
-	Secret           []byte  `protobuf:"bytes,2,opt,name=secret" json:"secret,omitempty"`
+	Secret           *string `protobuf:"bytes,2,opt,name=secret" json:"secret,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -3404,11 +3759,11 @@ func (m *Credential) GetPrincipal() string {
 	return ""
 }
 
-func (m *Credential) GetSecret() []byte {
-	if m != nil {
-		return m.Secret
+func (m *Credential) GetSecret() string {
+	if m != nil && m.Secret != nil {
+		return *m.Secret
 	}
-	return nil
+	return ""
 }
 
 // *
@@ -3439,7 +3794,7 @@ type RateLimit struct {
 	// which also implies unlimited capacity.
 	Qps *float64 `protobuf:"fixed64,1,opt,name=qps" json:"qps,omitempty"`
 	// Principal of framework(s) to be throttled. Should match
-	// FrameworkInfo.princpal and Credential.principal (if using authentication).
+	// FrameworkInfo.principal and Credential.principal (if using authentication).
 	Principal *string `protobuf:"bytes,2,req,name=principal" json:"principal,omitempty"`
 	// Max number of outstanding messages from frameworks of this principal
 	// allowed by master before the next message is dropped and an error is sent
@@ -3525,7 +3880,7 @@ type Image struct {
 	Type *Image_Type `protobuf:"varint,1,req,name=type,enum=mesosproto.Image_Type" json:"type,omitempty"`
 	// Only one of the following image messages should be set to match
 	// the type.
-	Appc             *Image_AppC   `protobuf:"bytes,2,opt,name=appc" json:"appc,omitempty"`
+	Appc             *Image_Appc   `protobuf:"bytes,2,opt,name=appc" json:"appc,omitempty"`
 	Docker           *Image_Docker `protobuf:"bytes,3,opt,name=docker" json:"docker,omitempty"`
 	XXX_unrecognized []byte        `json:"-"`
 }
@@ -3540,7 +3895,7 @@ func (m *Image) GetType() Image_Type {
 	return Image_APPC
 }
 
-func (m *Image) GetAppc() *Image_AppC {
+func (m *Image) GetAppc() *Image_Appc {
 	if m != nil {
 		return m.Appc
 	}
@@ -3556,7 +3911,7 @@ func (m *Image) GetDocker() *Image_Docker {
 
 // Protobuf for specifying an Appc container image. See:
 // https://github.com/appc/spec/blob/master/spec/aci.md
-type Image_AppC struct {
+type Image_Appc struct {
 	// The name of the image.
 	Name *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	// An image ID is a string of the format "hash-value", where
@@ -3569,24 +3924,24 @@ type Image_AppC struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Image_AppC) Reset()      { *m = Image_AppC{} }
-func (*Image_AppC) ProtoMessage() {}
+func (m *Image_Appc) Reset()      { *m = Image_Appc{} }
+func (*Image_Appc) ProtoMessage() {}
 
-func (m *Image_AppC) GetName() string {
+func (m *Image_Appc) GetName() string {
 	if m != nil && m.Name != nil {
 		return *m.Name
 	}
 	return ""
 }
 
-func (m *Image_AppC) GetId() string {
+func (m *Image_Appc) GetId() string {
 	if m != nil && m.Id != nil {
 		return *m.Id
 	}
 	return ""
 }
 
-func (m *Image_AppC) GetLabels() *Labels {
+func (m *Image_Appc) GetLabels() *Labels {
 	if m != nil {
 		return m.Labels
 	}
@@ -3594,7 +3949,10 @@ func (m *Image_AppC) GetLabels() *Labels {
 }
 
 type Image_Docker struct {
-	// The name of the image. Expected in format repository[:tag].
+	// The name of the image. Expected format:
+	//   [REGISTRY_HOST[:REGISTRY_PORT]/]REPOSITORY[:TAG|@TYPE:DIGEST]
+	//
+	// See: https://docs.docker.com/reference/commandline/pull/
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -3660,6 +4018,135 @@ func (m *Volume) GetImage() *Image {
 }
 
 // *
+// Describes a network request from a framework as well as network resolution
+// provided by Mesos.
+//
+// A Framework may request the network isolator on the Agent to isolate the
+// container in a network namespace and create a virtual network interface.
+// The `NetworkInfo` message describes the properties of that virtual
+// interface, including the IP addresses and network isolation policy
+// (network group membership).
+//
+// The NetworkInfo message is not interpreted by the Master or Agent and is
+// intended to be used by Agent and Master modules implementing network
+// isolation. If the modules are missing, the message is simply ignored. In
+// future, the task launch will fail if there is no module providing the
+// network isolation capabilities (MESOS-3390).
+//
+// An executor, Agent, or an Agent module may append NetworkInfos inside
+// TaskStatus::container_status to provide information such as the container IP
+// address and isolation groups.
+type NetworkInfo struct {
+	// When included in a ContainerInfo, each of these represent a
+	// request for an IP address. Each request can specify an explicit address
+	// or the IP protocol to use.
+	//
+	// When included in a TaskStatus message, these inform the framework
+	// scheduler about the IP addresses that are bound to the container
+	// interface. When there are no custom network isolator modules installed,
+	// this field is filled in automatically with the Agent IP address.
+	IpAddresses []*NetworkInfo_IPAddress `protobuf:"bytes,5,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	// Specify IP address requirement. Set protocol to the desired value to
+	// request the network isolator on the Agent to assign an IP address to the
+	// container being launched. If a specific IP address is specified in
+	// ip_address, this field should not be set.
+	Protocol *NetworkInfo_Protocol `protobuf:"varint,1,opt,name=protocol,enum=mesosproto.NetworkInfo_Protocol" json:"protocol,omitempty"`
+	// Statically assigned IP provided by the Framework. This IP will be assigned
+	// to the container by the network isolator module on the Agent. This field
+	// should not be used with the protocol field above.
+	// NOTE: It is up to the networking 'provider' (IPAM/Isolator) to interpret
+	// this either as a hint of as a requirement for assigning the IP.
+	IpAddress *string `protobuf:"bytes,2,opt,name=ip_address" json:"ip_address,omitempty"`
+	// A group is the name given to a set of logically-related interfaces that
+	// are allowed to communicate among themselves. Network traffic is allowed
+	// between two container interfaces that share at least one network group.
+	// For example, one might want to create separate groups for isolating dev,
+	// testing, qa and prod deployment environments.
+	Groups []string `protobuf:"bytes,3,rep,name=groups" json:"groups,omitempty"`
+	// To tag certain metadata to be used by Isolator/IPAM, e.g., rack, etc.
+	Labels           *Labels `protobuf:"bytes,4,opt,name=labels" json:"labels,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *NetworkInfo) Reset()      { *m = NetworkInfo{} }
+func (*NetworkInfo) ProtoMessage() {}
+
+func (m *NetworkInfo) GetIpAddresses() []*NetworkInfo_IPAddress {
+	if m != nil {
+		return m.IpAddresses
+	}
+	return nil
+}
+
+func (m *NetworkInfo) GetProtocol() NetworkInfo_Protocol {
+	if m != nil && m.Protocol != nil {
+		return *m.Protocol
+	}
+	return NetworkInfo_IPv4
+}
+
+func (m *NetworkInfo) GetIpAddress() string {
+	if m != nil && m.IpAddress != nil {
+		return *m.IpAddress
+	}
+	return ""
+}
+
+func (m *NetworkInfo) GetGroups() []string {
+	if m != nil {
+		return m.Groups
+	}
+	return nil
+}
+
+func (m *NetworkInfo) GetLabels() *Labels {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+// Specifies a request for an IP address, or reports the assigned container
+// IP address.
+//
+// Users can request an automatically assigned IP (for example, via an
+// IPAM service) or a specific IP by adding a NetworkInfo to the
+// ContainerInfo for a task.  On a request, specifying neither `protocol`
+// nor `ip_address` means that any available address may be assigned.
+type NetworkInfo_IPAddress struct {
+	// Specify IP address requirement. Set protocol to the desired value to
+	// request the network isolator on the Agent to assign an IP address to the
+	// container being launched. If a specific IP address is specified in
+	// ip_address, this field should not be set.
+	Protocol *NetworkInfo_Protocol `protobuf:"varint,1,opt,name=protocol,enum=mesosproto.NetworkInfo_Protocol" json:"protocol,omitempty"`
+	// Statically assigned IP provided by the Framework. This IP will be
+	// assigned to the container by the network isolator module on the Agent.
+	// This field should not be used with the protocol field above.
+	//
+	// If an explicit address is requested but is unavailable, the network
+	// isolator should fail the task.
+	IpAddress        *string `protobuf:"bytes,2,opt,name=ip_address" json:"ip_address,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *NetworkInfo_IPAddress) Reset()      { *m = NetworkInfo_IPAddress{} }
+func (*NetworkInfo_IPAddress) ProtoMessage() {}
+
+func (m *NetworkInfo_IPAddress) GetProtocol() NetworkInfo_Protocol {
+	if m != nil && m.Protocol != nil {
+		return *m.Protocol
+	}
+	return NetworkInfo_IPv4
+}
+
+func (m *NetworkInfo_IPAddress) GetIpAddress() string {
+	if m != nil && m.IpAddress != nil {
+		return *m.IpAddress
+	}
+	return ""
+}
+
+// *
 // Describes a container configuration and allows extensible
 // configurations for different container implementations.
 type ContainerInfo struct {
@@ -3668,9 +4155,12 @@ type ContainerInfo struct {
 	Hostname *string             `protobuf:"bytes,4,opt,name=hostname" json:"hostname,omitempty"`
 	// Only one of the following *Info messages should be set to match
 	// the type.
-	Docker           *ContainerInfo_DockerInfo `protobuf:"bytes,3,opt,name=docker" json:"docker,omitempty"`
-	Mesos            *ContainerInfo_MesosInfo  `protobuf:"bytes,5,opt,name=mesos" json:"mesos,omitempty"`
-	XXX_unrecognized []byte                    `json:"-"`
+	Docker *ContainerInfo_DockerInfo `protobuf:"bytes,3,opt,name=docker" json:"docker,omitempty"`
+	Mesos  *ContainerInfo_MesosInfo  `protobuf:"bytes,5,opt,name=mesos" json:"mesos,omitempty"`
+	// A list of network requests. A framework can request multiple IP addresses
+	// for the container.
+	NetworkInfos     []*NetworkInfo `protobuf:"bytes,7,rep,name=network_infos" json:"network_infos,omitempty"`
+	XXX_unrecognized []byte         `json:"-"`
 }
 
 func (m *ContainerInfo) Reset()      { *m = ContainerInfo{} }
@@ -3707,6 +4197,13 @@ func (m *ContainerInfo) GetDocker() *ContainerInfo_DockerInfo {
 func (m *ContainerInfo) GetMesos() *ContainerInfo_MesosInfo {
 	if m != nil {
 		return m.Mesos
+	}
+	return nil
+}
+
+func (m *ContainerInfo) GetNetworkInfos() []*NetworkInfo {
+	if m != nil {
+		return m.NetworkInfos
 	}
 	return nil
 }
@@ -3825,6 +4322,25 @@ func (m *ContainerInfo_MesosInfo) GetImage() *Image {
 }
 
 // *
+// Container related information that is resolved during container setup. The
+// information is sent back to the framework as part of the TaskStatus message.
+type ContainerStatus struct {
+	// This field can be reliably used to identify the container IP address.
+	NetworkInfos     []*NetworkInfo `protobuf:"bytes,1,rep,name=network_infos" json:"network_infos,omitempty"`
+	XXX_unrecognized []byte         `json:"-"`
+}
+
+func (m *ContainerStatus) Reset()      { *m = ContainerStatus{} }
+func (*ContainerStatus) ProtoMessage() {}
+
+func (m *ContainerStatus) GetNetworkInfos() []*NetworkInfo {
+	if m != nil {
+		return m.NetworkInfos
+	}
+	return nil
+}
+
+// *
 // Collection of labels.
 type Labels struct {
 	Labels           []*Label `protobuf:"bytes,1,rep,name=labels" json:"labels,omitempty"`
@@ -3869,10 +4385,11 @@ func (m *Label) GetValue() string {
 // *
 // Named port used for service discovery.
 type Port struct {
-	Number           *uint32 `protobuf:"varint,1,req,name=number" json:"number,omitempty"`
-	Name             *string `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Protocol         *string `protobuf:"bytes,3,opt,name=protocol" json:"protocol,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	Number           *uint32                   `protobuf:"varint,1,req,name=number" json:"number,omitempty"`
+	Name             *string                   `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Protocol         *string                   `protobuf:"bytes,3,opt,name=protocol" json:"protocol,omitempty"`
+	Visibility       *DiscoveryInfo_Visibility `protobuf:"varint,4,opt,name=visibility,enum=mesosproto.DiscoveryInfo_Visibility" json:"visibility,omitempty"`
+	XXX_unrecognized []byte                    `json:"-"`
 }
 
 func (m *Port) Reset()      { *m = Port{} }
@@ -3899,6 +4416,13 @@ func (m *Port) GetProtocol() string {
 	return ""
 }
 
+func (m *Port) GetVisibility() DiscoveryInfo_Visibility {
+	if m != nil && m.Visibility != nil {
+		return *m.Visibility
+	}
+	return DiscoveryInfo_FRAMEWORK
+}
+
 // *
 // Collection of ports.
 type Ports struct {
@@ -3918,15 +4442,16 @@ func (m *Ports) GetPorts() []*Port {
 
 // *
 // Service discovery information.
-// The visibility field restricts discovery within a framework
-// (FRAMEWORK), within a Mesos cluster (CLUSTER), or  places no
-// restrictions (EXTERNAL).
-// The environment, location, and version fields provide first class
-// support for common attributes used to differentiate between
-// similar services. The environment may receive values such as
-// PROD/QA/DEV, the location field may receive values like
-// EAST-US/WEST-US/EUROPE/AMEA, and the version field may receive
-// values like v2.0/v0.9. The exact use of these fields is up to each
+// The visibility field restricts discovery within a framework (FRAMEWORK),
+// within a Mesos cluster (CLUSTER), or places no restrictions (EXTERNAL).
+// Each port in the ports field also has an optional visibility field.
+// If visibility is specified for a port, it overrides the default service-wide
+// DiscoveryInfo.visibility for that port.
+// The environment, location, and version fields provide first class support for
+// common attributes used to differentiate between similar services. The
+// environment may receive values such as PROD/QA/DEV, the location field may
+// receive values like EAST-US/WEST-US/EUROPE/AMEA, and the version field may
+// receive values like v2.0/v0.9. The exact use of these fields is up to each
 // service discovery system.
 type DiscoveryInfo struct {
 	Visibility       *DiscoveryInfo_Visibility `protobuf:"varint,1,req,name=visibility,enum=mesosproto.DiscoveryInfo_Visibility" json:"visibility,omitempty"`
@@ -4098,6 +4623,7 @@ func (m *AppcImageManifest_Annotation) GetValue() string {
 func init() {
 	proto.RegisterEnum("mesosproto.Status", Status_name, Status_value)
 	proto.RegisterEnum("mesosproto.TaskState", TaskState_name, TaskState_value)
+	proto.RegisterEnum("mesosproto.MachineInfo_Mode", MachineInfo_Mode_name, MachineInfo_Mode_value)
 	proto.RegisterEnum("mesosproto.FrameworkInfo_Capability_Type", FrameworkInfo_Capability_Type_name, FrameworkInfo_Capability_Type_value)
 	proto.RegisterEnum("mesosproto.Value_Type", Value_Type_name, Value_Type_value)
 	proto.RegisterEnum("mesosproto.Offer_Operation_Type", Offer_Operation_Type_name, Offer_Operation_Type_value)
@@ -4105,6 +4631,7 @@ func init() {
 	proto.RegisterEnum("mesosproto.TaskStatus_Reason", TaskStatus_Reason_name, TaskStatus_Reason_value)
 	proto.RegisterEnum("mesosproto.Image_Type", Image_Type_name, Image_Type_value)
 	proto.RegisterEnum("mesosproto.Volume_Mode", Volume_Mode_name, Volume_Mode_value)
+	proto.RegisterEnum("mesosproto.NetworkInfo_Protocol", NetworkInfo_Protocol_name, NetworkInfo_Protocol_value)
 	proto.RegisterEnum("mesosproto.ContainerInfo_Type", ContainerInfo_Type_name, ContainerInfo_Type_value)
 	proto.RegisterEnum("mesosproto.ContainerInfo_DockerInfo_Network", ContainerInfo_DockerInfo_Network_name, ContainerInfo_DockerInfo_Network_value)
 	proto.RegisterEnum("mesosproto.DiscoveryInfo_Visibility", DiscoveryInfo_Visibility_name, DiscoveryInfo_Visibility_value)
@@ -4517,6 +5044,142 @@ func (this *ContainerID) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *TimeInfo) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*TimeInfo)
+	if !ok {
+		return fmt.Errorf("that is not of type *TimeInfo")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *TimeInfo but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *TimeInfobut is not nil && this == nil")
+	}
+	if this.Nanoseconds != nil && that1.Nanoseconds != nil {
+		if *this.Nanoseconds != *that1.Nanoseconds {
+			return fmt.Errorf("Nanoseconds this(%v) Not Equal that(%v)", *this.Nanoseconds, *that1.Nanoseconds)
+		}
+	} else if this.Nanoseconds != nil {
+		return fmt.Errorf("this.Nanoseconds == nil && that.Nanoseconds != nil")
+	} else if that1.Nanoseconds != nil {
+		return fmt.Errorf("Nanoseconds this(%v) Not Equal that(%v)", this.Nanoseconds, that1.Nanoseconds)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *TimeInfo) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*TimeInfo)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Nanoseconds != nil && that1.Nanoseconds != nil {
+		if *this.Nanoseconds != *that1.Nanoseconds {
+			return false
+		}
+	} else if this.Nanoseconds != nil {
+		return false
+	} else if that1.Nanoseconds != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *DurationInfo) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*DurationInfo)
+	if !ok {
+		return fmt.Errorf("that is not of type *DurationInfo")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *DurationInfo but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *DurationInfobut is not nil && this == nil")
+	}
+	if this.Nanoseconds != nil && that1.Nanoseconds != nil {
+		if *this.Nanoseconds != *that1.Nanoseconds {
+			return fmt.Errorf("Nanoseconds this(%v) Not Equal that(%v)", *this.Nanoseconds, *that1.Nanoseconds)
+		}
+	} else if this.Nanoseconds != nil {
+		return fmt.Errorf("this.Nanoseconds == nil && that.Nanoseconds != nil")
+	} else if that1.Nanoseconds != nil {
+		return fmt.Errorf("Nanoseconds this(%v) Not Equal that(%v)", this.Nanoseconds, that1.Nanoseconds)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *DurationInfo) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*DurationInfo)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Nanoseconds != nil && that1.Nanoseconds != nil {
+		if *this.Nanoseconds != *that1.Nanoseconds {
+			return false
+		}
+	} else if this.Nanoseconds != nil {
+		return false
+	} else if that1.Nanoseconds != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
 func (this *Address) VerboseEqual(that interface{}) error {
 	if that == nil {
 		if this == nil {
@@ -4740,6 +5403,234 @@ func (this *URL) Equal(that interface{}) bool {
 	} else if this.Fragment != nil {
 		return false
 	} else if that1.Fragment != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Unavailability) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Unavailability)
+	if !ok {
+		return fmt.Errorf("that is not of type *Unavailability")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Unavailability but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Unavailabilitybut is not nil && this == nil")
+	}
+	if !this.Start.Equal(that1.Start) {
+		return fmt.Errorf("Start this(%v) Not Equal that(%v)", this.Start, that1.Start)
+	}
+	if !this.Duration.Equal(that1.Duration) {
+		return fmt.Errorf("Duration this(%v) Not Equal that(%v)", this.Duration, that1.Duration)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *Unavailability) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Unavailability)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Start.Equal(that1.Start) {
+		return false
+	}
+	if !this.Duration.Equal(that1.Duration) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *MachineID) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*MachineID)
+	if !ok {
+		return fmt.Errorf("that is not of type *MachineID")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *MachineID but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *MachineIDbut is not nil && this == nil")
+	}
+	if this.Hostname != nil && that1.Hostname != nil {
+		if *this.Hostname != *that1.Hostname {
+			return fmt.Errorf("Hostname this(%v) Not Equal that(%v)", *this.Hostname, *that1.Hostname)
+		}
+	} else if this.Hostname != nil {
+		return fmt.Errorf("this.Hostname == nil && that.Hostname != nil")
+	} else if that1.Hostname != nil {
+		return fmt.Errorf("Hostname this(%v) Not Equal that(%v)", this.Hostname, that1.Hostname)
+	}
+	if this.Ip != nil && that1.Ip != nil {
+		if *this.Ip != *that1.Ip {
+			return fmt.Errorf("Ip this(%v) Not Equal that(%v)", *this.Ip, *that1.Ip)
+		}
+	} else if this.Ip != nil {
+		return fmt.Errorf("this.Ip == nil && that.Ip != nil")
+	} else if that1.Ip != nil {
+		return fmt.Errorf("Ip this(%v) Not Equal that(%v)", this.Ip, that1.Ip)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *MachineID) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*MachineID)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Hostname != nil && that1.Hostname != nil {
+		if *this.Hostname != *that1.Hostname {
+			return false
+		}
+	} else if this.Hostname != nil {
+		return false
+	} else if that1.Hostname != nil {
+		return false
+	}
+	if this.Ip != nil && that1.Ip != nil {
+		if *this.Ip != *that1.Ip {
+			return false
+		}
+	} else if this.Ip != nil {
+		return false
+	} else if that1.Ip != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *MachineInfo) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*MachineInfo)
+	if !ok {
+		return fmt.Errorf("that is not of type *MachineInfo")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *MachineInfo but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *MachineInfobut is not nil && this == nil")
+	}
+	if !this.Id.Equal(that1.Id) {
+		return fmt.Errorf("Id this(%v) Not Equal that(%v)", this.Id, that1.Id)
+	}
+	if this.Mode != nil && that1.Mode != nil {
+		if *this.Mode != *that1.Mode {
+			return fmt.Errorf("Mode this(%v) Not Equal that(%v)", *this.Mode, *that1.Mode)
+		}
+	} else if this.Mode != nil {
+		return fmt.Errorf("this.Mode == nil && that.Mode != nil")
+	} else if that1.Mode != nil {
+		return fmt.Errorf("Mode this(%v) Not Equal that(%v)", this.Mode, that1.Mode)
+	}
+	if !this.Unavailability.Equal(that1.Unavailability) {
+		return fmt.Errorf("Unavailability this(%v) Not Equal that(%v)", this.Unavailability, that1.Unavailability)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *MachineInfo) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*MachineInfo)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Id.Equal(that1.Id) {
+		return false
+	}
+	if this.Mode != nil && that1.Mode != nil {
+		if *this.Mode != *that1.Mode {
+			return false
+		}
+	} else if this.Mode != nil {
+		return false
+	} else if that1.Mode != nil {
+		return false
+	}
+	if !this.Unavailability.Equal(that1.Unavailability) {
 		return false
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
@@ -8153,6 +9044,9 @@ func (this *ResourceUsage_Executor) VerboseEqual(that interface{}) error {
 	if !this.Statistics.Equal(that1.Statistics) {
 		return fmt.Errorf("Statistics this(%v) Not Equal that(%v)", this.Statistics, that1.Statistics)
 	}
+	if !this.ContainerId.Equal(that1.ContainerId) {
+		return fmt.Errorf("ContainerId this(%v) Not Equal that(%v)", this.ContainerId, that1.ContainerId)
+	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
@@ -8190,6 +9084,9 @@ func (this *ResourceUsage_Executor) Equal(that interface{}) bool {
 		}
 	}
 	if !this.Statistics.Equal(that1.Statistics) {
+		return false
+	}
+	if !this.ContainerId.Equal(that1.ContainerId) {
 		return false
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
@@ -9338,6 +10235,9 @@ func (this *Offer) VerboseEqual(that interface{}) error {
 			return fmt.Errorf("ExecutorIds this[%v](%v) Not Equal that[%v](%v)", i, this.ExecutorIds[i], i, that1.ExecutorIds[i])
 		}
 	}
+	if !this.Unavailability.Equal(that1.Unavailability) {
+		return fmt.Errorf("Unavailability this(%v) Not Equal that(%v)", this.Unavailability, that1.Unavailability)
+	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
@@ -9407,6 +10307,9 @@ func (this *Offer) Equal(that interface{}) bool {
 		if !this.ExecutorIds[i].Equal(that1.ExecutorIds[i]) {
 			return false
 		}
+	}
+	if !this.Unavailability.Equal(that1.Unavailability) {
+		return false
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return false
@@ -9841,6 +10744,102 @@ func (this *Offer_Operation_Destroy) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *InverseOffer) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*InverseOffer)
+	if !ok {
+		return fmt.Errorf("that is not of type *InverseOffer")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *InverseOffer but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *InverseOfferbut is not nil && this == nil")
+	}
+	if !this.Id.Equal(that1.Id) {
+		return fmt.Errorf("Id this(%v) Not Equal that(%v)", this.Id, that1.Id)
+	}
+	if !this.Url.Equal(that1.Url) {
+		return fmt.Errorf("Url this(%v) Not Equal that(%v)", this.Url, that1.Url)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.Unavailability.Equal(that1.Unavailability) {
+		return fmt.Errorf("Unavailability this(%v) Not Equal that(%v)", this.Unavailability, that1.Unavailability)
+	}
+	if len(this.Resources) != len(that1.Resources) {
+		return fmt.Errorf("Resources this(%v) Not Equal that(%v)", len(this.Resources), len(that1.Resources))
+	}
+	for i := range this.Resources {
+		if !this.Resources[i].Equal(that1.Resources[i]) {
+			return fmt.Errorf("Resources this[%v](%v) Not Equal that[%v](%v)", i, this.Resources[i], i, that1.Resources[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *InverseOffer) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*InverseOffer)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Id.Equal(that1.Id) {
+		return false
+	}
+	if !this.Url.Equal(that1.Url) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.Unavailability.Equal(that1.Unavailability) {
+		return false
+	}
+	if len(this.Resources) != len(that1.Resources) {
+		return false
+	}
+	for i := range this.Resources {
+		if !this.Resources[i].Equal(that1.Resources[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
 func (this *TaskInfo) VerboseEqual(that interface{}) error {
 	if that == nil {
 		if this == nil {
@@ -10071,6 +11070,9 @@ func (this *TaskStatus) VerboseEqual(that interface{}) error {
 	if !this.Labels.Equal(that1.Labels) {
 		return fmt.Errorf("Labels this(%v) Not Equal that(%v)", this.Labels, that1.Labels)
 	}
+	if !this.ContainerStatus.Equal(that1.ContainerStatus) {
+		return fmt.Errorf("ContainerStatus this(%v) Not Equal that(%v)", this.ContainerStatus, that1.ContainerStatus)
+	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
@@ -10166,6 +11168,9 @@ func (this *TaskStatus) Equal(that interface{}) bool {
 		return false
 	}
 	if !this.Labels.Equal(that1.Labels) {
+		return false
+	}
+	if !this.ContainerStatus.Equal(that1.ContainerStatus) {
 		return false
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
@@ -10574,7 +11579,13 @@ func (this *Credential) VerboseEqual(that interface{}) error {
 	} else if that1.Principal != nil {
 		return fmt.Errorf("Principal this(%v) Not Equal that(%v)", this.Principal, that1.Principal)
 	}
-	if !bytes.Equal(this.Secret, that1.Secret) {
+	if this.Secret != nil && that1.Secret != nil {
+		if *this.Secret != *that1.Secret {
+			return fmt.Errorf("Secret this(%v) Not Equal that(%v)", *this.Secret, *that1.Secret)
+		}
+	} else if this.Secret != nil {
+		return fmt.Errorf("this.Secret == nil && that.Secret != nil")
+	} else if that1.Secret != nil {
 		return fmt.Errorf("Secret this(%v) Not Equal that(%v)", this.Secret, that1.Secret)
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
@@ -10611,7 +11622,13 @@ func (this *Credential) Equal(that interface{}) bool {
 	} else if that1.Principal != nil {
 		return false
 	}
-	if !bytes.Equal(this.Secret, that1.Secret) {
+	if this.Secret != nil && that1.Secret != nil {
+		if *this.Secret != *that1.Secret {
+			return false
+		}
+	} else if this.Secret != nil {
+		return false
+	} else if that1.Secret != nil {
 		return false
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
@@ -10971,7 +11988,7 @@ func (this *Image) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *Image_AppC) VerboseEqual(that interface{}) error {
+func (this *Image_Appc) VerboseEqual(that interface{}) error {
 	if that == nil {
 		if this == nil {
 			return nil
@@ -10979,17 +11996,17 @@ func (this *Image_AppC) VerboseEqual(that interface{}) error {
 		return fmt.Errorf("that == nil && this != nil")
 	}
 
-	that1, ok := that.(*Image_AppC)
+	that1, ok := that.(*Image_Appc)
 	if !ok {
-		return fmt.Errorf("that is not of type *Image_AppC")
+		return fmt.Errorf("that is not of type *Image_Appc")
 	}
 	if that1 == nil {
 		if this == nil {
 			return nil
 		}
-		return fmt.Errorf("that is type *Image_AppC but is nil && this != nil")
+		return fmt.Errorf("that is type *Image_Appc but is nil && this != nil")
 	} else if this == nil {
-		return fmt.Errorf("that is type *Image_AppCbut is not nil && this == nil")
+		return fmt.Errorf("that is type *Image_Appcbut is not nil && this == nil")
 	}
 	if this.Name != nil && that1.Name != nil {
 		if *this.Name != *that1.Name {
@@ -11017,7 +12034,7 @@ func (this *Image_AppC) VerboseEqual(that interface{}) error {
 	}
 	return nil
 }
-func (this *Image_AppC) Equal(that interface{}) bool {
+func (this *Image_Appc) Equal(that interface{}) bool {
 	if that == nil {
 		if this == nil {
 			return true
@@ -11025,7 +12042,7 @@ func (this *Image_AppC) Equal(that interface{}) bool {
 		return false
 	}
 
-	that1, ok := that.(*Image_AppC)
+	that1, ok := that.(*Image_Appc)
 	if !ok {
 		return false
 	}
@@ -11241,6 +12258,216 @@ func (this *Volume) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *NetworkInfo) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*NetworkInfo)
+	if !ok {
+		return fmt.Errorf("that is not of type *NetworkInfo")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *NetworkInfo but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *NetworkInfobut is not nil && this == nil")
+	}
+	if len(this.IpAddresses) != len(that1.IpAddresses) {
+		return fmt.Errorf("IpAddresses this(%v) Not Equal that(%v)", len(this.IpAddresses), len(that1.IpAddresses))
+	}
+	for i := range this.IpAddresses {
+		if !this.IpAddresses[i].Equal(that1.IpAddresses[i]) {
+			return fmt.Errorf("IpAddresses this[%v](%v) Not Equal that[%v](%v)", i, this.IpAddresses[i], i, that1.IpAddresses[i])
+		}
+	}
+	if this.Protocol != nil && that1.Protocol != nil {
+		if *this.Protocol != *that1.Protocol {
+			return fmt.Errorf("Protocol this(%v) Not Equal that(%v)", *this.Protocol, *that1.Protocol)
+		}
+	} else if this.Protocol != nil {
+		return fmt.Errorf("this.Protocol == nil && that.Protocol != nil")
+	} else if that1.Protocol != nil {
+		return fmt.Errorf("Protocol this(%v) Not Equal that(%v)", this.Protocol, that1.Protocol)
+	}
+	if this.IpAddress != nil && that1.IpAddress != nil {
+		if *this.IpAddress != *that1.IpAddress {
+			return fmt.Errorf("IpAddress this(%v) Not Equal that(%v)", *this.IpAddress, *that1.IpAddress)
+		}
+	} else if this.IpAddress != nil {
+		return fmt.Errorf("this.IpAddress == nil && that.IpAddress != nil")
+	} else if that1.IpAddress != nil {
+		return fmt.Errorf("IpAddress this(%v) Not Equal that(%v)", this.IpAddress, that1.IpAddress)
+	}
+	if len(this.Groups) != len(that1.Groups) {
+		return fmt.Errorf("Groups this(%v) Not Equal that(%v)", len(this.Groups), len(that1.Groups))
+	}
+	for i := range this.Groups {
+		if this.Groups[i] != that1.Groups[i] {
+			return fmt.Errorf("Groups this[%v](%v) Not Equal that[%v](%v)", i, this.Groups[i], i, that1.Groups[i])
+		}
+	}
+	if !this.Labels.Equal(that1.Labels) {
+		return fmt.Errorf("Labels this(%v) Not Equal that(%v)", this.Labels, that1.Labels)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *NetworkInfo) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*NetworkInfo)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if len(this.IpAddresses) != len(that1.IpAddresses) {
+		return false
+	}
+	for i := range this.IpAddresses {
+		if !this.IpAddresses[i].Equal(that1.IpAddresses[i]) {
+			return false
+		}
+	}
+	if this.Protocol != nil && that1.Protocol != nil {
+		if *this.Protocol != *that1.Protocol {
+			return false
+		}
+	} else if this.Protocol != nil {
+		return false
+	} else if that1.Protocol != nil {
+		return false
+	}
+	if this.IpAddress != nil && that1.IpAddress != nil {
+		if *this.IpAddress != *that1.IpAddress {
+			return false
+		}
+	} else if this.IpAddress != nil {
+		return false
+	} else if that1.IpAddress != nil {
+		return false
+	}
+	if len(this.Groups) != len(that1.Groups) {
+		return false
+	}
+	for i := range this.Groups {
+		if this.Groups[i] != that1.Groups[i] {
+			return false
+		}
+	}
+	if !this.Labels.Equal(that1.Labels) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *NetworkInfo_IPAddress) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*NetworkInfo_IPAddress)
+	if !ok {
+		return fmt.Errorf("that is not of type *NetworkInfo_IPAddress")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *NetworkInfo_IPAddress but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *NetworkInfo_IPAddressbut is not nil && this == nil")
+	}
+	if this.Protocol != nil && that1.Protocol != nil {
+		if *this.Protocol != *that1.Protocol {
+			return fmt.Errorf("Protocol this(%v) Not Equal that(%v)", *this.Protocol, *that1.Protocol)
+		}
+	} else if this.Protocol != nil {
+		return fmt.Errorf("this.Protocol == nil && that.Protocol != nil")
+	} else if that1.Protocol != nil {
+		return fmt.Errorf("Protocol this(%v) Not Equal that(%v)", this.Protocol, that1.Protocol)
+	}
+	if this.IpAddress != nil && that1.IpAddress != nil {
+		if *this.IpAddress != *that1.IpAddress {
+			return fmt.Errorf("IpAddress this(%v) Not Equal that(%v)", *this.IpAddress, *that1.IpAddress)
+		}
+	} else if this.IpAddress != nil {
+		return fmt.Errorf("this.IpAddress == nil && that.IpAddress != nil")
+	} else if that1.IpAddress != nil {
+		return fmt.Errorf("IpAddress this(%v) Not Equal that(%v)", this.IpAddress, that1.IpAddress)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *NetworkInfo_IPAddress) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*NetworkInfo_IPAddress)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Protocol != nil && that1.Protocol != nil {
+		if *this.Protocol != *that1.Protocol {
+			return false
+		}
+	} else if this.Protocol != nil {
+		return false
+	} else if that1.Protocol != nil {
+		return false
+	}
+	if this.IpAddress != nil && that1.IpAddress != nil {
+		if *this.IpAddress != *that1.IpAddress {
+			return false
+		}
+	} else if this.IpAddress != nil {
+		return false
+	} else if that1.IpAddress != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
 func (this *ContainerInfo) VerboseEqual(that interface{}) error {
 	if that == nil {
 		if this == nil {
@@ -11292,6 +12519,14 @@ func (this *ContainerInfo) VerboseEqual(that interface{}) error {
 	}
 	if !this.Mesos.Equal(that1.Mesos) {
 		return fmt.Errorf("Mesos this(%v) Not Equal that(%v)", this.Mesos, that1.Mesos)
+	}
+	if len(this.NetworkInfos) != len(that1.NetworkInfos) {
+		return fmt.Errorf("NetworkInfos this(%v) Not Equal that(%v)", len(this.NetworkInfos), len(that1.NetworkInfos))
+	}
+	for i := range this.NetworkInfos {
+		if !this.NetworkInfos[i].Equal(that1.NetworkInfos[i]) {
+			return fmt.Errorf("NetworkInfos this[%v](%v) Not Equal that[%v](%v)", i, this.NetworkInfos[i], i, that1.NetworkInfos[i])
+		}
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
@@ -11349,6 +12584,14 @@ func (this *ContainerInfo) Equal(that interface{}) bool {
 	}
 	if !this.Mesos.Equal(that1.Mesos) {
 		return false
+	}
+	if len(this.NetworkInfos) != len(that1.NetworkInfos) {
+		return false
+	}
+	for i := range this.NetworkInfos {
+		if !this.NetworkInfos[i].Equal(that1.NetworkInfos[i]) {
+			return false
+		}
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return false
@@ -11669,6 +12912,72 @@ func (this *ContainerInfo_MesosInfo) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *ContainerStatus) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ContainerStatus)
+	if !ok {
+		return fmt.Errorf("that is not of type *ContainerStatus")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ContainerStatus but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ContainerStatusbut is not nil && this == nil")
+	}
+	if len(this.NetworkInfos) != len(that1.NetworkInfos) {
+		return fmt.Errorf("NetworkInfos this(%v) Not Equal that(%v)", len(this.NetworkInfos), len(that1.NetworkInfos))
+	}
+	for i := range this.NetworkInfos {
+		if !this.NetworkInfos[i].Equal(that1.NetworkInfos[i]) {
+			return fmt.Errorf("NetworkInfos this[%v](%v) Not Equal that[%v](%v)", i, this.NetworkInfos[i], i, that1.NetworkInfos[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ContainerStatus) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ContainerStatus)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if len(this.NetworkInfos) != len(that1.NetworkInfos) {
+		return false
+	}
+	for i := range this.NetworkInfos {
+		if !this.NetworkInfos[i].Equal(that1.NetworkInfos[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
 func (this *Labels) VerboseEqual(that interface{}) error {
 	if that == nil {
 		if this == nil {
@@ -11868,6 +13177,15 @@ func (this *Port) VerboseEqual(that interface{}) error {
 	} else if that1.Protocol != nil {
 		return fmt.Errorf("Protocol this(%v) Not Equal that(%v)", this.Protocol, that1.Protocol)
 	}
+	if this.Visibility != nil && that1.Visibility != nil {
+		if *this.Visibility != *that1.Visibility {
+			return fmt.Errorf("Visibility this(%v) Not Equal that(%v)", *this.Visibility, *that1.Visibility)
+		}
+	} else if this.Visibility != nil {
+		return fmt.Errorf("this.Visibility == nil && that.Visibility != nil")
+	} else if that1.Visibility != nil {
+		return fmt.Errorf("Visibility this(%v) Not Equal that(%v)", this.Visibility, that1.Visibility)
+	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
 		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
 	}
@@ -11918,6 +13236,15 @@ func (this *Port) Equal(that interface{}) bool {
 	} else if this.Protocol != nil {
 		return false
 	} else if that1.Protocol != nil {
+		return false
+	}
+	if this.Visibility != nil && that1.Visibility != nil {
+		if *this.Visibility != *that1.Visibility {
+			return false
+		}
+	} else if this.Visibility != nil {
+		return false
+	} else if that1.Visibility != nil {
 		return false
 	}
 	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
@@ -12541,6 +13868,36 @@ func (this *ContainerID) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
+func (this *TimeInfo) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.TimeInfo{")
+	if this.Nanoseconds != nil {
+		s = append(s, "Nanoseconds: "+valueToGoStringMesos(this.Nanoseconds, "int64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *DurationInfo) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.DurationInfo{")
+	if this.Nanoseconds != nil {
+		s = append(s, "Nanoseconds: "+valueToGoStringMesos(this.Nanoseconds, "int64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func (this *Address) GoString() string {
 	if this == nil {
 		return "nil"
@@ -12582,6 +13939,63 @@ func (this *URL) GoString() string {
 	}
 	if this.Fragment != nil {
 		s = append(s, "Fragment: "+valueToGoStringMesos(this.Fragment, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Unavailability) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.Unavailability{")
+	if this.Start != nil {
+		s = append(s, "Start: "+fmt.Sprintf("%#v", this.Start)+",\n")
+	}
+	if this.Duration != nil {
+		s = append(s, "Duration: "+fmt.Sprintf("%#v", this.Duration)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *MachineID) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.MachineID{")
+	if this.Hostname != nil {
+		s = append(s, "Hostname: "+valueToGoStringMesos(this.Hostname, "string")+",\n")
+	}
+	if this.Ip != nil {
+		s = append(s, "Ip: "+valueToGoStringMesos(this.Ip, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *MachineInfo) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.MachineInfo{")
+	if this.Id != nil {
+		s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	}
+	if this.Mode != nil {
+		s = append(s, "Mode: "+valueToGoStringMesos(this.Mode, "mesosproto.MachineInfo_Mode")+",\n")
+	}
+	if this.Unavailability != nil {
+		s = append(s, "Unavailability: "+fmt.Sprintf("%#v", this.Unavailability)+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -13313,7 +14727,7 @@ func (this *ResourceUsage_Executor) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 8)
 	s = append(s, "&mesosproto.ResourceUsage_Executor{")
 	if this.ExecutorInfo != nil {
 		s = append(s, "ExecutorInfo: "+fmt.Sprintf("%#v", this.ExecutorInfo)+",\n")
@@ -13323,6 +14737,9 @@ func (this *ResourceUsage_Executor) GoString() string {
 	}
 	if this.Statistics != nil {
 		s = append(s, "Statistics: "+fmt.Sprintf("%#v", this.Statistics)+",\n")
+	}
+	if this.ContainerId != nil {
+		s = append(s, "ContainerId: "+fmt.Sprintf("%#v", this.ContainerId)+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -13523,7 +14940,7 @@ func (this *Offer) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 12)
+	s := make([]string, 0, 13)
 	s = append(s, "&mesosproto.Offer{")
 	if this.Id != nil {
 		s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
@@ -13548,6 +14965,9 @@ func (this *Offer) GoString() string {
 	}
 	if this.ExecutorIds != nil {
 		s = append(s, "ExecutorIds: "+fmt.Sprintf("%#v", this.ExecutorIds)+",\n")
+	}
+	if this.Unavailability != nil {
+		s = append(s, "Unavailability: "+fmt.Sprintf("%#v", this.Unavailability)+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -13660,6 +15080,36 @@ func (this *Offer_Operation_Destroy) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
+func (this *InverseOffer) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&mesosproto.InverseOffer{")
+	if this.Id != nil {
+		s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	}
+	if this.Url != nil {
+		s = append(s, "Url: "+fmt.Sprintf("%#v", this.Url)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.Unavailability != nil {
+		s = append(s, "Unavailability: "+fmt.Sprintf("%#v", this.Unavailability)+",\n")
+	}
+	if this.Resources != nil {
+		s = append(s, "Resources: "+fmt.Sprintf("%#v", this.Resources)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func (this *TaskInfo) GoString() string {
 	if this == nil {
 		return "nil"
@@ -13709,7 +15159,7 @@ func (this *TaskStatus) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 16)
+	s := make([]string, 0, 17)
 	s = append(s, "&mesosproto.TaskStatus{")
 	if this.TaskId != nil {
 		s = append(s, "TaskId: "+fmt.Sprintf("%#v", this.TaskId)+",\n")
@@ -13746,6 +15196,9 @@ func (this *TaskStatus) GoString() string {
 	}
 	if this.Labels != nil {
 		s = append(s, "Labels: "+fmt.Sprintf("%#v", this.Labels)+",\n")
+	}
+	if this.ContainerStatus != nil {
+		s = append(s, "ContainerStatus: "+fmt.Sprintf("%#v", this.ContainerStatus)+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -13844,7 +15297,7 @@ func (this *Credential) GoString() string {
 		s = append(s, "Principal: "+valueToGoStringMesos(this.Principal, "string")+",\n")
 	}
 	if this.Secret != nil {
-		s = append(s, "Secret: "+valueToGoStringMesos(this.Secret, "byte")+",\n")
+		s = append(s, "Secret: "+valueToGoStringMesos(this.Secret, "string")+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -13930,12 +15383,12 @@ func (this *Image) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
-func (this *Image_AppC) GoString() string {
+func (this *Image_Appc) GoString() string {
 	if this == nil {
 		return "nil"
 	}
 	s := make([]string, 0, 7)
-	s = append(s, "&mesosproto.Image_AppC{")
+	s = append(s, "&mesosproto.Image_Appc{")
 	if this.Name != nil {
 		s = append(s, "Name: "+valueToGoStringMesos(this.Name, "string")+",\n")
 	}
@@ -13990,11 +15443,56 @@ func (this *Volume) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
-func (this *ContainerInfo) GoString() string {
+func (this *NetworkInfo) GoString() string {
 	if this == nil {
 		return "nil"
 	}
 	s := make([]string, 0, 9)
+	s = append(s, "&mesosproto.NetworkInfo{")
+	if this.IpAddresses != nil {
+		s = append(s, "IpAddresses: "+fmt.Sprintf("%#v", this.IpAddresses)+",\n")
+	}
+	if this.Protocol != nil {
+		s = append(s, "Protocol: "+valueToGoStringMesos(this.Protocol, "mesosproto.NetworkInfo_Protocol")+",\n")
+	}
+	if this.IpAddress != nil {
+		s = append(s, "IpAddress: "+valueToGoStringMesos(this.IpAddress, "string")+",\n")
+	}
+	if this.Groups != nil {
+		s = append(s, "Groups: "+fmt.Sprintf("%#v", this.Groups)+",\n")
+	}
+	if this.Labels != nil {
+		s = append(s, "Labels: "+fmt.Sprintf("%#v", this.Labels)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *NetworkInfo_IPAddress) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.NetworkInfo_IPAddress{")
+	if this.Protocol != nil {
+		s = append(s, "Protocol: "+valueToGoStringMesos(this.Protocol, "mesosproto.NetworkInfo_Protocol")+",\n")
+	}
+	if this.IpAddress != nil {
+		s = append(s, "IpAddress: "+valueToGoStringMesos(this.IpAddress, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ContainerInfo) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
 	s = append(s, "&mesosproto.ContainerInfo{")
 	if this.Type != nil {
 		s = append(s, "Type: "+valueToGoStringMesos(this.Type, "mesosproto.ContainerInfo_Type")+",\n")
@@ -14010,6 +15508,9 @@ func (this *ContainerInfo) GoString() string {
 	}
 	if this.Mesos != nil {
 		s = append(s, "Mesos: "+fmt.Sprintf("%#v", this.Mesos)+",\n")
+	}
+	if this.NetworkInfos != nil {
+		s = append(s, "NetworkInfos: "+fmt.Sprintf("%#v", this.NetworkInfos)+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -14083,6 +15584,21 @@ func (this *ContainerInfo_MesosInfo) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
+func (this *ContainerStatus) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.ContainerStatus{")
+	if this.NetworkInfos != nil {
+		s = append(s, "NetworkInfos: "+fmt.Sprintf("%#v", this.NetworkInfos)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func (this *Labels) GoString() string {
 	if this == nil {
 		return "nil"
@@ -14120,7 +15636,7 @@ func (this *Port) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 8)
 	s = append(s, "&mesosproto.Port{")
 	if this.Number != nil {
 		s = append(s, "Number: "+valueToGoStringMesos(this.Number, "uint32")+",\n")
@@ -14130,6 +15646,9 @@ func (this *Port) GoString() string {
 	}
 	if this.Protocol != nil {
 		s = append(s, "Protocol: "+valueToGoStringMesos(this.Protocol, "string")+",\n")
+	}
+	if this.Visibility != nil {
+		s = append(s, "Visibility: "+valueToGoStringMesos(this.Visibility, "mesosproto.DiscoveryInfo_Visibility")+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -14447,6 +15966,62 @@ func (m *ContainerID) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *TimeInfo) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *TimeInfo) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Nanoseconds == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("nanoseconds")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintMesos(data, i, uint64(*m.Nanoseconds))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *DurationInfo) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *DurationInfo) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Nanoseconds == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("nanoseconds")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintMesos(data, i, uint64(*m.Nanoseconds))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
 func (m *Address) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -14552,6 +16127,130 @@ func (m *URL) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *Unavailability) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Unavailability) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Start == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("start")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Start.Size()))
+		n2, err := m.Start.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
+	if m.Duration != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Duration.Size()))
+		n3, err := m.Duration.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n3
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *MachineID) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *MachineID) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Hostname != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMesos(data, i, uint64(len(*m.Hostname)))
+		i += copy(data[i:], *m.Hostname)
+	}
+	if m.Ip != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMesos(data, i, uint64(len(*m.Ip)))
+		i += copy(data[i:], *m.Ip)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *MachineInfo) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *MachineInfo) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Id == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Id.Size()))
+		n4, err := m.Id.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n4
+	}
+	if m.Mode != nil {
+		data[i] = 0x10
+		i++
+		i = encodeVarintMesos(data, i, uint64(*m.Mode))
+	}
+	if m.Unavailability != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Unavailability.Size()))
+		n5, err := m.Unavailability.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
 func (m *FrameworkInfo) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -14587,11 +16286,11 @@ func (m *FrameworkInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Id.Size()))
-		n2, err := m.Id.MarshalTo(data[i:])
+		n6, err := m.Id.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n2
+		i += n6
 	}
 	if m.FailoverTimeout != nil {
 		data[i] = 0x21
@@ -14648,11 +16347,11 @@ func (m *FrameworkInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x5a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Labels.Size()))
-		n3, err := m.Labels.MarshalTo(data[i:])
+		n7, err := m.Labels.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n3
+		i += n7
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -14707,11 +16406,11 @@ func (m *HealthCheck) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Http.Size()))
-		n4, err := m.Http.MarshalTo(data[i:])
+		n8, err := m.Http.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n4
+		i += n8
 	}
 	if m.DelaySeconds != nil {
 		data[i] = 0x11
@@ -14742,11 +16441,11 @@ func (m *HealthCheck) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Command.Size()))
-		n5, err := m.Command.MarshalTo(data[i:])
+		n9, err := m.Command.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n9
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -14826,11 +16525,11 @@ func (m *CommandInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Environment.Size()))
-		n6, err := m.Environment.MarshalTo(data[i:])
+		n10, err := m.Environment.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n10
 	}
 	if m.Value != nil {
 		data[i] = 0x1a
@@ -14842,11 +16541,11 @@ func (m *CommandInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x22
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Container.Size()))
-		n7, err := m.Container.MarshalTo(data[i:])
+		n11, err := m.Container.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n11
 	}
 	if m.User != nil {
 		data[i] = 0x2a
@@ -15009,11 +16708,11 @@ func (m *ExecutorInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.ExecutorId.Size()))
-		n8, err := m.ExecutorId.MarshalTo(data[i:])
+		n12, err := m.ExecutorId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n8
+		i += n12
 	}
 	if m.Data != nil {
 		data[i] = 0x22
@@ -15039,21 +16738,21 @@ func (m *ExecutorInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Command.Size()))
-		n9, err := m.Command.MarshalTo(data[i:])
+		n13, err := m.Command.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n9
+		i += n13
 	}
 	if m.FrameworkId != nil {
 		data[i] = 0x42
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.FrameworkId.Size()))
-		n10, err := m.FrameworkId.MarshalTo(data[i:])
+		n14, err := m.FrameworkId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n10
+		i += n14
 	}
 	if m.Name != nil {
 		data[i] = 0x4a
@@ -15071,21 +16770,21 @@ func (m *ExecutorInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x5a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Container.Size()))
-		n11, err := m.Container.MarshalTo(data[i:])
+		n15, err := m.Container.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n11
+		i += n15
 	}
 	if m.Discovery != nil {
 		data[i] = 0x62
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Discovery.Size()))
-		n12, err := m.Discovery.MarshalTo(data[i:])
+		n16, err := m.Discovery.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n12
+		i += n16
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -15152,11 +16851,11 @@ func (m *MasterInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Address.Size()))
-		n13, err := m.Address.MarshalTo(data[i:])
+		n17, err := m.Address.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n13
+		i += n17
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -15215,11 +16914,11 @@ func (m *SlaveInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x32
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Id.Size()))
-		n14, err := m.Id.MarshalTo(data[i:])
+		n18, err := m.Id.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n14
+		i += n18
 	}
 	if m.Checkpoint != nil {
 		data[i] = 0x38
@@ -15268,41 +16967,41 @@ func (m *Value) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Scalar.Size()))
-		n15, err := m.Scalar.MarshalTo(data[i:])
+		n19, err := m.Scalar.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n15
+		i += n19
 	}
 	if m.Ranges != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Ranges.Size()))
-		n16, err := m.Ranges.MarshalTo(data[i:])
+		n20, err := m.Ranges.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n16
+		i += n20
 	}
 	if m.Set != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Set.Size()))
-		n17, err := m.Set.MarshalTo(data[i:])
+		n21, err := m.Set.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n17
+		i += n21
 	}
 	if m.Text != nil {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Text.Size()))
-		n18, err := m.Text.MarshalTo(data[i:])
+		n22, err := m.Text.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n18
+		i += n22
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -15505,41 +17204,41 @@ func (m *Attribute) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Scalar.Size()))
-		n19, err := m.Scalar.MarshalTo(data[i:])
+		n23, err := m.Scalar.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n19
+		i += n23
 	}
 	if m.Ranges != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Ranges.Size()))
-		n20, err := m.Ranges.MarshalTo(data[i:])
+		n24, err := m.Ranges.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n20
+		i += n24
 	}
 	if m.Text != nil {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Text.Size()))
-		n21, err := m.Text.MarshalTo(data[i:])
+		n25, err := m.Text.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n21
+		i += n25
 	}
 	if m.Set != nil {
 		data[i] = 0x32
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Set.Size()))
-		n22, err := m.Set.MarshalTo(data[i:])
+		n26, err := m.Set.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n22
+		i += n26
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -15581,31 +17280,31 @@ func (m *Resource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Scalar.Size()))
-		n23, err := m.Scalar.MarshalTo(data[i:])
+		n27, err := m.Scalar.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n23
+		i += n27
 	}
 	if m.Ranges != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Ranges.Size()))
-		n24, err := m.Ranges.MarshalTo(data[i:])
+		n28, err := m.Ranges.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n24
+		i += n28
 	}
 	if m.Set != nil {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Set.Size()))
-		n25, err := m.Set.MarshalTo(data[i:])
+		n29, err := m.Set.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n25
+		i += n29
 	}
 	if m.Role != nil {
 		data[i] = 0x32
@@ -15617,31 +17316,31 @@ func (m *Resource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Disk.Size()))
-		n26, err := m.Disk.MarshalTo(data[i:])
+		n30, err := m.Disk.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n26
+		i += n30
 	}
 	if m.Reservation != nil {
 		data[i] = 0x42
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Reservation.Size()))
-		n27, err := m.Reservation.MarshalTo(data[i:])
+		n31, err := m.Reservation.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n27
+		i += n31
 	}
 	if m.Revocable != nil {
 		data[i] = 0x4a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Revocable.Size()))
-		n28, err := m.Revocable.MarshalTo(data[i:])
+		n32, err := m.Revocable.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n28
+		i += n32
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -15697,21 +17396,21 @@ func (m *Resource_DiskInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Persistence.Size()))
-		n29, err := m.Persistence.MarshalTo(data[i:])
+		n33, err := m.Persistence.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n29
+		i += n33
 	}
 	if m.Volume != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Volume.Size()))
-		n30, err := m.Volume.MarshalTo(data[i:])
+		n34, err := m.Volume.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n30
+		i += n34
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -15924,11 +17623,11 @@ func (m *ResourceStatistics) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x6a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Perf.Size()))
-		n31, err := m.Perf.MarshalTo(data[i:])
+		n35, err := m.Perf.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n31
+		i += n35
 	}
 	if m.NetRxPackets != nil {
 		data[i] = 0x70
@@ -16201,11 +17900,11 @@ func (m *ResourceUsage_Executor) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.ExecutorInfo.Size()))
-		n32, err := m.ExecutorInfo.MarshalTo(data[i:])
+		n36, err := m.ExecutorInfo.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n32
+		i += n36
 	}
 	if len(m.Allocated) > 0 {
 		for _, msg := range m.Allocated {
@@ -16223,11 +17922,23 @@ func (m *ResourceUsage_Executor) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Statistics.Size()))
-		n33, err := m.Statistics.MarshalTo(data[i:])
+		n37, err := m.Statistics.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n33
+		i += n37
+	}
+	if m.ContainerId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("container_id")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.ContainerId.Size()))
+		n38, err := m.ContainerId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n38
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -16620,11 +18331,11 @@ func (m *Request) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.SlaveId.Size()))
-		n34, err := m.SlaveId.MarshalTo(data[i:])
+		n39, err := m.SlaveId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n34
+		i += n39
 	}
 	if len(m.Resources) > 0 {
 		for _, msg := range m.Resources {
@@ -16665,11 +18376,11 @@ func (m *Offer) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Id.Size()))
-		n35, err := m.Id.MarshalTo(data[i:])
+		n40, err := m.Id.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n35
+		i += n40
 	}
 	if m.FrameworkId == nil {
 		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
@@ -16677,11 +18388,11 @@ func (m *Offer) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.FrameworkId.Size()))
-		n36, err := m.FrameworkId.MarshalTo(data[i:])
+		n41, err := m.FrameworkId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n36
+		i += n41
 	}
 	if m.SlaveId == nil {
 		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
@@ -16689,11 +18400,11 @@ func (m *Offer) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.SlaveId.Size()))
-		n37, err := m.SlaveId.MarshalTo(data[i:])
+		n42, err := m.SlaveId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n37
+		i += n42
 	}
 	if m.Hostname == nil {
 		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("hostname")
@@ -16743,11 +18454,21 @@ func (m *Offer) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x42
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Url.Size()))
-		n38, err := m.Url.MarshalTo(data[i:])
+		n43, err := m.Url.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n38
+		i += n43
+	}
+	if m.Unavailability != nil {
+		data[i] = 0x4a
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Unavailability.Size()))
+		n44, err := m.Unavailability.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n44
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -16781,51 +18502,51 @@ func (m *Offer_Operation) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Launch.Size()))
-		n39, err := m.Launch.MarshalTo(data[i:])
+		n45, err := m.Launch.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n39
+		i += n45
 	}
 	if m.Reserve != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Reserve.Size()))
-		n40, err := m.Reserve.MarshalTo(data[i:])
+		n46, err := m.Reserve.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n40
+		i += n46
 	}
 	if m.Unreserve != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Unreserve.Size()))
-		n41, err := m.Unreserve.MarshalTo(data[i:])
+		n47, err := m.Unreserve.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n41
+		i += n47
 	}
 	if m.Create != nil {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Create.Size()))
-		n42, err := m.Create.MarshalTo(data[i:])
+		n48, err := m.Create.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n42
+		i += n48
 	}
 	if m.Destroy != nil {
 		data[i] = 0x32
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Destroy.Size()))
-		n43, err := m.Destroy.MarshalTo(data[i:])
+		n49, err := m.Destroy.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n43
+		i += n49
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -16998,6 +18719,95 @@ func (m *Offer_Operation_Destroy) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *InverseOffer) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *InverseOffer) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Id == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Id.Size()))
+		n50, err := m.Id.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n50
+	}
+	if m.Url != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Url.Size()))
+		n51, err := m.Url.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n51
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.FrameworkId.Size()))
+		n52, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n52
+	}
+	if m.SlaveId != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.SlaveId.Size()))
+		n53, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n53
+	}
+	if m.Unavailability == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("unavailability")
+	} else {
+		data[i] = 0x2a
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Unavailability.Size()))
+		n54, err := m.Unavailability.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n54
+	}
+	if len(m.Resources) > 0 {
+		for _, msg := range m.Resources {
+			data[i] = 0x32
+			i++
+			i = encodeVarintMesos(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
 func (m *TaskInfo) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -17027,11 +18837,11 @@ func (m *TaskInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.TaskId.Size()))
-		n44, err := m.TaskId.MarshalTo(data[i:])
+		n55, err := m.TaskId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n44
+		i += n55
 	}
 	if m.SlaveId == nil {
 		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
@@ -17039,11 +18849,11 @@ func (m *TaskInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.SlaveId.Size()))
-		n45, err := m.SlaveId.MarshalTo(data[i:])
+		n56, err := m.SlaveId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n45
+		i += n56
 	}
 	if len(m.Resources) > 0 {
 		for _, msg := range m.Resources {
@@ -17061,11 +18871,11 @@ func (m *TaskInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Executor.Size()))
-		n46, err := m.Executor.MarshalTo(data[i:])
+		n57, err := m.Executor.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n46
+		i += n57
 	}
 	if m.Data != nil {
 		data[i] = 0x32
@@ -17077,51 +18887,51 @@ func (m *TaskInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Command.Size()))
-		n47, err := m.Command.MarshalTo(data[i:])
+		n58, err := m.Command.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n47
+		i += n58
 	}
 	if m.HealthCheck != nil {
 		data[i] = 0x42
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.HealthCheck.Size()))
-		n48, err := m.HealthCheck.MarshalTo(data[i:])
+		n59, err := m.HealthCheck.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n48
+		i += n59
 	}
 	if m.Container != nil {
 		data[i] = 0x4a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Container.Size()))
-		n49, err := m.Container.MarshalTo(data[i:])
+		n60, err := m.Container.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n49
+		i += n60
 	}
 	if m.Labels != nil {
 		data[i] = 0x52
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Labels.Size()))
-		n50, err := m.Labels.MarshalTo(data[i:])
+		n61, err := m.Labels.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n50
+		i += n61
 	}
 	if m.Discovery != nil {
 		data[i] = 0x5a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Discovery.Size()))
-		n51, err := m.Discovery.MarshalTo(data[i:])
+		n62, err := m.Discovery.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n51
+		i += n62
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17150,11 +18960,11 @@ func (m *TaskStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.TaskId.Size()))
-		n52, err := m.TaskId.MarshalTo(data[i:])
+		n63, err := m.TaskId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n52
+		i += n63
 	}
 	if m.State == nil {
 		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("state")
@@ -17179,11 +18989,11 @@ func (m *TaskStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.SlaveId.Size()))
-		n53, err := m.SlaveId.MarshalTo(data[i:])
+		n64, err := m.SlaveId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n53
+		i += n64
 	}
 	if m.Timestamp != nil {
 		data[i] = 0x31
@@ -17194,11 +19004,11 @@ func (m *TaskStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.ExecutorId.Size()))
-		n54, err := m.ExecutorId.MarshalTo(data[i:])
+		n65, err := m.ExecutorId.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n54
+		i += n65
 	}
 	if m.Healthy != nil {
 		data[i] = 0x40
@@ -17230,11 +19040,21 @@ func (m *TaskStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x62
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Labels.Size()))
-		n55, err := m.Labels.MarshalTo(data[i:])
+		n66, err := m.Labels.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n55
+		i += n66
+	}
+	if m.ContainerStatus != nil {
+		data[i] = 0x6a
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.ContainerStatus.Size()))
+		n67, err := m.ContainerStatus.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n67
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17434,8 +19254,8 @@ func (m *Credential) MarshalTo(data []byte) (int, error) {
 	if m.Secret != nil {
 		data[i] = 0x12
 		i++
-		i = encodeVarintMesos(data, i, uint64(len(m.Secret)))
-		i += copy(data[i:], m.Secret)
+		i = encodeVarintMesos(data, i, uint64(len(*m.Secret)))
+		i += copy(data[i:], *m.Secret)
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17584,21 +19404,21 @@ func (m *Image) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Appc.Size()))
-		n56, err := m.Appc.MarshalTo(data[i:])
+		n68, err := m.Appc.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n56
+		i += n68
 	}
 	if m.Docker != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Docker.Size()))
-		n57, err := m.Docker.MarshalTo(data[i:])
+		n69, err := m.Docker.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n57
+		i += n69
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17606,7 +19426,7 @@ func (m *Image) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *Image_AppC) Marshal() (data []byte, err error) {
+func (m *Image_Appc) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -17616,7 +19436,7 @@ func (m *Image_AppC) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *Image_AppC) MarshalTo(data []byte) (int, error) {
+func (m *Image_Appc) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -17639,11 +19459,11 @@ func (m *Image_AppC) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Labels.Size()))
-		n58, err := m.Labels.MarshalTo(data[i:])
+		n70, err := m.Labels.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n58
+		i += n70
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17720,11 +19540,112 @@ func (m *Volume) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x22
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Image.Size()))
-		n59, err := m.Image.MarshalTo(data[i:])
+		n71, err := m.Image.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n59
+		i += n71
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *NetworkInfo) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkInfo) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Protocol != nil {
+		data[i] = 0x8
+		i++
+		i = encodeVarintMesos(data, i, uint64(*m.Protocol))
+	}
+	if m.IpAddress != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMesos(data, i, uint64(len(*m.IpAddress)))
+		i += copy(data[i:], *m.IpAddress)
+	}
+	if len(m.Groups) > 0 {
+		for _, s := range m.Groups {
+			data[i] = 0x1a
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			data[i] = uint8(l)
+			i++
+			i += copy(data[i:], s)
+		}
+	}
+	if m.Labels != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMesos(data, i, uint64(m.Labels.Size()))
+		n72, err := m.Labels.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n72
+	}
+	if len(m.IpAddresses) > 0 {
+		for _, msg := range m.IpAddresses {
+			data[i] = 0x2a
+			i++
+			i = encodeVarintMesos(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *NetworkInfo_IPAddress) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkInfo_IPAddress) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Protocol != nil {
+		data[i] = 0x8
+		i++
+		i = encodeVarintMesos(data, i, uint64(*m.Protocol))
+	}
+	if m.IpAddress != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMesos(data, i, uint64(len(*m.IpAddress)))
+		i += copy(data[i:], *m.IpAddress)
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17770,11 +19691,11 @@ func (m *ContainerInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Docker.Size()))
-		n60, err := m.Docker.MarshalTo(data[i:])
+		n73, err := m.Docker.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n60
+		i += n73
 	}
 	if m.Hostname != nil {
 		data[i] = 0x22
@@ -17786,11 +19707,23 @@ func (m *ContainerInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Mesos.Size()))
-		n61, err := m.Mesos.MarshalTo(data[i:])
+		n74, err := m.Mesos.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n61
+		i += n74
+	}
+	if len(m.NetworkInfos) > 0 {
+		for _, msg := range m.NetworkInfos {
+			data[i] = 0x3a
+			i++
+			i = encodeVarintMesos(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -17936,11 +19869,44 @@ func (m *ContainerInfo_MesosInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Image.Size()))
-		n62, err := m.Image.MarshalTo(data[i:])
+		n75, err := m.Image.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n62
+		i += n75
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ContainerStatus) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ContainerStatus) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.NetworkInfos) > 0 {
+		for _, msg := range m.NetworkInfos {
+			data[i] = 0xa
+			i++
+			i = encodeVarintMesos(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -18050,6 +20016,11 @@ func (m *Port) MarshalTo(data []byte) (int, error) {
 		i = encodeVarintMesos(data, i, uint64(len(*m.Protocol)))
 		i += copy(data[i:], *m.Protocol)
 	}
+	if m.Visibility != nil {
+		data[i] = 0x20
+		i++
+		i = encodeVarintMesos(data, i, uint64(*m.Visibility))
+	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
 	}
@@ -18139,21 +20110,21 @@ func (m *DiscoveryInfo) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x32
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Ports.Size()))
-		n63, err := m.Ports.MarshalTo(data[i:])
+		n76, err := m.Ports.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n63
+		i += n76
 	}
 	if m.Labels != nil {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintMesos(data, i, uint64(m.Labels.Size()))
-		n64, err := m.Labels.MarshalTo(data[i:])
+		n77, err := m.Labels.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n64
+		i += n77
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
@@ -18391,21 +20362,47 @@ func NewPopulatedContainerID(r randyMesos, easy bool) *ContainerID {
 	return this
 }
 
+func NewPopulatedTimeInfo(r randyMesos, easy bool) *TimeInfo {
+	this := &TimeInfo{}
+	v7 := int64(r.Int63())
+	if r.Intn(2) == 0 {
+		v7 *= -1
+	}
+	this.Nanoseconds = &v7
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedDurationInfo(r randyMesos, easy bool) *DurationInfo {
+	this := &DurationInfo{}
+	v8 := int64(r.Int63())
+	if r.Intn(2) == 0 {
+		v8 *= -1
+	}
+	this.Nanoseconds = &v8
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
+	}
+	return this
+}
+
 func NewPopulatedAddress(r randyMesos, easy bool) *Address {
 	this := &Address{}
 	if r.Intn(10) != 0 {
-		v7 := randStringMesos(r)
-		this.Hostname = &v7
+		v9 := randStringMesos(r)
+		this.Hostname = &v9
 	}
 	if r.Intn(10) != 0 {
-		v8 := randStringMesos(r)
-		this.Ip = &v8
+		v10 := randStringMesos(r)
+		this.Ip = &v10
 	}
-	v9 := int32(r.Int31())
+	v11 := int32(r.Int31())
 	if r.Intn(2) == 0 {
-		v9 *= -1
+		v11 *= -1
 	}
-	this.Port = &v9
+	this.Port = &v11
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
 	}
@@ -18414,23 +20411,23 @@ func NewPopulatedAddress(r randyMesos, easy bool) *Address {
 
 func NewPopulatedURL(r randyMesos, easy bool) *URL {
 	this := &URL{}
-	v10 := randStringMesos(r)
-	this.Scheme = &v10
+	v12 := randStringMesos(r)
+	this.Scheme = &v12
 	this.Address = NewPopulatedAddress(r, easy)
 	if r.Intn(10) != 0 {
-		v11 := randStringMesos(r)
-		this.Path = &v11
+		v13 := randStringMesos(r)
+		this.Path = &v13
 	}
 	if r.Intn(10) != 0 {
-		v12 := r.Intn(10)
-		this.Query = make([]*Parameter, v12)
-		for i := 0; i < v12; i++ {
+		v14 := r.Intn(10)
+		this.Query = make([]*Parameter, v14)
+		for i := 0; i < v14; i++ {
 			this.Query[i] = NewPopulatedParameter(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v13 := randStringMesos(r)
-		this.Fragment = &v13
+		v15 := randStringMesos(r)
+		this.Fragment = &v15
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 6)
@@ -18438,46 +20435,90 @@ func NewPopulatedURL(r randyMesos, easy bool) *URL {
 	return this
 }
 
+func NewPopulatedUnavailability(r randyMesos, easy bool) *Unavailability {
+	this := &Unavailability{}
+	this.Start = NewPopulatedTimeInfo(r, easy)
+	if r.Intn(10) != 0 {
+		this.Duration = NewPopulatedDurationInfo(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedMachineID(r randyMesos, easy bool) *MachineID {
+	this := &MachineID{}
+	if r.Intn(10) != 0 {
+		v16 := randStringMesos(r)
+		this.Hostname = &v16
+	}
+	if r.Intn(10) != 0 {
+		v17 := randStringMesos(r)
+		this.Ip = &v17
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedMachineInfo(r randyMesos, easy bool) *MachineInfo {
+	this := &MachineInfo{}
+	this.Id = NewPopulatedMachineID(r, easy)
+	if r.Intn(10) != 0 {
+		v18 := MachineInfo_Mode([]int32{1, 2, 3}[r.Intn(3)])
+		this.Mode = &v18
+	}
+	if r.Intn(10) != 0 {
+		this.Unavailability = NewPopulatedUnavailability(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
+	}
+	return this
+}
+
 func NewPopulatedFrameworkInfo(r randyMesos, easy bool) *FrameworkInfo {
 	this := &FrameworkInfo{}
-	v14 := randStringMesos(r)
-	this.User = &v14
-	v15 := randStringMesos(r)
-	this.Name = &v15
+	v19 := randStringMesos(r)
+	this.User = &v19
+	v20 := randStringMesos(r)
+	this.Name = &v20
 	if r.Intn(10) != 0 {
 		this.Id = NewPopulatedFrameworkID(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v16 := float64(r.Float64())
+		v21 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v16 *= -1
+			v21 *= -1
 		}
-		this.FailoverTimeout = &v16
+		this.FailoverTimeout = &v21
 	}
 	if r.Intn(10) != 0 {
-		v17 := bool(bool(r.Intn(2) == 0))
-		this.Checkpoint = &v17
+		v22 := bool(bool(r.Intn(2) == 0))
+		this.Checkpoint = &v22
 	}
 	if r.Intn(10) != 0 {
-		v18 := randStringMesos(r)
-		this.Role = &v18
+		v23 := randStringMesos(r)
+		this.Role = &v23
 	}
 	if r.Intn(10) != 0 {
-		v19 := randStringMesos(r)
-		this.Hostname = &v19
+		v24 := randStringMesos(r)
+		this.Hostname = &v24
 	}
 	if r.Intn(10) != 0 {
-		v20 := randStringMesos(r)
-		this.Principal = &v20
+		v25 := randStringMesos(r)
+		this.Principal = &v25
 	}
 	if r.Intn(10) != 0 {
-		v21 := randStringMesos(r)
-		this.WebuiUrl = &v21
+		v26 := randStringMesos(r)
+		this.WebuiUrl = &v26
 	}
 	if r.Intn(10) != 0 {
-		v22 := r.Intn(10)
-		this.Capabilities = make([]*FrameworkInfo_Capability, v22)
-		for i := 0; i < v22; i++ {
+		v27 := r.Intn(10)
+		this.Capabilities = make([]*FrameworkInfo_Capability, v27)
+		for i := 0; i < v27; i++ {
 			this.Capabilities[i] = NewPopulatedFrameworkInfo_Capability(r, easy)
 		}
 	}
@@ -18492,8 +20533,8 @@ func NewPopulatedFrameworkInfo(r randyMesos, easy bool) *FrameworkInfo {
 
 func NewPopulatedFrameworkInfo_Capability(r randyMesos, easy bool) *FrameworkInfo_Capability {
 	this := &FrameworkInfo_Capability{}
-	v23 := FrameworkInfo_Capability_Type([]int32{1}[r.Intn(1)])
-	this.Type = &v23
+	v28 := FrameworkInfo_Capability_Type([]int32{1}[r.Intn(1)])
+	this.Type = &v28
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
 	}
@@ -18506,36 +20547,36 @@ func NewPopulatedHealthCheck(r randyMesos, easy bool) *HealthCheck {
 		this.Http = NewPopulatedHealthCheck_HTTP(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v24 := float64(r.Float64())
+		v29 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v24 *= -1
+			v29 *= -1
 		}
-		this.DelaySeconds = &v24
+		this.DelaySeconds = &v29
 	}
 	if r.Intn(10) != 0 {
-		v25 := float64(r.Float64())
+		v30 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v25 *= -1
+			v30 *= -1
 		}
-		this.IntervalSeconds = &v25
+		this.IntervalSeconds = &v30
 	}
 	if r.Intn(10) != 0 {
-		v26 := float64(r.Float64())
+		v31 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v26 *= -1
+			v31 *= -1
 		}
-		this.TimeoutSeconds = &v26
+		this.TimeoutSeconds = &v31
 	}
 	if r.Intn(10) != 0 {
-		v27 := uint32(r.Uint32())
-		this.ConsecutiveFailures = &v27
+		v32 := uint32(r.Uint32())
+		this.ConsecutiveFailures = &v32
 	}
 	if r.Intn(10) != 0 {
-		v28 := float64(r.Float64())
+		v33 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v28 *= -1
+			v33 *= -1
 		}
-		this.GracePeriodSeconds = &v28
+		this.GracePeriodSeconds = &v33
 	}
 	if r.Intn(10) != 0 {
 		this.Command = NewPopulatedCommandInfo(r, easy)
@@ -18548,16 +20589,16 @@ func NewPopulatedHealthCheck(r randyMesos, easy bool) *HealthCheck {
 
 func NewPopulatedHealthCheck_HTTP(r randyMesos, easy bool) *HealthCheck_HTTP {
 	this := &HealthCheck_HTTP{}
-	v29 := uint32(r.Uint32())
-	this.Port = &v29
+	v34 := uint32(r.Uint32())
+	this.Port = &v34
 	if r.Intn(10) != 0 {
-		v30 := randStringMesos(r)
-		this.Path = &v30
+		v35 := randStringMesos(r)
+		this.Path = &v35
 	}
 	if r.Intn(10) != 0 {
-		v31 := r.Intn(100)
-		this.Statuses = make([]uint32, v31)
-		for i := 0; i < v31; i++ {
+		v36 := r.Intn(100)
+		this.Statuses = make([]uint32, v36)
+		for i := 0; i < v36; i++ {
 			this.Statuses[i] = uint32(r.Uint32())
 		}
 	}
@@ -18570,9 +20611,9 @@ func NewPopulatedHealthCheck_HTTP(r randyMesos, easy bool) *HealthCheck_HTTP {
 func NewPopulatedCommandInfo(r randyMesos, easy bool) *CommandInfo {
 	this := &CommandInfo{}
 	if r.Intn(10) != 0 {
-		v32 := r.Intn(10)
-		this.Uris = make([]*CommandInfo_URI, v32)
-		for i := 0; i < v32; i++ {
+		v37 := r.Intn(10)
+		this.Uris = make([]*CommandInfo_URI, v37)
+		for i := 0; i < v37; i++ {
 			this.Uris[i] = NewPopulatedCommandInfo_URI(r, easy)
 		}
 	}
@@ -18580,24 +20621,24 @@ func NewPopulatedCommandInfo(r randyMesos, easy bool) *CommandInfo {
 		this.Environment = NewPopulatedEnvironment(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v33 := randStringMesos(r)
-		this.Value = &v33
+		v38 := randStringMesos(r)
+		this.Value = &v38
 	}
 	if r.Intn(10) != 0 {
 		this.Container = NewPopulatedCommandInfo_ContainerInfo(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v34 := randStringMesos(r)
-		this.User = &v34
+		v39 := randStringMesos(r)
+		this.User = &v39
 	}
 	if r.Intn(10) != 0 {
-		v35 := bool(bool(r.Intn(2) == 0))
-		this.Shell = &v35
+		v40 := bool(bool(r.Intn(2) == 0))
+		this.Shell = &v40
 	}
 	if r.Intn(10) != 0 {
-		v36 := r.Intn(10)
-		this.Arguments = make([]string, v36)
-		for i := 0; i < v36; i++ {
+		v41 := r.Intn(10)
+		this.Arguments = make([]string, v41)
+		for i := 0; i < v41; i++ {
 			this.Arguments[i] = randStringMesos(r)
 		}
 	}
@@ -18609,19 +20650,19 @@ func NewPopulatedCommandInfo(r randyMesos, easy bool) *CommandInfo {
 
 func NewPopulatedCommandInfo_URI(r randyMesos, easy bool) *CommandInfo_URI {
 	this := &CommandInfo_URI{}
-	v37 := randStringMesos(r)
-	this.Value = &v37
+	v42 := randStringMesos(r)
+	this.Value = &v42
 	if r.Intn(10) != 0 {
-		v38 := bool(bool(r.Intn(2) == 0))
-		this.Executable = &v38
+		v43 := bool(bool(r.Intn(2) == 0))
+		this.Executable = &v43
 	}
 	if r.Intn(10) != 0 {
-		v39 := bool(bool(r.Intn(2) == 0))
-		this.Extract = &v39
+		v44 := bool(bool(r.Intn(2) == 0))
+		this.Extract = &v44
 	}
 	if r.Intn(10) != 0 {
-		v40 := bool(bool(r.Intn(2) == 0))
-		this.Cache = &v40
+		v45 := bool(bool(r.Intn(2) == 0))
+		this.Cache = &v45
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 5)
@@ -18631,12 +20672,12 @@ func NewPopulatedCommandInfo_URI(r randyMesos, easy bool) *CommandInfo_URI {
 
 func NewPopulatedCommandInfo_ContainerInfo(r randyMesos, easy bool) *CommandInfo_ContainerInfo {
 	this := &CommandInfo_ContainerInfo{}
-	v41 := randStringMesos(r)
-	this.Image = &v41
+	v46 := randStringMesos(r)
+	this.Image = &v46
 	if r.Intn(10) != 0 {
-		v42 := r.Intn(10)
-		this.Options = make([]string, v42)
-		for i := 0; i < v42; i++ {
+		v47 := r.Intn(10)
+		this.Options = make([]string, v47)
+		for i := 0; i < v47; i++ {
 			this.Options[i] = randStringMesos(r)
 		}
 	}
@@ -18650,16 +20691,16 @@ func NewPopulatedExecutorInfo(r randyMesos, easy bool) *ExecutorInfo {
 	this := &ExecutorInfo{}
 	this.ExecutorId = NewPopulatedExecutorID(r, easy)
 	if r.Intn(10) != 0 {
-		v43 := r.Intn(100)
-		this.Data = make([]byte, v43)
-		for i := 0; i < v43; i++ {
+		v48 := r.Intn(100)
+		this.Data = make([]byte, v48)
+		for i := 0; i < v48; i++ {
 			this.Data[i] = byte(r.Intn(256))
 		}
 	}
 	if r.Intn(10) != 0 {
-		v44 := r.Intn(10)
-		this.Resources = make([]*Resource, v44)
-		for i := 0; i < v44; i++ {
+		v49 := r.Intn(10)
+		this.Resources = make([]*Resource, v49)
+		for i := 0; i < v49; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -18668,12 +20709,12 @@ func NewPopulatedExecutorInfo(r randyMesos, easy bool) *ExecutorInfo {
 		this.FrameworkId = NewPopulatedFrameworkID(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v45 := randStringMesos(r)
-		this.Name = &v45
+		v50 := randStringMesos(r)
+		this.Name = &v50
 	}
 	if r.Intn(10) != 0 {
-		v46 := randStringMesos(r)
-		this.Source = &v46
+		v51 := randStringMesos(r)
+		this.Source = &v51
 	}
 	if r.Intn(10) != 0 {
 		this.Container = NewPopulatedContainerInfo(r, easy)
@@ -18689,23 +20730,23 @@ func NewPopulatedExecutorInfo(r randyMesos, easy bool) *ExecutorInfo {
 
 func NewPopulatedMasterInfo(r randyMesos, easy bool) *MasterInfo {
 	this := &MasterInfo{}
-	v47 := randStringMesos(r)
-	this.Id = &v47
-	v48 := uint32(r.Uint32())
-	this.Ip = &v48
-	v49 := uint32(r.Uint32())
-	this.Port = &v49
+	v52 := randStringMesos(r)
+	this.Id = &v52
+	v53 := uint32(r.Uint32())
+	this.Ip = &v53
+	v54 := uint32(r.Uint32())
+	this.Port = &v54
 	if r.Intn(10) != 0 {
-		v50 := randStringMesos(r)
-		this.Pid = &v50
+		v55 := randStringMesos(r)
+		this.Pid = &v55
 	}
 	if r.Intn(10) != 0 {
-		v51 := randStringMesos(r)
-		this.Hostname = &v51
+		v56 := randStringMesos(r)
+		this.Hostname = &v56
 	}
 	if r.Intn(10) != 0 {
-		v52 := randStringMesos(r)
-		this.Version = &v52
+		v57 := randStringMesos(r)
+		this.Version = &v57
 	}
 	if r.Intn(10) != 0 {
 		this.Address = NewPopulatedAddress(r, easy)
@@ -18718,19 +20759,19 @@ func NewPopulatedMasterInfo(r randyMesos, easy bool) *MasterInfo {
 
 func NewPopulatedSlaveInfo(r randyMesos, easy bool) *SlaveInfo {
 	this := &SlaveInfo{}
-	v53 := randStringMesos(r)
-	this.Hostname = &v53
+	v58 := randStringMesos(r)
+	this.Hostname = &v58
 	if r.Intn(10) != 0 {
-		v54 := r.Intn(10)
-		this.Resources = make([]*Resource, v54)
-		for i := 0; i < v54; i++ {
+		v59 := r.Intn(10)
+		this.Resources = make([]*Resource, v59)
+		for i := 0; i < v59; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v55 := r.Intn(10)
-		this.Attributes = make([]*Attribute, v55)
-		for i := 0; i < v55; i++ {
+		v60 := r.Intn(10)
+		this.Attributes = make([]*Attribute, v60)
+		for i := 0; i < v60; i++ {
 			this.Attributes[i] = NewPopulatedAttribute(r, easy)
 		}
 	}
@@ -18738,15 +20779,15 @@ func NewPopulatedSlaveInfo(r randyMesos, easy bool) *SlaveInfo {
 		this.Id = NewPopulatedSlaveID(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v56 := bool(bool(r.Intn(2) == 0))
-		this.Checkpoint = &v56
+		v61 := bool(bool(r.Intn(2) == 0))
+		this.Checkpoint = &v61
 	}
 	if r.Intn(10) != 0 {
-		v57 := int32(r.Int31())
+		v62 := int32(r.Int31())
 		if r.Intn(2) == 0 {
-			v57 *= -1
+			v62 *= -1
 		}
-		this.Port = &v57
+		this.Port = &v62
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 9)
@@ -18756,8 +20797,8 @@ func NewPopulatedSlaveInfo(r randyMesos, easy bool) *SlaveInfo {
 
 func NewPopulatedValue(r randyMesos, easy bool) *Value {
 	this := &Value{}
-	v58 := Value_Type([]int32{0, 1, 2, 3}[r.Intn(4)])
-	this.Type = &v58
+	v63 := Value_Type([]int32{0, 1, 2, 3}[r.Intn(4)])
+	this.Type = &v63
 	if r.Intn(10) != 0 {
 		this.Scalar = NewPopulatedValue_Scalar(r, easy)
 	}
@@ -18778,11 +20819,11 @@ func NewPopulatedValue(r randyMesos, easy bool) *Value {
 
 func NewPopulatedValue_Scalar(r randyMesos, easy bool) *Value_Scalar {
 	this := &Value_Scalar{}
-	v59 := float64(r.Float64())
+	v64 := float64(r.Float64())
 	if r.Intn(2) == 0 {
-		v59 *= -1
+		v64 *= -1
 	}
-	this.Value = &v59
+	this.Value = &v64
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
 	}
@@ -18791,10 +20832,10 @@ func NewPopulatedValue_Scalar(r randyMesos, easy bool) *Value_Scalar {
 
 func NewPopulatedValue_Range(r randyMesos, easy bool) *Value_Range {
 	this := &Value_Range{}
-	v60 := uint64(uint64(r.Uint32()))
-	this.Begin = &v60
-	v61 := uint64(uint64(r.Uint32()))
-	this.End = &v61
+	v65 := uint64(uint64(r.Uint32()))
+	this.Begin = &v65
+	v66 := uint64(uint64(r.Uint32()))
+	this.End = &v66
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
 	}
@@ -18804,9 +20845,9 @@ func NewPopulatedValue_Range(r randyMesos, easy bool) *Value_Range {
 func NewPopulatedValue_Ranges(r randyMesos, easy bool) *Value_Ranges {
 	this := &Value_Ranges{}
 	if r.Intn(10) != 0 {
-		v62 := r.Intn(10)
-		this.Range = make([]*Value_Range, v62)
-		for i := 0; i < v62; i++ {
+		v67 := r.Intn(10)
+		this.Range = make([]*Value_Range, v67)
+		for i := 0; i < v67; i++ {
 			this.Range[i] = NewPopulatedValue_Range(r, easy)
 		}
 	}
@@ -18819,9 +20860,9 @@ func NewPopulatedValue_Ranges(r randyMesos, easy bool) *Value_Ranges {
 func NewPopulatedValue_Set(r randyMesos, easy bool) *Value_Set {
 	this := &Value_Set{}
 	if r.Intn(10) != 0 {
-		v63 := r.Intn(10)
-		this.Item = make([]string, v63)
-		for i := 0; i < v63; i++ {
+		v68 := r.Intn(10)
+		this.Item = make([]string, v68)
+		for i := 0; i < v68; i++ {
 			this.Item[i] = randStringMesos(r)
 		}
 	}
@@ -18833,8 +20874,8 @@ func NewPopulatedValue_Set(r randyMesos, easy bool) *Value_Set {
 
 func NewPopulatedValue_Text(r randyMesos, easy bool) *Value_Text {
 	this := &Value_Text{}
-	v64 := randStringMesos(r)
-	this.Value = &v64
+	v69 := randStringMesos(r)
+	this.Value = &v69
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
 	}
@@ -18843,10 +20884,10 @@ func NewPopulatedValue_Text(r randyMesos, easy bool) *Value_Text {
 
 func NewPopulatedAttribute(r randyMesos, easy bool) *Attribute {
 	this := &Attribute{}
-	v65 := randStringMesos(r)
-	this.Name = &v65
-	v66 := Value_Type([]int32{0, 1, 2, 3}[r.Intn(4)])
-	this.Type = &v66
+	v70 := randStringMesos(r)
+	this.Name = &v70
+	v71 := Value_Type([]int32{0, 1, 2, 3}[r.Intn(4)])
+	this.Type = &v71
 	if r.Intn(10) != 0 {
 		this.Scalar = NewPopulatedValue_Scalar(r, easy)
 	}
@@ -18867,10 +20908,10 @@ func NewPopulatedAttribute(r randyMesos, easy bool) *Attribute {
 
 func NewPopulatedResource(r randyMesos, easy bool) *Resource {
 	this := &Resource{}
-	v67 := randStringMesos(r)
-	this.Name = &v67
-	v68 := Value_Type([]int32{0, 1, 2, 3}[r.Intn(4)])
-	this.Type = &v68
+	v72 := randStringMesos(r)
+	this.Name = &v72
+	v73 := Value_Type([]int32{0, 1, 2, 3}[r.Intn(4)])
+	this.Type = &v73
 	if r.Intn(10) != 0 {
 		this.Scalar = NewPopulatedValue_Scalar(r, easy)
 	}
@@ -18881,8 +20922,8 @@ func NewPopulatedResource(r randyMesos, easy bool) *Resource {
 		this.Set = NewPopulatedValue_Set(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v69 := randStringMesos(r)
-		this.Role = &v69
+		v74 := randStringMesos(r)
+		this.Role = &v74
 	}
 	if r.Intn(10) != 0 {
 		this.Disk = NewPopulatedResource_DiskInfo(r, easy)
@@ -18901,8 +20942,8 @@ func NewPopulatedResource(r randyMesos, easy bool) *Resource {
 
 func NewPopulatedResource_ReservationInfo(r randyMesos, easy bool) *Resource_ReservationInfo {
 	this := &Resource_ReservationInfo{}
-	v70 := randStringMesos(r)
-	this.Principal = &v70
+	v75 := randStringMesos(r)
+	this.Principal = &v75
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
 	}
@@ -18925,8 +20966,8 @@ func NewPopulatedResource_DiskInfo(r randyMesos, easy bool) *Resource_DiskInfo {
 
 func NewPopulatedResource_DiskInfo_Persistence(r randyMesos, easy bool) *Resource_DiskInfo_Persistence {
 	this := &Resource_DiskInfo_Persistence{}
-	v71 := randStringMesos(r)
-	this.Id = &v71
+	v76 := randStringMesos(r)
+	this.Id = &v76
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
 	}
@@ -18943,43 +20984,43 @@ func NewPopulatedResource_RevocableInfo(r randyMesos, easy bool) *Resource_Revoc
 
 func NewPopulatedTrafficControlStatistics(r randyMesos, easy bool) *TrafficControlStatistics {
 	this := &TrafficControlStatistics{}
-	v72 := randStringMesos(r)
-	this.Id = &v72
-	if r.Intn(10) != 0 {
-		v73 := uint64(uint64(r.Uint32()))
-		this.Backlog = &v73
-	}
-	if r.Intn(10) != 0 {
-		v74 := uint64(uint64(r.Uint32()))
-		this.Bytes = &v74
-	}
-	if r.Intn(10) != 0 {
-		v75 := uint64(uint64(r.Uint32()))
-		this.Drops = &v75
-	}
-	if r.Intn(10) != 0 {
-		v76 := uint64(uint64(r.Uint32()))
-		this.Overlimits = &v76
-	}
-	if r.Intn(10) != 0 {
-		v77 := uint64(uint64(r.Uint32()))
-		this.Packets = &v77
-	}
+	v77 := randStringMesos(r)
+	this.Id = &v77
 	if r.Intn(10) != 0 {
 		v78 := uint64(uint64(r.Uint32()))
-		this.Qlen = &v78
+		this.Backlog = &v78
 	}
 	if r.Intn(10) != 0 {
 		v79 := uint64(uint64(r.Uint32()))
-		this.Ratebps = &v79
+		this.Bytes = &v79
 	}
 	if r.Intn(10) != 0 {
 		v80 := uint64(uint64(r.Uint32()))
-		this.Ratepps = &v80
+		this.Drops = &v80
 	}
 	if r.Intn(10) != 0 {
 		v81 := uint64(uint64(r.Uint32()))
-		this.Requeues = &v81
+		this.Overlimits = &v81
+	}
+	if r.Intn(10) != 0 {
+		v82 := uint64(uint64(r.Uint32()))
+		this.Packets = &v82
+	}
+	if r.Intn(10) != 0 {
+		v83 := uint64(uint64(r.Uint32()))
+		this.Qlen = &v83
+	}
+	if r.Intn(10) != 0 {
+		v84 := uint64(uint64(r.Uint32()))
+		this.Ratebps = &v84
+	}
+	if r.Intn(10) != 0 {
+		v85 := uint64(uint64(r.Uint32()))
+		this.Ratepps = &v85
+	}
+	if r.Intn(10) != 0 {
+		v86 := uint64(uint64(r.Uint32()))
+		this.Requeues = &v86
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 11)
@@ -18989,202 +21030,202 @@ func NewPopulatedTrafficControlStatistics(r randyMesos, easy bool) *TrafficContr
 
 func NewPopulatedResourceStatistics(r randyMesos, easy bool) *ResourceStatistics {
 	this := &ResourceStatistics{}
-	v82 := float64(r.Float64())
+	v87 := float64(r.Float64())
 	if r.Intn(2) == 0 {
-		v82 *= -1
+		v87 *= -1
 	}
-	this.Timestamp = &v82
+	this.Timestamp = &v87
 	if r.Intn(10) != 0 {
-		v83 := float64(r.Float64())
+		v88 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v83 *= -1
+			v88 *= -1
 		}
-		this.CpusUserTimeSecs = &v83
+		this.CpusUserTimeSecs = &v88
 	}
 	if r.Intn(10) != 0 {
-		v84 := float64(r.Float64())
+		v89 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v84 *= -1
+			v89 *= -1
 		}
-		this.CpusSystemTimeSecs = &v84
-	}
-	if r.Intn(10) != 0 {
-		v85 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v85 *= -1
-		}
-		this.CpusLimit = &v85
-	}
-	if r.Intn(10) != 0 {
-		v86 := uint64(uint64(r.Uint32()))
-		this.MemRssBytes = &v86
-	}
-	if r.Intn(10) != 0 {
-		v87 := uint64(uint64(r.Uint32()))
-		this.MemLimitBytes = &v87
-	}
-	if r.Intn(10) != 0 {
-		v88 := uint32(r.Uint32())
-		this.CpusNrPeriods = &v88
-	}
-	if r.Intn(10) != 0 {
-		v89 := uint32(r.Uint32())
-		this.CpusNrThrottled = &v89
+		this.CpusSystemTimeSecs = &v89
 	}
 	if r.Intn(10) != 0 {
 		v90 := float64(r.Float64())
 		if r.Intn(2) == 0 {
 			v90 *= -1
 		}
-		this.CpusThrottledTimeSecs = &v90
+		this.CpusLimit = &v90
 	}
 	if r.Intn(10) != 0 {
 		v91 := uint64(uint64(r.Uint32()))
-		this.MemFileBytes = &v91
+		this.MemRssBytes = &v91
 	}
 	if r.Intn(10) != 0 {
 		v92 := uint64(uint64(r.Uint32()))
-		this.MemAnonBytes = &v92
+		this.MemLimitBytes = &v92
 	}
 	if r.Intn(10) != 0 {
-		v93 := uint64(uint64(r.Uint32()))
-		this.MemMappedFileBytes = &v93
+		v93 := uint32(r.Uint32())
+		this.CpusNrPeriods = &v93
+	}
+	if r.Intn(10) != 0 {
+		v94 := uint32(r.Uint32())
+		this.CpusNrThrottled = &v94
+	}
+	if r.Intn(10) != 0 {
+		v95 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v95 *= -1
+		}
+		this.CpusThrottledTimeSecs = &v95
+	}
+	if r.Intn(10) != 0 {
+		v96 := uint64(uint64(r.Uint32()))
+		this.MemFileBytes = &v96
+	}
+	if r.Intn(10) != 0 {
+		v97 := uint64(uint64(r.Uint32()))
+		this.MemAnonBytes = &v97
+	}
+	if r.Intn(10) != 0 {
+		v98 := uint64(uint64(r.Uint32()))
+		this.MemMappedFileBytes = &v98
 	}
 	if r.Intn(10) != 0 {
 		this.Perf = NewPopulatedPerfStatistics(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v94 := uint64(uint64(r.Uint32()))
-		this.NetRxPackets = &v94
-	}
-	if r.Intn(10) != 0 {
-		v95 := uint64(uint64(r.Uint32()))
-		this.NetRxBytes = &v95
-	}
-	if r.Intn(10) != 0 {
-		v96 := uint64(uint64(r.Uint32()))
-		this.NetRxErrors = &v96
-	}
-	if r.Intn(10) != 0 {
-		v97 := uint64(uint64(r.Uint32()))
-		this.NetRxDropped = &v97
-	}
-	if r.Intn(10) != 0 {
-		v98 := uint64(uint64(r.Uint32()))
-		this.NetTxPackets = &v98
-	}
-	if r.Intn(10) != 0 {
 		v99 := uint64(uint64(r.Uint32()))
-		this.NetTxBytes = &v99
+		this.NetRxPackets = &v99
 	}
 	if r.Intn(10) != 0 {
 		v100 := uint64(uint64(r.Uint32()))
-		this.NetTxErrors = &v100
+		this.NetRxBytes = &v100
 	}
 	if r.Intn(10) != 0 {
 		v101 := uint64(uint64(r.Uint32()))
-		this.NetTxDropped = &v101
+		this.NetRxErrors = &v101
 	}
 	if r.Intn(10) != 0 {
-		v102 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v102 *= -1
-		}
-		this.NetTcpRttMicrosecsP50 = &v102
+		v102 := uint64(uint64(r.Uint32()))
+		this.NetRxDropped = &v102
 	}
 	if r.Intn(10) != 0 {
-		v103 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v103 *= -1
-		}
-		this.NetTcpRttMicrosecsP90 = &v103
+		v103 := uint64(uint64(r.Uint32()))
+		this.NetTxPackets = &v103
 	}
 	if r.Intn(10) != 0 {
-		v104 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v104 *= -1
-		}
-		this.NetTcpRttMicrosecsP95 = &v104
+		v104 := uint64(uint64(r.Uint32()))
+		this.NetTxBytes = &v104
 	}
 	if r.Intn(10) != 0 {
-		v105 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v105 *= -1
-		}
-		this.NetTcpRttMicrosecsP99 = &v105
+		v105 := uint64(uint64(r.Uint32()))
+		this.NetTxErrors = &v105
 	}
 	if r.Intn(10) != 0 {
 		v106 := uint64(uint64(r.Uint32()))
-		this.DiskLimitBytes = &v106
+		this.NetTxDropped = &v106
 	}
 	if r.Intn(10) != 0 {
-		v107 := uint64(uint64(r.Uint32()))
-		this.DiskUsedBytes = &v107
+		v107 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v107 *= -1
+		}
+		this.NetTcpRttMicrosecsP50 = &v107
 	}
 	if r.Intn(10) != 0 {
 		v108 := float64(r.Float64())
 		if r.Intn(2) == 0 {
 			v108 *= -1
 		}
-		this.NetTcpActiveConnections = &v108
+		this.NetTcpRttMicrosecsP90 = &v108
 	}
 	if r.Intn(10) != 0 {
 		v109 := float64(r.Float64())
 		if r.Intn(2) == 0 {
 			v109 *= -1
 		}
-		this.NetTcpTimeWaitConnections = &v109
+		this.NetTcpRttMicrosecsP95 = &v109
 	}
 	if r.Intn(10) != 0 {
-		v110 := uint32(r.Uint32())
-		this.Processes = &v110
+		v110 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v110 *= -1
+		}
+		this.NetTcpRttMicrosecsP99 = &v110
 	}
 	if r.Intn(10) != 0 {
-		v111 := uint32(r.Uint32())
-		this.Threads = &v111
+		v111 := uint64(uint64(r.Uint32()))
+		this.DiskLimitBytes = &v111
 	}
 	if r.Intn(10) != 0 {
 		v112 := uint64(uint64(r.Uint32()))
-		this.MemLowPressureCounter = &v112
+		this.DiskUsedBytes = &v112
 	}
 	if r.Intn(10) != 0 {
-		v113 := uint64(uint64(r.Uint32()))
-		this.MemMediumPressureCounter = &v113
+		v113 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v113 *= -1
+		}
+		this.NetTcpActiveConnections = &v113
 	}
 	if r.Intn(10) != 0 {
-		v114 := uint64(uint64(r.Uint32()))
-		this.MemCriticalPressureCounter = &v114
+		v114 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v114 *= -1
+		}
+		this.NetTcpTimeWaitConnections = &v114
 	}
 	if r.Intn(10) != 0 {
-		v115 := r.Intn(10)
-		this.NetTrafficControlStatistics = make([]*TrafficControlStatistics, v115)
-		for i := 0; i < v115; i++ {
+		v115 := uint32(r.Uint32())
+		this.Processes = &v115
+	}
+	if r.Intn(10) != 0 {
+		v116 := uint32(r.Uint32())
+		this.Threads = &v116
+	}
+	if r.Intn(10) != 0 {
+		v117 := uint64(uint64(r.Uint32()))
+		this.MemLowPressureCounter = &v117
+	}
+	if r.Intn(10) != 0 {
+		v118 := uint64(uint64(r.Uint32()))
+		this.MemMediumPressureCounter = &v118
+	}
+	if r.Intn(10) != 0 {
+		v119 := uint64(uint64(r.Uint32()))
+		this.MemCriticalPressureCounter = &v119
+	}
+	if r.Intn(10) != 0 {
+		v120 := r.Intn(10)
+		this.NetTrafficControlStatistics = make([]*TrafficControlStatistics, v120)
+		for i := 0; i < v120; i++ {
 			this.NetTrafficControlStatistics[i] = NewPopulatedTrafficControlStatistics(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v116 := uint64(uint64(r.Uint32()))
-		this.MemTotalBytes = &v116
-	}
-	if r.Intn(10) != 0 {
-		v117 := uint64(uint64(r.Uint32()))
-		this.MemTotalMemswBytes = &v117
-	}
-	if r.Intn(10) != 0 {
-		v118 := uint64(uint64(r.Uint32()))
-		this.MemSoftLimitBytes = &v118
-	}
-	if r.Intn(10) != 0 {
-		v119 := uint64(uint64(r.Uint32()))
-		this.MemCacheBytes = &v119
-	}
-	if r.Intn(10) != 0 {
-		v120 := uint64(uint64(r.Uint32()))
-		this.MemSwapBytes = &v120
-	}
-	if r.Intn(10) != 0 {
 		v121 := uint64(uint64(r.Uint32()))
-		this.MemUnevictableBytes = &v121
+		this.MemTotalBytes = &v121
+	}
+	if r.Intn(10) != 0 {
+		v122 := uint64(uint64(r.Uint32()))
+		this.MemTotalMemswBytes = &v122
+	}
+	if r.Intn(10) != 0 {
+		v123 := uint64(uint64(r.Uint32()))
+		this.MemSoftLimitBytes = &v123
+	}
+	if r.Intn(10) != 0 {
+		v124 := uint64(uint64(r.Uint32()))
+		this.MemCacheBytes = &v124
+	}
+	if r.Intn(10) != 0 {
+		v125 := uint64(uint64(r.Uint32()))
+		this.MemSwapBytes = &v125
+	}
+	if r.Intn(10) != 0 {
+		v126 := uint64(uint64(r.Uint32()))
+		this.MemUnevictableBytes = &v126
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 42)
@@ -19195,16 +21236,16 @@ func NewPopulatedResourceStatistics(r randyMesos, easy bool) *ResourceStatistics
 func NewPopulatedResourceUsage(r randyMesos, easy bool) *ResourceUsage {
 	this := &ResourceUsage{}
 	if r.Intn(10) != 0 {
-		v122 := r.Intn(10)
-		this.Executors = make([]*ResourceUsage_Executor, v122)
-		for i := 0; i < v122; i++ {
+		v127 := r.Intn(10)
+		this.Executors = make([]*ResourceUsage_Executor, v127)
+		for i := 0; i < v127; i++ {
 			this.Executors[i] = NewPopulatedResourceUsage_Executor(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v123 := r.Intn(10)
-		this.Total = make([]*Resource, v123)
-		for i := 0; i < v123; i++ {
+		v128 := r.Intn(10)
+		this.Total = make([]*Resource, v128)
+		for i := 0; i < v128; i++ {
 			this.Total[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19218,242 +21259,243 @@ func NewPopulatedResourceUsage_Executor(r randyMesos, easy bool) *ResourceUsage_
 	this := &ResourceUsage_Executor{}
 	this.ExecutorInfo = NewPopulatedExecutorInfo(r, easy)
 	if r.Intn(10) != 0 {
-		v124 := r.Intn(10)
-		this.Allocated = make([]*Resource, v124)
-		for i := 0; i < v124; i++ {
+		v129 := r.Intn(10)
+		this.Allocated = make([]*Resource, v129)
+		for i := 0; i < v129; i++ {
 			this.Allocated[i] = NewPopulatedResource(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
 		this.Statistics = NewPopulatedResourceStatistics(r, easy)
 	}
+	this.ContainerId = NewPopulatedContainerID(r, easy)
 	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 5)
 	}
 	return this
 }
 
 func NewPopulatedPerfStatistics(r randyMesos, easy bool) *PerfStatistics {
 	this := &PerfStatistics{}
-	v125 := float64(r.Float64())
+	v130 := float64(r.Float64())
 	if r.Intn(2) == 0 {
-		v125 *= -1
+		v130 *= -1
 	}
-	this.Timestamp = &v125
-	v126 := float64(r.Float64())
+	this.Timestamp = &v130
+	v131 := float64(r.Float64())
 	if r.Intn(2) == 0 {
-		v126 *= -1
+		v131 *= -1
 	}
-	this.Duration = &v126
-	if r.Intn(10) != 0 {
-		v127 := uint64(uint64(r.Uint32()))
-		this.Cycles = &v127
-	}
-	if r.Intn(10) != 0 {
-		v128 := uint64(uint64(r.Uint32()))
-		this.StalledCyclesFrontend = &v128
-	}
-	if r.Intn(10) != 0 {
-		v129 := uint64(uint64(r.Uint32()))
-		this.StalledCyclesBackend = &v129
-	}
-	if r.Intn(10) != 0 {
-		v130 := uint64(uint64(r.Uint32()))
-		this.Instructions = &v130
-	}
-	if r.Intn(10) != 0 {
-		v131 := uint64(uint64(r.Uint32()))
-		this.CacheReferences = &v131
-	}
+	this.Duration = &v131
 	if r.Intn(10) != 0 {
 		v132 := uint64(uint64(r.Uint32()))
-		this.CacheMisses = &v132
+		this.Cycles = &v132
 	}
 	if r.Intn(10) != 0 {
 		v133 := uint64(uint64(r.Uint32()))
-		this.Branches = &v133
+		this.StalledCyclesFrontend = &v133
 	}
 	if r.Intn(10) != 0 {
 		v134 := uint64(uint64(r.Uint32()))
-		this.BranchMisses = &v134
+		this.StalledCyclesBackend = &v134
 	}
 	if r.Intn(10) != 0 {
 		v135 := uint64(uint64(r.Uint32()))
-		this.BusCycles = &v135
+		this.Instructions = &v135
 	}
 	if r.Intn(10) != 0 {
 		v136 := uint64(uint64(r.Uint32()))
-		this.RefCycles = &v136
+		this.CacheReferences = &v136
 	}
 	if r.Intn(10) != 0 {
-		v137 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v137 *= -1
-		}
-		this.CpuClock = &v137
+		v137 := uint64(uint64(r.Uint32()))
+		this.CacheMisses = &v137
 	}
 	if r.Intn(10) != 0 {
-		v138 := float64(r.Float64())
-		if r.Intn(2) == 0 {
-			v138 *= -1
-		}
-		this.TaskClock = &v138
+		v138 := uint64(uint64(r.Uint32()))
+		this.Branches = &v138
 	}
 	if r.Intn(10) != 0 {
 		v139 := uint64(uint64(r.Uint32()))
-		this.PageFaults = &v139
+		this.BranchMisses = &v139
 	}
 	if r.Intn(10) != 0 {
 		v140 := uint64(uint64(r.Uint32()))
-		this.MinorFaults = &v140
+		this.BusCycles = &v140
 	}
 	if r.Intn(10) != 0 {
 		v141 := uint64(uint64(r.Uint32()))
-		this.MajorFaults = &v141
+		this.RefCycles = &v141
 	}
 	if r.Intn(10) != 0 {
-		v142 := uint64(uint64(r.Uint32()))
-		this.ContextSwitches = &v142
+		v142 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v142 *= -1
+		}
+		this.CpuClock = &v142
 	}
 	if r.Intn(10) != 0 {
-		v143 := uint64(uint64(r.Uint32()))
-		this.CpuMigrations = &v143
+		v143 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v143 *= -1
+		}
+		this.TaskClock = &v143
 	}
 	if r.Intn(10) != 0 {
 		v144 := uint64(uint64(r.Uint32()))
-		this.AlignmentFaults = &v144
+		this.PageFaults = &v144
 	}
 	if r.Intn(10) != 0 {
 		v145 := uint64(uint64(r.Uint32()))
-		this.EmulationFaults = &v145
+		this.MinorFaults = &v145
 	}
 	if r.Intn(10) != 0 {
 		v146 := uint64(uint64(r.Uint32()))
-		this.L1DcacheLoads = &v146
+		this.MajorFaults = &v146
 	}
 	if r.Intn(10) != 0 {
 		v147 := uint64(uint64(r.Uint32()))
-		this.L1DcacheLoadMisses = &v147
+		this.ContextSwitches = &v147
 	}
 	if r.Intn(10) != 0 {
 		v148 := uint64(uint64(r.Uint32()))
-		this.L1DcacheStores = &v148
+		this.CpuMigrations = &v148
 	}
 	if r.Intn(10) != 0 {
 		v149 := uint64(uint64(r.Uint32()))
-		this.L1DcacheStoreMisses = &v149
+		this.AlignmentFaults = &v149
 	}
 	if r.Intn(10) != 0 {
 		v150 := uint64(uint64(r.Uint32()))
-		this.L1DcachePrefetches = &v150
+		this.EmulationFaults = &v150
 	}
 	if r.Intn(10) != 0 {
 		v151 := uint64(uint64(r.Uint32()))
-		this.L1DcachePrefetchMisses = &v151
+		this.L1DcacheLoads = &v151
 	}
 	if r.Intn(10) != 0 {
 		v152 := uint64(uint64(r.Uint32()))
-		this.L1IcacheLoads = &v152
+		this.L1DcacheLoadMisses = &v152
 	}
 	if r.Intn(10) != 0 {
 		v153 := uint64(uint64(r.Uint32()))
-		this.L1IcacheLoadMisses = &v153
+		this.L1DcacheStores = &v153
 	}
 	if r.Intn(10) != 0 {
 		v154 := uint64(uint64(r.Uint32()))
-		this.L1IcachePrefetches = &v154
+		this.L1DcacheStoreMisses = &v154
 	}
 	if r.Intn(10) != 0 {
 		v155 := uint64(uint64(r.Uint32()))
-		this.L1IcachePrefetchMisses = &v155
+		this.L1DcachePrefetches = &v155
 	}
 	if r.Intn(10) != 0 {
 		v156 := uint64(uint64(r.Uint32()))
-		this.LlcLoads = &v156
+		this.L1DcachePrefetchMisses = &v156
 	}
 	if r.Intn(10) != 0 {
 		v157 := uint64(uint64(r.Uint32()))
-		this.LlcLoadMisses = &v157
+		this.L1IcacheLoads = &v157
 	}
 	if r.Intn(10) != 0 {
 		v158 := uint64(uint64(r.Uint32()))
-		this.LlcStores = &v158
+		this.L1IcacheLoadMisses = &v158
 	}
 	if r.Intn(10) != 0 {
 		v159 := uint64(uint64(r.Uint32()))
-		this.LlcStoreMisses = &v159
+		this.L1IcachePrefetches = &v159
 	}
 	if r.Intn(10) != 0 {
 		v160 := uint64(uint64(r.Uint32()))
-		this.LlcPrefetches = &v160
+		this.L1IcachePrefetchMisses = &v160
 	}
 	if r.Intn(10) != 0 {
 		v161 := uint64(uint64(r.Uint32()))
-		this.LlcPrefetchMisses = &v161
+		this.LlcLoads = &v161
 	}
 	if r.Intn(10) != 0 {
 		v162 := uint64(uint64(r.Uint32()))
-		this.DtlbLoads = &v162
+		this.LlcLoadMisses = &v162
 	}
 	if r.Intn(10) != 0 {
 		v163 := uint64(uint64(r.Uint32()))
-		this.DtlbLoadMisses = &v163
+		this.LlcStores = &v163
 	}
 	if r.Intn(10) != 0 {
 		v164 := uint64(uint64(r.Uint32()))
-		this.DtlbStores = &v164
+		this.LlcStoreMisses = &v164
 	}
 	if r.Intn(10) != 0 {
 		v165 := uint64(uint64(r.Uint32()))
-		this.DtlbStoreMisses = &v165
+		this.LlcPrefetches = &v165
 	}
 	if r.Intn(10) != 0 {
 		v166 := uint64(uint64(r.Uint32()))
-		this.DtlbPrefetches = &v166
+		this.LlcPrefetchMisses = &v166
 	}
 	if r.Intn(10) != 0 {
 		v167 := uint64(uint64(r.Uint32()))
-		this.DtlbPrefetchMisses = &v167
+		this.DtlbLoads = &v167
 	}
 	if r.Intn(10) != 0 {
 		v168 := uint64(uint64(r.Uint32()))
-		this.ItlbLoads = &v168
+		this.DtlbLoadMisses = &v168
 	}
 	if r.Intn(10) != 0 {
 		v169 := uint64(uint64(r.Uint32()))
-		this.ItlbLoadMisses = &v169
+		this.DtlbStores = &v169
 	}
 	if r.Intn(10) != 0 {
 		v170 := uint64(uint64(r.Uint32()))
-		this.BranchLoads = &v170
+		this.DtlbStoreMisses = &v170
 	}
 	if r.Intn(10) != 0 {
 		v171 := uint64(uint64(r.Uint32()))
-		this.BranchLoadMisses = &v171
+		this.DtlbPrefetches = &v171
 	}
 	if r.Intn(10) != 0 {
 		v172 := uint64(uint64(r.Uint32()))
-		this.NodeLoads = &v172
+		this.DtlbPrefetchMisses = &v172
 	}
 	if r.Intn(10) != 0 {
 		v173 := uint64(uint64(r.Uint32()))
-		this.NodeLoadMisses = &v173
+		this.ItlbLoads = &v173
 	}
 	if r.Intn(10) != 0 {
 		v174 := uint64(uint64(r.Uint32()))
-		this.NodeStores = &v174
+		this.ItlbLoadMisses = &v174
 	}
 	if r.Intn(10) != 0 {
 		v175 := uint64(uint64(r.Uint32()))
-		this.NodeStoreMisses = &v175
+		this.BranchLoads = &v175
 	}
 	if r.Intn(10) != 0 {
 		v176 := uint64(uint64(r.Uint32()))
-		this.NodePrefetches = &v176
+		this.BranchLoadMisses = &v176
 	}
 	if r.Intn(10) != 0 {
 		v177 := uint64(uint64(r.Uint32()))
-		this.NodePrefetchMisses = &v177
+		this.NodeLoads = &v177
+	}
+	if r.Intn(10) != 0 {
+		v178 := uint64(uint64(r.Uint32()))
+		this.NodeLoadMisses = &v178
+	}
+	if r.Intn(10) != 0 {
+		v179 := uint64(uint64(r.Uint32()))
+		this.NodeStores = &v179
+	}
+	if r.Intn(10) != 0 {
+		v180 := uint64(uint64(r.Uint32()))
+		this.NodeStoreMisses = &v180
+	}
+	if r.Intn(10) != 0 {
+		v181 := uint64(uint64(r.Uint32()))
+		this.NodePrefetches = &v181
+	}
+	if r.Intn(10) != 0 {
+		v182 := uint64(uint64(r.Uint32()))
+		this.NodePrefetchMisses = &v182
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 54)
@@ -19467,9 +21509,9 @@ func NewPopulatedRequest(r randyMesos, easy bool) *Request {
 		this.SlaveId = NewPopulatedSlaveID(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v178 := r.Intn(10)
-		this.Resources = make([]*Resource, v178)
-		for i := 0; i < v178; i++ {
+		v183 := r.Intn(10)
+		this.Resources = make([]*Resource, v183)
+		for i := 0; i < v183; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19484,42 +21526,45 @@ func NewPopulatedOffer(r randyMesos, easy bool) *Offer {
 	this.Id = NewPopulatedOfferID(r, easy)
 	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
 	this.SlaveId = NewPopulatedSlaveID(r, easy)
-	v179 := randStringMesos(r)
-	this.Hostname = &v179
+	v184 := randStringMesos(r)
+	this.Hostname = &v184
 	if r.Intn(10) != 0 {
-		v180 := r.Intn(10)
-		this.Resources = make([]*Resource, v180)
-		for i := 0; i < v180; i++ {
+		v185 := r.Intn(10)
+		this.Resources = make([]*Resource, v185)
+		for i := 0; i < v185; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v181 := r.Intn(10)
-		this.ExecutorIds = make([]*ExecutorID, v181)
-		for i := 0; i < v181; i++ {
+		v186 := r.Intn(10)
+		this.ExecutorIds = make([]*ExecutorID, v186)
+		for i := 0; i < v186; i++ {
 			this.ExecutorIds[i] = NewPopulatedExecutorID(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v182 := r.Intn(10)
-		this.Attributes = make([]*Attribute, v182)
-		for i := 0; i < v182; i++ {
+		v187 := r.Intn(10)
+		this.Attributes = make([]*Attribute, v187)
+		for i := 0; i < v187; i++ {
 			this.Attributes[i] = NewPopulatedAttribute(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
 		this.Url = NewPopulatedURL(r, easy)
 	}
+	if r.Intn(10) != 0 {
+		this.Unavailability = NewPopulatedUnavailability(r, easy)
+	}
 	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedMesos(r, 9)
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 10)
 	}
 	return this
 }
 
 func NewPopulatedOffer_Operation(r randyMesos, easy bool) *Offer_Operation {
 	this := &Offer_Operation{}
-	v183 := Offer_Operation_Type([]int32{1, 2, 3, 4, 5}[r.Intn(5)])
-	this.Type = &v183
+	v188 := Offer_Operation_Type([]int32{1, 2, 3, 4, 5}[r.Intn(5)])
+	this.Type = &v188
 	if r.Intn(10) != 0 {
 		this.Launch = NewPopulatedOffer_Operation_Launch(r, easy)
 	}
@@ -19544,9 +21589,9 @@ func NewPopulatedOffer_Operation(r randyMesos, easy bool) *Offer_Operation {
 func NewPopulatedOffer_Operation_Launch(r randyMesos, easy bool) *Offer_Operation_Launch {
 	this := &Offer_Operation_Launch{}
 	if r.Intn(10) != 0 {
-		v184 := r.Intn(10)
-		this.TaskInfos = make([]*TaskInfo, v184)
-		for i := 0; i < v184; i++ {
+		v189 := r.Intn(10)
+		this.TaskInfos = make([]*TaskInfo, v189)
+		for i := 0; i < v189; i++ {
 			this.TaskInfos[i] = NewPopulatedTaskInfo(r, easy)
 		}
 	}
@@ -19559,9 +21604,9 @@ func NewPopulatedOffer_Operation_Launch(r randyMesos, easy bool) *Offer_Operatio
 func NewPopulatedOffer_Operation_Reserve(r randyMesos, easy bool) *Offer_Operation_Reserve {
 	this := &Offer_Operation_Reserve{}
 	if r.Intn(10) != 0 {
-		v185 := r.Intn(10)
-		this.Resources = make([]*Resource, v185)
-		for i := 0; i < v185; i++ {
+		v190 := r.Intn(10)
+		this.Resources = make([]*Resource, v190)
+		for i := 0; i < v190; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19574,9 +21619,9 @@ func NewPopulatedOffer_Operation_Reserve(r randyMesos, easy bool) *Offer_Operati
 func NewPopulatedOffer_Operation_Unreserve(r randyMesos, easy bool) *Offer_Operation_Unreserve {
 	this := &Offer_Operation_Unreserve{}
 	if r.Intn(10) != 0 {
-		v186 := r.Intn(10)
-		this.Resources = make([]*Resource, v186)
-		for i := 0; i < v186; i++ {
+		v191 := r.Intn(10)
+		this.Resources = make([]*Resource, v191)
+		for i := 0; i < v191; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19589,9 +21634,9 @@ func NewPopulatedOffer_Operation_Unreserve(r randyMesos, easy bool) *Offer_Opera
 func NewPopulatedOffer_Operation_Create(r randyMesos, easy bool) *Offer_Operation_Create {
 	this := &Offer_Operation_Create{}
 	if r.Intn(10) != 0 {
-		v187 := r.Intn(10)
-		this.Volumes = make([]*Resource, v187)
-		for i := 0; i < v187; i++ {
+		v192 := r.Intn(10)
+		this.Volumes = make([]*Resource, v192)
+		for i := 0; i < v192; i++ {
 			this.Volumes[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19604,9 +21649,9 @@ func NewPopulatedOffer_Operation_Create(r randyMesos, easy bool) *Offer_Operatio
 func NewPopulatedOffer_Operation_Destroy(r randyMesos, easy bool) *Offer_Operation_Destroy {
 	this := &Offer_Operation_Destroy{}
 	if r.Intn(10) != 0 {
-		v188 := r.Intn(10)
-		this.Volumes = make([]*Resource, v188)
-		for i := 0; i < v188; i++ {
+		v193 := r.Intn(10)
+		this.Volumes = make([]*Resource, v193)
+		for i := 0; i < v193; i++ {
 			this.Volumes[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19616,16 +21661,40 @@ func NewPopulatedOffer_Operation_Destroy(r randyMesos, easy bool) *Offer_Operati
 	return this
 }
 
+func NewPopulatedInverseOffer(r randyMesos, easy bool) *InverseOffer {
+	this := &InverseOffer{}
+	this.Id = NewPopulatedOfferID(r, easy)
+	if r.Intn(10) != 0 {
+		this.Url = NewPopulatedURL(r, easy)
+	}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		this.SlaveId = NewPopulatedSlaveID(r, easy)
+	}
+	this.Unavailability = NewPopulatedUnavailability(r, easy)
+	if r.Intn(10) != 0 {
+		v194 := r.Intn(10)
+		this.Resources = make([]*Resource, v194)
+		for i := 0; i < v194; i++ {
+			this.Resources[i] = NewPopulatedResource(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 7)
+	}
+	return this
+}
+
 func NewPopulatedTaskInfo(r randyMesos, easy bool) *TaskInfo {
 	this := &TaskInfo{}
-	v189 := randStringMesos(r)
-	this.Name = &v189
+	v195 := randStringMesos(r)
+	this.Name = &v195
 	this.TaskId = NewPopulatedTaskID(r, easy)
 	this.SlaveId = NewPopulatedSlaveID(r, easy)
 	if r.Intn(10) != 0 {
-		v190 := r.Intn(10)
-		this.Resources = make([]*Resource, v190)
-		for i := 0; i < v190; i++ {
+		v196 := r.Intn(10)
+		this.Resources = make([]*Resource, v196)
+		for i := 0; i < v196; i++ {
 			this.Resources[i] = NewPopulatedResource(r, easy)
 		}
 	}
@@ -19633,9 +21702,9 @@ func NewPopulatedTaskInfo(r randyMesos, easy bool) *TaskInfo {
 		this.Executor = NewPopulatedExecutorInfo(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v191 := r.Intn(100)
-		this.Data = make([]byte, v191)
-		for i := 0; i < v191; i++ {
+		v197 := r.Intn(100)
+		this.Data = make([]byte, v197)
+		for i := 0; i < v197; i++ {
 			this.Data[i] = byte(r.Intn(256))
 		}
 	}
@@ -19663,56 +21732,59 @@ func NewPopulatedTaskInfo(r randyMesos, easy bool) *TaskInfo {
 func NewPopulatedTaskStatus(r randyMesos, easy bool) *TaskStatus {
 	this := &TaskStatus{}
 	this.TaskId = NewPopulatedTaskID(r, easy)
-	v192 := TaskState([]int32{6, 0, 1, 2, 3, 4, 5, 7}[r.Intn(8)])
-	this.State = &v192
+	v198 := TaskState([]int32{6, 0, 1, 2, 3, 4, 5, 7}[r.Intn(8)])
+	this.State = &v198
 	if r.Intn(10) != 0 {
-		v193 := r.Intn(100)
-		this.Data = make([]byte, v193)
-		for i := 0; i < v193; i++ {
+		v199 := r.Intn(100)
+		this.Data = make([]byte, v199)
+		for i := 0; i < v199; i++ {
 			this.Data[i] = byte(r.Intn(256))
 		}
 	}
 	if r.Intn(10) != 0 {
-		v194 := randStringMesos(r)
-		this.Message = &v194
+		v200 := randStringMesos(r)
+		this.Message = &v200
 	}
 	if r.Intn(10) != 0 {
 		this.SlaveId = NewPopulatedSlaveID(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v195 := float64(r.Float64())
+		v201 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v195 *= -1
+			v201 *= -1
 		}
-		this.Timestamp = &v195
+		this.Timestamp = &v201
 	}
 	if r.Intn(10) != 0 {
 		this.ExecutorId = NewPopulatedExecutorID(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v196 := bool(bool(r.Intn(2) == 0))
-		this.Healthy = &v196
+		v202 := bool(bool(r.Intn(2) == 0))
+		this.Healthy = &v202
 	}
 	if r.Intn(10) != 0 {
-		v197 := TaskStatus_Source([]int32{0, 1, 2}[r.Intn(3)])
-		this.Source = &v197
+		v203 := TaskStatus_Source([]int32{0, 1, 2}[r.Intn(3)])
+		this.Source = &v203
 	}
 	if r.Intn(10) != 0 {
-		v198 := TaskStatus_Reason([]int32{0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 9, 18, 10, 11, 12, 13, 14, 15, 16}[r.Intn(19)])
-		this.Reason = &v198
+		v204 := TaskStatus_Reason([]int32{0, 21, 19, 20, 8, 17, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 9, 18, 10, 11, 12, 13, 14, 15, 16}[r.Intn(25)])
+		this.Reason = &v204
 	}
 	if r.Intn(10) != 0 {
-		v199 := r.Intn(100)
-		this.Uuid = make([]byte, v199)
-		for i := 0; i < v199; i++ {
+		v205 := r.Intn(100)
+		this.Uuid = make([]byte, v205)
+		for i := 0; i < v205; i++ {
 			this.Uuid[i] = byte(r.Intn(256))
 		}
 	}
 	if r.Intn(10) != 0 {
 		this.Labels = NewPopulatedLabels(r, easy)
 	}
+	if r.Intn(10) != 0 {
+		this.ContainerStatus = NewPopulatedContainerStatus(r, easy)
+	}
 	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedMesos(r, 13)
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 14)
 	}
 	return this
 }
@@ -19720,11 +21792,11 @@ func NewPopulatedTaskStatus(r randyMesos, easy bool) *TaskStatus {
 func NewPopulatedFilters(r randyMesos, easy bool) *Filters {
 	this := &Filters{}
 	if r.Intn(10) != 0 {
-		v200 := float64(r.Float64())
+		v206 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v200 *= -1
+			v206 *= -1
 		}
-		this.RefuseSeconds = &v200
+		this.RefuseSeconds = &v206
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
@@ -19735,9 +21807,9 @@ func NewPopulatedFilters(r randyMesos, easy bool) *Filters {
 func NewPopulatedEnvironment(r randyMesos, easy bool) *Environment {
 	this := &Environment{}
 	if r.Intn(10) != 0 {
-		v201 := r.Intn(10)
-		this.Variables = make([]*Environment_Variable, v201)
-		for i := 0; i < v201; i++ {
+		v207 := r.Intn(10)
+		this.Variables = make([]*Environment_Variable, v207)
+		for i := 0; i < v207; i++ {
 			this.Variables[i] = NewPopulatedEnvironment_Variable(r, easy)
 		}
 	}
@@ -19749,10 +21821,10 @@ func NewPopulatedEnvironment(r randyMesos, easy bool) *Environment {
 
 func NewPopulatedEnvironment_Variable(r randyMesos, easy bool) *Environment_Variable {
 	this := &Environment_Variable{}
-	v202 := randStringMesos(r)
-	this.Name = &v202
-	v203 := randStringMesos(r)
-	this.Value = &v203
+	v208 := randStringMesos(r)
+	this.Name = &v208
+	v209 := randStringMesos(r)
+	this.Value = &v209
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
 	}
@@ -19761,10 +21833,10 @@ func NewPopulatedEnvironment_Variable(r randyMesos, easy bool) *Environment_Vari
 
 func NewPopulatedParameter(r randyMesos, easy bool) *Parameter {
 	this := &Parameter{}
-	v204 := randStringMesos(r)
-	this.Key = &v204
-	v205 := randStringMesos(r)
-	this.Value = &v205
+	v210 := randStringMesos(r)
+	this.Key = &v210
+	v211 := randStringMesos(r)
+	this.Value = &v211
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
 	}
@@ -19774,9 +21846,9 @@ func NewPopulatedParameter(r randyMesos, easy bool) *Parameter {
 func NewPopulatedParameters(r randyMesos, easy bool) *Parameters {
 	this := &Parameters{}
 	if r.Intn(10) != 0 {
-		v206 := r.Intn(10)
-		this.Parameter = make([]*Parameter, v206)
-		for i := 0; i < v206; i++ {
+		v212 := r.Intn(10)
+		this.Parameter = make([]*Parameter, v212)
+		for i := 0; i < v212; i++ {
 			this.Parameter[i] = NewPopulatedParameter(r, easy)
 		}
 	}
@@ -19788,14 +21860,11 @@ func NewPopulatedParameters(r randyMesos, easy bool) *Parameters {
 
 func NewPopulatedCredential(r randyMesos, easy bool) *Credential {
 	this := &Credential{}
-	v207 := randStringMesos(r)
-	this.Principal = &v207
+	v213 := randStringMesos(r)
+	this.Principal = &v213
 	if r.Intn(10) != 0 {
-		v208 := r.Intn(100)
-		this.Secret = make([]byte, v208)
-		for i := 0; i < v208; i++ {
-			this.Secret[i] = byte(r.Intn(256))
-		}
+		v214 := randStringMesos(r)
+		this.Secret = &v214
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
@@ -19806,9 +21875,9 @@ func NewPopulatedCredential(r randyMesos, easy bool) *Credential {
 func NewPopulatedCredentials(r randyMesos, easy bool) *Credentials {
 	this := &Credentials{}
 	if r.Intn(10) != 0 {
-		v209 := r.Intn(10)
-		this.Credentials = make([]*Credential, v209)
-		for i := 0; i < v209; i++ {
+		v215 := r.Intn(10)
+		this.Credentials = make([]*Credential, v215)
+		for i := 0; i < v215; i++ {
 			this.Credentials[i] = NewPopulatedCredential(r, easy)
 		}
 	}
@@ -19821,17 +21890,17 @@ func NewPopulatedCredentials(r randyMesos, easy bool) *Credentials {
 func NewPopulatedRateLimit(r randyMesos, easy bool) *RateLimit {
 	this := &RateLimit{}
 	if r.Intn(10) != 0 {
-		v210 := float64(r.Float64())
+		v216 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v210 *= -1
+			v216 *= -1
 		}
-		this.Qps = &v210
+		this.Qps = &v216
 	}
-	v211 := randStringMesos(r)
-	this.Principal = &v211
+	v217 := randStringMesos(r)
+	this.Principal = &v217
 	if r.Intn(10) != 0 {
-		v212 := uint64(uint64(r.Uint32()))
-		this.Capacity = &v212
+		v218 := uint64(uint64(r.Uint32()))
+		this.Capacity = &v218
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
@@ -19842,22 +21911,22 @@ func NewPopulatedRateLimit(r randyMesos, easy bool) *RateLimit {
 func NewPopulatedRateLimits(r randyMesos, easy bool) *RateLimits {
 	this := &RateLimits{}
 	if r.Intn(10) != 0 {
-		v213 := r.Intn(10)
-		this.Limits = make([]*RateLimit, v213)
-		for i := 0; i < v213; i++ {
+		v219 := r.Intn(10)
+		this.Limits = make([]*RateLimit, v219)
+		for i := 0; i < v219; i++ {
 			this.Limits[i] = NewPopulatedRateLimit(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v214 := float64(r.Float64())
+		v220 := float64(r.Float64())
 		if r.Intn(2) == 0 {
-			v214 *= -1
+			v220 *= -1
 		}
-		this.AggregateDefaultQps = &v214
+		this.AggregateDefaultQps = &v220
 	}
 	if r.Intn(10) != 0 {
-		v215 := uint64(uint64(r.Uint32()))
-		this.AggregateDefaultCapacity = &v215
+		v221 := uint64(uint64(r.Uint32()))
+		this.AggregateDefaultCapacity = &v221
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
@@ -19867,10 +21936,10 @@ func NewPopulatedRateLimits(r randyMesos, easy bool) *RateLimits {
 
 func NewPopulatedImage(r randyMesos, easy bool) *Image {
 	this := &Image{}
-	v216 := Image_Type([]int32{1, 2}[r.Intn(2)])
-	this.Type = &v216
+	v222 := Image_Type([]int32{1, 2}[r.Intn(2)])
+	this.Type = &v222
 	if r.Intn(10) != 0 {
-		this.Appc = NewPopulatedImage_AppC(r, easy)
+		this.Appc = NewPopulatedImage_Appc(r, easy)
 	}
 	if r.Intn(10) != 0 {
 		this.Docker = NewPopulatedImage_Docker(r, easy)
@@ -19881,13 +21950,13 @@ func NewPopulatedImage(r randyMesos, easy bool) *Image {
 	return this
 }
 
-func NewPopulatedImage_AppC(r randyMesos, easy bool) *Image_AppC {
-	this := &Image_AppC{}
-	v217 := randStringMesos(r)
-	this.Name = &v217
+func NewPopulatedImage_Appc(r randyMesos, easy bool) *Image_Appc {
+	this := &Image_Appc{}
+	v223 := randStringMesos(r)
+	this.Name = &v223
 	if r.Intn(10) != 0 {
-		v218 := randStringMesos(r)
-		this.Id = &v218
+		v224 := randStringMesos(r)
+		this.Id = &v224
 	}
 	if r.Intn(10) != 0 {
 		this.Labels = NewPopulatedLabels(r, easy)
@@ -19900,8 +21969,8 @@ func NewPopulatedImage_AppC(r randyMesos, easy bool) *Image_AppC {
 
 func NewPopulatedImage_Docker(r randyMesos, easy bool) *Image_Docker {
 	this := &Image_Docker{}
-	v219 := randStringMesos(r)
-	this.Name = &v219
+	v225 := randStringMesos(r)
+	this.Name = &v225
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
 	}
@@ -19910,14 +21979,14 @@ func NewPopulatedImage_Docker(r randyMesos, easy bool) *Image_Docker {
 
 func NewPopulatedVolume(r randyMesos, easy bool) *Volume {
 	this := &Volume{}
-	v220 := randStringMesos(r)
-	this.ContainerPath = &v220
+	v226 := randStringMesos(r)
+	this.ContainerPath = &v226
 	if r.Intn(10) != 0 {
-		v221 := randStringMesos(r)
-		this.HostPath = &v221
+		v227 := randStringMesos(r)
+		this.HostPath = &v227
 	}
-	v222 := Volume_Mode([]int32{1, 2}[r.Intn(2)])
-	this.Mode = &v222
+	v228 := Volume_Mode([]int32{1, 2}[r.Intn(2)])
+	this.Mode = &v228
 	if r.Intn(10) != 0 {
 		this.Image = NewPopulatedImage(r, easy)
 	}
@@ -19927,26 +21996,32 @@ func NewPopulatedVolume(r randyMesos, easy bool) *Volume {
 	return this
 }
 
-func NewPopulatedContainerInfo(r randyMesos, easy bool) *ContainerInfo {
-	this := &ContainerInfo{}
-	v223 := ContainerInfo_Type([]int32{1, 2}[r.Intn(2)])
-	this.Type = &v223
+func NewPopulatedNetworkInfo(r randyMesos, easy bool) *NetworkInfo {
+	this := &NetworkInfo{}
 	if r.Intn(10) != 0 {
-		v224 := r.Intn(10)
-		this.Volumes = make([]*Volume, v224)
-		for i := 0; i < v224; i++ {
-			this.Volumes[i] = NewPopulatedVolume(r, easy)
+		v229 := NetworkInfo_Protocol([]int32{1, 2}[r.Intn(2)])
+		this.Protocol = &v229
+	}
+	if r.Intn(10) != 0 {
+		v230 := randStringMesos(r)
+		this.IpAddress = &v230
+	}
+	if r.Intn(10) != 0 {
+		v231 := r.Intn(10)
+		this.Groups = make([]string, v231)
+		for i := 0; i < v231; i++ {
+			this.Groups[i] = randStringMesos(r)
 		}
 	}
 	if r.Intn(10) != 0 {
-		this.Docker = NewPopulatedContainerInfo_DockerInfo(r, easy)
+		this.Labels = NewPopulatedLabels(r, easy)
 	}
 	if r.Intn(10) != 0 {
-		v225 := randStringMesos(r)
-		this.Hostname = &v225
-	}
-	if r.Intn(10) != 0 {
-		this.Mesos = NewPopulatedContainerInfo_MesosInfo(r, easy)
+		v232 := r.Intn(10)
+		this.IpAddresses = make([]*NetworkInfo_IPAddress, v232)
+		for i := 0; i < v232; i++ {
+			this.IpAddresses[i] = NewPopulatedNetworkInfo_IPAddress(r, easy)
+		}
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 6)
@@ -19954,35 +22029,85 @@ func NewPopulatedContainerInfo(r randyMesos, easy bool) *ContainerInfo {
 	return this
 }
 
-func NewPopulatedContainerInfo_DockerInfo(r randyMesos, easy bool) *ContainerInfo_DockerInfo {
-	this := &ContainerInfo_DockerInfo{}
-	v226 := randStringMesos(r)
-	this.Image = &v226
+func NewPopulatedNetworkInfo_IPAddress(r randyMesos, easy bool) *NetworkInfo_IPAddress {
+	this := &NetworkInfo_IPAddress{}
 	if r.Intn(10) != 0 {
-		v227 := ContainerInfo_DockerInfo_Network([]int32{1, 2, 3}[r.Intn(3)])
-		this.Network = &v227
+		v233 := NetworkInfo_Protocol([]int32{1, 2}[r.Intn(2)])
+		this.Protocol = &v233
 	}
 	if r.Intn(10) != 0 {
-		v228 := r.Intn(10)
-		this.PortMappings = make([]*ContainerInfo_DockerInfo_PortMapping, v228)
-		for i := 0; i < v228; i++ {
+		v234 := randStringMesos(r)
+		this.IpAddress = &v234
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedContainerInfo(r randyMesos, easy bool) *ContainerInfo {
+	this := &ContainerInfo{}
+	v235 := ContainerInfo_Type([]int32{1, 2}[r.Intn(2)])
+	this.Type = &v235
+	if r.Intn(10) != 0 {
+		v236 := r.Intn(10)
+		this.Volumes = make([]*Volume, v236)
+		for i := 0; i < v236; i++ {
+			this.Volumes[i] = NewPopulatedVolume(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		this.Docker = NewPopulatedContainerInfo_DockerInfo(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		v237 := randStringMesos(r)
+		this.Hostname = &v237
+	}
+	if r.Intn(10) != 0 {
+		this.Mesos = NewPopulatedContainerInfo_MesosInfo(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		v238 := r.Intn(10)
+		this.NetworkInfos = make([]*NetworkInfo, v238)
+		for i := 0; i < v238; i++ {
+			this.NetworkInfos[i] = NewPopulatedNetworkInfo(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 8)
+	}
+	return this
+}
+
+func NewPopulatedContainerInfo_DockerInfo(r randyMesos, easy bool) *ContainerInfo_DockerInfo {
+	this := &ContainerInfo_DockerInfo{}
+	v239 := randStringMesos(r)
+	this.Image = &v239
+	if r.Intn(10) != 0 {
+		v240 := ContainerInfo_DockerInfo_Network([]int32{1, 2, 3}[r.Intn(3)])
+		this.Network = &v240
+	}
+	if r.Intn(10) != 0 {
+		v241 := r.Intn(10)
+		this.PortMappings = make([]*ContainerInfo_DockerInfo_PortMapping, v241)
+		for i := 0; i < v241; i++ {
 			this.PortMappings[i] = NewPopulatedContainerInfo_DockerInfo_PortMapping(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v229 := bool(bool(r.Intn(2) == 0))
-		this.Privileged = &v229
+		v242 := bool(bool(r.Intn(2) == 0))
+		this.Privileged = &v242
 	}
 	if r.Intn(10) != 0 {
-		v230 := r.Intn(10)
-		this.Parameters = make([]*Parameter, v230)
-		for i := 0; i < v230; i++ {
+		v243 := r.Intn(10)
+		this.Parameters = make([]*Parameter, v243)
+		for i := 0; i < v243; i++ {
 			this.Parameters[i] = NewPopulatedParameter(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v231 := bool(bool(r.Intn(2) == 0))
-		this.ForcePullImage = &v231
+		v244 := bool(bool(r.Intn(2) == 0))
+		this.ForcePullImage = &v244
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 7)
@@ -19992,13 +22117,13 @@ func NewPopulatedContainerInfo_DockerInfo(r randyMesos, easy bool) *ContainerInf
 
 func NewPopulatedContainerInfo_DockerInfo_PortMapping(r randyMesos, easy bool) *ContainerInfo_DockerInfo_PortMapping {
 	this := &ContainerInfo_DockerInfo_PortMapping{}
-	v232 := uint32(r.Uint32())
-	this.HostPort = &v232
-	v233 := uint32(r.Uint32())
-	this.ContainerPort = &v233
+	v245 := uint32(r.Uint32())
+	this.HostPort = &v245
+	v246 := uint32(r.Uint32())
+	this.ContainerPort = &v246
 	if r.Intn(10) != 0 {
-		v234 := randStringMesos(r)
-		this.Protocol = &v234
+		v247 := randStringMesos(r)
+		this.Protocol = &v247
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
@@ -20017,12 +22142,27 @@ func NewPopulatedContainerInfo_MesosInfo(r randyMesos, easy bool) *ContainerInfo
 	return this
 }
 
+func NewPopulatedContainerStatus(r randyMesos, easy bool) *ContainerStatus {
+	this := &ContainerStatus{}
+	if r.Intn(10) != 0 {
+		v248 := r.Intn(10)
+		this.NetworkInfos = make([]*NetworkInfo, v248)
+		for i := 0; i < v248; i++ {
+			this.NetworkInfos[i] = NewPopulatedNetworkInfo(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 2)
+	}
+	return this
+}
+
 func NewPopulatedLabels(r randyMesos, easy bool) *Labels {
 	this := &Labels{}
 	if r.Intn(10) != 0 {
-		v235 := r.Intn(10)
-		this.Labels = make([]*Label, v235)
-		for i := 0; i < v235; i++ {
+		v249 := r.Intn(10)
+		this.Labels = make([]*Label, v249)
+		for i := 0; i < v249; i++ {
 			this.Labels[i] = NewPopulatedLabel(r, easy)
 		}
 	}
@@ -20034,11 +22174,11 @@ func NewPopulatedLabels(r randyMesos, easy bool) *Labels {
 
 func NewPopulatedLabel(r randyMesos, easy bool) *Label {
 	this := &Label{}
-	v236 := randStringMesos(r)
-	this.Key = &v236
+	v250 := randStringMesos(r)
+	this.Key = &v250
 	if r.Intn(10) != 0 {
-		v237 := randStringMesos(r)
-		this.Value = &v237
+		v251 := randStringMesos(r)
+		this.Value = &v251
 	}
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
@@ -20048,18 +22188,22 @@ func NewPopulatedLabel(r randyMesos, easy bool) *Label {
 
 func NewPopulatedPort(r randyMesos, easy bool) *Port {
 	this := &Port{}
-	v238 := uint32(r.Uint32())
-	this.Number = &v238
+	v252 := uint32(r.Uint32())
+	this.Number = &v252
 	if r.Intn(10) != 0 {
-		v239 := randStringMesos(r)
-		this.Name = &v239
+		v253 := randStringMesos(r)
+		this.Name = &v253
 	}
 	if r.Intn(10) != 0 {
-		v240 := randStringMesos(r)
-		this.Protocol = &v240
+		v254 := randStringMesos(r)
+		this.Protocol = &v254
+	}
+	if r.Intn(10) != 0 {
+		v255 := DiscoveryInfo_Visibility([]int32{0, 1, 2}[r.Intn(3)])
+		this.Visibility = &v255
 	}
 	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedMesos(r, 4)
+		this.XXX_unrecognized = randUnrecognizedMesos(r, 5)
 	}
 	return this
 }
@@ -20067,9 +22211,9 @@ func NewPopulatedPort(r randyMesos, easy bool) *Port {
 func NewPopulatedPorts(r randyMesos, easy bool) *Ports {
 	this := &Ports{}
 	if r.Intn(10) != 0 {
-		v241 := r.Intn(10)
-		this.Ports = make([]*Port, v241)
-		for i := 0; i < v241; i++ {
+		v256 := r.Intn(10)
+		this.Ports = make([]*Port, v256)
+		for i := 0; i < v256; i++ {
 			this.Ports[i] = NewPopulatedPort(r, easy)
 		}
 	}
@@ -20081,23 +22225,23 @@ func NewPopulatedPorts(r randyMesos, easy bool) *Ports {
 
 func NewPopulatedDiscoveryInfo(r randyMesos, easy bool) *DiscoveryInfo {
 	this := &DiscoveryInfo{}
-	v242 := DiscoveryInfo_Visibility([]int32{0, 1, 2}[r.Intn(3)])
-	this.Visibility = &v242
+	v257 := DiscoveryInfo_Visibility([]int32{0, 1, 2}[r.Intn(3)])
+	this.Visibility = &v257
 	if r.Intn(10) != 0 {
-		v243 := randStringMesos(r)
-		this.Name = &v243
+		v258 := randStringMesos(r)
+		this.Name = &v258
 	}
 	if r.Intn(10) != 0 {
-		v244 := randStringMesos(r)
-		this.Environment = &v244
+		v259 := randStringMesos(r)
+		this.Environment = &v259
 	}
 	if r.Intn(10) != 0 {
-		v245 := randStringMesos(r)
-		this.Location = &v245
+		v260 := randStringMesos(r)
+		this.Location = &v260
 	}
 	if r.Intn(10) != 0 {
-		v246 := randStringMesos(r)
-		this.Version = &v246
+		v261 := randStringMesos(r)
+		this.Version = &v261
 	}
 	if r.Intn(10) != 0 {
 		this.Ports = NewPopulatedPorts(r, easy)
@@ -20113,23 +22257,23 @@ func NewPopulatedDiscoveryInfo(r randyMesos, easy bool) *DiscoveryInfo {
 
 func NewPopulatedAppcImageManifest(r randyMesos, easy bool) *AppcImageManifest {
 	this := &AppcImageManifest{}
-	v247 := randStringMesos(r)
-	this.AcKind = &v247
-	v248 := randStringMesos(r)
-	this.AcVersion = &v248
-	v249 := randStringMesos(r)
-	this.Name = &v249
+	v262 := randStringMesos(r)
+	this.AcKind = &v262
+	v263 := randStringMesos(r)
+	this.AcVersion = &v263
+	v264 := randStringMesos(r)
+	this.Name = &v264
 	if r.Intn(10) != 0 {
-		v250 := r.Intn(10)
-		this.Labels = make([]*AppcImageManifest_Label, v250)
-		for i := 0; i < v250; i++ {
+		v265 := r.Intn(10)
+		this.Labels = make([]*AppcImageManifest_Label, v265)
+		for i := 0; i < v265; i++ {
 			this.Labels[i] = NewPopulatedAppcImageManifest_Label(r, easy)
 		}
 	}
 	if r.Intn(10) != 0 {
-		v251 := r.Intn(10)
-		this.Annotations = make([]*AppcImageManifest_Annotation, v251)
-		for i := 0; i < v251; i++ {
+		v266 := r.Intn(10)
+		this.Annotations = make([]*AppcImageManifest_Annotation, v266)
+		for i := 0; i < v266; i++ {
 			this.Annotations[i] = NewPopulatedAppcImageManifest_Annotation(r, easy)
 		}
 	}
@@ -20141,10 +22285,10 @@ func NewPopulatedAppcImageManifest(r randyMesos, easy bool) *AppcImageManifest {
 
 func NewPopulatedAppcImageManifest_Label(r randyMesos, easy bool) *AppcImageManifest_Label {
 	this := &AppcImageManifest_Label{}
-	v252 := randStringMesos(r)
-	this.Name = &v252
-	v253 := randStringMesos(r)
-	this.Value = &v253
+	v267 := randStringMesos(r)
+	this.Name = &v267
+	v268 := randStringMesos(r)
+	this.Value = &v268
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
 	}
@@ -20153,10 +22297,10 @@ func NewPopulatedAppcImageManifest_Label(r randyMesos, easy bool) *AppcImageMani
 
 func NewPopulatedAppcImageManifest_Annotation(r randyMesos, easy bool) *AppcImageManifest_Annotation {
 	this := &AppcImageManifest_Annotation{}
-	v254 := randStringMesos(r)
-	this.Name = &v254
-	v255 := randStringMesos(r)
-	this.Value = &v255
+	v269 := randStringMesos(r)
+	this.Name = &v269
+	v270 := randStringMesos(r)
+	this.Value = &v270
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedMesos(r, 3)
 	}
@@ -20182,9 +22326,9 @@ func randUTF8RuneMesos(r randyMesos) rune {
 	return rune(ru + 61)
 }
 func randStringMesos(r randyMesos) string {
-	v256 := r.Intn(100)
-	tmps := make([]rune, v256)
-	for i := 0; i < v256; i++ {
+	v271 := r.Intn(100)
+	tmps := make([]rune, v271)
+	for i := 0; i < v271; i++ {
 		tmps[i] = randUTF8RuneMesos(r)
 	}
 	return string(tmps)
@@ -20206,11 +22350,11 @@ func randFieldMesos(data []byte, r randyMesos, fieldNumber int, wire int) []byte
 	switch wire {
 	case 0:
 		data = encodeVarintPopulateMesos(data, uint64(key))
-		v257 := r.Int63()
+		v272 := r.Int63()
 		if r.Intn(2) == 0 {
-			v257 *= -1
+			v272 *= -1
 		}
-		data = encodeVarintPopulateMesos(data, uint64(v257))
+		data = encodeVarintPopulateMesos(data, uint64(v272))
 	case 1:
 		data = encodeVarintPopulateMesos(data, uint64(key))
 		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -20313,6 +22457,30 @@ func (m *ContainerID) Size() (n int) {
 	return n
 }
 
+func (m *TimeInfo) Size() (n int) {
+	var l int
+	_ = l
+	if m.Nanoseconds != nil {
+		n += 1 + sovMesos(uint64(*m.Nanoseconds))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DurationInfo) Size() (n int) {
+	var l int
+	_ = l
+	if m.Nanoseconds != nil {
+		n += 1 + sovMesos(uint64(*m.Nanoseconds))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *Address) Size() (n int) {
 	var l int
 	_ = l
@@ -20356,6 +22524,60 @@ func (m *URL) Size() (n int) {
 	}
 	if m.Fragment != nil {
 		l = len(*m.Fragment)
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *Unavailability) Size() (n int) {
+	var l int
+	_ = l
+	if m.Start != nil {
+		l = m.Start.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.Duration != nil {
+		l = m.Duration.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *MachineID) Size() (n int) {
+	var l int
+	_ = l
+	if m.Hostname != nil {
+		l = len(*m.Hostname)
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.Ip != nil {
+		l = len(*m.Ip)
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *MachineInfo) Size() (n int) {
+	var l int
+	_ = l
+	if m.Id != nil {
+		l = m.Id.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.Mode != nil {
+		n += 1 + sovMesos(uint64(*m.Mode))
+	}
+	if m.Unavailability != nil {
+		l = m.Unavailability.Size()
 		n += 1 + l + sovMesos(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -21120,6 +23342,10 @@ func (m *ResourceUsage_Executor) Size() (n int) {
 		l = m.Statistics.Size()
 		n += 1 + l + sovMesos(uint64(l))
 	}
+	if m.ContainerId != nil {
+		l = m.ContainerId.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -21354,6 +23580,10 @@ func (m *Offer) Size() (n int) {
 		l = m.Url.Size()
 		n += 1 + l + sovMesos(uint64(l))
 	}
+	if m.Unavailability != nil {
+		l = m.Unavailability.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -21467,6 +23697,41 @@ func (m *Offer_Operation_Destroy) Size() (n int) {
 	return n
 }
 
+func (m *InverseOffer) Size() (n int) {
+	var l int
+	_ = l
+	if m.Id != nil {
+		l = m.Id.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.Url != nil {
+		l = m.Url.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.Unavailability != nil {
+		l = m.Unavailability.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if len(m.Resources) > 0 {
+		for _, e := range m.Resources {
+			l = e.Size()
+			n += 1 + l + sovMesos(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *TaskInfo) Size() (n int) {
 	var l int
 	_ = l
@@ -21568,6 +23833,10 @@ func (m *TaskStatus) Size() (n int) {
 		l = m.Labels.Size()
 		n += 1 + l + sovMesos(uint64(l))
 	}
+	if m.ContainerStatus != nil {
+		l = m.ContainerStatus.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -21658,7 +23927,7 @@ func (m *Credential) Size() (n int) {
 		n += 1 + l + sovMesos(uint64(l))
 	}
 	if m.Secret != nil {
-		l = len(m.Secret)
+		l = len(*m.Secret)
 		n += 1 + l + sovMesos(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -21742,7 +24011,7 @@ func (m *Image) Size() (n int) {
 	return n
 }
 
-func (m *Image_AppC) Size() (n int) {
+func (m *Image_Appc) Size() (n int) {
 	var l int
 	_ = l
 	if m.Name != nil {
@@ -21800,6 +24069,54 @@ func (m *Volume) Size() (n int) {
 	return n
 }
 
+func (m *NetworkInfo) Size() (n int) {
+	var l int
+	_ = l
+	if m.Protocol != nil {
+		n += 1 + sovMesos(uint64(*m.Protocol))
+	}
+	if m.IpAddress != nil {
+		l = len(*m.IpAddress)
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if len(m.Groups) > 0 {
+		for _, s := range m.Groups {
+			l = len(s)
+			n += 1 + l + sovMesos(uint64(l))
+		}
+	}
+	if m.Labels != nil {
+		l = m.Labels.Size()
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if len(m.IpAddresses) > 0 {
+		for _, e := range m.IpAddresses {
+			l = e.Size()
+			n += 1 + l + sovMesos(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *NetworkInfo_IPAddress) Size() (n int) {
+	var l int
+	_ = l
+	if m.Protocol != nil {
+		n += 1 + sovMesos(uint64(*m.Protocol))
+	}
+	if m.IpAddress != nil {
+		l = len(*m.IpAddress)
+		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *ContainerInfo) Size() (n int) {
 	var l int
 	_ = l
@@ -21823,6 +24140,12 @@ func (m *ContainerInfo) Size() (n int) {
 	if m.Mesos != nil {
 		l = m.Mesos.Size()
 		n += 1 + l + sovMesos(uint64(l))
+	}
+	if len(m.NetworkInfos) > 0 {
+		for _, e := range m.NetworkInfos {
+			l = e.Size()
+			n += 1 + l + sovMesos(uint64(l))
+		}
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -21896,6 +24219,21 @@ func (m *ContainerInfo_MesosInfo) Size() (n int) {
 	return n
 }
 
+func (m *ContainerStatus) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.NetworkInfos) > 0 {
+		for _, e := range m.NetworkInfos {
+			l = e.Size()
+			n += 1 + l + sovMesos(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *Labels) Size() (n int) {
 	var l int
 	_ = l
@@ -21941,6 +24279,9 @@ func (m *Port) Size() (n int) {
 	if m.Protocol != nil {
 		l = len(*m.Protocol)
 		n += 1 + l + sovMesos(uint64(l))
+	}
+	if m.Visibility != nil {
+		n += 1 + sovMesos(uint64(*m.Visibility))
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -22145,6 +24486,28 @@ func (this *ContainerID) String() string {
 	}, "")
 	return s
 }
+func (this *TimeInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TimeInfo{`,
+		`Nanoseconds:` + valueToStringMesos(this.Nanoseconds) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DurationInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DurationInfo{`,
+		`Nanoseconds:` + valueToStringMesos(this.Nanoseconds) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *Address) String() string {
 	if this == nil {
 		return "nil"
@@ -22168,6 +24531,43 @@ func (this *URL) String() string {
 		`Path:` + valueToStringMesos(this.Path) + `,`,
 		`Query:` + strings.Replace(fmt.Sprintf("%v", this.Query), "Parameter", "Parameter", 1) + `,`,
 		`Fragment:` + valueToStringMesos(this.Fragment) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Unavailability) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Unavailability{`,
+		`Start:` + strings.Replace(fmt.Sprintf("%v", this.Start), "TimeInfo", "TimeInfo", 1) + `,`,
+		`Duration:` + strings.Replace(fmt.Sprintf("%v", this.Duration), "DurationInfo", "DurationInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *MachineID) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&MachineID{`,
+		`Hostname:` + valueToStringMesos(this.Hostname) + `,`,
+		`Ip:` + valueToStringMesos(this.Ip) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *MachineInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&MachineInfo{`,
+		`Id:` + strings.Replace(fmt.Sprintf("%v", this.Id), "MachineID", "MachineID", 1) + `,`,
+		`Mode:` + valueToStringMesos(this.Mode) + `,`,
+		`Unavailability:` + strings.Replace(fmt.Sprintf("%v", this.Unavailability), "Unavailability", "Unavailability", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -22571,6 +24971,7 @@ func (this *ResourceUsage_Executor) String() string {
 		`ExecutorInfo:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorInfo), "ExecutorInfo", "ExecutorInfo", 1) + `,`,
 		`Allocated:` + strings.Replace(fmt.Sprintf("%v", this.Allocated), "Resource", "Resource", 1) + `,`,
 		`Statistics:` + strings.Replace(fmt.Sprintf("%v", this.Statistics), "ResourceStatistics", "ResourceStatistics", 1) + `,`,
+		`ContainerId:` + strings.Replace(fmt.Sprintf("%v", this.ContainerId), "ContainerID", "ContainerID", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -22664,6 +25065,7 @@ func (this *Offer) String() string {
 		`ExecutorIds:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorIds), "ExecutorID", "ExecutorID", 1) + `,`,
 		`Attributes:` + strings.Replace(fmt.Sprintf("%v", this.Attributes), "Attribute", "Attribute", 1) + `,`,
 		`Url:` + strings.Replace(fmt.Sprintf("%v", this.Url), "URL", "URL", 1) + `,`,
+		`Unavailability:` + strings.Replace(fmt.Sprintf("%v", this.Unavailability), "Unavailability", "Unavailability", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -22740,6 +25142,22 @@ func (this *Offer_Operation_Destroy) String() string {
 	}, "")
 	return s
 }
+func (this *InverseOffer) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&InverseOffer{`,
+		`Id:` + strings.Replace(fmt.Sprintf("%v", this.Id), "OfferID", "OfferID", 1) + `,`,
+		`Url:` + strings.Replace(fmt.Sprintf("%v", this.Url), "URL", "URL", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`Unavailability:` + strings.Replace(fmt.Sprintf("%v", this.Unavailability), "Unavailability", "Unavailability", 1) + `,`,
+		`Resources:` + strings.Replace(fmt.Sprintf("%v", this.Resources), "Resource", "Resource", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *TaskInfo) String() string {
 	if this == nil {
 		return "nil"
@@ -22778,6 +25196,7 @@ func (this *TaskStatus) String() string {
 		`Reason:` + valueToStringMesos(this.Reason) + `,`,
 		`Uuid:` + valueToStringMesos(this.Uuid) + `,`,
 		`Labels:` + strings.Replace(fmt.Sprintf("%v", this.Labels), "Labels", "Labels", 1) + `,`,
+		`ContainerStatus:` + strings.Replace(fmt.Sprintf("%v", this.ContainerStatus), "ContainerStatus", "ContainerStatus", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -22895,18 +25314,18 @@ func (this *Image) String() string {
 	}
 	s := strings.Join([]string{`&Image{`,
 		`Type:` + valueToStringMesos(this.Type) + `,`,
-		`Appc:` + strings.Replace(fmt.Sprintf("%v", this.Appc), "Image_AppC", "Image_AppC", 1) + `,`,
+		`Appc:` + strings.Replace(fmt.Sprintf("%v", this.Appc), "Image_Appc", "Image_Appc", 1) + `,`,
 		`Docker:` + strings.Replace(fmt.Sprintf("%v", this.Docker), "Image_Docker", "Image_Docker", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *Image_AppC) String() string {
+func (this *Image_Appc) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Image_AppC{`,
+	s := strings.Join([]string{`&Image_Appc{`,
 		`Name:` + valueToStringMesos(this.Name) + `,`,
 		`Id:` + valueToStringMesos(this.Id) + `,`,
 		`Labels:` + strings.Replace(fmt.Sprintf("%v", this.Labels), "Labels", "Labels", 1) + `,`,
@@ -22940,6 +25359,33 @@ func (this *Volume) String() string {
 	}, "")
 	return s
 }
+func (this *NetworkInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NetworkInfo{`,
+		`Protocol:` + valueToStringMesos(this.Protocol) + `,`,
+		`IpAddress:` + valueToStringMesos(this.IpAddress) + `,`,
+		`Groups:` + fmt.Sprintf("%v", this.Groups) + `,`,
+		`Labels:` + strings.Replace(fmt.Sprintf("%v", this.Labels), "Labels", "Labels", 1) + `,`,
+		`IpAddresses:` + strings.Replace(fmt.Sprintf("%v", this.IpAddresses), "NetworkInfo_IPAddress", "NetworkInfo_IPAddress", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NetworkInfo_IPAddress) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NetworkInfo_IPAddress{`,
+		`Protocol:` + valueToStringMesos(this.Protocol) + `,`,
+		`IpAddress:` + valueToStringMesos(this.IpAddress) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ContainerInfo) String() string {
 	if this == nil {
 		return "nil"
@@ -22950,6 +25396,7 @@ func (this *ContainerInfo) String() string {
 		`Docker:` + strings.Replace(fmt.Sprintf("%v", this.Docker), "ContainerInfo_DockerInfo", "ContainerInfo_DockerInfo", 1) + `,`,
 		`Hostname:` + valueToStringMesos(this.Hostname) + `,`,
 		`Mesos:` + strings.Replace(fmt.Sprintf("%v", this.Mesos), "ContainerInfo_MesosInfo", "ContainerInfo_MesosInfo", 1) + `,`,
+		`NetworkInfos:` + strings.Replace(fmt.Sprintf("%v", this.NetworkInfos), "NetworkInfo", "NetworkInfo", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -22995,6 +25442,17 @@ func (this *ContainerInfo_MesosInfo) String() string {
 	}, "")
 	return s
 }
+func (this *ContainerStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerStatus{`,
+		`NetworkInfos:` + strings.Replace(fmt.Sprintf("%v", this.NetworkInfos), "NetworkInfo", "NetworkInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *Labels) String() string {
 	if this == nil {
 		return "nil"
@@ -23026,6 +25484,7 @@ func (this *Port) String() string {
 		`Number:` + valueToStringMesos(this.Number) + `,`,
 		`Name:` + valueToStringMesos(this.Name) + `,`,
 		`Protocol:` + valueToStringMesos(this.Protocol) + `,`,
+		`Visibility:` + valueToStringMesos(this.Visibility) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -23111,8 +25570,12 @@ func (m *FrameworkID) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23125,6 +25588,12 @@ func (m *FrameworkID) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: FrameworkID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: FrameworkID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23132,6 +25601,9 @@ func (m *FrameworkID) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23155,15 +25627,7 @@ func (m *FrameworkID) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23182,6 +25646,9 @@ func (m *FrameworkID) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *OfferID) Unmarshal(data []byte) error {
@@ -23189,8 +25656,12 @@ func (m *OfferID) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23203,6 +25674,12 @@ func (m *OfferID) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: OfferID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: OfferID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23210,6 +25687,9 @@ func (m *OfferID) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23233,15 +25713,7 @@ func (m *OfferID) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23260,6 +25732,9 @@ func (m *OfferID) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *SlaveID) Unmarshal(data []byte) error {
@@ -23267,8 +25742,12 @@ func (m *SlaveID) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23281,6 +25760,12 @@ func (m *SlaveID) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SlaveID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SlaveID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23288,6 +25773,9 @@ func (m *SlaveID) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23311,15 +25799,7 @@ func (m *SlaveID) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23338,6 +25818,9 @@ func (m *SlaveID) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *TaskID) Unmarshal(data []byte) error {
@@ -23345,8 +25828,12 @@ func (m *TaskID) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23359,6 +25846,12 @@ func (m *TaskID) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23366,6 +25859,9 @@ func (m *TaskID) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23389,15 +25885,7 @@ func (m *TaskID) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23416,6 +25904,9 @@ func (m *TaskID) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ExecutorID) Unmarshal(data []byte) error {
@@ -23423,8 +25914,12 @@ func (m *ExecutorID) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23437,6 +25932,12 @@ func (m *ExecutorID) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ExecutorID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ExecutorID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23444,6 +25945,9 @@ func (m *ExecutorID) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23467,15 +25971,7 @@ func (m *ExecutorID) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23494,6 +25990,9 @@ func (m *ExecutorID) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ContainerID) Unmarshal(data []byte) error {
@@ -23501,8 +26000,12 @@ func (m *ContainerID) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23515,6 +26018,12 @@ func (m *ContainerID) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23522,6 +26031,9 @@ func (m *ContainerID) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23545,15 +26057,7 @@ func (m *ContainerID) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23572,15 +26076,22 @@ func (m *ContainerID) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
-func (m *Address) Unmarshal(data []byte) error {
+func (m *TimeInfo) Unmarshal(data []byte) error {
 	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23593,6 +26104,164 @@ func (m *Address) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TimeInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TimeInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nanoseconds", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Nanoseconds = &v
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("nanoseconds")
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DurationInfo) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DurationInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DurationInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nanoseconds", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Nanoseconds = &v
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("nanoseconds")
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Address) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Address: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Address: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23600,6 +26269,9 @@ func (m *Address) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23627,6 +26299,9 @@ func (m *Address) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23654,6 +26329,9 @@ func (m *Address) Unmarshal(data []byte) error {
 			}
 			var v int32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23667,15 +26345,7 @@ func (m *Address) Unmarshal(data []byte) error {
 			m.Port = &v
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23694,6 +26364,9 @@ func (m *Address) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("port")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *URL) Unmarshal(data []byte) error {
@@ -23701,8 +26374,12 @@ func (m *URL) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23715,6 +26392,12 @@ func (m *URL) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: URL: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: URL: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23722,6 +26405,9 @@ func (m *URL) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23750,6 +26436,9 @@ func (m *URL) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23781,6 +26470,9 @@ func (m *URL) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23808,6 +26500,9 @@ func (m *URL) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23836,6 +26531,9 @@ func (m *URL) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23858,15 +26556,7 @@ func (m *URL) Unmarshal(data []byte) error {
 			m.Fragment = &s
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -23888,15 +26578,22 @@ func (m *URL) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("address")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
-func (m *FrameworkInfo) Unmarshal(data []byte) error {
+func (m *Unavailability) Unmarshal(data []byte) error {
 	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -23909,6 +26606,387 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Unavailability: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Unavailability: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Start", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Start == nil {
+				m.Start = &TimeInfo{}
+			}
+			if err := m.Start.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Duration", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Duration == nil {
+				m.Duration = &DurationInfo{}
+			}
+			if err := m.Duration.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("start")
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MachineID) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MachineID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MachineID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hostname", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Hostname = &s
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ip", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Ip = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MachineInfo) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MachineInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MachineInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Id == nil {
+				m.Id = &MachineID{}
+			}
+			if err := m.Id.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mode", wireType)
+			}
+			var v MachineInfo_Mode
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (MachineInfo_Mode(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Mode = &v
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Unavailability", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Unavailability == nil {
+				m.Unavailability = &Unavailability{}
+			}
+			if err := m.Unavailability.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("id")
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *FrameworkInfo) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: FrameworkInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: FrameworkInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -23916,6 +26994,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23944,6 +27025,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -23972,6 +27056,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24021,6 +27108,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24039,6 +27129,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24066,6 +27159,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24093,6 +27189,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24120,6 +27219,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24147,6 +27249,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24175,6 +27280,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24200,15 +27308,7 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -24230,6 +27330,9 @@ func (m *FrameworkInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *FrameworkInfo_Capability) Unmarshal(data []byte) error {
@@ -24237,8 +27340,12 @@ func (m *FrameworkInfo_Capability) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -24251,6 +27358,12 @@ func (m *FrameworkInfo_Capability) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Capability: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Capability: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -24258,6 +27371,9 @@ func (m *FrameworkInfo_Capability) Unmarshal(data []byte) error {
 			}
 			var v FrameworkInfo_Capability_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24271,15 +27387,7 @@ func (m *FrameworkInfo_Capability) Unmarshal(data []byte) error {
 			m.Type = &v
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -24298,14 +27406,21 @@ func (m *FrameworkInfo_Capability) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *HealthCheck) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -24318,6 +27433,12 @@ func (m *HealthCheck) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: HealthCheck: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: HealthCheck: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -24325,6 +27446,9 @@ func (m *HealthCheck) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24412,6 +27536,9 @@ func (m *HealthCheck) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24448,6 +27575,9 @@ func (m *HealthCheck) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24473,15 +27603,7 @@ func (m *HealthCheck) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -24497,6 +27619,9 @@ func (m *HealthCheck) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
@@ -24504,8 +27629,12 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -24518,6 +27647,12 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: HTTP: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: HTTP: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -24525,6 +27660,9 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24543,6 +27681,9 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24570,6 +27711,9 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24582,15 +27726,7 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 			}
 			m.Statuses = append(m.Statuses, v)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -24609,14 +27745,21 @@ func (m *HealthCheck_HTTP) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("port")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *CommandInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -24629,6 +27772,12 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CommandInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CommandInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -24636,6 +27785,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24664,6 +27816,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24694,6 +27849,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24721,6 +27879,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24751,6 +27912,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24778,6 +27942,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24796,6 +27963,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24817,15 +27987,7 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 			m.Arguments = append(m.Arguments, string(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -24841,6 +28003,9 @@ func (m *CommandInfo) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *CommandInfo_URI) Unmarshal(data []byte) error {
@@ -24848,8 +28013,12 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -24862,6 +28031,12 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: URI: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: URI: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -24869,6 +28044,9 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24897,6 +28075,9 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24915,6 +28096,9 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24933,6 +28117,9 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -24946,15 +28133,7 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 			b := bool(v != 0)
 			m.Cache = &b
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -24973,6 +28152,9 @@ func (m *CommandInfo_URI) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
@@ -24980,8 +28162,12 @@ func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -24994,6 +28180,12 @@ func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -25001,6 +28193,9 @@ func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25029,6 +28224,9 @@ func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25050,15 +28248,7 @@ func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
 			m.Options = append(m.Options, string(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -25077,6 +28267,9 @@ func (m *CommandInfo_ContainerInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("image")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ExecutorInfo) Unmarshal(data []byte) error {
@@ -25084,8 +28277,12 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -25098,6 +28295,12 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ExecutorInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ExecutorInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -25105,6 +28308,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25136,6 +28342,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var byteLen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25161,6 +28370,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25189,6 +28401,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25220,6 +28435,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25250,6 +28468,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25277,6 +28498,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25304,6 +28528,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25334,6 +28561,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25359,15 +28589,7 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -25389,6 +28611,9 @@ func (m *ExecutorInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("command")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *MasterInfo) Unmarshal(data []byte) error {
@@ -25396,8 +28621,12 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -25410,6 +28639,12 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MasterInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MasterInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -25417,6 +28652,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25445,6 +28683,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25463,6 +28704,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25481,6 +28725,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25508,6 +28755,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25535,6 +28785,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25562,6 +28815,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25587,15 +28843,7 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -25620,6 +28868,9 @@ func (m *MasterInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("port")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *SlaveInfo) Unmarshal(data []byte) error {
@@ -25627,8 +28878,12 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -25641,6 +28896,12 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SlaveInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SlaveInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -25648,6 +28909,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25676,6 +28940,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25704,6 +28971,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25732,6 +29002,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25762,6 +29035,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25780,6 +29056,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			var v int32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25792,15 +29071,7 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 			}
 			m.Port = &v
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -25819,6 +29090,9 @@ func (m *SlaveInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("hostname")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Value) Unmarshal(data []byte) error {
@@ -25826,8 +29100,12 @@ func (m *Value) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -25840,6 +29118,12 @@ func (m *Value) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Value: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Value: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -25847,6 +29131,9 @@ func (m *Value) Unmarshal(data []byte) error {
 			}
 			var v Value_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25865,6 +29152,9 @@ func (m *Value) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25895,6 +29185,9 @@ func (m *Value) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25925,6 +29218,9 @@ func (m *Value) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25955,6 +29251,9 @@ func (m *Value) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -25980,15 +29279,7 @@ func (m *Value) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26007,6 +29298,9 @@ func (m *Value) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Value_Scalar) Unmarshal(data []byte) error {
@@ -26014,8 +29308,12 @@ func (m *Value_Scalar) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26028,6 +29326,12 @@ func (m *Value_Scalar) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Scalar: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Scalar: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 1 {
@@ -26050,15 +29354,7 @@ func (m *Value_Scalar) Unmarshal(data []byte) error {
 			m.Value = &v2
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26077,6 +29373,9 @@ func (m *Value_Scalar) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Value_Range) Unmarshal(data []byte) error {
@@ -26084,8 +29383,12 @@ func (m *Value_Range) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26098,6 +29401,12 @@ func (m *Value_Range) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Range: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Range: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -26105,6 +29414,9 @@ func (m *Value_Range) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26123,6 +29435,9 @@ func (m *Value_Range) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26136,15 +29451,7 @@ func (m *Value_Range) Unmarshal(data []byte) error {
 			m.End = &v
 			hasFields[0] |= uint64(0x00000002)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26166,14 +29473,21 @@ func (m *Value_Range) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("end")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Value_Ranges) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26186,6 +29500,12 @@ func (m *Value_Ranges) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Ranges: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Ranges: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -26193,6 +29513,9 @@ func (m *Value_Ranges) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26216,15 +29539,7 @@ func (m *Value_Ranges) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26240,14 +29555,21 @@ func (m *Value_Ranges) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Value_Set) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26260,6 +29582,12 @@ func (m *Value_Set) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Set: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Set: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -26267,6 +29595,9 @@ func (m *Value_Set) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26288,15 +29619,7 @@ func (m *Value_Set) Unmarshal(data []byte) error {
 			m.Item = append(m.Item, string(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26312,6 +29635,9 @@ func (m *Value_Set) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Value_Text) Unmarshal(data []byte) error {
@@ -26319,8 +29645,12 @@ func (m *Value_Text) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26333,6 +29663,12 @@ func (m *Value_Text) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Text: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Text: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -26340,6 +29676,9 @@ func (m *Value_Text) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26363,15 +29702,7 @@ func (m *Value_Text) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26390,6 +29721,9 @@ func (m *Value_Text) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Attribute) Unmarshal(data []byte) error {
@@ -26397,8 +29731,12 @@ func (m *Attribute) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26411,6 +29749,12 @@ func (m *Attribute) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Attribute: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Attribute: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -26418,6 +29762,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26446,6 +29793,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			var v Value_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26464,6 +29814,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26494,6 +29847,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26524,6 +29880,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26554,6 +29913,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26579,15 +29941,7 @@ func (m *Attribute) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26609,6 +29963,9 @@ func (m *Attribute) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Resource) Unmarshal(data []byte) error {
@@ -26616,8 +29973,12 @@ func (m *Resource) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26630,6 +29991,12 @@ func (m *Resource) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Resource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Resource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -26637,6 +30004,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26665,6 +30035,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var v Value_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26683,6 +30056,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26713,6 +30089,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26743,6 +30122,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26773,6 +30155,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26800,6 +30185,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26830,6 +30218,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26860,6 +30251,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26885,15 +30279,7 @@ func (m *Resource) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26915,6 +30301,9 @@ func (m *Resource) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Resource_ReservationInfo) Unmarshal(data []byte) error {
@@ -26922,8 +30311,12 @@ func (m *Resource_ReservationInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -26936,6 +30329,12 @@ func (m *Resource_ReservationInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ReservationInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ReservationInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -26943,6 +30342,9 @@ func (m *Resource_ReservationInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -26966,15 +30368,7 @@ func (m *Resource_ReservationInfo) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -26993,14 +30387,21 @@ func (m *Resource_ReservationInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("principal")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Resource_DiskInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -27013,6 +30414,12 @@ func (m *Resource_DiskInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DiskInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DiskInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -27020,6 +30427,9 @@ func (m *Resource_DiskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27050,6 +30460,9 @@ func (m *Resource_DiskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27075,15 +30488,7 @@ func (m *Resource_DiskInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -27099,6 +30504,9 @@ func (m *Resource_DiskInfo) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Resource_DiskInfo_Persistence) Unmarshal(data []byte) error {
@@ -27106,8 +30514,12 @@ func (m *Resource_DiskInfo_Persistence) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -27120,6 +30532,12 @@ func (m *Resource_DiskInfo_Persistence) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Persistence: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Persistence: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -27127,6 +30545,9 @@ func (m *Resource_DiskInfo_Persistence) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27150,15 +30571,7 @@ func (m *Resource_DiskInfo_Persistence) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -27177,14 +30590,21 @@ func (m *Resource_DiskInfo_Persistence) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("id")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Resource_RevocableInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -27196,17 +30616,16 @@ func (m *Resource_RevocableInfo) Unmarshal(data []byte) error {
 			}
 		}
 		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RevocableInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RevocableInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -27222,6 +30641,9 @@ func (m *Resource_RevocableInfo) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
@@ -27229,8 +30651,12 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -27243,6 +30669,12 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TrafficControlStatistics: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TrafficControlStatistics: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -27250,6 +30682,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27278,6 +30713,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27295,6 +30733,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27312,6 +30753,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27329,6 +30773,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27346,6 +30793,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27363,6 +30813,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27380,6 +30833,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27397,6 +30853,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27414,6 +30873,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27426,15 +30888,7 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 			}
 			m.Requeues = &v
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -27453,6 +30907,9 @@ func (m *TrafficControlStatistics) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("id")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ResourceStatistics) Unmarshal(data []byte) error {
@@ -27460,8 +30917,12 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -27474,6 +30935,12 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ResourceStatistics: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ResourceStatistics: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 1 {
@@ -27558,6 +31025,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27575,6 +31045,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27592,6 +31065,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27609,6 +31085,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27645,6 +31124,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27662,6 +31144,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27679,6 +31164,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27696,6 +31184,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27726,6 +31217,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27743,6 +31237,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27760,6 +31257,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27777,6 +31277,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27794,6 +31297,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27811,6 +31317,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27828,6 +31337,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27845,6 +31357,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27938,6 +31453,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -27955,6 +31473,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28010,6 +31531,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28027,6 +31551,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28044,6 +31571,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28061,6 +31591,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28078,6 +31611,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28095,6 +31631,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28123,6 +31662,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28140,6 +31682,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28157,6 +31702,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28174,6 +31722,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28191,6 +31742,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28208,6 +31762,9 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28220,15 +31777,7 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 			}
 			m.MemUnevictableBytes = &v
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -28247,14 +31796,21 @@ func (m *ResourceStatistics) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("timestamp")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ResourceUsage) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -28267,6 +31823,12 @@ func (m *ResourceUsage) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ResourceUsage: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ResourceUsage: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -28274,6 +31836,9 @@ func (m *ResourceUsage) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28302,6 +31867,9 @@ func (m *ResourceUsage) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28325,15 +31893,7 @@ func (m *ResourceUsage) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -28349,6 +31909,9 @@ func (m *ResourceUsage) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
@@ -28356,8 +31919,12 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -28370,6 +31937,12 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Executor: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Executor: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -28377,6 +31950,9 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28408,6 +31984,9 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28436,6 +32015,9 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28460,16 +32042,42 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
 					break
 				}
 			}
-			iNdEx -= sizeOfWire
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ContainerId == nil {
+				m.ContainerId = &ContainerID{}
+			}
+			if err := m.ContainerId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -28487,7 +32095,13 @@ func (m *ResourceUsage_Executor) Unmarshal(data []byte) error {
 	if hasFields[0]&uint64(0x00000001) == 0 {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_info")
 	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("container_id")
+	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *PerfStatistics) Unmarshal(data []byte) error {
@@ -28495,8 +32109,12 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -28509,6 +32127,12 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PerfStatistics: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PerfStatistics: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 1 {
@@ -28556,6 +32180,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28573,6 +32200,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28590,6 +32220,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28607,6 +32240,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28624,6 +32260,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28641,6 +32280,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28658,6 +32300,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28675,6 +32320,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28692,6 +32340,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28709,6 +32360,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28764,6 +32418,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28781,6 +32438,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28798,6 +32458,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28815,6 +32478,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28832,6 +32498,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28849,6 +32518,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28866,6 +32538,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28883,6 +32558,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28900,6 +32578,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28917,6 +32598,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28934,6 +32618,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28951,6 +32638,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28968,6 +32658,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -28985,6 +32678,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29002,6 +32698,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29019,6 +32718,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29036,6 +32738,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29053,6 +32758,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29070,6 +32778,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29087,6 +32798,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29104,6 +32818,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29121,6 +32838,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29138,6 +32858,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29155,6 +32878,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29172,6 +32898,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29189,6 +32918,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29206,6 +32938,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29223,6 +32958,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29240,6 +32978,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29257,6 +32998,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29274,6 +33018,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29291,6 +33038,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29308,6 +33058,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29325,6 +33078,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29342,6 +33098,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29359,6 +33118,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29376,6 +33138,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29393,6 +33158,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29410,6 +33178,9 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29422,15 +33193,7 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 			}
 			m.NodePrefetchMisses = &v
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -29452,14 +33215,21 @@ func (m *PerfStatistics) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("duration")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Request) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -29472,6 +33242,12 @@ func (m *Request) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Request: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Request: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -29479,6 +33255,9 @@ func (m *Request) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29509,6 +33288,9 @@ func (m *Request) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29532,15 +33314,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -29556,6 +33330,9 @@ func (m *Request) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer) Unmarshal(data []byte) error {
@@ -29563,8 +33340,12 @@ func (m *Offer) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -29577,6 +33358,12 @@ func (m *Offer) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Offer: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Offer: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -29584,6 +33371,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29615,6 +33405,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29646,6 +33439,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29677,6 +33473,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29705,6 +33504,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29733,6 +33535,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29761,6 +33566,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29789,6 +33597,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29813,16 +33624,41 @@ func (m *Offer) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Unavailability", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
 					break
 				}
 			}
-			iNdEx -= sizeOfWire
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Unavailability == nil {
+				m.Unavailability = &Unavailability{}
+			}
+			if err := m.Unavailability.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -29850,6 +33686,9 @@ func (m *Offer) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("hostname")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer_Operation) Unmarshal(data []byte) error {
@@ -29857,8 +33696,12 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -29871,6 +33714,12 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Operation: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Operation: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -29878,6 +33727,9 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			var v Offer_Operation_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29896,6 +33748,9 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29926,6 +33781,9 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29956,6 +33814,9 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -29986,6 +33847,9 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30016,6 +33880,9 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30041,15 +33908,7 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30068,14 +33927,21 @@ func (m *Offer_Operation) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer_Operation_Launch) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30088,6 +33954,12 @@ func (m *Offer_Operation_Launch) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Launch: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Launch: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30095,6 +33967,9 @@ func (m *Offer_Operation_Launch) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30118,15 +33993,7 @@ func (m *Offer_Operation_Launch) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30142,14 +34009,21 @@ func (m *Offer_Operation_Launch) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer_Operation_Reserve) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30162,6 +34036,12 @@ func (m *Offer_Operation_Reserve) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Reserve: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Reserve: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30169,6 +34049,9 @@ func (m *Offer_Operation_Reserve) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30192,15 +34075,7 @@ func (m *Offer_Operation_Reserve) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30216,14 +34091,21 @@ func (m *Offer_Operation_Reserve) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer_Operation_Unreserve) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30236,6 +34118,12 @@ func (m *Offer_Operation_Unreserve) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Unreserve: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Unreserve: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30243,6 +34131,9 @@ func (m *Offer_Operation_Unreserve) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30266,15 +34157,7 @@ func (m *Offer_Operation_Unreserve) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30290,14 +34173,21 @@ func (m *Offer_Operation_Unreserve) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer_Operation_Create) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30310,6 +34200,12 @@ func (m *Offer_Operation_Create) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Create: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Create: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30317,6 +34213,9 @@ func (m *Offer_Operation_Create) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30340,15 +34239,7 @@ func (m *Offer_Operation_Create) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30364,14 +34255,21 @@ func (m *Offer_Operation_Create) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Offer_Operation_Destroy) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30384,6 +34282,12 @@ func (m *Offer_Operation_Destroy) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Destroy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Destroy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30391,6 +34295,9 @@ func (m *Offer_Operation_Destroy) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30414,15 +34321,7 @@ func (m *Offer_Operation_Destroy) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30438,6 +34337,269 @@ func (m *Offer_Operation_Destroy) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *InverseOffer) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: InverseOffer: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: InverseOffer: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Id == nil {
+				m.Id = &OfferID{}
+			}
+			if err := m.Id.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Url", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Url == nil {
+				m.Url = &URL{}
+			}
+			if err := m.Url.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Unavailability", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Unavailability == nil {
+				m.Unavailability = &Unavailability{}
+			}
+			if err := m.Unavailability.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Resources = append(m.Resources, &Resource{})
+			if err := m.Resources[len(m.Resources)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("unavailability")
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *TaskInfo) Unmarshal(data []byte) error {
@@ -30445,8 +34607,12 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30459,6 +34625,12 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30466,6 +34638,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30494,6 +34669,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30525,6 +34703,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30556,6 +34737,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30584,6 +34768,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30614,6 +34801,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var byteLen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30639,6 +34829,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30669,6 +34862,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30699,6 +34895,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30729,6 +34928,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30759,6 +34961,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30784,15 +34989,7 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -30817,6 +35014,9 @@ func (m *TaskInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *TaskStatus) Unmarshal(data []byte) error {
@@ -30824,8 +35024,12 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -30838,6 +35042,12 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TaskStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TaskStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -30845,6 +35055,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30876,6 +35089,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var v TaskState
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30894,6 +35110,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var byteLen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30919,6 +35138,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30946,6 +35168,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -30995,6 +35220,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31025,6 +35253,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31043,6 +35274,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var v TaskStatus_Source
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31060,6 +35294,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var v TaskStatus_Reason
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31077,6 +35314,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var byteLen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31102,6 +35342,9 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31126,16 +35369,41 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerStatus", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
 					break
 				}
 			}
-			iNdEx -= sizeOfWire
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ContainerStatus == nil {
+				m.ContainerStatus = &ContainerStatus{}
+			}
+			if err := m.ContainerStatus.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31157,14 +35425,21 @@ func (m *TaskStatus) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("state")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Filters) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31177,6 +35452,12 @@ func (m *Filters) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Filters: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Filters: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 1 {
@@ -31198,15 +35479,7 @@ func (m *Filters) Unmarshal(data []byte) error {
 			v2 := float64(math.Float64frombits(v))
 			m.RefuseSeconds = &v2
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31222,14 +35495,21 @@ func (m *Filters) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Environment) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31242,6 +35522,12 @@ func (m *Environment) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Environment: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Environment: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31249,6 +35535,9 @@ func (m *Environment) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31272,15 +35561,7 @@ func (m *Environment) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31296,6 +35577,9 @@ func (m *Environment) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Environment_Variable) Unmarshal(data []byte) error {
@@ -31303,8 +35587,12 @@ func (m *Environment_Variable) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31317,6 +35605,12 @@ func (m *Environment_Variable) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Variable: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Variable: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31324,6 +35618,9 @@ func (m *Environment_Variable) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31352,6 +35649,9 @@ func (m *Environment_Variable) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31375,15 +35675,7 @@ func (m *Environment_Variable) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000002)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31405,6 +35697,9 @@ func (m *Environment_Variable) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Parameter) Unmarshal(data []byte) error {
@@ -31412,8 +35707,12 @@ func (m *Parameter) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31426,6 +35725,12 @@ func (m *Parameter) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Parameter: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Parameter: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31433,6 +35738,9 @@ func (m *Parameter) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31461,6 +35769,9 @@ func (m *Parameter) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31484,15 +35795,7 @@ func (m *Parameter) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000002)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31514,14 +35817,21 @@ func (m *Parameter) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Parameters) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31534,6 +35844,12 @@ func (m *Parameters) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Parameters: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Parameters: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31541,6 +35857,9 @@ func (m *Parameters) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31564,15 +35883,7 @@ func (m *Parameters) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31588,6 +35899,9 @@ func (m *Parameters) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Credential) Unmarshal(data []byte) error {
@@ -31595,8 +35909,12 @@ func (m *Credential) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31609,6 +35927,12 @@ func (m *Credential) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Credential: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Credential: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31616,6 +35940,9 @@ func (m *Credential) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31642,37 +35969,34 @@ func (m *Credential) Unmarshal(data []byte) error {
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Secret", wireType)
 			}
-			var byteLen int
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
 				b := data[iNdEx]
 				iNdEx++
-				byteLen |= (int(b) & 0x7F) << shift
+				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if byteLen < 0 {
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
 				return ErrInvalidLengthMesos
 			}
-			postIndex := iNdEx + byteLen
+			postIndex := iNdEx + intStringLen
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Secret = append([]byte{}, data[iNdEx:postIndex]...)
+			s := string(data[iNdEx:postIndex])
+			m.Secret = &s
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31691,14 +36015,21 @@ func (m *Credential) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("principal")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Credentials) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31711,6 +36042,12 @@ func (m *Credentials) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Credentials: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Credentials: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31718,6 +36055,9 @@ func (m *Credentials) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31741,15 +36081,7 @@ func (m *Credentials) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31765,6 +36097,9 @@ func (m *Credentials) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *RateLimit) Unmarshal(data []byte) error {
@@ -31772,8 +36107,12 @@ func (m *RateLimit) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31786,6 +36125,12 @@ func (m *RateLimit) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RateLimit: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RateLimit: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 1 {
@@ -31812,6 +36157,9 @@ func (m *RateLimit) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31840,6 +36188,9 @@ func (m *RateLimit) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31852,15 +36203,7 @@ func (m *RateLimit) Unmarshal(data []byte) error {
 			}
 			m.Capacity = &v
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31879,14 +36222,21 @@ func (m *RateLimit) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("principal")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *RateLimits) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -31899,6 +36249,12 @@ func (m *RateLimits) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RateLimits: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RateLimits: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -31906,6 +36262,9 @@ func (m *RateLimits) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31953,6 +36312,9 @@ func (m *RateLimits) Unmarshal(data []byte) error {
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -31965,15 +36327,7 @@ func (m *RateLimits) Unmarshal(data []byte) error {
 			}
 			m.AggregateDefaultCapacity = &v
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -31989,6 +36343,9 @@ func (m *RateLimits) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Image) Unmarshal(data []byte) error {
@@ -31996,8 +36353,12 @@ func (m *Image) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32010,6 +36371,12 @@ func (m *Image) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Image: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Image: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -32017,6 +36384,9 @@ func (m *Image) Unmarshal(data []byte) error {
 			}
 			var v Image_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32035,6 +36405,9 @@ func (m *Image) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32053,7 +36426,7 @@ func (m *Image) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Appc == nil {
-				m.Appc = &Image_AppC{}
+				m.Appc = &Image_Appc{}
 			}
 			if err := m.Appc.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -32065,6 +36438,9 @@ func (m *Image) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32090,15 +36466,7 @@ func (m *Image) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32117,15 +36485,22 @@ func (m *Image) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
-func (m *Image_AppC) Unmarshal(data []byte) error {
+func (m *Image_Appc) Unmarshal(data []byte) error {
 	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32138,6 +36513,12 @@ func (m *Image_AppC) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Appc: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Appc: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -32145,6 +36526,9 @@ func (m *Image_AppC) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32173,6 +36557,9 @@ func (m *Image_AppC) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32200,6 +36587,9 @@ func (m *Image_AppC) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32225,15 +36615,7 @@ func (m *Image_AppC) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32252,6 +36634,9 @@ func (m *Image_AppC) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Image_Docker) Unmarshal(data []byte) error {
@@ -32259,8 +36644,12 @@ func (m *Image_Docker) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32273,6 +36662,12 @@ func (m *Image_Docker) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Docker: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Docker: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -32280,6 +36675,9 @@ func (m *Image_Docker) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32303,15 +36701,7 @@ func (m *Image_Docker) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000001)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32330,6 +36720,9 @@ func (m *Image_Docker) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Volume) Unmarshal(data []byte) error {
@@ -32337,8 +36730,12 @@ func (m *Volume) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32351,6 +36748,12 @@ func (m *Volume) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Volume: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Volume: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -32358,6 +36761,9 @@ func (m *Volume) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32386,6 +36792,9 @@ func (m *Volume) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32413,6 +36822,9 @@ func (m *Volume) Unmarshal(data []byte) error {
 			}
 			var v Volume_Mode
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32431,6 +36843,9 @@ func (m *Volume) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32456,15 +36871,7 @@ func (m *Volume) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32486,15 +36893,21 @@ func (m *Volume) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("mode")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
-func (m *ContainerInfo) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
+func (m *NetworkInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32507,6 +36920,308 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Protocol", wireType)
+			}
+			var v NetworkInfo_Protocol
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (NetworkInfo_Protocol(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Protocol = &v
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IpAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.IpAddress = &s
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Groups", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Groups = append(m.Groups, string(data[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Labels", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Labels == nil {
+				m.Labels = &Labels{}
+			}
+			if err := m.Labels.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IpAddresses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IpAddresses = append(m.IpAddresses, &NetworkInfo_IPAddress{})
+			if err := m.IpAddresses[len(m.IpAddresses)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkInfo_IPAddress) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IPAddress: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IPAddress: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Protocol", wireType)
+			}
+			var v NetworkInfo_Protocol
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (NetworkInfo_Protocol(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Protocol = &v
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IpAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.IpAddress = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerInfo) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -32514,6 +37229,9 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var v ContainerInfo_Type
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32532,6 +37250,9 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32560,6 +37281,9 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32590,6 +37314,9 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32617,6 +37344,9 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32641,16 +37371,39 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NetworkInfos", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
 					break
 				}
 			}
-			iNdEx -= sizeOfWire
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NetworkInfos = append(m.NetworkInfos, &NetworkInfo{})
+			if err := m.NetworkInfos[len(m.NetworkInfos)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32669,6 +37422,9 @@ func (m *ContainerInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
@@ -32676,8 +37432,12 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32690,6 +37450,12 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DockerInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DockerInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -32697,6 +37463,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32725,6 +37494,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			}
 			var v ContainerInfo_DockerInfo_Network
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32742,6 +37514,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32770,6 +37545,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32788,6 +37566,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32816,6 +37597,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32829,15 +37613,7 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 			b := bool(v != 0)
 			m.ForcePullImage = &b
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32856,6 +37632,9 @@ func (m *ContainerInfo_DockerInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("image")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
@@ -32863,8 +37642,12 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32877,6 +37660,12 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PortMapping: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PortMapping: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -32884,6 +37673,9 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32902,6 +37694,9 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32920,6 +37715,9 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -32942,15 +37740,7 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 			m.Protocol = &s
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -32972,14 +37762,21 @@ func (m *ContainerInfo_DockerInfo_PortMapping) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("container_port")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *ContainerInfo_MesosInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -32992,6 +37789,12 @@ func (m *ContainerInfo_MesosInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MesosInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MesosInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -32999,6 +37802,9 @@ func (m *ContainerInfo_MesosInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33024,15 +37830,7 @@ func (m *ContainerInfo_MesosInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33048,14 +37846,21 @@ func (m *ContainerInfo_MesosInfo) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
-func (m *Labels) Unmarshal(data []byte) error {
+func (m *ContainerStatus) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33068,6 +37873,94 @@ func (m *Labels) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NetworkInfos", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMesos
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NetworkInfos = append(m.NetworkInfos, &NetworkInfo{})
+			if err := m.NetworkInfos[len(m.NetworkInfos)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMesos(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMesos
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Labels) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Labels: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Labels: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -33075,6 +37968,9 @@ func (m *Labels) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33098,15 +37994,7 @@ func (m *Labels) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33122,6 +38010,9 @@ func (m *Labels) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Label) Unmarshal(data []byte) error {
@@ -33129,8 +38020,12 @@ func (m *Label) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33143,6 +38038,12 @@ func (m *Label) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Label: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Label: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -33150,6 +38051,9 @@ func (m *Label) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33178,6 +38082,9 @@ func (m *Label) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33200,15 +38107,7 @@ func (m *Label) Unmarshal(data []byte) error {
 			m.Value = &s
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33227,6 +38126,9 @@ func (m *Label) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("key")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Port) Unmarshal(data []byte) error {
@@ -33234,8 +38136,12 @@ func (m *Port) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33248,6 +38154,12 @@ func (m *Port) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Port: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Port: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -33255,6 +38167,9 @@ func (m *Port) Unmarshal(data []byte) error {
 			}
 			var v uint32
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33273,6 +38188,9 @@ func (m *Port) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33300,6 +38218,9 @@ func (m *Port) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33321,16 +38242,28 @@ func (m *Port) Unmarshal(data []byte) error {
 			s := string(data[iNdEx:postIndex])
 			m.Protocol = &s
 			iNdEx = postIndex
-		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Visibility", wireType)
+			}
+			var v DiscoveryInfo_Visibility
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (DiscoveryInfo_Visibility(b) & 0x7F) << shift
+				if b < 0x80 {
 					break
 				}
 			}
-			iNdEx -= sizeOfWire
+			m.Visibility = &v
+		default:
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33349,14 +38282,21 @@ func (m *Port) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("number")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Ports) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33369,6 +38309,12 @@ func (m *Ports) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Ports: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Ports: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -33376,6 +38322,9 @@ func (m *Ports) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33399,15 +38348,7 @@ func (m *Ports) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33423,6 +38364,9 @@ func (m *Ports) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *DiscoveryInfo) Unmarshal(data []byte) error {
@@ -33430,8 +38374,12 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33444,6 +38392,12 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DiscoveryInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DiscoveryInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -33451,6 +38405,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var v DiscoveryInfo_Visibility
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33469,6 +38426,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33496,6 +38456,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33523,6 +38486,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33550,6 +38516,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33577,6 +38546,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33607,6 +38579,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33632,15 +38607,7 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33659,6 +38626,9 @@ func (m *DiscoveryInfo) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("visibility")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *AppcImageManifest) Unmarshal(data []byte) error {
@@ -33666,8 +38636,12 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33680,6 +38654,12 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AppcImageManifest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AppcImageManifest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -33687,6 +38667,9 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33715,6 +38698,9 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33743,6 +38729,9 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33771,6 +38760,9 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33799,6 +38791,9 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33822,15 +38817,7 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33855,6 +38842,9 @@ func (m *AppcImageManifest) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
@@ -33862,8 +38852,12 @@ func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33876,6 +38870,12 @@ func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Label: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Label: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -33883,6 +38883,9 @@ func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33911,6 +38914,9 @@ func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -33934,15 +38940,7 @@ func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000002)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -33964,6 +38962,9 @@ func (m *AppcImageManifest_Label) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
@@ -33971,8 +38972,12 @@ func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -33985,6 +38990,12 @@ func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Annotation: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Annotation: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
@@ -33992,6 +39003,9 @@ func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -34020,6 +39034,9 @@ func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -34043,15 +39060,7 @@ func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000002)
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipMesos(data[iNdEx:])
 			if err != nil {
 				return err
@@ -34073,6 +39082,9 @@ func (m *AppcImageManifest_Annotation) Unmarshal(data []byte) error {
 		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func skipMesos(data []byte) (n int, err error) {
@@ -34081,6 +39093,9 @@ func skipMesos(data []byte) (n int, err error) {
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return 0, ErrIntOverflowMesos
+			}
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
@@ -34094,7 +39109,10 @@ func skipMesos(data []byte) (n int, err error) {
 		wireType := int(wire & 0x7)
 		switch wireType {
 		case 0:
-			for {
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return 0, ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
@@ -34110,6 +39128,9 @@ func skipMesos(data []byte) (n int, err error) {
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return 0, ErrIntOverflowMesos
+				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
@@ -34130,6 +39151,9 @@ func skipMesos(data []byte) (n int, err error) {
 				var innerWire uint64
 				var start int = iNdEx
 				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return 0, ErrIntOverflowMesos
+					}
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
@@ -34165,4 +39189,5 @@ func skipMesos(data []byte) (n int, err error) {
 
 var (
 	ErrInvalidLengthMesos = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowMesos   = fmt.Errorf("proto: integer overflow")
 )

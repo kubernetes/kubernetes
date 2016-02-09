@@ -18,13 +18,14 @@ limitations under the License.
 package options
 
 import (
-	"net"
 	_ "net/http/pprof"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/spf13/pflag"
 )
@@ -33,67 +34,51 @@ const (
 	ExperimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
 )
 
-// ProxyServerConfig contains configurations for a Kubernetes proxy server
+// ProxyServerConfig configures and runs a Kubernetes proxy server
 type ProxyServerConfig struct {
-	BindAddress                    net.IP
-	HealthzPort                    int
-	HealthzBindAddress             net.IP
-	OOMScoreAdj                    int
-	ResourceContainer              string
-	Master                         string
-	Kubeconfig                     string
-	PortRange                      utilnet.PortRange
-	HostnameOverride               string
-	ProxyMode                      string
-	IptablesSyncPeriod             time.Duration
-	ConfigSyncPeriod               time.Duration
-	NodeRef                        *api.ObjectReference // Reference to this node.
-	MasqueradeAll                  bool
-	CleanupAndExit                 bool
-	KubeAPIQPS                     float32
-	KubeAPIBurst                   int
-	UDPIdleTimeout                 time.Duration
-	ConntrackMax                   int
-	ConntrackTCPTimeoutEstablished int // seconds
+	componentconfig.KubeProxyConfiguration
+	ResourceContainer string
+	KubeAPIQPS        float32
+	KubeAPIBurst      int
+	ConfigSyncPeriod  time.Duration
+	CleanupAndExit    bool
+	NodeRef           *api.ObjectReference
+	Master            string
+	Kubeconfig        string
 }
 
 func NewProxyConfig() *ProxyServerConfig {
+	config := componentconfig.KubeProxyConfiguration{}
+	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &config)
 	return &ProxyServerConfig{
-		BindAddress:                    net.ParseIP("0.0.0.0"),
-		HealthzPort:                    10249,
-		HealthzBindAddress:             net.ParseIP("127.0.0.1"),
-		OOMScoreAdj:                    qos.KubeProxyOOMScoreAdj,
-		ResourceContainer:              "/kube-proxy",
-		IptablesSyncPeriod:             30 * time.Second,
-		ConfigSyncPeriod:               15 * time.Minute,
-		KubeAPIQPS:                     5.0,
-		KubeAPIBurst:                   10,
-		UDPIdleTimeout:                 250 * time.Millisecond,
-		ConntrackMax:                   256 * 1024, // 4x default (64k)
-		ConntrackTCPTimeoutEstablished: 86400,      // 1 day (1/5 default)
+		KubeProxyConfiguration: config,
+		KubeAPIQPS:             5.0,
+		KubeAPIBurst:           10,
+		ConfigSyncPeriod:       15 * time.Minute,
 	}
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
 func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
-	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.Var(componentconfig.IPVar{&s.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
-	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.Var(componentconfig.IPVar{&s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
+	fs.IntVar(s.OOMScoreAdj, "oom-score-adj", util.IntPtrDerefOr(s.OOMScoreAdj, qos.KubeProxyOOMScoreAdj), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
-	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
+	fs.Var(componentconfig.PortRangeVar{&s.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
-	fs.StringVar(&s.ProxyMode, "proxy-mode", "", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If blank, look at the Node object on the Kubernetes API and respect the '"+ExperimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
-	fs.DurationVar(&s.IptablesSyncPeriod, "iptables-sync-period", s.IptablesSyncPeriod, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.Var(&s.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If blank, look at the Node object on the Kubernetes API and respect the '"+ExperimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.IntVar(s.IPTablesMasqueradeBit, "iptables-masquerade-bit", util.IntPtrDerefOr(s.IPTablesMasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
+	fs.DurationVar(&s.IPTablesSyncPeriod.Duration, "iptables-sync-period", s.IPTablesSyncPeriod.Duration, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.DurationVar(&s.ConfigSyncPeriod, "config-sync-period", s.ConfigSyncPeriod, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
-	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
+	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", s.MasqueradeAll, "If using the pure iptables proxy, SNAT everything")
+	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", s.CleanupAndExit, "If true cleanup iptables rules and exit.")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
-	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
+	fs.DurationVar(&s.UDPIdleTimeout.Duration, "udp-timeout", s.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 	fs.IntVar(&s.ConntrackMax, "conntrack-max", s.ConntrackMax, "Maximum number of NAT connections to track (0 to leave as-is)")
-	fs.IntVar(&s.ConntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.ConntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections (0 to leave as-is)")
+	fs.DurationVar(&s.ConntrackTCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", s.ConntrackTCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
 }

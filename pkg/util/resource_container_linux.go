@@ -33,8 +33,11 @@ import (
 func RunInResourceContainer(containerName string) error {
 	manager := fs.Manager{
 		Cgroups: &configs.Cgroup{
-			Name:            containerName,
-			AllowAllDevices: true,
+			Parent: "/",
+			Name:   containerName,
+			Resources: &configs.Resources{
+				AllowAllDevices: true,
+			},
 		},
 	}
 

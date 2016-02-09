@@ -3,8 +3,10 @@
 package libcontainer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -19,6 +21,8 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/criurpc"
+	"github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/vishvananda/netlink/nl"
 )
 
 const stdioFdCount = 3
@@ -34,6 +38,7 @@ type linuxContainer struct {
 	criuPath      string
 	m             sync.Mutex
 	criuVersion   int
+	state         containerState
 }
 
 // State represents a running container's state
@@ -100,6 +105,12 @@ type Container interface {
 	// errors:
 	// Systemerror - System error.
 	NotifyOOM() (<-chan struct{}, error)
+
+	// NotifyMemoryPressure returns a read-only channel signaling when the container reaches a given pressure level
+	//
+	// errors:
+	// Systemerror - System error.
+	NotifyMemoryPressure(level PressureLevel) (<-chan struct{}, error)
 }
 
 // ID returns the container's unique ID
@@ -125,7 +136,7 @@ func (c *linuxContainer) State() (*State, error) {
 }
 
 func (c *linuxContainer) Processes() ([]int, error) {
-	pids, err := c.cgroupManager.GetPids()
+	pids, err := c.cgroupManager.GetAllPids()
 	if err != nil {
 		return nil, newSystemError(err)
 	}
@@ -179,22 +190,27 @@ func (c *linuxContainer) Start(process *Process) error {
 		}
 		return newSystemError(err)
 	}
-	if doInit {
-		c.updateState(parent)
+	c.state = &runningState{
+		c: c,
 	}
-	if c.config.Hooks != nil {
-		s := configs.HookState{
-			Version: c.config.Version,
-			ID:      c.id,
-			Pid:     parent.pid(),
-			Root:    c.config.Rootfs,
+	if doInit {
+		if err := c.updateState(parent); err != nil {
+			return err
 		}
-		for _, hook := range c.config.Hooks.Poststart {
-			if err := hook.Run(s); err != nil {
-				if err := parent.terminate(); err != nil {
-					logrus.Warn(err)
+		if c.config.Hooks != nil {
+			s := configs.HookState{
+				Version: c.config.Version,
+				ID:      c.id,
+				Pid:     parent.pid(),
+				Root:    c.config.Rootfs,
+			}
+			for _, hook := range c.config.Hooks.Poststart {
+				if err := hook.Run(s); err != nil {
+					if err := parent.terminate(); err != nil {
+						logrus.Warn(err)
+					}
+					return newSystemError(err)
 				}
-				return newSystemError(err)
 			}
 		}
 	}
@@ -218,7 +234,7 @@ func (c *linuxContainer) newParentProcess(p *Process, doInit bool) (parentProces
 		return nil, newSystemError(err)
 	}
 	if !doInit {
-		return c.newSetnsProcess(p, cmd, parentPipe, childPipe), nil
+		return c.newSetnsProcess(p, cmd, parentPipe, childPipe)
 	}
 	return c.newInitProcess(p, cmd, parentPipe, childPipe)
 }
@@ -247,7 +263,7 @@ func (c *linuxContainer) commandTemplate(p *Process, childPipe *os.File) (*exec.
 }
 
 func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, childPipe *os.File) (*initProcess, error) {
-	t := "_LIBCONTAINER_INITTYPE=standard"
+	t := "_LIBCONTAINER_INITTYPE=" + string(initStandard)
 	cloneFlags := c.config.Namespaces.CloneFlags()
 	if cloneFlags&syscall.CLONE_NEWUSER != 0 {
 		if err := c.addUidGidMappings(cmd.SysProcAttr); err != nil {
@@ -273,23 +289,24 @@ func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, c
 	}, nil
 }
 
-func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, parentPipe, childPipe *os.File) *setnsProcess {
-	cmd.Env = append(cmd.Env,
-		fmt.Sprintf("_LIBCONTAINER_INITPID=%d", c.initProcess.pid()),
-		"_LIBCONTAINER_INITTYPE=setns",
-	)
-	if p.consolePath != "" {
-		cmd.Env = append(cmd.Env, "_LIBCONTAINER_CONSOLE_PATH="+p.consolePath)
+func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, parentPipe, childPipe *os.File) (*setnsProcess, error) {
+	cmd.Env = append(cmd.Env, "_LIBCONTAINER_INITTYPE="+string(initSetns))
+	// for setns process, we dont have to set cloneflags as the process namespaces
+	// will only be set via setns syscall
+	data, err := c.bootstrapData(0, c.initProcess.pid(), p.consolePath)
+	if err != nil {
+		return nil, err
 	}
 	// TODO: set on container for process management
 	return &setnsProcess{
-		cmd:         cmd,
-		cgroupPaths: c.cgroupManager.GetPaths(),
-		childPipe:   childPipe,
-		parentPipe:  parentPipe,
-		config:      c.newInitConfig(p),
-		process:     p,
-	}
+		cmd:           cmd,
+		cgroupPaths:   c.cgroupManager.GetPaths(),
+		childPipe:     childPipe,
+		parentPipe:    parentPipe,
+		config:        c.newInitConfig(p),
+		process:       p,
+		bootstrapData: data,
+	}, nil
 }
 
 func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
@@ -316,52 +333,51 @@ func newPipe() (parent *os.File, child *os.File, err error) {
 func (c *linuxContainer) Destroy() error {
 	c.m.Lock()
 	defer c.m.Unlock()
-	status, err := c.currentStatus()
-	if err != nil {
-		return err
-	}
-	if status != Destroyed {
-		return newGenericError(fmt.Errorf("container is not destroyed"), ContainerNotStopped)
-	}
-	if !c.config.Namespaces.Contains(configs.NEWPID) {
-		if err := killCgroupProcesses(c.cgroupManager); err != nil {
-			logrus.Warn(err)
-		}
-	}
-	err = c.cgroupManager.Destroy()
-	if rerr := os.RemoveAll(c.root); err == nil {
-		err = rerr
-	}
-	c.initProcess = nil
-	if c.config.Hooks != nil {
-		s := configs.HookState{
-			Version: c.config.Version,
-			ID:      c.id,
-			Root:    c.config.Rootfs,
-		}
-		for _, hook := range c.config.Hooks.Poststop {
-			if err := hook.Run(s); err != nil {
-				return err
-			}
-		}
-	}
-	return err
+	return c.state.destroy()
 }
 
 func (c *linuxContainer) Pause() error {
 	c.m.Lock()
 	defer c.m.Unlock()
-	return c.cgroupManager.Freeze(configs.Frozen)
+	status, err := c.currentStatus()
+	if err != nil {
+		return err
+	}
+	if status != Running {
+		return newGenericError(fmt.Errorf("container not running"), ContainerNotRunning)
+	}
+	if err := c.cgroupManager.Freeze(configs.Frozen); err != nil {
+		return err
+	}
+	return c.state.transition(&pausedState{
+		c: c,
+	})
 }
 
 func (c *linuxContainer) Resume() error {
 	c.m.Lock()
 	defer c.m.Unlock()
-	return c.cgroupManager.Freeze(configs.Thawed)
+	status, err := c.currentStatus()
+	if err != nil {
+		return err
+	}
+	if status != Paused {
+		return newGenericError(fmt.Errorf("container not paused"), ContainerNotPaused)
+	}
+	if err := c.cgroupManager.Freeze(configs.Thawed); err != nil {
+		return err
+	}
+	return c.state.transition(&runningState{
+		c: c,
+	})
 }
 
 func (c *linuxContainer) NotifyOOM() (<-chan struct{}, error) {
 	return notifyOnOOM(c.cgroupManager.GetPaths())
+}
+
+func (c *linuxContainer) NotifyMemoryPressure(level PressureLevel) (<-chan struct{}, error) {
+	return notifyMemoryPressure(c.cgroupManager.GetPaths(), level)
 }
 
 // XXX debug support, remove when debugging done.
@@ -455,7 +471,7 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 	}
 
 	if criuOpts.ImagesDirectory == "" {
-		criuOpts.ImagesDirectory = filepath.Join(c.root, "criu.image")
+		return fmt.Errorf("invalid directory to save checkpoint")
 	}
 
 	// Since a container can be C/R'ed multiple times,
@@ -574,11 +590,9 @@ func (c *linuxContainer) addCriuRestoreMount(req *criurpc.CriuReq, m *configs.Mo
 func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 	c.m.Lock()
 	defer c.m.Unlock()
-
 	if err := c.checkCriuVersion("1.5.2"); err != nil {
 		return err
 	}
-
 	if criuOpts.WorkDirectory == "" {
 		criuOpts.WorkDirectory = filepath.Join(c.root, "criu.work")
 	}
@@ -587,22 +601,19 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 	if err := os.Mkdir(criuOpts.WorkDirectory, 0655); err != nil && !os.IsExist(err) {
 		return err
 	}
-
 	workDir, err := os.Open(criuOpts.WorkDirectory)
 	if err != nil {
 		return err
 	}
 	defer workDir.Close()
-
 	if criuOpts.ImagesDirectory == "" {
-		criuOpts.ImagesDirectory = filepath.Join(c.root, "criu.image")
+		return fmt.Errorf("invalid directory to restore checkpoint")
 	}
 	imageDir, err := os.Open(criuOpts.ImagesDirectory)
 	if err != nil {
 		return err
 	}
 	defer imageDir.Close()
-
 	// CRIU has a few requirements for a root directory:
 	// * it must be a mount point
 	// * its parent must not be overmounted
@@ -613,18 +624,15 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 		return err
 	}
 	defer os.Remove(root)
-
 	root, err = filepath.EvalSymlinks(root)
 	if err != nil {
 		return err
 	}
-
 	err = syscall.Mount(c.config.Rootfs, root, "", syscall.MS_BIND|syscall.MS_REC, "")
 	if err != nil {
 		return err
 	}
 	defer syscall.Unmount(root, syscall.MNT_DETACH)
-
 	t := criurpc.CriuReqType_RESTORE
 	req := &criurpc.CriuReq{
 		Type: &t,
@@ -692,15 +700,13 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 		fds    []string
 		fdJSON []byte
 	)
-
 	if fdJSON, err = ioutil.ReadFile(filepath.Join(criuOpts.ImagesDirectory, descriptorsFilename)); err != nil {
 		return err
 	}
 
-	if err = json.Unmarshal(fdJSON, &fds); err != nil {
+	if err := json.Unmarshal(fdJSON, &fds); err != nil {
 		return err
 	}
-
 	for i := range fds {
 		if s := fds[i]; strings.Contains(s, "pipe:") {
 			inheritFd := new(criurpc.InheritFd)
@@ -709,12 +715,7 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 			req.Opts.InheritFd = append(req.Opts.InheritFd, inheritFd)
 		}
 	}
-
-	err = c.criuSwrk(process, req, criuOpts, true)
-	if err != nil {
-		return err
-	}
-	return nil
+	return c.criuSwrk(process, req, criuOpts, true)
 }
 
 func (c *linuxContainer) criuApplyCgroups(pid int, req *criurpc.CriuReq) error {
@@ -909,46 +910,43 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 	if notify == nil {
 		return fmt.Errorf("invalid response: %s", resp.String())
 	}
-
 	switch {
 	case notify.GetScript() == "post-dump":
-		if !opts.LeaveRunning {
-			f, err := os.Create(filepath.Join(c.root, "checkpoint"))
-			if err != nil {
-				return err
-			}
-			f.Close()
+		f, err := os.Create(filepath.Join(c.root, "checkpoint"))
+		if err != nil {
+			return err
 		}
-		break
-
+		f.Close()
 	case notify.GetScript() == "network-unlock":
 		if err := unlockNetwork(c.config); err != nil {
 			return err
 		}
-		break
-
 	case notify.GetScript() == "network-lock":
 		if err := lockNetwork(c.config); err != nil {
 			return err
 		}
-		break
-
 	case notify.GetScript() == "post-restore":
 		pid := notify.GetPid()
 		r, err := newRestoredProcess(int(pid), fds)
 		if err != nil {
 			return err
 		}
-
-		// TODO: crosbymichael restore previous process information by saving the init process information in
-		// the container's state file or separate process state files.
+		process.ops = r
+		if err := c.state.transition(&restoredState{
+			imageDir: opts.ImagesDirectory,
+			c:        c,
+		}); err != nil {
+			return err
+		}
 		if err := c.updateState(r); err != nil {
 			return err
 		}
-		process.ops = r
-		break
+		if err := os.Remove(filepath.Join(c.root, "checkpoint")); err != nil {
+			if !os.IsNotExist(err) {
+				logrus.Error(err)
+			}
+		}
 	}
-
 	return nil
 }
 
@@ -958,66 +956,130 @@ func (c *linuxContainer) updateState(process parentProcess) error {
 	if err != nil {
 		return err
 	}
+	return c.saveState(state)
+}
+
+func (c *linuxContainer) saveState(s *State) error {
 	f, err := os.Create(filepath.Join(c.root, stateFilename))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	os.Remove(filepath.Join(c.root, "checkpoint"))
-	return json.NewEncoder(f).Encode(state)
+	return utils.WriteJSON(f, s)
+}
+
+func (c *linuxContainer) deleteState() error {
+	return os.Remove(filepath.Join(c.root, stateFilename))
 }
 
 func (c *linuxContainer) currentStatus() (Status, error) {
-	if _, err := os.Stat(filepath.Join(c.root, "checkpoint")); err == nil {
-		return Checkpointed, nil
+	if err := c.refreshState(); err != nil {
+		return -1, err
 	}
+	return c.state.status(), nil
+}
+
+// refreshState needs to be called to verify that the current state on the
+// container is what is true.  Because consumers of libcontainer can use it
+// out of process we need to verify the container's status based on runtime
+// information and not rely on our in process info.
+func (c *linuxContainer) refreshState() error {
+	paused, err := c.isPaused()
+	if err != nil {
+		return err
+	}
+	if paused {
+		return c.state.transition(&pausedState{c: c})
+	}
+	running, err := c.isRunning()
+	if err != nil {
+		return err
+	}
+	if running {
+		return c.state.transition(&runningState{c: c})
+	}
+	return c.state.transition(&stoppedState{c: c})
+}
+
+func (c *linuxContainer) isRunning() (bool, error) {
 	if c.initProcess == nil {
-		return Destroyed, nil
+		return false, nil
 	}
 	// return Running if the init process is alive
 	if err := syscall.Kill(c.initProcess.pid(), 0); err != nil {
 		if err == syscall.ESRCH {
-			return Destroyed, nil
+			return false, nil
 		}
-		return 0, newSystemError(err)
+		return false, newSystemError(err)
 	}
-	if c.config.Cgroups != nil && c.config.Cgroups.Freezer == configs.Frozen {
-		return Paused, nil
+	return true, nil
+}
+
+func (c *linuxContainer) isPaused() (bool, error) {
+	data, err := ioutil.ReadFile(filepath.Join(c.cgroupManager.GetPaths()["freezer"], "freezer.state"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, newSystemError(err)
 	}
-	return Running, nil
+	return bytes.Equal(bytes.TrimSpace(data), []byte("FROZEN")), nil
 }
 
 func (c *linuxContainer) currentState() (*State, error) {
-	status, err := c.currentStatus()
-	if err != nil {
-		return nil, err
-	}
-	if status == Destroyed {
-		return nil, newGenericError(fmt.Errorf("container destroyed"), ContainerNotExists)
-	}
-	startTime, err := c.initProcess.startTime()
-	if err != nil {
-		return nil, newSystemError(err)
+	var (
+		startTime           string
+		externalDescriptors []string
+		pid                 = -1
+	)
+	if c.initProcess != nil {
+		pid = c.initProcess.pid()
+		startTime, _ = c.initProcess.startTime()
+		externalDescriptors = c.initProcess.externalDescriptors()
 	}
 	state := &State{
 		BaseState: BaseState{
 			ID:                   c.ID(),
 			Config:               *c.config,
-			InitProcessPid:       c.initProcess.pid(),
+			InitProcessPid:       pid,
 			InitProcessStartTime: startTime,
 		},
 		CgroupPaths:         c.cgroupManager.GetPaths(),
 		NamespacePaths:      make(map[configs.NamespaceType]string),
-		ExternalDescriptors: c.initProcess.externalDescriptors(),
+		ExternalDescriptors: externalDescriptors,
 	}
-	for _, ns := range c.config.Namespaces {
-		state.NamespacePaths[ns.Type] = ns.GetPath(c.initProcess.pid())
-	}
-	for _, nsType := range configs.NamespaceTypes() {
-		if _, ok := state.NamespacePaths[nsType]; !ok {
-			ns := configs.Namespace{Type: nsType}
-			state.NamespacePaths[ns.Type] = ns.GetPath(c.initProcess.pid())
+	if pid > 0 {
+		for _, ns := range c.config.Namespaces {
+			state.NamespacePaths[ns.Type] = ns.GetPath(pid)
+		}
+		for _, nsType := range configs.NamespaceTypes() {
+			if _, ok := state.NamespacePaths[nsType]; !ok {
+				ns := configs.Namespace{Type: nsType}
+				state.NamespacePaths[ns.Type] = ns.GetPath(pid)
+			}
 		}
 	}
 	return state, nil
+}
+
+// bootstrapData encodes the necessary data in netlink binary format as a io.Reader.
+// Consumer can write the data to a bootstrap program such as one that uses
+// nsenter package to bootstrap the container's init process correctly, i.e. with
+// correct namespaces, uid/gid mapping etc.
+func (c *linuxContainer) bootstrapData(cloneFlags uintptr, pid int, consolePath string) (io.Reader, error) {
+	// create the netlink message
+	r := nl.NewNetlinkRequest(int(InitMsg), 0)
+	// write pid
+	r.AddData(&Int32msg{
+		Type:  PidAttr,
+		Value: uint32(pid),
+	})
+	// write console path
+	if consolePath != "" {
+		r.AddData(&Bytemsg{
+			Type:  ConsolePathAttr,
+			Value: []byte(consolePath),
+		})
+	}
+	return bytes.NewReader(r.Serialize()), nil
 }

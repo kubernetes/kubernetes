@@ -48,7 +48,7 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_GOLANG_VERSION=1.5.3
+readonly KUBE_BUILD_GOLANG_VERSION=1.4.2
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-1"
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
@@ -472,7 +472,11 @@ function kube::build::build_image() {
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
 
   cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
-  sed -i "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  if kube::build::is_osx; then
+    sed -i "" "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  else
+    sed -i "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
+  fi
   # We don't want to force-pull this image because it's based on a local image
   # (see kube::build::build_image_cross), not upstream.
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}" 'false'
@@ -879,27 +883,36 @@ function kube::release::package_salt_tarball() {
 # such as Ubuntu Trusty.
 #
 # There are two sources of manifests files: (1) some manifests in the directory
-# cluster/saltbase/salt can be used directly or after minor revision, so we copy
-# them from there; (2) otherwise, we will maintain separate copies in
-# cluster/gce/kube-manifests.
+# cluster/saltbase/salt and cluster/addons can be used directly or after minor
+# revision, so we copy them from there; (2) otherwise, we will maintain separate
+# copies in cluster/gce/<distro>/kube-manifests.
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
   local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
   rm -rf "${release_stage}"
-  mkdir -p "${release_stage}"
+  mkdir -p "${release_stage}/trusty"
 
-  # Source 1: manifests from cluster/saltbase/salt.
-  # TODO(andyzheng0831): Add more manifests when supporting master on trusty.
+  # Source 1: manifests from cluster/saltbase/salt and cluster/addons
   local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
   cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
+  cp "${salt_dir}/etcd/etcd.manifest" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-addons/namespace.yaml" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-addons/kube-addons.sh" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-addons/kube-addon-update.sh" "${release_stage}/trusty"
+  cp -r "${salt_dir}/kube-admission-controls/limit-range" "${release_stage}/trusty"
+  local objects
+  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
+  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/trusty"
 
-  # Source 2: manifests from cluster/gce/kube-manifests.
-  # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
-  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/*" "${release_stage}/"
+  # Source 2: manifests from cluster/gce/<distro>/kube-manifests.
+  # TODO(andyzheng0831): Avoid using separate copies for trusty. We should use whatever
+  # from cluster/saltbase/salt to minimize maintenance cost.
+  cp "${KUBE_ROOT}/cluster/gce/trusty/kube-manifests/"* "${release_stage}/trusty"
   cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
   kube::release::clean_cruft
@@ -1090,10 +1103,11 @@ function kube::release::gcs::copy_release_artifacts() {
   # Stage everything in release directory
   kube::release::gcs::stage_and_hash "${RELEASE_DIR}"/* . || return 1
 
-  # Having the configure-vm.sh and trusty/node.yaml scripts from the GCE cluster
+  # Having the configure-vm.sh script and and trusty code from the GCE cluster
   # deploy hosted with the release is useful for GKE.
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" extra/gce || return 1
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/node.yaml" extra/gce || return 1
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/master.yaml" extra/gce || return 1
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/configure.sh" extra/gce || return 1
 
   # Upload the "naked" binaries to GCS.  This is useful for install scripts that

@@ -28,6 +28,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"github.com/mesos/mesos-go/mesosproto/scheduler"
 	"github.com/mesos/mesos-go/mesosutil/process"
 	"github.com/mesos/mesos-go/upid"
 	"golang.org/x/net/context"
@@ -391,5 +392,14 @@ func (m *MesosMessenger) decodeLoop() {
 
 // getMessageName returns the name of the message in the mesos manner.
 func getMessageName(msg proto.Message) string {
-	return fmt.Sprintf("%v.%v", "mesos.internal", reflect.TypeOf(msg).Elem().Name())
+	var msgName string
+
+	switch msg := msg.(type) {
+	case *scheduler.Call:
+		msgName = "scheduler"
+	default:
+		msgName = fmt.Sprintf("%v.%v", "mesos.internal", reflect.TypeOf(msg).Elem().Name())
+	}
+
+	return msgName
 }

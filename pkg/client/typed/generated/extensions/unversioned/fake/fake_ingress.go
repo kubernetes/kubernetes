@@ -24,15 +24,15 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// FakeIngress implements IngressInterface
-type FakeIngress struct {
+// FakeIngresses implements IngressInterface
+type FakeIngresses struct {
 	Fake *FakeExtensions
 	ns   string
 }
 
-func (c *FakeIngress) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("ingress", c.ns, ingress), &extensions.Ingress{})
+		Invokes(core.NewCreateAction("ingresses", c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -40,9 +40,9 @@ func (c *FakeIngress) Create(ingress *extensions.Ingress) (result *extensions.In
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("ingress", c.ns, ingress), &extensions.Ingress{})
+		Invokes(core.NewUpdateAction("ingresses", c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -50,9 +50,9 @@ func (c *FakeIngress) Update(ingress *extensions.Ingress) (result *extensions.In
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
+func (c *FakeIngresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("ingress", "status", c.ns, ingress), &extensions.Ingress{})
+		Invokes(core.NewUpdateSubresourceAction("ingresses", "status", c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -60,23 +60,23 @@ func (c *FakeIngress) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ing
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeIngresses) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("ingress", c.ns, name), &extensions.Ingress{})
+		Invokes(core.NewDeleteAction("ingresses", c.ns, name), &extensions.Ingress{})
 
 	return err
 }
 
-func (c *FakeIngress) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+func (c *FakeIngresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	action := core.NewDeleteCollectionAction("ingresses", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.IngressList{})
 	return err
 }
 
-func (c *FakeIngress) Get(name string) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Get(name string) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("ingress", c.ns, name), &extensions.Ingress{})
+		Invokes(core.NewGetAction("ingresses", c.ns, name), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -84,9 +84,9 @@ func (c *FakeIngress) Get(name string) (result *extensions.Ingress, err error) {
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
+func (c *FakeIngresses) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("ingress", c.ns, opts), &extensions.IngressList{})
+		Invokes(core.NewListAction("ingresses", c.ns, opts), &extensions.IngressList{})
 
 	if obj == nil {
 		return nil, err
@@ -105,9 +105,9 @@ func (c *FakeIngress) List(opts api.ListOptions) (result *extensions.IngressList
 	return list, err
 }
 
-// Watch returns a watch.Interface that watches the requested ingress.
-func (c *FakeIngress) Watch(opts api.ListOptions) (watch.Interface, error) {
+// Watch returns a watch.Interface that watches the requested ingresses.
+func (c *FakeIngresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("ingress", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("ingresses", c.ns, opts))
 
 }

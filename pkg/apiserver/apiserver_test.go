@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -158,6 +159,7 @@ func addNewTestTypes() {
 	api.Scheme.AddKnownTypes(newGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddKnownTypes(newGroupVersion, &v1.Pod{})
 }
 
 func init() {
@@ -177,9 +179,9 @@ func init() {
 			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
+				nsMapper.Add(gvk, meta.RESTScopeRoot)
 			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
+				nsMapper.Add(gvk, meta.RESTScopeNamespace)
 			}
 		}
 	}
@@ -295,7 +297,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	}
 
 	ws := new(restful.WebService)
-	InstallSupport(mux, ws, false)
+	InstallSupport(mux, ws)
 	container.Add(ws)
 	return &defaultAPIServer{mux, container}
 }

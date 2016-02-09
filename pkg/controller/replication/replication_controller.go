@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// If you make changes to this file, you should also make the corresponding change in ReplicaSet.
+
 package replication
 
 import (
@@ -25,13 +27,15 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -59,7 +63,7 @@ const (
 // TODO: this really should be called ReplicationController. The only reason why it's a Manager
 // is to distinguish this type from API object "ReplicationController". We should fix this.
 type ReplicationManager struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
 	// An rc is temporarily suspended after creating/deleting these many replicas.
@@ -88,10 +92,10 @@ type ReplicationManager struct {
 }
 
 // NewReplicationManager creates a new ReplicationManager.
-func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
+func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
@@ -107,10 +111,10 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(options)
+				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(options)
+				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ReplicationController{},
@@ -148,10 +152,10 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 	rm.podStore.Store, rm.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rm.kubeClient.Pods(api.NamespaceAll).List(options)
+				return rm.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rm.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return rm.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -181,13 +185,13 @@ func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	glog.Infof("Starting RC Manager")
 	controller.SyncAllPodsWithStore(rm.kubeClient, rm.podStore.Store)
 	go rm.rcController.Run(stopCh)
 	go rm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(rm.worker, time.Second, stopCh)
+		go wait.Until(rm.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down RC Manager")
@@ -361,7 +365,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)
-					util.HandleError(err)
+					utilruntime.HandleError(err)
 				}
 			}()
 		}
@@ -389,7 +393,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.DeletionObserved(rcKey)
-					util.HandleError(err)
+					utilruntime.HandleError(err)
 				}
 			}(i)
 		}
@@ -449,7 +453,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rm.kubeClient.ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
+	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the controller ensures
 		// we retry with some fairness.
 		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)

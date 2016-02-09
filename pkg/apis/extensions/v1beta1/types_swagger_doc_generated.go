@@ -74,6 +74,25 @@ func (ClusterAutoscalerSpec) SwaggerDoc() map[string]string {
 	return map_ClusterAutoscalerSpec
 }
 
+var map_CustomMetricCurrentStatus = map[string]string{
+	"name":  "Custom Metric name.",
+	"value": "Custom Metric value (average).",
+}
+
+func (CustomMetricCurrentStatus) SwaggerDoc() map[string]string {
+	return map_CustomMetricCurrentStatus
+}
+
+var map_CustomMetricTarget = map[string]string{
+	"":      "Alpha-level support for Custom Metrics in HPA (as annotations).",
+	"name":  "Custom Metric name.",
+	"value": "Custom Metric value (average).",
+}
+
+func (CustomMetricTarget) SwaggerDoc() map[string]string {
+	return map_CustomMetricTarget
+}
+
 var map_DaemonSet = map[string]string{
 	"":         "DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -148,14 +167,27 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 	return map_DeploymentList
 }
 
+var map_DeploymentRollback = map[string]string{
+	"":                   "DeploymentRollback stores the information required to rollback a deployment.",
+	"name":               "Required: This must match the Name of a deployment.",
+	"updatedAnnotations": "The annotations to be updated to a deployment",
+	"rollbackTo":         "The config of this deployment rollback.",
+}
+
+func (DeploymentRollback) SwaggerDoc() map[string]string {
+	return map_DeploymentRollback
+}
+
 var map_DeploymentSpec = map[string]string{
-	"":               "DeploymentSpec is the specification of the desired behavior of the Deployment.",
-	"replicas":       "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
-	"selector":       "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be the ones affected by this deployment.",
-	"template":       "Template describes the pods that will be created.",
-	"strategy":       "The deployment strategy to use to replace existing pods with new ones.",
-	"uniqueLabelKey": "Key of the selector that is added to existing RCs (and label key that is added to its pods) to prevent the existing RCs to select new pods (and old pods being selected by new RC). Users can set this to an empty string to indicate that the system should not add any selector and label. If unspecified, system uses DefaultDeploymentUniqueLabelKey(\"deployment.kubernetes.io/podTemplateHash\"). Value of this key is hash of DeploymentSpec.PodTemplateSpec. No label is added if this is set to empty string.",
-	"paused":         "Indicates that the deployment is paused and will not be processed by the deployment controller.",
+	"":                     "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+	"replicas":             "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+	"selector":             "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be the ones affected by this deployment.",
+	"template":             "Template describes the pods that will be created.",
+	"strategy":             "The deployment strategy to use to replace existing pods with new ones.",
+	"minReadySeconds":      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+	"revisionHistoryLimit": "The number of old ReplicationControllers to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
+	"paused":               "Indicates that the deployment is paused and will not be processed by the deployment controller.",
+	"rollbackTo":           "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {
@@ -259,6 +291,26 @@ func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscalerStatus
 }
 
+var map_HostPortRange = map[string]string{
+	"":    "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+	"min": "min is the start of the range, inclusive.",
+	"max": "max is the end of the range, inclusive.",
+}
+
+func (HostPortRange) SwaggerDoc() map[string]string {
+	return map_HostPortRange
+}
+
+var map_IDRange = map[string]string{
+	"":    "ID Range provides a min/max of an allowed range of IDs.",
+	"min": "Min is the start of the range, inclusive.",
+	"max": "Max is the end of the range, inclusive.",
+}
+
+func (IDRange) SwaggerDoc() map[string]string {
+	return map_IDRange
+}
+
 var map_Ingress = map[string]string{
 	"":         "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -310,6 +362,7 @@ func (IngressRuleValue) SwaggerDoc() map[string]string {
 var map_IngressSpec = map[string]string{
 	"":        "IngressSpec describes the Ingress the user wishes to exist.",
 	"backend": "A default backend capable of servicing requests that don't match any rule. At least one of 'backend' or 'rules' must be specified. This field is optional to allow the loadbalancer controller or defaulting logic to specify a global default.",
+	"tls":     "TLS configuration. Currently the Ingress only supports a single TLS port, 443, and assumes TLS termination. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension.",
 	"rules":   "A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend.",
 }
 
@@ -324,6 +377,16 @@ var map_IngressStatus = map[string]string{
 
 func (IngressStatus) SwaggerDoc() map[string]string {
 	return map_IngressStatus
+}
+
+var map_IngressTLS = map[string]string{
+	"":           "IngressTLS describes the transport layer security associated with an Ingress.",
+	"hosts":      "Hosts are a list of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified.",
+	"secretName": "SecretName is the name of the secret used to terminate SSL traffic on 443. Field is left optional to allow SSL routing based on SNI hostname alone. If the SNI host in a listener conflicts with the \"Host\" header field used by an IngressRule, the SNI host is used for termination and value of the Host header is used for routing.",
+}
+
+func (IngressTLS) SwaggerDoc() map[string]string {
+	return map_IngressTLS
 }
 
 var map_Job = map[string]string{
@@ -431,6 +494,43 @@ func (NodeUtilization) SwaggerDoc() map[string]string {
 	return map_NodeUtilization
 }
 
+var map_PodSecurityPolicy = map[string]string{
+	"":         "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "spec defines the policy enforced.",
+}
+
+func (PodSecurityPolicy) SwaggerDoc() map[string]string {
+	return map_PodSecurityPolicy
+}
+
+var map_PodSecurityPolicyList = map[string]string{
+	"":         "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+	"metadata": "Standard list metadata. More info: http://docs.k8s.io/api-conventions.md#metadata",
+	"items":    "Items is a list of schema objects.",
+}
+
+func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
+	return map_PodSecurityPolicyList
+}
+
+var map_PodSecurityPolicySpec = map[string]string{
+	"":               "Pod Security Policy Spec defines the policy enforced.",
+	"privileged":     "privileged determines if a pod can request to be run as privileged.",
+	"capabilities":   "capabilities is a list of capabilities that can be added.",
+	"volumes":        "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+	"hostNetwork":    "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+	"hostPorts":      "hostPorts determines which host port ranges are allowed to be exposed.",
+	"hostPID":        "hostPID determines if the policy allows the use of HostPID in the pod spec.",
+	"hostIPC":        "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
+	"seLinuxContext": "seLinuxContext is the strategy that will dictate the allowable labels that may be set.",
+	"runAsUser":      "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+}
+
+func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
+	return map_PodSecurityPolicySpec
+}
+
 var map_ReplicaSet = map[string]string{
 	"":         "ReplicaSet represents the configuration of a ReplicaSet.",
 	"metadata": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -481,6 +581,14 @@ func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerDummy
 }
 
+var map_RollbackConfig = map[string]string{
+	"revision": "The revision to rollback to. If set to 0, rollbck to the last revision.",
+}
+
+func (RollbackConfig) SwaggerDoc() map[string]string {
+	return map_RollbackConfig
+}
+
 var map_RollingUpdateDaemonSet = map[string]string{
 	"":                "Spec to control the desired behavior of daemon set rolling update.",
 	"maxUnavailable":  "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
@@ -492,14 +600,33 @@ func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
 }
 
 var map_RollingUpdateDeployment = map[string]string{
-	"":                "Spec to control the desired behavior of rolling update.",
-	"maxUnavailable":  "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
-	"maxSurge":        "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
-	"minReadySeconds": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+	"":               "Spec to control the desired behavior of rolling update.",
+	"maxUnavailable": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+	"maxSurge":       "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
 }
 
 func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 	return map_RollingUpdateDeployment
+}
+
+var map_RunAsUserStrategyOptions = map[string]string{
+	"":       "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+	"type":   "type is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"ranges": "Ranges are the allowed ranges of uids that may be used.",
+}
+
+func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
+	return map_RunAsUserStrategyOptions
+}
+
+var map_SELinuxContextStrategyOptions = map[string]string{
+	"":               "SELinux Context Strategy Options defines the strategy type and any options used to create the strategy.",
+	"type":           "type is the strategy that will dictate the allowable labels that may be set.",
+	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context",
+}
+
+func (SELinuxContextStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SELinuxContextStrategyOptions
 }
 
 var map_Scale = map[string]string{

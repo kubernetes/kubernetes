@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type Tester struct {
@@ -148,7 +148,7 @@ func (t *Tester) TestCreate(valid runtime.Object, setFn SetFunc, getFn GetFunc, 
 // Test updating an object.
 func (t *Tester) TestUpdate(valid runtime.Object, setFn SetFunc, getFn GetFunc, updateFn UpdateFunc, invalidUpdateFn ...UpdateFunc) {
 	t.testUpdateEquals(copyOrDie(valid), setFn, getFn, updateFn)
-	t.testUpdateFailsOnVersionTooOld(copyOrDie(valid), setFn)
+	t.testUpdateFailsOnVersionTooOld(copyOrDie(valid), setFn, getFn)
 	t.testUpdateOnNotFound(copyOrDie(valid))
 	if !t.clusterScope {
 		t.testUpdateRejectsMismatchedNamespace(copyOrDie(valid), setFn)
@@ -426,7 +426,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, setFn SetFunc, getFn GetFu
 	}
 }
 
-func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, setFn SetFunc) {
+func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, setFn SetFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
@@ -436,11 +436,16 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, setFn SetFun
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	older := copyOrDie(foo)
+	storedFoo, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	older := copyOrDie(storedFoo)
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.ResourceVersion = "1"
 
-	_, _, err := t.storage.(rest.Updater).Update(t.TestContext(), older)
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), older)
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if !errors.IsConflict(err) {
@@ -668,7 +673,8 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, setFn SetFunc, 
 		t.Errorf("unexpected error, object should be deleted immediately: %v", err)
 	}
 	objectMeta = t.getObjectMetaOrFail(out)
-	if objectMeta.DeletionTimestamp == nil || objectMeta.DeletionGracePeriodSeconds == nil || *objectMeta.DeletionGracePeriodSeconds != 0 {
+	// the second delete shouldn't update the object, so the objectMeta.DeletionGracePeriodSeconds should eqaul to the value set in the first delete.
+	if objectMeta.DeletionTimestamp == nil || objectMeta.DeletionGracePeriodSeconds == nil || *objectMeta.DeletionGracePeriodSeconds != expectedGrace {
 		t.Errorf("unexpected deleted meta: %#v", objectMeta)
 	}
 }
@@ -921,7 +927,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 				if !ok {
 					t.Errorf("watch channel should be open")
 				}
-			case <-time.After(util.ForeverTestTimeout):
+			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()
@@ -969,7 +975,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 				if !ok {
 					t.Errorf("watch channel should be open")
 				}
-			case <-time.After(util.ForeverTestTimeout):
+			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()

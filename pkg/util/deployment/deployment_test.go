@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -159,9 +159,8 @@ func generateDeployment(image string) extensions.Deployment {
 			Name: image,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas:       1,
-			Selector:       podLabels,
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			Replicas: 1,
+			Selector: podLabels,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,
@@ -231,7 +230,7 @@ func TestGetNewRC(t *testing.T) {
 				Body:       &test.rcList,
 			},
 		}
-		rc, err := GetNewRC(newDeployment, c.Setup(t))
+		rc, err := GetNewRC(newDeployment, c.Setup(t).Clientset)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
@@ -314,7 +313,7 @@ func TestGetOldRCs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rcs, err := GetOldRCs(newDeployment, testclient.NewSimpleFake(test.objs...))
+		rcs, _, err := GetOldRCs(newDeployment, fake.NewSimpleClientset(test.objs...))
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}

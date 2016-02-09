@@ -23,6 +23,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -44,6 +45,9 @@ type AnnotateOptions struct {
 	overwrite       bool
 	all             bool
 	resourceVersion string
+
+	changeCause       string
+	recordChangeCause bool
 
 	f   *cmdutil.Factory
 	out io.Writer
@@ -110,6 +114,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the annotation"
 	kubectl.AddJsonFilenameFlag(cmd, &options.filenames, usage)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -149,6 +154,9 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 	if o.newAnnotations, o.removeAnnotations, err = parseAnnotations(annotationArgs); err != nil {
 		return err
 	}
+
+	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
+	o.changeCause = f.Command()
 
 	mapper, typer := f.Object()
 	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
@@ -198,6 +206,10 @@ func (o AnnotateOptions) RunAnnotate() error {
 		if err != nil {
 			return err
 		}
+		// If we should record change-cause, add it to new annotations
+		if cmdutil.ContainsChangeCause(info) || o.recordChangeCause {
+			o.newAnnotations[kubectl.ChangeCauseAnnotation] = o.changeCause
+		}
 		if err := o.updateAnnotations(obj); err != nil {
 			return err
 		}
@@ -206,8 +218,9 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return err
 		}
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+		createdPatch := err == nil
 		if err != nil {
-			return err
+			glog.V(2).Infof("couldn't compute patch: %v", err)
 		}
 
 		mapping := info.ResourceMapping()
@@ -217,7 +230,12 @@ func (o AnnotateOptions) RunAnnotate() error {
 		}
 		helper := resource.NewHelper(client, mapping)
 
-		outputObj, err := helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+		var outputObj runtime.Object
+		if createdPatch {
+			outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+		} else {
+			outputObj, err = helper.Replace(namespace, name, false, obj)
+		}
 		if err != nil {
 			return err
 		}
@@ -285,6 +303,10 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 func validateNoAnnotationOverwrites(meta *api.ObjectMeta, annotations map[string]string) error {
 	var buf bytes.Buffer
 	for key := range annotations {
+		// change-cause annotation can always be overwritten
+		if key == kubectl.ChangeCauseAnnotation {
+			continue
+		}
 		if value, found := meta.Annotations[key]; found {
 			if buf.Len() > 0 {
 				buf.WriteString("; ")

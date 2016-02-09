@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -71,7 +72,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs := []string{}
-	p, err := f.Printer(nil, false, false, false, false, false, []string{})
+	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -96,6 +97,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmdutil.AddRecordFlag(cmd)
 
 	return cmd
 }
@@ -251,6 +253,11 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			if err := labelFunc(obj, overwrite, resourceVersion, lbls, remove); err != nil {
 				return err
 			}
+			if cmdutil.ShouldRecord(cmd, info) {
+				if err := cmdutil.RecordChangeCause(obj, f.Command()); err != nil {
+					return err
+				}
+			}
 			newData, err := json.Marshal(obj)
 			if err != nil {
 				return err
@@ -259,8 +266,9 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 				dataChangeMsg = "labeled"
 			}
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			createdPatch := err == nil
 			if err != nil {
-				return err
+				glog.V(2).Infof("couldn't compute patch: %v", err)
 			}
 
 			mapping := info.ResourceMapping()
@@ -270,7 +278,11 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			}
 			helper := resource.NewHelper(client, mapping)
 
-			outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+			if createdPatch {
+				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+			} else {
+				outputObj, err = helper.Replace(namespace, name, false, obj)
+			}
 			if err != nil {
 				return err
 			}

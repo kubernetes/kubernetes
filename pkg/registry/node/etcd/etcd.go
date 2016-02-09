@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
@@ -57,7 +58,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, con
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
 	storageInterface := storageDecorator(
-		s, 1000, &api.Node{}, prefix, false, newListFunc)
+		s, cachesize.GetWatchCacheSizeByResource(cachesize.Nodes), &api.Node{}, prefix, node.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },

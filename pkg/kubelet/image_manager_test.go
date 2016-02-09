@@ -22,12 +22,12 @@ import (
 	"time"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"github.com/ssoroka/ttime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 var zero time.Time
@@ -231,7 +231,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.freeSpace(2048)
+	spaceFreed, err := manager.freeSpace(2048, time.Now())
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
@@ -271,7 +271,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	require.NoError(t, manager.detectImages(time.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
-	spaceFreed, err := manager.freeSpace(1024)
+	spaceFreed, err := manager.freeSpace(1024, time.Now())
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
@@ -302,7 +302,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	require.NoError(t, manager.detectImages(time.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
-	spaceFreed, err := manager.freeSpace(1024)
+	spaceFreed, err := manager.freeSpace(1024, time.Now())
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(2048, spaceFreed)
@@ -330,7 +330,7 @@ func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.freeSpace(1024)
+	spaceFreed, err := manager.freeSpace(1024, time.Now())
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
@@ -431,18 +431,20 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, manager.detectImages(ttime.Now()))
+	fakeClock := util.NewFakeClock(time.Now())
+	t.Log(fakeClock.Now())
+	require.NoError(t, manager.detectImages(fakeClock.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 	// no space freed since one image is in used, and another one is not old enough
-	spaceFreed, err := manager.freeSpace(1024)
+	spaceFreed, err := manager.freeSpace(1024, fakeClock.Now())
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(0, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 2)
 
-	// sleep 1 minute, then 1 image will be garbage collected
-	ttime.Sleep(defaultGCAge)
-	spaceFreed, err = manager.freeSpace(1024)
+	// move clock by minAge duration, then 1 image will be garbage collected
+	fakeClock.Step(manager.minAge)
+	spaceFreed, err = manager.freeSpace(1024, fakeClock.Now())
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 1)

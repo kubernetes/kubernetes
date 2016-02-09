@@ -92,3 +92,14 @@ func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error 
 func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("deployments", c.Namespace, opts))
 }
+
+func (c *FakeDeployments) Rollback(deploymentRollback *extensions.DeploymentRollback) error {
+	action := CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = "deployments"
+	action.Subresource = "rollback"
+	action.Object = deploymentRollback
+
+	_, err := c.Fake.Invokes(action, deploymentRollback)
+	return err
+}

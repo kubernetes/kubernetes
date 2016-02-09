@@ -35,3 +35,19 @@ func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint
 	newLabels[labelKey] = fmt.Sprintf("%d", labelValue)
 	return newLabels
 }
+
+// CloneAndRemoveLabel clones the given map and returns a new map with the given key removed.
+// Returns the given map, if labelKey is empty.
+func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]string {
+	if labelKey == "" {
+		// Dont need to add a label.
+		return labels
+	}
+	// Clone.
+	newLabels := map[string]string{}
+	for key, value := range labels {
+		newLabels[key] = value
+	}
+	delete(newLabels, labelKey)
+	return newLabels
+}

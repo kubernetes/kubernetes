@@ -92,7 +92,7 @@ func main() {
 	}
 
 	versionPath := pkgPath(gv.Group, gv.Version)
-	generator := kruntime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
+	generator := kruntime.NewConversionGenerator(api.Scheme, versionPath)
 	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
 	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.

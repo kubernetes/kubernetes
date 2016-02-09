@@ -63,6 +63,8 @@ func findSuiteFile() (string, os.FileMode) {
 		if err != nil {
 			complainAndQuit("Could not find suite file for nodot: " + err.Error())
 		}
+		defer f.Close()
+
 		if re.MatchReader(bufio.NewReader(f)) {
 			return path, file.Mode()
 		}

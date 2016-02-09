@@ -53,6 +53,7 @@ using resources with kubectl can be found in [Working with resources](../user-gu
       - [Lists of named subobjects preferred over maps](#lists-of-named-subobjects-preferred-over-maps)
       - [Primitive types](#primitive-types)
       - [Constants](#constants)
+      - [Unions](#unions)
     - [Lists and Simple kinds](#lists-and-simple-kinds)
   - [Differing Representations](#differing-representations)
   - [Verbs on Resources](#verbs-on-resources)
@@ -262,6 +263,15 @@ This rule maintains the invariant that all JSON/YAML keys are fields in API obje
 #### Constants
 
 Some fields will have a list of allowed values (enumerations). These values will be strings, and they will be in CamelCase, with an initial uppercase letter. Examples: "ClusterFirst", "Pending", "ClientIP".
+
+#### Unions
+
+Sometimes, at most one of a set of fields can be set.  For example, the [volumes] field of a PodSpec has 17 different volume type-specific
+fields, such as `nfs` and `iscsi`.  All fields in the set should be [Optional](#optional-vs-required).
+
+Sometimes, when a new type is created, the api designer may anticipate that a union will be needed in the future, even if only one field is
+allowed initially.  In this case, be sure to make the field [Optional](#optional-vs-required) optional.  In the validation, you may
+still return an error if the sole field is unset.  Do not set a default value for that field.
 
 ### Lists and Simple kinds
 

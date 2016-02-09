@@ -54,7 +54,7 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
 func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -97,6 +97,6 @@ func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("resourceQuotas").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

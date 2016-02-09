@@ -49,14 +49,14 @@ func NewEtcdClient() etcd.Client {
 }
 
 func NewEtcdStorage() storage.Interface {
-	return etcdstorage.NewEtcdStorage(NewEtcdClient(), testapi.Default.Codec(), etcdtest.PathPrefix())
+	return etcdstorage.NewEtcdStorage(NewEtcdClient(), testapi.Default.Codec(), etcdtest.PathPrefix(), false)
 }
 
 func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
 	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix())
+	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
 }
 
 func RequireEtcd() {

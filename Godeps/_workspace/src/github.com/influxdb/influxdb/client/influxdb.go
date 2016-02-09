@@ -2,609 +2,582 @@ package client
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
-	"strings"
+	"time"
+
+	"github.com/influxdb/influxdb/influxql"
+	"github.com/influxdb/influxdb/tsdb"
 )
 
-const (
-	UDPMaxMessageSize = 2048
-)
+// Query is used to send a command to the server. Both Command and Database are required.
+type Query struct {
+	Command  string
+	Database string
+}
 
+// Config is used to specify what server to connect to.
+// URL: The URL of the server connecting to.
+// Username/Password are optional.  They will be passed via basic auth if provided.
+// UserAgent: If not provided, will default "InfluxDBClient",
+// Timeout: If not provided, will default to 0 (no timeout)
+type Config struct {
+	URL       url.URL
+	Username  string
+	Password  string
+	UserAgent string
+	Timeout   time.Duration
+}
+
+// Client is used to make calls to the server.
 type Client struct {
-	host        string
-	username    string
-	password    string
-	database    string
-	httpClient  *http.Client
-	udpConn     *net.UDPConn
-	schema      string
-	compression bool
+	url        url.URL
+	username   string
+	password   string
+	httpClient *http.Client
+	userAgent  string
 }
-
-type ClientConfig struct {
-	Host       string
-	Username   string
-	Password   string
-	Database   string
-	HttpClient *http.Client
-	IsSecure   bool
-	IsUDP      bool
-}
-
-var defaults *ClientConfig
-
-func init() {
-	defaults = &ClientConfig{
-		Host:       "localhost:8086",
-		Username:   "root",
-		Password:   "root",
-		Database:   "",
-		HttpClient: http.DefaultClient,
-	}
-}
-
-func getDefault(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-func New(config *ClientConfig) (*Client, error) {
-	return NewClient(config)
-}
-
-func NewClient(config *ClientConfig) (*Client, error) {
-	host := getDefault(config.Host, defaults.Host)
-	username := getDefault(config.Username, defaults.Username)
-	password := getDefault(config.Password, defaults.Password)
-	database := getDefault(config.Database, defaults.Database)
-	if config.HttpClient == nil {
-		config.HttpClient = defaults.HttpClient
-	}
-	var udpConn *net.UDPConn
-	if config.IsUDP {
-		serverAddr, err := net.ResolveUDPAddr("udp", host)
-		if err != nil {
-			return nil, err
-		}
-		udpConn, err = net.DialUDP("udp", nil, serverAddr)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	schema := "http"
-	if config.IsSecure {
-		schema = "https"
-	}
-	return &Client{host, username, password, database, config.HttpClient, udpConn, schema, false}, nil
-}
-
-func (self *Client) DisableCompression() {
-	self.compression = false
-}
-
-func (self *Client) getUrl(path string) string {
-	return self.getUrlWithUserAndPass(path, self.username, self.password)
-}
-
-func (self *Client) getUrlWithUserAndPass(path, username, password string) string {
-	return fmt.Sprintf("%s://%s%s?u=%s&p=%s", self.schema, self.host, path, username, password)
-}
-
-func responseToError(response *http.Response, err error, closeResponse bool) error {
-	if err != nil {
-		return err
-	}
-	if closeResponse {
-		defer response.Body.Close()
-	}
-	if response.StatusCode >= 200 && response.StatusCode < 300 {
-		return nil
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-	return fmt.Errorf("Server returned (%d): %s", response.StatusCode, string(body))
-}
-
-func (self *Client) CreateDatabase(name string) error {
-	url := self.getUrl("/db")
-	payload := map[string]string{"name": name}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) del(url string) (*http.Response, error) {
-	return self.delWithBody(url, nil)
-}
-
-func (self *Client) delWithBody(url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest("DELETE", url, body)
-	if err != nil {
-		return nil, err
-	}
-	return self.httpClient.Do(req)
-}
-
-func (self *Client) DeleteDatabase(name string) error {
-	url := self.getUrl("/db/" + name)
-	resp, err := self.del(url)
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) get(url string) ([]byte, error) {
-	resp, err := self.httpClient.Get(url)
-	err = responseToError(resp, err, false)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	return body, err
-}
-
-func (self *Client) getWithVersion(url string) ([]byte, string, error) {
-	resp, err := self.httpClient.Get(url)
-	err = responseToError(resp, err, false)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	version := resp.Header.Get("X-Influxdb-Version")
-	fields := strings.Fields(version)
-	if len(fields) > 2 {
-		return body, fields[1], err
-	}
-	return body, "", err
-}
-
-func (self *Client) listSomething(url string) ([]map[string]interface{}, error) {
-	body, err := self.get(url)
-	if err != nil {
-		return nil, err
-	}
-	somethings := []map[string]interface{}{}
-	err = json.Unmarshal(body, &somethings)
-	if err != nil {
-		return nil, err
-	}
-	return somethings, nil
-}
-
-func (self *Client) GetDatabaseList() ([]map[string]interface{}, error) {
-	url := self.getUrl("/db")
-	return self.listSomething(url)
-}
-
-func (self *Client) CreateClusterAdmin(name, password string) error {
-	url := self.getUrl("/cluster_admins")
-	payload := map[string]string{"name": name, "password": password}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) UpdateClusterAdmin(name, password string) error {
-	url := self.getUrl("/cluster_admins/" + name)
-	payload := map[string]string{"password": password}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) DeleteClusterAdmin(name string) error {
-	url := self.getUrl("/cluster_admins/" + name)
-	resp, err := self.del(url)
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) GetClusterAdminList() ([]map[string]interface{}, error) {
-	url := self.getUrl("/cluster_admins")
-	return self.listSomething(url)
-}
-
-func (self *Client) Servers() ([]map[string]interface{}, error) {
-	url := self.getUrl("/cluster/servers")
-	return self.listSomething(url)
-}
-
-func (self *Client) RemoveServer(id int) error {
-	resp, err := self.del(self.getUrl(fmt.Sprintf("/cluster/servers/%d", id)))
-	return responseToError(resp, err, true)
-}
-
-// Creates a new database user for the given database. permissions can
-// be omitted in which case the user will be able to read and write to
-// all time series. If provided, there should be two strings, the
-// first for read and the second for write. The strings are regexes
-// that are used to match the time series name to determine whether
-// the user has the ability to read/write to the given time series.
-//
-//     client.CreateDatabaseUser("db", "user", "pass")
-//     // the following user cannot read from any series and can write
-//     // to the limited time series only
-//     client.CreateDatabaseUser("db", "limited", "pass", "^$", "limited")
-func (self *Client) CreateDatabaseUser(database, name, password string, permissions ...string) error {
-	readMatcher, writeMatcher := ".*", ".*"
-	switch len(permissions) {
-	case 0:
-	case 2:
-		readMatcher, writeMatcher = permissions[0], permissions[1]
-	default:
-		return fmt.Errorf("You have to provide two ")
-	}
-
-	url := self.getUrl("/db/" + database + "/users")
-	payload := map[string]string{"name": name, "password": password, "readFrom": readMatcher, "writeTo": writeMatcher}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-// Change the cluster admin password
-func (self *Client) ChangeClusterAdminPassword(name, newPassword string) error {
-	url := self.getUrl("/cluster_admins/" + name)
-	payload := map[string]interface{}{"password": newPassword}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-// Change the user password, adming flag and optionally permissions
-func (self *Client) ChangeDatabaseUser(database, name, newPassword string, isAdmin bool, newPermissions ...string) error {
-	switch len(newPermissions) {
-	case 0, 2:
-	default:
-		return fmt.Errorf("You have to provide two ")
-	}
-
-	url := self.getUrl("/db/" + database + "/users/" + name)
-	payload := map[string]interface{}{"password": newPassword, "admin": isAdmin}
-	if len(newPermissions) == 2 {
-		payload["readFrom"] = newPermissions[0]
-		payload["writeTo"] = newPermissions[1]
-	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-// See Client.CreateDatabaseUser for more info on the permissions
-// argument
-func (self *Client) updateDatabaseUserCommon(database, name string, password *string, isAdmin *bool, permissions ...string) error {
-	url := self.getUrl("/db/" + database + "/users/" + name)
-	payload := map[string]interface{}{}
-	if password != nil {
-		payload["password"] = *password
-	}
-	if isAdmin != nil {
-		payload["admin"] = *isAdmin
-	}
-	switch len(permissions) {
-	case 0:
-	case 2:
-		payload["readFrom"] = permissions[0]
-		payload["writeTo"] = permissions[1]
-	default:
-	}
-
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) UpdateDatabaseUser(database, name, password string) error {
-	return self.updateDatabaseUserCommon(database, name, &password, nil)
-}
-
-func (self *Client) UpdateDatabaseUserPermissions(database, name, readPermission, writePermissions string) error {
-	return self.updateDatabaseUserCommon(database, name, nil, nil, readPermission, writePermissions)
-}
-
-func (self *Client) DeleteDatabaseUser(database, name string) error {
-	url := self.getUrl("/db/" + database + "/users/" + name)
-	resp, err := self.del(url)
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) GetDatabaseUserList(database string) ([]map[string]interface{}, error) {
-	url := self.getUrl("/db/" + database + "/users")
-	return self.listSomething(url)
-}
-
-func (self *Client) AlterDatabasePrivilege(database, name string, isAdmin bool, permissions ...string) error {
-	return self.updateDatabaseUserCommon(database, name, nil, &isAdmin, permissions...)
-}
-
-type TimePrecision string
 
 const (
-	Second      TimePrecision = "s"
-	Millisecond TimePrecision = "ms"
-	Microsecond TimePrecision = "u"
+	ConsistencyOne    = "one"
+	ConsistencyAll    = "all"
+	ConsistencyQuorum = "quorum"
+	ConsistencyAny    = "any"
 )
 
-func (self *Client) WriteSeries(series []*Series) error {
-	return self.writeSeriesCommon(series, nil)
+// NewClient will instantiate and return a connected client to issue commands to the server.
+func NewClient(c Config) (*Client, error) {
+	client := Client{
+		url:        c.URL,
+		username:   c.Username,
+		password:   c.Password,
+		httpClient: &http.Client{Timeout: c.Timeout},
+		userAgent:  c.UserAgent,
+	}
+	if client.userAgent == "" {
+		client.userAgent = "InfluxDBClient"
+	}
+	return &client, nil
 }
 
-func (self *Client) WriteSeriesOverUDP(series []*Series) error {
-	if self.udpConn == nil {
-		return fmt.Errorf("UDP isn't enabled. Make sure to set config.IsUDP to true")
+// SetAuth will update the username and passwords
+func (c *Client) SetAuth(u, p string) {
+	c.username = u
+	c.password = p
+}
+
+// Query sends a command to the server and returns the Response
+func (c *Client) Query(q Query) (*Response, error) {
+	u := c.url
+
+	u.Path = "query"
+	values := u.Query()
+	values.Set("q", q.Command)
+	values.Set("db", q.Database)
+	u.RawQuery = values.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
 	}
 
-	data, err := json.Marshal(series)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	dec := json.NewDecoder(resp.Body)
+	dec.UseNumber()
+	decErr := dec.Decode(&response)
+
+	// ignore this error if we got an invalid status code
+	if decErr != nil && decErr.Error() == "EOF" && resp.StatusCode != http.StatusOK {
+		decErr = nil
+	}
+	// If we got a valid decode error, send that back
+	if decErr != nil {
+		return nil, decErr
+	}
+	// If we don't have an error in our json response, and didn't get  statusOK, then send back an error
+	if resp.StatusCode != http.StatusOK && response.Error() == nil {
+		return &response, fmt.Errorf("received status code %d from server", resp.StatusCode)
+	}
+	return &response, nil
+}
+
+// Write takes BatchPoints and allows for writing of multiple points with defaults
+// If successful, error is nil and Response is nil
+// If an error occurs, Response may contain additional information if populated.
+func (c *Client) Write(bp BatchPoints) (*Response, error) {
+	c.url.Path = "write"
+
+	var b bytes.Buffer
+	for _, p := range bp.Points {
+		if p.Raw != "" {
+			if _, err := b.WriteString(p.Raw); err != nil {
+				return nil, err
+			}
+		} else {
+			for k, v := range bp.Tags {
+				if p.Tags == nil {
+					p.Tags = make(map[string]string, len(bp.Tags))
+				}
+				p.Tags[k] = v
+			}
+
+			if _, err := b.WriteString(p.MarshalString()); err != nil {
+				return nil, err
+			}
+		}
+
+		if err := b.WriteByte('\n'); err != nil {
+			return nil, err
+		}
+	}
+
+	req, err := http.NewRequest("POST", c.url.String(), &b)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "")
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	params := req.URL.Query()
+	params.Add("db", bp.Database)
+	params.Add("rp", bp.RetentionPolicy)
+	params.Add("precision", bp.Precision)
+	params.Add("consistency", bp.WriteConsistency)
+	req.URL.RawQuery = params.Encode()
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil && err.Error() != "EOF" {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		var err = fmt.Errorf(string(body))
+		response.Err = err
+		return &response, err
+	}
+
+	return nil, nil
+}
+
+// Ping will check to see if the server is up
+// Ping returns how long the request took, the version of the server it connected to, and an error if one occurred.
+func (c *Client) Ping() (time.Duration, string, error) {
+	now := time.Now()
+	u := c.url
+	u.Path = "ping"
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return 0, "", err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, "", err
+	}
+	defer resp.Body.Close()
+
+	version := resp.Header.Get("X-Influxdb-Version")
+	return time.Since(now), version, nil
+}
+
+// Dump connects to server and retrieves all data stored for specified database.
+// If successful, Dump returns the entire response body, which is an io.ReadCloser
+func (c *Client) Dump(db string) (io.ReadCloser, error) {
+	u := c.url
+	u.Path = "dump"
+	values := u.Query()
+	values.Set("db", db)
+	u.RawQuery = values.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return resp.Body, fmt.Errorf("HTTP Protocol error %d", resp.StatusCode)
+	}
+	return resp.Body, nil
+}
+
+// Structs
+
+// Result represents a resultset returned from a single statement.
+type Result struct {
+	Series []influxql.Row
+	Err    error
+}
+
+// MarshalJSON encodes the result into JSON.
+func (r *Result) MarshalJSON() ([]byte, error) {
+	// Define a struct that outputs "error" as a string.
+	var o struct {
+		Series []influxql.Row `json:"series,omitempty"`
+		Err    string         `json:"error,omitempty"`
+	}
+
+	// Copy fields to output struct.
+	o.Series = r.Series
+	if r.Err != nil {
+		o.Err = r.Err.Error()
+	}
+
+	return json.Marshal(&o)
+}
+
+// UnmarshalJSON decodes the data into the Result struct
+func (r *Result) UnmarshalJSON(b []byte) error {
+	var o struct {
+		Series []influxql.Row `json:"series,omitempty"`
+		Err    string         `json:"error,omitempty"`
+	}
+
+	dec := json.NewDecoder(bytes.NewBuffer(b))
+	dec.UseNumber()
+	err := dec.Decode(&o)
 	if err != nil {
 		return err
 	}
-	// because max of msg over upd is 2048 bytes
-	// https://github.com/influxdb/influxdb/blob/master/src/api/udp/api.go#L65
-	if len(data) >= UDPMaxMessageSize {
-		err = fmt.Errorf("data size over limit %v limit is %v", len(data), UDPMaxMessageSize)
-		fmt.Println(err)
-		return err
-	}
-	_, err = self.udpConn.Write(data)
-	if err != nil {
-		return err
+	r.Series = o.Series
+	if o.Err != "" {
+		r.Err = errors.New(o.Err)
 	}
 	return nil
 }
 
-func (self *Client) WriteSeriesWithTimePrecision(series []*Series, timePrecision TimePrecision) error {
-	return self.writeSeriesCommon(series, map[string]string{"time_precision": string(timePrecision)})
+// Response represents a list of statement results.
+type Response struct {
+	Results []Result
+	Err     error
 }
 
-func (self *Client) writeSeriesCommon(series []*Series, options map[string]string) error {
-	data, err := json.Marshal(series)
+// MarshalJSON encodes the response into JSON.
+func (r *Response) MarshalJSON() ([]byte, error) {
+	// Define a struct that outputs "error" as a string.
+	var o struct {
+		Results []Result `json:"results,omitempty"`
+		Err     string   `json:"error,omitempty"`
+	}
+
+	// Copy fields to output struct.
+	o.Results = r.Results
+	if r.Err != nil {
+		o.Err = r.Err.Error()
+	}
+
+	return json.Marshal(&o)
+}
+
+// UnmarshalJSON decodes the data into the Response struct
+func (r *Response) UnmarshalJSON(b []byte) error {
+	var o struct {
+		Results []Result `json:"results,omitempty"`
+		Err     string   `json:"error,omitempty"`
+	}
+
+	dec := json.NewDecoder(bytes.NewBuffer(b))
+	dec.UseNumber()
+	err := dec.Decode(&o)
 	if err != nil {
 		return err
 	}
-	url := self.getUrl("/db/" + self.database + "/series")
-	for name, value := range options {
-		url += fmt.Sprintf("&%s=%s", name, value)
+	r.Results = o.Results
+	if o.Err != "" {
+		r.Err = errors.New(o.Err)
 	}
-	var b *bytes.Buffer
-	if self.compression {
-		b = bytes.NewBuffer(nil)
-		w := gzip.NewWriter(b)
-		if _, err := w.Write(data); err != nil {
+	return nil
+}
+
+// Error returns the first error from any statement.
+// Returns nil if no errors occurred on any statements.
+func (r Response) Error() error {
+	if r.Err != nil {
+		return r.Err
+	}
+	for _, result := range r.Results {
+		if result.Err != nil {
+			return result.Err
+		}
+	}
+	return nil
+}
+
+// Point defines the fields that will be written to the database
+// Measurement, Time, and Fields are required
+// Precision can be specified if the time is in epoch format (integer).
+// Valid values for Precision are n, u, ms, s, m, and h
+type Point struct {
+	Measurement string
+	Tags        map[string]string
+	Time        time.Time
+	Fields      map[string]interface{}
+	Precision   string
+	Raw         string
+}
+
+// MarshalJSON will format the time in RFC3339Nano
+// Precision is also ignored as it is only used for writing, not reading
+// Or another way to say it is we always send back in nanosecond precision
+func (p *Point) MarshalJSON() ([]byte, error) {
+	point := struct {
+		Measurement string                 `json:"measurement,omitempty"`
+		Tags        map[string]string      `json:"tags,omitempty"`
+		Time        string                 `json:"time,omitempty"`
+		Fields      map[string]interface{} `json:"fields,omitempty"`
+		Precision   string                 `json:"precision,omitempty"`
+	}{
+		Measurement: p.Measurement,
+		Tags:        p.Tags,
+		Fields:      p.Fields,
+		Precision:   p.Precision,
+	}
+	// Let it omit empty if it's really zero
+	if !p.Time.IsZero() {
+		point.Time = p.Time.UTC().Format(time.RFC3339Nano)
+	}
+	return json.Marshal(&point)
+}
+
+func (p *Point) MarshalString() string {
+	return tsdb.NewPoint(p.Measurement, p.Tags, p.Fields, p.Time).String()
+}
+
+// UnmarshalJSON decodes the data into the Point struct
+func (p *Point) UnmarshalJSON(b []byte) error {
+	var normal struct {
+		Measurement string                 `json:"measurement"`
+		Tags        map[string]string      `json:"tags"`
+		Time        time.Time              `json:"time"`
+		Precision   string                 `json:"precision"`
+		Fields      map[string]interface{} `json:"fields"`
+	}
+	var epoch struct {
+		Measurement string                 `json:"measurement"`
+		Tags        map[string]string      `json:"tags"`
+		Time        *int64                 `json:"time"`
+		Precision   string                 `json:"precision"`
+		Fields      map[string]interface{} `json:"fields"`
+	}
+
+	if err := func() error {
+		var err error
+		dec := json.NewDecoder(bytes.NewBuffer(b))
+		dec.UseNumber()
+		if err = dec.Decode(&epoch); err != nil {
 			return err
 		}
-		w.Flush()
-		w.Close()
-	} else {
-		b = bytes.NewBuffer(data)
+		// Convert from epoch to time.Time, but only if Time
+		// was actually set.
+		var ts time.Time
+		if epoch.Time != nil {
+			ts, err = EpochToTime(*epoch.Time, epoch.Precision)
+			if err != nil {
+				return err
+			}
+		}
+		p.Measurement = epoch.Measurement
+		p.Tags = epoch.Tags
+		p.Time = ts
+		p.Precision = epoch.Precision
+		p.Fields = normalizeFields(epoch.Fields)
+		return nil
+	}(); err == nil {
+		return nil
 	}
-	req, err := http.NewRequest("POST", url, b)
-	if err != nil {
+
+	dec := json.NewDecoder(bytes.NewBuffer(b))
+	dec.UseNumber()
+	if err := dec.Decode(&normal); err != nil {
 		return err
 	}
-	if self.compression {
-		req.Header.Set("Content-Encoding", "gzip")
-	}
-	resp, err := self.httpClient.Do(req)
-	return responseToError(resp, err, true)
+	normal.Time = SetPrecision(normal.Time, normal.Precision)
+	p.Measurement = normal.Measurement
+	p.Tags = normal.Tags
+	p.Time = normal.Time
+	p.Precision = normal.Precision
+	p.Fields = normalizeFields(normal.Fields)
+
+	return nil
 }
 
-func (self *Client) Query(query string, precision ...TimePrecision) ([]*Series, error) {
-	return self.queryCommon(query, false, precision...)
+// Remove any notion of json.Number
+func normalizeFields(fields map[string]interface{}) map[string]interface{} {
+	newFields := map[string]interface{}{}
+
+	for k, v := range fields {
+		switch v := v.(type) {
+		case json.Number:
+			jv, e := v.Float64()
+			if e != nil {
+				panic(fmt.Sprintf("unable to convert json.Number to float64: %s", e))
+			}
+			newFields[k] = jv
+		default:
+			newFields[k] = v
+		}
+	}
+	return newFields
 }
 
-func (self *Client) QueryWithNumbers(query string, precision ...TimePrecision) ([]*Series, error) {
-	return self.queryCommon(query, true, precision...)
+// BatchPoints is used to send batched data in a single write.
+// Database and Points are required
+// If no retention policy is specified, it will use the databases default retention policy.
+// If tags are specified, they will be "merged" with all points.  If a point already has that tag, it is ignored.
+// If time is specified, it will be applied to any point with an empty time.
+// Precision can be specified if the time is in epoch format (integer).
+// Valid values for Precision are n, u, ms, s, m, and h
+type BatchPoints struct {
+	Points           []Point           `json:"points,omitempty"`
+	Database         string            `json:"database,omitempty"`
+	RetentionPolicy  string            `json:"retentionPolicy,omitempty"`
+	Tags             map[string]string `json:"tags,omitempty"`
+	Time             time.Time         `json:"time,omitempty"`
+	Precision        string            `json:"precision,omitempty"`
+	WriteConsistency string            `json:"-"`
 }
 
-func (self *Client) queryCommon(query string, useNumber bool, precision ...TimePrecision) ([]*Series, error) {
-	escapedQuery := url.QueryEscape(query)
-	url := self.getUrl("/db/" + self.database + "/series")
-	if len(precision) > 0 {
-		url += "&time_precision=" + string(precision[0])
+// UnmarshalJSON decodes the data into the BatchPoints struct
+func (bp *BatchPoints) UnmarshalJSON(b []byte) error {
+	var normal struct {
+		Points          []Point           `json:"points"`
+		Database        string            `json:"database"`
+		RetentionPolicy string            `json:"retentionPolicy"`
+		Tags            map[string]string `json:"tags"`
+		Time            time.Time         `json:"time"`
+		Precision       string            `json:"precision"`
 	}
-	url += "&q=" + escapedQuery
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	if !self.compression {
-		req.Header.Set("Accept-Encoding", "identity")
-	}
-	resp, err := self.httpClient.Do(req)
-	err = responseToError(resp, err, false)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	series := []*Series{}
-	decoder := json.NewDecoder(resp.Body)
-	if useNumber {
-		decoder.UseNumber()
-	}
-	err = decoder.Decode(&series)
-	if err != nil {
-		return nil, err
-	}
-	return series, nil
-}
-
-func (self *Client) Ping() error {
-	url := self.getUrl("/ping")
-	resp, err := self.httpClient.Get(url)
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) AuthenticateDatabaseUser(database, username, password string) error {
-	url := self.getUrlWithUserAndPass(fmt.Sprintf("/db/%s/authenticate", database), username, password)
-	resp, err := self.httpClient.Get(url)
-	return responseToError(resp, err, true)
-}
-
-func (self *Client) AuthenticateClusterAdmin(username, password string) error {
-	url := self.getUrlWithUserAndPass("/cluster_admins/authenticate", username, password)
-	resp, err := self.httpClient.Get(url)
-	return responseToError(resp, err, true)
-}
-
-type LongTermShortTermShards struct {
-	// Long term shards, (doesn't get populated for version >= 0.8.0)
-	LongTerm []*Shard `json:"longTerm"`
-	// Short term shards, (doesn't get populated for version >= 0.8.0)
-	ShortTerm []*Shard `json:"shortTerm"`
-	// All shards in the system (Long + Short term shards for version < 0.8.0)
-	All []*Shard `json:"-"`
-}
-
-type Shard struct {
-	Id        uint32   `json:"id"`
-	EndTime   int64    `json:"endTime"`
-	StartTime int64    `json:"startTime"`
-	ServerIds []uint32 `json:"serverIds"`
-	SpaceName string   `json:"spaceName"`
-	Database  string   `json:"database"`
-}
-
-type ShardSpaceCollection struct {
-	ShardSpaces []ShardSpace
-}
-
-func (self *Client) GetShards() (*LongTermShortTermShards, error) {
-	url := self.getUrlWithUserAndPass("/cluster/shards", self.username, self.password)
-	body, version, err := self.getWithVersion(url)
-	if err != nil {
-		return nil, err
-	}
-	return parseShards(body, version)
-}
-
-func isOrNewerThan(version, reference string) bool {
-	if version == "vdev" {
-		return true
-	}
-	majorMinor := strings.Split(version[1:], ".")[:2]
-	refMajorMinor := strings.Split(reference[1:], ".")[:2]
-	if majorMinor[0] > refMajorMinor[0] {
-		return true
-	}
-	if majorMinor[1] > refMajorMinor[1] {
-		return true
-	}
-	return majorMinor[1] == refMajorMinor[1]
-}
-
-func parseShards(body []byte, version string) (*LongTermShortTermShards, error) {
-	// strip the initial v in `v0.8.0` and split on the dots
-	if version != "" && isOrNewerThan(version, "v0.8") {
-		return parseNewShards(body)
-	}
-	shards := &LongTermShortTermShards{}
-	err := json.Unmarshal(body, &shards)
-	if err != nil {
-		return nil, err
+	var epoch struct {
+		Points          []Point           `json:"points"`
+		Database        string            `json:"database"`
+		RetentionPolicy string            `json:"retentionPolicy"`
+		Tags            map[string]string `json:"tags"`
+		Time            *int64            `json:"time"`
+		Precision       string            `json:"precision"`
 	}
 
-	shards.All = make([]*Shard, len(shards.LongTerm)+len(shards.ShortTerm))
-	copy(shards.All, shards.LongTerm)
-	copy(shards.All[len(shards.LongTerm):], shards.ShortTerm)
-	return shards, nil
-}
-
-func parseNewShards(body []byte) (*LongTermShortTermShards, error) {
-	shards := []*Shard{}
-	err := json.Unmarshal(body, &shards)
-	if err != nil {
-		return nil, err
+	if err := func() error {
+		var err error
+		if err = json.Unmarshal(b, &epoch); err != nil {
+			return err
+		}
+		// Convert from epoch to time.Time
+		var ts time.Time
+		if epoch.Time != nil {
+			ts, err = EpochToTime(*epoch.Time, epoch.Precision)
+			if err != nil {
+				return err
+			}
+		}
+		bp.Points = epoch.Points
+		bp.Database = epoch.Database
+		bp.RetentionPolicy = epoch.RetentionPolicy
+		bp.Tags = epoch.Tags
+		bp.Time = ts
+		bp.Precision = epoch.Precision
+		return nil
+	}(); err == nil {
+		return nil
 	}
 
-	return &LongTermShortTermShards{All: shards}, nil
-}
-
-// Added to InfluxDB in 0.8.0
-func (self *Client) GetShardSpaces() ([]*ShardSpace, error) {
-	url := self.getUrlWithUserAndPass("/cluster/shard_spaces", self.username, self.password)
-	body, err := self.get(url)
-	if err != nil {
-		return nil, err
-	}
-	spaces := []*ShardSpace{}
-	err = json.Unmarshal(body, &spaces)
-	if err != nil {
-		return nil, err
-	}
-
-	return spaces, nil
-}
-
-// Added to InfluxDB in 0.8.0
-func (self *Client) DropShardSpace(database, name string) error {
-	url := self.getUrlWithUserAndPass(fmt.Sprintf("/cluster/shard_spaces/%s/%s", database, name), self.username, self.password)
-	_, err := self.del(url)
-	return err
-}
-
-// Added to InfluxDB in 0.8.0
-func (self *Client) CreateShardSpace(database string, space *ShardSpace) error {
-	url := self.getUrl(fmt.Sprintf("/cluster/shard_spaces/%s", database))
-	data, err := json.Marshal(space)
-	if err != nil {
+	if err := json.Unmarshal(b, &normal); err != nil {
 		return err
 	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
+	normal.Time = SetPrecision(normal.Time, normal.Precision)
+	bp.Points = normal.Points
+	bp.Database = normal.Database
+	bp.RetentionPolicy = normal.RetentionPolicy
+	bp.Tags = normal.Tags
+	bp.Time = normal.Time
+	bp.Precision = normal.Precision
+
+	return nil
 }
 
-func (self *Client) DropShard(id uint32, serverIds []uint32) error {
-	url := self.getUrlWithUserAndPass(fmt.Sprintf("/cluster/shards/%d", id), self.username, self.password)
-	ids := map[string][]uint32{"serverIds": serverIds}
-	body, err := json.Marshal(ids)
-	if err != nil {
-		return err
-	}
-	_, err = self.delWithBody(url, bytes.NewBuffer(body))
-	return err
+// utility functions
+
+// Addr provides the current url as a string of the server the client is connected to.
+func (c *Client) Addr() string {
+	return c.url.String()
 }
 
-// Added to InfluxDB in 0.8.2
-func (self *Client) UpdateShardSpace(database, name string, space *ShardSpace) error {
-	url := self.getUrl(fmt.Sprintf("/cluster/shard_spaces/%s/%s", database, name))
-	data, err := json.Marshal(space)
-	if err != nil {
-		return err
+// helper functions
+
+// EpochToTime takes a unix epoch time and uses precision to return back a time.Time
+func EpochToTime(epoch int64, precision string) (time.Time, error) {
+	if precision == "" {
+		precision = "s"
 	}
-	resp, err := self.httpClient.Post(url, "application/json", bytes.NewBuffer(data))
-	return responseToError(resp, err, true)
+	var t time.Time
+	switch precision {
+	case "h":
+		t = time.Unix(0, epoch*int64(time.Hour))
+	case "m":
+		t = time.Unix(0, epoch*int64(time.Minute))
+	case "s":
+		t = time.Unix(0, epoch*int64(time.Second))
+	case "ms":
+		t = time.Unix(0, epoch*int64(time.Millisecond))
+	case "u":
+		t = time.Unix(0, epoch*int64(time.Microsecond))
+	case "n":
+		t = time.Unix(0, epoch)
+	default:
+		return time.Time{}, fmt.Errorf("Unknown precision %q", precision)
+	}
+	return t, nil
+}
+
+// SetPrecision will round a time to the specified precision
+func SetPrecision(t time.Time, precision string) time.Time {
+	switch precision {
+	case "n":
+	case "u":
+		return t.Round(time.Microsecond)
+	case "ms":
+		return t.Round(time.Millisecond)
+	case "s":
+		return t.Round(time.Second)
+	case "m":
+		return t.Round(time.Minute)
+	case "h":
+		return t.Round(time.Hour)
+	}
+	return t
 }

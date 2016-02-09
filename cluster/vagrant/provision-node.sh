@@ -52,8 +52,12 @@ for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
   fi
 done
 
+prepare-package-manager
+
 # Configure network
-provision-network-node
+if [ "${NETWORK_PROVIDER}" != "kubenet" ]; then
+  provision-network-node
+fi
 
 write-salt-config kubernetes-pool
 

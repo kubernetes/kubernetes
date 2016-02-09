@@ -60,6 +60,7 @@ It assumes some familiarity with concepts in the [User Guide](../user-guide/READ
   1. [DNS](dns.md)
 1. [Networking](networking.md)
   1. [OVS Networking](ovs-networking.md)
+1. [Master <-> Node Communication](master-node-communication.md)
 1. Example Configurations
   1. [Multiple Clusters](multi-cluster.md)
   1. [High Availability Clusters](high-availability.md)

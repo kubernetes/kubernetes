@@ -16,16 +16,14 @@ limitations under the License.
 
 package admission
 
-import (
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-)
+import clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func NewFromPlugins(client client.Interface, pluginNames []string, configFilePath string) Interface {
+func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string) Interface {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
 		plugin := InitPlugin(pluginName, client, configFilePath)

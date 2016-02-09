@@ -24,8 +24,8 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // streamProtocolV2 implements version 2 of the streaming protocol for attach
@@ -113,7 +113,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 			defer once.Do(func() { remoteStdin.Close() })
 
 			if _, err := io.Copy(remoteStdin, e.stdin); err != nil {
-				util.HandleError(err)
+				runtime.HandleError(err)
 			}
 		}()
 
@@ -133,7 +133,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 			// this "copy" doesn't actually read anything - it's just here to wait for
 			// the server to close remoteStdin.
 			if _, err := io.Copy(ioutil.Discard, remoteStdin); err != nil {
-				util.HandleError(err)
+				runtime.HandleError(err)
 			}
 		}()
 	}
@@ -143,7 +143,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 		go func() {
 			defer wg.Done()
 			if _, err := io.Copy(e.stdout, remoteStdout); err != nil {
-				util.HandleError(err)
+				runtime.HandleError(err)
 			}
 		}()
 	}
@@ -153,7 +153,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 		go func() {
 			defer wg.Done()
 			if _, err := io.Copy(e.stderr, remoteStderr); err != nil {
-				util.HandleError(err)
+				runtime.HandleError(err)
 			}
 		}()
 	}

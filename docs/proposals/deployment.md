@@ -71,7 +71,7 @@ type DeploymentSpec struct {
 
   // Label selector for pods. Existing ReplicationControllers whose pods are
   // selected by this will be scaled down. New ReplicationControllers will be
-  // created with this selector, with a unique label as defined by UniqueLabelKey.
+  // created with this selector, with a unique label `pod-template-hash`.
   // If Selector is empty, it is defaulted to the labels present on the Pod template.
   Selector map[string]string
 
@@ -80,15 +80,6 @@ type DeploymentSpec struct {
 
   // The deployment strategy to use to replace existing pods with new ones.
   Strategy DeploymentStrategy
-
-  // Key of the selector that is added to existing RCs (and label key that is
-  // added to its pods) to prevent the existing RCs to select new pods (and old
-  // pods being selected by new RC).
-  // Users can set this to an empty string to indicate that the system should
-  // not add any selector and label. If unspecified, system uses
-  // "deployment.kubernetes.io/podTemplateHash".
-  // Value of this key is hash of DeploymentSpec.PodTemplateSpec.
-  UniqueLabelKey *string
 }
 
 type DeploymentStrategy struct {
@@ -170,7 +161,7 @@ For each pending deployment, it will:
    selector to all these RCs (and the corresponding label to their pods) to ensure
    that they do not select the newly created pods (or old pods get selected by
    new RC).
-   - The label key will be "deployment.kubernetes.io/podTemplateHash".
+   - The label key will be "pod-template-hash".
    - The label value will be hash of the podTemplateSpec for that RC without
      this label. This value will be unique for all RCs, since PodTemplateSpec should be unique.
    - If the RCs and pods dont already have this label and selector:
@@ -178,10 +169,10 @@ For each pending deployment, it will:
        ensure that all new pods that they create will have this label.
      - Then we will add this label to their existing pods and then add this as a selector
        to that RC.
-3. Find if there exists an RC for which value of "deployment.kubernetes.io/podTemplateHash" label
+3. Find if there exists an RC for which value of "pod-template-hash" label
    is same as hash of DeploymentSpec.PodTemplateSpec. If it exists already, then
    this is the RC that will be ramped up. If there is no such RC, then we create
-   a new one using DeploymentSpec and then add a "deployment.kubernetes.io/podTemplateHash" label
+   a new one using DeploymentSpec and then add a "pod-template-hash" label
    to it. RCSpec.replicas = 0 for a newly created RC.
 4. Scale up the new RC and scale down the olds ones as per the DeploymentStrategy.
    - Raise an event if we detect an error, like new pods failing to come up.

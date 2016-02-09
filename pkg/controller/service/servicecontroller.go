@@ -27,12 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -67,7 +68,7 @@ type serviceCache struct {
 
 type ServiceController struct {
 	cloud            cloudprovider.Interface
-	kubeClient       client.Interface
+	kubeClient       clientset.Interface
 	clusterName      string
 	balancer         cloudprovider.LoadBalancer
 	zone             cloudprovider.Zone
@@ -79,9 +80,9 @@ type ServiceController struct {
 
 // New returns a new service controller to keep cloud provider service resources
 // (like load balancers) in sync with the registry.
-func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName string) *ServiceController {
+func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(kubeClient.Events(""))
+	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
 
 	return &ServiceController{
@@ -115,8 +116,8 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 	// We have to make this check beecause the ListWatch that we use in
 	// WatchServices requires Client functions that aren't in the interface
 	// for some reason.
-	if _, ok := s.kubeClient.(*client.Client); !ok {
-		return fmt.Errorf("ServiceController only works with real Client objects, but was passed something else satisfying the client Interface.")
+	if _, ok := s.kubeClient.(*clientset.Clientset); !ok {
+		return fmt.Errorf("ServiceController only works with real Client objects, but was passed something else satisfying the clientset.Interface.")
 	}
 
 	// Get the currently existing set of services and then all future creates
@@ -133,13 +134,13 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		}),
 		s.cache,
 	)
-	lw := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "services", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient, "services", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(lw, &api.Service{}, serviceQueue, serviceSyncPeriod).Run()
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
 
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go s.nodeSyncLoop(nodeSyncPeriod)
 	return nil
@@ -188,7 +189,7 @@ func (s *ServiceController) watchServices(serviceQueue *cache.DeltaFIFO) {
 			time.Sleep(processingRetryInterval)
 			serviceQueue.AddIfNotPresent(deltas)
 		} else if err != nil {
-			util.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
+			runtime.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
 		}
 	}
 }
@@ -273,7 +274,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 // Returns whatever error occurred along with a boolean indicator of whether it
 // should be retried.
 func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.NamespacedName, service, appliedState *api.Service) (error, bool) {
-	if appliedState != nil && !needsUpdate(appliedState, service) {
+	if appliedState != nil && !s.needsUpdate(appliedState, service) {
 		glog.Infof("LB already exists and doesn't need update for service %s", namespacedName)
 		return nil, notRetryable
 	}
@@ -343,7 +344,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 func (s *ServiceController) persistUpdate(service *api.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.Services(service.Namespace).Update(service)
+		_, err = s.kubeClient.Core().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}
@@ -351,18 +352,20 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 		// out so that we can process the delete, which we should soon be receiving
 		// if we haven't already.
 		if errors.IsNotFound(err) {
-			glog.Infof("Not persisting update to service that no longer exists: %v", err)
+			glog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
+				service.Namespace, service.Name, err)
 			return nil
 		}
 		// TODO: Try to resolve the conflict if the change was unrelated to load
 		// balancer status. For now, just rely on the fact that we'll
 		// also process the update that caused the resource version to change.
 		if errors.IsConflict(err) {
-			glog.V(4).Infof("Not persisting update to service that has been changed since we received it: %v", err)
+			glog.V(4).Infof("Not persisting update to service '%s/%s' that has been changed since we received it: %v",
+				service.Namespace, service.Name, err)
 			return nil
 		}
-		glog.Warningf("Failed to persist updated LoadBalancerStatus to service %s after creating its load balancer: %v",
-			service.Name, err)
+		glog.Warningf("Failed to persist updated LoadBalancerStatus to service '%s/%s' after creating its load balancer: %v",
+			service.Namespace, service.Name, err)
 		time.Sleep(clientRetryInterval)
 	}
 	return err
@@ -456,24 +459,32 @@ func (s *serviceCache) delete(serviceName string) {
 	delete(s.serviceMap, serviceName)
 }
 
-func needsUpdate(oldService *api.Service, newService *api.Service) bool {
+func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api.Service) bool {
 	if !wantsLoadBalancer(oldService) && !wantsLoadBalancer(newService) {
 		return false
 	}
 	if wantsLoadBalancer(oldService) != wantsLoadBalancer(newService) {
+		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "Type", "%v -> %v",
+			oldService.Spec.Type, newService.Spec.Type)
 		return true
 	}
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
 	if !loadBalancerIPsAreEqual(oldService, newService) {
+		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "LoadbalancerIP", "%v -> %v",
+			oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP)
 		return true
 	}
 	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
+		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "ExternalIP", "Count: %v -> %v",
+			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
 		return true
 	}
 	for i := range oldService.Spec.ExternalIPs {
 		if oldService.Spec.ExternalIPs[i] != newService.Spec.ExternalIPs[i] {
+			s.eventRecorder.Eventf(newService, api.EventTypeNormal, "ExternalIP", "Added: %v",
+				newService.Spec.ExternalIPs[i])
 			return true
 		}
 	}

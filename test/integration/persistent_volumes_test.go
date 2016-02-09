@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
@@ -45,9 +46,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer s.Close()
 
 	deleteAllEtcdKeys()
-	binderClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	testClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	binderClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	recyclerClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	testClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	host := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
 	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}}}
@@ -57,7 +58,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	binder.Run()
 	defer binder.Stop()
 
-	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 30*time.Second, plugins, cloud)
+	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 30*time.Second, 3, plugins, cloud)
 	recycler.Run()
 	defer recycler.Stop()
 
@@ -90,7 +91,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	waitForPersistentVolumePhase(w, api.VolumeBound)
 
 	// deleting a claim releases the volume, after which it can be recycled
-	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name); err != nil {
+	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 
@@ -115,7 +116,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	waitForPersistentVolumePhase(w, api.VolumeBound)
 
 	// deleting a claim releases the volume, after which it can be recycled
-	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name); err != nil {
+	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 

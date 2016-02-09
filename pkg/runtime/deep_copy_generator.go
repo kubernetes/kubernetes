@@ -24,7 +24,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -69,7 +68,7 @@ type DeepCopyGenerator interface {
 	OverwritePackage(pkg, overwrite string)
 }
 
-func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include sets.String) DeepCopyGenerator {
+func NewDeepCopyGenerator(scheme *Scheme, targetPkg string, include sets.String) DeepCopyGenerator {
 	g := &deepCopyGenerator{
 		scheme:        scheme,
 		targetPkg:     targetPkg,
@@ -91,7 +90,7 @@ type pkgPathNamePair struct {
 }
 
 type deepCopyGenerator struct {
-	scheme    *conversion.Scheme
+	scheme    *Scheme
 	targetPkg string
 	copyables map[reflect.Type]bool
 	// map of package names to shortname

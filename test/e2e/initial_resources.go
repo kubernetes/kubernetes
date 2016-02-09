@@ -20,24 +20,20 @@ import (
 	"fmt"
 	"time"
 
-	influxdb "github.com/influxdb/influxdb/client"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 )
 
-var _ = Describe("Initial Resources [Skipped] ", func() {
+// [Feature:InitialResources]: Initial resources is an experimental feature, so
+// these tests are not run by default.
+//
+// Flaky issue #20272
+var _ = Describe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
 	f := NewFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {
-		// Cleanup data in InfluxDB that left from previous tests.
-		influxdbClient, err := getInfluxdbClient(f.Client)
-		expectNoError(err, "failed to create influxdb client")
-		_, err = influxdbClient.Query("drop series autoscaling.cpu.usage.2m", influxdb.Second)
-		expectNoError(err)
-		_, err = influxdbClient.Query("drop series autoscaling.memory.usage.2m", influxdb.Second)
-		expectNoError(err)
-
+		// TODO(piosz): Add cleanup data in InfluxDB that left from previous tests.
 		cpu := 100
 		mem := 200
 		for i := 0; i < 10; i++ {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -161,6 +162,27 @@ func (s *StoreToReplicationControllerLister) List() (controllers []api.Replicati
 	return controllers, nil
 }
 
+func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace string) storeReplicationControllersNamespacer {
+	return storeReplicationControllersNamespacer{s.Store, namespace}
+}
+
+type storeReplicationControllersNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (controllers []api.ReplicationController, err error) {
+	for _, c := range s.store.List() {
+		rc := *(c.(*api.ReplicationController))
+		if s.namespace == api.NamespaceAll || s.namespace == rc.Namespace {
+			if selector.Matches(labels.Set(rc.Labels)) {
+				controllers = append(controllers, rc)
+			}
+		}
+	}
+	return
+}
+
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
 func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
 	var selector labels.Selector
@@ -245,6 +267,62 @@ func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationControl
 	return
 }
 
+// StoreToReplicaSetLister gives a store List and Exists methods. The store must contain only ReplicaSets.
+type StoreToReplicaSetLister struct {
+	Store
+}
+
+// Exists checks if the given ReplicaSet exists in the store.
+func (s *StoreToReplicaSetLister) Exists(rs *extensions.ReplicaSet) (bool, error) {
+	_, exists, err := s.Store.Get(rs)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// List lists all ReplicaSets in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToReplicaSetLister) List() (rss []extensions.ReplicaSet, err error) {
+	for _, rs := range s.Store.List() {
+		rss = append(rss, *(rs.(*extensions.ReplicaSet)))
+	}
+	return rss, nil
+}
+
+// GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
+func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensions.ReplicaSet, err error) {
+	var selector labels.Selector
+	var rs extensions.ReplicaSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rs = *m.(*extensions.ReplicaSet)
+		if rs.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			err = fmt.Errorf("failed to convert pod selector to selector: %v", err)
+			return
+		}
+
+		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		rss = append(rss, rs)
+	}
+	if len(rss) == 0 {
+		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
 type StoreToDaemonSetLister struct {
 	Store
@@ -284,7 +362,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = extensions.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -406,7 +484,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 			continue
 		}
 
-		selector, _ = extensions.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}

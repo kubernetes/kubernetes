@@ -160,17 +160,25 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 		rm.Stop()
 	})
 	Describe("regular resource usage tracking", func() {
+		// We assume that the scheduler will make reasonable scheduling choices
+		// and assign ~N pods on the node.
+		// Although we want to track N pods per node, there are N + add-on pods
+		// in the cluster. The cluster add-on pods can be distributed unevenly
+		// among the nodes because they are created during the cluster
+		// initialization. This *noise* is obvious when N is small. We
+		// deliberately set higher resource usage limits to account for the
+		// noise.
 		rTests := []resourceTest{
 			{podsPerNode: 0,
 				limits: containersCPUSummary{
-					"/kubelet":       {0.50: 0.05, 0.95: 0.15},
-					"/docker-daemon": {0.50: 0.03, 0.95: 0.06},
+					"/kubelet":       {0.50: 0.06, 0.95: 0.08},
+					"/docker-daemon": {0.50: 0.05, 0.95: 0.06},
 				},
 			},
 			{podsPerNode: 35,
 				limits: containersCPUSummary{
-					"/kubelet":       {0.50: 0.15, 0.95: 0.35},
-					"/docker-daemon": {0.50: 0.06, 0.95: 0.30},
+					"/kubelet":       {0.50: 0.12, 0.95: 0.14},
+					"/docker-daemon": {0.50: 0.06, 0.95: 0.08},
 				},
 			},
 		}

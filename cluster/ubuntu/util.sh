@@ -408,7 +408,7 @@ function provision-master() {
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
-      FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" ~/kube/reconfDocker.sh a
+      FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh a
       '" || {
       echo "Deploying master on machine ${MASTER_IP} failed"
       exit 1
@@ -461,7 +461,7 @@ function provision-node() {
       mkdir -p /opt/bin/
       cp ~/kube/minion/* /opt/bin
       service flanneld start
-      KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" ~/kube/reconfDocker.sh i
+      KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh i
       '" || {
       echo "Deploying node on machine ${1#*@} failed"
       exit 1
@@ -542,7 +542,7 @@ function provision-masterandnode() {
       cp ~/kube/minion/* /opt/bin/
 
       service etcd start
-      FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" ~/kube/reconfDocker.sh ai
+      FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh ai
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
       exit 1
@@ -553,7 +553,7 @@ function provision-masterandnode() {
 function check-pods-torn-down() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   local attempt=0
-  while [[ ! -z "$(kubectl get pods | tail -n +2)" ]]; do
+  while [[ ! -z "$(kubectl get pods --show-all --all-namespaces| tail -n +2)" ]]; do
     if (( attempt > 120 )); then
       echo "timeout waiting for tearing down pods" >> ~/kube/err.log
     fi

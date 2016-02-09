@@ -208,8 +208,7 @@ release](https://github.com/kubernetes/kubernetes/releases/new):
 1. fill in the release title from the draft;
 1. re-run the appropriate release notes tool(s) to pick up any changes people
    have made;
-1. find the appropriate `kubernetes.tar.gz` in [GCS bucket](https://
-console.developers.google.com/storage/browser/kubernetes-release/release/),
+1. find the appropriate `kubernetes.tar.gz` in [GCS bucket](https://console.developers.google.com/storage/browser/kubernetes-release/release/),
    download it, double check the hash (compare to what you had in the release
    notes draft), and attach it to the release; and
 1. publish!

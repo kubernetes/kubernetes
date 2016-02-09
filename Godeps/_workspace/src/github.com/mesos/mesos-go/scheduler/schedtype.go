@@ -66,6 +66,11 @@ type SchedulerDriver interface {
 	// framework via Scheduler.ResourceOffers callback, asynchronously.
 	RequestResources(requests []*mesos.Request) (mesos.Status, error)
 
+	// AcceptOffers utilizes the new HTTP API to send a Scheduler Call Message
+	// to the Mesos Master. Valid operation types are LAUNCH, RESERVE, UNRESERVE,
+	// CREATE, DESTROY, and more.
+	AcceptOffers(offerIDs []*mesos.OfferID, operations []*mesos.Offer_Operation, filters *mesos.Filters) (mesos.Status, error)
+
 	// Launches the given set of tasks. Any resources remaining (i.e.,
 	// not used by the tasks or their executors) will be considered
 	// declined. The specified filters are applied on all unused

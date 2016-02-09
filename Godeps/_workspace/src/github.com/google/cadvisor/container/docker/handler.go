@@ -17,6 +17,7 @@ package docker
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
 	"path"
 	"strings"
@@ -35,14 +36,10 @@ import (
 )
 
 const (
-	// Path to aufs dir where all the files exist.
-	// aufs/layers is ignored here since it does not hold a lot of data.
-	// aufs/mnt contains the mount points used to compose the rootfs. Hence it is also ignored.
-	pathToAufsDir = "aufs/diff"
+	// The read write layers exist here.
+	aufsRWLayer = "diff"
 	// Path to the directory where docker stores log files if the json logging driver is enabled.
 	pathToContainersDir = "containers"
-	// Path to the overlayfs storage driver directory.
-	pathToOverlayDir = "overlay"
 )
 
 type dockerContainerHandler struct {
@@ -86,15 +83,34 @@ type dockerContainerHandler struct {
 	fsHandler fsHandler
 }
 
+func getRwLayerID(containerID, storageDir string, sd storageDriver, dockerVersion []int) (string, error) {
+	const (
+		// Docker version >=1.10.0 have a randomized ID for the root fs of a container.
+		randomizedRWLayerMinorVersion = 10
+		rwLayerIDFile                 = "mount-id"
+	)
+	if (dockerVersion[0] <= 1) && (dockerVersion[1] < randomizedRWLayerMinorVersion) {
+		return containerID, nil
+	}
+
+	bytes, err := ioutil.ReadFile(path.Join(storageDir, "image", string(sd), "layerdb", "mounts", containerID, rwLayerIDFile))
+	if err != nil {
+		return "", fmt.Errorf("failed to identify the read-write layer ID for container %q. - %v", containerID, err)
+	}
+	return string(bytes), err
+}
+
 func newDockerContainerHandler(
 	client *docker.Client,
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
 	storageDriver storageDriver,
+	storageDir string,
 	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
 	metadataEnvs []string,
+	dockerVersion []int,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
 	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
@@ -118,13 +134,18 @@ func newDockerContainerHandler(
 	id := ContainerNameToDockerId(name)
 
 	// Add the Containers dir where the log files are stored.
-	otherStorageDir := path.Join(*dockerRootDir, pathToContainersDir, id)
+	otherStorageDir := path.Join(storageDir, pathToContainersDir, id)
+
+	rwLayerID, err := getRwLayerID(id, storageDir, storageDriver, dockerVersion)
+	if err != nil {
+		return nil, err
+	}
 	var rootfsStorageDir string
 	switch storageDriver {
 	case aufsStorageDriver:
-		rootfsStorageDir = path.Join(*dockerRootDir, pathToAufsDir, id)
+		rootfsStorageDir = path.Join(storageDir, string(aufsStorageDriver), aufsRWLayer, rwLayerID)
 	case overlayStorageDriver:
-		rootfsStorageDir = path.Join(*dockerRootDir, pathToOverlayDir, id)
+		rootfsStorageDir = path.Join(storageDir, string(overlayStorageDriver), rwLayerID)
 	}
 
 	handler := &dockerContainerHandler{
@@ -139,6 +160,7 @@ func newDockerContainerHandler(
 		rootFs:             rootFs,
 		rootfsStorageDir:   rootfsStorageDir,
 		fsHandler:          newFsHandler(time.Minute, rootfsStorageDir, otherStorageDir, fsInfo),
+		envs:               make(map[string]string),
 	}
 
 	// We assume that if Inspect fails then the container is not known to docker.
@@ -179,9 +201,11 @@ func (self *dockerContainerHandler) Cleanup() {
 
 func (self *dockerContainerHandler) ContainerReference() (info.ContainerReference, error) {
 	return info.ContainerReference{
+		Id:        self.id,
 		Name:      self.name,
 		Aliases:   self.aliases,
 		Namespace: DockerNamespace,
+		Labels:    self.labels,
 	}, nil
 }
 
@@ -206,36 +230,31 @@ func libcontainerConfigToContainerSpec(config *libcontainerconfigs.Config, mi *i
 	spec.HasMemory = true
 	spec.Memory.Limit = math.MaxUint64
 	spec.Memory.SwapLimit = math.MaxUint64
-	if config.Cgroups.Memory > 0 {
-		spec.Memory.Limit = uint64(config.Cgroups.Memory)
-	}
-	if config.Cgroups.MemorySwap > 0 {
-		spec.Memory.SwapLimit = uint64(config.Cgroups.MemorySwap)
-	}
 
-	// Get CPU info
-	spec.HasCpu = true
-	spec.Cpu.Limit = 1024
-	if config.Cgroups.CpuShares != 0 {
-		spec.Cpu.Limit = uint64(config.Cgroups.CpuShares)
+	if config.Cgroups.Resources != nil {
+		if config.Cgroups.Resources.Memory > 0 {
+			spec.Memory.Limit = uint64(config.Cgroups.Resources.Memory)
+		}
+		if config.Cgroups.Resources.MemorySwap > 0 {
+			spec.Memory.SwapLimit = uint64(config.Cgroups.Resources.MemorySwap)
+		}
+
+		// Get CPU info
+		spec.HasCpu = true
+		spec.Cpu.Limit = 1024
+		if config.Cgroups.Resources.CpuShares != 0 {
+			spec.Cpu.Limit = uint64(config.Cgroups.Resources.CpuShares)
+		}
+		spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.Resources.CpusetCpus, mi.NumCores)
 	}
-	spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.CpusetCpus, mi.NumCores)
 
 	spec.HasDiskIo = true
 
 	return spec
 }
 
-var (
-	hasNetworkModes = map[string]bool{
-		"host":    true,
-		"bridge":  true,
-		"default": true,
-	}
-)
-
 func hasNet(networkMode string) bool {
-	return hasNetworkModes[networkMode]
+	return !strings.HasPrefix(networkMode, "container:")
 }
 
 func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {

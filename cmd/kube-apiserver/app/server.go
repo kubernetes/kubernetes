@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -41,12 +42,14 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
@@ -82,9 +85,9 @@ func verifyClusterIPFlags(s *options.APIServer) {
 	}
 }
 
-type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string) (storage.Interface, error)
+type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string, bool) (storage.Interface, error)
 
-func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, pathPrefix string) (etcdStorage storage.Interface, err error) {
+func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, pathPrefix string, quorum bool) (etcdStorage storage.Interface, err error) {
 	if storageGroupVersionString == "" {
 		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
 	}
@@ -96,6 +99,7 @@ func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGr
 	var storageConfig etcdstorage.EtcdConfig
 	storageConfig.ServerList = etcdServerList
 	storageConfig.Prefix = pathPrefix
+	storageConfig.Quorum = quorum
 	s, ok := ns.SerializerForMediaType("application/json", nil)
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for JSON")
@@ -120,7 +124,7 @@ func generateStorageVersionMap(legacyVersion string, storageVersions string) map
 }
 
 // parse the value of --etcd-servers-overrides and update given storageDestinations.
-func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc) {
+func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, quorum bool, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc) {
 	if len(overrides) == 0 {
 		return
 	}
@@ -149,7 +153,7 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		}
 
 		servers := strings.Split(tokens[1], ";")
-		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], prefix)
+		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], prefix, quorum)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -210,9 +214,18 @@ func Run(s *options.APIServer) error {
 				installSSH = instances.AddSSHKeyToAllInstances
 			}
 		}
-
+		if s.KubeletConfig.Port == 0 {
+			glog.Fatalf("Must enable kubelet port if proxy ssh-tunneling is specified.")
+		}
 		// Set up the tunneler
-		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, installSSH)
+		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
+		// kubelet listen-addresses, we need to plumb through options.
+		healthCheckPath := &url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
+			Path:   "healthz",
+		}
+		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
 
 		// Use the tunneler's dialer to connect to the kubelet
 		s.KubeletConfig.Dial = tunneler.Dial
@@ -244,9 +257,9 @@ func Run(s *options.APIServer) error {
 		clientConfig.GroupVersion = &gv
 	}
 
-	client, err := client.New(clientConfig)
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		glog.Fatalf("Invalid server address: %v", err)
+		glog.Errorf("Failed to create clientset: %v", err)
 	}
 
 	legacyV1Group, err := registered.Group(api.GroupName)
@@ -260,7 +273,7 @@ func Run(s *options.APIServer) error {
 	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
 		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix, s.EtcdQuorumRead)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -274,14 +287,14 @@ func Run(s *options.APIServer) error {
 		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix)
+		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix, s.EtcdQuorumRead)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
 	}
 
-	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, &storageDestinations, newEtcd)
+	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd)
 
 	n := s.ServiceClusterIPRange
 
@@ -389,7 +402,16 @@ func Run(s *options.APIServer) error {
 
 		Tunneler: tunneler,
 	}
-	m := master.New(config)
+
+	if s.EnableWatchCache {
+		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
+	}
+
+	m, err := master.New(config)
+	if err != nil {
+		return err
+	}
+
 	m.Run(s.ServerRunOptions)
 	return nil
 }

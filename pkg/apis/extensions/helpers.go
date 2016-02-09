@@ -17,52 +17,8 @@ limitations under the License.
 package extensions
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-// LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
-// labels.Selector
-func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
-	if ps == nil {
-		return labels.Nothing(), nil
-	}
-	if len(ps.MatchLabels)+len(ps.MatchExpressions) == 0 {
-		return labels.Everything(), nil
-	}
-	selector := labels.NewSelector()
-	for k, v := range ps.MatchLabels {
-		r, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-	for _, expr := range ps.MatchExpressions {
-		var op labels.Operator
-		switch expr.Operator {
-		case LabelSelectorOpIn:
-			op = labels.InOperator
-		case LabelSelectorOpNotIn:
-			op = labels.NotInOperator
-		case LabelSelectorOpExists:
-			op = labels.ExistsOperator
-		case LabelSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
-		default:
-			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
-		}
-		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-	return selector, nil
-}
 
 // ScaleFromDeployment returns a scale subresource for a deployment.
 func ScaleFromDeployment(deployment *Deployment) *Scale {

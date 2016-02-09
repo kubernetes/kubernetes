@@ -36,6 +36,10 @@ type DebugLogger interface {
 	Logf(format string, args ...interface{})
 }
 
+type NameFunc func(t reflect.Type) string
+
+var DefaultNameFunc = func(t reflect.Type) string { return t.Name() }
+
 // Converter knows how to convert one type to another.
 type Converter struct {
 	// Map from the conversion pair to a function which can
@@ -77,14 +81,14 @@ type Converter struct {
 }
 
 // NewConverter creates a new Converter object.
-func NewConverter() *Converter {
+func NewConverter(nameFn NameFunc) *Converter {
 	c := &Converter{
 		conversionFuncs:          NewConversionFuncs(),
 		generatedConversionFuncs: NewConversionFuncs(),
 		ignoredConversions:       make(map[typePair]struct{}),
 		defaultingFuncs:          make(map[reflect.Type]reflect.Value),
 		defaultingInterfaces:     make(map[reflect.Type]interface{}),
-		nameFunc:                 func(t reflect.Type) string { return t.Name() },
+		nameFunc:                 nameFn,
 		structFieldDests:         make(map[typeNamePair][]typeNamePair),
 		structFieldSources:       make(map[typeNamePair][]typeNamePair),
 
@@ -101,6 +105,13 @@ func (c *Converter) WithConversions(fns ConversionFuncs) *Converter {
 	copied := *c
 	copied.conversionFuncs = c.conversionFuncs.Merge(fns)
 	return &copied
+}
+
+// DefaultMeta returns the conversion FieldMappingFunc and meta for a given type.
+func (c *Converter) DefaultMeta(t reflect.Type) (FieldMatchingFlags, *Meta) {
+	return c.inputDefaultFlags[t], &Meta{
+		KeyNameMapping: c.inputFieldMappingFuncs[t],
+	}
 }
 
 // ByteSliceCopy prevents recursing into every byte

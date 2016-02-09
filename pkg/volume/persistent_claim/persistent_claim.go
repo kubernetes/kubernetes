@@ -54,7 +54,7 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.Volume.PersistentVolumeClaim.ClaimName)
+	claim, err := plugin.host.GetKubeClient().Core().PersistentVolumeClaims(pod.Namespace).Get(spec.Volume.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.Volume.PersistentVolumeClaim.ClaimName)
 		return nil, err
@@ -64,7 +64,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 		return nil, fmt.Errorf("The claim %+v is not yet bound to a volume", claim.Name)
 	}
 
-	pv, err := plugin.host.GetKubeClient().PersistentVolumes().Get(claim.Spec.VolumeName)
+	pv, err := plugin.host.GetKubeClient().Core().PersistentVolumes().Get(claim.Spec.VolumeName)
 	if err != nil {
 		glog.Errorf("Error finding persistent volume for claim: %+v\n", claim.Name)
 		return nil, err

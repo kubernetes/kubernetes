@@ -65,26 +65,13 @@ type Runtime interface {
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
+	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+	// TODO(random-liu): Return PodSyncResult in KillPod.
 	KillPod(pod *api.Pod, runningPod Pod) error
-	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
-	// all containers in the pod. Clients of this interface assume the
-	// containers' statuses in a pod always have a deterministic ordering
-	// (e.g., sorted by name).
-	GetAPIPodStatus(*api.Pod) (*api.PodStatus, error)
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
-	// ConvertPodStatusToAPIPodStatus converts the PodStatus object to api.PodStatus.
-	// This function is needed because Docker generates some high-level and/or
-	// pod-level information for api.PodStatus (e.g., check whether the image
-	// exists to determine the reason). We should try generalizing the logic
-	// for all container runtimes in kubelet and remove this funciton.
-	ConvertPodStatusToAPIPodStatus(*api.Pod, *PodStatus) (*api.PodStatus, error)
-	// Return both PodStatus and api.PodStatus, this is just a temporary function.
-	// TODO(random-liu): Remove this method later
-	GetPodStatusAndAPIPodStatus(*api.Pod) (*PodStatus, *api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
@@ -141,6 +128,14 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
+}
+
+// PodPair contains both runtime#Pod and api#Pod
+type PodPair struct {
+	// APIPod is the api.Pod
+	APIPod *api.Pod
+	// RunningPod is the pod defined defined in pkg/kubelet/container/runtime#Pod
+	RunningPod *Pod
 }
 
 // ContainerID is a type that identifies a container.
@@ -469,3 +464,7 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 	}
 	return parts[0], parts[1], nil
 }
+
+// Option is a functional option type for Runtime, useful for
+// completely optional settings.
+type Option func(Runtime)

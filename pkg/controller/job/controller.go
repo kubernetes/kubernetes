@@ -27,19 +27,21 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 type JobController struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
 	// To allow injection of updateJobStatus for testing.
@@ -68,10 +70,11 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
+func NewJobController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	// TODO: remove the wrapper when every clients have moved to use the clientset.
+	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 
 	jm := &JobController{
 		kubeClient: kubeClient,
@@ -110,10 +113,10 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 	jm.podStore.Store, jm.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return jm.kubeClient.Pods(api.NamespaceAll).List(options)
+				return jm.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return jm.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return jm.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -133,11 +136,11 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	go jm.jobController.Run(stopCh)
 	go jm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(jm.worker, time.Second, stopCh)
+		go wait.Until(jm.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down Job Manager")
@@ -314,7 +317,7 @@ func (jm *JobController) syncJob(key string) error {
 		return err
 	}
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
-	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
+	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 	podList, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
 		glog.Errorf("Error getting pods for job %q: %v", key, err)
@@ -347,7 +350,7 @@ func (jm *JobController) syncJob(key string) error {
 			go func(ix int) {
 				defer wait.Done()
 				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, &job); err != nil {
-					defer util.HandleError(err)
+					defer utilruntime.HandleError(err)
 				}
 			}(i)
 		}
@@ -467,7 +470,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ex
 			go func(ix int) {
 				defer wait.Done()
 				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
-					defer util.HandleError(err)
+					defer utilruntime.HandleError(err)
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					jm.expectations.DeletionObserved(jobKey)
 					activeLock.Lock()
@@ -512,7 +515,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ex
 			go func() {
 				defer wait.Done()
 				if err := jm.podControl.CreatePods(job.Namespace, &job.Spec.Template, job); err != nil {
-					defer util.HandleError(err)
+					defer utilruntime.HandleError(err)
 					// Decrement the expected number of creates because the informer won't observe this pod
 					jm.expectations.CreationObserved(jobKey)
 					activeLock.Lock()

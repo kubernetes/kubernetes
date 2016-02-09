@@ -21,8 +21,6 @@
 //   The API defined here is proposed, experimental,   //
 //   and (for now) subject to change at any time.      //
 //                                                     //
-//                   Do not use it.                    //
-//                                                     //
 //  If you think you want to use it, or for any other  //
 //     queries, contact <rkt-dev@googlegroups.com>     //
 //      or file an issue on github.com/coreos/rkt      //
@@ -73,6 +71,12 @@ message Image {
 
         // JSON-encoded byte array that represents the image manifest, optional.
         bytes manifest = 6;
+
+        // Size is the size in bytes of this image in the store.
+        int64 size = 7;
+
+        // Annotations on this image.
+        repeated KeyValue annotations = 8;
 }
 
 // Network describes the network information of a pod.
@@ -109,6 +113,9 @@ message App {
         // Exit code of the app. optional, only valid if it's returned by InspectPod() and
         // the app has already exited.
         sint32 exit_code = 4;
+
+	// Annotations for this app.
+        repeated KeyValue annotations = 5;
 }
 
 // PodState defines the possible states of the pod.
@@ -133,25 +140,38 @@ enum PodState {
 }
 
 // Pod describes a pod's information.
+// If a pod is in Embryo, Preparing, AbortedPrepare state,
+// only id and state will be returned.
+//
+// If a pod is in other states, the pod manifest and
+// apps will be returned when 'detailed' is true in the request.
+//
+// A valid pid of the stage1 process of the pod will be returned
+// if the pod is Running has run once.
+//
+// Networks are only returned when a pod is in Running.
 message Pod {
-        // ID of the pod, in the form of a UUID, required.
+        // ID of the pod, in the form of a UUID.
         string id = 1;
 
-        // PID of the pod, optional, only valid if it's returned by InspectPod(). A negative value means the pod has exited.
+        // PID of the stage1 process of the pod.
         sint32 pid = 2;
 
-        // State of the pod, required.
+        // State of the pod.
         PodState state = 3;
 
-        // List of apps in the pod, required.
+        // List of apps in the pod.
         repeated App apps = 4;
 
-        // Network information of the pod, optional, non-empty if the pod is running in private net.
+        // Network information of the pod.
         // Note that a pod can be in multiple networks.
         repeated Network networks = 5;
 
-        // JSON-encoded byte array that represents the pod manifest of the pod, required.
+        // JSON-encoded byte array that represents the pod manifest of the pod.
         bytes manifest = 6;
+
+        // Annotations on this pod.
+        repeated KeyValue annotations = 7;
 }
 
 message KeyValue {
@@ -212,6 +232,9 @@ message ImageFilter {
 
         // If not empty, the images that have all of the annotations will be returned.
         repeated KeyValue annotations = 8;
+
+        // If not empty, the images that have any of the exact full names will be returned.
+        repeated string full_names = 9;
 }
 
 // Info describes the information of rkt on the machine.

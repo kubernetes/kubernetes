@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,4 +58,4 @@ ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
 # Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/k8s.io/kubernetes
+ADD kube-source.tar.gz /go/src/k8s.io/kubernetes/

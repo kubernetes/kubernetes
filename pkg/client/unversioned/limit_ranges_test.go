@@ -164,39 +164,6 @@ func TestLimitRangeUpdate(t *testing.T) {
 	c.Validate(t, response, err)
 }
 
-func TestInvalidLimitRangeUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	limitRange := &api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
-			Name: "abc",
-		},
-		Spec: api.LimitRangeSpec{
-			Limits: []api.LimitRangeItem{
-				{
-					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100"),
-						api.ResourceMemory: resource.MustParse("10000"),
-					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("0"),
-						api.ResourceMemory: resource.MustParse("100"),
-					},
-				},
-			},
-		},
-	}
-	c := &simple.Client{
-		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200, Body: limitRange},
-	}
-	_, err := c.Setup(t).LimitRanges(ns).Update(limitRange)
-	defer c.Close()
-	if err == nil {
-		t.Errorf("Expected an error due to missing ResourceVersion")
-	}
-}
-
 func TestLimitRangeDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{

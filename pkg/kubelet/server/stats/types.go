@@ -17,7 +17,6 @@ limitations under the License.
 package stats
 
 import (
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -39,6 +38,8 @@ type NodeStats struct {
 	// Stats of system daemons tracked as raw containers.
 	// The system containers are named according to the SystemContainer* constants.
 	SystemContainers []ContainerStats `json:"systemContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	// The time at which data collection for the node-scoped (i.e. aggregate) stats was (re)started.
+	StartTime unversioned.Time `json:"startTime"`
 	// Stats pertaining to CPU resources.
 	CPU *CPUStats `json:"cpu,omitempty"`
 	// Stats pertaining to memory (RAM) resources.
@@ -62,7 +63,9 @@ const (
 // PodStats holds pod-level unprocessed sample stats.
 type PodStats struct {
 	// Reference to the measured Pod.
-	PodRef NonLocalObjectReference `json:"podRef"`
+	PodRef PodReference `json:"podRef"`
+	// The time at which data collection for the pod-scoped (e.g. network) stats was (re)started.
+	StartTime unversioned.Time `json:"startTime"`
 	// Stats of containers in the measured pod.
 	Containers []ContainerStats `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
 	// Stats pertaining to network resources.
@@ -76,6 +79,8 @@ type PodStats struct {
 type ContainerStats struct {
 	// Reference to the measured container.
 	Name string `json:"name"`
+	// The time at which data collection for this container was (re)started.
+	StartTime unversioned.Time `json:"startTime"`
 	// Stats pertaining to CPU resources.
 	CPU *CPUStats `json:"cpu,omitempty"`
 	// Stats pertaining to memory (RAM) resources.
@@ -86,46 +91,49 @@ type ContainerStats struct {
 	// Stats pertaining to container logs usage of filesystem resources.
 	// Logs.UsedBytes is the number of bytes used for the container logs.
 	Logs *FsStats `json:"logs,omitempty"`
+	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
+	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
-// NonLocalObjectReference contains enough information to locate the referenced object.
-type NonLocalObjectReference struct {
+// PodReference contains enough information to locate the referenced pod.
+type PodReference struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
+	UID       string `json:"uid"`
 }
 
 // NetworkStats contains data about network resources.
 type NetworkStats struct {
 	// Cumulative count of bytes received.
-	RxBytes *resource.Quantity `json:"rxBytes,omitempty"`
+	RxBytes *uint64 `json:"rxBytes,omitempty"`
 	// Cumulative count of receive errors encountered.
-	RxErrors *int64 `json:"rxErrors,omitempty"`
+	RxErrors *uint64 `json:"rxErrors,omitempty"`
 	// Cumulative count of bytes transmitted.
-	TxBytes *resource.Quantity `json:"txBytes,omitempty"`
+	TxBytes *uint64 `json:"txBytes,omitempty"`
 	// Cumulative count of transmit errors encountered.
-	TxErrors *int64 `json:"txErrors,omitempty"`
+	TxErrors *uint64 `json:"txErrors,omitempty"`
 }
 
 // CPUStats contains data about CPU usage.
 type CPUStats struct {
 	// Total CPU usage (sum of all cores) averaged over the sample window.
-	// The "core" unit can be interpreted as CPU core-seconds per second.
-	UsageCores *resource.Quantity `json:"usageCores,omitempty"`
+	// The "core" unit can be interpreted as CPU core-nanoseconds per second.
+	UsageNanoCores *uint64 `json:"usageNanoCores,omitempty"`
 	// Cumulative CPU usage (sum of all cores) since object creation.
-	UsageCoreSeconds *resource.Quantity `json:"usageCoreSeconds,omitempty"`
+	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.
 type MemoryStats struct {
 	// Total memory in use. This includes all memory regardless of when it was accessed.
-	UsageBytes *resource.Quantity `json:"usageBytes,omitempty"`
+	UsageBytes *uint64 `json:"usageBytes,omitempty"`
 	// The amount of working set memory. This includes recently accessed memory,
 	// dirty memory, and kernel memory. UsageBytes is <= TotalBytes.
-	WorkingSetBytes *resource.Quantity `json:"workingSetBytes,omitempty"`
+	WorkingSetBytes *uint64 `json:"workingSetBytes,omitempty"`
 	// Cumulative number of minor page faults.
-	PageFaults *int64 `json:"pageFaults,omitempty"`
+	PageFaults *uint64 `json:"pageFaults,omitempty"`
 	// Cumulative number of major page faults.
-	MajorPageFaults *int64 `json:"majorPageFaults,omitempty"`
+	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
 }
 
 // VolumeStats contains data about Volume filesystem usage.
@@ -139,11 +147,48 @@ type VolumeStats struct {
 // FsStats contains data about filesystem usage.
 type FsStats struct {
 	// AvailableBytes represents the storage space available (bytes) for the filesystem.
-	AvailableBytes *resource.Quantity `json:"availableBytes,omitempty"`
+	AvailableBytes *uint64 `json:"availableBytes,omitempty"`
 	// CapacityBytes represents the total capacity (bytes) of the filesystems underlying storage.
-	CapacityBytes *resource.Quantity `json:"capacityBytes,omitempty"`
+	CapacityBytes *uint64 `json:"capacityBytes,omitempty"`
 	// UsedBytes represents the bytes used for a specific task on the filesystem.
 	// This may differ from the total bytes used on the filesystem and may not equal CapacityBytes - AvailableBytes.
 	// e.g. For ContainerStats.Rootfs this is the bytes used by the container rootfs on the filesystem.
-	UsedBytes *resource.Quantity `json:"usedBytes,omitempty"`
+	UsedBytes *uint64 `json:"usedBytes,omitempty"`
+}
+
+// UserDefinedMetricType defines how the metric should be interpreted by the user.
+type UserDefinedMetricType string
+
+const (
+	// Instantaneous value. May increase or decrease.
+	MetricGauge UserDefinedMetricType = "gauge"
+
+	// A counter-like value that is only expected to increase.
+	MetricCumulative UserDefinedMetricType = "cumulative"
+
+	// Rate over a time period.
+	MetricDelta UserDefinedMetricType = "delta"
+)
+
+// UserDefinedMetricDescriptor contains metadata that describes a user defined metric.
+type UserDefinedMetricDescriptor struct {
+	// The name of the metric.
+	Name string `json:"name"`
+
+	// Type of the metric.
+	Type UserDefinedMetricType `json:"type"`
+
+	// Display Units for the stats.
+	Units string `json:"units"`
+
+	// Metadata labels associated with this metric.
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// UserDefinedMetric represents a metric defined and generate by users.
+type UserDefinedMetric struct {
+	UserDefinedMetricDescriptor `json:",inline"`
+	// Value of the metric. Float64s have 53 bit precision.
+	// We do not forsee any metrics exceeding that value.
+	Value float64 `json:"value"`
 }

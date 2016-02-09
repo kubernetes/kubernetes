@@ -46,6 +46,10 @@ import (
 // errOverflow is returned when an integer is too large to be represented.
 var errOverflow = errors.New("proto: integer overflow")
 
+// ErrInternalBadWireType is returned by generated code when an incorrect
+// wire type is encountered. It does not get returned to user code.
+var ErrInternalBadWireType = errors.New("proto: internal error: bad wiretype for oneof")
+
 // The fundamental decoders that interpret bytes on the wire.
 // Those that take integer types all return uint64 and are
 // therefore of type valueDecoder.
@@ -314,6 +318,24 @@ func UnmarshalMerge(buf []byte, pb Message) error {
 	return NewBuffer(buf).Unmarshal(pb)
 }
 
+// DecodeMessage reads a count-delimited message from the Buffer.
+func (p *Buffer) DecodeMessage(pb Message) error {
+	enc, err := p.DecodeRawBytes(false)
+	if err != nil {
+		return err
+	}
+	return NewBuffer(enc).Unmarshal(pb)
+}
+
+// DecodeGroup reads a tag-delimited group from the Buffer.
+func (p *Buffer) DecodeGroup(pb Message) error {
+	typ, base, err := getbase(pb)
+	if err != nil {
+		return err
+	}
+	return p.unmarshalType(typ.Elem(), GetProperties(typ.Elem()), true, base)
+}
+
 // Unmarshal parses the protocol buffer representation in the
 // Buffer and places the decoded result in pb.  If the struct
 // underlying pb does not match the data in the buffer, the results can be
@@ -374,6 +396,20 @@ func (o *Buffer) unmarshalType(st reflect.Type, prop *StructProperties, is_group
 						ext.enc = append(ext.enc, o.buf[oi:o.index]...)
 						e.ExtensionMap()[int32(tag)] = ext
 					}
+					continue
+				}
+			}
+			// Maybe it's a oneof?
+			if prop.oneofUnmarshaler != nil {
+				m := structPointer_Interface(base, st).(Message)
+				// First return value indicates whether tag is a oneof field.
+				ok, err = prop.oneofUnmarshaler(m, tag, wire, o)
+				if err == ErrInternalBadWireType {
+					// Map the error to something more descriptive.
+					// Do the formatting here to save generated code space.
+					err = fmt.Errorf("bad wiretype for oneof field in %T", m)
+				}
+				if ok {
 					continue
 				}
 			}
@@ -518,9 +554,7 @@ func (o *Buffer) dec_string(p *Properties, base structPointer) error {
 	if err != nil {
 		return err
 	}
-	sp := new(string)
-	*sp = s
-	*structPointer_String(base, p.field) = sp
+	*structPointer_String(base, p.field) = &s
 	return nil
 }
 
@@ -563,9 +597,13 @@ func (o *Buffer) dec_slice_packed_bool(p *Properties, base structPointer) error 
 		return err
 	}
 	nb := int(nn) // number of bytes of encoded bools
+	fin := o.index + nb
+	if fin < o.index {
+		return errOverflow
+	}
 
 	y := *v
-	for i := 0; i < nb; i++ {
+	for o.index < fin {
 		u, err := p.valDec(o)
 		if err != nil {
 			return err
@@ -677,7 +715,7 @@ func (o *Buffer) dec_new_map(p *Properties, base structPointer) error {
 	oi := o.index       // index at the end of this map entry
 	o.index -= len(raw) // move buffer back to start of map entry
 
-	mptr := structPointer_Map(base, p.field, p.mtype) // *map[K]V
+	mptr := structPointer_NewAt(base, p.field, p.mtype) // *map[K]V
 	if mptr.Elem().IsNil() {
 		mptr.Elem().Set(reflect.MakeMap(mptr.Type().Elem()))
 	}
@@ -729,8 +767,14 @@ func (o *Buffer) dec_new_map(p *Properties, base structPointer) error {
 			return fmt.Errorf("proto: bad map data tag %d", raw[0])
 		}
 	}
+	keyelem, valelem := keyptr.Elem(), valptr.Elem()
+	if !keyelem.IsValid() || !valelem.IsValid() {
+		// We did not decode the key or the value in the map entry.
+		// Either way, it's an invalid map entry.
+		return fmt.Errorf("proto: bad map data: missing key/val")
+	}
 
-	v.SetMapIndex(keyptr.Elem(), valptr.Elem())
+	v.SetMapIndex(keyelem, valelem)
 	return nil
 }
 

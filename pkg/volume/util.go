@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -36,7 +36,7 @@ import (
 // An attempt to delete a recycler pod is always attempted before returning.
 // 	pod - the pod designed by a volume plugin to recycle the volume
 //	client - kube client for API operations.
-func RecycleVolumeByWatchingPodUntilCompletion(pod *api.Pod, kubeClient client.Interface) error {
+func RecycleVolumeByWatchingPodUntilCompletion(pod *api.Pod, kubeClient clientset.Interface) error {
 	return internalRecycleVolumeByWatchingPodUntilCompletion(pod, newRecyclerClient(kubeClient))
 }
 
@@ -80,24 +80,24 @@ type recyclerClient interface {
 	WatchPod(name, namespace, resourceVersion string, stopChannel chan struct{}) func() *api.Pod
 }
 
-func newRecyclerClient(client client.Interface) recyclerClient {
+func newRecyclerClient(client clientset.Interface) recyclerClient {
 	return &realRecyclerClient{client}
 }
 
 type realRecyclerClient struct {
-	client client.Interface
+	client clientset.Interface
 }
 
 func (c *realRecyclerClient) CreatePod(pod *api.Pod) (*api.Pod, error) {
-	return c.client.Pods(pod.Namespace).Create(pod)
+	return c.client.Core().Pods(pod.Namespace).Create(pod)
 }
 
 func (c *realRecyclerClient) GetPod(name, namespace string) (*api.Pod, error) {
-	return c.client.Pods(namespace).Get(name)
+	return c.client.Core().Pods(namespace).Get(name)
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.Pods(namespace).Delete(name, nil)
+	return c.client.Core().Pods(namespace).Delete(name, nil)
 }
 
 // WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
@@ -109,11 +109,11 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 	podLW := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return c.client.Pods(namespace).List(options)
+			return c.client.Core().Pods(namespace).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return c.client.Pods(namespace).Watch(options)
+			return c.client.Core().Pods(namespace).Watch(options)
 		},
 	}
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)

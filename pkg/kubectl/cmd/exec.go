@@ -233,7 +233,7 @@ func (p *ExecOptions) Run() error {
 		Stdout:    p.Out != nil,
 		Stderr:    p.Err != nil,
 		TTY:       tty,
-	}, api.Scheme)
+	}, api.ParameterCodec)
 
 	return p.Executor.Execute("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
 }

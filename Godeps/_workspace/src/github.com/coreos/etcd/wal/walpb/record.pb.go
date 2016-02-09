@@ -14,16 +14,19 @@
 */
 package walpb
 
-import proto "github.com/gogo/protobuf/proto"
+import (
+	"fmt"
+
+	proto "github.com/gogo/protobuf/proto"
+)
+
 import math "math"
 
-// discarding unused import gogoproto "github.com/coreos/etcd/Godeps/_workspace/src/gogoproto"
-
 import io "io"
-import fmt "fmt"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
 
 type Record struct {
@@ -47,6 +50,10 @@ func (m *Snapshot) Reset()         { *m = Snapshot{} }
 func (m *Snapshot) String() string { return proto.CompactTextString(m) }
 func (*Snapshot) ProtoMessage()    {}
 
+func init() {
+	proto.RegisterType((*Record)(nil), "walpb.Record")
+	proto.RegisterType((*Snapshot)(nil), "walpb.Snapshot")
+}
 func (m *Record) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -177,8 +184,12 @@ func (m *Record) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRecord
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -191,6 +202,12 @@ func (m *Record) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Record: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Record: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -198,6 +215,9 @@ func (m *Record) Unmarshal(data []byte) error {
 			}
 			m.Type = 0
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -214,6 +234,9 @@ func (m *Record) Unmarshal(data []byte) error {
 			}
 			m.Crc = 0
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -230,6 +253,9 @@ func (m *Record) Unmarshal(data []byte) error {
 			}
 			var byteLen int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -247,18 +273,13 @@ func (m *Record) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Data = append([]byte{}, data[iNdEx:postIndex]...)
+			m.Data = append(m.Data[:0], data[iNdEx:postIndex]...)
+			if m.Data == nil {
+				m.Data = []byte{}
+			}
 			iNdEx = postIndex
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipRecord(data[iNdEx:])
 			if err != nil {
 				return err
@@ -274,14 +295,21 @@ func (m *Record) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func (m *Snapshot) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
+		preIndex := iNdEx
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRecord
+			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
@@ -294,6 +322,12 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 		}
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Snapshot: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Snapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
@@ -301,6 +335,9 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 			}
 			m.Index = 0
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -317,6 +354,9 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 			}
 			m.Term = 0
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
@@ -328,15 +368,7 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 				}
 			}
 		default:
-			var sizeOfWire int
-			for {
-				sizeOfWire++
-				wire >>= 7
-				if wire == 0 {
-					break
-				}
-			}
-			iNdEx -= sizeOfWire
+			iNdEx = preIndex
 			skippy, err := skipRecord(data[iNdEx:])
 			if err != nil {
 				return err
@@ -352,6 +384,9 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 		}
 	}
 
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 func skipRecord(data []byte) (n int, err error) {
@@ -360,6 +395,9 @@ func skipRecord(data []byte) (n int, err error) {
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return 0, ErrIntOverflowRecord
+			}
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
@@ -373,7 +411,10 @@ func skipRecord(data []byte) (n int, err error) {
 		wireType := int(wire & 0x7)
 		switch wireType {
 		case 0:
-			for {
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return 0, ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
@@ -389,6 +430,9 @@ func skipRecord(data []byte) (n int, err error) {
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return 0, ErrIntOverflowRecord
+				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
@@ -409,6 +453,9 @@ func skipRecord(data []byte) (n int, err error) {
 				var innerWire uint64
 				var start int = iNdEx
 				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return 0, ErrIntOverflowRecord
+					}
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
@@ -444,4 +491,5 @@ func skipRecord(data []byte) (n int, err error) {
 
 var (
 	ErrInvalidLengthRecord = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowRecord   = fmt.Errorf("proto: integer overflow")
 )

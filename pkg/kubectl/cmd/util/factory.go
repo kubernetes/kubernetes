@@ -27,6 +27,7 @@ import (
 	"os/user"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -61,6 +63,7 @@ const (
 type Factory struct {
 	clients *ClientCache
 	flags   *pflag.FlagSet
+	cmd     string
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -80,11 +83,15 @@ type Factory struct {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error)
+	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
 	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
+	// Returns a HistoryViewer for viewing change history
+	HistoryViewer func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
+	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
+	Rollbacker func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
 	PodSelectorForObject func(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
@@ -93,10 +100,14 @@ type Factory struct {
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
+	PauseObject func(object runtime.Object) (bool, error)
+	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
+	ResumeObject func(object runtime.Object) (bool, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
-	// SwaggerSchema returns the schema declaration for the provided group version.
-	SwaggerSchema func(unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
+	// SwaggerSchema returns the schema declaration for the provided group version kind.
+	SwaggerSchema func(unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overriden.
@@ -175,6 +186,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	return &Factory{
 		clients: clients,
 		flags:   flags,
+		cmd:     recordCommand(os.Args),
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -226,8 +238,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		JSONEncoder: func() runtime.Encoder {
 			return api.Codecs.LegacyCodec(registered.EnabledVersions()...)
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
-			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, absoluteTimestamps, columnLabels), nil
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, showLabels, absoluteTimestamps, columnLabels), nil
 		},
 		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
@@ -297,6 +309,50 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, fmt.Errorf("cannot get the logs from %v", gvk)
 			}
 		},
+		PauseObject: func(object runtime.Object) (bool, error) {
+			c, err := clients.ClientForVersion(nil)
+			if err != nil {
+				return false, err
+			}
+
+			switch t := object.(type) {
+			case *extensions.Deployment:
+				if t.Spec.Paused {
+					return true, nil
+				}
+				t.Spec.Paused = true
+				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
+				return false, err
+			default:
+				gvk, err := api.Scheme.ObjectKind(object)
+				if err != nil {
+					return false, err
+				}
+				return false, fmt.Errorf("cannot pause %v", gvk)
+			}
+		},
+		ResumeObject: func(object runtime.Object) (bool, error) {
+			c, err := clients.ClientForVersion(nil)
+			if err != nil {
+				return false, err
+			}
+
+			switch t := object.(type) {
+			case *extensions.Deployment:
+				if !t.Spec.Paused {
+					return true, nil
+				}
+				t.Spec.Paused = false
+				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
+				return false, err
+			default:
+				gvk, err := api.Scheme.ObjectKind(object)
+				if err != nil {
+					return false, err
+				}
+				return false, fmt.Errorf("cannot resume %v", gvk)
+			}
+		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
 			client, err := clients.ClientForVersion(&mappingVersion)
@@ -312,6 +368,23 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), client)
+		},
+		HistoryViewer: func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset := clientset.FromUnversionedClient(client)
+			if err != nil {
+				return nil, err
+			}
+			return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+		},
+		Rollbacker: func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
+			if err != nil {
+				return nil, err
+			}
+			return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
@@ -335,7 +408,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return validation.NullSchema{}, nil
 		},
-		SwaggerSchema: func(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+		SwaggerSchema: func(gvk unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error) {
+			version := gvk.GroupVersion()
 			client, err := clients.ClientForVersion(&version)
 			if err != nil {
 				return nil, err
@@ -410,6 +484,17 @@ func GetFirstPod(client *client.Client, namespace string, selector map[string]st
 	}
 	pod := &pods.Items[0]
 	return pod, nil
+}
+
+func recordCommand(args []string) string {
+	if len(args) > 0 {
+		args[0] = "kubectl"
+	}
+	return strings.Join(args, " ")
+}
+
+func (f *Factory) Command() string {
+	return f.cmd
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
@@ -669,7 +754,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			columnLabel = []string{}
 		}
-		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), GetFlagBool(cmd, "show-all"), isWatch(cmd), columnLabel)
+		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), GetFlagBool(cmd, "show-all"), GetFlagBool(cmd, "show-labels"), isWatch(cmd), columnLabel)
 		if err != nil {
 			return nil, err
 		}

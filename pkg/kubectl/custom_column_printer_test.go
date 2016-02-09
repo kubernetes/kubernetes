@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -103,7 +104,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		printer, err := NewCustomColumnsPrinterFromSpec(test.spec)
+		printer, err := NewCustomColumnsPrinterFromSpec(test.spec, api.Codecs.UniversalDecoder())
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("[%s] unexpected non-error", test.name)
@@ -186,7 +187,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 	}
 	for _, test := range tests {
 		reader := bytes.NewBufferString(test.spec)
-		printer, err := NewCustomColumnsPrinterFromTemplate(reader)
+		printer, err := NewCustomColumnsPrinterFromTemplate(reader, api.Codecs.UniversalDecoder())
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("[%s] unexpected non-error", test.name)
@@ -262,6 +263,7 @@ foo       baz
 	for _, test := range tests {
 		printer := &CustomColumnsPrinter{
 			Columns: test.columns,
+			Decoder: api.Codecs.UniversalDecoder(),
 		}
 		buffer := &bytes.Buffer{}
 		if err := printer.PrintObj(test.obj, buffer); err != nil {

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/io"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -37,8 +38,9 @@ func TestSavePodToFile(t *testing.T) {
 	encoded, err := runtime.Encode(codec, pod)
 	runtime.DecodeInto(codec, encoded, pod)
 
-	path := fmt.Sprintf("/tmp/kube-io-test-%s", uuid.New())
-	defer os.Remove(path)
+	tmpDir := utiltesting.MkTmpdirOrDie("kube-io-test")
+	defer os.RemoveAll(tmpDir)
+	path := fmt.Sprintf("/%s/kube-io-test-%s", tmpDir, uuid.New())
 
 	if err := io.SavePodToFile(pod, path, 777); err != nil {
 		t.Fatalf("failed to save pod to file: %v", err)

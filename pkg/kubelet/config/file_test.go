@@ -29,7 +29,8 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -52,7 +53,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -153,7 +154,7 @@ func TestReadPodsFromFile(t *testing.T) {
 				if !api.Semantic.DeepEqual(testCase.expected, update) {
 					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
-			case <-time.After(util.ForeverTestTimeout):
+			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
 			}
 		}()
@@ -174,7 +175,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 }
 
 func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := ioutil.TempDir("", "foo")
+	dirName, err := utiltesting.MkTmpdir("file-test")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

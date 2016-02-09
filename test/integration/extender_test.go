@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -195,7 +194,10 @@ func TestSchedulerExtender(t *testing.T) {
 	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m = master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -292,7 +294,7 @@ func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err = wait.Poll(time.Second, util.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}

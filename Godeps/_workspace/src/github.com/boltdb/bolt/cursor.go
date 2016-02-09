@@ -34,6 +34,13 @@ func (c *Cursor) First() (key []byte, value []byte) {
 	p, n := c.bucket.pageNode(c.bucket.root)
 	c.stack = append(c.stack, elemRef{page: p, node: n, index: 0})
 	c.first()
+
+	// If we land on an empty page then move to the next value.
+	// https://github.com/boltdb/bolt/issues/450
+	if c.stack[len(c.stack)-1].count() == 0 {
+		c.next()
+	}
+
 	k, v, flags := c.keyValue()
 	if (flags & uint32(bucketLeafFlag)) != 0 {
 		return k, nil
@@ -209,28 +216,37 @@ func (c *Cursor) last() {
 // next moves to the next leaf element and returns the key and value.
 // If the cursor is at the last leaf element then it stays there and returns nil.
 func (c *Cursor) next() (key []byte, value []byte, flags uint32) {
-	// Attempt to move over one element until we're successful.
-	// Move up the stack as we hit the end of each page in our stack.
-	var i int
-	for i = len(c.stack) - 1; i >= 0; i-- {
-		elem := &c.stack[i]
-		if elem.index < elem.count()-1 {
-			elem.index++
-			break
+	for {
+		// Attempt to move over one element until we're successful.
+		// Move up the stack as we hit the end of each page in our stack.
+		var i int
+		for i = len(c.stack) - 1; i >= 0; i-- {
+			elem := &c.stack[i]
+			if elem.index < elem.count()-1 {
+				elem.index++
+				break
+			}
 		}
-	}
 
-	// If we've hit the root page then stop and return. This will leave the
-	// cursor on the last element of the last page.
-	if i == -1 {
-		return nil, nil, 0
-	}
+		// If we've hit the root page then stop and return. This will leave the
+		// cursor on the last element of the last page.
+		if i == -1 {
+			return nil, nil, 0
+		}
 
-	// Otherwise start from where we left off in the stack and find the
-	// first element of the first leaf page.
-	c.stack = c.stack[:i+1]
-	c.first()
-	return c.keyValue()
+		// Otherwise start from where we left off in the stack and find the
+		// first element of the first leaf page.
+		c.stack = c.stack[:i+1]
+		c.first()
+
+		// If this is an empty page then restart and move back up the stack.
+		// https://github.com/boltdb/bolt/issues/450
+		if c.stack[len(c.stack)-1].count() == 0 {
+			continue
+		}
+
+		return c.keyValue()
+	}
 }
 
 // search recursively performs a binary search against a given page/node until it finds a given key.

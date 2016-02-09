@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/metrics"
-	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -362,6 +361,7 @@ var fieldMappings = versionToResourceToFieldMapping{
 			ObjectNameField:              ObjectNameField,
 			EventReason:                  EventReason,
 			EventSource:                  EventSource,
+			EventType:                    EventType,
 			EventInvolvedKind:            EventInvolvedKind,
 			EventInvolvedNamespace:       EventInvolvedNamespace,
 			EventInvolvedName:            EventInvolvedName,
@@ -425,18 +425,13 @@ func (r *Request) Param(paramName, s string) *Request {
 }
 
 // VersionedParams will take the provided object, serialize it to a map[string][]string using the
-// implicit RESTClient API version and the provided object convertor, and then add those as parameters
+// implicit RESTClient API version and the default parameter codec, and then add those as parameters
 // to the request. Use this to provide versioned query parameters from client libraries.
-func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectConvertor) *Request {
+func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
 	if r.err != nil {
 		return r
 	}
-	versioned, err := convertor.ConvertToVersion(obj, r.content.GroupVersion.String())
-	if err != nil {
-		r.err = err
-		return r
-	}
-	params, err := queryparams.Convert(versioned)
+	params, err := codec.EncodeParameters(obj, *r.content.GroupVersion)
 	if err != nil {
 		r.err = err
 		return r
@@ -648,6 +643,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
 		if result := r.transformResponse(resp, req); result.err != nil {
 			return nil, result.err
 		}
@@ -847,10 +843,13 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status *unversioned.Status
-	result, err := runtime.Decode(r.content.Codec, body)
-	if out, ok := result.(*unversioned.Status); err == nil && ok && len(out.Status) > 0 {
-		status = out
+	// Because release-1.1 server returns Status with empty APIVersion at paths
+	// to the Extensions resources, we need to use DecodeInto here to provide
+	// default groupVersion, otherwise a status response won't be correctly
+	// decoded.
+	status := &unversioned.Status{}
+	err := runtime.DecodeInto(r.content.Codec, body, status)
+	if err == nil && len(status.Status) > 0 {
 		isStatusResponse = true
 	}
 

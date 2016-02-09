@@ -25,11 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -42,7 +45,7 @@ func newJob(parallelism, completions int) *extensions.Job {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.JobSpec{
-			Selector: &extensions.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: api.PodTemplateSpec{
@@ -204,8 +207,8 @@ func TestControllerSyncJob(t *testing.T) {
 
 	for name, tc := range testCases {
 		// job manager setup
-		client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-		manager := NewJobController(client, controller.NoResyncPeriodFunc)
+		clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+		manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
@@ -299,8 +302,8 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 	for name, tc := range testCases {
 		// job manager setup
-		client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-		manager := NewJobController(client, controller.NoResyncPeriodFunc)
+		clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+		manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
@@ -369,8 +372,8 @@ func getCondition(job *extensions.Job, condition extensions.JobConditionType) bo
 }
 
 func TestSyncPastDeadlineJobFinished(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -403,8 +406,8 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 }
 
 func TestSyncJobComplete(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -428,8 +431,8 @@ func TestSyncJobComplete(t *testing.T) {
 }
 
 func TestSyncJobDeleted(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -448,8 +451,8 @@ func TestSyncJobDeleted(t *testing.T) {
 }
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -469,8 +472,8 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 }
 
 func TestJobPodLookup(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
 		job *extensions.Job
@@ -493,7 +496,7 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
 					},
 				},
@@ -512,11 +515,11 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.LabelSelector{
-						MatchExpressions: []extensions.LabelSelectorRequirement{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
 							{
 								Key:      "foo",
-								Operator: extensions.LabelSelectorOpIn,
+								Operator: unversioned.LabelSelectorOpIn,
 								Values:   []string{"bar"},
 							},
 						},
@@ -559,8 +562,8 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 // TestSyncJobExpectations tests that a pod cannot sneak in between counting active pods
 // and checking expectations.
 func TestSyncJobExpectations(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -594,10 +597,10 @@ type FakeWatcher struct {
 }
 
 func TestWatchJobs(t *testing.T) {
-	client := testclient.NewSimpleFake()
+	clientset := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset.PrependWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 
 	var testJob extensions.Job
@@ -623,7 +626,7 @@ func TestWatchJobs(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.jobController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	// We're sending new job to see if it reaches syncHandler.
 	testJob.Name = "foo"
@@ -658,10 +661,10 @@ func TestIsJobFinished(t *testing.T) {
 }
 
 func TestWatchPods(t *testing.T) {
-	client := testclient.NewSimpleFake()
+	clientset := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	clientset.PrependWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+	manager := NewJobController(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store
@@ -688,7 +691,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.podController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, api.PodRunning, testJob)
 	testPod := pods[0]

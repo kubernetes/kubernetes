@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func PackageForGroup(group string, version string, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte) generator.Package {
@@ -70,6 +71,35 @@ func PackageForGroup(group string, version string, typeList []*types.Type, packa
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
 			return types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] == "true"
+		},
+	}
+}
+
+func PackageForClientset(typedClientBasePath string, groupVersions []unversioned.GroupVersion, boilerplate []byte) generator.Package {
+	return &generator.DefaultPackage{
+		// TODO: we'll generate fake clientset for different release in the future.
+		// Package name and path are hard coded for now.
+		PackageName: "fake",
+		PackagePath: "k8s.io/kubernetes/pkg/client/testing/fake",
+		HeaderText:  boilerplate,
+		PackageDocumentation: []byte(
+			`// This package has the automatically generated fake clientset.
+`),
+		// GeneratorFunc returns a list of generators. Each generator generates a
+		// single file.
+		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			generators = []generator.Generator{
+				&genClientset{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: "clientset_generated",
+					},
+					groupVersions:   groupVersions,
+					typedClientPath: typedClientBasePath,
+					outputPackage:   "fake",
+					imports:         generator.NewImportTracker(),
+				},
+			}
+			return generators
 		},
 	}
 }

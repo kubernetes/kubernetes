@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -38,14 +38,14 @@ import (
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
 	rootDir    string
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	pluginMgr  VolumePluginMgr
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	writer     io.Writer
 }
 
-func NewFakeVolumeHost(rootDir string, kubeClient client.Interface, plugins []VolumePlugin) *fakeVolumeHost {
+func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil}
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
@@ -65,7 +65,7 @@ func (f *fakeVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) st
 	return path.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
 }
 
-func (f *fakeVolumeHost) GetKubeClient() client.Interface {
+func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
 	return f.kubeClient
 }
 

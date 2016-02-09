@@ -24,6 +24,11 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
+func deepCopy_unversioned_Duration(in unversioned.Duration, out *unversioned.Duration, c *conversion.Cloner) error {
+	out.Duration = in.Duration
+	return nil
+}
+
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
@@ -35,13 +40,18 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 		return err
 	}
 	out.BindAddress = in.BindAddress
-	out.CleanupIPTables = in.CleanupIPTables
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesSyncePeriodSeconds = in.IPTablesSyncePeriodSeconds
-	out.KubeAPIBurst = in.KubeAPIBurst
-	out.KubeAPIQPS = in.KubeAPIQPS
+	if in.IPTablesMasqueradeBit != nil {
+		out.IPTablesMasqueradeBit = new(int32)
+		*out.IPTablesMasqueradeBit = *in.IPTablesMasqueradeBit
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
+	if err := deepCopy_unversioned_Duration(in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, c); err != nil {
+		return err
+	}
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -54,14 +64,65 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	out.Mode = in.Mode
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	out.UDPTimeoutMilliseconds = in.UDPTimeoutMilliseconds
+	if err := deepCopy_unversioned_Duration(in.UDPIdleTimeout, &out.UDPIdleTimeout, c); err != nil {
+		return err
+	}
+	out.ConntrackMax = in.ConntrackMax
+	if err := deepCopy_unversioned_Duration(in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_KubeSchedulerConfiguration(in KubeSchedulerConfiguration, out *KubeSchedulerConfiguration, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Port = in.Port
+	out.Address = in.Address
+	out.AlgorithmProvider = in.AlgorithmProvider
+	out.PolicyConfigFile = in.PolicyConfigFile
+	if in.EnableProfiling != nil {
+		out.EnableProfiling = new(bool)
+		*out.EnableProfiling = *in.EnableProfiling
+	} else {
+		out.EnableProfiling = nil
+	}
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.SchedulerName = in.SchedulerName
+	if err := deepCopy_v1alpha1_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_LeaderElectionConfiguration(in LeaderElectionConfiguration, out *LeaderElectionConfiguration, c *conversion.Cloner) error {
+	if in.LeaderElect != nil {
+		out.LeaderElect = new(bool)
+		*out.LeaderElect = *in.LeaderElect
+	} else {
+		out.LeaderElect = nil
+	}
+	if err := deepCopy_unversioned_Duration(in.LeaseDuration, &out.LeaseDuration, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Duration(in.RenewDeadline, &out.RenewDeadline, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Duration(in.RetryPeriod, &out.RetryPeriod, c); err != nil {
+		return err
+	}
 	return nil
 }
 
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		deepCopy_unversioned_Duration,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1alpha1_KubeProxyConfiguration,
+		deepCopy_v1alpha1_KubeSchedulerConfiguration,
+		deepCopy_v1alpha1_LeaderElectionConfiguration,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

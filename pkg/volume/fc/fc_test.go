@@ -17,19 +17,27 @@ limitations under the License.
 package fc
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("fc_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -44,8 +52,14 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("fc_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -66,12 +80,23 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 }
 
 type fakeDiskManager struct {
+	tmpDir       string
 	attachCalled bool
 	detachCalled bool
 }
 
+func NewFakeDiskManager() *fakeDiskManager {
+	return &fakeDiskManager{
+		tmpDir: utiltesting.MkTmpdirOrDie("fc_test"),
+	}
+}
+
+func (fake *fakeDiskManager) Cleanup() {
+	os.RemoveAll(fake.tmpDir)
+}
+
 func (fake *fakeDiskManager) MakeGlobalPDName(disk fcDisk) string {
-	return "/tmp/fake_fc_path"
+	return fake.tmpDir
 }
 func (fake *fakeDiskManager) AttachDisk(b fcDiskBuilder) error {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
@@ -98,14 +123,21 @@ func (fake *fakeDiskManager) DetachDisk(c fcDiskCleaner, mntPath string) error {
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
+	tmpDir, err := utiltesting.MkTmpdir("fc_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fakeManager := &fakeDiskManager{}
+	fakeManager := NewFakeDiskManager()
+	defer fakeManager.Cleanup()
 	fakeMounter := &mount.FakeMounter{}
 	builder, err := plug.(*fcPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
@@ -116,8 +148,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~fc/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fc/vol1", tmpDir)
+	if path != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 
 	if err := builder.SetUp(nil); err != nil {
@@ -141,8 +174,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Attach was not called")
 	}
 
-	fakeManager = &fakeDiskManager{}
-	cleaner, err := plug.(*fcPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
+	fakeManager2 := NewFakeDiskManager()
+	defer fakeManager2.Cleanup()
+	cleaner, err := plug.(*fcPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -158,7 +192,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
-	if !fakeManager.detachCalled {
+	if !fakeManager2.detachCalled {
 		t.Errorf("Detach was not called")
 	}
 }
@@ -198,6 +232,12 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("fc_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	lun := 0
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
@@ -230,10 +270,10 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 	}
 
-	client := testclient.NewSimpleFake(pv, claim)
+	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(fcPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes

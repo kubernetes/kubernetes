@@ -38,7 +38,7 @@ import (
 func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -63,7 +63,7 @@ func TestSet(t *testing.T) {
 func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -90,7 +90,7 @@ func TestGet(t *testing.T) {
 func TestWriteTTL(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -145,7 +145,7 @@ func TestWriteTTL(t *testing.T) {
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
-	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix(), false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)

@@ -55,9 +55,7 @@ type ClientGenArgs struct {
 // NameSystems returns the name system used by the generators in this package.
 func NameSystems() namer.NameSystems {
 	pluralExceptions := map[string]string{
-		"Endpoints":       "Endpoints",
-		"ComponentStatus": "ComponentStatus",
-		"Ingress":         "Ingress",
+		"Endpoints": "Endpoints",
 	}
 	return namer.NameSystems{
 		"public":             namer.NewPublicNamer(0),
@@ -176,9 +174,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				continue
 			}
 			group := filepath.Base(t.Name.Package)
-			// Special case for the legacy API.
+			// Special case for the core API.
 			if group == "api" {
-				group = "legacy"
+				group = "core"
 			}
 			if _, found := groupToTypes[group]; !found {
 				groupToTypes[group] = []*types.Type{}
@@ -195,6 +193,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList []generator.Package
 
 	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
+	if customArgs.FakeClient {
+		packageList = append(packageList, fake.PackageForClientset(arguments.OutputPackagePath, customArgs.GroupVersions, boilerplate))
+	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
 	if customArgs.ClientsetOnly {

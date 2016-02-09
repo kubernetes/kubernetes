@@ -17,20 +17,28 @@ limitations under the License.
 package glusterfs
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("glusterfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/glusterfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -47,8 +55,14 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("glusterfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/glusterfs")
 	if err != nil {
@@ -69,8 +83,14 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
+	tmpDir, err := utiltesting.MkTmpdir("glusterfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/glusterfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -101,8 +121,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Error("Got a nil Builder")
 	}
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~glusterfs/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~glusterfs/vol1", tmpDir)
+	if path != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 	if err := builder.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
@@ -155,6 +176,12 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("glusterfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pvA",
@@ -192,10 +219,10 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		}},
 	}
 
-	client := testclient.NewSimpleFake(pv, claim, ep)
+	client := fake.NewSimpleClientset(pv, claim, ep)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(glusterfsPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes

@@ -33,8 +33,8 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"golang.org/x/net/context"
@@ -42,7 +42,7 @@ import (
 
 func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
-	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix)
+	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix, false)
 	return server, storage
 }
 
@@ -158,7 +158,7 @@ func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType
 		if e, a := eventObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected (%s): %#v, got: %#v", eventType, e, a)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Timed out waiting for an event")
 	}
 }

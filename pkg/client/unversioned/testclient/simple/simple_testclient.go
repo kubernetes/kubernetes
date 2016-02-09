@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -53,12 +54,13 @@ type Response struct {
 
 type Client struct {
 	*client.Client
-	Request  Request
-	Response Response
-	Error    bool
-	Created  bool
-	server   *httptest.Server
-	handler  *utiltesting.FakeHandler
+	Clientset *clientset.Clientset
+	Request   Request
+	Response  Response
+	Error     bool
+	Created   bool
+	server    *httptest.Server
+	handler   *utiltesting.FakeHandler
 	// For query args, an optional function to validate the contents
 	// useful when the contents can change but still be correct.
 	// Maps from query arg key to validator.
@@ -86,6 +88,8 @@ func (c *Client) Setup(t *testing.T) *Client {
 			Host:          c.server.URL,
 			ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
 		})
+
+		c.Clientset = clientset.NewForConfigOrDie(&client.Config{Host: c.server.URL})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
 	return c

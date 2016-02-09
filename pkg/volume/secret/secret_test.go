@@ -24,9 +24,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -34,13 +35,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-func newTestHost(t *testing.T, client client.Interface) (string, volume.VolumeHost) {
+func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := ioutil.TempDir("/tmp", "secret_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -72,7 +73,7 @@ func TestPlugin(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName)
 		secret        = secret(testNamespace, testName)
-		client        = testclient.NewSimpleFake(&secret)
+		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -121,6 +122,11 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 	doTestSecretDataInVolume(volumePath, secret, t)
+
+	metrics, err := builder.GetMetrics()
+	assert.NotEmpty(t, metrics)
+	assert.NoError(t, err)
+
 	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
@@ -135,7 +141,7 @@ func TestPluginIdempotent(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName)
 		secret        = secret(testNamespace, testName)
-		client        = testclient.NewSimpleFake(&secret)
+		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
@@ -196,7 +202,7 @@ func TestPluginReboot(t *testing.T) {
 
 		volumeSpec    = volumeSpec(testVolumeName, testName)
 		secret        = secret(testNamespace, testName)
-		client        = testclient.NewSimpleFake(&secret)
+		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)

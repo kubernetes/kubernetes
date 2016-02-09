@@ -34,7 +34,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type cadvisorClient struct {
@@ -119,7 +119,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		// If export failed, retry in the background until we are able to bind.
 		// This allows an existing cAdvisor to be killed before this one registers.
 		go func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 
 			err := serv.ListenAndServe()
 			for err != nil {
@@ -135,6 +135,10 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 
 func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return cc.GetContainerInfo(name, req)
+}
+
+func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	return cc.GetContainerInfoV2(name, options)
 }
 
 func (cc *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {

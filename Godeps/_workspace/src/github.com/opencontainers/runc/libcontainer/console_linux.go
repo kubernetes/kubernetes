@@ -10,9 +10,9 @@ import (
 	"github.com/opencontainers/runc/libcontainer/label"
 )
 
-// newConsole returns an initalized console that can be used within a container by copying bytes
+// NewConsole returns an initalized console that can be used within a container by copying bytes
 // from the master side to the slave that is attached as the tty for the container's init process.
-func newConsole(uid, gid int) (Console, error) {
+func NewConsole(uid, gid int) (Console, error) {
 	master, err := os.OpenFile("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err

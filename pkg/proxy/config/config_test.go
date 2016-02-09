@@ -19,11 +19,12 @@ package config_test
 import (
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	. "k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const TomcatPort int = 8080
@@ -49,29 +50,37 @@ func (s sortedServices) Less(i, j int) bool {
 }
 
 type ServiceHandlerMock struct {
-	services []api.Service
-	updated  sync.WaitGroup
+	updated chan []api.Service
+	waits   int
 }
 
 func NewServiceHandlerMock() *ServiceHandlerMock {
-	return &ServiceHandlerMock{services: make([]api.Service, 0)}
+	return &ServiceHandlerMock{updated: make(chan []api.Service, 5)}
 }
 
 func (h *ServiceHandlerMock) OnServiceUpdate(services []api.Service) {
 	sort.Sort(sortedServices(services))
-	h.services = services
-	h.updated.Done()
+	h.updated <- services
 }
 
 func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []api.Service) {
-	h.updated.Wait()
-	if !reflect.DeepEqual(h.services, expectedServices) {
-		t.Errorf("Expected %#v, Got %#v", expectedServices, h.services)
+	// We might get 1 or more updates for N service updates, because we
+	// over write older snapshots of services from the producer go-routine
+	// if the consumer falls behind.
+	var services []api.Service
+	for {
+		select {
+		case services = <-h.updated:
+			if reflect.DeepEqual(services, expectedServices) {
+				return
+			}
+		// Unittests will hard timeout in 5m with a stack trace, prevent that
+		// and surface a clearer reason for failure.
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("Timed out. Expected %#v, Got %#v", expectedServices, services)
+			return
+		}
 	}
-}
-
-func (h *ServiceHandlerMock) Wait(waits int) {
-	h.updated.Add(waits)
 }
 
 type sortedEndpoints []api.Endpoints
@@ -87,29 +96,37 @@ func (s sortedEndpoints) Less(i, j int) bool {
 }
 
 type EndpointsHandlerMock struct {
-	endpoints []api.Endpoints
-	updated   sync.WaitGroup
+	updated chan []api.Endpoints
+	waits   int
 }
 
 func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	return &EndpointsHandlerMock{endpoints: make([]api.Endpoints, 0)}
+	return &EndpointsHandlerMock{updated: make(chan []api.Endpoints, 5)}
 }
 
 func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []api.Endpoints) {
 	sort.Sort(sortedEndpoints(endpoints))
-	h.endpoints = endpoints
-	h.updated.Done()
+	h.updated <- endpoints
 }
 
 func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []api.Endpoints) {
-	h.updated.Wait()
-	if !reflect.DeepEqual(h.endpoints, expectedEndpoints) {
-		t.Errorf("Expected %#v, Got %#v", expectedEndpoints, h.endpoints)
+	// We might get 1 or more updates for N endpoint updates, because we
+	// over write older snapshots of endpoints from the producer go-routine
+	// if the consumer falls behind. Unittests will hard timeout in 5m.
+	var endpoints []api.Endpoints
+	for {
+		select {
+		case endpoints = <-h.updated:
+			if reflect.DeepEqual(endpoints, expectedEndpoints) {
+				return
+			}
+		// Unittests will hard timeout in 5m with a stack trace, prevent that
+		// and surface a clearer reason for failure.
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("Timed out. Expected %#v, Got %#v", expectedEndpoints, endpoints)
+			return
+		}
 	}
-}
-
-func (h *EndpointsHandlerMock) Wait(waits int) {
-	h.updated.Add(waits)
 }
 
 func CreateServiceUpdate(op Operation, services ...api.Service) ServiceUpdate {
@@ -134,7 +151,6 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig()
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
-	handler.Wait(1)
 	config.RegisterHandler(handler)
 	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
@@ -154,7 +170,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
@@ -162,7 +177,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate.Services[0]}
 	handler.ValidateServices(t, services)
@@ -170,7 +184,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate3
 	services = []api.Service{serviceUpdate2.Services[0]}
 	handler.ValidateServices(t, services)
@@ -179,7 +192,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 99}}},
 	})
-	handler.Wait(1)
 	channel <- serviceUpdate4
 	services = []api.Service{serviceUpdate4.Services[0]}
 	handler.ValidateServices(t, services)
@@ -202,7 +214,6 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
-	handler.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate1.Services[0]}
@@ -225,8 +236,6 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
-	handler.Wait(2)
-	handler2.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate1.Services[0]}
@@ -256,8 +265,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(2)
-	handler2.Wait(2)
 	channelOne <- endpointsUpdate1
 	channelTwo <- endpointsUpdate2
 
@@ -288,8 +295,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(2)
-	handler2.Wait(2)
 	channelOne <- endpointsUpdate1
 	channelTwo <- endpointsUpdate2
 
@@ -305,8 +310,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(1)
-	handler2.Wait(1)
 	channelTwo <- endpointsUpdate3
 	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
 	handler.ValidateEndpoints(t, endpoints)
@@ -320,8 +323,6 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	handler.Wait(1)
-	handler2.Wait(1)
 	channelOne <- endpointsUpdate1
 	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
 	handler.ValidateEndpoints(t, endpoints)
@@ -329,11 +330,14 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 
 	// Remove "bar" service
 	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
-	handler.Wait(1)
-	handler2.Wait(1)
 	channelTwo <- endpointsUpdate2
 
 	endpoints = []api.Endpoints{endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }
+
+// TODO: Add a unittest for interrupts getting processed in a timely manner.
+// Currently this module has a circular dependency with config, and so it's
+// named config_test, which means even test methods need to be public. This
+// is refactoring that we can avoid by resolving the dependency.

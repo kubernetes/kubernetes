@@ -124,9 +124,8 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
 
-			mixedCase := false
 			scope := meta.RESTScopeNamespace
-			mapper.Add(gvk, scope, mixedCase)
+			mapper.Add(gvk, scope)
 		}
 	}
 
@@ -195,7 +194,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -253,7 +252,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -327,7 +326,7 @@ func stringBody(body string) io.ReadCloser {
 
 func ExamplePrintReplicationControllerWithNamespace() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -369,7 +368,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 
 func ExamplePrintPodWithWideFormat() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -400,6 +399,45 @@ func ExamplePrintPodWithWideFormat() {
 	// Output:
 	// NAME      READY     STATUS     RESTARTS   AGE       NODE
 	// test1     1/2       podPhase   6          10y       kubernetes-minion-abcd
+}
+
+func ExamplePrintPodWithShowLabels() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, true, false, []string{})
+	tf.Client = &fake.RESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	nodeName := "kubernetes-minion-abcd"
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			Labels: map[string]string{
+				"l1": "key",
+				"l2": "value",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: make([]api.Container, 2),
+			NodeName:   nodeName,
+		},
+		Status: api.PodStatus{
+			Phase: "podPhase",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, pod, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     STATUS     RESTARTS   AGE       LABELS
+	// test1     1/2       podPhase   6          10y       l1=key,l2=value
 }
 
 func newAllPhasePodList() *api.PodList {
@@ -496,7 +534,7 @@ func newAllPhasePodList() *api.PodList {
 
 func ExamplePrintPodHideTerminated() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -516,7 +554,7 @@ func ExamplePrintPodHideTerminated() {
 
 func ExamplePrintPodShowAll() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -538,7 +576,7 @@ func ExamplePrintPodShowAll() {
 
 func ExamplePrintServiceWithNamespacesAndLabels() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, []string{"l1"})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, false, []string{"l1"})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -596,7 +634,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      CLUSTER_IP   EXTERNAL_IP   PORT(S)           SELECTOR   AGE       L1|
+	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           SELECTOR   AGE       L1|
 	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     s=magic    10y       value|
 	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   s=kazam    10y       dolla-bill-yall|
 	// ||

@@ -21,6 +21,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -30,10 +31,11 @@ import (
 // genClientset generates a package for a clientset.
 type genClientset struct {
 	generator.DefaultGen
-	groupVersions   []unversioned.GroupVersion
-	typedClientPath string
-	outputPackage   string
-	imports         *generator.ImportTracker
+	groupVersions      []unversioned.GroupVersion
+	typedClientPath    string
+	outputPackage      string
+	imports            *generator.ImportTracker
+	clientsetGenerated bool
 }
 
 var _ generator.Generator = &genClientset{}
@@ -44,36 +46,21 @@ func (g *genClientset) Namers(c *generator.Context) namer.NameSystems {
 	}
 }
 
-var generate_clientset = true
-
 // We only want to call GenerateType() once.
 func (g *genClientset) Filter(c *generator.Context, t *types.Type) bool {
-	ret := generate_clientset
-	generate_clientset = false
+	ret := !g.clientsetGenerated
+	g.clientsetGenerated = true
 	return ret
 }
 
-func normalizeGroup(group string) string {
-	if group == "api" {
-		return "legacy"
-	}
-	return group
-}
-
-func normalizeVersion(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
-}
-
 func (g *genClientset) Imports(c *generator.Context) (imports []string) {
+	imports = append(imports, g.imports.ImportLines()...)
 	for _, gv := range g.groupVersions {
-		group := normalizeGroup(gv.Group)
-		version := normalizeVersion(gv.Version)
+		group := normalization.Group(gv.Group)
+		version := normalization.Version(gv.Version)
 		typedClientPath := filepath.Join(g.typedClientPath, group, version)
-		imports = append(imports, g.imports.ImportLines()...)
 		imports = append(imports, fmt.Sprintf("%s_%s \"%s\"", group, version, typedClientPath))
+		imports = append(imports, "github.com/golang/glog")
 	}
 	return
 }
@@ -91,22 +78,28 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	allGroups := []arg{}
 	for _, gv := range g.groupVersions {
-		group := normalizeGroup(gv.Group)
-		version := normalizeVersion(gv.Version)
+		group := normalization.Group(gv.Group)
+		version := normalization.Version(gv.Version)
 		allGroups = append(allGroups, arg{namer.IC(group), group + "_" + version})
 	}
 
 	m := map[string]interface{}{
-		"allGroups":                  allGroups,
-		"Config":                     c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
-		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
+		"allGroups":                        allGroups,
+		"Config":                           c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
+		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
+		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
+		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryInterface"}),
+		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryClient"}),
+		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfig"}),
+		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfigOrDie"}),
+		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClient"}),
 	}
 	sw.Do(clientsetInterfaceTemplate, m)
 	sw.Do(clientsetTemplate, m)
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
 	}
+	sw.Do(getDiscoveryTemplate, m)
 	sw.Do(newClientsetForConfigTemplate, m)
 	sw.Do(newClientsetForConfigOrDieTemplate, m)
 	sw.Do(newClientsetForRESTClientTemplate, m)
@@ -116,6 +109,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 var clientsetInterfaceTemplate = `
 type Interface interface {
+	Discovery() $.DiscoveryInterface|raw$
     $range .allGroups$$.Group$() $.PackageName$.$.Group$Interface
     $end$
 }
@@ -125,6 +119,7 @@ var clientsetTemplate = `
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*$.DiscoveryClient|raw$
     $range .allGroups$*$.PackageName$.$.Group$Client
     $end$
 }
@@ -136,6 +131,12 @@ func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
 	return c.$.Group$Client
 }
 `
+var getDiscoveryTemplate = `
+// Discovery retrieves the DiscoveryClient
+func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
+	return c.DiscoveryClient
+}
+`
 
 var newClientsetForConfigTemplate = `
 // NewForConfig creates a new Clientset for the given config.
@@ -144,10 +145,14 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	var err error
 $range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(c)
 	if err!=nil {
-		return nil, err
+		return &clientset, err
 	}
 $end$
-	return &clientset, nil
+	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(c)
+	if err!=nil {
+		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+	}
+	return &clientset, err
 }
 `
 
@@ -158,6 +163,7 @@ func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
 	var clientset Clientset
 $range .allGroups$    clientset.$.Group$Client =$.PackageName$.NewForConfigOrDie(c)
 $end$
+	clientset.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
 	return &clientset
 }
 `
@@ -168,7 +174,7 @@ func New(c *$.RESTClient|raw$) *Clientset {
 	var clientset Clientset
 $range .allGroups$    clientset.$.Group$Client =$.PackageName$.New(c)
 $end$
-
+	clientset.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &clientset
 }
 `

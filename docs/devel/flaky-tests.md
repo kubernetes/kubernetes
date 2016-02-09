@@ -58,7 +58,10 @@ discoverable from the issue.
    flake is exactly the same, add a comment instead of making a new issue.
 2. If you make a new issue, you should title it with the test name, prefixed by
    "e2e/unit/integration flake:" (whichever is appropriate)
-3. Reference any old issues you found in step one.
+3. Reference any old issues you found in step one. Also, make a comment in the
+   old issue referencing your new issue, because people monitoring only their
+   email do not see the backlinks github adds. Alternatively, tag the person or
+   people who most recently worked on it.
 4. Paste, in block quotes, the entire log of the individual failing test, not
    just the failure line.
 5. Link to durable storage with the rest of the logs. This means (for all the

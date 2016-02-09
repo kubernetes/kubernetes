@@ -19,6 +19,7 @@ package storage
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -40,8 +42,15 @@ func makeTestPod(name string, resourceVersion uint64) *api.Pod {
 	}
 }
 
+// newTestWatchCache just adds a fake clock.
+func newTestWatchCache(capacity int) *watchCache {
+	wc := newWatchCache(capacity)
+	wc.clock = util.NewFakeClock(time.Now())
+	return wc
+}
+
 func TestWatchCacheBasic(t *testing.T) {
-	store := newWatchCache(2)
+	store := newTestWatchCache(2)
 
 	// Test Add/Update/Delete.
 	pod1 := makeTestPod("pod", 1)
@@ -111,7 +120,7 @@ func TestWatchCacheBasic(t *testing.T) {
 }
 
 func TestEvents(t *testing.T) {
-	store := newWatchCache(5)
+	store := newTestWatchCache(5)
 
 	store.Add(makeTestPod("pod", 2))
 
@@ -231,7 +240,7 @@ func TestEvents(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndList(t *testing.T) {
-	store := newWatchCache(3)
+	store := newTestWatchCache(3)
 
 	// In background, update the store.
 	go func() {
@@ -239,12 +248,39 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	list, resourceVersion := store.WaitUntilFreshAndList(4)
+	list, resourceVersion, err := store.WaitUntilFreshAndList(5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if resourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
 	}
 	if len(list) != 2 {
 		t.Errorf("unexpected list returned: %#v", list)
+	}
+}
+
+func TestWaitUntilFreshAndListTimeout(t *testing.T) {
+	store := newTestWatchCache(3)
+	fc := store.clock.(*util.FakeClock)
+
+	// In background, step clock after the below call starts the timer.
+	go func() {
+		for !fc.HasWaiters() {
+			time.Sleep(time.Millisecond)
+		}
+		fc.Step(MaximumListWait)
+
+		// Add an object to make sure the test would
+		// eventually fail instead of just waiting
+		// forever.
+		time.Sleep(30 * time.Second)
+		store.Add(makeTestPod("bar", 5))
+	}()
+
+	_, _, err := store.WaitUntilFreshAndList(5)
+	if err == nil {
+		t.Fatalf("unexpected lack of timeout error")
 	}
 }
 
@@ -261,10 +297,13 @@ func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
 }
 
 func TestReflectorForWatchCache(t *testing.T) {
-	store := newWatchCache(5)
+	store := newTestWatchCache(5)
 
 	{
-		_, version := store.WaitUntilFreshAndList(0)
+		_, version, err := store.WaitUntilFreshAndList(0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if version != 0 {
 			t.Errorf("unexpected resource version: %d", version)
 		}
@@ -281,10 +320,13 @@ func TestReflectorForWatchCache(t *testing.T) {
 		},
 	}
 	r := cache.NewReflector(lw, &api.Pod{}, store, 0)
-	r.ListAndWatch(util.NeverStop)
+	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version := store.WaitUntilFreshAndList(10)
+		_, version, err := store.WaitUntilFreshAndList(10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if version != 10 {
 			t.Errorf("unexpected resource version: %d", version)
 		}

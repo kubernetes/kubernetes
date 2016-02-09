@@ -31,7 +31,7 @@ import (
 const (
 	dynamicConsumptionTimeInSeconds = 30
 	staticConsumptionTimeInSeconds  = 3600
-	dynamicRequestSizeInMillicores  = 100
+	dynamicRequestSizeInMillicores  = 20
 	dynamicRequestSizeInMegabytes   = 100
 	port                            = 80
 	targetPort                      = 8080

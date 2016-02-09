@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"reflect"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -45,10 +44,9 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	processed := make(map[types.UID][]string)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeRuntime := &kubecontainer.FakeRuntime{}
-	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(fakeRuntime)
+	fakeCache := kubecontainer.NewFakeCache(fakeRuntime)
 	podWorkers := newPodWorkers(
-		fakeRuntimeCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
+		func(pod *api.Pod, mirrorPod *api.Pod, status *kubecontainer.PodStatus, updateType kubetypes.SyncPodType) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -60,6 +58,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 		queue.NewBasicWorkQueue(),
 		time.Second,
 		time.Second,
+		fakeCache,
 	)
 	return podWorkers, processed
 }
@@ -150,19 +149,19 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 }
 
 type simpleFakeKubelet struct {
-	pod        *api.Pod
-	mirrorPod  *api.Pod
-	runningPod kubecontainer.Pod
-	wg         sync.WaitGroup
+	pod       *api.Pod
+	mirrorPod *api.Pod
+	podStatus *kubecontainer.PodStatus
+	wg        sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
-	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
+func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, status *kubecontainer.PodStatus, updateType kubetypes.SyncPodType) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, status
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncPodWithWaitGroup(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
-	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(pod *api.Pod, mirrorPod *api.Pod, status *kubecontainer.PodStatus, updateType kubetypes.SyncPodType) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, status
 	kl.wg.Done()
 	return nil
 }
@@ -185,25 +184,21 @@ func (b byContainerName) Less(i, j int) bool {
 func TestFakePodWorkers(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	fakeRuntime := &kubecontainer.FakeRuntime{}
-	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(fakeRuntime)
+	fakeCache := kubecontainer.NewFakeCache(fakeRuntime)
 
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second)
-	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeRuntimeCache, t}
+	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second, fakeCache)
+	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
 	tests := []struct {
-		pod                    *api.Pod
-		mirrorPod              *api.Pod
-		podList                []*kubecontainer.Pod
-		containersInRunningPod int
+		pod       *api.Pod
+		mirrorPod *api.Pod
 	}{
 		{
 			&api.Pod{},
 			&api.Pod{},
-			[]*kubecontainer.Pod{},
-			0,
 		},
 		{
 			&api.Pod{
@@ -220,29 +215,6 @@ func TestFakePodWorkers(t *testing.T) {
 					Namespace: "new",
 				},
 			},
-			[]*kubecontainer.Pod{
-				{
-					ID:        "12345678",
-					Name:      "foo",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "fooContainer",
-						},
-					},
-				},
-				{
-					ID:        "12345678",
-					Name:      "fooMirror",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "fooContainerMirror",
-						},
-					},
-				},
-			},
-			1,
 		},
 		{
 			&api.Pod{
@@ -259,42 +231,11 @@ func TestFakePodWorkers(t *testing.T) {
 					Namespace: "new",
 				},
 			},
-			[]*kubecontainer.Pod{
-				{
-					ID:        "98765",
-					Name:      "bar",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "barContainer0",
-						},
-						{
-							Name: "barContainer1",
-						},
-					},
-				},
-				{
-					ID:        "98765",
-					Name:      "barMirror",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "barContainerMirror0",
-						},
-						{
-							Name: "barContainerMirror1",
-						},
-					},
-				},
-			},
-			2,
 		},
 	}
 
 	for i, tt := range tests {
 		kubeletForRealWorkers.wg.Add(1)
-
-		fakeRuntime.PodList = tt.podList
 		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
 		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
 
@@ -308,14 +249,8 @@ func TestFakePodWorkers(t *testing.T) {
 			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.mirrorPod, kubeletForFakeWorkers.mirrorPod)
 		}
 
-		if tt.containersInRunningPod != len(kubeletForFakeWorkers.runningPod.Containers) {
-			t.Errorf("%d: Expected: %#v, Actual: %#v", i, tt.containersInRunningPod, len(kubeletForFakeWorkers.runningPod.Containers))
-		}
-
-		sort.Sort(byContainerName(kubeletForRealWorkers.runningPod))
-		sort.Sort(byContainerName(kubeletForFakeWorkers.runningPod))
-		if !reflect.DeepEqual(kubeletForRealWorkers.runningPod, kubeletForFakeWorkers.runningPod) {
-			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.runningPod, kubeletForFakeWorkers.runningPod)
+		if !reflect.DeepEqual(kubeletForRealWorkers.podStatus, kubeletForFakeWorkers.podStatus) {
+			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.podStatus, kubeletForFakeWorkers.podStatus)
 		}
 	}
 }

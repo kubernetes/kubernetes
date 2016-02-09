@@ -17,6 +17,8 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -26,14 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 )
 
 func TestRunStop(t *testing.T) {
-	client := &testclient.Fake{}
-	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+	clientset := fake.NewSimpleClientset()
+	binder := NewPersistentVolumeClaimBinder(clientset, 1*time.Second)
 
 	if len(binder.stopChannels) != 0 {
 		t.Errorf("Non-running binder should not have any stopChannels.  Got %v", len(binder.stopChannels))
@@ -53,6 +57,11 @@ func TestRunStop(t *testing.T) {
 }
 
 func TestClaimRace(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	c1 := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name: "c1",
@@ -100,7 +109,7 @@ func TestClaimRace(t *testing.T) {
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data01",
+					Path: fmt.Sprintf("%s/data01", tmpDir),
 				},
 			},
 		},
@@ -113,7 +122,7 @@ func TestClaimRace(t *testing.T) {
 	mockClient := &mockBinderClient{}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	// adds the volume to the index, making the volume available
 	syncVolume(volumeIndex, mockClient, v)
@@ -125,7 +134,7 @@ func TestClaimRace(t *testing.T) {
 	}
 
 	// an initial sync for a claim matches the volume
-	err := syncClaim(volumeIndex, mockClient, c1)
+	err = syncClaim(volumeIndex, mockClient, c1)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -143,7 +152,75 @@ func TestClaimRace(t *testing.T) {
 	}
 }
 
+func TestNewClaimWithSameNameAsOldClaim(t *testing.T) {
+	c1 := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "c1",
+			Namespace: "foo",
+			UID:       "12345",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
+				},
+			},
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+	c1.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", "")
+
+	v := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{
+				Name:      c1.Name,
+				Namespace: c1.Namespace,
+				UID:       "45678",
+			},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/tmp/data01",
+				},
+			},
+		},
+		Status: api.PersistentVolumeStatus{
+			Phase: api.VolumeBound,
+		},
+	}
+
+	volumeIndex := NewPersistentVolumeOrderedIndex()
+	mockClient := &mockBinderClient{
+		claim:  c1,
+		volume: v,
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	syncVolume(volumeIndex, mockClient, v)
+	if mockClient.volume.Status.Phase != api.VolumeReleased {
+		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, mockClient.volume.Status.Phase)
+	}
+
+}
+
 func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	// Tests that binder.syncVolume will also syncClaim if the PV has completed
 	// provisioning but the claim is still Pending.  We want to advance to Bound
 	// without having to wait until the binder's next sync period.
@@ -184,7 +261,7 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data01",
+					Path: fmt.Sprintf("%s/data01", tmpDir),
 				},
 			},
 			ClaimRef: claimRef,
@@ -200,7 +277,7 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	// adds the volume to the index, making the volume available.
 	// pv also completed provisioning, so syncClaim should cause claim's phase to advance to Bound
@@ -250,7 +327,7 @@ func TestExampleObjects(t *testing.T) {
 					},
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{
-							Path: "/tmp/data01",
+							Path: "/somepath/data01",
 						},
 					},
 				},
@@ -265,7 +342,7 @@ func TestExampleObjects(t *testing.T) {
 					},
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{
-							Path: "/tmp/data02",
+							Path: "/somepath/data02",
 						},
 					},
 					PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
@@ -276,18 +353,18 @@ func TestExampleObjects(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		codec := api.Codecs.UniversalDecoder()
-		o := testclient.NewObjects(api.Scheme, codec)
-		if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/"+name, o, codec); err != nil {
+		o := core.NewObjects(api.Scheme, codec)
+		if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/"+name, o, codec); err != nil {
 			t.Fatal(err)
 		}
 
-		client := &testclient.Fake{}
-		client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
+		clientset := &fake.Clientset{}
+		clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolumeClaim{}) {
-			pvc, err := client.PersistentVolumeClaims("ns").Get("doesntmatter")
+			pvc, err := clientset.Core().PersistentVolumeClaims("ns").Get("doesntmatter")
 			if err != nil {
-				t.Errorf("Error retrieving object: %v", err)
+				t.Fatalf("Error retrieving object: %v", err)
 			}
 
 			expected := scenario.expected.(*api.PersistentVolumeClaim)
@@ -306,9 +383,9 @@ func TestExampleObjects(t *testing.T) {
 		}
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolume{}) {
-			pv, err := client.PersistentVolumes().Get("doesntmatter")
+			pv, err := clientset.Core().PersistentVolumes().Get("doesntmatter")
 			if err != nil {
-				t.Errorf("Error retrieving object: %v", err)
+				t.Fatalf("Error retrieving object: %v", err)
 			}
 
 			expected := scenario.expected.(*api.PersistentVolume)
@@ -333,19 +410,28 @@ func TestExampleObjects(t *testing.T) {
 }
 
 func TestBindingWithExamples(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	codec := api.Codecs.UniversalDecoder()
-	o := testclient.NewObjects(api.Scheme, codec)
-	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
+	o := core.NewObjects(api.Scheme, codec)
+	if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
 		t.Fatal(err)
 	}
-	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, codec); err != nil {
+	if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, codec); err != nil {
 		t.Fatal(err)
 	}
 
-	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
+	clientset := &fake.Clientset{}
+	clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
 
-	pv, err := client.PersistentVolumes().Get("any")
+	pv, err := clientset.Core().PersistentVolumes().Get("any")
+	if err != nil {
+		t.Errorf("Unexpected error getting PV from client: %v", err)
+	}
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimRecycle
 	if err != nil {
 		t.Errorf("Unexpected error getting PV from client: %v", err)
@@ -357,7 +443,7 @@ func TestBindingWithExamples(t *testing.T) {
 	// Test that !Pending gets correctly added
 	pv.Status.Phase = api.VolumeAvailable
 
-	claim, error := client.PersistentVolumeClaims("ns").Get("any")
+	claim, error := clientset.Core().PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
 		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}
@@ -370,10 +456,10 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	recycler := &PersistentVolumeRecycler{
-		kubeClient: client,
+		kubeClient: clientset,
 		client:     mockClient,
 		pluginMgr:  plugMgr,
 	}
@@ -443,8 +529,8 @@ func TestBindingWithExamples(t *testing.T) {
 }
 
 func TestCasting(t *testing.T) {
-	client := &testclient.Fake{}
-	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+	clientset := fake.NewSimpleClientset()
+	binder := NewPersistentVolumeClaimBinder(clientset, 1*time.Second)
 
 	pv := &api.PersistentVolume{}
 	unk := cache.DeletedFinalStateUnknown{}

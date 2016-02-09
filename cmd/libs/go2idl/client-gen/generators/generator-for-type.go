@@ -68,14 +68,15 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	pkg := filepath.Base(t.Name.Package)
 	namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
 	m := map[string]interface{}{
-		"type":             t,
-		"package":          pkg,
-		"Package":          namer.IC(pkg),
-		"Group":            namer.IC(g.group),
-		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
-		"namespaced":       namespaced,
+		"type":              t,
+		"package":           pkg,
+		"Package":           namer.IC(pkg),
+		"Group":             namer.IC(g.group),
+		"watchInterface":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"apiDeleteOptions":  c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
+		"apiListOptions":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"apiParameterCodec": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
+		"namespaced":        namespaced,
 	}
 
 	sw.Do(getterComment, m)
@@ -207,7 +208,7 @@ func (c *$.type|privatePlural$) List(opts $.apiListOptions|raw$) (result *$.type
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, $.apiParameterCodec|raw$).
 		Do().
 		Into(result)
 	return
@@ -246,7 +247,7 @@ func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, $.apiParameterCodec|raw$).
 		Body(options).
 		Do().
 		Error()
@@ -304,7 +305,7 @@ func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterf
 		Prefix("watch").
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, $.apiParameterCodec|raw$).
 		Watch()
 }
 `

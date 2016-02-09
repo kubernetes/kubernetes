@@ -70,7 +70,7 @@ func (c *ConfigMaps) List(opts api.ListOptions) (*api.ConfigMapList, error) {
 	err := c.client.Get().
 		Namespace(c.namespace).
 		Resource(ConfigMapResourceName).
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -117,6 +117,6 @@ func (c *ConfigMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.namespace).
 		Resource(ConfigMapResourceName).
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

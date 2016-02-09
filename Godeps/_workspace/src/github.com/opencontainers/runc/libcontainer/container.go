@@ -14,8 +14,11 @@ import (
 type Status int
 
 const (
+	// The container exists but has not been run yet
+	Created Status = iota
+
 	// The container exists and is running.
-	Running Status = iota + 1
+	Running
 
 	// The container exists, it is in the process of being paused.
 	Pausing
@@ -29,6 +32,25 @@ const (
 	// The container does not exist.
 	Destroyed
 )
+
+func (s Status) String() string {
+	switch s {
+	case Created:
+		return "created"
+	case Running:
+		return "running"
+	case Pausing:
+		return "pausing"
+	case Paused:
+		return "paused"
+	case Checkpointed:
+		return "checkpointed"
+	case Destroyed:
+		return "destroyed"
+	default:
+		return "unknown"
+	}
+}
 
 // BaseState represents the platform agnostic pieces relating to a
 // running container's state

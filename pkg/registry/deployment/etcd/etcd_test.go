@@ -17,9 +17,12 @@ limitations under the License.
 package etcd
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -64,8 +67,7 @@ func validNewDeployment() *extensions.Deployment {
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
-			UniqueLabelKey: "my-label",
-			Replicas:       7,
+			Replicas: 7,
 		},
 		Status: extensions.DeploymentStatus{
 			Replicas: 5,
@@ -276,5 +278,90 @@ func TestStatusUpdate(t *testing.T) {
 	}
 	if deployment.Status.Replicas != 100 {
 		t.Errorf("we expected .status.replicas to be updated to 100 but it was %v", deployment.Status.Replicas)
+	}
+}
+
+func TestEtcdCreateDeploymentRollback(t *testing.T) {
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+
+	testCases := map[string]struct {
+		rollback extensions.DeploymentRollback
+		errOK    func(error) bool
+	}{
+		"normal": {
+			rollback: extensions.DeploymentRollback{
+				Name:               name,
+				UpdatedAnnotations: map[string]string{},
+				RollbackTo:         extensions.RollbackConfig{Revision: 1},
+			},
+			errOK: func(err error) bool { return err == nil },
+		},
+		"noAnnotation": {
+			rollback: extensions.DeploymentRollback{
+				Name:       name,
+				RollbackTo: extensions.RollbackConfig{Revision: 1},
+			},
+			errOK: func(err error) bool { return err == nil },
+		},
+		"noName": {
+			rollback: extensions.DeploymentRollback{
+				UpdatedAnnotations: map[string]string{},
+				RollbackTo:         extensions.RollbackConfig{Revision: 1},
+			},
+			errOK: func(err error) bool { return err != nil },
+		},
+	}
+	for k, test := range testCases {
+		storage, server := newStorage(t)
+		rollbackStorage := storage.Rollback
+		key, _ := storage.Deployment.KeyFunc(ctx, name)
+		key = etcdtest.AddPrefix(key)
+
+		if _, err := storage.Deployment.Create(ctx, validNewDeployment()); err != nil {
+			t.Fatalf("%s: unexpected error: %v", k, err)
+		}
+		if _, err := rollbackStorage.Create(ctx, &test.rollback); !test.errOK(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		} else if err == nil {
+			// If rollback succeeded, verify Rollback field of deployment
+			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", k, err)
+			} else if !reflect.DeepEqual(*d.(*extensions.Deployment).Spec.RollbackTo, test.rollback.RollbackTo) {
+				t.Errorf("%s: expected: %v, got: %v", k, *d.(*extensions.Deployment).Spec.RollbackTo, test.rollback.RollbackTo)
+			}
+		}
+		server.Terminate(t)
+	}
+}
+
+// Ensure that when a deploymentRollback is created for a deployment that has already been deleted
+// by the API server, API server returns not-found error.
+func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	rollbackStorage := storage.Rollback
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+
+	key, _ := storage.Deployment.KeyFunc(ctx, name)
+	key = etcdtest.AddPrefix(key)
+	_, err := rollbackStorage.Create(ctx, &extensions.DeploymentRollback{
+		Name:               name,
+		UpdatedAnnotations: map[string]string{},
+		RollbackTo:         extensions.RollbackConfig{Revision: 1},
+	})
+	if err == nil {
+		t.Fatalf("Expected not-found-error but got nothing")
+	}
+	if !errors.IsNotFound(etcderrors.InterpretGetError(err, extensions.Resource("deployments"), name)) {
+		t.Fatalf("Unexpected error returned: %#v", err)
+	}
+
+	_, err = storage.Deployment.Get(ctx, name)
+	if err == nil {
+		t.Fatalf("Expected not-found-error but got nothing")
+	}
+	if !errors.IsNotFound(etcderrors.InterpretGetError(err, extensions.Resource("deployments"), name)) {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 }

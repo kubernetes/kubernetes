@@ -61,7 +61,7 @@ Code conventions
 Testing conventions
   - All new packages and most new significant functionality must come with unit tests
   - Table-driven tests are preferred for testing multiple scenarios/inputs; for example, see [TestNamespaceAuthorization](../../test/integration/auth_test.go)
-  - Significant features should come with integration (test/integration) and/or end-to-end (test/e2e) tests
+  - Significant features should come with integration (test/integration) and/or [end-to-end (test/e2e) tests](e2e-tests.md)
     - Including new kubectl commands and major features of existing commands
   - Unit tests must pass on OS X and Windows platforms - if you use Linux specific features, your test case must either be skipped on windows or compiled out (skipped is better when running Linux specific commands, compiled out is required when your code does not compile on Windows).
 
@@ -77,8 +77,10 @@ Directory and file conventions
     - Examples should also illustrate
       [best practices for configuration and using the system](../user-guide/config-best-practices.md)
   - Third-party code
-    - Third-party Go code is managed using Godeps
-    - Other third-party code belongs in /third_party
+    - Go code for normal third-party dependencies is managed using [Godeps](https://github.com/tools/godep)
+    - Other third-party code belongs in `/third_party`
+      - forked third party Go code goes in `/third_party/forked`
+      - forked _golang stdlib_ code goes in `/third_party/golang`
     - Third-party code must include licenses
     - This includes modified third-party code and excerpts, as well
 

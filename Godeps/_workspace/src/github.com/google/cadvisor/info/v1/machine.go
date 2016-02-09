@@ -136,7 +136,7 @@ type MachineInfo struct {
 	CpuFrequency uint64 `json:"cpu_frequency_khz"`
 
 	// The amount of memory (in bytes) in this machine
-	MemoryCapacity int64 `json:"memory_capacity"`
+	MemoryCapacity uint64 `json:"memory_capacity"`
 
 	// The machine id
 	MachineID string `json:"machine_id"`

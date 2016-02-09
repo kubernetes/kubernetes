@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -89,155 +90,11 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 // for the generated functions to work properly.
 // This should be fixed: https://github.com/kubernetes/kubernetes/issues/12977
 func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.PodSpec))(in)
-	}
-	if in.Volumes != nil {
-		out.Volumes = make([]v1.Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := Convert_api_Volume_To_v1_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
-	}
-	if in.Containers != nil {
-		out.Containers = make([]v1.Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := Convert_api_Container_To_v1_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	out.RestartPolicy = v1.RestartPolicy(in.RestartPolicy)
-	if in.TerminationGracePeriodSeconds != nil {
-		out.TerminationGracePeriodSeconds = new(int64)
-		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
-	} else {
-		out.TerminationGracePeriodSeconds = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		out.ActiveDeadlineSeconds = new(int64)
-		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
-	out.DNSPolicy = v1.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
-	}
-	out.ServiceAccountName = in.ServiceAccountName
-	// DeprecatedServiceAccount is an alias for ServiceAccountName.
-	out.DeprecatedServiceAccount = in.ServiceAccountName
-	out.NodeName = in.NodeName
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(v1.PodSecurityContext)
-		if err := Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
-			return err
-		}
-
-		out.HostNetwork = in.SecurityContext.HostNetwork
-		out.HostPID = in.SecurityContext.HostPID
-		out.HostIPC = in.SecurityContext.HostIPC
-	}
-	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]v1.LocalObjectReference, len(in.ImagePullSecrets))
-		for i := range in.ImagePullSecrets {
-			if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ImagePullSecrets = nil
-	}
-	return nil
+	return v1.Convert_api_PodSpec_To_v1_PodSpec(in, out, s)
 }
 
 func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*v1.PodSpec))(in)
-	}
-	if in.Volumes != nil {
-		out.Volumes = make([]api.Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := Convert_v1_Volume_To_api_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
-	}
-	if in.Containers != nil {
-		out.Containers = make([]api.Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := Convert_v1_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
-	if in.TerminationGracePeriodSeconds != nil {
-		out.TerminationGracePeriodSeconds = new(int64)
-		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
-	} else {
-		out.TerminationGracePeriodSeconds = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		out.ActiveDeadlineSeconds = new(int64)
-		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
-	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
-	}
-	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
-	// If both are specified, ServiceAccountName (the new field) wins.
-	out.ServiceAccountName = in.ServiceAccountName
-	if in.ServiceAccountName == "" {
-		out.ServiceAccountName = in.DeprecatedServiceAccount
-	}
-	out.NodeName = in.NodeName
-
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(api.PodSecurityContext)
-		if err := Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
-			return err
-		}
-	}
-	if out.SecurityContext == nil {
-		out.SecurityContext = new(api.PodSecurityContext)
-	}
-	out.SecurityContext.HostNetwork = in.HostNetwork
-	out.SecurityContext.HostPID = in.HostPID
-	out.SecurityContext.HostIPC = in.HostIPC
-	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
-		for i := range in.ImagePullSecrets {
-			if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ImagePullSecrets = nil
-	}
-	return nil
+	return v1.Convert_v1_PodSpec_To_api_PodSpec(in, out, s)
 }
 
 func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
@@ -254,15 +111,24 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	} else {
 		out.Selector = nil
 	}
-	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
-	out.UniqueLabelKey = new(string)
-	*out.UniqueLabelKey = in.UniqueLabelKey
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = int32(*in.RevisionHistoryLimit)
+	}
+	out.MinReadySeconds = int32(in.MinReadySeconds)
 	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(RollbackConfig)
+		out.RollbackTo.Revision = int64(in.RollbackTo.Revision)
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -281,16 +147,24 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	} else {
 		out.Selector = nil
 	}
-	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = *in.UniqueLabelKey
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int)
+		*out.RevisionHistoryLimit = int(*in.RevisionHistoryLimit)
 	}
+	out.MinReadySeconds = int(in.MinReadySeconds)
 	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(extensions.RollbackConfig)
+		out.RollbackTo.Revision = in.RollbackTo.Revision
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -342,7 +216,6 @@ func Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployme
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = int32(in.MinReadySeconds)
 	return nil
 }
 
@@ -356,77 +229,6 @@ func Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = int(in.MinReadySeconds)
-	return nil
-}
-
-func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.PodSecurityContext))(in)
-	}
-
-	out.SupplementalGroups = in.SupplementalGroups
-	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(v1.SELinuxOptions)
-		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
-			return err
-		}
-	} else {
-		out.SELinuxOptions = nil
-	}
-	if in.RunAsUser != nil {
-		out.RunAsUser = new(int64)
-		*out.RunAsUser = *in.RunAsUser
-	} else {
-		out.RunAsUser = nil
-	}
-	if in.RunAsNonRoot != nil {
-		out.RunAsNonRoot = new(bool)
-		*out.RunAsNonRoot = *in.RunAsNonRoot
-	} else {
-		out.RunAsNonRoot = nil
-	}
-	if in.FSGroup != nil {
-		out.FSGroup = new(int64)
-		*out.FSGroup = *in.FSGroup
-	} else {
-		out.FSGroup = nil
-	}
-	return nil
-}
-
-func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*v1.PodSecurityContext))(in)
-	}
-
-	out.SupplementalGroups = in.SupplementalGroups
-	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(api.SELinuxOptions)
-		if err := Convert_v1_SELinuxOptions_To_api_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
-			return err
-		}
-	} else {
-		out.SELinuxOptions = nil
-	}
-	if in.RunAsUser != nil {
-		out.RunAsUser = new(int64)
-		*out.RunAsUser = *in.RunAsUser
-	} else {
-		out.RunAsUser = nil
-	}
-	if in.RunAsNonRoot != nil {
-		out.RunAsNonRoot = new(bool)
-		*out.RunAsNonRoot = *in.RunAsNonRoot
-	} else {
-		out.RunAsNonRoot = nil
-	}
-	if in.FSGroup != nil {
-		out.FSGroup = new(int64)
-		*out.FSGroup = *in.FSGroup
-	} else {
-		out.FSGroup = nil
-	}
 	return nil
 }
 
@@ -434,23 +236,17 @@ func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.Da
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DaemonSetSpec))(in)
 	}
-	// unable to generate simple pointer conversion for extensions.LabelSelector -> v1beta1.LabelSelector
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
-		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
 		out.Selector = nil
 	}
-	// unable to generate simple pointer conversion for api.PodTemplateSpec -> v1.PodTemplateSpec
-	if in.Template != nil {
-		out.Template = new(v1.PodTemplateSpec)
-		if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
@@ -464,23 +260,17 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetSpec))(in)
 	}
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> extensions.LabelSelector
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
-		out.Selector = new(extensions.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
 		out.Selector = nil
 	}
-	// unable to generate simple pointer conversion for v1.PodTemplateSpec -> api.PodTemplateSpec
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
@@ -556,7 +346,7 @@ func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.
 	*out.Replicas = int32(in.Replicas)
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
-		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -564,7 +354,7 @@ func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.
 	}
 	if in.Template != nil {
 		out.Template = new(v1.PodTemplateSpec)
-		if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+		if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
 	} else {
@@ -581,8 +371,8 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 		out.Replicas = int(*in.Replicas)
 	}
 	if in.Selector != nil {
-		out.Selector = new(extensions.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
 			return err
 		}
 	} else {
@@ -590,7 +380,7 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 	}
 	if in.Template != nil {
 		out.Template = new(api.PodTemplateSpec)
-		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
 	} else {

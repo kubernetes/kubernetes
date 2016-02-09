@@ -509,6 +509,7 @@ func TestValidateVolumes(t *testing.T) {
 		}}}},
 		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{[]string{"some_wwn"}, &lun, "ext4", false}}},
 		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
+		{Name: "azure", VolumeSource: api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{"key", "share", false}}},
 	}
 	names, errs := validateVolumes(successCase, field.NewPath("field"))
 	if len(errs) != 0 {
@@ -557,6 +558,8 @@ func TestValidateVolumes(t *testing.T) {
 	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{[]string{}, &lun, "ext4", false}}
 	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{[]string{"wwn"}, nil, "ext4", false}}
 	slashInName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "foo/bar"}}
+	emptyAzureSecret := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{"", "share", false}}
+	emptyAzureShare := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{"name", "", false}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T field.ErrorType
@@ -677,6 +680,16 @@ func TestValidateVolumes(t *testing.T) {
 			[]api.Volume{{Name: "absolutetarget", VolumeSource: absPath}},
 			field.ErrorTypeInvalid,
 			"gitRepo.directory", "",
+		},
+		"empty secret": {
+			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureSecret}},
+			field.ErrorTypeRequired,
+			"azureFile.secretName", "",
+		},
+		"empty share": {
+			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureShare}},
+			field.ErrorTypeRequired,
+			"azureFile.shareName", "",
 		},
 	}
 	for k, v := range errorCases {
@@ -823,6 +836,17 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "ENV_VAR_1",
+			ValueFrom: &api.EnvVarSource{
+				ConfigMapKeyRef: &api.ConfigMapKeySelector{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "some-config-map",
+					},
+					Key: "some-key",
+				},
+			},
+		},
 	}
 	if errs := validateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -858,7 +882,7 @@ func TestValidateEnv(t *testing.T) {
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
 		},
 		{
-			name: "FieldRef and SecretKeyRef specified",
+			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 			envs: []api.EnvVar{{
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
@@ -875,6 +899,50 @@ func TestValidateEnv(t *testing.T) {
 				},
 			}},
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not have more than one field specified at a time",
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.configMapKeyRef set",
+			envs: []api.EnvVar{{
+				Name: "some_var_name",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "some-config-map",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
+		},
+		{
+			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					SecretKeyRef: &api.SecretKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "a-secret",
+						},
+						Key: "a-key",
+					},
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "some-config-map",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
 		},
 		{
 			name: "missing FieldPath on ObjectFieldSelector",
@@ -1027,6 +1095,8 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP"}},
 		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65535), Host: "host", Scheme: "HTTP"}},
 		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"Host", "foo.example.com"}}}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"X-Forwarded-For", "1.2.3.4"}, {"X-Forwarded-For", "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
 		if errs := validateHandler(&h, field.NewPath("field")); len(errs) != 0 {
@@ -1040,6 +1110,8 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &api.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
 		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65536), Host: "host"}},
 		{HTTPGet: &api.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"Host:", "foo.example.com"}}}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []api.HTTPHeader{{"X_Forwarded_For", "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
 		if errs := validateHandler(&h, field.NewPath("field")); len(errs) == 0 {
@@ -1495,6 +1567,12 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate Affinity.
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -1657,6 +1735,50 @@ func TestValidatePod(t *testing.T) {
 				NodeName: "foobar",
 			},
 		},
+		{ // Serialized affinity requirements in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {
+						"requiredDuringSchedulingRequiredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "key1",
+									"operator": "Exists"
+								}]
+							}]
+						},
+						"requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						},
+						"preferredDuringSchedulingIgnoredDuringExecution": [
+							{
+								"weight": 10,
+								"preference": {"matchExpressions": [
+									{
+										"key": "foo",
+										"operator": "In", "values": ["bar"]
+									}
+								]}
+							}
+						]
+					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 	}
 	for _, pod := range successCases {
 		if errs := ValidatePod(&pod); len(errs) != 0 {
@@ -1701,6 +1823,111 @@ func TestValidatePod(t *testing.T) {
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			},
 		},
+		"invalid json of affinity in pod annotations": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {
+						"requiredDuringSchedulingRequiredDuringExecution": {
+							"nodeSelectorTerms": [{
+					`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid node selector requirement in affinity in pod annotations, operator can't be null": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {"requiredDuringSchedulingRequiredDuringExecution": {
+						"nodeSelectorTerms": [{
+							"matchExpressions": [{
+								"key": "key1",
+							}]
+						}]
+					}}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid preferredSchedulingTerm in affinity in pod annotations, weight should be in range 1-100": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
+						{
+							"weight": 199,
+							"preference": {"matchExpressions": [
+								{
+									"key": "foo",
+									"operator": "In",
+									"values": ["bar"]
+								}
+							]}
+						}
+					]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid requiredDuringSchedulingRequiredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {
+						"requiredDuringSchedulingRequiredDuringExecution": {
+							"nodeSelectorTerms": []
+						},
+					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid requiredDuringSchedulingRequiredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {
+						"requiredDuringSchedulingRequiredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": []
+							}]
+						},
+					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
@@ -1710,9 +1937,17 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	now := unversioned.Now()
-	grace := int64(30)
-	grace2 := int64(31)
+	var (
+		activeDeadlineSecondsZero     = int64(0)
+		activeDeadlineSecondsNegative = int64(-30)
+		activeDeadlineSecondsPositive = int64(30)
+		activeDeadlineSecondsLarger   = int64(31)
+
+		now    = unversioned.Now()
+		grace  = int64(30)
+		grace2 = int64(31)
+	)
+
 	tests := []struct {
 		a       api.Pod
 		b       api.Pod
@@ -1852,6 +2087,150 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
+						{},
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
+						},
+					},
+				},
+			},
+			false,
+			"image change to empty",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{},
+			},
+			api.Pod{
+				Spec: api.PodSpec{},
+			},
+			true,
+			"activeDeadlineSeconds no change, nil",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			true,
+			"activeDeadlineSeconds no change, set",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{},
+			true,
+			"activeDeadlineSeconds change to positive from nil",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
+				},
+			},
+			true,
+			"activeDeadlineSeconds change to smaller positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			false,
+			"activeDeadlineSeconds change to larger positive",
+		},
+
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
+				},
+			},
+			api.Pod{},
+			false,
+			"activeDeadlineSeconds change to negative from nil",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			false,
+			"activeDeadlineSeconds change to negative from positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
+				},
+			},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			true,
+			"activeDeadlineSeconds change to zero from positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
+				},
+			},
+			api.Pod{},
+			true,
+			"activeDeadlineSeconds change to zero from nil",
+		},
+		{
+			api.Pod{},
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			false,
+			"activeDeadlineSeconds change to nil from positive",
+		},
+
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
 						{
 							Image: "foo:V1",
 							Resources: api.ResourceRequirements{
@@ -1935,11 +2314,11 @@ func TestValidatePodUpdate(t *testing.T) {
 		errs := ValidatePodUpdate(&test.a, &test.b)
 		if test.isValid {
 			if len(errs) != 0 {
-				t.Errorf("unexpected invalid: %s %v, %v", test.test, test.a, test.b)
+				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.a, test.b)
 			}
 		} else {
 			if len(errs) == 0 {
-				t.Errorf("unexpected valid: %s %v, %v", test.test, test.a, test.b)
+				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.a, test.b)
 			}
 		}
 	}
@@ -2214,9 +2593,17 @@ func TestValidateService(t *testing.T) {
 			name: "valid load balancer protocol UDP 2",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports[0] = api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)}
 			},
 			numErrs: 0,
+		},
+		{
+			name: "invalid load balancer with mix protocol",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
+			},
+			numErrs: 1,
 		},
 		{
 			name: "valid 1",
@@ -3035,6 +3422,36 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				PodCIDR: "",
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				PodCIDR: "192.168.0.0/16",
+			},
+		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				PodCIDR: "192.123.0.0/16",
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				PodCIDR: "192.168.0.0/16",
+			},
+		}, false},
 		{api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo",
@@ -4339,6 +4756,52 @@ func TestValidateEndpoints(t *testing.T) {
 	}
 }
 
+func TestValidateTLSSecret(t *testing.T) {
+	successCases := map[string]api.Secret{
+		"emtpy certificate chain": {
+			ObjectMeta: api.ObjectMeta{Name: "tls-cert", Namespace: "namespace"},
+			Data: map[string][]byte{
+				api.TLSCertKey:       []byte("public key"),
+				api.TLSPrivateKeyKey: []byte("private key"),
+			},
+		},
+	}
+	for k, v := range successCases {
+		if errs := ValidateSecret(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+	errorCases := map[string]struct {
+		secrets     api.Secret
+		errorType   field.ErrorType
+		errorDetail string
+	}{
+		"missing public key": {
+			secrets: api.Secret{
+				ObjectMeta: api.ObjectMeta{Name: "tls-cert"},
+				Data: map[string][]byte{
+					api.TLSCertKey: []byte("public key"),
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+		"missing private key": {
+			secrets: api.Secret{
+				ObjectMeta: api.ObjectMeta{Name: "tls-cert"},
+				Data: map[string][]byte{
+					api.TLSCertKey: []byte("public key"),
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+	}
+	for k, v := range errorCases {
+		if errs := ValidateSecret(&v.secrets); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+			t.Errorf("[%s] Expected error type %s with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+		}
+	}
+}
+
 func TestValidateSecurityContext(t *testing.T) {
 	priv := false
 	var runAsUser int64 = 1
@@ -4480,6 +4943,7 @@ func TestValidateConfigMap(t *testing.T) {
 		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
 		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
 		overMaxKeyLength = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"})
+		overMaxSize      = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", api.MaxSecretSize+1)})
 	)
 
 	tests := map[string]struct {
@@ -4497,6 +4961,7 @@ func TestValidateConfigMap(t *testing.T) {
 		"dot key":             {dotKey, false},
 		"double dot key":      {doubleDotKey, false},
 		"over max key length": {overMaxKeyLength, false},
+		"over max size":       {overMaxSize, false},
 	}
 
 	for name, tc := range tests {

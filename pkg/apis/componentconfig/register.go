@@ -45,7 +45,9 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeProxyConfiguration{},
+		&KubeSchedulerConfiguration{},
 	)
 }
 
-func (obj *KubeProxyConfiguration) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *KubeProxyConfiguration) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *KubeSchedulerConfiguration) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

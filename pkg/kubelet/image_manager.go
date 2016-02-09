@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -130,7 +130,7 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 }
 
 func (im *realImageManager) Start() error {
-	go util.Until(func() {
+	go wait.Until(func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
 		if im.initialized {
@@ -142,7 +142,7 @@ func (im *realImageManager) Start() error {
 		} else {
 			im.initialized = true
 		}
-	}, 5*time.Minute, util.NeverStop)
+	}, 5*time.Minute, wait.NeverStop)
 
 	return nil
 }
@@ -156,7 +156,7 @@ func (im *realImageManager) GetImageList() ([]kubecontainer.Image, error) {
 	return images, nil
 }
 
-func (im *realImageManager) detectImages(detected time.Time) error {
+func (im *realImageManager) detectImages(detectTime time.Time) error {
 	images, err := im.runtime.ListImages()
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (im *realImageManager) detectImages(detected time.Time) error {
 		// New image, set it as detected now.
 		if _, ok := im.imageRecords[image.ID]; !ok {
 			im.imageRecords[image.ID] = &imageRecord{
-				firstDetected: detected,
+				firstDetected: detectTime,
 			}
 		}
 
@@ -228,7 +228,7 @@ func (im *realImageManager) GarbageCollect() error {
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := usage - (int64(im.policy.LowThresholdPercent) * capacity / 100)
 		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
-		freed, err := im.freeSpace(amountToFree)
+		freed, err := im.freeSpace(amountToFree, time.Now())
 		if err != nil {
 			return err
 		}
@@ -249,9 +249,8 @@ func (im *realImageManager) GarbageCollect() error {
 // bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (im *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
-	startTime := time.Now()
-	err := im.detectImages(startTime)
+func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) {
+	err := im.detectImages(freeTime)
 	if err != nil {
 		return 0, err
 	}
@@ -274,13 +273,13 @@ func (im *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 	spaceFreed := int64(0)
 	for _, image := range images {
 		// Images that are currently in used were given a newer lastUsed.
-		if image.lastUsed.After(startTime) {
+		if image.lastUsed.After(freeTime) {
 			break
 		}
 
 		// Avoid garbage collect the image if the image is not old enough.
 		// In such a case, the image may have just been pulled down, and will be used by a container right away.
-		if startTime.Sub(image.firstDetected) < im.minAge {
+		if freeTime.Sub(image.firstDetected) < im.minAge {
 			continue
 		}
 

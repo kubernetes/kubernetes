@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -138,7 +138,7 @@ type VolumeHost interface {
 	GetPodPluginDir(podUID types.UID, pluginName string) string
 
 	// GetKubeClient returns a client interface
-	GetKubeClient() client.Interface
+	GetKubeClient() clientset.Interface
 
 	// NewWrapperBuilder finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which

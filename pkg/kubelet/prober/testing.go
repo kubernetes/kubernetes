@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -97,7 +97,7 @@ func newTestManager() *manager {
 	refManager := kubecontainer.NewRefManager()
 	refManager.SetRef(testContainerID, &api.ObjectReference{}) // Suppress prober warnings.
 	m := NewManager(
-		status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil)),
+		status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil)),
 		results.NewManager(),
 		nil, // runner
 		refManager,

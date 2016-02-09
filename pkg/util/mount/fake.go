@@ -16,10 +16,19 @@ limitations under the License.
 
 package mount
 
+import (
+	"sync"
+
+	"github.com/golang/glog"
+)
+
 // FakeMounter implements mount.Interface for tests.
 type FakeMounter struct {
 	MountPoints []MountPoint
 	Log         []FakeAction
+	// Some tests run things in parallel, make sure the mounter does not produce
+	// any golang's DATA RACE warnings.
+	mutex sync.Mutex
 }
 
 var _ Interface = &FakeMounter{}
@@ -37,21 +46,58 @@ type FakeAction struct {
 }
 
 func (f *FakeMounter) ResetLog() {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	f.Log = []FakeAction{}
 }
 
 func (f *FakeMounter) Mount(source string, target string, fstype string, options []string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	// find 'bind' option
+	for _, option := range options {
+		if option == "bind" {
+			// This is a bind-mount. In order to mimic linux behaviour, we must
+			// use the original device of the bind-mount as the real source.
+			// E.g. when mounted /dev/sda like this:
+			//      $ mount /dev/sda /mnt/test
+			//      $ mount -o bind /mnt/test /mnt/bound
+			// then /proc/mount contains:
+			// /dev/sda /mnt/test
+			// /dev/sda /mnt/bound
+			// (and not /mnt/test /mnt/bound)
+			// I.e. we must use /dev/sda as source instead of /mnt/test in the
+			// bind mount.
+			for _, mnt := range f.MountPoints {
+				if source == mnt.Path {
+					source = mnt.Device
+					break
+				}
+			}
+			break
+		}
+	}
+
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: target, Type: fstype})
+	glog.V(5).Infof("Fake mounter: mouted %s to %s", source, target)
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})
 	return nil
 }
 
 func (f *FakeMounter) Unmount(target string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
-		if mp.Path != target {
-			newMountpoints = append(newMountpoints, MountPoint{Device: mp.Device, Path: mp.Path, Type: mp.Type})
+		if mp.Path == target {
+			glog.V(5).Infof("Fake mounter: unmouted %s from %s", mp.Device, target)
+			// Don't copy it to newMountpoints
+			continue
 		}
+		newMountpoints = append(newMountpoints, MountPoint{Device: mp.Device, Path: mp.Path, Type: mp.Type})
 	}
 	f.MountPoints = newMountpoints
 	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: target})
@@ -59,14 +105,22 @@ func (f *FakeMounter) Unmount(target string) error {
 }
 
 func (f *FakeMounter) List() ([]MountPoint, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	return f.MountPoints, nil
 }
 
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	for _, mp := range f.MountPoints {
 		if mp.Path == file {
+			glog.V(5).Infof("isLikelyMountPoint for %s: monted %s, false", file, mp.Path)
 			return false, nil
 		}
 	}
+	glog.V(5).Infof("isLikelyMountPoint for %s: true", file)
 	return true, nil
 }

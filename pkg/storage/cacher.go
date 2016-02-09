@@ -26,10 +26,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -115,7 +116,7 @@ func NewCacher(
 	versioner Versioner,
 	objectType runtime.Object,
 	resourcePrefix string,
-	namespaceScoped bool,
+	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object) Interface {
 	config := CacherConfig{
 		CacheCapacity:  capacity,
@@ -125,7 +126,7 @@ func NewCacher(
 		ResourcePrefix: resourcePrefix,
 		NewListFunc:    newListFunc,
 	}
-	if namespaceScoped {
+	if scopeStrategy.NamespaceScoped() {
 		config.KeyFunc = func(obj runtime.Object) (string, error) {
 			return NamespaceKeyFunc(resourcePrefix, obj)
 		}
@@ -155,7 +156,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		keyFunc:    config.KeyFunc,
 		stopped:    false,
 		// We need to (potentially) stop both:
-		// - util.Until go-routine
+		// - wait.Until go-routine
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
@@ -170,7 +171,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	stopCh := cacher.stopCh
 	cacher.stopWg.Add(1)
 	go func() {
-		util.Until(
+		wait.Until(
 			func() {
 				if !cacher.isStopped() {
 					cacher.startCaching(stopCh)
@@ -312,7 +313,10 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 	}
 	filterFunc := filterFunction(key, c.keyFunc, filter)
 
-	objs, readResourceVersion := c.watchCache.WaitUntilFreshAndList(listRV)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV)
+	if err != nil {
+		return fmt.Errorf("failed to wait for fresh list: %v", err)
+	}
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {

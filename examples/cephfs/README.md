@@ -45,6 +45,7 @@ Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
 Once you have installed Ceph and a Kubernetes cluster, you can create a pod based on my examples [cephfs.yaml](cephfs.yaml)  and [cephfs-with-secret.yaml](cephfs-with-secret.yaml). In the pod yaml, you need to provide the following information.
 
 - *monitors*:  Array of Ceph monitors.
+- *path*: Used as the mounted root, rather than the full Ceph tree. If not provided, default */* is used.
 - *user*: The RADOS user name. If not provided, default *admin* is used.
 - *secretFile*: The path to the keyring file. If not provided, default */etc/ceph/user.secret* is used.
 - *secretRef*: Reference to Ceph authentication secrets. If provided, *secret* overrides *secretFile*.

@@ -47,8 +47,80 @@ We still have [a bunch of work](http://issue.k8s.io/8262) to do to make the expe
 
 - Note that for rkt version later than v0.7.0, `metadata service` is not required for running pods in private networks. So now rkt pods will not register the metadata service be default.
 
-- Since release [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5), [rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md)
-  is required to be running on the machine.
+- Since release [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5),
+the [rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md)
+must be running on the node.
+
+### Network Setup
+
+rkt uses the [Container Network Interface (CNI)](https://github.com/appc/cni)
+to manage container networking. By default, all pods attempt to join a network
+called `rkt.kubernetes.io`, which is currently defined [in `rkt.go`]
+(https://github.com/kubernetes/kubernetes/blob/v1.2.0-alpha.6/pkg/kubelet/rkt/rkt.go#L91).
+In order for pods to get correct IP addresses, the CNI config file must be
+edited to add this `rkt.kubernetes.io` network:
+
+#### Using flannel
+
+In addition to the basic prerequisites above, each node must be running
+a [flannel](https://github.com/coreos/flannel) daemon. This implies
+that a flannel-supporting etcd service must be available to the cluster
+as well, apart from the Kubernetes etcd, which will not yet be
+available at flannel configuration time. Once it's running, flannel can
+be set up with a CNI config like:
+
+```console
+$ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
+{
+    "name": "rkt.kubernetes.io",
+    "type": "flannel"
+}
+EOF
+```
+
+While `k8s_cluster.conf` is a rather arbitrary name for the config file itself,
+and can be adjusted to suit local conventions, the keys and values should be exactly
+as shown above. `name` must be `rkt.kubernetes.io` and `type` should be `flannel`.
+More details about the flannel CNI plugin can be found
+[in the CNI documentation](https://github.com/appc/cni/blob/master/Documentation/flannel.md).
+
+#### On GCE
+
+Each VM on GCE has an additional 256 IP addresses routed to it, so
+it is possible to forego flannel in smaller clusters. This makes the
+necessary CNI config file a bit more verbose:
+
+```console
+$ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
+{
+    "name": "rkt.kubernetes.io",
+    "type": "bridge",
+    "bridge": "cbr0",
+    "isGateway": true,
+    "ipam": {
+        "type": "host-local",
+        "subnet": "10.255.228.1/24",
+        "gateway": "10.255.228.1"
+    },
+    "routes": [
+      { "dst": "0.0.0.0/0" }
+    ]
+}
+EOF
+```
+
+This example creates a `bridge` plugin configuration for the CNI network, specifying
+the bridge name `cbr0`. It also specifies the CIDR, in the `ipam` field.
+
+Creating these files for any moderately-sized cluster is at best inconvenient.
+Work is in progress to
+[enable Kubernetes to use the CNI by default]
+(https://github.com/kubernetes/kubernetes/pull/18795/files).
+As that work matures, such manual CNI config munging will become unnecessary
+for primary use cases. For early adopters, an initial example shows one way to
+[automatically generate these CNI configurations]
+(https://gist.github.com/yifan-gu/fbb911db83d785915543)
+for rkt.
 
 ### Local cluster
 
@@ -86,13 +158,13 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 
 ```console
-$ export KUBE_RKT_VERSION=0.8.0
+$ export KUBE_RKT_VERSION=0.15.0
 ```
 
 Then you can launch the cluster by:
 
 ```console
-$ kube-up.sh
+$ cluster/kube-up.sh
 ```
 
 Note that we are still working on making all containerized the master components run smoothly in rkt. Before that we are not able to run the master node with rkt yet.

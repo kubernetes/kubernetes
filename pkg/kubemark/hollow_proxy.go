@@ -26,6 +26,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 
 	"github.com/golang/glog"
@@ -59,7 +60,7 @@ func NewHollowProxyOrDie(
 ) *HollowProxy {
 	// Create and start Hollow Proxy
 	config := options.NewProxyConfig()
-	config.OOMScoreAdj = 0
+	config.OOMScoreAdj = util.IntPtr(0)
 	config.ResourceContainer = ""
 	config.NodeRef = &api.ObjectReference{
 		Kind:      "Node",
@@ -74,7 +75,7 @@ func NewHollowProxyOrDie(
 		endpointsConfig.Channel("api"),
 	)
 
-	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil)
+	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
 	if err != nil {
 		glog.Fatalf("Error while creating ProxyServer: %v\n", err)
 	}

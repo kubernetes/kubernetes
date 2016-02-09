@@ -290,7 +290,7 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 	} else if field.IsMessage() || p.IsGroup(field) {
 		funcCall := getFuncCall(goTypName)
 		if field.IsRepeated() {
-			p.P(p.varGen.Next(), ` := r.Intn(10)`)
+			p.P(p.varGen.Next(), ` := r.Intn(5)`)
 			p.P(`this.`, fieldname, ` = make(`, goTyp, `, `, p.varGen.Current(), `)`)
 			p.P(`for i := 0; i < `, p.varGen.Current(), `; i++ {`)
 			p.In()
@@ -346,7 +346,7 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 			}
 		} else if field.IsBytes() {
 			if field.IsRepeated() {
-				p.P(p.varGen.Next(), ` := r.Intn(100)`)
+				p.P(p.varGen.Next(), ` := r.Intn(10)`)
 				p.P(`this.`, fieldname, ` = make(`, goTyp, `, `, p.varGen.Current(), `)`)
 				p.P(`for i := 0; i < `, p.varGen.Current(), `; i++ {`)
 				p.In()
@@ -387,7 +387,7 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 		} else {
 			typName := generator.GoTypeToName(goTyp)
 			if field.IsRepeated() {
-				p.P(p.varGen.Next(), ` := r.Intn(100)`)
+				p.P(p.varGen.Next(), ` := r.Intn(10)`)
 				p.P(`this.`, fieldname, ` = make(`, goTyp, `, `, p.varGen.Current(), `)`)
 				p.P(`for i := 0; i < `, p.varGen.Current(), `; i++ {`)
 				p.In()

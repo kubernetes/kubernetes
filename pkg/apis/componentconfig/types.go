@@ -21,41 +21,56 @@ import "k8s.io/kubernetes/pkg/api/unversioned"
 type KubeProxyConfiguration struct {
 	unversioned.TypeMeta
 
-	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)
+	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
+	// for all interfaces)
 	BindAddress string `json:"bindAddress"`
-	// cleanupIPTables
-	CleanupIPTables bool `json:"cleanupIPTables"`
-	// healthzBindAddress is the IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
+	// healthzBindAddress is the IP address for the health check server to serve on,
+	// defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
 	HealthzBindAddress string `json:"healthzBindAddress"`
 	// healthzPort is the port to bind the health check server. Use 0 to disable.
 	HealthzPort int `json:"healthzPort"`
 	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
-	// iptablesSyncPeriodSeconds is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.
-	IPTablesSyncePeriodSeconds int `json:"iptablesSyncPeriodSeconds"`
-	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver
-	KubeAPIBurst int `json:"kubeAPIBurst"`
-	// kubeAPIQPS is the max QPS to use while talking with kubernetes apiserver
-	KubeAPIQPS int `json:"kubeAPIQPS"`
-	// kubeconfigPath is the path to the kubeconfig file with authorization information (the master location is set by the master flag).
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
+	// the pure iptables proxy mode. Values must be within the range [0, 31].
+	IPTablesMasqueradeBit *int `json:"iptablesMasqueradeBit"`
+	// iptablesSyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
+	// '2h22m').  Must be greater than 0.
+	IPTablesSyncPeriod unversioned.Duration `json:"iptablesSyncPeriodSeconds"`
+	// kubeconfigPath is the path to the kubeconfig file with authorization information (the
+	// master location is set by the master flag).
 	KubeconfigPath string `json:"kubeconfigPath"`
 	// masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
 	MasqueradeAll bool `json:"masqueradeAll"`
 	// master is the address of the Kubernetes API server (overrides any value in kubeconfig)
 	Master string `json:"master"`
-	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]
+	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
+	// the range [-1000, 1000]
 	OOMScoreAdj *int `json:"oomScoreAdj"`
 	// mode specifies which proxy mode to use.
 	Mode ProxyMode `json:"mode"`
-	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
+	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
+	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string `json:"portRange"`
-	// resourceContainer is the bsolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).
+	// resourceContainer is the bsolute name of the resource-only container to create and run
+	// the Kube-proxy in (Default: /kube-proxy).
 	ResourceContainer string `json:"resourceContainer"`
-	// udpTimeoutMilliseconds is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxyMode=userspace.
-	UDPTimeoutMilliseconds int `json:"udpTimeoutMilliseconds"`
+	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
+	// Must be greater than 0. Only applicable for proxyMode=userspace.
+	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
+	// conntrackMax is the maximum number of NAT connections to track (0 to leave as-is)")
+	ConntrackMax int `json:"conntrackMax"`
+	// conntrackTCPEstablishedTimeout is how long an idle UDP connection will be kept open
+	// (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxyMode is Userspace
+	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
 }
 
-// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables' (experimental). If blank, look at the Node object on the Kubernetes API and respect the 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the best-available proxy (currently userspace, but may change in future versions).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.
+// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
+// (newer, faster). If blank, look at the Node object on the Kubernetes API and respect the
+// 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
+// best-available proxy (currently iptables, but may change in future versions).  If the
+// iptables proxy is selected, regardless of how, but the system's kernel or iptables
+// versions are insufficient, this always falls back to the userspace proxy.
 type ProxyMode string
 
 const (
@@ -193,6 +208,8 @@ type KubeletConfiguration struct {
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
 	LowDiskSpaceThresholdMB int `json:"lowDiskSpaceThresholdMB"`
+	// How frequently to calculate and cache volume disk usage for all pods
+	VolumeStatsAggPeriod unversioned.Duration `json:volumeStatsAggPeriod`
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
@@ -276,6 +293,33 @@ type KubeletConfiguration struct {
 	NodeLabels map[string]string `json:"nodeLabels"`
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
+	// enable gathering custom metrics.
+	EnableCustomMetrics bool `json:"enableCustomMetrics"`
+}
+
+type KubeSchedulerConfiguration struct {
+	unversioned.TypeMeta
+
+	// port is the port that the scheduler's http service runs on.
+	Port int `json:"port"`
+	// address is the IP address to serve on.
+	Address string `json:"address"`
+	// algorithmProvider is the scheduling algorithm provider to use.
+	AlgorithmProvider string `json:"algorithmProvider"`
+	// policyConfigFile is the filepath to the scheduler policy configuration.
+	PolicyConfigFile string `json:"policyConfigFile"`
+	// enableProfiling enables profiling via web interface.
+	EnableProfiling bool `json:"enableProfiling"`
+	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
+	KubeAPIQPS float32 `json:"kubeAPIQPS"`
+	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
+	KubeAPIBurst int `json:"kubeAPIBurst"`
+	// schedulerName is name of the scheduler, used to select which pods
+	// will be processed by this scheduler, based on pod's annotation with
+	// key 'scheduler.alpha.kubernetes.io/name'.
+	SchedulerName string `json:"schedulerName"`
+	// leaderElection defines the configuration of leader election client.
+	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

@@ -32,13 +32,13 @@ import (
 	"sync"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -134,6 +135,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	}
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
@@ -169,7 +171,10 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	masterConfig.CacheTimeout = 2 * time.Second
 
 	// Create a master and install handlers into mux.
-	m := master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		glog.Fatalf("Error in bringing up the master: %v", err)
+	}
 	handler.delegate = m.Handler
 
 	// Scheduler
@@ -185,14 +190,14 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	scheduler.New(schedulerConfig).Run()
 
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
-	go endpointcontroller.NewEndpointController(cl, controller.NoResyncPeriodFunc).
-		Run(3, util.NeverStop)
+	go endpointcontroller.NewEndpointController(clientset, controller.NoResyncPeriodFunc).
+		Run(3, wait.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	go replicationcontroller.NewReplicationManager(cl, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
-		Run(3, util.NeverStop)
+	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
+		Run(3, wait.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
@@ -201,10 +206,9 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
 	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.20"}
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker1,
 		"localhost",
 		testRootDir,
@@ -234,10 +238,9 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// have a place they can schedule.
 	testRootDir = integration.MakeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.20"}
 
 	kcfg = kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker2,
 		"127.0.0.1",
 		testRootDir,
@@ -965,7 +968,7 @@ func main() {
 	addFlags(pflag.CommandLine)
 
 	util.InitFlags()
-	util.ReallyCrash = true
+	utilruntime.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
 
@@ -1042,11 +1045,11 @@ func main() {
 			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 pod infra containers + 2 containers from the replication controller +
+	// We expect 12: 2 pod infra containers + 2 containers from the replication controller +
 	//              1 pod infra container + 2 containers from the URL on first Kubelet +
 	//              1 pod infra container + 2 containers from the URL on second Kubelet +
 	//              1 pod infra container + 1 container from the service test.
-	// The total number of container created is 9
+	// The total number of container created is 12
 
 	if len(createdConts) != 12 {
 		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)

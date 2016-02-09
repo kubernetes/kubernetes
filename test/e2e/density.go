@@ -108,7 +108,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 // So by default it is added to the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = Describe("Density [Skipped]", func() {
+var _ = Describe("Density", func() {
 	var c *client.Client
 	var nodeCount int
 	var RCName string
@@ -190,8 +190,10 @@ var _ = Describe("Density [Skipped]", func() {
 	for _, testArg := range densityTests {
 		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
 		if testArg.podsPerNode == 30 {
-			name = "[Performance] " + name
+			name = "[Feature:Performance] " + name
 			framework.addonResourceConstraints = density30AddonResourceVerifier()
+		} else {
+			name = "[Feature:ManualPerformance] " + name
 		}
 		itArg := testArg
 		It(name, func() {
@@ -459,6 +461,21 @@ var _ = Describe("Density [Skipped]", func() {
 
 				Logf("Approx throughput: %v pods/min",
 					float64(nodeCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
+			}
+
+			By("Deleting ReplicationController and all additional Pods")
+			// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
+			rc, err := c.ReplicationControllers(ns).Get(RCName)
+			if err == nil && rc.Spec.Replicas != 0 {
+				By("Cleaning up the replication controller")
+				err := DeleteRC(c, ns, RCName)
+				expectNoError(err)
+			}
+
+			By("Removing additional pods if any")
+			for i := 1; i <= nodeCount; i++ {
+				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+				c.Pods(ns).Delete(name, nil)
 			}
 		})
 	}

@@ -19,9 +19,13 @@ package componentconfig
 import (
 	"fmt"
 	"net"
+
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-// used for validating command line ip addresses.
+// used for validating command line opts
+// TODO(mikedanese): remove these when we remove command line flags
+
 type IPVar struct {
 	Val *string
 }
@@ -47,4 +51,47 @@ func (v IPVar) String() string {
 
 func (v IPVar) Type() string {
 	return "ip"
+}
+
+func (m *ProxyMode) Set(s string) error {
+	*m = ProxyMode(s)
+	return nil
+}
+
+func (m *ProxyMode) String() string {
+	if m != nil {
+		return string(*m)
+	}
+	return ""
+}
+
+func (m *ProxyMode) Type() string {
+	return "ProxyMode"
+}
+
+type PortRangeVar struct {
+	Val *string
+}
+
+func (v PortRangeVar) Set(s string) error {
+	if _, err := utilnet.ParsePortRange(s); err != nil {
+		return fmt.Errorf("%q is not a valid port range: %v", s, err)
+	}
+	if v.Val == nil {
+		// it's okay to panic here since this is programmer error
+		panic("the string pointer passed into PortRangeVar should not be nil")
+	}
+	*v.Val = s
+	return nil
+}
+
+func (v PortRangeVar) String() string {
+	if v.Val == nil {
+		return ""
+	}
+	return *v.Val
+}
+
+func (v PortRangeVar) Type() string {
+	return "port-range"
 }

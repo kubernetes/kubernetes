@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"path/filepath"
 	"syscall"
@@ -36,10 +37,20 @@ func ResolveRootfs(uncleanRootfs string) (string, error) {
 }
 
 // ExitStatus returns the correct exit status for a process based on if it
-// was signaled or exited cleanly.
+// was signaled or exited cleanly
 func ExitStatus(status syscall.WaitStatus) int {
 	if status.Signaled() {
 		return exitSignalOffset + int(status.Signal())
 	}
 	return status.ExitStatus()
+}
+
+// WriteJSON writes the provided struct v to w using standard json marshaling
+func WriteJSON(w io.Writer, v interface{}) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(data)
+	return err
 }

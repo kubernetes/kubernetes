@@ -374,7 +374,7 @@ func (d *msgpackDecDriver) DecodeNaked() {
 	}
 	if n.v == valueTypeUint && d.h.SignedInteger {
 		n.v = valueTypeInt
-		n.i = int64(n.v)
+		n.i = int64(n.u)
 	}
 	return
 }
@@ -729,6 +729,7 @@ func (e *msgpackEncDriver) reset() {
 
 func (d *msgpackDecDriver) reset() {
 	d.r = d.d.r
+	d.bd, d.bdRead = 0, false
 }
 
 //--------------------------------------------------

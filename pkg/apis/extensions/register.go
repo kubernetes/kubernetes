@@ -51,6 +51,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ClusterAutoscalerList{},
 		&Deployment{},
 		&DeploymentList{},
+		&DeploymentRollback{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&Job{},
@@ -69,6 +70,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&api.ExportOptions{},
+		&PodSecurityPolicy{},
+		&PodSecurityPolicyList{},
 	)
 }
 
@@ -76,6 +79,7 @@ func (obj *ClusterAutoscaler) GetObjectKind() unversioned.ObjectKind           {
 func (obj *ClusterAutoscalerList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
 func (obj *Deployment) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *DeploymentList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *DeploymentRollback) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *HorizontalPodAutoscaler) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *HorizontalPodAutoscalerList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *Job) GetObjectKind() unversioned.ObjectKind                         { return &obj.TypeMeta }
@@ -92,3 +96,5 @@ func (obj *Ingress) GetObjectKind() unversioned.ObjectKind                     {
 func (obj *IngressList) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }

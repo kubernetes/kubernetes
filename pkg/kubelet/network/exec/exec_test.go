@@ -31,10 +31,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func tmpDirOrDie() string {
-	dir, err := ioutil.TempDir(os.TempDir(), "exec-test")
+	dir, err := utiltesting.MkTmpdir("exec-test")
 	if err != nil {
 		panic(fmt.Sprintf("error creating tmp dir: %v", err))
 	}

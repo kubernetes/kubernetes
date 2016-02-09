@@ -35,9 +35,12 @@ package grpc
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"time"
@@ -73,6 +76,71 @@ func (protoCodec) Unmarshal(data []byte, v interface{}) error {
 
 func (protoCodec) String() string {
 	return "proto"
+}
+
+// Compressor defines the interface gRPC uses to compress a message.
+type Compressor interface {
+	// Do compresses p into w.
+	Do(w io.Writer, p []byte) error
+	// Type returns the compression algorithm the Compressor uses.
+	Type() string
+}
+
+// NewGZIPCompressor creates a Compressor based on GZIP.
+func NewGZIPCompressor() Compressor {
+	return &gzipCompressor{}
+}
+
+type gzipCompressor struct {
+}
+
+func (c *gzipCompressor) Do(w io.Writer, p []byte) error {
+	z := gzip.NewWriter(w)
+	if _, err := z.Write(p); err != nil {
+		return err
+	}
+	return z.Close()
+}
+
+func (c *gzipCompressor) Type() string {
+	return "gzip"
+}
+
+// Decompressor defines the interface gRPC uses to decompress a message.
+type Decompressor interface {
+	// Do reads the data from r and uncompress them.
+	Do(r io.Reader) ([]byte, error)
+	// Type returns the compression algorithm the Decompressor uses.
+	Type() string
+}
+
+type gzipDecompressor struct {
+}
+
+// NewGZIPDecompressor creates a Decompressor based on GZIP.
+func NewGZIPDecompressor() Decompressor {
+	return &gzipDecompressor{}
+}
+
+func (d *gzipDecompressor) Do(r io.Reader) ([]byte, error) {
+	z, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	defer z.Close()
+	return ioutil.ReadAll(z)
+}
+
+func (d *gzipDecompressor) Type() string {
+	return "gzip"
+}
+
+// callInfo contains all related configuration and information about an RPC.
+type callInfo struct {
+	failFast  bool
+	headerMD  metadata.MD
+	trailerMD metadata.MD
+	traceInfo traceInfo // in trace.go
 }
 
 // CallOption configures a Call before it starts or extracts information from
@@ -118,8 +186,7 @@ type payloadFormat uint8
 
 const (
 	compressionNone payloadFormat = iota // no compression
-	compressionFlate
-	// More formats
+	compressionMade
 )
 
 // parser reads complelete gRPC messages from the underlying reader.
@@ -127,42 +194,40 @@ type parser struct {
 	s io.Reader
 }
 
-// msgFixedHeader defines the header of a gRPC message (go/grpc-wirefmt).
-type msgFixedHeader struct {
-	T      payloadFormat
-	Length uint32
-}
-
 // recvMsg is to read a complete gRPC message from the stream. It is blocking if
 // the message has not been complete yet. It returns the message and its type,
 // EOF is returned with nil msg and 0 pf if the entire stream is done. Other
 // non-nil error is returned if something is wrong on reading.
 func (p *parser) recvMsg() (pf payloadFormat, msg []byte, err error) {
-	var hdr msgFixedHeader
-	if err := binary.Read(p.s, binary.BigEndian, &hdr); err != nil {
+	// The header of a gRPC message. Find more detail
+	// at http://www.grpc.io/docs/guides/wire.html.
+	var buf [5]byte
+
+	if _, err := io.ReadFull(p.s, buf[:]); err != nil {
 		return 0, nil, err
 	}
-	if hdr.Length == 0 {
-		return hdr.T, nil, nil
+
+	pf = payloadFormat(buf[0])
+	length := binary.BigEndian.Uint32(buf[1:])
+
+	if length == 0 {
+		return pf, nil, nil
 	}
-	msg = make([]byte, int(hdr.Length))
+	msg = make([]byte, int(length))
 	if _, err := io.ReadFull(p.s, msg); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
 		return 0, nil, err
 	}
-	return hdr.T, msg, nil
+	return pf, msg, nil
 }
 
 // encode serializes msg and prepends the message header. If msg is nil, it
 // generates the message header of 0 message length.
-func encode(c Codec, msg interface{}, pf payloadFormat) ([]byte, error) {
-	var buf bytes.Buffer
-	// Write message fixed header.
-	buf.WriteByte(uint8(pf))
+func encode(c Codec, msg interface{}, cp Compressor, cbuf *bytes.Buffer) ([]byte, error) {
 	var b []byte
-	var length uint32
+	var length uint
 	if msg != nil {
 		var err error
 		// TODO(zhaoq): optimize to reduce memory alloc and copying.
@@ -170,27 +235,71 @@ func encode(c Codec, msg interface{}, pf payloadFormat) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		length = uint32(len(b))
+		if cp != nil {
+			if err := cp.Do(cbuf, b); err != nil {
+				return nil, err
+			}
+			b = cbuf.Bytes()
+		}
+		length = uint(len(b))
 	}
-	var szHdr [4]byte
-	binary.BigEndian.PutUint32(szHdr[:], length)
-	buf.Write(szHdr[:])
-	buf.Write(b)
-	return buf.Bytes(), nil
+	if length > math.MaxUint32 {
+		return nil, Errorf(codes.InvalidArgument, "grpc: message too large (%d bytes)", length)
+	}
+
+	const (
+		payloadLen = 1
+		sizeLen    = 4
+	)
+
+	var buf = make([]byte, payloadLen+sizeLen+len(b))
+
+	// Write payload format
+	if cp == nil {
+		buf[0] = byte(compressionNone)
+	} else {
+		buf[0] = byte(compressionMade)
+	}
+	// Write length of b into buf
+	binary.BigEndian.PutUint32(buf[1:], uint32(length))
+	// Copy encoded msg to buf
+	copy(buf[5:], b)
+
+	return buf, nil
 }
 
-func recv(p *parser, c Codec, m interface{}) error {
+func checkRecvPayload(pf payloadFormat, recvCompress string, dc Decompressor) error {
+	switch pf {
+	case compressionNone:
+	case compressionMade:
+		if recvCompress == "" {
+			return transport.StreamErrorf(codes.InvalidArgument, "grpc: received unexpected payload format %d", pf)
+		}
+		if dc == nil || recvCompress != dc.Type() {
+			return transport.StreamErrorf(codes.InvalidArgument, "grpc: Decompressor is not installed for grpc-encoding %q", recvCompress)
+		}
+	default:
+		return transport.StreamErrorf(codes.InvalidArgument, "grpc: received unexpected payload format %d", pf)
+	}
+	return nil
+}
+
+func recv(p *parser, c Codec, s *transport.Stream, dc Decompressor, m interface{}) error {
 	pf, d, err := p.recvMsg()
 	if err != nil {
 		return err
 	}
-	switch pf {
-	case compressionNone:
-		if err := c.Unmarshal(d, m); err != nil {
-			return Errorf(codes.Internal, "grpc: %v", err)
+	if err := checkRecvPayload(pf, s.RecvCompress(), dc); err != nil {
+		return err
+	}
+	if pf == compressionMade {
+		d, err = dc.Do(bytes.NewReader(d))
+		if err != nil {
+			return transport.StreamErrorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
 		}
-	default:
-		return Errorf(codes.Internal, "gprc: compression is not supported yet.")
+	}
+	if err := c.Unmarshal(d, m); err != nil {
+		return transport.StreamErrorf(codes.Internal, "grpc: failed to unmarshal the received message %v", err)
 	}
 	return nil
 }
@@ -217,6 +326,18 @@ func Code(err error) codes.Code {
 	return codes.Unknown
 }
 
+// ErrorDesc returns the error description of err if it was produced by the rpc system.
+// Otherwise, it returns err.Error() or empty string when err is nil.
+func ErrorDesc(err error) string {
+	if err == nil {
+		return ""
+	}
+	if e, ok := err.(rpcError); ok {
+		return e.desc
+	}
+	return err.Error()
+}
+
 // Errorf returns an error containing an error code and a description;
 // Errorf returns nil if c is OK.
 func Errorf(c codes.Code, format string, a ...interface{}) error {
@@ -232,6 +353,8 @@ func Errorf(c codes.Code, format string, a ...interface{}) error {
 // toRPCErr converts an error into a rpcError.
 func toRPCErr(err error) error {
 	switch e := err.(type) {
+	case rpcError:
+		return err
 	case transport.StreamError:
 		return rpcError{
 			code: e.Code,

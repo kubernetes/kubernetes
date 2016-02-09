@@ -59,7 +59,7 @@ func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
 // doesn't already exist.
 func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, servicePort int) error {
 	ctx := api.NewDefaultContext()
-	if _, err := m.client.Services(api.NamespaceValue(ctx)).Get(serviceName); err == nil {
+	if _, err := m.client.Core().Services(api.NamespaceValue(ctx)).Get(serviceName); err == nil {
 		// The service already exists.
 		return nil
 	}
@@ -79,7 +79,7 @@ func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, ser
 	if m.serviceAddress != nil {
 		svc.Spec.ClusterIP = m.serviceAddress.String()
 	}
-	_, err := m.client.Services(api.NamespaceValue(ctx)).Create(svc)
+	_, err := m.client.Core().Services(api.NamespaceValue(ctx)).Create(svc)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}

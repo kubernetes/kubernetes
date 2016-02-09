@@ -33,20 +33,20 @@ type mockVolumes struct {
 
 var _ aws.Volumes = &mockVolumes{}
 
-func (v *mockVolumes) AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error) {
+func (v *mockVolumes) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DetachDisk(instanceName string, volumeName string) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) CreateVolume(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
+func (v *mockVolumes) DetachDisk(diskName string, instanceName string) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DeleteVolume(volumeName string) error {
-	return fmt.Errorf("not implemented")
+func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (v *mockVolumes) DeleteDisk(volumeName string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
 }
 
 func (v *mockVolumes) GetVolumeLabels(volumeName string) (map[string]string, error) {

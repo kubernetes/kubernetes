@@ -354,7 +354,7 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*client.Config, err
 		if err == nil {
 			return kubeconfig, nil
 		}
-		glog.Warning("error creating inClusterConfig, falling back to default config: %v", err)
+		glog.Warning("error creating inClusterConfig, falling back to default config: ", err)
 	}
 
 	return NewNonInteractiveDeferredLoadingClientConfig(

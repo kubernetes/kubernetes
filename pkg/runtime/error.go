@@ -17,31 +17,86 @@ limitations under the License.
 package runtime
 
 import (
-	"k8s.io/kubernetes/pkg/conversion"
+	"fmt"
+	"reflect"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
+
+type notRegisteredErr struct {
+	gvk unversioned.GroupVersionKind
+	t   reflect.Type
+}
+
+// NewNotRegisteredErr is exposed for testing.
+func NewNotRegisteredErr(gvk unversioned.GroupVersionKind, t reflect.Type) error {
+	return &notRegisteredErr{gvk: gvk, t: t}
+}
+
+func (k *notRegisteredErr) Error() string {
+	if k.t != nil {
+		return fmt.Sprintf("no kind is registered for the type %v", k.t)
+	}
+	if len(k.gvk.Kind) == 0 {
+		return fmt.Sprintf("no version %q has been registered", k.gvk.GroupVersion())
+	}
+	if k.gvk.Version == APIVersionInternal {
+		return fmt.Sprintf("no kind %q is registered for the internal version of group %q", k.gvk.Kind, k.gvk.Group)
+	}
+
+	return fmt.Sprintf("no kind %q is registered for version %q", k.gvk.Kind, k.gvk.GroupVersion())
+}
 
 // IsNotRegisteredError returns true if the error indicates the provided
 // object or input data is not registered.
 func IsNotRegisteredError(err error) bool {
-	return conversion.IsNotRegisteredError(err)
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*notRegisteredErr)
+	return ok
+}
+
+type missingKindErr struct {
+	data string
+}
+
+func NewMissingKindErr(data string) error {
+	return &missingKindErr{data}
+}
+
+func (k *missingKindErr) Error() string {
+	return fmt.Sprintf("Object 'Kind' is missing in '%s'", k.data)
 }
 
 // IsMissingKind returns true if the error indicates that the provided object
 // is missing a 'Kind' field.
 func IsMissingKind(err error) bool {
-	return conversion.IsMissingKind(err)
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*missingKindErr)
+	return ok
+}
+
+type missingVersionErr struct {
+	data string
 }
 
 // IsMissingVersion returns true if the error indicates that the provided object
 // is missing a 'Versioj' field.
-func IsMissingVersion(err error) bool {
-	return conversion.IsMissingVersion(err)
-}
-
-func NewMissingKindErr(data string) error {
-	return conversion.NewMissingKindErr(data)
-}
-
 func NewMissingVersionErr(data string) error {
-	return conversion.NewMissingVersionErr(data)
+	return &missingVersionErr{data}
+}
+
+func (k *missingVersionErr) Error() string {
+	return fmt.Sprintf("Object 'apiVersion' is missing in '%s'", k.data)
+}
+
+func IsMissingVersion(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*missingVersionErr)
+	return ok
 }

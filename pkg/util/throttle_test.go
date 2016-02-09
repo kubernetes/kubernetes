@@ -18,6 +18,7 @@ package util
 
 import (
 	"math"
+	"sync"
 	"testing"
 	"time"
 )
@@ -85,5 +86,42 @@ func TestRateLimiterSaturation(t *testing.T) {
 			t.Fatalf("#%d: Saturation rate difference isn't within tolerable range\n want=%f, get=%f",
 				i, tt.expectedSaturation, rl.Saturation())
 		}
+	}
+}
+
+func TestAlwaysFake(t *testing.T) {
+	rl := NewFakeAlwaysRateLimiter()
+	if !rl.TryAccept() {
+		t.Error("TryAccept in AlwaysFake should return true.")
+	}
+	// If this will block the test will timeout
+	rl.Accept()
+}
+
+func TestNeverFake(t *testing.T) {
+	rl := NewFakeNeverRateLimiter()
+	if rl.TryAccept() {
+		t.Error("TryAccept in NeverFake should return false.")
+	}
+
+	finished := false
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		rl.Accept()
+		finished = true
+		wg.Done()
+	}()
+
+	// Wait some time to make sure it never finished.
+	time.Sleep(time.Second)
+	if finished {
+		t.Error("Accept should block forever in NeverFake.")
+	}
+
+	rl.Stop()
+	wg.Wait()
+	if !finished {
+		t.Error("Stop should make Accept unblock in NeverFake.")
 	}
 }

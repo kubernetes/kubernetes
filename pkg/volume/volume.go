@@ -18,11 +18,11 @@ package volume
 
 import (
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-
 	"os"
 	"path"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // Volume represents a directory used by pods or hosts on a node.
@@ -81,7 +81,7 @@ type Builder interface {
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, sGroup *int64) error
+	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the builder.
 	GetAttributes() Attributes
 }

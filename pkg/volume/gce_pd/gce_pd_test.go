@@ -18,21 +18,21 @@ package gce_pd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -124,7 +124,7 @@ func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -273,9 +273,9 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 	}
 
-	client := testclient.NewSimpleFake(pv, claim)
+	client := fake.NewSimpleClientset(pv, claim)
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

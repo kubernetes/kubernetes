@@ -51,7 +51,11 @@ while true; do
   if [[ $loadedImageFlags == 7 ]]; then break; fi
 
   # Sometimes docker load hang, restart docker daemon resolve the issue
-  if [[ $restart_docker ]]; then service docker restart; fi
+  if [[ $restart_docker ]]; then
+    if ! service docker restart; then # Try systemctl if there's no service command.
+      systemctl restart docker      
+    fi
+  fi
 
   # sleep for 15 seconds before attempting to load docker images again
   sleep 15

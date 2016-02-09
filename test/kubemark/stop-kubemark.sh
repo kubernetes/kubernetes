@@ -43,3 +43,4 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
 fi
 
 rm -rf "${KUBE_ROOT}/test/kubemark/kubeconfig.loc" &> /dev/null || true
+rm "ca.crt" "kubecfg.crt" "kubecfg.key" "${KUBE_ROOT}/test/kubemark/hollow-node.json" &> /dev/null || true

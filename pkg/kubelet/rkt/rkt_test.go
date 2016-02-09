@@ -19,6 +19,7 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -60,7 +62,7 @@ func makeRktPod(rktPodState rktapi.PodState,
 	rktPodID, podUID, podName, podNamespace,
 	podIP, podCreationTs, podRestartCount string,
 	appNames, imgIDs, imgNames, containerHashes []string,
-	appStates []rktapi.AppState) *rktapi.Pod {
+	appStates []rktapi.AppState, exitcodes []int32) *rktapi.Pod {
 
 	podManifest := &appcschema.PodManifest{
 		ACKind:    appcschema.PodManifestKind,
@@ -123,6 +125,7 @@ func makeRktPod(rktPodState rktapi.PodState,
 					},
 				),
 			},
+			ExitCode: exitcodes[i],
 		}
 		podManifest.Apps = append(podManifest.Apps, appcschema.RuntimeApp{
 			Name:  *appctypes.MustACName(appNames[i]),
@@ -297,21 +300,25 @@ func TestListImages(t *testing.T) {
 					Id:      "sha512-a2fb8f390702",
 					Name:    "quay.io/coreos/alpine-sh",
 					Version: "latest",
+					Size:    400,
 				},
 				{
 					Id:      "sha512-c6b597f42816",
 					Name:    "coreos.com/rkt/stage1-coreos",
 					Version: "0.10.0",
+					Size:    400,
 				},
 			},
 			[]kubecontainer.Image{
 				{
 					ID:       "sha512-a2fb8f390702",
 					RepoTags: []string{"quay.io/coreos/alpine-sh:latest"},
+					Size:     400,
 				},
 				{
 					ID:       "sha512-c6b597f42816",
 					RepoTags: []string{"coreos.com/rkt/stage1-coreos:0.10.0"},
+					Size:     400,
 				},
 			},
 		},
@@ -353,6 +360,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			[]*kubecontainer.Pod{
@@ -392,6 +400,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4003", "43", "guestbook", "default",
@@ -401,6 +410,7 @@ func TestGetPods(t *testing.T) {
 					[]string{"img-name-11", "img-name-22"},
 					[]string{"10011", "10022"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			[]*kubecontainer.Pod{
@@ -540,6 +550,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 			},
 			&kubecontainer.PodStatus{
@@ -569,6 +580,7 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
+						Reason:       "Completed",
 					},
 				},
 			},
@@ -584,6 +596,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 0},
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING, // The latest pod is running.
 					"uuid-4003", "42", "guestbook", "default",
@@ -593,6 +606,7 @@ func TestGetPodStatus(t *testing.T) {
 					[]string{"img-name-1", "img-name-2"},
 					[]string{"1001", "1002"},
 					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+					[]int32{0, 1},
 				),
 			},
 			&kubecontainer.PodStatus{
@@ -623,6 +637,7 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
+						Reason:       "Completed",
 					},
 					{
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-1"),
@@ -645,6 +660,8 @@ func TestGetPodStatus(t *testing.T) {
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 10,
+						ExitCode:     1,
+						Reason:       "Error",
 					},
 				},
 			},
@@ -701,8 +718,6 @@ func generateMemoryIsolator(t *testing.T, request, limit string) appctypes.Isola
 func baseApp(t *testing.T) *appctypes.App {
 	return &appctypes.App{
 		Exec:              appctypes.Exec{"/bin/foo"},
-		User:              "0",
-		Group:             "22",
 		SupplementaryGIDs: []int{4, 5, 6},
 		WorkingDirectory:  "/foo",
 		Environment: []appctypes.EnvironmentVariable{
@@ -721,6 +736,12 @@ func baseApp(t *testing.T) *appctypes.App {
 			generateMemoryIsolator(t, "10M", "20M"),
 		},
 	}
+}
+
+func baseAppWithRootUserGroup(t *testing.T) *appctypes.App {
+	app := baseApp(t)
+	app.User, app.Group = "0", "0"
+	return app
 }
 
 type envByName []appctypes.EnvironmentVariable
@@ -755,6 +776,12 @@ func sortAppFields(app *appctypes.App) {
 }
 
 func TestSetApp(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rkt_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	rootUser := int64(0)
 	nonRootUser := int64(42)
 	runAsNonRootTrue := true
@@ -768,13 +795,13 @@ func TestSetApp(t *testing.T) {
 		expect    *appctypes.App
 		err       error
 	}{
-		// Nothing should change.
+		// Nothing should change, but the "User" and "Group" should be filled.
 		{
 			container: &api.Container{},
 			opts:      &kubecontainer.RunContainerOptions{},
 			ctx:       nil,
 			podCtx:    nil,
-			expect:    baseApp(t),
+			expect:    baseAppWithRootUserGroup(t),
 			err:       nil,
 		},
 
@@ -796,7 +823,7 @@ func TestSetApp(t *testing.T) {
 			container: &api.Container{
 				Command:    []string{"/bin/bar"},
 				Args:       []string{"hello", "world"},
-				WorkingDir: "/tmp",
+				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
 					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
 					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
@@ -828,9 +855,9 @@ func TestSetApp(t *testing.T) {
 			expect: &appctypes.App{
 				Exec:              appctypes.Exec{"/bin/bar", "hello", "world"},
 				User:              "42",
-				Group:             "22",
+				Group:             "0",
 				SupplementaryGIDs: []int{1, 2, 3},
-				WorkingDirectory:  "/tmp",
+				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
 					{"env-foo", "bar"},
 					{"env-bar", "foo"},
@@ -855,17 +882,19 @@ func TestSetApp(t *testing.T) {
 		// app should be changed. (env, mounts, ports, are overrided).
 		{
 			container: &api.Container{
-				Command:    []string{"/bin/bar"},
-				Args:       []string{"hello", "world"},
-				WorkingDir: "/tmp",
+				Name:       "hello-world",
+				Command:    []string{"/bin/bar", "$(env-foo)"},
+				Args:       []string{"hello", "world", "$(env-bar)"},
+				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
-					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+					Limits:   api.ResourceList{"cpu": resource.MustParse("50m")},
+					Requests: api.ResourceList{"memory": resource.MustParse("5M")},
 				},
 			},
 			opts: &kubecontainer.RunContainerOptions{
 				Envs: []kubecontainer.EnvVar{
 					{Name: "env-foo", Value: "foo"},
+					{Name: "env-bar", Value: "bar"},
 				},
 				Mounts: []kubecontainer.Mount{
 					{Name: "mnt-foo", ContainerPath: "/mnt-bar", ReadOnly: true},
@@ -887,13 +916,14 @@ func TestSetApp(t *testing.T) {
 				FSGroup:            &fsgid,
 			},
 			expect: &appctypes.App{
-				Exec:              appctypes.Exec{"/bin/bar", "hello", "world"},
+				Exec:              appctypes.Exec{"/bin/bar", "foo", "hello", "world", "bar"},
 				User:              "42",
-				Group:             "22",
+				Group:             "0",
 				SupplementaryGIDs: []int{1, 2, 3},
-				WorkingDirectory:  "/tmp",
+				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
 					{"env-foo", "foo"},
+					{"env-bar", "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-bar", ReadOnly: true},
@@ -904,8 +934,8 @@ func TestSetApp(t *testing.T) {
 				Isolators: []appctypes.Isolator{
 					generateCapRetainIsolator(t, "CAP_SYS_CHROOT", "CAP_SYS_BOOT"),
 					generateCapRevokeIsolator(t, "CAP_SETUID", "CAP_SETGID"),
-					generateCPUIsolator(t, "5m", "50m"),
-					generateMemoryIsolator(t, "5M", "50M"),
+					generateCPUIsolator(t, "50m", "50m"),
+					generateMemoryIsolator(t, "5M", "5M"),
 				},
 			},
 		},
@@ -923,5 +953,104 @@ func TestSetApp(t *testing.T) {
 			sortAppFields(app)
 			assert.Equal(t, tt.expect, app, testCaseHint)
 		}
+	}
+}
+
+func TestGenerateRunCommand(t *testing.T) {
+	tests := []struct {
+		pod  *api.Pod
+		uuid string
+
+		dnsServers  []string
+		dnsSearches []string
+		err         error
+
+		expect string
+	}{
+		// Case #0, returns error.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{},
+			},
+			"rkt-uuid-foo",
+			[]string{},
+			[]string{},
+			fmt.Errorf("failed to get cluster dns"),
+			"",
+		},
+		// Case #1, returns no dns, with private-net.
+		{
+			&api.Pod{},
+			"rkt-uuid-foo",
+			[]string{},
+			[]string{},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io rkt-uuid-foo",
+		},
+		// Case #2, returns no dns, with host-net.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: true,
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			[]string{},
+			[]string{},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host rkt-uuid-foo",
+		},
+		// Case #3, returns dns, dns searches, with private-net.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: false,
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			[]string{"127.0.0.1"},
+			[]string{"."},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 rkt-uuid-foo",
+		},
+		// Case #4, returns dns, dns searches, with host-network.
+		{
+			&api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: true,
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			[]string{"127.0.0.1"},
+			[]string{"."},
+			nil,
+			"/bin/rkt/rkt --debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 rkt-uuid-foo",
+		},
+	}
+
+	rkt := &Runtime{
+		rktBinAbsPath: "/bin/rkt/rkt",
+		config: &Config{
+			Path:            "/bin/rkt/rkt",
+			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
+			Dir:             "/var/data",
+			InsecureOptions: "image,ondisk",
+			LocalConfigDir:  "/var/rkt/local/data",
+		},
+	}
+
+	for i, tt := range tests {
+		testCaseHint := fmt.Sprintf("test case #%d", i)
+		rkt.runtimeHelper = &fakeRuntimeHelper{tt.dnsServers, tt.dnsSearches, tt.err}
+
+		result, err := rkt.generateRunCommand(tt.pod, tt.uuid)
+		assert.Equal(t, tt.err, err, testCaseHint)
+		assert.Equal(t, tt.expect, result, testCaseHint)
 	}
 }

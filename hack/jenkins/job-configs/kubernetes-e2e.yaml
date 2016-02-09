@@ -20,7 +20,7 @@
         - reverse:
             jobs: '{trigger-job}'
             result: success
-        - timed: 'H/30 * * * *'
+        - timed: '{cron-string}'
     wrappers:
         - ansicolor:
             colormap: xterm
@@ -38,28 +38,22 @@
     suffix:
         - 'gce':
             description: 'Run E2E tests on GCE using the latest successful build.'
-            timeout: 150
+            timeout: 30
+        - 'gce-slow':
+            description: 'Run slow E2E tests on GCE using the latest successful build.'
+            timeout: 60
         - 'gce-autoscaling':
             description: 'Run autoscaling E2E tests on GCE using the latest successful build.'
             timeout: 210
         - 'gce-flaky':
             description: 'Run E2E tests on GCE using the latest successful build. Limit to known-flaky tests.'
             timeout: 180
-        - 'gce-parallel':
-            description: 'Run E2E tests using Ginkgo''s parallel test runner on GCE using the latest successful build.'
-            timeout: 120
         - 'gce-parallel-flaky':
             description: 'Run E2E tests using Ginkgo''s parallel test runner on GCE using the latest successful build. Limit to known-flaky tests.'
             timeout: 90
-        - 'gce-reboot':
-            description: 'Run E2E reboot tests on GCE using the latest successful build. The reboot tests are currently flaky and causing other tests to fail, so we quarantine them into this project and dedicated test cluster.'
-            timeout: 300
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
             timeout: 210
-        - 'gce-slow':
-            description: 'Run slow E2E tests on GCE using the latest successful build.'
-            timeout: 270
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
             timeout: 90
@@ -76,26 +70,12 @@
     branch: 'master'
     emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
     suffix:
-        - 'gke-ci':
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - apiary: staging<br>
-                - borg job: test<br>
-                - client (kubectl): ci/latest.txt<br>
-                - cluster (k8s): ci/latest.txt<br>
-                - tests: ci/latest.txt
-            timeout: 300
-        - 'gke-ci-reboot':
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - apiary: staging<br>
-                - borg job: test<br>
-                - client (kubectl): ci/latest.txt<br>
-                - cluster (k8s): ci/latest.txt<br>
-                - tests: ci/latest.txt
-            timeout: 300
+        - 'gke':
+            description: Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)
+            timeout: 30
+        - 'gke-slow':
+            description: 'Run slow E2E tests on GKE using the latest successful build.'
+            timeout: 60
         - 'gke-flaky':
             description: |
                 Run flaky e2e tests using the following config:<br>
@@ -209,5 +189,43 @@
             timeout: 300
             emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
             test-owner: 'ihmccreery'
+        - 'gce-reboot':
+            description: 'Run [Feature:Reboot] tests on GCE using the latest successful build.'
+            timeout: 120
+            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
+            test-owner: 'ihmccreery'
+        - 'gke-reboot':
+            description: 'Run [Feature:Reboot] tests on GKE using the latest successful build.'
+            timeout: 120
+            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
+            test-owner: 'ihmccreery'
+        - 'gce-ingress':
+            description: 'Run [Feature:Ingress] tests on GCE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
+            test-owner: 'beeps'
+        - 'gke-ingress':
+            description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
+            test-owner: 'beeps'
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-aws
+    test-owner: 'bburns'
+    emails: 'bburns@google.com'
+    cron-string: '@daily'
+    trigger-job: ''
+    suffix:
+        - 'aws':
+            description: 'Run e2e tests on AWS using the latest successful Kubernetes build.'
+            timeout: 240
+            branch: 'master'
+        - 'aws-release-1.1':
+            description: 'Run e2e tests on AWS using the latest successful 1.1 Kubernetes build.'
+            timeout: 240
+            branch: 'release-1.1'
     jobs:
         - 'kubernetes-e2e-{suffix}'

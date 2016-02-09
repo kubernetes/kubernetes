@@ -18,6 +18,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/label"
+	"github.com/opencontainers/runc/libcontainer/system"
 )
 
 const defaultMountFlags = syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
@@ -299,6 +300,24 @@ func checkMountDestination(rootfs, dest string) error {
 	invalidDestinations := []string{
 		"/proc",
 	}
+	// White list, it should be sub directories of invalid destinations
+	validDestinations := []string{
+		// These entries can be bind mounted by files emulated by fuse,
+		// so commands like top, free displays stats in container.
+		"/proc/cpuinfo",
+		"/proc/diskstats",
+		"/proc/meminfo",
+		"/proc/stats",
+	}
+	for _, valid := range validDestinations {
+		path, err := filepath.Rel(filepath.Join(rootfs, valid), dest)
+		if err != nil {
+			return err
+		}
+		if path == "." {
+			return nil
+		}
+	}
 	for _, invalid := range invalidDestinations {
 		path, err := filepath.Rel(filepath.Join(rootfs, invalid), dest)
 		if err != nil {
@@ -365,11 +384,12 @@ func reOpenDevNull() error {
 
 // Create the device nodes in the container.
 func createDevices(config *configs.Config) error {
+	useBindMount := system.RunningInUserNS() || config.Namespaces.Contains(configs.NEWUSER)
 	oldMask := syscall.Umask(0000)
 	for _, node := range config.Devices {
 		// containers running in a user namespace are not allowed to mknod
 		// devices so we can just bind mount it from the host.
-		if err := createDeviceNode(config.Rootfs, node, config.Namespaces.Contains(configs.NEWUSER)); err != nil {
+		if err := createDeviceNode(config.Rootfs, node, useBindMount); err != nil {
 			syscall.Umask(oldMask)
 			return err
 		}

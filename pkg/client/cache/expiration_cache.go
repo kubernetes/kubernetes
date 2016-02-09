@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // ExpirationCache implements the store interface
@@ -90,7 +91,7 @@ func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {
 		// fails; as long as we only return un-expired entries a
 		// reader doesn't need to wait for the result of the delete.
 		go func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 			c.cacheStorage.Delete(key)
 		}()
 		return nil, false

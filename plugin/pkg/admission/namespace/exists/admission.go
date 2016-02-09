@@ -20,17 +20,18 @@ import (
 	"io"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceExists", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("NamespaceExists", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewExists(client), nil
 	})
 }
@@ -40,7 +41,7 @@ func init() {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
 	*admission.Handler
-	client client.Interface
+	client clientset.Interface
 	store  cache.Store
 }
 
@@ -68,7 +69,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.Namespaces().Get(a.GetNamespace())
+	_, err = e.client.Core().Namespaces().Get(a.GetNamespace())
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err
@@ -80,15 +81,15 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 }
 
 // NewExists creates a new namespace exists admission control handler
-func NewExists(c client.Interface) admission.Interface {
+func NewExists(c clientset.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Namespaces().List(options)
+				return c.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Namespaces().Watch(options)
+				return c.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},

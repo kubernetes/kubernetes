@@ -52,7 +52,7 @@ func TestLabels(t *testing.T) {
 	}
 	container := &api.Container{
 		Name: "test_container",
-		TerminationMessagePath: "/tmp",
+		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
 	pod := &api.Pod{
@@ -81,7 +81,7 @@ func TestLabels(t *testing.T) {
 	}
 
 	// Test whether we can get right information from label
-	labels := newLabels(container, pod, restartCount)
+	labels := newLabels(container, pod, restartCount, false)
 	containerInfo := getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
@@ -97,7 +97,7 @@ func TestLabels(t *testing.T) {
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
 	expected.Hash = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	labels = newLabels(container, pod, restartCount)
+	labels = newLabels(container, pod, restartCount, false)
 	containerInfo = getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)

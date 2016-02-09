@@ -29,10 +29,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			}
 		},
 		func(obj *DaemonSet) {
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
+			labels := obj.Spec.Template.Labels
+
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
@@ -101,10 +99,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 					maxSurge := intstr.FromInt(1)
 					strategy.RollingUpdate.MaxSurge = &maxSurge
 				}
-			}
-			if obj.Spec.UniqueLabelKey == nil {
-				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = DefaultDeploymentUniqueLabelKey
 			}
 		},
 		func(obj *Job) {

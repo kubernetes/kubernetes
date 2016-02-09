@@ -19,7 +19,8 @@ package rkt
 import "fmt"
 
 // Config stores the global configuration for the rkt runtime.
-// Run 'rkt' for more details.
+// Detailed documents can be found at:
+// https://github.com/coreos/rkt/blob/master/Documentation/commands.md#global-options
 type Config struct {
 	// The absolute path to the binary, or leave empty to find it in $PATH.
 	Path string
@@ -29,8 +30,9 @@ type Config struct {
 	Debug bool
 	// The rkt data directory.
 	Dir string
-	// This flag controls whether we skip image or key verification.
-	InsecureSkipVerify bool
+	// Comma-separated list of security features to disable.
+	// Allowed values: "none", "image", "tls", "ondisk", "http", "all".
+	InsecureOptions string
 	// The local config directory.
 	LocalConfigDir string
 }
@@ -43,7 +45,7 @@ func (c *Config) buildGlobalOptions() []string {
 	}
 
 	result = append(result, fmt.Sprintf("--debug=%v", c.Debug))
-	result = append(result, fmt.Sprintf("--insecure-skip-verify=%v", c.InsecureSkipVerify))
+	result = append(result, fmt.Sprintf("--insecure-options=%s", c.InsecureOptions))
 	if c.LocalConfigDir != "" {
 		result = append(result, fmt.Sprintf("--local-config=%s", c.LocalConfigDir))
 	}

@@ -18,6 +18,7 @@ package util
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
@@ -125,7 +128,10 @@ func checkErr(err error, handleErr func(string)) {
 
 	msg, ok := StandardErrorMessage(err)
 	if !ok {
-		msg = fmt.Sprintf("error: %s", err.Error())
+		msg = err.Error()
+		if !strings.HasPrefix(msg, "error: ") {
+			msg = fmt.Sprintf("error: %s", msg)
+		}
 	}
 	handleErr(msg)
 }
@@ -430,4 +436,57 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 	}
 
 	return info.Object, nil
+}
+
+// AddCmdRecordFlag adds --record flag to command
+func AddRecordFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation.")
+}
+
+func GetRecordFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "record")
+}
+
+// RecordChangeCause annotate change-cause to input runtime object.
+func RecordChangeCause(obj runtime.Object, changeCause string) error {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return err
+	}
+	if meta.Annotations == nil {
+		meta.Annotations = make(map[string]string)
+	}
+	meta.Annotations[kubectl.ChangeCauseAnnotation] = changeCause
+	return nil
+}
+
+// ChangeResourcePatch creates a strategic merge patch between the origin input resource info
+// and the annotated with change-cause input resource info.
+func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
+	oldData, err := json.Marshal(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	if err := RecordChangeCause(info.Object, changeCause); err != nil {
+		return nil, err
+	}
+	newData, err := json.Marshal(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
+}
+
+// containsChangeCause checks if input resource info contains change-cause annotation.
+func ContainsChangeCause(info *resource.Info) bool {
+	annotations, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
+	if err != nil {
+		return false
+	}
+	return len(annotations[kubectl.ChangeCauseAnnotation]) > 0
+}
+
+// ShouldRecord checks if we should record current change cause
+func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
+	return GetRecordFlag(cmd) || ContainsChangeCause(info)
 }

@@ -21,18 +21,19 @@ import (
 	"io"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceLifecycle", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("NamespaceLifecycle", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewLifecycle(client), nil
 	})
 }
@@ -41,7 +42,7 @@ func init() {
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type lifecycle struct {
 	*admission.Handler
-	client             client.Interface
+	client             clientset.Interface
 	store              cache.Store
 	immortalNamespaces sets.String
 }
@@ -72,7 +73,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	// refuse to operate on non-existent namespaces
 	if !exists {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespaceObj, err = l.client.Namespaces().Get(a.GetNamespace())
+		namespaceObj, err = l.client.Core().Namespaces().Get(a.GetNamespace())
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return err
@@ -96,15 +97,15 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
-func NewLifecycle(c client.Interface) admission.Interface {
+func NewLifecycle(c clientset.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Namespaces().List(options)
+				return c.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Namespaces().Watch(options)
+				return c.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
