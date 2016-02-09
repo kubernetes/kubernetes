@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -801,24 +802,33 @@ type dockerVersion struct {
 	*semver.Version
 }
 
+// Older versions of Docker could return non-semantically versioned values (distros like Fedora
+// included partial values such as 1.8.1.fc21 which is not semver). Force those values to be semver.
+var almostSemverRegexp = regexp.MustCompile(`^(\d+\.\d+\.\d+)\.(.*)$`)
+
+// newDockerVersion returns a semantically versioned docker version value
 func newDockerVersion(version string) (dockerVersion, error) {
 	sem, err := semver.NewVersion(version)
 	if err != nil {
-		return dockerVersion{}, err
+		matches := almostSemverRegexp.FindStringSubmatch(version)
+		if matches == nil {
+			return dockerVersion{}, err
+		}
+		sem, err = semver.NewVersion(strings.Join(matches[1:], "-"))
 	}
-	return dockerVersion{sem}, nil
+	return dockerVersion{sem}, err
 }
 
 func (r dockerVersion) Compare(other string) (int, error) {
-	v, err := semver.NewVersion(other)
+	v, err := newDockerVersion(other)
 	if err != nil {
 		return -1, err
 	}
 
-	if r.LessThan(*v) {
+	if r.LessThan(*v.Version) {
 		return -1, nil
 	}
-	if v.LessThan(*r.Version) {
+	if v.Version.LessThan(*r.Version) {
 		return 1, nil
 	}
 	return 0, nil
