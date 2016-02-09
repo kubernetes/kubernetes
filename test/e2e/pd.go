@@ -327,7 +327,7 @@ func createPD() (string, error) {
 		}
 		volumeOptions := &awscloud.VolumeOptions{}
 		volumeOptions.CapacityGB = 10
-		return volumes.CreateVolume(volumeOptions)
+		return volumes.CreateDisk(volumeOptions)
 	}
 }
 
@@ -354,7 +354,15 @@ func deletePD(pdName string) error {
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
-		return volumes.DeleteVolume(pdName)
+		deleted, err := volumes.DeleteDisk(pdName)
+		if err != nil {
+			return err
+		} else {
+			if !deleted {
+				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			}
+			return nil
+		}
 	}
 }
 
@@ -384,7 +392,8 @@ func detachPD(hostName, pdName string) error {
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
-		return volumes.DetachDisk(hostName, pdName)
+		_, err := volumes.DetachDisk(pdName, hostName)
+		return err
 	}
 }
 
