@@ -657,11 +657,14 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 			return nil, err
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: internalIP})
+		// Legacy compatibility: the private ip was the legacy host ip
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: internalIP})
 
 		externalIP, err := aws.metadata.GetMetadata("public-ipv4")
 		if err != nil {
-			//Perhaps only log this as a warning the first time this method is called?
+			//TODO: It would be nice to be able to determine the reason for the failure,
+			// but the AWS client masks all failures with the same error description.
+			glog.V(2).Info("Could not determine public IP from AWS metadata.")
 		} else {
 			addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: externalIP})
 		}
