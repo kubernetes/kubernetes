@@ -45,9 +45,14 @@ func AddToScheme(scheme *runtime.Scheme) {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) {
-	// TODO this gets cleaned up when the types are fixed
+	// Note that we add only the versions from the extensions package.
+	// Adding the ones from this package confuses the autogenerators-- we
+	// want them to generate cross-package conversions.
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&extensions.Job{},
 		&extensions.JobList{},
 	)
 }
+
+func (obj *Job) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *JobList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
