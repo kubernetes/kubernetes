@@ -49,7 +49,7 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_GOLANG_VERSION=1.4.2
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-1"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-2"
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
@@ -90,17 +90,47 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
 
-# The set of master binaries that run in Docker (on Linux)
+# Get the set of master binaries that run in Docker (on Linux)
 # Entry format is "<name-of-binary>,<base-image>".
 # Binaries are placed in /usr/local/bin inside the image.
-readonly KUBE_DOCKER_WRAPPED_BINARIES=(
-  kube-apiserver,busybox
-  kube-controller-manager,busybox
-  kube-scheduler,busybox
-  kube-proxy,gcr.io/google_containers/debian-iptables:v1
-)
+# 
+# $1 - server architecture
+kube::build::get_docker_wrapped_binaries() {
+  case $1 in
+    "amd64")
+        local targets=(
+          kube-apiserver,busybox
+          kube-controller-manager,busybox
+          kube-scheduler,busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables:v1
+        );;
+    "arm") # TODO: Use image with iptables installed for kube-proxy for arm, arm64 and ppc64le
+        local targets=(
+          kube-apiserver,hypriot/armhf-busybox
+          kube-controller-manager,hypriot/armhf-busybox
+          kube-scheduler,hypriot/armhf-busybox
+          kube-proxy,hypriot/armhf-busybox
+        );;
+    "arm64")
+        local targets=(
+          kube-apiserver,aarch64/busybox
+          kube-controller-manager,aarch64/busybox
+          kube-scheduler,aarch64/busybox
+          kube-proxy,aarch64/busybox
+        );;
+    "ppc64le")
+        local targets=(
+          kube-apiserver,ppc64le/busybox
+          kube-controller-manager,ppc64le/busybox
+          kube-scheduler,ppc64le/busybox
+          kube-proxy,ppc64le/busybox
+        );;
+  esac
 
-# The set of addons images that should be prepopulated
+  echo "${targets[@]}"
+}
+
+# The set of addons images that should be prepopulated on linux/amd64
 readonly KUBE_ADDON_PATHS=(
   gcr.io/google_containers/pause:2.0
   gcr.io/google_containers/kube-registry-proxy:0.3
@@ -109,7 +139,7 @@ readonly KUBE_ADDON_PATHS=(
 # ---------------------------------------------------------------------------
 # Basic setup functions
 
-# Verify that the right utilities and such are installed for building Kube.  Set
+# Verify that the right utilities and such are installed for building Kube. Set
 # up some dynamic constants.
 #
 # Vars set:
@@ -669,7 +699,7 @@ function kube::release::package_tarballs() {
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
-# Package up all of the cross compiled clients.  Over time this should grow into
+# Package up all of the cross compiled clients. Over time this should grow into
 # a full SDK
 function kube::release::package_client_tarballs() {
    # Find all of the built client binaries
@@ -726,7 +756,11 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
-    kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
+    
+    # Only release addon images for linux/amd64. These addon images aren't necessary for other architectures
+    if [[ ${platform} == "linux/amd64" ]]; then
+      kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
+    fi
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -764,15 +798,15 @@ function kube::release::sha1() {
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
 #  $2 - arch, architecture for which we are building docker images.
-# Globals:
-#   KUBE_DOCKER_WRAPPED_BINARIES
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
     local binary_dir="$1"
     local arch="$2"
     local binary_name
-    for wrappable in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+    local binaries=($(kube::build::get_docker_wrapped_binaries ${arch}))
+
+    for wrappable in "${binaries[@]}"; do
 
       local oldifs=$IFS
       IFS=","
@@ -797,7 +831,14 @@ function kube::release::create_docker_images_for_server() {
         ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
-        local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
+        if [[ ${arch} == "amd64" ]]; then
+          # If we are building a amd64 docker image, preserve the original image name
+          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
+        else
+          # If we are building a docker image for another architecture, append the arch in the image tag
+          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
+        fi
+
         "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
@@ -930,7 +971,7 @@ function kube::release::package_test_tarball() {
   mkdir -p "${release_stage}"
 
   local platform
-  for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
+  for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
     local test_bins=("${KUBE_TEST_BINARIES[@]}")
     if [[ "${platform%/*}" == "windows" ]]; then
       test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
@@ -1482,6 +1523,9 @@ function kube::release::docker::release() {
 
   local archs=(
     "amd64"
+    "arm"
+    "arm64"
+    "ppc64le"
   )
 
   local docker_push_cmd=("${DOCKER[@]}")
@@ -1494,6 +1538,16 @@ function kube::release::docker::release() {
       local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
       kube::log::status "Pushing ${binary} to ${docker_target}"
       "${docker_push_cmd[@]}" push "${docker_target}"
+
+      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compability with earlier versions
+      if [[ ${arch} == "amd64" ]]; then
+        local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
+
+        "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
+
+        kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
+        "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+      fi
     done
   done
 }
