@@ -1643,7 +1643,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 		}
 	}
 
-	apiPodStatus := kl.generatePodStatus(pod, podStatus)
+	apiPodStatus := kl.synthesizeAPIPodStatusFromInternalPodStatus(pod, podStatus)
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
@@ -1852,7 +1852,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 			if err != nil {
 				return err
 			}
-			status = kl.generatePodStatus(pod, s)
+			status = kl.synthesizeAPIPodStatusFromInternalPodStatus(pod, s)
 		}
 		if status.Phase == api.PodRunning {
 			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
@@ -3150,7 +3150,11 @@ func (kl *Kubelet) getRuntimePodStatus(pod *api.Pod) (*kubecontainer.PodStatus, 
 	return kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 }
 
-func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+// synthesizeAPIPodStatusFromInternalPodStatus creates an API podStatus for
+// the given pod from the given internal PodStatus.  It converts the status
+// appends ready conditions for the current container statuses, and inserts
+// the host IP.
+func (kl *Kubelet) synthesizeAPIPodStatusFromInternalPodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {

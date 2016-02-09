@@ -1718,8 +1718,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 	} else {
 		// Otherwise kill any running containers in this pod which are not specified as ones to keep.
-		runningContainerStatues := podStatus.GetRunningContainerStatuses()
-		for _, containerStatus := range runningContainerStatues {
+		runningContainerStatuses := podStatus.GetRunningContainerStatuses()
+		for _, containerStatus := range runningContainerStatuses {
 			_, keep := containerChanges.ContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)]
 			if !keep {
 				glog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerStatus.Name, containerStatus.ID, format.Pod(pod))
