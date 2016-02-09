@@ -17,9 +17,10 @@ limitations under the License.
 package util
 
 import (
-	"math"
 	"sync"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util/integer"
 )
 
 type backoffEntry struct {
@@ -65,7 +66,7 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 		entry = p.initEntryUnsafe(id)
 	} else {
 		delay := entry.backoff * 2 // exponential
-		entry.backoff = time.Duration(math.Min(float64(delay), float64(p.maxDuration)))
+		entry.backoff = time.Duration(integer.Int64Min(int64(delay), int64(p.maxDuration)))
 	}
 	entry.lastUpdate = p.Clock.Now()
 }
