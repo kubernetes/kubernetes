@@ -395,7 +395,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		cleanupPods(c, ns)
 	})
 
-	It("validates that a pod with an invalid Affinity is rejected [Conformance]", func() {
+	It("validates that a pod with an invalid NodeAffinity is rejected [Feature:NodeAffinity]", func() {
 
 		By("Trying to launch a pod with an invalid Affinity data.")
 		podName := "without-label"
@@ -519,7 +519,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// non-nil NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
-	It("validates that NodeAffinity is respected if not matching [Conformance]", func() {
+	It("validates that NodeAffinity is respected if not matching [Feature:NodeAffinity]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
@@ -575,7 +575,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 
 	// Keep the same steps with the test on NodeSelector,
 	// but specify Affinity in Pod.Annotations, instead of NodeSelector.
-	It("validates that required NodeAffinity setting is respected if matching [Conformance]", func() {
+	It("validates that required NodeAffinity setting is respected if matching [Feature:NodeAffinity]", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
@@ -669,7 +669,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// Verify that an escaped JSON string of NodeAffinity in a YAML PodSpec works.
-	It("validates that embedding the JSON NodeAffinity setting as a string in the annotation value work [Conformance]", func() {
+	It("validates that embedding the JSON NodeAffinity setting as a string in the annotation value work [Feature:NodeAffinity]", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
