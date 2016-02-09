@@ -397,6 +397,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
+var replicaSetColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
 var jobColumns = []string{"JOB", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "SUCCESSFUL"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "SELECTOR", "AGE"}
 var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
@@ -427,6 +428,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podTemplateColumns, printPodTemplateList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
+	h.Handler(replicaSetColumns, printReplicaSet)
+	h.Handler(replicaSetColumns, printReplicaSetList)
 	h.Handler(daemonSetColumns, printDaemonSet)
 	h.Handler(daemonSetColumns, printDaemonSetList)
 	h.Handler(jobColumns, printJob)
@@ -737,6 +740,63 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer, options PrintOptions) error {
 	for _, controller := range list.Items {
 		if err := printReplicationController(&controller, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOptions) error {
+	name := rs.Name
+	namespace := rs.Namespace
+	containers := rs.Spec.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
+	}
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s",
+		name,
+		firstContainer.Name,
+		firstContainer.Image,
+		unversioned.FormatLabelSelector(rs.Spec.Selector),
+		rs.Spec.Replicas,
+		translateTimestamp(rs.CreationTimestamp),
+	); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, appendLabels(rs.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, appendAllLabels(options.ShowLabels, rs.Labels)); err != nil {
+		return err
+	}
+
+	// Lay out all the other containers on separate lines.
+	extraLinePrefix := "\t"
+	if options.WithNamespace {
+		extraLinePrefix = "\t\t"
+	}
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s%s\t%s\t%s\t%s", extraLinePrefix, container.Name, container.Image, "", "")
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(options.ColumnLabels)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printReplicaSetList(list *extensions.ReplicaSetList, w io.Writer, options PrintOptions) error {
+	for _, rs := range list.Items {
+		if err := printReplicaSet(&rs, w, options); err != nil {
 			return err
 		}
 	}
