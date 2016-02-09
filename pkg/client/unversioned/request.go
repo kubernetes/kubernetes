@@ -643,6 +643,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
 		if result := r.transformResponse(resp, req); result.err != nil {
 			return nil, result.err
 		}
