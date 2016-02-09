@@ -650,19 +650,26 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		return nil, err
 	}
 	if self.nodeName == name || len(name) == 0 {
+		addresses := []api.NodeAddress{}
+
 		internalIP, err := aws.metadata.GetMetadata("local-ipv4")
 		if err != nil {
 			return nil, err
 		}
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: internalIP})
+		// Legacy compatibility: the private ip was the legacy host ip
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: internalIP})
+
 		externalIP, err := aws.metadata.GetMetadata("public-ipv4")
 		if err != nil {
-			return nil, err
+			//TODO: It would be nice to be able to determine the reason for the failure,
+			// but the AWS client masks all failures with the same error description.
+			glog.V(2).Info("Could not determine public IP from AWS metadata.")
+		} else {
+			addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: externalIP})
 		}
-		return []api.NodeAddress{
-			{Type: api.NodeInternalIP, Address: internalIP},
-			{Type: api.NodeLegacyHostIP, Address: internalIP},
-			{Type: api.NodeExternalIP, Address: externalIP},
-		}, nil
+
+		return addresses, nil
 	}
 	instance, err := aws.getInstanceByNodeName(name)
 	if err != nil {
