@@ -1797,6 +1797,15 @@ func (gce *GCECloud) InstanceID(instanceName string) (string, error) {
 	return gce.projectID + "/" + instance.Zone + "/" + instance.Name, nil
 }
 
+// InstanceType returns the type of the specified instance.
+func (gce *GCECloud) InstanceType(instanceName string) (string, error) {
+	instance, err := gce.getInstanceByName(instanceName)
+	if err != nil {
+		return "", err
+	}
+	return instance.Type, nil
+}
+
 // List is an implementation of Instances.List.
 func (gce *GCECloud) List(filter string) ([]string, error) {
 	var instances []string
@@ -2151,6 +2160,7 @@ type gceInstance struct {
 	Name  string
 	ID    uint64
 	Disks []*compute.AttachedDisk
+	Type  string
 }
 
 type gceDisk struct {
@@ -2185,7 +2195,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 		// Add the filter for hosts
 		listCall = listCall.Filter("name eq (" + strings.Join(remaining, "|") + ")")
 
-		listCall = listCall.Fields("items(name,id,disks)")
+		listCall = listCall.Fields("items(name,id,disks,machineType)")
 
 		res, err := listCall.Do()
 		if err != nil {
@@ -2199,6 +2209,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 				Name:  name,
 				ID:    i.Id,
 				Disks: i.Disks,
+				Type:  lastComponent(i.MachineType),
 			}
 			instances[name] = instance
 		}
@@ -2236,6 +2247,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 			Name:  res.Name,
 			ID:    res.Id,
 			Disks: res.Disks,
+			Type:  lastComponent(res.MachineType),
 		}, nil
 	}
 
