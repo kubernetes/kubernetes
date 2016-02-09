@@ -293,7 +293,7 @@ func injectHtml(client *client.Client, config VolumeTestConfig, volume api.Volum
 			Containers: []api.Container{
 				{
 					Name:    config.prefix + "-injector",
-					Image:   "gcr.io/google_containers/busybox",
+					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
 					VolumeMounts: []api.VolumeMount{

@@ -396,7 +396,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 			containers[i].Name = fmt.Sprintf("mycontainer%v", i+1)
 		}
 
-		containers[i].Image = "gcr.io/google_containers/busybox"
+		containers[i].Image = "gcr.io/google_containers/busybox:1.24"
 
 		containers[i].Command = []string{"sleep", "6000"}
 
