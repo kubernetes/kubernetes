@@ -365,7 +365,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	_, res := meta.KindToResource(kind, false)
+	_, res := meta.KindToResource(kind)
 	cmdutil.PrintSuccess(mapper, false, out, res.Resource, oldName, message)
 	return nil
 }
