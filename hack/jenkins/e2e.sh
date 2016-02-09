@@ -640,6 +640,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${E2E_UP:="true"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-2"}
+    : ${HUNG_TASK_PANIC:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
@@ -658,6 +659,7 @@ case ${JOB_NAME} in
     # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-2"}
+    : ${HUNG_TASK_PANIC:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
@@ -891,6 +893,7 @@ export FAIL_ON_GCP_RESOURCE_LEAK="${FAIL_ON_GCP_RESOURCE_LEAK:-false}"
 export ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-}
 export EXIT_ON_WEAK_ERROR=${EXIT_ON_WEAK_ERROR:-}
 export HAIRPIN_MODE=${HAIRPIN_MODE:-}
+export HUNG_TASK_PANIC=${HUNG_TASK_PANIC:-}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
