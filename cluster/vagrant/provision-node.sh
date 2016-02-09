@@ -52,6 +52,8 @@ for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
   fi
 done
 
+prepare-package-manager
+
 # Configure network
 if [ "${NETWORK_PROVIDER}" != "kubenet" ]; then
   provision-network-node
