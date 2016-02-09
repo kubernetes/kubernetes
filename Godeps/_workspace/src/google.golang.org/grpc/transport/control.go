@@ -37,7 +37,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/bradfitz/http2"
+	"golang.org/x/net/http2"
 )
 
 const (
@@ -86,7 +86,8 @@ func (flushIO) isItem() bool {
 }
 
 type ping struct {
-	ack bool
+	ack  bool
+	data [8]byte
 }
 
 func (ping) isItem() bool {

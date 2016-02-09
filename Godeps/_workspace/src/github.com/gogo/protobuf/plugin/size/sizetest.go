@@ -51,7 +51,12 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 	}
 	for _, message := range file.Messages() {
 		ccTypeName := generator.CamelCaseSlice(message.TypeName())
-		if !gogoproto.IsSizer(file.FileDescriptorProto, message.DescriptorProto) {
+		sizeName := ""
+		if gogoproto.IsSizer(file.FileDescriptorProto, message.DescriptorProto) {
+			sizeName = "Size"
+		} else if gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto) {
+			sizeName = "ProtoSize"
+		} else {
 			continue
 		}
 		if message.DescriptorProto.GetOptions().GetMapEntry() {
@@ -60,7 +65,7 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 
 		if gogoproto.HasTestGen(file.FileDescriptorProto, message.DescriptorProto) {
 			used = true
-			p.P(`func Test`, ccTypeName, `Size(t *`, testingPkg.Use(), `.T) {`)
+			p.P(`func Test`, ccTypeName, sizeName, `(t *`, testingPkg.Use(), `.T) {`)
 			p.In()
 			p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
@@ -72,7 +77,7 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 			p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 			p.Out()
 			p.P(`}`)
-			p.P(`size := p.Size()`)
+			p.P(`size := p.`, sizeName, `()`)
 			p.P(`if len(data) != size {`)
 			p.In()
 			p.P(`t.Errorf("seed = %d, size %v != marshalled size %v", seed, size, len(data))`)
@@ -96,7 +101,7 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 
 		if gogoproto.HasBenchGen(file.FileDescriptorProto, message.DescriptorProto) {
 			used = true
-			p.P(`func Benchmark`, ccTypeName, `Size(b *`, testingPkg.Use(), `.B) {`)
+			p.P(`func Benchmark`, ccTypeName, sizeName, `(b *`, testingPkg.Use(), `.B) {`)
 			p.In()
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(616))`)
 			p.P(`total := 0`)
@@ -109,7 +114,7 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 			p.P(`b.ResetTimer()`)
 			p.P(`for i := 0; i < b.N; i++ {`)
 			p.In()
-			p.P(`total += pops[i%1000].Size()`)
+			p.P(`total += pops[i%1000].`, sizeName, `()`)
 			p.Out()
 			p.P(`}`)
 			p.P(`b.SetBytes(int64(total / b.N))`)

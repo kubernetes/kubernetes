@@ -21,8 +21,6 @@
 //   The API defined here is proposed, experimental,   //
 //   and (for now) subject to change at any time.      //
 //                                                     //
-//                   Do not use it.                    //
-//                                                     //
 //  If you think you want to use it, or for any other  //
 //     queries, contact <rkt-dev@googlegroups.com>     //
 //      or file an issue on github.com/coreos/rkt      //
@@ -234,6 +232,9 @@ message ImageFilter {
 
         // If not empty, the images that have all of the annotations will be returned.
         repeated KeyValue annotations = 8;
+
+        // If not empty, the images that have any of the exact full names will be returned.
+        repeated string full_names = 9;
 }
 
 // Info describes the information of rkt on the machine.

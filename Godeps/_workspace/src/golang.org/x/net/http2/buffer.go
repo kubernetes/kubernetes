@@ -19,8 +19,9 @@ type buffer struct {
 }
 
 var (
-	errReadEmpty = errors.New("read from empty buffer")
-	errWriteFull = errors.New("write on full buffer")
+	errReadEmpty   = errors.New("read from empty buffer")
+	errWriteClosed = errors.New("write on closed buffer")
+	errWriteFull   = errors.New("write on full buffer")
 )
 
 // Read copies bytes from the buffer into p.
@@ -45,7 +46,7 @@ func (b *buffer) Len() int {
 // It is an error to write more data than the buffer can hold.
 func (b *buffer) Write(p []byte) (n int, err error) {
 	if b.closed {
-		return 0, errors.New("closed")
+		return 0, errWriteClosed
 	}
 
 	// Slide existing data to beginning.
