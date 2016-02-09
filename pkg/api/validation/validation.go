@@ -903,8 +903,14 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) field.ErrorLi
 }
 
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = ValidatePersistentVolumeClaim(newPvc)
+	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePersistentVolumeClaim(newPvc)...)
+	// if a pvc had a bound volume, we should not allow updates to resources or access modes
+	if len(oldPvc.Spec.VolumeName) != 0 {
+		if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "spec is immutable once a claim has been bound to a volume"))
+		}
+	}
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
