@@ -77,9 +77,9 @@ const (
 	k8sRktNamespaceAnno    = "rkt.kubernetes.io/namespace"
 	//TODO: remove the creation time annotation once this is closed: https://github.com/coreos/rkt/issues/1789
 	k8sRktCreationTimeAnno           = "rkt.kubernetes.io/created"
-	k8sRktContainerHashAnno          = "rkt.kubernetes.io/containerhash"
-	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restartcount"
-	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/terminationMessagePath"
+	k8sRktContainerHashAnno          = "rkt.kubernetes.io/container-hash"
+	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restart-count"
+	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/termination-message-path"
 	dockerPrefix                     = "docker://"
 
 	authDir            = "auth.d"
