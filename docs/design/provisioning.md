@@ -95,6 +95,9 @@ One configuration is shown below.  The remainder can be found [here](provisionin
     },
     "data": {
       "plugin-name": "kubernetes.io/gce-pd",  
+      "description": "Something human readable",
+      // suggested as means to template params with values coming from claim's label selector
+      // "overrides": [ "zone" ],  
       "parameters": "{'volumeType':'ssd', 'zone':'us-east'}"  // OPAQUE JSON MAP OF PARAMS AS DEFINED BY THE PLUGIN
     }
   }
@@ -130,6 +133,15 @@ End users request specific storage by using a PersistentVolumeSelector on their 
 }
 	
 ```
+
+
+> Important! One provisioner currently supports create 1 type of volume, per its distinct params map.
+2 zones requires 2 provisioners.  A future enhancement is allowing "overrides" of param values with the value
+supplied in the user's claim.PersistentVolumeSelector.  Admins get to manage 1 provisioner object with a list
+of zones given to users.
+
+
+
 
 ## Labelling PersistentVolumes
 
