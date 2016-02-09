@@ -57,6 +57,600 @@
     ]
    },
    {
+    "path": "/api/v1/clusters",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.ClusterList",
+      "method": "GET",
+      "summary": "list or watch objects of kind Cluster",
+      "nickname": "listNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ClusterList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Cluster",
+      "method": "POST",
+      "summary": "create a Cluster",
+      "nickname": "createNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Cluster",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Cluster"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete collection of Cluster",
+      "nickname": "deletecollectionNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/clusters",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of Cluster",
+      "nickname": "watchNamespacedClusterList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/clusters/{name}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.Cluster",
+      "method": "GET",
+      "summary": "read the specified Cluster",
+      "nickname": "readNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Cluster",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Cluster"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Cluster",
+      "method": "PUT",
+      "summary": "replace the specified Cluster",
+      "nickname": "replaceNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Cluster",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Cluster",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Cluster"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Cluster",
+      "method": "PATCH",
+      "summary": "partially update the specified Cluster",
+      "nickname": "patchNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Cluster",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Cluster"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete a Cluster",
+      "nickname": "deleteNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Cluster",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/clusters/{name}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind Cluster",
+      "nickname": "watchNamespacedCluster",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Cluster",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/clusters/{name}/status",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.Cluster",
+      "method": "PUT",
+      "summary": "replace status of the specified Cluster",
+      "nickname": "replaceNamespacedClusterStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Cluster",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Cluster",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Cluster"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/componentstatuses",
     "description": "API at /api/v1",
     "operations": [
@@ -13756,9 +14350,9 @@
      }
     }
    },
-   "v1.ComponentStatusList": {
-    "id": "v1.ComponentStatusList",
-    "description": "Status of all the conditions for the component as a list of ComponentStatus objects.",
+   "v1.ClusterList": {
+    "id": "v1.ClusterList",
+    "description": "A list of Clusters",
     "required": [
      "items"
     ],
@@ -13772,15 +14366,13 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "$ref": "unversioned.ListMeta"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1.ComponentStatus"
-      },
-      "description": "List of ComponentStatus objects."
+       "$ref": "v1.Cluster"
+      }
      }
     }
    },
@@ -13798,9 +14390,9 @@
      }
     }
    },
-   "v1.ComponentStatus": {
-    "id": "v1.ComponentStatus",
-    "description": "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
+   "v1.Cluster": {
+    "id": "v1.Cluster",
+    "description": "Cluster information in Ubernetes",
     "properties": {
      "kind": {
       "type": "string",
@@ -13811,88 +14403,65 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "$ref": "v1.ObjectMeta"
      },
-     "conditions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.ComponentCondition"
-      },
-      "description": "List of component conditions observed"
+     "spec": {
+      "$ref": "v1.ClusterSpec",
+      "description": "Spec defines the behavior of the Cluster."
+     },
+     "status": {
+      "$ref": "v1.ClusterStatus",
+      "description": "Status describes the current status of a Cluster"
      }
     }
    },
-   "v1.ComponentCondition": {
-    "id": "v1.ComponentCondition",
-    "description": "Information about the condition of a component.",
+   "v1.ClusterSpec": {
+    "id": "v1.ClusterSpec",
+    "required": [
+     "address",
+     "credential"
+    ],
+    "properties": {
+     "address": {
+      "$ref": "v1.NodeAddress"
+     },
+     "credential": {
+      "type": "string"
+     }
+    }
+   },
+   "v1.NodeAddress": {
+    "id": "v1.NodeAddress",
+    "description": "NodeAddress contains information for the node's address.",
     "required": [
      "type",
-     "status"
+     "address"
     ],
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type of condition for a component. Valid value: \"Healthy\""
+      "description": "Node address type, one of Hostname, ExternalIP or InternalIP."
      },
-     "status": {
+     "address": {
       "type": "string",
-      "description": "Status of the condition for a component. Valid values for \"Healthy\": \"True\", \"False\", or \"Unknown\"."
-     },
-     "message": {
-      "type": "string",
-      "description": "Message about the condition for a component. For example, information about a health check."
-     },
-     "error": {
-      "type": "string",
-      "description": "Condition error code for a component. For example, a health check error code."
+      "description": "The node address."
      }
     }
    },
-   "v1.ConfigMapList": {
-    "id": "v1.ConfigMapList",
-    "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
+   "v1.ClusterStatus": {
+    "id": "v1.ClusterStatus",
+    "required": [
+     "ClusterMeta"
+    ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     "phase": {
+      "type": "string"
      },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     "capacity": {
+      "type": "any"
      },
-     "metadata": {
-      "$ref": "unversioned.ListMeta",
-      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
-     },
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.ConfigMap"
-      },
-      "description": "Items is the list of ConfigMaps."
-     }
-    }
-   },
-   "v1.ConfigMap": {
-    "id": "v1.ConfigMap",
-    "description": "ConfigMap holds configuration data for pods to consume.",
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "metadata": {
-      "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
-     },
-     "data": {
-      "type": "any",
-      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
+     "ClusterMeta": {
+      "type": "string"
      }
     }
    },
@@ -14020,6 +14589,132 @@
       "type": "integer",
       "format": "int64",
       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately."
+     }
+    }
+   },
+   "v1.ComponentStatusList": {
+    "id": "v1.ComponentStatusList",
+    "description": "Status of all the conditions for the component as a list of ComponentStatus objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ComponentStatus"
+      },
+      "description": "List of ComponentStatus objects."
+     }
+    }
+   },
+   "v1.ComponentStatus": {
+    "id": "v1.ComponentStatus",
+    "description": "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ComponentCondition"
+      },
+      "description": "List of component conditions observed"
+     }
+    }
+   },
+   "v1.ComponentCondition": {
+    "id": "v1.ComponentCondition",
+    "description": "Information about the condition of a component.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of condition for a component. Valid value: \"Healthy\""
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition for a component. Valid values for \"Healthy\": \"True\", \"False\", or \"Unknown\"."
+     },
+     "message": {
+      "type": "string",
+      "description": "Message about the condition for a component. For example, information about a health check."
+     },
+     "error": {
+      "type": "string",
+      "description": "Condition error code for a component. For example, a health check error code."
+     }
+    }
+   },
+   "v1.ConfigMapList": {
+    "id": "v1.ConfigMapList",
+    "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ConfigMap"
+      },
+      "description": "Items is the list of ConfigMaps."
+     }
+    }
+   },
+   "v1.ConfigMap": {
+    "id": "v1.ConfigMap",
+    "description": "ConfigMap holds configuration data for pods to consume.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "data": {
+      "type": "any",
+      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
      }
     }
    },
@@ -14576,24 +15271,6 @@
      "message": {
       "type": "string",
       "description": "Human readable message indicating details about last transition."
-     }
-    }
-   },
-   "v1.NodeAddress": {
-    "id": "v1.NodeAddress",
-    "description": "NodeAddress contains information for the node's address.",
-    "required": [
-     "type",
-     "address"
-    ],
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "Node address type, one of Hostname, ExternalIP or InternalIP."
-     },
-     "address": {
-      "type": "string",
-      "description": "The node address."
      }
     }
    },

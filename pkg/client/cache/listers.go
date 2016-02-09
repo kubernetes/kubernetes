@@ -534,7 +534,6 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 	return o.(*api.PersistentVolumeClaim), nil
 }
 
-
 type StoreToClusterLister struct {
 	Store
 }

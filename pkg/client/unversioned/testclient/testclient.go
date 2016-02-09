@@ -284,6 +284,8 @@ func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 
 func (c *Fake) ConfigMaps(namespace string) client.ConfigMapsInterface {
 	return &FakeConfigMaps{Fake: c, Namespace: namespace}
+}
+
 func (c *Fake) Clusters() client.ClusterInterface {
 	return &FakeClusters{Fake: c}
 }

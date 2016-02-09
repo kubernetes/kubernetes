@@ -2323,30 +2323,49 @@ const (
 	DefaultSchedulerName = "default-scheduler"
 )
 
-
+// ClusterSpec describes the attributes on a Cluster.
 type ClusterSpec struct {
+	// Address of the cluster
 	Address NodeAddress `json:"address"`
-	Credential string `json:"credential,omitempty"`
+	// The credential used to access cluster. It’s used for system routines (not behalf of users)
+	Credential string `json:"credential"`
 }
+
 type ClusterPhase string
+
+// These are the valid phases of a cluster.
 const (
+	// Newly registered clusters or clusters suspended by admin for various reasons. They are not eligible for accepting workloads
 	ClusterPending ClusterPhase = "pending"
+	// Clusters in normal status that can accept workloads
 	ClusterRunning ClusterPhase = "running"
+	// Clusters temporarily down or not reachable
 	ClusterOffline ClusterPhase = "offline"
+	// Clusters removed from federation
 	ClusterTerminated ClusterPhase = "terminated"
 )
+
+// Cluster metadata
 type ClusterMeta struct {
+	// Version of the cluster
 	Version string `json:"version,omitempty"`
 }
+
+// ClusterStatus is information about the current status of a cluster.
 type ClusterStatus struct {
+	// Phase is the recently observed lifecycle phase of the cluster.
 	Phase ClusterPhase `json:"phase,omitempty"`
-	Capacity ResourceList `json:"capacity,omitempty"`
-	ClusterMeta string `json:",inline"`
+	// Capacity represents the total resources of the cluster
+	Capacity    ResourceList `json:"capacity,omitempty"`
+	ClusterMeta string       `json:",inline"`
 }
+
 // Cluster information in Ubernetes
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
-	ObjectMeta           `json:"metadata,omitempty"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Cluster.
 	Spec ClusterSpec `json:"spec,omitempty"`
@@ -2357,8 +2376,10 @@ type Cluster struct {
 // A list of Clusters
 type ClusterList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
+	// List of Cluster objects.
 	Items []Cluster `json:"items"`
-
 }

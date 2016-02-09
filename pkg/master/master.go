@@ -362,8 +362,8 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 
-		"clusters":                      clusterStorage,
-		"clusters/status":               clusterStatusStorage,
+		"clusters":        clusterStorage,
+		"clusters/status": clusterStatusStorage,
 	}
 }
 
