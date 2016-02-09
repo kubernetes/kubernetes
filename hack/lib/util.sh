@@ -297,4 +297,19 @@ kube::util::group-version-to-pkg-path() {
   esac
 }
 
+# Takes a group/version and returns the swagger-spec file name.
+# default behavior: extensions/v1beta1 -> extensions_v1beta1
+# special case for v1: v1 -> v1
+kube::util::gv-to-swagger-name() {
+  local group_version="$1"
+  case "${group_version}" in
+    v1)
+      echo "v1"
+      ;;
+    *)
+      echo "${group_version%/*}_${group_version#*/}"
+      ;;
+  esac
+}
+
 # ex: ts=2 sw=2 et filetype=sh
