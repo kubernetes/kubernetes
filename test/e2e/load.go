@@ -132,11 +132,17 @@ var _ = Describe("Load capacity", func() {
 			// We may want to revisit it in the future.
 			creatingTime := time.Duration(totalPods/5) * time.Second
 			createAllRC(configs, creatingTime)
+			By("============================================================================")
 
+			// We would like to spread scaling replication controllers over time
+			// to make it possible to create/schedule & delete them in the meantime.
+			// Currently we assume that 5 pods/second average throughput.
+			// The expected number of created/deleted pods is less than totalPods/3.
+			scalingTime := time.Duration(totalPods/15) * time.Second
+			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
-			scaleAllRC(configs)
-			By("============================================================================")
-			scaleAllRC(configs)
+
+			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
@@ -211,23 +217,22 @@ func createRC(wg *sync.WaitGroup, config *RCConfig, creatingTime time.Duration) 
 	expectNoError(RunRC(*config), fmt.Sprintf("creating rc %s", config.Name))
 }
 
-func scaleAllRC(configs []*RCConfig) {
+func scaleAllRC(configs []*RCConfig, scalingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
-		go scaleRC(&wg, config)
+		go scaleRC(&wg, config, scalingTime)
 	}
 	wg.Wait()
 }
 
 // Scales RC to a random size within [0.5*size, 1.5*size] and lists all the pods afterwards.
 // Scaling happens always based on original size, not the current size.
-func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
+func scaleRC(wg *sync.WaitGroup, config *RCConfig, scalingTime time.Duration) {
 	defer GinkgoRecover()
 	defer wg.Done()
-	resizingTime := 3 * time.Minute
 
-	sleepUpTo(resizingTime)
+	sleepUpTo(scalingTime)
 	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
 	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
