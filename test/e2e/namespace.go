@@ -105,22 +105,12 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 // rate of approximately 1 per second.
 var _ = Describe("Namespaces [Serial]", func() {
 
-	//This namespace is modified throughout the course of the test.
-	var c *client.Client
-	var err error = nil
-	BeforeEach(func() {
-		By("Creating a kubernetes client")
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-	})
+	f := NewFramework("namespaces")
 
 	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
-		func() { extinguish(c, 100, 10, 150) })
+		func() { extinguish(f.Client, 100, 10, 150) })
 
 	// On hold until etcd3; see #7372
 	It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
-		func() { extinguish(c, 100, 0, 150) })
+		func() { extinguish(f.Client, 100, 0, 150) })
 })
