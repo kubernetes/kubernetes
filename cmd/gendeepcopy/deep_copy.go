@@ -28,10 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 

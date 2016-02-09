@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
-	. "k8s.io/kubernetes/pkg/apis/batch/v1"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
+	. "k8s.io/kubernetes/pkg/apis/batch/v1"
 	// Install extensions because that is where the __internal repr lives.
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/runtime"
