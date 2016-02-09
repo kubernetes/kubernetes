@@ -111,11 +111,11 @@ func NewKubeletServer() *KubeletServer {
 			RegisterSchedulable:            true,
 			RegistryBurst:                  10,
 			RegistryPullQPS:                5.0,
-			ResourceContainer:              "/kubelet",
+			ResourceContainer:              "",
 			RktPath:                        "",
 			RktStage1Image:                 "",
 			RootDirectory:                  defaultRootDir,
-			RuntimeContainer:               "/docker-daemon",
+			RuntimeContainer:               "",
 			SerializeImagePulls:            true,
 			StreamingConnectionIdleTimeout: unversioned.Duration{4 * time.Hour},
 			SyncFrequency:                  unversioned.Duration{1 * time.Minute},
@@ -191,7 +191,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Optional absolute name of the resource-only container to create and run the Kubelet in.")
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
@@ -222,5 +222,5 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
-	fs.StringVar(&s.RuntimeContainer, "runtime-container", s.RuntimeContainer, "Absolute name of the cgroups to create (if required) and run the runtime in (Default: /docker-daemon).")
+	fs.StringVar(&s.RuntimeContainer, "runtime-container", s.RuntimeContainer, "Optional absolute name of cgroups to create and run the runtime in.")
 }

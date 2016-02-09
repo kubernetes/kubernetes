@@ -139,6 +139,8 @@ script
 		--configure-cbr0=true \
 		--cgroup-root=/ \
 		--system-container=/system \
+                --runtime-container=/docker-daemon \
+                --resource-container=/kubelet \
 		--nosystemd=true \
 		${ARGS}
 end script
