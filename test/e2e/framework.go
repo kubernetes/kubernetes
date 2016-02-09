@@ -33,6 +33,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	maxKubectlExecRetries = 5
+)
+
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
 type Framework struct {
@@ -283,7 +287,7 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 		}
 	}
 	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
-	stdout, stderr, err := kubectlExec(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
+	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
 		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
@@ -294,11 +298,32 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 func (f *Framework) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
 	By("reading a file in the container")
 
-	stdout, stderr, err := kubectlExec(f.Namespace.Name, podName, containerName, "--", "cat", path)
+	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
 	if err != nil {
 		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
+}
+
+func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
+	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
+		if numRetries > 0 {
+			Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
+		}
+
+		stdOutBytes, stdErrBytes, err := kubectlExec(namespace, podName, containerName, args...)
+		if err != nil {
+			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
+				// Retry on "i/o timeout" errors
+				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				continue
+			}
+		}
+
+		return stdOutBytes, stdErrBytes, err
+	}
+	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up.", maxKubectlExecRetries)
+	return nil, nil, err
 }
 
 func kubectlExec(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
