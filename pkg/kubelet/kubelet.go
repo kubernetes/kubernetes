@@ -3137,19 +3137,6 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-// Get the internal PodStatus from the cache if the cache exists;
-// otherwise, query the runtime directly.
-func (kl *Kubelet) getRuntimePodStatus(pod *api.Pod) (*kubecontainer.PodStatus, error) {
-	start := kl.clock.Now()
-	defer func() {
-		metrics.PodStatusLatency.Observe(metrics.SinceInMicroseconds(start))
-	}()
-	if kl.podCache != nil {
-		return kl.podCache.Get(pod.UID)
-	}
-	return kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-}
-
 func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 	// TODO: Consider include the container information.
