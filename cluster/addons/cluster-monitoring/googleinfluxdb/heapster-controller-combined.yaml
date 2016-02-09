@@ -26,7 +26,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v0.20.0-alpha4
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha5
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -40,12 +40,13 @@ spec:
             - /heapster
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
+            - --sink=gcm:?metrics=autoscaling
             - --metric_resolution=60s
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
-        - image: gcr.io/google_containers/heapster:v0.20.0-alpha4
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha5
           name: eventer
           resources:
             # keep request = limit to keep this container in guaranteed class
