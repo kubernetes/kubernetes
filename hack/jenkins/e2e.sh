@@ -659,6 +659,7 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
+    : ${KUBEMARK_TESTS:="\[Feature:Performance\]"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     KUBE_GCE_INSTANCE_PREFIX="kubemark100"
     NUM_NODES="10"
@@ -679,6 +680,7 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
+    : ${KUBEMARK_TESTS:="\[Feature:Performance\]"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     NUM_NODES="6"
     MASTER_SIZE="n1-standard-4"
@@ -698,6 +700,7 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
+    : ${KUBEMARK_TESTS:="should\sallow\sstarting\s30\spods\sper\snode"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
     NUM_NODES="11"
@@ -1029,6 +1032,7 @@ export KUBE_SKIP_CONFIRMATIONS=y
 
 # Kubemark
 export USE_KUBEMARK="${USE_KUBEMARK:-false}"
+export KUBEMARK_TESTS="${KUBEMARK_TESTS:-}"
 export KUBEMARK_MASTER_SIZE="${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}"
 export KUBEMARK_NUM_NODES="${KUBEMARK_NUM_NODES:-$NUM_NODES}"
 
