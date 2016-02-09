@@ -218,6 +218,15 @@ type AWSCloudConfig struct {
 		Zone string
 
 		KubernetesClusterTag string
+
+		//The aws provider creates an inbound rule per load balancer on the node security
+		//group. However, this can run into the AWS security group rule limit of 50 if
+		//many LoadBalancers are created.
+		//
+		//This flag disables the automatic ingress creation. It requires that the user
+		//has setup a rule that allows inbound traffic on kubelet ports from the
+		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
+		DisableSecurityGroupIngress bool
 	}
 }
 
@@ -2090,6 +2099,10 @@ func findSecurityGroupForInstance(instance *ec2.Instance) *string {
 // Open security group ingress rules on the instances so that the load balancer can talk to them
 // Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
 func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, allInstances []*ec2.Instance) error {
+	if s.cfg.Global.DisableSecurityGroupIngress {
+		return nil
+	}
+
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupId := ""
 	for _, securityGroup := range lb.SecurityGroups {
