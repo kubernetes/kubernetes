@@ -46,7 +46,7 @@ const (
 	port = ":50051"
 )
 
-// server is used to implement hellowrld.GreeterServer.
+// server is used to implement helloworld.GreeterServer.
 type server struct{}
 
 // SayHello implements helloworld.GreeterServer

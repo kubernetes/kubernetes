@@ -87,19 +87,6 @@ type AuthInfo interface {
 	AuthType() string
 }
 
-type authInfoKey struct{}
-
-// NewContext creates a new context with authInfo attached.
-func NewContext(ctx context.Context, authInfo AuthInfo) context.Context {
-	return context.WithValue(ctx, authInfoKey{}, authInfo)
-}
-
-// FromContext returns the authInfo in ctx if it exists.
-func FromContext(ctx context.Context) (authInfo AuthInfo, ok bool) {
-	authInfo, ok = ctx.Value(authInfoKey{}).(AuthInfo)
-	return
-}
-
 // TransportAuthenticator defines the common interface for all the live gRPC wire
 // protocols and supported transport security protocols (e.g., TLS, SSL).
 type TransportAuthenticator interface {
@@ -119,7 +106,7 @@ type TransportAuthenticator interface {
 // TLSInfo contains the auth information for a TLS authenticated connection.
 // It implements the AuthInfo interface.
 type TLSInfo struct {
-	state tls.ConnectionState
+	State tls.ConnectionState
 }
 
 func (t TLSInfo) AuthType() string {

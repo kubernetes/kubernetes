@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -99,6 +100,8 @@ type Config struct {
 	// watch start. But if server is behind some kind of proxy, the response
 	// header may be cached at proxy, and Client cannot rely on this behavior.
 	//
+	// Especially, wait request will ignore this timeout.
+	//
 	// One API call may send multiple requests to different etcd servers until it
 	// succeeds. Use context of the API to specify the overall timeout.
 	//
@@ -162,6 +165,11 @@ type Client interface {
 	// this may differ from the initial Endpoints provided in the Config.
 	Endpoints() []string
 
+	// SetEndpoints sets the set of API endpoints used by Client to resolve
+	// HTTP requests. If the given endpoints are not valid, an error will be
+	// returned
+	SetEndpoints(eps []string) error
+
 	httpClient
 }
 
@@ -176,7 +184,7 @@ func New(cfg Config) (Client, error) {
 			password: cfg.Password,
 		}
 	}
-	if err := c.reset(cfg.Endpoints); err != nil {
+	if err := c.SetEndpoints(cfg.Endpoints); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -219,7 +227,7 @@ type httpClusterClient struct {
 	rand *rand.Rand
 }
 
-func (c *httpClusterClient) reset(eps []string) error {
+func (c *httpClusterClient) SetEndpoints(eps []string) error {
 	if len(eps) == 0 {
 		return ErrNoEndpoints
 	}
@@ -341,7 +349,7 @@ func (c *httpClusterClient) Sync(ctx context.Context) error {
 		return nil
 	}
 
-	return c.reset(eps)
+	return c.SetEndpoints(eps)
 }
 
 func (c *httpClusterClient) AutoSync(ctx context.Context, interval time.Duration) error {
@@ -378,9 +386,21 @@ func (c *simpleHTTPClient) Do(ctx context.Context, act httpAction) (*http.Respon
 		return nil, nil, err
 	}
 
+	isWait := false
+	if req != nil && req.URL != nil {
+		ws := req.URL.Query().Get("wait")
+		if len(ws) != 0 {
+			var err error
+			isWait, err = strconv.ParseBool(ws)
+			if err != nil {
+				return nil, nil, fmt.Errorf("wrong wait value %s (%v for %+v)", ws, err, req)
+			}
+		}
+	}
+
 	var hctx context.Context
 	var hcancel context.CancelFunc
-	if c.headerTimeout > 0 {
+	if !isWait && c.headerTimeout > 0 {
 		hctx, hcancel = context.WithTimeout(ctx, c.headerTimeout)
 	} else {
 		hctx, hcancel = context.WithCancel(ctx)
