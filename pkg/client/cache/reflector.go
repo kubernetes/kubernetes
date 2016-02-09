@@ -265,6 +265,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			switch err {
 			case io.EOF:
 				// watch closed normally
+				glog.V(4).Infof("%s: Watch for %v closed normally (with EOF)", r.name, r.expectedType)
 			case io.ErrUnexpectedEOF:
 				glog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
 			default:
@@ -277,6 +278,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			if urlError, ok := err.(*url.Error); ok {
 				if opError, ok := urlError.Err.(*net.OpError); ok {
 					if errno, ok := opError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
+						glog.V(1).Infof("%s: Watch for %v got connection-refused error; will sleep and retry watch", r.name, r.expectedType)
 						time.Sleep(time.Second)
 						continue
 					}
@@ -285,7 +287,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return nil
 		}
 		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
-			if err != errorResyncRequested && err != errorStopRequested {
+			if err == errorResyncRequested || err == errorStopRequested {
+				glog.V(2).Infof("%s: watch of %v ended because of stop/resync request: %v", r.name, r.expectedType, err)
+			} else {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
 			return nil
