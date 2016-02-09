@@ -532,9 +532,6 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 	if len(iscsi.IQN) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("iqn"), ""))
 	}
-	if len(iscsi.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
-	}
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, InclusiveRangeErrorMsg(0, 255)))
 	}
@@ -545,10 +542,6 @@ func validateFCVolumeSource(fc *api.FCVolumeSource, fldPath *field.Path) field.E
 	allErrs := field.ErrorList{}
 	if len(fc.TargetWWNs) < 1 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("targetWWNs"), ""))
-	}
-
-	if len(fc.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
 	}
 
 	if fc.Lun == nil {
@@ -566,9 +559,6 @@ func validateGCEPersistentDiskVolumeSource(pd *api.GCEPersistentDiskVolumeSource
 	if len(pd.PDName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("pdName"), ""))
 	}
-	if len(pd.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
-	}
 	if pd.Partition < 0 || pd.Partition > 255 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), pd.Partition, pdPartitionErrorMsg))
 	}
@@ -579,9 +569,6 @@ func validateAWSElasticBlockStoreVolumeSource(PD *api.AWSElasticBlockStoreVolume
 	allErrs := field.ErrorList{}
 	if len(PD.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
-	}
-	if len(PD.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
 	}
 	if PD.Partition < 0 || PD.Partition > 255 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), PD.Partition, pdPartitionErrorMsg))
@@ -686,9 +673,6 @@ func validateRBDVolumeSource(rbd *api.RBDVolumeSource, fldPath *field.Path) fiel
 	if len(rbd.RBDImage) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
 	}
-	if len(rbd.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
-	}
 	return allErrs
 }
 
@@ -696,9 +680,6 @@ func validateCinderVolumeSource(cd *api.CinderVolumeSource, fldPath *field.Path)
 	allErrs := field.ErrorList{}
 	if len(cd.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
-	}
-	if len(cd.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
 	}
 	return allErrs
 }
@@ -715,9 +696,6 @@ func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
-	}
-	if len(fv.FSType) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
 	}
 	return allErrs
 }
