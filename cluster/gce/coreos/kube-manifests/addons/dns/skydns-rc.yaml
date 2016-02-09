@@ -53,8 +53,9 @@ spec:
           requests:
             cpu: 100m
             memory: 50Mi
+        command:
+        - /kube2sky
         args:
-        # command = "/kube2sky"
         - -domain=${DNS_DOMAIN}
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
@@ -66,8 +67,9 @@ spec:
           requests:
             cpu: 100m
             memory: 50Mi
+        command:
+        - /skydns
         args:
-        # command = "/skydns"
         - -machines=http://127.0.0.1:4001
         - -addr=0.0.0.0:53
         - -ns-rotate=false
@@ -103,6 +105,8 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
+        command:
+        - /exechealthz
         args:
         - -cmd=nslookup kubernetes.default.svc.${DNS_DOMAIN} 127.0.0.1 >/dev/null
         - -port=8080
