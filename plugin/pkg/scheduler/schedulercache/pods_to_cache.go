@@ -41,11 +41,11 @@ func (p PodsToCache) GetNodeNameToInfoMap() map[string]*NodeInfo {
 	return CreateNodeNameToInfoMap(p)
 }
 
-func (p PodsToCache) List(s labels.Selector) (selected []*api.Pod) {
+func (p PodsToCache) List(s labels.Selector) (selected []*api.Pod, err error) {
 	for _, pod := range p {
 		if s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
 		}
 	}
-	return selected
+	return selected, nil
 }

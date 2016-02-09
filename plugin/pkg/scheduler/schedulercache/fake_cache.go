@@ -42,4 +42,4 @@ func (f *FakeCache) RemovePod(pod *api.Pod) error { return nil }
 
 func (f *FakeCache) GetNodeNameToInfoMap() map[string]*NodeInfo { return nil }
 
-func (f *FakeCache) List(s labels.Selector) (selected []*api.Pod) { return nil }
+func (f *FakeCache) List(s labels.Selector) ([]*api.Pod, error) { return nil, nil }
