@@ -48,8 +48,10 @@ import (
 	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/blang/semver"
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
@@ -877,6 +879,36 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// serverVersionGTE returns true if v is greater than or equal to the server
+// version.
+//
+// TODO(18726): This should be incorporated into client.VersionInterface.
+func serverVersionGTE(v semver.Version, c client.VersionInterface) (bool, error) {
+	serverVersion, err := c.ServerVersion()
+	if err != nil {
+		return false, fmt.Errorf("Unable to get server version: %v", err)
+	}
+	sv, err := version.Parse(serverVersion.GitVersion)
+	if err != nil {
+		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+	}
+	return sv.GTE(v), nil
+}
+
+// Multi-scheduler was implemented in #17865, first built into v1.2.0-alpha.6.
+// It changed the default scheduler name from "scheduler" to
+// "default-scheduler", breaking forward-compatibility with tests that rely on
+// finding events from the default scheduler.
+var multiSchedulerVersion = version.MustParse("v1.2.0-alpha.6")
+
+func getSchedulerName(c client.VersionInterface) string {
+	serverVersionGTEMultiSchedulerVersion, err := serverVersionGTE(multiSchedulerVersion, c)
+	if err != nil && serverVersionGTEMultiSchedulerVersion {
+		return "default-scheduler"
+	}
+	return "scheduler"
 }
 
 func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {

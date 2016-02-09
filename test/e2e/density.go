@@ -335,7 +335,7 @@ var _ = Describe("Density", func() {
 					fields.Set{
 						"involvedObject.kind":      "Pod",
 						"involvedObject.namespace": ns,
-						"source":                   "scheduler",
+						"source":                   getSchedulerName(c),
 					}.AsSelector())
 				expectNoError(err)
 				for k := range createTimes {

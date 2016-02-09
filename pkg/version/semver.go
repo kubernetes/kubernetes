@@ -44,7 +44,7 @@ func Parse(gitversion string) (semver.Version, error) {
 func MustParse(gitversion string) semver.Version {
 	v, err := Parse(gitversion)
 	if err != nil {
-		glog.Fatalf("failed to parse semver from giversion %q: %v", gitversion, err)
+		glog.Fatalf("failed to parse semver from gitversion %q: %v", gitversion, err)
 	}
 	return v
 }
