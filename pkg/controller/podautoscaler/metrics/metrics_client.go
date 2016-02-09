@@ -136,7 +136,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	if missing || requestSum == 0 {
 		return 0, 0, time.Time{}, fmt.Errorf("some pods do not have request for cpu")
 	}
-	glog.Infof("Sum of CPU requested: %d", requestSum)
+	glog.V(4).Infof("%s %v - sum of CPU requested: %d", namespace, selector, requestSum)
 	requestAvg := requestSum / int64(len(podList.Items))
 	// Consumption is already averaged and in millis.
 	consumption, timestamp, err := h.getForPods(heapsterCpuUsageMetricDefinition, namespace, podNames)
@@ -193,7 +193,7 @@ func (h *HeapsterMetricsClient) getForPods(metricSpec metricDefinition, namespac
 		return nil, time.Time{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 	}
 
-	glog.Infof("Metrics available: %s", string(resultRaw))
+	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
 
 	sum, count, timestamp := metricSpec.aggregator(metrics)
 	if count != len(podNames) {
