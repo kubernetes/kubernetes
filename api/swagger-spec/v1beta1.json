@@ -4333,6 +4333,10 @@
      "fc": {
       "$ref": "v1.FCVolumeSource",
       "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod."
+     },
+     "azureFile": {
+      "$ref": "v1.AzureFileVolumeSource",
+      "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod."
      }
     }
    },
@@ -4776,6 +4780,28 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.AzureFileVolumeSource": {
+    "id": "v1.AzureFileVolumeSource",
+    "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+    "required": [
+     "secretName",
+     "shareName"
+    ],
+    "properties": {
+     "secretName": {
+      "type": "string",
+      "description": "the name of secret that contains Azure Storage Account Name and Key"
+     },
+     "shareName": {
+      "type": "string",
+      "description": "Share Name"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
      }
     }
    },

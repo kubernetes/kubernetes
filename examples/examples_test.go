@@ -402,6 +402,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-service": &api.Service{},
 			"job":           &extensions.Job{},
 		},
+		"../examples/azure_file": {
+			"azure": &api.Pod{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
