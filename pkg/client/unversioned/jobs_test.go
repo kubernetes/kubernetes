@@ -58,7 +58,7 @@ func TestListJobs(t *testing.T) {
 				},
 			},
 		},
-		ResourceGroup: "extensions",
+		ResourceGroup: extensions.GroupName,
 	}
 	receivedJobList, err := c.Setup(t).Extensions().Jobs(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -88,7 +88,7 @@ func TestGetJob(t *testing.T) {
 				},
 			},
 		},
-		ResourceGroup: "extensions",
+		ResourceGroup: extensions.GroupName,
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Get("foo")
 	defer c.Close()
@@ -137,7 +137,7 @@ func TestUpdateJob(t *testing.T) {
 				},
 			},
 		},
-		ResourceGroup: "extensions",
+		ResourceGroup: extensions.GroupName,
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Update(requestJob)
 	defer c.Close()
@@ -177,7 +177,7 @@ func TestUpdateJobStatus(t *testing.T) {
 				},
 			},
 		},
-		ResourceGroup: "extensions",
+		ResourceGroup: extensions.GroupName,
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).UpdateStatus(requestJob)
 	defer c.Close()
@@ -193,7 +193,7 @@ func TestDeleteJob(t *testing.T) {
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response:      simple.Response{StatusCode: 200},
-		ResourceGroup: "extensions",
+		ResourceGroup: extensions.GroupName,
 	}
 	err := c.Setup(t).Extensions().Jobs(ns).Delete("foo", nil)
 	defer c.Close()
@@ -230,7 +230,7 @@ func TestCreateJob(t *testing.T) {
 				},
 			},
 		},
-		ResourceGroup: "extensions",
+		ResourceGroup: extensions.GroupName,
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Create(requestJob)
 	defer c.Close()

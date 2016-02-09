@@ -223,7 +223,7 @@ func (c *Client) body(t *testing.T, obj runtime.Object, raw *string) *string {
 		var bs []byte
 		g, found := testapi.Groups[groupName]
 		if !found {
-			t.Errorf("Group %s is not registered in testapi", fqKind.GroupVersion().Group)
+			t.Errorf("Group %s is not registered in testapi", groupName)
 		}
 		bs, err = runtime.Encode(g.Codec(), obj)
 		if err != nil {
