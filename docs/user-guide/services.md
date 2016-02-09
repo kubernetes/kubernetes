@@ -191,7 +191,7 @@ created. You can manually map the service to your own specific endpoints:
     "subsets": [
         {
             "addresses": [
-                { "IP": "1.2.3.4" }
+                { "ip": "1.2.3.4" }
             ],
             "ports": [
                 { "port": 9376 }
