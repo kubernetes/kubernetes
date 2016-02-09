@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"syscall"
+
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -35,12 +37,12 @@ const mb = 1024 * 1024
 type diskSpaceManager interface {
 	// Checks the available disk space
 	IsRootDiskSpaceAvailable() (bool, error)
-	IsDockerDiskSpaceAvailable() (bool, error)
+	IsContainerDiskSpaceAvailable() (bool, error)
 }
 
 type DiskSpacePolicy struct {
 	// free disk space threshold for filesystem holding docker images.
-	DockerFreeDiskMB int
+	ContainersFreeDiskMB int
 	// free disk space threshold for root filesystem. Host volumes are created on root fs.
 	RootFreeDiskMB int
 }
@@ -57,6 +59,65 @@ type realDiskSpaceManager struct {
 	cachedInfo map[string]fsInfo // cache of filesystem info.
 	lock       sync.Mutex        // protecting cachedInfo.
 	policy     DiskSpacePolicy   // thresholds. Set at creation time.
+}
+
+
+type rktDiskSpaceManager struct {
+	realDiskSpaceManager
+	rktPath string
+}
+
+func newRktDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy, rktPath string) (diskSpaceManager, error) {
+	glog.Info("newRktDiskSpaceManager: enter");
+	// validate policy
+	err := validatePolicy(policy)
+	if err != nil {
+		return nil, err
+	}
+
+	dm := &rktDiskSpaceManager{
+		realDiskSpaceManager: realDiskSpaceManager {
+			cadvisor:   cadvisorInterface,
+			policy:     policy,
+			cachedInfo: map[string]fsInfo{},
+		},
+		rktPath: rktPath,
+	}
+
+	return dm, nil
+}
+
+func getVfsStats(path string) (uint64, uint64, uint64, error) {
+	glog.Info("getVfsStats: enter");
+        var s syscall.Statfs_t
+        if err := syscall.Statfs(path, &s); err != nil {
+                return 0, 0, 0, err
+        }
+        total := uint64(s.Frsize) * s.Blocks
+        free := uint64(s.Frsize) * s.Bfree
+        avail := uint64(s.Frsize) * s.Bavail
+
+	return total, free, avail, nil
+}
+
+func (dm *rktDiskSpaceManager) IsContainerDiskSpaceAvailable() (bool, error) {
+	f := func() (cadvisorapi.FsInfo, error) {
+		ret := cadvisorapi.FsInfo{}
+
+		total, free, avail, err := getVfsStats(dm.rktPath)
+
+		if err != nil {
+			return ret, err
+		}
+
+		ret.Usage = free
+		ret.Capacity = total
+		ret.Available = avail
+
+		return ret, nil
+	}
+
+	return dm.isSpaceAvailable("rkt", dm.policy.ContainersFreeDiskMB, f)
 }
 
 func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
@@ -83,8 +144,8 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 	return fsi, nil
 }
 
-func (dm *realDiskSpaceManager) IsDockerDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("docker", dm.policy.DockerFreeDiskMB, dm.cadvisor.DockerImagesFsInfo)
+func (dm *realDiskSpaceManager) IsContainerDiskSpaceAvailable() (bool, error) {
+	return dm.isSpaceAvailable("docker", dm.policy.ContainersFreeDiskMB, dm.cadvisor.DockerImagesFsInfo)
 }
 
 func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
@@ -111,8 +172,8 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 }
 
 func validatePolicy(policy DiskSpacePolicy) error {
-	if policy.DockerFreeDiskMB < 0 {
-		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for docker disk space threshold.", policy.DockerFreeDiskMB)
+	if policy.ContainersFreeDiskMB < 0 {
+		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for docker disk space threshold.", policy.ContainersFreeDiskMB)
 	}
 	if policy.RootFreeDiskMB < 0 {
 		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for root disk space threshold.", policy.RootFreeDiskMB)

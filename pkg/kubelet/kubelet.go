@@ -265,10 +265,20 @@ func NewMainKubelet(
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
+	var diskSpaceManager diskSpaceManager
+	var err error
+	switch containerRuntime {
+	case "docker":
+		diskSpaceManager, err = newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
+	case "rkt":
+		diskSpaceManager, err = newRktDiskSpaceManager(cadvisorInterface, diskSpacePolicy, rktPath)
+	default:
+		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
+
 	containerRefManager := kubecontainer.NewRefManager()
 
 	volumeManager := newVolumeManager()
@@ -2214,7 +2224,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	outOfDockerDisk := false
 	outOfRootDisk := false
 	// Check disk space once globally and reject or accept all new pods.
-	withinBounds, err := kl.diskSpaceManager.IsDockerDiskSpaceAvailable()
+	withinBounds, err := kl.diskSpaceManager.IsContainerDiskSpaceAvailable()
 	// Assume enough space in case of errors.
 	if err == nil && !withinBounds {
 		outOfDockerDisk = true

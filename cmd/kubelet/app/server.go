@@ -158,8 +158,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	}
 
 	diskSpacePolicy := kubelet.DiskSpacePolicy{
-		DockerFreeDiskMB: s.LowDiskSpaceThresholdMB,
-		RootFreeDiskMB:   s.LowDiskSpaceThresholdMB,
+		ContainersFreeDiskMB: s.LowDiskSpaceThresholdMB,
+		RootFreeDiskMB:       s.LowDiskSpaceThresholdMB,
 	}
 
 	manifestURLHeader := make(http.Header)
@@ -476,8 +476,8 @@ func SimpleKubelet(client *clientset.Clientset,
 		LowThresholdPercent:  80,
 	}
 	diskSpacePolicy := kubelet.DiskSpacePolicy{
-		DockerFreeDiskMB: 256,
-		RootFreeDiskMB:   256,
+		ContainersFreeDiskMB: 256,
+		RootFreeDiskMB:       256,
 	}
 
 	kcfg := KubeletConfig{
