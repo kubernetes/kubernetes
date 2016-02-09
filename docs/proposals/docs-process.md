@@ -36,6 +36,14 @@ Right now, the subdirectory of kubernetes/docs acts as the HEAD for the docs, wh
 
 New releases can be developed under `http://kubernetets.io/vNEXT`. We can do this because there is an extensive set of steps to get any one particular folder full of docs to be the default. Or, at worst, we can make a vNEXT branch of the `kubernetes/kubernetes.github.io` repo and do vNEXT work there, culminating in a pull request at release time. But this would only be necessary if we don’t want users to ever see what vNEXT docs look like. I personally vote for doing our work out in public. We can always mark those docs "beta" -- and keeping them in the master branch means that we get to use all the great github.io staging tools. 
 
+## Replacing of munging scripts
+
+- Inline/top-of-page Table of Contents can be done with JavaScript, e.g.: http://jsfiddle.net/s8m2t/8/
+- Header/footer insertion can be done by simply using the native layouts functionality in Jekyll
+- Linking to specific versions of docs can be done with inline variables in the URL, e.g. /docs/{{ version }}/hello-world.md
+- Replacement of file extensions in link paths should not be necessary as public Jekyll URLs are "friendly" (extension-free)
+- Other pre/post-processing scripts for docs?
+
 ## Adapting the current docs process for releases
 
 Nuts and bolts: How would a pure-GitHub Pages process work? Let’s rewrite this doc that we provide to the community, which covers [how to contribute to our docs for a K8s release](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/update-release-docs.md).
