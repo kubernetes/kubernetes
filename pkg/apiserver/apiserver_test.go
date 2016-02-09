@@ -179,9 +179,9 @@ func init() {
 			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
+				nsMapper.Add(gvk, meta.RESTScopeRoot)
 			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
+				nsMapper.Add(gvk, meta.RESTScopeNamespace)
 			}
 		}
 	}

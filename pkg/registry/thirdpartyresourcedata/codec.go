@@ -42,7 +42,7 @@ type thirdPartyResourceDataMapper struct {
 var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
 
 func (t *thirdPartyResourceDataMapper) getResource() unversioned.GroupVersionResource {
-	plural, _ := meta.KindToResource(t.getKind(), false)
+	plural, _ := meta.KindToResource(t.getKind())
 
 	return plural
 }
