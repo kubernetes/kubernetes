@@ -77,15 +77,6 @@ type Cache interface {
 	// aggregated information of pods scheduled (including assumed to be) on this node.
 	GetNodeNameToInfoMap() map[string]*NodeInfo
 
-	// List lists all pods added (including assumed) in this cache
-	List(labels.Selector) []*api.Pod
-}
-
-// CacheToPodLister make a Cache have the List method required by algorithm.PodLister
-type CacheToPodLister struct {
-	Cache Cache
-}
-
-func (c2p *CacheToPodLister) List(selector labels.Selector) ([]*api.Pod, error) {
-	return c2p.Cache.List(selector), nil
+	// List lists all cached pods (including assumed ones).
+	List(labels.Selector) ([]*api.Pod, error)
 }
