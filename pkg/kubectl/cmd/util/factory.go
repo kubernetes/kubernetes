@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -217,6 +218,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch mapping.GroupVersionKind.Group {
 			case api.GroupName:
 				return client.RESTClient, nil
+			case autoscaling.GroupName:
+				return client.AutoscalingClient.RESTClient, nil
 			case extensions.GroupName:
 				return client.ExtensionsClient.RESTClient, nil
 			}
@@ -699,6 +702,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	}
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
+	}
+	if gvk.Group == autoscaling.GroupName {
+		if c.c.AutoscalingClient == nil {
+			return errors.New("unable to validate: no autoscaling client")
+		}
+		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
 	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {
