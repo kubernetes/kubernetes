@@ -170,7 +170,7 @@ var _ = Describe("Kubectl client", func() {
 		var podPath string
 
 		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "examples/readiness-probe-pod")
+			podPath = filepath.Join(testContext.RepoRoot, "test", "e2e", "testing-manifests", "kubectl", "pod-with-readiness-probe.yaml") 
 			By(fmt.Sprintf("creating the pod from %v", podPath))
 			runKubectlOrDie("create", "-f", podPath, fmt.Sprintf("--namespace=%v", ns))
 			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
