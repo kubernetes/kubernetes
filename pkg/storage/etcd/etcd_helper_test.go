@@ -373,7 +373,6 @@ func TestSetNilOutParam(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
-	helper.versioner = nil
 	err := helper.Set(context.TODO(), "/some/key", obj, nil, 3)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
