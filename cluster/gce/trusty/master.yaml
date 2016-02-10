@@ -130,8 +130,11 @@ script
 	fi
 	# Assemble command line flags based on env variables.
 	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+		ARGS="${KUBELET_TEST_LOG_LEVEL}"
+	fi
 	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-		ARGS="${KUBELET_TEST_ARGS}"
+		ARGS="${ARGS} ${KUBELET_TEST_ARGS}"
 	fi
 	if [ ! -z "${KUBELET_APISERVER:-}" ] && [ ! -z "${KUBELET_CERT:-}" ] && [ ! -z "${KUBELET_KEY:-}" ]; then
 		ARGS="${ARGS} --api-servers=https://${KUBELET_APISERVER}"
@@ -155,7 +158,7 @@ script
 		--cgroup-root=/ \
 		--system-container=/system \
 		--nosystemd=true \
-		${ARGS}
+		${ARGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
 # Wait for 10s to start kubelet again.
