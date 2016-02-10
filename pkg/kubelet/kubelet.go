@@ -1500,7 +1500,18 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 	}
 	switch internalFieldPath {
 	case "status.podIP":
-		return pod.Status.PodIP, nil
+		status, _ := kl.statusManager.GetPodStatus(pod.UID)
+		if status.PodIP != "" {
+			return status.PodIP, nil
+		}
+
+		glog.V(4).Infof("Calling out to container runtime for status of pod %v/%v in order to inject pod IP", pod.Namespace, pod.Name)
+		runtimeStatus, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+		if err != nil {
+			glog.Warning("Unable to find pod IP in order to inject env var for pod %v/%v: %v", pod.Namespace, pod.Name, err)
+			return "", err
+		}
+		return runtimeStatus.IP, nil
 	}
 	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
