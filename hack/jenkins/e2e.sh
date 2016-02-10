@@ -225,8 +225,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce.
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
     # Override GCE defaults
@@ -241,8 +240,7 @@ case ${JOB_NAME} in
     : ${E2E_PUBLISH_GREEN_VERSION:="true"}
     : ${E2E_NETWORK:="e2e-gce"}
     # This list should match the list in kubernetes-pull-build-test-e2e-gce.
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
@@ -253,9 +251,8 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-slow)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
     : ${E2E_NETWORK:="e2e-slow"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-slow"}
     : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
@@ -304,9 +301,8 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
@@ -318,9 +314,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="parallel-flaky"}
     : ${E2E_NETWORK:="e2e-parallel-flaky"}
     : ${GINKGO_PARALLEL:="y"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
@@ -337,8 +332,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     ;;
 
@@ -348,9 +342,8 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     ;;
 
@@ -371,9 +364,8 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Feature:.+\]"}
     ;;
 
   # AWS core jobs
@@ -385,8 +377,7 @@ case ${JOB_NAME} in
     : ${E2E_ZONE:="us-west-2a"}
     : ${ZONE:="us-west-2a"}
     : ${E2E_NETWORK:="e2e-aws"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
@@ -619,9 +610,7 @@ case ${JOB_NAME} in
     # We should be testing the reliability of a long-running cluster. The
     # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    #
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${HAIRPIN_MODE:="false"}
     : ${PROJECT:="kubernetes-jenkins"}
@@ -649,9 +638,7 @@ case ${JOB_NAME} in
     # We should be testing the reliability of a long-running cluster. The
     # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    #
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-2"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
@@ -683,9 +670,7 @@ case ${JOB_NAME} in
     # We should be testing the reliability of a long-running cluster. The
     # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    #
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     ;;
 
   # Upgrade jobs
