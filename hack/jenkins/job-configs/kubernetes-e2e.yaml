@@ -53,7 +53,7 @@
             timeout: 90
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
-            timeout: 210
+            timeout: 120
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
             timeout: 90
