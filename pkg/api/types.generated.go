@@ -9354,12 +9354,13 @@ func (x *FCVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq610 [4]bool
 			_, _, _ = yysep610, yyq610, yy2arr610
 			const yyr610 bool = false
+			yyq610[2] = x.FSType != ""
 			yyq610[3] = x.ReadOnly != false
 			var yynn610 int
 			if yyr610 || yy2arr610 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn610 = 3
+				yynn610 = 2
 				for _, b := range yyq610 {
 					if b {
 						yynn610++
@@ -9426,21 +9427,27 @@ func (x *FCVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr610 || yy2arr610 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym620 := z.EncBinary()
-				_ = yym620
-				if false {
+				if yyq610[2] {
+					yym620 := z.EncBinary()
+					_ = yym620
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("fsType"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym621 := z.EncBinary()
-				_ = yym621
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+				if yyq610[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("fsType"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym621 := z.EncBinary()
+					_ = yym621
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				}
 			}
 			if yyr610 || yy2arr610 {
