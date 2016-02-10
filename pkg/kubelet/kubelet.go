@@ -3555,9 +3555,18 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 	if kl.networkPlugin != nil {
 		details := make(map[string]interface{})
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
+
+		// If the container runtime is rkt,
+		// save the CNI config into the rkt config directory.
+		runtime, ok := kl.GetRuntime().(*rkt.Runtime)
+		if ok {
+			configFilePath := path.Join(runtime.GetConfig().LocalConfigDir, rkt.DefaultK8sNetConfigFile)
+			details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_PATH] = configFilePath
+		}
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
 }
+
 func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 	return kl.containerManager.GetNodeConfig()
 }

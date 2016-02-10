@@ -20,7 +20,10 @@ package kubenet
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path"
 	"strings"
 	"syscall"
 
@@ -64,7 +67,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 		Path: []string{DefaultCNIDir},
 	}
 
-	if link, err := findMinMTU(); err == nil {
+	if link, err := FindMinMTU(); err == nil {
 		plugin.MTU = link.MTU
 		glog.V(5).Infof("Using interface %s MTU %d as bridge MTU", link.Name, link.MTU)
 	} else {
@@ -74,7 +77,8 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 	return nil
 }
 
-func findMinMTU() (*net.Interface, error) {
+// Export the function for testing purpose.
+func FindMinMTU() (*net.Interface, error) {
 	intfs, err := net.Interfaces()
 	if err != nil {
 		return nil, err
@@ -118,6 +122,8 @@ const NET_CONFIG_TEMPLATE = `{
 }`
 
 func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interface{}) {
+	var json string
+
 	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
 		return
 	}
@@ -139,7 +145,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 		// Set bridge address to first address in IPNet
 		cidr.IP.To4()[3] += 1
 
-		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.MTU, DefaultInterfaceName, podCIDR, cidr.IP.String())
+		json = fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.MTU, DefaultInterfaceName, podCIDR, cidr.IP.String())
 		plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 		if err == nil {
 			glog.V(5).Infof("CNI network config:\n%s", json)
@@ -152,6 +158,19 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 
 	if err != nil {
 		glog.Warningf("Failed to generate CNI network config: %v", err)
+	}
+
+	configFilePath, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_PATH].(string)
+	if ok {
+		glog.V(5).Infof("Saving CNI config file at %q", configFilePath)
+		if err := os.MkdirAll(path.Dir(configFilePath), 0750); err != nil && !os.IsExist(err) {
+			glog.Errorf("CNI cannot save config file at %q: %v", configFilePath, err)
+			return
+		}
+		if err := ioutil.WriteFile(configFilePath, []byte(json), 0640); err != nil {
+			glog.Errorf("CNI cannot save config file at %q: %v", configFilePath, err)
+			return
+		}
 	}
 }
 
