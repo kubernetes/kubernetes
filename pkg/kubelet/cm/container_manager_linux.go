@@ -66,7 +66,7 @@ type systemContainer struct {
 	manager *fs.Manager
 }
 
-func newSystemContainer(containerName string) *systemContainer {
+func newSystemCgroups(containerName string) *systemContainer {
 	return &systemContainer{
 		name:    containerName,
 		manager: createManager(containerName),
@@ -193,8 +193,8 @@ func (cm *containerManagerImpl) setupNode() error {
 
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
-		if cm.RuntimeContainerName != "" {
-			cont := newSystemContainer(cm.RuntimeContainerName)
+		if cm.RuntimeCgroupsName != "" {
+			cont := newSystemCgroups(cm.RuntimeCgroupsName)
 			info, err := cm.cadvisorInterface.MachineInfo()
 			var capacity = api.ResourceList{}
 			if err != nil {
@@ -203,16 +203,16 @@ func (cm *containerManagerImpl) setupNode() error {
 			}
 			memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
 			if memoryLimit < MinDockerMemoryLimit {
-				glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.RuntimeContainerName, MinDockerMemoryLimit)
+				glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.RuntimeCgroupsName, MinDockerMemoryLimit)
 				memoryLimit = MinDockerMemoryLimit
 			}
 
-			glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.RuntimeContainerName, memoryLimit)
+			glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.RuntimeCgroupsName, memoryLimit)
 
 			dockerContainer := &fs.Manager{
 				Cgroups: &configs.Cgroup{
 					Parent: "/",
-					Name:   cm.RuntimeContainerName,
+					Name:   cm.RuntimeCgroupsName,
 					Resources: &configs.Resources{
 						Memory:          memoryLimit,
 						MemorySwap:      -1,
@@ -229,16 +229,16 @@ func (cm *containerManagerImpl) setupNode() error {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				cm.RuntimeContainerName = cont
+				cm.RuntimeCgroupsName = cont
 			}
 		}
 	}
 
-	if cm.SystemContainerName != "" {
-		if cm.SystemContainerName == "/" {
+	if cm.SystemCgroupsName != "" {
+		if cm.SystemCgroupsName == "/" {
 			return fmt.Errorf("system container cannot be root (\"/\")")
 		}
-		cont := newSystemContainer(cm.SystemContainerName)
+		cont := newSystemCgroups(cm.SystemCgroupsName)
 		rootContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Parent: "/",
@@ -246,17 +246,17 @@ func (cm *containerManagerImpl) setupNode() error {
 			},
 		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureSystemContainer(rootContainer, manager)
+			return ensureSystemCgroups(rootContainer, manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	}
 
-	if cm.KubeletContainerName != "" {
-		cont := newSystemContainer(cm.KubeletContainerName)
+	if cm.KubeletCgroupsName != "" {
+		cont := newSystemCgroups(cm.KubeletCgroupsName)
 		manager := fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Parent: "/",
-				Name:   cm.KubeletContainerName,
+				Name:   cm.KubeletCgroupsName,
 				Resources: &configs.Resources{
 					AllowAllDevices: true,
 				},
@@ -271,7 +271,7 @@ func (cm *containerManagerImpl) setupNode() error {
 		if err != nil {
 			glog.Error("failed to find cgroups of kubelet - %v", err)
 		} else {
-			cm.KubeletContainerName = cont
+			cm.KubeletCgroupsName = cont
 		}
 	}
 
@@ -328,7 +328,7 @@ func (cm *containerManagerImpl) Start() error {
 	return nil
 }
 
-func (cm *containerManagerImpl) SystemContainersLimit() api.ResourceList {
+func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
 	cpuLimit := int64(0)
 
 	// Sum up resources of all external containers.
@@ -435,7 +435,7 @@ func getContainer(pid int) (string, error) {
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
 //
-func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error {
+func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
 	var errs []error

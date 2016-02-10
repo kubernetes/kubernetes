@@ -119,9 +119,9 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 	}
 
 	systemContainers := map[string]string{
-		SystemContainerKubelet: sb.nodeConfig.KubeletContainerName,
-		SystemContainerRuntime: sb.nodeConfig.RuntimeContainerName,
-		SystemContainerMisc:    sb.nodeConfig.SystemContainerName,
+		SystemContainerKubelet: sb.nodeConfig.KubeletCgroupsName,
+		SystemContainerRuntime: sb.nodeConfig.RuntimeCgroupsName,
+		SystemContainerMisc:    sb.nodeConfig.SystemCgroupsName,
 	}
 	for sys, name := range systemContainers {
 		if info, ok := sb.infos[name]; ok {

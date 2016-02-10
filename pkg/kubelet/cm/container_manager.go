@@ -27,17 +27,17 @@ type ContainerManager interface {
 	// - Creates the system container where all non-containerized processes run.
 	Start() error
 
-	// Returns resources allocated to system containers in the machine.
-	// These containers include the system and Kubernetes services.
-	SystemContainersLimit() api.ResourceList
+	// Returns resources allocated to system cgroups in the machine.
+	// These cgroups include the system and Kubernetes services.
+	SystemCgroupsLimit() api.ResourceList
 
 	// Returns a NodeConfig that is being used by the container manager.
 	GetNodeConfig() NodeConfig
 }
 
 type NodeConfig struct {
-	RuntimeContainerName string
-	SystemContainerName  string
-	KubeletContainerName string
-	ContainerRuntime     string
+	RuntimeCgroupsName string
+	SystemCgroupsName  string
+	KubeletCgroupsName string
+	ContainerRuntime   string
 }

@@ -30,7 +30,7 @@ func (cm *containerManagerStub) Start() error {
 	return nil
 }
 
-func (cm *containerManagerStub) SystemContainersLimit() api.ResourceList {
+func (cm *containerManagerStub) SystemCgroupsLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 

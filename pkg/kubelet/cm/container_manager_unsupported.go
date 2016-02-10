@@ -35,7 +35,7 @@ func (unsupportedContainerManager) Start() error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
+func (unsupportedContainerManager) SystemCgroupsLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 
