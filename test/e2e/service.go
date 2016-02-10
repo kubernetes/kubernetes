@@ -48,7 +48,11 @@ import (
 const kubeProxyLagTimeout = 5 * time.Minute
 
 // Maximum time a load balancer is allowed to not respond after creation.
-const loadBalancerLagTimeout = 2 * time.Minute
+const loadBalancerLagTimeoutDefault = 2 * time.Minute
+
+// On AWS there is a delay between ELB creation and serving traffic;
+// a few minutes is typical, so use 10m.
+const loadBalancerLagTimeoutAWS = 10 * time.Minute
 
 // How long to wait for a load balancer to be created/modified.
 //TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
@@ -419,6 +423,11 @@ var _ = Describe("Services", func() {
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		loadBalancerSupportsUDP := !providerIs("aws")
+
+		loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
+		if providerIs("aws") {
+			loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
+		}
 
 		// This test is more monolithic than we'd like because LB turnup can be
 		// very slow, so we lumped all the tests into one LB lifecycle.
