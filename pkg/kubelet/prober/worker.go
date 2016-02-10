@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/golang/glog"
@@ -93,7 +94,8 @@ func newWorker(
 
 // run periodically probes the container.
 func (w *worker) run() {
-	probeTicker := time.NewTicker(time.Duration(w.spec.PeriodSeconds) * time.Second)
+	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+	probeTicker := time.NewTicker(probeTickerPeriod)
 
 	defer func() {
 		// Clean up.
@@ -104,6 +106,10 @@ func (w *worker) run() {
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
 	}()
+
+	// If kubelet restarted the probes could be started in rapid succession.
+	// Let the worker wait for a random portion of tickerPeriod before probing.
+	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
 
 probeLoop:
 	for w.doProbe() {
