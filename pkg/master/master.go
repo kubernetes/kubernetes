@@ -264,7 +264,6 @@ func (m *Master) InstallAPIs(c *Config) {
 
 		// Hard code preferred group version to batch/v1
 		batchGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "batch", Version: "v1"}
-		glog.Infof("batch setup: \n\n%#v\n\n", batchGroupMeta)
 
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *batchGroupMeta,

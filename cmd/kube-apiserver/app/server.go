@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -86,15 +85,17 @@ func verifyClusterIPFlags(s *options.APIServer) {
 	}
 }
 
-type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string, bool) (storage.Interface, error)
-
-func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, pathPrefix string, quorum bool) (etcdStorage storage.Interface, err error) {
+func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, memoryGroupVersionString, pathPrefix string, quorum bool) (etcdStorage storage.Interface, err error) {
 	if storageGroupVersionString == "" {
 		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
 	}
 	storageVersion, err := unversioned.ParseGroupVersion(storageGroupVersionString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't understand storage version %v: %v", storageGroupVersionString, err)
+	}
+	memoryVersion, err := unversioned.ParseGroupVersion(memoryGroupVersionString)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't understand memory version %v: %v", memoryGroupVersionString, err)
 	}
 
 	var storageConfig etcdstorage.EtcdConfig
@@ -105,27 +106,12 @@ func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGr
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for JSON")
 	}
-	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, unversioned.GroupVersion{Group: storageVersion.Group, Version: runtime.APIVersionInternal}))
+	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, memoryVersion))
 	return storageConfig.NewStorage()
 }
 
-// convert to a map between group and groupVersions.
-func generateStorageVersionMap(legacyVersion string, storageVersions string) map[string]string {
-	storageVersionMap := map[string]string{}
-	if legacyVersion != "" {
-		storageVersionMap[""] = legacyVersion
-	}
-	if storageVersions != "" {
-		groupVersions := strings.Split(storageVersions, ",")
-		for _, gv := range groupVersions {
-			storageVersionMap[apiutil.GetGroup(gv)] = gv
-		}
-	}
-	return storageVersionMap
-}
-
 // parse the value of --etcd-servers-overrides and update given storageDestinations.
-func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, quorum bool, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc) {
+func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, quorum bool, storageDestinations *genericapiserver.StorageDestinations) {
 	if len(overrides) == 0 {
 		return
 	}
@@ -154,7 +140,11 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		}
 
 		servers := strings.Split(tokens[1], ";")
-		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], prefix, quorum)
+		// Note, internalGV will be wrong for things like batch or
+		// autoscalers, but they shouldn't be using the override
+		// storage.
+		internalGV := apigroup.GroupVersion.Group + "/__internal"
+		etcdOverrideStorage, err := newEtcd(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], internalGV, prefix, quorum)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -270,11 +260,11 @@ func Run(s *options.APIServer) error {
 
 	storageDestinations := genericapiserver.NewStorageDestinations()
 
-	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
+	storageVersions := s.StorageGroupsToGroupVersions()
 	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
 		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix, s.EtcdQuorumRead)
+	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], "/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -288,7 +278,7 @@ func Run(s *options.APIServer) error {
 		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix, s.EtcdQuorumRead)
+		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
@@ -313,14 +303,15 @@ func Run(s *options.APIServer) error {
 		if storageGroupVersion != "batch/v1" && storageGroupVersion != "extensions/v1beta1" {
 			glog.Fatalf("The storage version for batch must be either 'batch/v1' or 'extensions/v1beta1'")
 		}
-		batchEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, s.EtcdPathPrefix, s.EtcdQuorumRead)
+		glog.Infof("Using %v for batch group storage version", storageGroupVersion)
+		batchEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
 	}
 
-	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd)
+	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations)
 
 	n := s.ServiceClusterIPRange
 

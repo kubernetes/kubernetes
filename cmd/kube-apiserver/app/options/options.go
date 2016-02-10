@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -108,6 +109,38 @@ func NewAPIServer() *APIServer {
 	return &s
 }
 
+// dest must be a map of group to groupVersion.
+func gvToMap(gvList string, dest map[string]string) {
+	for _, gv := range strings.Split(gvList, ",") {
+		// We accept two formats. "group/version" OR
+		// "group=group/version". The latter is used when types
+		// move between groups.
+		if !strings.Contains(gv, "=") {
+			dest[apiutil.GetGroup(gv)] = gv
+		} else {
+			parts := strings.SplitN(gv, "=", 2)
+			// TODO: error checking.
+			dest[parts[0]] = parts[1]
+		}
+	}
+}
+
+// StorageGroupsToGroupVersions returns a map from group name to group version,
+// computed from the s.DeprecatedStorageVersion and s.StorageVersions flags.
+func (s *APIServer) StorageGroupsToGroupVersions() map[string]string {
+	storageVersionMap := map[string]string{}
+	if s.DeprecatedStorageVersion != "" {
+		storageVersionMap[""] = s.DeprecatedStorageVersion
+	}
+
+	// First, get the defaults.
+	gvToMap(registered.AllPreferredGroupVersions(), storageVersionMap)
+	// Override any defaults with the user settings.
+	gvToMap(s.StorageVersions, storageVersionMap)
+
+	return storageVersionMap
+}
+
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
@@ -149,9 +182,10 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("api-prefix", "--api-prefix is deprecated and will be removed when the v1 API is retired.")
 	fs.StringVar(&s.DeprecatedStorageVersion, "storage-version", s.DeprecatedStorageVersion, "The version to store the legacy v1 resources with. Defaults to server preferred")
 	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API is retired. See --storage-versions instead.")
-	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, "The versions to store resources with. "+
-		"Different groups may be stored in different versions. Specified in the format \"group1/version1,group2/version2...\". "+
-		"This flag expects a complete list of storage versions of ALL groups registered in the server. "+
+	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, "The per-group version to store resources in. "+
+		"Specified in the format \"group1/version1,group2/version2,...\". "+
+		"In the case where objects are moved from one group to the other, you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
+		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
