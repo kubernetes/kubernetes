@@ -403,24 +403,6 @@ case ${JOB_NAME} in
 
   # Feature jobs
 
-  # Runs only the reboot tests on GCE.
-  kubernetes-e2e-gce-reboot)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
-    : ${E2E_NETWORK:="e2e-reboot"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Reboot\]"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
-    : ${PROJECT:="kubernetes-jenkins"}
-  ;;
-
-  kubernetes-e2e-gke-reboot)
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
-    : ${E2E_NETWORK:="e2e-gke-ci-reboot"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Reboot\]"}
-  ;;
-
   # Runs only the examples tests on GCE.
   kubernetes-e2e-gce-examples)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
