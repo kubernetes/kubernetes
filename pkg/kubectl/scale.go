@@ -48,8 +48,9 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 		return &ReplicaSetScaler{c.Extensions()}, nil
 	case extensions.Kind("Job"):
 		return &JobScaler{c.Extensions()}, nil
-	case extensions.Kind("Deployment"):
-		return &DeploymentScaler{c.Extensions()}, nil
+		// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
+		// case extensions.Kind("Deployment"):
+		// 	return &DeploymentScaler{c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
 }
@@ -327,53 +328,57 @@ func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions
 	return nil
 }
 
-type DeploymentScaler struct {
-	c client.ExtensionsInterface
-}
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
+// type DeploymentScaler struct {
+// 	c client.ExtensionsInterface
+// }
 
-// ScaleSimple is responsible for updating a deployment's desired replicas count.
-func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
-	deployment, err := scaler.c.Deployments(namespace).Get(name)
-	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
-	}
-	if preconditions != nil {
-		if err := preconditions.ValidateDeployment(deployment); err != nil {
-			return err
-		}
-	}
-	scale := extensions.ScaleFromDeployment(deployment)
-	scale.Spec.Replicas = int(newSize)
-	if _, err := scaler.c.Scales(namespace).Update("Deployment", scale); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, deployment.ResourceVersion, err}
-		}
-		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
-	}
-	return nil
-}
+// // ScaleSimple is responsible for updating a deployment's desired replicas count.
+// func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
+// 	deployment, err := scaler.c.Deployments(namespace).Get(name)
+// 	if err != nil {
+// 		return ScaleError{ScaleGetFailure, "Unknown", err}
+// 	}
+// 	if preconditions != nil {
+// 		if err := preconditions.ValidateDeployment(deployment); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	scale, err := extensions.ScaleFromDeployment(deployment)
+// 	if err != nil {
+// 		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
+// 	}
+// 	scale.Spec.Replicas = int(newSize)
+// 	if _, err := scaler.c.Scales(namespace).Update("Deployment", scale); err != nil {
+// 		if errors.IsInvalid(err) {
+// 			return ScaleError{ScaleUpdateInvalidFailure, deployment.ResourceVersion, err}
+// 		}
+// 		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
+// 	}
+// 	return nil
+// }
 
-// Scale updates a deployment to a new size, with optional precondition check (if preconditions is not nil),
-// optional retries (if retry is not nil), and then optionally waits for the status to reach desired count.
-func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
-	if preconditions == nil {
-		preconditions = &ScalePrecondition{-1, ""}
-	}
-	if retry == nil {
-		// Make it try only once, immediately
-		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
-	}
-	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
-		return err
-	}
-	if waitForReplicas != nil {
-		deployment, err := scaler.c.Deployments(namespace).Get(name)
-		if err != nil {
-			return err
-		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.DeploymentHasDesiredReplicas(scaler.c, deployment))
-	}
-	return nil
-}
+// // Scale updates a deployment to a new size, with optional precondition check (if preconditions is not nil),
+// // optional retries (if retry is not nil), and then optionally waits for the status to reach desired count.
+// func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
+// 	if preconditions == nil {
+// 		preconditions = &ScalePrecondition{-1, ""}
+// 	}
+// 	if retry == nil {
+// 		// Make it try only once, immediately
+// 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
+// 	}
+// 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
+// 	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+// 		return err
+// 	}
+// 	if waitForReplicas != nil {
+// 		deployment, err := scaler.c.Deployments(namespace).Get(name)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
+// 			client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+// 	}
+// 	return nil
+// }

@@ -58,7 +58,7 @@ type DeploymentHistoryViewer struct {
 	c clientset.Interface
 }
 
-// History returns a revision-to-RC map as the revision history of a deployment
+// History returns a revision-to-replicaset map as the revision history of a deployment
 func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, error) {
 	historyInfo := HistoryInfo{
 		RevisionToTemplate: make(map[int64]*api.PodTemplateSpec),
@@ -67,22 +67,22 @@ func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, 
 	if err != nil {
 		return historyInfo, fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRCs, err := deploymentutil.GetOldRCs(*deployment, h.c)
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, h.c)
 	if err != nil {
-		return historyInfo, fmt.Errorf("failed to retrieve old RCs from deployment %s: %v", name, err)
+		return historyInfo, fmt.Errorf("failed to retrieve old replica sets from deployment %s: %v", name, err)
 	}
-	newRC, err := deploymentutil.GetNewRC(*deployment, h.c)
+	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, h.c)
 	if err != nil {
-		return historyInfo, fmt.Errorf("failed to retrieve new RC from deployment %s: %v", name, err)
+		return historyInfo, fmt.Errorf("failed to retrieve new replica set from deployment %s: %v", name, err)
 	}
-	allRCs := append(allOldRCs, newRC)
-	for _, rc := range allRCs {
-		v, err := deploymentutil.Revision(rc)
+	allRSs := append(allOldRSs, newRS)
+	for _, rs := range allRSs {
+		v, err := deploymentutil.Revision(rs)
 		if err != nil {
 			continue
 		}
-		historyInfo.RevisionToTemplate[v] = rc.Spec.Template
-		changeCause := getChangeCause(rc)
+		historyInfo.RevisionToTemplate[v] = rs.Spec.Template
+		changeCause := getChangeCause(rs)
 		if historyInfo.RevisionToTemplate[v].Annotations == nil {
 			historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)
 		}

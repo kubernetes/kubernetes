@@ -147,7 +147,7 @@ func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_Deployment = map[string]string{
-	"":         "Deployment enables declarative updates for Pods and ReplicationControllers.",
+	"":         "Deployment enables declarative updates for Pods and ReplicaSets.",
 	"metadata": "Standard object metadata.",
 	"spec":     "Specification of the desired behavior of the Deployment.",
 	"status":   "Most recently observed status of the Deployment.",
@@ -181,11 +181,11 @@ func (DeploymentRollback) SwaggerDoc() map[string]string {
 var map_DeploymentSpec = map[string]string{
 	"":                     "DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":             "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
-	"selector":             "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be the ones affected by this deployment.",
+	"selector":             "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
 	"template":             "Template describes the pods that will be created.",
 	"strategy":             "The deployment strategy to use to replace existing pods with new ones.",
 	"minReadySeconds":      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
-	"revisionHistoryLimit": "The number of old ReplicationControllers to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
+	"revisionHistoryLimit": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
 	"paused":               "Indicates that the deployment is paused and will not be processed by the deployment controller.",
 	"rollbackTo":           "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 }

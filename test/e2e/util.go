@@ -1529,8 +1529,10 @@ func (config *DeploymentConfig) create() error {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: config.Replicas,
-			Selector: map[string]string{
-				"name": config.Name,
+			Selector: &unversioned.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": config.Name,
+				},
 			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -2064,43 +2066,43 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		if err != nil {
 			return false, err
 		}
-		oldRCs, _, err := deploymentutil.GetOldRCs(*deployment, c)
+		oldRSs, _, err := deploymentutil.GetOldReplicaSets(*deployment, c)
 		if err != nil {
 			return false, err
 		}
-		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
 		if err != nil {
 			return false, err
 		}
-		if newRC == nil {
+		if newRS == nil {
 			// New RC hasnt been created yet.
 			return false, nil
 		}
-		allRCs := append(oldRCs, newRC)
-		totalCreated := deploymentutil.GetReplicaCountForRCs(allRCs)
-		totalAvailable, err := deploymentutil.GetAvailablePodsForRCs(c, allRCs, minReadySeconds)
+		allRSs := append(oldRSs, newRS)
+		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForReplicaSets(c, allRSs, minReadySeconds)
 		if err != nil {
 			return false, err
 		}
 		if totalCreated > maxCreated {
-			logRCsOfDeployment(deploymentName, oldRCs, newRC)
+			logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
-			logRCsOfDeployment(deploymentName, oldRCs, newRC)
+			logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
 		if deployment.Status.Replicas == desiredUpdatedReplicas &&
 			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
-			// Verify RCs.
-			if deploymentutil.GetReplicaCountForRCs(oldRCs) != 0 {
-				logRCsOfDeployment(deploymentName, oldRCs, newRC)
-				return false, fmt.Errorf("old RCs are not fully scaled down")
+			// Verify replica sets.
+			if deploymentutil.GetReplicaCountForReplicaSets(oldRSs) != 0 {
+				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+				return false, fmt.Errorf("old replica sets are not fully scaled down")
 			}
-			if deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
-				logRCsOfDeployment(deploymentName, oldRCs, newRC)
-				return false, fmt.Errorf("new RC is not fully scaled up")
+			if deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) != desiredUpdatedReplicas {
+				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+				return false, fmt.Errorf("new replica sets is not fully scaled up")
 			}
 			return true, nil
 		}
@@ -2109,26 +2111,25 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 }
 
 // Waits for the deployment to clean up old rcs.
-func waitForDeploymentOldRCsNum(c *clientset.Clientset, ns, deploymentName string, desiredRCNum int) error {
+func waitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName string, desiredRSNum int) error {
 	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
-
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
 			return false, err
 		}
-		oldRCs, _, err := deploymentutil.GetOldRCs(*deployment, c)
+		oldRSs, _, err := deploymentutil.GetOldReplicaSets(*deployment, c)
 		if err != nil {
 			return false, err
 		}
-		return len(oldRCs) == desiredRCNum, nil
+		return len(oldRSs) == desiredRSNum, nil
 	})
 }
 
-func logRCsOfDeployment(deploymentName string, oldRCs []*api.ReplicationController, newRC *api.ReplicationController) {
-	for i := range oldRCs {
-		Logf("Old RCs (%d/%d) of deployment %s: %+v", i+1, len(oldRCs), deploymentName, oldRCs[i])
+func logReplicaSetsOfDeployment(deploymentName string, oldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
+	for i := range oldRSs {
+		Logf("Old ReplicaSets (%d/%d) of deployment %s: %+v", i+1, len(oldRSs), deploymentName, oldRSs[i])
 	}
-	Logf("New RC of deployment %s: %+v", deploymentName, newRC)
+	Logf("New ReplicaSet of deployment %s: %+v", deploymentName, newRS)
 }
 
 // Waits for the number of events on the given object to reach a desired count.

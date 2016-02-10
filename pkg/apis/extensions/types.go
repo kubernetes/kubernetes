@@ -233,9 +233,9 @@ type DeploymentSpec struct {
 	// zero and not specified. Defaults to 1.
 	Replicas int `json:"replicas,omitempty"`
 
-	// Label selector for pods. Existing ReplicationControllers whose pods are
+	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 
 	// Template describes the pods that will be created.
 	Template api.PodTemplateSpec `json:"template"`
@@ -248,7 +248,7 @@ type DeploymentSpec struct {
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	MinReadySeconds int `json:"minReadySeconds,omitempty"`
 
-	// The number of old ReplicationControllers to retain to allow rollback.
+	// The number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	RevisionHistoryLimit *int `json:"revisionHistoryLimit,omitempty"`
 

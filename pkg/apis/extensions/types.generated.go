@@ -5430,7 +5430,7 @@ func (x *DeploymentSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep453, yyq453, yy2arr453
 			const yyr453 bool = false
 			yyq453[0] = x.Replicas != 0
-			yyq453[1] = len(x.Selector) != 0
+			yyq453[1] = x.Selector != nil
 			yyq453[3] = true
 			yyq453[4] = x.MinReadySeconds != 0
 			yyq453[5] = x.RevisionHistoryLimit != nil
@@ -5483,8 +5483,9 @@ func (x *DeploymentSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 						yym458 := z.EncBinary()
 						_ = yym458
 						if false {
+						} else if z.HasExtensions() && z.EncExt(x.Selector) {
 						} else {
-							z.F.EncMapStringStringV(x.Selector, false, e)
+							z.EncFallback(x.Selector)
 						}
 					}
 				} else {
@@ -5501,8 +5502,9 @@ func (x *DeploymentSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 						yym459 := z.EncBinary()
 						_ = yym459
 						if false {
+						} else if z.HasExtensions() && z.EncExt(x.Selector) {
 						} else {
-							z.F.EncMapStringStringV(x.Selector, false, e)
+							z.EncFallback(x.Selector)
 						}
 					}
 				}
@@ -5712,14 +5714,19 @@ func (x *DeploymentSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "selector":
 			if r.TryDecodeAsNil() {
-				x.Selector = nil
+				if x.Selector != nil {
+					x.Selector = nil
+				}
 			} else {
-				yyv482 := &x.Selector
+				if x.Selector == nil {
+					x.Selector = new(pkg1_unversioned.LabelSelector)
+				}
 				yym483 := z.DecBinary()
 				_ = yym483
 				if false {
+				} else if z.HasExtensions() && z.DecExt(x.Selector) {
 				} else {
-					z.F.DecMapStringStringX(yyv482, false, d)
+					z.DecFallback(x.Selector, false)
 				}
 			}
 		case "template":
@@ -5817,14 +5824,19 @@ func (x *DeploymentSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Selector = nil
+		if x.Selector != nil {
+			x.Selector = nil
+		}
 	} else {
-		yyv493 := &x.Selector
+		if x.Selector == nil {
+			x.Selector = new(pkg1_unversioned.LabelSelector)
+		}
 		yym494 := z.DecBinary()
 		_ = yym494
 		if false {
+		} else if z.HasExtensions() && z.DecExt(x.Selector) {
 		} else {
-			z.F.DecMapStringStringX(yyv493, false, d)
+			z.DecFallback(x.Selector, false)
 		}
 	}
 	yyj491++

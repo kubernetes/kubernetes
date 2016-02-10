@@ -624,7 +624,8 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"), storageDecorator)
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
-		storage["deployments/scale"] = deploymentStorage.Scale
+		// TODO(madhusudancs): Install scale when Scale group issues are fixed (see issue #18528).
+		// storage["deployments/scale"] = deploymentStorage.Scale
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
 	if isEnabled("jobs") {
