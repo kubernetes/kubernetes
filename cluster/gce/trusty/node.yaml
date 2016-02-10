@@ -138,9 +138,9 @@ script
 		--cluster-domain=${DNS_DOMAIN} \
 		--configure-cbr0=true \
 		--cgroup-root=/ \
-		--system-container=/system \
-                --runtime-container=/docker-daemon \
-                --resource-container=/kubelet \
+		--system-cgroups=/system \
+		--runtime-cgroups=/docker-daemon \
+		--kubelet-cgroups=/kubelet \
 		--nosystemd=true \
 		${ARGS}
 end script
