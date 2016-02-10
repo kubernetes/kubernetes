@@ -728,90 +728,28 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 	}
 }
 
-func constructSubnets(subnetsIn map[int]map[string]string) (subnetsOut []*ec2.Subnet) {
-	for i := range subnetsIn {
-		subnetsOut = append(
-			subnetsOut,
-			constructSubnet(
-				subnetsIn[i]["id"],
-				subnetsIn[i]["az"],
-			),
-		)
-	}
-	return
-}
+func TestFindSubnetIDs(t *testing.T) {
 
-func constructSubnet(id string, az string) *ec2.Subnet {
-	return &ec2.Subnet{
-		SubnetId:         &id,
-		AvailabilityZone: &az,
-	}
-}
+	expectedIds := []string{"id1", "id2"}
 
-func TestSubnetIDsinVPC(t *testing.T) {
-	awsServices := NewFakeAWSServices()
-	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
-	if err != nil {
-		t.Errorf("Error building aws cloud: %v", err)
+	instances := []*ec2.Instance{
+		{SubnetId: &expectedIds[0]},
+		{SubnetId: &expectedIds[1]},
+	}
+
+	subnetIds := findSubnetIDs(instances)
+
+	if len(expectedIds) != len(subnetIds) {
+		t.Errorf("Expected arrays to have same length")
 		return
 	}
 
-	vpcID := "vpc-deadbeef"
-
-	// test with 3 subnets from 3 different AZs
-	subnets := make(map[int]map[string]string)
-	subnets[0] = make(map[string]string)
-	subnets[0]["id"] = "subnet-a0000001"
-	subnets[0]["az"] = "af-south-1a"
-	subnets[1] = make(map[string]string)
-	subnets[1]["id"] = "subnet-b0000001"
-	subnets[1]["az"] = "af-south-1b"
-	subnets[2] = make(map[string]string)
-	subnets[2]["id"] = "subnet-c0000001"
-	subnets[2]["az"] = "af-south-1c"
-	awsServices.ec2.Subnets = constructSubnets(subnets)
-
-	result, err := c.listSubnetIDsinVPC(vpcID)
-	if err != nil {
-		t.Errorf("Error listing subnets: %v", err)
-		return
-	}
-
-	if len(result) != 3 {
-		t.Errorf("Expected 3 subnets but got %d", len(result))
-		return
-	}
-
-	result_set := make(map[string]bool)
-	for _, v := range result {
-		result_set[v] = true
-	}
-
-	for i := range subnets {
-		if !result_set[subnets[i]["id"]] {
-			t.Errorf("Expected subnet%d '%s' in result: %v", i, subnets[i]["id"], result)
+	for i, expectedId := range expectedIds {
+		if expectedId != subnetIds[i] {
+			t.Errorf("Expected subnet id %v to match %v", expectedId, subnetIds[i])
 			return
 		}
 	}
-
-	// test with 4 subnets from 3 different AZs
-	// add duplicate az subnet
-	subnets[3] = make(map[string]string)
-	subnets[3]["id"] = "subnet-c0000002"
-	subnets[3]["az"] = "af-south-1c"
-	awsServices.ec2.Subnets = constructSubnets(subnets)
-
-	result, err = c.listSubnetIDsinVPC(vpcID)
-	if err != nil {
-		t.Errorf("Error listing subnets: %v", err)
-		return
-	}
-
-	if len(result) != 3 {
-		t.Errorf("Expected 3 subnets but got %d", len(result))
-		return
-	}
-
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
