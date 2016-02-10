@@ -1619,7 +1619,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
-		fmt.Fprintf(out, "MinReadySeconds:\t%s\n", d.Spec.MinReadySeconds)
+		fmt.Fprintf(out, "MinReadySeconds:\t%d\n", d.Spec.MinReadySeconds)
 		if d.Spec.Strategy.RollingUpdate != nil {
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
