@@ -21,6 +21,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+function get-tokens() {
+  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  MASTER_USER="root"
+  MASTER_PASSWD=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=12 count=1 2>/dev/null)
+}
+get-tokens
+
 SALT_ROOT=$(dirname "${BASH_SOURCE}")
 readonly SALT_ROOT
 
@@ -83,6 +91,24 @@ cat <<EOF >>"${docker_images_sls_file}"
 kube_docker_registry: '$(echo ${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers})'
 EOF
 
+# Generate and distribute a shared secret (bearer token) to
+# apiserver and kubelet so that kubelet can authenticate to
+# apiserver to send events.
+echo "+++ Creating kube-apiserver token files"
+readonly known_tokens_file="/srv/salt-new/salt/kube-apiserver/known_tokens.csv"
+if [[ ! -f "${known_tokens_file}" ]]; then
+  mkdir -p /srv/salt-new/salt/kube-apiserver
+  (umask u=rw,go= ;
+    echo "$KUBELET_TOKEN,kubelet,kubelet" > $known_tokens_file;
+    echo "$KUBE_PROXY_TOKEN,kube_proxy,kube_proxy" >> $known_tokens_file)
+fi
+
+readonly BASIC_AUTH_FILE="/srv/salt-new/salt/kube-apiserver/basic_auth.csv"
+if [ ! -e "${BASIC_AUTH_FILE}" ]; then
+  mkdir -p /srv/salt-new/salt/kube-apiserver
+  (umask u=rwx,go=;
+    echo "${MASTER_USER},${MASTER_PASSWD},admin" > "${BASIC_AUTH_FILE}")
+fi
 
 echo "+++ Swapping in new configs"
 for dir in "${SALTDIRS[@]}"; do
