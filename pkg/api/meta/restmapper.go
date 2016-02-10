@@ -206,23 +206,32 @@ func (m *DefaultRESTMapper) ResourcesFor(resource unversioned.GroupVersionResour
 
 	case hasGroup:
 		requestedGroupResource := resource.GroupResource()
-		for currResource := range m.pluralToSingular {
-			if currResource.GroupResource() == requestedGroupResource {
-				ret = append(ret, currResource)
+		for plural, singular := range m.pluralToSingular {
+			if singular.GroupResource() == requestedGroupResource {
+				ret = append(ret, plural)
+			}
+			if plural.GroupResource() == requestedGroupResource {
+				ret = append(ret, plural)
 			}
 		}
 
 	case hasVersion:
-		for currResource := range m.pluralToSingular {
-			if currResource.Version == resource.Version && currResource.Resource == resource.Resource {
-				ret = append(ret, currResource)
+		for plural, singular := range m.pluralToSingular {
+			if singular.Version == resource.Version && singular.Resource == resource.Resource {
+				ret = append(ret, plural)
+			}
+			if plural.Version == resource.Version && plural.Resource == resource.Resource {
+				ret = append(ret, plural)
 			}
 		}
 
 	default:
-		for currResource := range m.pluralToSingular {
-			if currResource.Resource == resource.Resource {
-				ret = append(ret, currResource)
+		for plural, singular := range m.pluralToSingular {
+			if singular.Resource == resource.Resource {
+				ret = append(ret, plural)
+			}
+			if plural.Resource == resource.Resource {
+				ret = append(ret, plural)
 			}
 		}
 	}
