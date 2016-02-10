@@ -1786,6 +1786,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 					glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
 				}
 				return
+			} else {
+				glog.V(4).Infof("Called network plugin SetupPod successfully for pod %v/%v", pod.Namespace, pod.Name)
 			}
 		}
 
@@ -1805,7 +1807,14 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 		// Find the pod IP after starting the infra container in order to expose
 		// it safely via the downward API without a race and be able to use podIP in kubelet-managed /etc/hosts file.
-		pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		podIP := dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		if podIP == "" {
+			glog.Errorf("Pod IP for %v/%v could not be determined", pod.Namespace, pod.Name)
+		} else {
+			glog.V(4).Infof("Pod IP for %v/%v: %v", pod.Namespace, pod.Name, podIP)
+		}
+
+		pod.Status.PodIP = podIP
 	}
 
 	// Start everything
@@ -2030,6 +2039,9 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 		}
 		containerStatuses = append(containerStatuses, result)
 		if ip != "" {
+			if podStatus.IP != ip {
+				glog.V(4).Infof("Pod IP for %v/%v updating from %q to %q", namespace, name, podStatus.IP, ip)
+			}
 			podStatus.IP = ip
 		}
 	}
