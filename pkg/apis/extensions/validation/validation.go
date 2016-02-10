@@ -346,9 +346,24 @@ func ValidateRollback(rollback *extensions.RollbackConfig, fldPath *field.Path) 
 // Validates given deployment spec.
 func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecForRC(&spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
+
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
+	} else {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for deployment."))
+		}
+	}
+
+	selector, err := unversioned.LabelSelectorAsSelector(spec.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "failed to convert LabelSelector to Selector."))
+	} else {
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+	}
+
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	if spec.RevisionHistoryLimit != nil {

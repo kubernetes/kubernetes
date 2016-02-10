@@ -1607,12 +1607,16 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", d.ObjectMeta.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(d.Labels))
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(d.Spec.Selector))
+		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
 		fmt.Fprintf(out, "MinReadySeconds:\t%s\n", d.Spec.MinReadySeconds)
@@ -1620,17 +1624,17 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
-		oldRCs, _, err := deploymentutil.GetOldRCs(*d, dd)
+		oldRSs, _, err := deploymentutil.GetOldReplicaSets(*d, dd)
 		if err == nil {
-			fmt.Fprintf(out, "OldReplicationControllers:\t%s\n", printReplicationControllersByLabels(oldRCs))
+			fmt.Fprintf(out, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
 		}
-		newRC, err := deploymentutil.GetNewRC(*d, dd)
+		newRS, err := deploymentutil.GetNewReplicaSet(*d, dd)
 		if err == nil {
-			var newRCs []*api.ReplicationController
-			if newRC != nil {
-				newRCs = append(newRCs, newRC)
+			var newRSs []*extensions.ReplicaSet
+			if newRS != nil {
+				newRSs = append(newRSs, newRS)
 			}
-			fmt.Fprintf(out, "NewReplicationController:\t%s\n", printReplicationControllersByLabels(newRCs))
+			fmt.Fprintf(out, "NewReplicaSet:\t%s\n", printReplicaSetsByLabels(newRSs))
 		}
 		events, err := dd.Core().Events(namespace).Search(d)
 		if err == nil && events != nil {
@@ -1699,6 +1703,20 @@ func printReplicationControllersByLabels(matchingRCs []*api.ReplicationControlle
 	}
 
 	list := strings.Join(rcStrings, ", ")
+	if list == "" {
+		return "<none>"
+	}
+	return list
+}
+
+func printReplicaSetsByLabels(matchingRSs []*extensions.ReplicaSet) string {
+	// Format the matching ReplicaSets into strings.
+	var rsStrings []string
+	for _, rs := range matchingRSs {
+		rsStrings = append(rsStrings, fmt.Sprintf("%s (%d/%d replicas created)", rs.Name, rs.Status.Replicas, rs.Spec.Replicas))
+	}
+
+	list := strings.Join(rsStrings, ", ")
 	if list == "" {
 		return "<none>"
 	}

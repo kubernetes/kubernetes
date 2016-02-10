@@ -1185,9 +1185,9 @@ func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *
 		out.Replicas = nil
 	}
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(LabelSelector)
+		if err := deepCopy_v1beta1_LabelSelector(*in.Selector, out.Selector, c); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil

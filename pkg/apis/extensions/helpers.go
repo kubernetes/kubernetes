@@ -16,24 +16,32 @@ limitations under the License.
 
 package extensions
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-)
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
+// import (
+// 	"fmt"
 
-// ScaleFromDeployment returns a scale subresource for a deployment.
-func ScaleFromDeployment(deployment *Deployment) *Scale {
-	return &Scale{
-		ObjectMeta: api.ObjectMeta{
-			Name:              deployment.Name,
-			Namespace:         deployment.Namespace,
-			CreationTimestamp: deployment.CreationTimestamp,
-		},
-		Spec: ScaleSpec{
-			Replicas: deployment.Spec.Replicas,
-		},
-		Status: ScaleStatus{
-			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
-		},
-	}
-}
+// 	"k8s.io/kubernetes/pkg/api"
+// 	"k8s.io/kubernetes/pkg/api/unversioned"
+// )
+
+// // ScaleFromDeployment returns a scale subresource for a deployment.
+// func ScaleFromDeployment(deployment *Deployment) (*Scale, error) {
+// 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+// 	}
+// 	return &Scale{
+// 		ObjectMeta: api.ObjectMeta{
+// 			Name:              deployment.Name,
+// 			Namespace:         deployment.Namespace,
+// 			CreationTimestamp: deployment.CreationTimestamp,
+// 		},
+// 		Spec: ScaleSpec{
+// 			Replicas: deployment.Spec.Replicas,
+// 		},
+// 		Status: ScaleStatus{
+// 			Replicas: deployment.Status.Replicas,
+// 			Selector: selector.String(),
+// 		},
+// 	}, nil
+// }

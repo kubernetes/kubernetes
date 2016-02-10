@@ -94,6 +94,10 @@ type Factory struct {
 	Rollbacker func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
 	PodSelectorForObject func(object runtime.Object) (string, error)
+	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
+	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
+	// map-based selector
+	MapBasedSelectorForObject func(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
 	PortsForObject func(object runtime.Object) ([]string, error)
 	// LabelsForObject returns the labels associated with the provided object
@@ -257,7 +261,41 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(t.Spec.Selector), nil
 			case *extensions.Deployment:
+				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+				if err != nil {
+					return "", fmt.Errorf("failed to convert label selector to selector: %v", err)
+				}
+				return selector.String(), nil
+			default:
+				gvk, err := api.Scheme.ObjectKind(object)
+				if err != nil {
+					return "", err
+				}
+				return "", fmt.Errorf("cannot extract pod selector from %v", gvk)
+			}
+		},
+		MapBasedSelectorForObject: func(object runtime.Object) (string, error) {
+			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
+			switch t := object.(type) {
+			case *api.ReplicationController:
 				return kubectl.MakeLabels(t.Spec.Selector), nil
+			case *api.Pod:
+				if len(t.Labels) == 0 {
+					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
+				}
+				return kubectl.MakeLabels(t.Labels), nil
+			case *api.Service:
+				if t.Spec.Selector == nil {
+					return "", fmt.Errorf("the service has no pod selector set")
+				}
+				return kubectl.MakeLabels(t.Spec.Selector), nil
+			case *extensions.Deployment:
+				// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
+				// operator, DoubleEquals operator and In operator with only one element in the set.
+				if len(t.Spec.Selector.MatchExpressions) > 0 {
+					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format")
+				}
+				return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 			default:
 				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
@@ -447,11 +485,20 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			switch t := object.(type) {
 			case *api.ReplicationController:
-				return GetFirstPod(client, t.Namespace, t.Spec.Selector)
+				selector := labels.SelectorFromSet(t.Spec.Selector)
+				return GetFirstPod(client, t.Namespace, selector)
 			case *extensions.Deployment:
-				return GetFirstPod(client, t.Namespace, t.Spec.Selector)
+				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+				}
+				return GetFirstPod(client, t.Namespace, selector)
 			case *extensions.Job:
-				return GetFirstPod(client, t.Namespace, t.Spec.Selector.MatchLabels)
+				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+				}
+				return GetFirstPod(client, t.Namespace, selector)
 			case *api.Pod:
 				return t, nil
 			default:
@@ -469,12 +516,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 }
 
 // GetFirstPod returns the first pod of an object from its namespace and selector
-func GetFirstPod(client *client.Client, namespace string, selector map[string]string) (*api.Pod, error) {
+func GetFirstPod(client *client.Client, namespace string, selector labels.Selector) (*api.Pod, error) {
 	var pods *api.PodList
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
-		labelSelector := labels.SelectorFromSet(selector)
-		options := api.ListOptions{LabelSelector: labelSelector}
+		options := api.ListOptions{LabelSelector: selector}
 		if pods, err = client.Pods(namespace).List(options); err != nil {
 			return nil, err
 		}

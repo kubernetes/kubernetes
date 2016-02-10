@@ -18,6 +18,8 @@ package labels
 
 import (
 	"fmt"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Clones the given map and returns a new map with the given key and value added.
@@ -50,4 +52,44 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 	}
 	delete(newLabels, labelKey)
 	return newLabels
+}
+
+// Clones the given selector and returns a new selector with the given key and value added.
+// Returns the given selector, if labelKey is empty.
+func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
+	if labelKey == "" {
+		// Dont need to add a label.
+		return selector
+	}
+
+	// Clone.
+	newSelector := new(unversioned.LabelSelector)
+
+	// TODO(madhusudancs): Check if you can use deepCopy_extensions_LabelSelector here.
+	newSelector.MatchLabels = make(map[string]string)
+	if selector.MatchLabels != nil {
+		for key, val := range selector.MatchLabels {
+			newSelector.MatchLabels[key] = val
+		}
+	}
+	newSelector.MatchLabels[labelKey] = fmt.Sprintf("%d", labelValue)
+
+	if selector.MatchExpressions != nil {
+		newMExps := make([]unversioned.LabelSelectorRequirement, len(selector.MatchExpressions))
+		for i, me := range selector.MatchExpressions {
+			newMExps[i].Key = me.Key
+			newMExps[i].Operator = me.Operator
+			if me.Values != nil {
+				newMExps[i].Values = make([]string, len(me.Values))
+				copy(newMExps[i].Values, me.Values)
+			} else {
+				newMExps[i].Values = nil
+			}
+		}
+		newSelector.MatchExpressions = newMExps
+	} else {
+		newSelector.MatchExpressions = nil
+	}
+
+	return newSelector
 }

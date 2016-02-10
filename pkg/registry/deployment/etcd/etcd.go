@@ -183,43 +183,53 @@ type ScaleREST struct {
 	registry *deployment.Registry
 }
 
-// ScaleREST implements Patcher
-var _ = rest.Patcher(&ScaleREST{})
+// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 
-// New creates a new Scale object
-func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
-}
+//  // ScaleREST implements Patcher
+// var _ = rest.Patcher(&ScaleREST{})
 
-func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	deployment, err := (*r.registry).GetDeployment(ctx, name)
-	if err != nil {
-		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
-	}
-	return extensions.ScaleFromDeployment(deployment), nil
-}
+// // New creates a new Scale object
+// func (r *ScaleREST) New() runtime.Object {
+// 	return &extensions.Scale{}
+// }
 
-func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	if obj == nil {
-		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
-	}
-	scale, ok := obj.(*extensions.Scale)
-	if !ok {
-		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
-	}
+// func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
+// 	deployment, err := (*r.registry).GetDeployment(ctx, name)
+// 	if err != nil {
+// 		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
+// 	}
+// 	scale, err := extensions.ScaleFromDeployment(deployment)
+// 	if err != nil {
+// 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
+// 	}
+// 	return scale, nil
+// }
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
-	}
+// func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+// 	if obj == nil {
+// 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+// 	}
+// 	scale, ok := obj.(*extensions.Scale)
+// 	if !ok {
+// 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+// 	}
 
-	deployment, err := (*r.registry).GetDeployment(ctx, scale.Name)
-	if err != nil {
-		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), scale.Name)
-	}
-	deployment.Spec.Replicas = scale.Spec.Replicas
-	deployment, err = (*r.registry).UpdateDeployment(ctx, deployment)
-	if err != nil {
-		return nil, false, errors.NewConflict(extensions.Resource("deployments/scale"), scale.Name, err)
-	}
-	return extensions.ScaleFromDeployment(deployment), false, nil
-}
+// 	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+// 		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+// 	}
+
+// 	deployment, err := (*r.registry).GetDeployment(ctx, scale.Name)
+// 	if err != nil {
+// 		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), scale.Name)
+// 	}
+// 	deployment.Spec.Replicas = scale.Spec.Replicas
+// 	deployment, err = (*r.registry).UpdateDeployment(ctx, deployment)
+// 	if err != nil {
+// 		return nil, false, errors.NewConflict(extensions.Resource("deployments/scale"), scale.Name, err)
+// 	}
+// 	newScale, err := extensions.ScaleFromDeployment(deployment)
+// 	if err != nil {
+// 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
+// 	}
+// 	return newScale, false, nil
+// }

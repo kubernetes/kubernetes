@@ -149,9 +149,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	// For objects that need a pod selector, derive it from the exposed object in case a user
 	// didn't explicitly specify one via --selector
 	if s, found := params["selector"]; found && kubectl.IsZero(s) {
-		s, err := f.PodSelectorForObject(inputObject)
+		s, err := f.MapBasedSelectorForObject(inputObject)
 		if err != nil {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
+			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
 		}
 		params["selector"] = s
 	}
