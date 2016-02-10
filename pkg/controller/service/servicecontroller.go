@@ -321,7 +321,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 
 		// The load balancer doesn't exist yet, so create it.
 		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-		err := s.createLoadBalancer(service)
+		err := s.createLoadBalancer(service, namespacedName)
 		if err != nil {
 			return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
 		}
@@ -371,7 +371,7 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 	return err
 }
 
-func (s *ServiceController) createLoadBalancer(service *api.Service) error {
+func (s *ServiceController) createLoadBalancer(service *api.Service, serviceName types.NamespacedName) error {
 	ports, err := getPortsForLB(service)
 	if err != nil {
 		return err
@@ -385,7 +385,7 @@ func (s *ServiceController) createLoadBalancer(service *api.Service) error {
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
 	status, err := s.balancer.EnsureLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
-		ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
+		ports, hostsFromNodeList(&nodes), serviceName, service.Spec.SessionAffinity)
 	if err != nil {
 		return err
 	} else {
