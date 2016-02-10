@@ -34,15 +34,15 @@
     suffix:
         - 'gce':
             description: 'Continuously run Density test on Kubemark.'
-            timeout: 90
+            timeout: 120
             cron-string: '@hourly'
         - '500-gce':
             description: 'Run Density test on Kubemark in a large cluster that we should be able to handle.'
-            timeout: 180
+            timeout: 300
             cron-string: '@hourly'
         - 'gce-scale':
             description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 6 hours so as not to waste too many resources.'
-            timeout: 180
-            cron-string: 'H H/6 * * *'
+            timeout: 480
+            cron-string: 'H H/8 * * *'
     jobs:
         - 'kubernetes-kubemark-{suffix}'

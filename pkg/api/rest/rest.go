@@ -55,6 +55,14 @@ type Storage interface {
 	New() runtime.Object
 }
 
+// KindProvider specifies a different kind for its API than for its internal storage.  This is necessary for external
+// objects that are not compiled into the api server.  For such objects, there is no in-memory representation for
+// the object, so they must be represented as generic objects (e.g. RawJSON), but when we present the object as part of
+// API discovery we want to present the specific kind, not the generic internal representation.
+type KindProvider interface {
+	Kind() string
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

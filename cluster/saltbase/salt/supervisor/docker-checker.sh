@@ -25,7 +25,7 @@ echo "waiting a minute for startup"
 sleep 60
 
 while true; do
-  if ! sudo timeout 10 docker version > /dev/null; then
+  if ! sudo timeout 20 docker ps > /dev/null; then
     echo "Docker failed!"
     exit 2
   fi

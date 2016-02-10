@@ -33,6 +33,10 @@
 function create-master-instance {
   local address_opt=""
   [[ -n ${1:-} ]] && address_opt="--address ${1}"
+  local preemptible_master=""
+  if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
+    preemptible_master="--preemptible --maintenance-policy TERMINATE"
+  fi
 
   write-master-env
   gcloud compute instances create "${MASTER_NAME}" \
@@ -48,7 +52,8 @@ function create-master-instance {
     --can-ip-forward \
     --metadata-from-file \
       "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
+    ${preemptible_master}
 }
 
 # $1: template name (required)

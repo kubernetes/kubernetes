@@ -147,7 +147,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (volum
 		return "", 0, err
 	}
 
-	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB))
+	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB), *c.options.CloudTags)
 	if err != nil {
 		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
 		return "", 0, err
@@ -262,7 +262,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 				// Log error, if any, and continue checking periodically.
 				glog.Errorf("Error verifying GCE PD (%q) is detached: %v", c.pdName, err)
 			} else if allPathsRemoved {
-				// All paths to the PD have been succefully removed
+				// All paths to the PD have been successfully removed
 				unmountPDAndRemoveGlobalPath(c)
 				glog.Infof("Successfully detached GCE PD %q.", c.pdName)
 				return

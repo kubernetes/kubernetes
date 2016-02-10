@@ -24,12 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -37,7 +37,7 @@ import (
 // ResourceQuotaController is responsible for tracking quota usage status in the system
 type ResourceQuotaController struct {
 	// Must have authority to list all resources in the system, and update quota status
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	// An index of resource quota objects by namespace
 	rqIndexer cache.Indexer
 	// Watches changes to all resource quota
@@ -55,7 +55,7 @@ type ResourceQuotaController struct {
 }
 
 // NewResourceQuotaController creates a new ResourceQuotaController
-func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *ResourceQuotaController {
+func NewResourceQuotaController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *ResourceQuotaController {
 
 	rq := &ResourceQuotaController{
 		kubeClient:   kubeClient,
@@ -66,10 +66,10 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 	rq.rqIndexer, rq.rqController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).List(options)
+				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).Watch(options)
+				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ResourceQuota{},
@@ -106,10 +106,10 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 	rq.podStore.Store, rq.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Pods(api.NamespaceAll).List(options)
+				return rq.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return rq.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -166,9 +166,9 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	go rq.rqController.Run(stopCh)
 	go rq.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(rq.worker, time.Second, stopCh)
+		go wait.Until(rq.worker, time.Second, stopCh)
 	}
-	go util.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
+	go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
 	<-stopCh
 	glog.Infof("Shutting down ResourceQuotaController")
 	rq.queue.ShutDown()
@@ -265,7 +265,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rq.kubeClient.Pods(usage.Namespace).List(api.ListOptions{})
+		pods, err = rq.kubeClient.Core().Pods(usage.Namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -288,31 +288,31 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 		case api.ResourcePods:
 			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
 		case api.ResourceServices:
-			items, err := rq.kubeClient.Services(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().Services(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceReplicationControllers:
-			items, err := rq.kubeClient.ReplicationControllers(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().ReplicationControllers(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
-			items, err := rq.kubeClient.ResourceQuotas(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().ResourceQuotas(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceSecrets:
-			items, err := rq.kubeClient.Secrets(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().Secrets(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourcePersistentVolumeClaims:
-			items, err := rq.kubeClient.PersistentVolumeClaims(usage.Namespace).List(api.ListOptions{})
+			items, err := rq.kubeClient.Core().PersistentVolumeClaims(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -334,7 +334,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 
 	// update the usage only if it changed
 	if dirty {
-		_, err = rq.kubeClient.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+		_, err = rq.kubeClient.Core().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 		return err
 	}
 	return nil

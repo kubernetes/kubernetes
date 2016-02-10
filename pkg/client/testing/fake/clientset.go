@@ -18,12 +18,8 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	extensions_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned/fake"
-	legacy_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
-	legacy_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -54,14 +50,6 @@ type Clientset struct {
 }
 
 var _ clientset.Interface = &Clientset{}
-
-func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
-	return &legacy_unversioned_fake.FakeLegacy{&c.Fake}
-}
-
-func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
-	return &extensions_unversioned_fake.FakeExtensions{&c.Fake}
-}
 
 func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
 	return &FakeDiscovery{&c.Fake}

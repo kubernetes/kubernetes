@@ -2,6 +2,10 @@
   "swaggerVersion": "1.2",
   "apis": [
    {
+    "path": "/apis",
+    "description": "get available API versions"
+   },
+   {
     "path": "/version",
     "description": "git code version from which this is built"
    },
@@ -20,10 +24,6 @@
    {
     "path": "/apis/extensions",
     "description": "get information of a group"
-   },
-   {
-    "path": "/apis",
-    "description": "get available API versions"
    }
   ],
   "apiVersion": "",

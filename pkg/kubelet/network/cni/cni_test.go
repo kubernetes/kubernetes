@@ -28,12 +28,13 @@ import (
 	"testing"
 	"text/template"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -111,10 +112,10 @@ func tearDownPlugin(tmpDir string) {
 }
 
 type fakeNetworkHost struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 }
 
-func NewFakeHost(kubeClient client.Interface) *fakeNetworkHost {
+func NewFakeHost(kubeClient clientset.Interface) *fakeNetworkHost {
 	host := &fakeNetworkHost{kubeClient: kubeClient}
 	return host
 }
@@ -123,7 +124,7 @@ func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool
 	return nil, false
 }
 
-func (fnh *fakeNetworkHost) GetKubeClient() client.Interface {
+func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 	return nil
 }
 

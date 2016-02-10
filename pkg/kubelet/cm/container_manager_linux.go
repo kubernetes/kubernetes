@@ -33,12 +33,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -272,7 +272,7 @@ func (cm *containerManagerImpl) Start(nodeConfig NodeConfig) error {
 	}
 
 	// Run ensure state functions every minute.
-	go util.Until(func() {
+	go wait.Until(func() {
 		for _, cont := range cm.systemContainers {
 			if cont.ensureStateFunc != nil {
 				if err := cont.ensureStateFunc(cont.manager); err != nil {
@@ -280,7 +280,7 @@ func (cm *containerManagerImpl) Start(nodeConfig NodeConfig) error {
 				}
 			}
 		}
-	}, time.Minute, util.NeverStop)
+	}, time.Minute, wait.NeverStop)
 
 	return nil
 }
@@ -298,6 +298,19 @@ func (cm *containerManagerImpl) SystemContainersLimit() api.ResourceList {
 			cpuLimit,
 			resource.DecimalSI),
 	}
+}
+
+func isProcessRunningInHost(pid int) (bool, error) {
+	// Get init mount namespace. Mount namespace is unique for all containers.
+	initMntNs, err := os.Readlink("/proc/1/ns/mnt")
+	if err != nil {
+		return false, fmt.Errorf("failed to find mount namespace of init process")
+	}
+	processMntNs, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", pid))
+	if err != nil {
+		return false, fmt.Errorf("failed to find mount namespace of process %q", pid)
+	}
+	return initMntNs == processMntNs, nil
 }
 
 // Ensures that the Docker daemon is in the desired container.
@@ -322,6 +335,15 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 	// Move if the pid is not already in the desired container.
 	errs := []error{}
 	for _, pid := range pids {
+		if runningInHost, err := isProcessRunningInHost(pid); err != nil {
+			errs = append(errs, err)
+			// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
+			continue
+		} else if !runningInHost {
+			// Docker daemon is running inside a container. Don't touch that.
+			continue
+		}
+
 		cont, err := getContainer(pid)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
@@ -365,10 +387,6 @@ func getContainer(pid int) (string, error) {
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
 //
-// The reason of leaving process 1 at root cgroup is that libcontainer hardcoded on
-// the base cgroup path based on process 1. Please see:
-// https://github.com/kubernetes/kubernetes/issues/12789#issuecomment-132384126
-// for detail explanation.
 func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
@@ -387,7 +405,7 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 		// Remove kernel pids and other protected PIDs (pid 1, PIDs already in system & kubelet containers)
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
-			if isKernelPid(pid) {
+			if pid == 1 || isKernelPid(pid) {
 				continue
 			}
 

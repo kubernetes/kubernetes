@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // the unused capacity is calculated on a scale of 0-10
@@ -114,7 +115,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) sc
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2
-func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return schedulerapi.HostPriorityList{}, err
@@ -122,7 +123,7 @@ func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, 
 
 	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateResourceOccupancy(pod, node, machinesToPods[node.Name]))
+		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name].Pods()))
 	}
 	return list, nil
 }
@@ -143,7 +144,7 @@ func NewNodeLabelPriority(label string, presence bool) algorithm.PriorityFunctio
 // CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var score int
 	nodes, err := nodeLister.List()
 	if err != nil {
@@ -170,13 +171,85 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machines
 	return result, nil
 }
 
+// This is a reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
+const (
+	mb         int64 = 1024 * 1024
+	minImgSize int64 = 23 * mb
+	maxImgSize int64 = 1000 * mb
+)
+
+// ImageLocalityPriority is a priority function that favors nodes that already have requested pod container's images.
+// It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
+// based on the total size of those images.
+// - If none of the images are present, this node will be given the lowest priority.
+// - If some of the images are present on a node, the larger their sizes' sum, the higher the node's priority.
+func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+	sumSizeMap := make(map[string]int64)
+
+	nodes, err := nodeLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for _, node := range nodes.Items {
+			// Check if this container's image is present and get its size.
+			imageSize := checkContainerImageOnNode(node, container)
+			// Add this size to the total result of this node.
+			sumSizeMap[node.Name] += imageSize
+		}
+	}
+
+	result := []schedulerapi.HostPriority{}
+	// score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest.
+	for nodeName, sumSize := range sumSizeMap {
+		result = append(result, schedulerapi.HostPriority{Host: nodeName,
+			Score: calculateScoreFromSize(sumSize)})
+	}
+	return result, nil
+}
+
+// checkContainerImageOnNode checks if a container image is present on a node and returns its size.
+func checkContainerImageOnNode(node api.Node, container api.Container) int64 {
+	for _, image := range node.Status.Images {
+		for _, repoTag := range image.RepoTags {
+			if container.Image == repoTag {
+				// Should return immediately.
+				return image.Size
+			}
+		}
+	}
+	return 0
+}
+
+// calculateScoreFromSize calculates the priority of a node. sumSize is sum size of requested images on this node.
+// 1. Split image size range into 10 buckets.
+// 2. Decide the priority of a given sumSize based on which bucket it belongs to.
+func calculateScoreFromSize(sumSize int64) int {
+	var score int
+	switch {
+	case sumSize == 0 || sumSize < minImgSize:
+		// score == 0 means none of the images required by this pod are present on this
+		// node or the total size of the images present is too small to be taken into further consideration.
+		score = 0
+	// If existing images' total size is larger than max, just make it highest priority.
+	case sumSize >= maxImgSize:
+		score = 10
+	default:
+		score = int((10 * (sumSize - minImgSize) / (maxImgSize - minImgSize)) + 1)
+	}
+	// Return which bucket the given size belongs to
+	return score
+}
+
 // BalancedResourceAllocation favors nodes with balanced resource usage rate.
 // BalancedResourceAllocation should **NOT** be used alone, and **MUST** be used together with LeastRequestedPriority.
 // It calculates the difference between the cpu and memory fracion of capacity, and prioritizes the host based on how
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return schedulerapi.HostPriorityList{}, err
@@ -184,7 +257,7 @@ func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.P
 
 	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateBalancedResourceAllocation(pod, node, machinesToPods[node.Name]))
+		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name].Pods()))
 	}
 	return list, nil
 }

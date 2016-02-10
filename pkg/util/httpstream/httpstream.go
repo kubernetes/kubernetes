@@ -33,12 +33,12 @@ const (
 
 // NewStreamHandler defines a function that is called when a new Stream is
 // received. If no error is returned, the Stream is accepted; otherwise,
-// the stream is rejected.
-type NewStreamHandler func(Stream) error
+// the stream is rejected. After the reply frame has been sent, replySent is closed.
+type NewStreamHandler func(stream Stream, replySent <-chan struct{}) error
 
 // NoOpNewStreamHandler is a stream handler that accepts a new stream and
 // performs no other logic.
-func NoOpNewStreamHandler(stream Stream) error { return nil }
+func NoOpNewStreamHandler(stream Stream, replySent <-chan struct{}) error { return nil }
 
 // Dialer knows how to open a streaming connection to a server.
 type Dialer interface {

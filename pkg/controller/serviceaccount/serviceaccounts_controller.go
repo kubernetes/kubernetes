@@ -25,6 +25,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -66,7 +67,7 @@ func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions 
 }
 
 // NewServiceAccountsController returns a new *ServiceAccountsController.
-func NewServiceAccountsController(cl client.Interface, options ServiceAccountsControllerOptions) *ServiceAccountsController {
+func NewServiceAccountsController(cl clientset.Interface, options ServiceAccountsControllerOptions) *ServiceAccountsController {
 	e := &ServiceAccountsController{
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
@@ -81,11 +82,11 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = accountSelector
-				return e.client.ServiceAccounts(api.NamespaceAll).List(options)
+				return e.client.Core().ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = accountSelector
-				return e.client.ServiceAccounts(api.NamespaceAll).Watch(options)
+				return e.client.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -99,10 +100,10 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 	e.namespaces, e.namespaceController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Namespaces().List(options)
+				return e.client.Core().Namespaces().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Namespaces().Watch(options)
+				return e.client.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
@@ -121,7 +122,7 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 type ServiceAccountsController struct {
 	stopChan chan struct{}
 
-	client                  client.Interface
+	client                  clientset.Interface
 	serviceAccountsToEnsure []api.ServiceAccount
 
 	serviceAccounts cache.Indexer
@@ -216,7 +217,7 @@ func (e *ServiceAccountsController) createServiceAccountIfNeeded(sa api.ServiceA
 // createDefaultServiceAccount creates a default ServiceAccount in the specified namespace
 func (e *ServiceAccountsController) createServiceAccount(sa api.ServiceAccount, namespace string) {
 	sa.Namespace = namespace
-	if _, err := e.client.ServiceAccounts(namespace).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
+	if _, err := e.client.Core().ServiceAccounts(namespace).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
 		glog.Error(err)
 	}
 }

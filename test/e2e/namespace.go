@@ -120,7 +120,7 @@ var _ = Describe("Namespaces [Serial]", func() {
 	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
 		func() { extinguish(c, 100, 10, 150) })
 
-	//comprehensive draining ; uncomment after #7372
-	PIt("should always delete fast (ALL of 100 namespaces in 150 seconds)",
+	// On hold until etcd3; see #7372
+	It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
 		func() { extinguish(c, 100, 0, 150) })
 })

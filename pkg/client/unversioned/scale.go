@@ -52,7 +52,7 @@ func (c *scales) Get(kind string, name string) (result *extensions.Scale, err er
 
 	// TODO this method needs to take a proper unambiguous kind
 	fullyQualifiedKind := unversioned.GroupVersionKind{Kind: kind}
-	resource, _ := meta.KindToResource(fullyQualifiedKind, false)
+	resource, _ := meta.KindToResource(fullyQualifiedKind)
 
 	err = c.client.Get().Namespace(c.ns).Resource(resource.Resource).Name(name).SubResource("scale").Do().Into(result)
 	return
@@ -63,7 +63,7 @@ func (c *scales) Update(kind string, scale *extensions.Scale) (result *extension
 
 	// TODO this method needs to take a proper unambiguous kind
 	fullyQualifiedKind := unversioned.GroupVersionKind{Kind: kind}
-	resource, _ := meta.KindToResource(fullyQualifiedKind, false)
+	resource, _ := meta.KindToResource(fullyQualifiedKind)
 
 	err = c.client.Put().
 		Namespace(scale.Namespace).

@@ -68,7 +68,7 @@ func (c *FakeReplicaSets) Delete(name string, options *api.DeleteOptions) error 
 }
 
 func (c *FakeReplicaSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("replicasets", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.ReplicaSetList{})
 	return err

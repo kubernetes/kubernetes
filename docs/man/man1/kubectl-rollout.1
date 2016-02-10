@@ -13,7 +13,7 @@ kubectl rollout \- rollout manages a deployment
 
 .SH DESCRIPTION
 .PP
-rollout manages a deployment using subcommands
+rollout manages a deployment using subcommands like "kubectl rollout undo deployment/abc"
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -110,9 +110,21 @@ rollout manages a deployment using subcommands
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Rollback to the previous deployment
+$ kubectl rollout undo deployment/abc
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP, \fBkubectl\-rollout\-history(1)\fP,
+\fBkubectl(1)\fP, \fBkubectl\-rollout\-history(1)\fP, \fBkubectl\-rollout\-pause(1)\fP, \fBkubectl\-rollout\-resume(1)\fP, \fBkubectl\-rollout\-undo(1)\fP,
 
 
 .SH HISTORY

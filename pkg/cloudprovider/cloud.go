@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
@@ -82,8 +83,8 @@ type LoadBalancer interface {
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
 	GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
-	// EnsureLoadBalancer creates a new load balancer, or updates an existing one. Returns the status of the balancer
-	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
+	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
+	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	UpdateLoadBalancer(name, region string, hosts []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it

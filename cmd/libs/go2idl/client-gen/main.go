@@ -32,14 +32,14 @@ import (
 var (
 	test          = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
 	inputVersions = flag.StringSlice("input", []string{"api/", "extensions/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions\"")
-	clientsetName = flag.StringP("clientset-name", "n", "release_1_1", "the name of the generated clientset package.")
+	clientsetName = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
 	clientsetPath = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>. Default to \"k8s.io/kubernetes/pkg/client/clientset_generated/\"")
 	clientsetOnly = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 )
 
 func versionToPath(group string, version string) (path string) {
 	const base = "k8s.io/kubernetes/pkg"
-	// special case for the legacy group
+	// special case for the core group
 	if group == "api" {
 		path = filepath.Join(base, "api", version)
 	} else {
@@ -88,7 +88,7 @@ func main() {
 		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
 		arguments.CustomArgs = generators.ClientGenArgs{
 			[]unversioned.GroupVersion{{"testgroup", ""}},
-			"test_release_1_1",
+			"test_internalclientset",
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
 			false,
 			false,
@@ -98,7 +98,7 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Error: %v", err)
 		}
-		glog.Info("going to generate clientset from these input paths: %v", inputPath)
+		glog.Infof("going to generate clientset from these input paths: %v", inputPath)
 		arguments.InputDirs = append(inputPath, dependencies...)
 		// TODO: we need to make OutPackagePath a map[string]string. For example,
 		// we need clientset and the individual typed clients be output to different

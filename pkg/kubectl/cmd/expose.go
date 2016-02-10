@@ -95,6 +95,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -148,9 +149,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	// For objects that need a pod selector, derive it from the exposed object in case a user
 	// didn't explicitly specify one via --selector
 	if s, found := params["selector"]; found && kubectl.IsZero(s) {
-		s, err := f.PodSelectorForObject(inputObject)
+		s, err := f.MapBasedSelectorForObject(inputObject)
 		if err != nil {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
+			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
 		}
 		params["selector"] = s
 	}
@@ -210,6 +211,12 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
+	if cmdutil.ShouldRecord(cmd, info) {
+		if err := cmdutil.RecordChangeCause(object, f.Command()); err != nil {
+			return err
+		}
+	}
+	info.Refresh(object, true)
 	// TODO: extract this flag to a central location, when such a location exists.
 	if cmdutil.GetFlagBool(cmd, "dry-run") {
 		return f.PrintObject(cmd, object, out)

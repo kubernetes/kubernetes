@@ -110,21 +110,59 @@ We are working on implementing clearer partitioning of our e2e tests to make run
 - `[Slow]`: If a test takes more than five minutes to run (by itself or in parallel with many other tests), it is labeled `[Slow]`.  This partition allows us to run almost all of our tests quickly in parallel, without waiting for the stragglers to finish.
 - `[Serial]`: If a test cannot be run in parallel with other tests (e.g. it takes too many resources or restarts nodes), it is labeled `[Serial]`, and should be run in serial as part of a separate suite.
 - `[Disruptive]`: If a test restarts components that might cause other tests to fail or break the cluster completely, it is labeled `[Disruptive]`.  Any `[Disruptive]` test is also assumed to qualify for the `[Serial]` label, but need not be labeled as both.  These tests are not run against soak clusters to avoid restarting components.
-- `[Flaky]`: If a test is found to be flaky, it receives the `[Flaky]` label until it is fixed.  A `[Flaky]` label should be accompanied with a reference to the issue for de-flaking the test, because while a test remains labeled `[Flaky]`, it is not monitored closely in CI. `[Flaky]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
+- `[Flaky]`: If a test is found to be flaky and we have decided that it's too hard to fix in the short term (e.g. it's going to take a full engineer-week), it receives the `[Flaky]` label until it is fixed.  The `[Flaky]` label should be used very sparingly, and should be accompanied with a reference to the issue for de-flaking the test, because while a test remains labeled `[Flaky]`, it is not monitored closely in CI. `[Flaky]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
 - `[Skipped]`: `[Skipped]` is a legacy label that we're phasing out.  If a test is marked `[Skipped]`, there should be an issue open to label it properly.  `[Skipped]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
-- `[Feature:...]`: If a test has non-default requirements to run or targets some non-core functionality, and thus should not be run as part of the standard suite, it receives a `[Feature:...]` label, e.g. `[Feature:Performance]` or `[Feature:Ingress]`.  `[Feature:...]` tests are not run in our core suites, instead running in custom suites.  There are a few use-cases for `[Feature:...]` tests:
-  - If a feature is experimental or alpha and is not enabled by default due to being incomplete or potentially subject to breaking changes, it should *not* block the merge-queue, and thus should run in some separate test suites owned by the feature owner(s).
-  - If a feature is in beta or GA, it *should* block the merge-queue.  In moving from experimental to beta or GA, tests that are expected to pass by default should simply remove the `[Feature:...]` label, and will be incorporated into our core suites.  If tests are not expected to pass by default, (e.g. they require a special environment such as added quota,) they should remain with the `[Feature:...]` label, and the suites that run them should be incorporated into our merge-queue, owned by the Build Cop.
+- `[Feature:.+]`: If a test has non-default requirements to run or targets some non-core functionality, and thus should not be run as part of the standard suite, it receives a `[Feature:.+]` label, e.g. `[Feature:Performance]` or `[Feature:Ingress]`.  `[Feature:.+]` tests are not run in our core suites, instead running in custom suites. If a feature is experimental or alpha and is not enabled by default due to being incomplete or potentially subject to breaking changes, it does *not* block the merge-queue, and thus should run in some separate test suites owned by the feature owner(s) (see #continuous_integration below).
 
 Finally, `[Conformance]` tests are tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.  `[Conformance]` test policies are a work-in-progress; see #18162.
 
-## Adding a New Test
+## Continuous Integration
+
+A quick overview of how we run e2e CI on Kubernetes.
+
+### What is CI?
+
+We run a battery of `e2e` tests against `HEAD` of the master branch on a continuous basis, and block merges via the [submit queue](http://submit-queue.k8s.io/) on a subset of those tests if they fail (the subset is defined in the [munger config](https://github.com/kubernetes/contrib/blob/master/mungegithub/mungers/submit-queue.go) via the `jenkins-jobs` flag; note we also block on	`kubernetes-build` and `kubernetes-test-go` jobs for build and unit and integration tests).
+
+CI results can be found at [ci-test.k8s.io](http://ci-test.k8s.io), e.g. [ci-test.k8s.io/kubernetes-e2e-gce/10594](http://ci-test.k8s.io/kubernetes-e2e-gce/10594).
+
+### What runs in CI?
+
+We run all default tests (those that aren't marked `[Flaky]` or `[Feature:.+]`) against GCE and GKE.  To minimize the time from regression-to-green-run, we partition tests across different jobs:
+
+- `kubernetes-e2e-<provider>` runs all non-`[Slow]`, non-`[Serial]`, non-`[Disruptive]`, non-`[Flaky]`, non-`[Feature:.+]` tests in parallel.
+- `kubernetes-e2e-<provider>-slow` runs all `[Slow]`, non-`[Serial]`, non-`[Disruptive]`, non-`[Flaky]`, non-`[Feature:.+]` tests in parallel.
+- `kubernetes-e2e-<provider>-serial` runs all `[Serial]` and `[Disruptive]`, non-`[Flaky]`, non-`[Feature:.+]` tests in serial.
+
+We also run non-default tests if the tests exercise general-availability ("GA") features that require a special environment to run in, e.g. `kubernetes-e2e-gce-scalability` and `kubernetes-kubemark-gce`, which test for Kubernetes performance.
+
+#### Non-default tests
+
+Many `[Feature:.+]` tests we don't run in CI.  These tests are for features that are experimental (often in the `experimental` API), and aren't enabled by default.
+
+### The PR-builder
+
+We also run a battery of tests against every PR before we merge it.  These tests are equivalent to `kubernetes-gce`: it runs all non-`[Slow]`, non-`[Serial]`, non-`[Disruptive]`, non-`[Flaky]`, non-`[Feature:.+]` tests in parallel.  These tests are considered "smoke tests" to give a decent signal that the PR doesn't break most functionality.  Results for you PR can be found at [pr-test.k8s.io](http://pr-test.k8s.io), e.g. [pr-test.k8s.io/20354](http://pr-test.k8s.io/20354) for #20354.
+
+### Adding a test to CI
 
 As mentioned above, prior to adding a new test, it is a good idea to perform a `-ginkgo.dryRun=true` on the system, in order to see if a behavior is already being tested, or to determine if it may be possible to augment an existing set of tests for a specific use case.
 
 If a behavior does not currently have coverage and a developer wishes to add a new e2e test, navigate to the ./test/e2e directory and create a new test using the existing suite as a guide.
 
-**TODO:** Create a self-documented example which has been disabled, but can be copied to create new tests and outlines the capabilities and libraries used.
+TODO(#20357): Create a self-documented example which has been disabled, but can be copied to create new tests and outlines the capabilities and libraries used.
+
+When writing a test, consult #kinds_of_tests above to determine how your test should be marked, (e.g. `[Slow]`, `[Serial]`; remember, by default we assume a test can run in parallel with other tests!).
+
+When first adding a test it should *not* go straight into CI, because failures block ordinary development. A test should only be added to CI after is has been running in some non-CI suite long enough to establish a track record showing that the test does not fail when run against *working* software.  Note also that tests running in CI are generally running on a well-loaded cluster, so must contend for resources; see above about [kinds of tests](#kinds_of_tests).
+
+Generally, a feature starts as `experimental`, and will be run in some suite owned by the team developing the feature.  If a feature is in beta or GA, it *should* block the merge-queue.  In moving from experimental to beta or GA, tests that are expected to pass by default should simply remove the `[Feature:.+]` label, and will be incorporated into our core suites.  If tests are not expected to pass by default, (e.g. they require a special environment such as added quota,) they should remain with the `[Feature:.+]` label, and the suites that run them should be incorporated into the [munger config](https://github.com/kubernetes/contrib/blob/master/mungegithub/mungers/submit-queue.go) via the `jenkins-jobs` flag.
+
+Occasionally, we'll want to add tests to better exercise features that are already GA.  These tests also shouldn't go straight to CI.  They should begin by being marked as `[Flaky]` to be run outside of CI, and once a track-record for them is established, they may be promoted out of `[Flaky]`.
+
+### Moving a test out of CI
+
+If we have determined that a test is known-flaky and cannot be fixed in the short-term, we may move it out of CI indefinitely.  This move should be used sparingly, as it effectively means that we have no coverage of that test.  When a test if demoted, it should be marked `[Flaky]` with a comment accompanying the label with a reference to an issue opened to fix the test.
 
 ## Performance Evaluation
 

@@ -29,7 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build !appengine appenginevm
+// +build !appengine
 
 // This file contains the implementation of the proto field accesses using package unsafe.
 
@@ -130,8 +130,8 @@ func structPointer_ExtMap(p structPointer, f field) *map[int32]Extension {
 	return (*map[int32]Extension)(unsafe.Pointer(uintptr(p) + uintptr(f)))
 }
 
-// Map returns the reflect.Value for the address of a map field in the struct.
-func structPointer_Map(p structPointer, f field, typ reflect.Type) reflect.Value {
+// NewAt returns the reflect.Value for a pointer to a field in the struct.
+func structPointer_NewAt(p structPointer, f field, typ reflect.Type) reflect.Value {
 	return reflect.NewAt(typ, unsafe.Pointer(uintptr(p)+uintptr(f)))
 }
 

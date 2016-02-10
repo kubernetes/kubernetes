@@ -419,7 +419,7 @@ func (p *unmarshal) noStarOrSliceType(msg *generator.Descriptor, field *descript
 	return typ
 }
 
-func (p *unmarshal) field(file *descriptor.FileDescriptorProto, msg *generator.Descriptor, field *descriptor.FieldDescriptorProto, fieldname string, proto3 bool) {
+func (p *unmarshal) field(file *generator.FileDescriptor, msg *generator.Descriptor, field *descriptor.FieldDescriptorProto, fieldname string, proto3 bool) {
 	repeated := field.IsRepeated()
 	nullable := gogoproto.IsNullable(field)
 	typ := p.noStarOrSliceType(msg, field)
@@ -676,7 +676,7 @@ func (p *unmarshal) field(file *descriptor.FileDescriptorProto, msg *generator.D
 			p.Out()
 			p.P(`}`)
 			p.P(`m.`, fieldname, ` = &`, p.OneOfTypeName(msg, field), `{v}`)
-		} else if generator.IsMap(file, field) {
+		} else if generator.IsMap(file.FileDescriptorProto, field) {
 			m := p.GoMapType(nil, field)
 
 			keygoTyp, _ := p.GoType(nil, m.KeyField)
@@ -773,7 +773,12 @@ func (p *unmarshal) field(file *descriptor.FileDescriptorProto, msg *generator.D
 				p.P(`m.`, fieldname, ` = append(m.`, fieldname, `, make([]byte, postIndex-iNdEx))`)
 				p.P(`copy(m.`, fieldname, `[len(m.`, fieldname, `)-1], data[iNdEx:postIndex])`)
 			} else {
-				p.P(`m.`, fieldname, ` = append([]byte{}`, `, data[iNdEx:postIndex]...)`)
+				p.P(`m.`, fieldname, ` = append(m.`, fieldname, `[:0] , data[iNdEx:postIndex]...)`)
+				p.P(`if m.`, fieldname, ` == nil {`)
+				p.In()
+				p.P(`m.`, fieldname, ` = []byte{}`)
+				p.Out()
+				p.P(`}`)
 			}
 		} else {
 			_, ctyp, err := generator.GetCustomType(field)
@@ -1061,13 +1066,13 @@ func (p *unmarshal) Generate(file *generator.FileDescriptor) {
 				p.P(`}`)
 				p.P(`for iNdEx < postIndex {`)
 				p.In()
-				p.field(file.FileDescriptorProto, message, field, fieldname, false)
+				p.field(file, message, field, fieldname, false)
 				p.Out()
 				p.P(`}`)
 				p.Out()
 				p.P(`} else if wireType == `, strconv.Itoa(wireType), `{`)
 				p.In()
-				p.field(file.FileDescriptorProto, message, field, fieldname, false)
+				p.field(file, message, field, fieldname, false)
 				p.Out()
 				p.P(`} else {`)
 				p.In()
@@ -1080,7 +1085,7 @@ func (p *unmarshal) Generate(file *generator.FileDescriptor) {
 				p.P(`return ` + fmtPkg.Use() + `.Errorf("proto: wrong wireType = %d for field ` + errFieldname + `", wireType)`)
 				p.Out()
 				p.P(`}`)
-				p.field(file.FileDescriptorProto, message, field, fieldname, proto3)
+				p.field(file, message, field, fieldname, proto3)
 			}
 
 			if field.IsRequired() {

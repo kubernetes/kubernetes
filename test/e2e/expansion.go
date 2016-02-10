@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
+// These tests exercise the Kubernetes expansion syntax $(VAR).
+// For more information, see: docs/design/expansion.md
 var _ = Describe("Variable Expansion", func() {
 	framework := NewFramework("var-expansion")
 
@@ -37,7 +39,7 @@ var _ = Describe("Variable Expansion", func() {
 				Containers: []api.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 						Env: []api.EnvVar{
 							{
@@ -77,7 +79,7 @@ var _ = Describe("Variable Expansion", func() {
 				Containers: []api.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []api.EnvVar{
 							{
@@ -107,7 +109,7 @@ var _ = Describe("Variable Expansion", func() {
 				Containers: []api.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c"},
 						Args:    []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []api.EnvVar{

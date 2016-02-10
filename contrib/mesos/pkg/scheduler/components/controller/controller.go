@@ -19,13 +19,14 @@ package controller
 import (
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 const (
@@ -45,11 +46,11 @@ type controller struct {
 	nextPod   func() *api.Pod
 	error     func(*api.Pod, error)
 	recorder  record.EventRecorder
-	client    *client.Client
+	client    *clientset.Clientset
 	started   chan<- struct{} // startup latch
 }
 
-func New(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
+func New(client *clientset.Clientset, algorithm algorithm.SchedulerAlgorithm,
 	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
 	binder binder.Binder, started chan<- struct{}) Controller {
 	return &controller{
@@ -78,7 +79,7 @@ func (s *controller) scheduleOne() {
 	// the scheduler has to take care of this:
 	if pod.Spec.NodeName != "" && pod.DeletionTimestamp != nil {
 		log.V(3).Infof("deleting pre-scheduled, not yet running pod: %s/%s", pod.Namespace, pod.Name)
-		s.client.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
+		s.client.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
 		return
 	}
 

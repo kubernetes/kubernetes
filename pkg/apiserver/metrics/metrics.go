@@ -17,11 +17,15 @@ limitations under the License.
 package metrics
 
 import (
-	"io"
+	"bufio"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+
+	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -63,14 +67,182 @@ func Register() {
 }
 
 func Monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
-	requestCounter.WithLabelValues(*verb, *resource, client, strconv.Itoa(*httpCode)).Inc()
+	requestCounter.WithLabelValues(*verb, *resource, client, codeToString(*httpCode)).Inc()
 	requestLatencies.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
-func Reset(w http.ResponseWriter, req *http.Request) {
+func Reset() {
 	requestCounter.Reset()
 	requestLatencies.Reset()
 	requestLatenciesSummary.Reset()
-	io.WriteString(w, "metrics reset\n")
+}
+
+// InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
+// the go-restful RouteFunction instead of a HandlerFunc
+func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction) restful.RouteFunction {
+	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
+		now := time.Now()
+
+		delegate := &responseWriterDelegator{ResponseWriter: response.ResponseWriter}
+
+		_, cn := response.ResponseWriter.(http.CloseNotifier)
+		_, fl := response.ResponseWriter.(http.Flusher)
+		_, hj := response.ResponseWriter.(http.Hijacker)
+		var rw http.ResponseWriter
+		if cn && fl && hj {
+			rw = &fancyResponseWriterDelegator{delegate}
+		} else {
+			rw = delegate
+		}
+		response.ResponseWriter = rw
+
+		routeFunc(request, response)
+
+		elapsed := float64(time.Since(now)) / float64(time.Microsecond)
+		requestCounter.WithLabelValues(verb, resource, utilnet.GetHTTPClient(request.Request), codeToString(delegate.status)).Inc()
+		requestLatencies.WithLabelValues(verb, resource).Observe(elapsed)
+		requestLatenciesSummary.WithLabelValues(verb, resource).Observe(elapsed)
+	})
+}
+
+type responseWriterDelegator struct {
+	http.ResponseWriter
+
+	status      int
+	written     int64
+	wroteHeader bool
+}
+
+func (r *responseWriterDelegator) WriteHeader(code int) {
+	r.status = code
+	r.wroteHeader = true
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *responseWriterDelegator) Write(b []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+	n, err := r.ResponseWriter.Write(b)
+	r.written += int64(n)
+	return n, err
+}
+
+type fancyResponseWriterDelegator struct {
+	*responseWriterDelegator
+}
+
+func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
+	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
+}
+
+func (f *fancyResponseWriterDelegator) Flush() {
+	f.ResponseWriter.(http.Flusher).Flush()
+}
+
+func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return f.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+// Small optimization over Itoa
+func codeToString(s int) string {
+	switch s {
+	case 100:
+		return "100"
+	case 101:
+		return "101"
+
+	case 200:
+		return "200"
+	case 201:
+		return "201"
+	case 202:
+		return "202"
+	case 203:
+		return "203"
+	case 204:
+		return "204"
+	case 205:
+		return "205"
+	case 206:
+		return "206"
+
+	case 300:
+		return "300"
+	case 301:
+		return "301"
+	case 302:
+		return "302"
+	case 304:
+		return "304"
+	case 305:
+		return "305"
+	case 307:
+		return "307"
+
+	case 400:
+		return "400"
+	case 401:
+		return "401"
+	case 402:
+		return "402"
+	case 403:
+		return "403"
+	case 404:
+		return "404"
+	case 405:
+		return "405"
+	case 406:
+		return "406"
+	case 407:
+		return "407"
+	case 408:
+		return "408"
+	case 409:
+		return "409"
+	case 410:
+		return "410"
+	case 411:
+		return "411"
+	case 412:
+		return "412"
+	case 413:
+		return "413"
+	case 414:
+		return "414"
+	case 415:
+		return "415"
+	case 416:
+		return "416"
+	case 417:
+		return "417"
+	case 418:
+		return "418"
+
+	case 500:
+		return "500"
+	case 501:
+		return "501"
+	case 502:
+		return "502"
+	case 503:
+		return "503"
+	case 504:
+		return "504"
+	case 505:
+		return "505"
+
+	case 428:
+		return "428"
+	case 429:
+		return "429"
+	case 431:
+		return "431"
+	case 511:
+		return "511"
+
+	default:
+		return strconv.Itoa(s)
+	}
 }

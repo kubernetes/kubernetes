@@ -36,6 +36,10 @@ func (c *Fake) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest)
 	return new(cadvisorapi.ContainerInfo), nil
 }
 
+func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	return map[string]cadvisorapiv2.ContainerInfo{}, nil
+}
+
 func (c *Fake) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }

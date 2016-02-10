@@ -26,9 +26,10 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null  ); then
 fi
 
 # Make sure k8s version env is properly set
-K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.6"}
+K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.7"}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
+FLANNEL_IPMASQ=${FLANNEL_IPMASQ:-"true"}
 ARCH=${ARCH:-"amd64"}
 
 # Run as root
@@ -46,6 +47,7 @@ fi
 echo "K8S_VERSION is set to: ${K8S_VERSION}"
 echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
 echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
+echo "FLANNEL_IPMASQ is set to: ${FLANNEL_IPMASQ}"
 echo "MASTER_IP is set to: ${MASTER_IP}"
 echo "ARCH is set to: ${ARCH}"
 
@@ -118,13 +120,13 @@ start_k8s() {
     # Start flannel
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
         -d \
-        --restart=always \
+        --restart=on-failure \
         --net=host \
         --privileged \
         -v /dev/net:/dev/net \
         quay.io/coreos/flannel:${FLANNEL_VERSION} \
         /opt/bin/flanneld \
-            --ip-masq \
+            --ip-masq="${FLANNEL_IPMASQ}" \
             --etcd-endpoints=http://${MASTER_IP}:4001 \
             --iface="${FLANNEL_IFACE}")
 
@@ -180,7 +182,7 @@ start_k8s() {
         --net=host \
         --pid=host \
         --privileged \
-        --restart=always \
+        --restart=on-failure \
         -d \
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw  \
@@ -203,7 +205,7 @@ start_k8s() {
         -d \
         --net=host \
         --privileged \
-        --restart=always \
+        --restart=on-failure \
         gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
         /hyperkube proxy \
             --master=http://${MASTER_IP}:8080 \

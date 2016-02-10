@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 type FakeNodeInfo api.Node
@@ -42,6 +43,28 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 		}
 	}
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+}
+
+type FakePersistentVolumeClaimInfo []api.PersistentVolumeClaim
+
+func (pvcs FakePersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace string, pvcID string) (*api.PersistentVolumeClaim, error) {
+	for _, pvc := range pvcs {
+		if pvc.Name == pvcID && pvc.Namespace == namespace {
+			return &pvc, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find persistent volume claim: %s/%s", namespace, pvcID)
+}
+
+type FakePersistentVolumeInfo []api.PersistentVolume
+
+func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*api.PersistentVolume, error) {
+	for _, pv := range pvs {
+		if pv.Name == pvID {
+			return &pv, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
 }
 
 func makeResources(milliCPU int64, memory int64, pods int64) api.NodeResources {
@@ -83,53 +106,48 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		fits         bool
-		test         string
-		wErr         error
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
+		wErr     error
 	}{
 		{
 			pod: &api.Pod{},
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
 			fits: true,
 			test: "no resources requested always fits",
 			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
 			fits: false,
 			test: "too many resources fails",
 			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
 			fits: true,
 			test: "both resources fit",
 			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
 			test: "one resources fits",
 			wErr: newInsufficientResourceError(memoryResoureceName, 2, 19, 20),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: true,
 			test: "equal edge case",
 			wErr: nil,
@@ -140,7 +158,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
-		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
+		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -150,35 +168,32 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	notEnoughPodsTests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		fits         bool
-		test         string
-		wErr         error
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
+		wErr     error
 	}{
 		{
 			pod: &api.Pod{},
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
 			fits: false,
 			test: "even without specified resources predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
 			fits: false,
 			test: "even if both resources fit predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
 			test: "even for equal edge case predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
@@ -188,7 +203,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
-		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
+		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -234,7 +249,7 @@ func TestPodFitsHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := PodFitsHost(test.pod, []*api.Pod{}, test.node)
+		result, err := PodFitsHost(test.pod, test.node, schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -263,52 +278,48 @@ func newPod(host string, hostPorts ...int) *api.Pod {
 
 func TestPodFitsHostPorts(t *testing.T) {
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		fits         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
 	}{
 		{
-			pod:          &api.Pod{},
-			existingPods: []*api.Pod{},
-			fits:         true,
-			test:         "nothing running",
+			pod:      &api.Pod{},
+			nodeInfo: schedulercache.NewNodeInfo(),
+			fits:     true,
+			test:     "nothing running",
 		},
 		{
 			pod: newPod("m1", 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 9090),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 9090)),
 			fits: true,
 			test: "other port",
 		},
 		{
 			pod: newPod("m1", 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 8080),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 8080)),
 			fits: false,
 			test: "same port",
 		},
 		{
 			pod: newPod("m1", 8000, 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 8080),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 8080)),
 			fits: false,
 			test: "second port",
 		},
 		{
 			pod: newPod("m1", 8000, 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 8001, 8080),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 8001, 8080)),
 			fits: false,
 			test: "second port",
 		},
 	}
 	for _, test := range tests {
-		fits, err := PodFitsHostPorts(test.pod, test.existingPods, "machine")
+		fits, err := PodFitsHostPorts(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -378,27 +389,27 @@ func TestDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		isOk         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
 	}{
-		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
-		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
-		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
-		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.existingPods, "machine")
+		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -427,27 +438,27 @@ func TestAWSDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		isOk         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
 	}{
-		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
-		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
-		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
-		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.existingPods, "machine")
+		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -482,27 +493,27 @@ func TestRBDDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		isOk         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
 	}{
-		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
-		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
-		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
-		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.existingPods, "machine")
+		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -574,12 +585,400 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: false,
 			test: "node labels are subset",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["bar", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using In operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "kernel-version",
+									"operator": "Gt",
+									"values": ["2.4"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"kernel-version": "2.6",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using Gt operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "mem-type",
+									"operator": "NotIn",
+									"values": ["DDR", "DDR2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"mem-type": "DDR3",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using NotIn operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "GPU",
+									"operator": "Exists"
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"GPU": "NVIDIA-GRID-K1",
+			},
+			fits: true,
+			test: "Pod with matchExpressions using Exists operator that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with affinity that don't match node's labels won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": null
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with a nil []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": []
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{}, {}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with invalid NodeSelectTerms in affinity will match no objects and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{"matchExpressions": [{}]}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						"some-key": "some-value",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with no Affinity will schedule onto a node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": null
+						}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with Affinity but nil NodeSelector will schedule onto a node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "GPU",
+									"operator": "Exists"
+								}, {
+									"key": "GPU",
+									"operator": "NotIn",
+									"values": ["AMD", "INTER"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"GPU": "NVIDIA-GRID-K1",
+			},
+			fits: true,
+			test: "Pod with multiple matchExpressions ANDed that matches the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "GPU",
+									"operator": "Exists"
+								}, {
+									"key": "GPU",
+									"operator": "In",
+									"values": ["AMD", "INTER"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"GPU": "NVIDIA-GRID-K1",
+			},
+			fits: false,
+			test: "Pod with multiple matchExpressions ANDed that doesn't match the existing node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [
+								{
+									"matchExpressions": [{
+										"key": "foo",
+										"operator": "In",
+										"values": ["bar", "value2"]
+									}]
+								},
+								{
+									"matchExpressions": [{
+										"key": "diffkey",
+										"operator": "In",
+										"values": ["wrong", "value2"]
+									}]
+								}
+							]
+						}}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with multiple NodeSelectorTerms ORed in affinity, matches the node's labels and will schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": {
+							"requiredDuringSchedulingRequiredDuringExecution": {
+								"nodeSelectorTerms": [{
+									"matchExpressions": [{
+										"key": "foo",
+										"operator": "In",
+										"values": ["bar", "value2"]
+									}]
+								}]
+							},
+							"requiredDuringSchedulingIgnoredDuringExecution": {
+								"nodeSelectorTerms": [{
+									"matchExpressions": [{
+										"key": "foo",
+										"operator": "NotIn",
+										"values": ["bar", "value2"]
+									}]
+								}]
+							}
+						}}`,
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
+				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "Exists"
+								}]
+							}]
+						}}}`,
+					},
+				},
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "Pod with an Affinity and a PodSpec.NodeSelector(the old thing that we are deprecating) " +
+				"both are satisfied, will schedule onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "Exists"
+								}]
+							}]
+						}}}`,
+					},
+				},
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "barrrrrr",
+			},
+			fits: false,
+			test: "Pod with an Affinity matches node's labels but the PodSpec.NodeSelector(the old thing that we are deprecating) " +
+				"is not satisfied, won't schedule onto the node",
+		},
 	}
+
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 
 		fit := NodeSelector{FakeNodeInfo(node)}
-		fits, err := fit.PodSelectorMatches(test.pod, []*api.Pod{}, "machine")
+		fits, err := fit.PodSelectorMatches(test.pod, "machine", schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -592,12 +991,11 @@ func TestPodFitsSelector(t *testing.T) {
 func TestNodeLabelPresence(t *testing.T) {
 	label := map[string]string{"foo": "bar", "bar": "foo"}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		labels       []string
-		presence     bool
-		fits         bool
-		test         string
+		pod      *api.Pod
+		labels   []string
+		presence bool
+		fits     bool
+		test     string
 	}{
 		{
 			labels:   []string{"baz"},
@@ -639,7 +1037,7 @@ func TestNodeLabelPresence(t *testing.T) {
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
 		labelChecker := NodeLabelChecker{FakeNodeInfo(node), test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, test.existingPods, "machine")
+		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, "machine", schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -779,12 +1177,233 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
 		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, []*api.Pod{}, test.node)
+		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, test.node, schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
+
+func TestEBSVolumeCountConflicts(t *testing.T) {
+	oneVolPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
+					},
+				},
+			},
+		},
+	}
+	ebsPVCPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol",
+						},
+					},
+				},
+			},
+		},
+	}
+	splitPVCPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someNonEBSVol",
+						},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol",
+						},
+					},
+				},
+			},
+		},
+	}
+	twoVolPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
+					},
+				},
+			},
+		},
+	}
+	splitVolsPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
+					},
+				},
+			},
+		},
+	}
+	nonApplicablePod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	emptyPod := &api.Pod{
+		Spec: api.PodSpec{},
+	}
+
+	tests := []struct {
+		newPod       *api.Pod
+		existingPods []*api.Pod
+		maxVols      int
+		fits         bool
+		test         string
+	}{
+		{
+			newPod:       oneVolPod,
+			existingPods: []*api.Pod{twoVolPod, oneVolPod},
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{oneVolPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "doesn't fit when node capacity < new pod's EBS volumes",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*api.Pod{twoVolPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores non-EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts ignore non-EBS volumes",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*api.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count considers PVCs backed by EBS volumes",
+		},
+		{
+			newPod:       splitPVCPod,
+			existingPods: []*api.Pod{splitVolsPod, oneVolPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores PVCs not backed by EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{oneVolPod, ebsPVCPod},
+			maxVols:      3,
+			fits:         false,
+			test:         "existing pods' counts considers PVCs backed by EBS volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*api.Pod{oneVolPod, twoVolPod, ebsPVCPod},
+			maxVols:      4,
+			fits:         true,
+			test:         "already-mounted EBS volumes are always ok to allow",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*api.Pod{oneVolPod, oneVolPod, ebsPVCPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "the same EBS volumes are not counted multiple times",
+		},
+	}
+
+	pvInfo := FakePersistentVolumeInfo{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someEBSVol"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someNonEBSVol"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{},
+			},
+		},
+	}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someEBSVol"},
+			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "someEBSVol"},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "someNonEBSVol"},
+			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
+		},
+	}
+
+	filter := VolumeFilter{
+		FilterVolume: func(vol *api.Volume) (string, bool) {
+			if vol.AWSElasticBlockStore != nil {
+				return vol.AWSElasticBlockStore.VolumeID, true
+			}
+			return "", false
+		},
+
+		FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
+			if pv.Spec.AWSElasticBlockStore != nil {
+				return pv.Spec.AWSElasticBlockStore.VolumeID, true
+			}
+			return "", false
+		},
+	}
+
+	for _, test := range tests {
+		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
+		fits, err := pred(test.newPod, "some-node", schedulercache.NewNodeInfo(test.existingPods...))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if fits != test.fits {
+			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
 		}
 	}
 }

@@ -553,7 +553,7 @@ function provision-masterandnode() {
 function check-pods-torn-down() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   local attempt=0
-  while [[ ! -z "$(kubectl get pods | tail -n +2)" ]]; do
+  while [[ ! -z "$(kubectl get pods --show-all --all-namespaces| tail -n +2)" ]]; do
     if (( attempt > 120 )); then
       echo "timeout waiting for tearing down pods" >> ~/kube/err.log
     fi

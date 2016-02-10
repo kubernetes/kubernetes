@@ -10,7 +10,7 @@ const (
 	referenceCloser = ')'
 )
 
-// syntaxWrap returns the input string wrapped the expansion syntax.
+// syntaxWrap returns the input string wrapped by the expansion syntax.
 func syntaxWrap(input string) string {
 	return string(operator) + string(referenceOpener) + input + string(referenceCloser)
 }

@@ -30,9 +30,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/service/podsource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
+	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -42,10 +46,20 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
+// TODO(jdef): passing the value of envContainerID to all docker containers instantiated
+// through the kubelet is part of a strategy to enable orphan container GC; this can all
+// be ripped out once we have a kubelet runtime that leverages Mesos native containerization.
+
+// envContainerID is the name of the environment variable that contains the
+// Mesos-assigned container ID of the Executor.
+const envContainerID = "MESOS_EXECUTOR_CONTAINER_UUID"
+
 type KubeletExecutorServer struct {
 	*options.KubeletServer
 	SuicideTimeout    time.Duration
 	LaunchGracePeriod time.Duration
+
+	containerID string
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -74,18 +88,34 @@ func (s *KubeletExecutorServer) runExecutor(
 	nodeInfos chan<- executor.NodeInfo,
 	kubeletFinished <-chan struct{},
 	staticPodsConfigPath string,
-	apiclient *client.Client,
+	apiclient *clientset.Clientset,
 	registry executor.Registry,
 ) (<-chan struct{}, error) {
+	staticPodFilters := podutil.Filters{
+		// annotate the pod with BindingHostKey so that the scheduler will ignore the pod
+		// once it appears in the pod registry. the stock kubelet sets the pod host in order
+		// to accomplish the same; we do this because the k8sm scheduler works differently.
+		podutil.Annotator(map[string]string{
+			meta.BindingHostKey: s.HostnameOverride,
+		}),
+	}
+	if s.containerID != "" {
+		// tag all pod containers with the containerID so that they can be properly GC'd by Mesos
+		staticPodFilters = append(staticPodFilters, podutil.Environment([]api.EnvVar{
+			{Name: envContainerID, Value: s.containerID},
+		}))
+	}
 	exec := executor.New(executor.Config{
-		Registry:             registry,
-		APIClient:            apiclient,
-		Docker:               dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		SuicideTimeout:       s.SuicideTimeout,
-		KubeletFinished:      kubeletFinished,
-		ExitFunc:             os.Exit,
-		StaticPodsConfigPath: staticPodsConfigPath,
-		NodeInfos:            nodeInfos,
+		Registry:        registry,
+		APIClient:       apiclient,
+		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		SuicideTimeout:  s.SuicideTimeout,
+		KubeletFinished: kubeletFinished,
+		ExitFunc:        os.Exit,
+		NodeInfos:       nodeInfos,
+		Options: []executor.Option{
+			executor.StaticPods(staticPodsConfigPath, staticPodFilters),
+		},
 	})
 
 	// initialize driver and initialize the executor with it
@@ -116,7 +146,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	nodeInfos <-chan executor.NodeInfo,
 	kubeletDone chan<- struct{},
 	staticPodsConfigPath string,
-	apiclient *client.Client,
+	apiclient *clientset.Clientset,
 	podLW *cache.ListWatch,
 	registry executor.Registry,
 	executorDone <-chan struct{},
@@ -163,7 +193,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	// make a separate client for events
 	eventClientConfig.QPS = s.EventRecordQPS
 	eventClientConfig.Burst = s.EventBurst
-	kcfg.EventClient, err = client.New(eventClientConfig)
+	kcfg.EventClient, err = clientset.NewForConfig(eventClientConfig)
 	if err != nil {
 		return err
 	}
@@ -199,7 +229,19 @@ func (s *KubeletExecutorServer) runKubelet(
 	}()
 
 	// create main pod source, it will stop generating events once executorDone is closed
-	newSourceMesos(executorDone, kcfg.PodConfig.Channel(mesosSource), podLW, registry)
+	var containerOptions []podsource.Option
+	if s.containerID != "" {
+		// tag all pod containers with the containerID so that they can be properly GC'd by Mesos
+		containerOptions = append(containerOptions, podsource.ContainerEnvOverlay([]api.EnvVar{
+			{Name: envContainerID, Value: s.containerID},
+		}))
+		kcfg.ContainerRuntimeOptions = append(kcfg.ContainerRuntimeOptions,
+			dockertools.PodInfraContainerEnv(map[string]string{
+				envContainerID: s.containerID,
+			}))
+	}
+
+	podsource.Mesos(executorDone, kcfg.PodConfig.Channel(podsource.MesosSource), podLW, registry, containerOptions...)
 
 	// create static-pods directory file source
 	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
@@ -228,11 +270,17 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		return err
 	}
 
+	// we're expecting that either Mesos or the minion process will set this for us
+	s.containerID = os.Getenv(envContainerID)
+	if s.containerID == "" {
+		log.Warningf("missing expected environment variable %q", envContainerID)
+	}
+
 	// create apiserver client
-	var apiclient *client.Client
+	var apiclient *clientset.Clientset
 	clientConfig, err := kubeletapp.CreateAPIServerClientConfig(s.KubeletServer)
 	if err == nil {
-		apiclient, err = client.New(clientConfig)
+		apiclient, err = clientset.NewForConfig(clientConfig)
 	}
 	if err != nil {
 		// required for k8sm since we need to send api.Binding information back to the apiserver
@@ -240,7 +288,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	var (
-		pw = cache.NewListWatchFromClient(apiclient, "pods", api.NamespaceAll,
+		pw = cache.NewListWatchFromClient(apiclient.CoreClient, "pods", api.NamespaceAll,
 			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
 		)
 		reg = executor.NewRegistry(apiclient)

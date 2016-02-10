@@ -15,10 +15,10 @@
 # limitations under the License.
 
 # This script contains functions for configuring instances to run kubernetes
-# nodes. It is uploaded to GCE metadata server when a VM instance is created,
-# and then downloaded by the instance. The upstart jobs in
-# cluster/gce/trusty/node.yaml source this script to make use of needed
-# functions. The script itself is not supposed to be executed in other manners.
+# master and nodes. It is uploaded as GCE instance metadata. The upstart jobs
+# in cluster/gce/trusty/<node.yaml, master.yaml> download it and make use
+# of needed functions. The script itself is not supposed to be executed in
+# other manners.
 
 config_hostname() {
   # Set the hostname to the short version.
@@ -53,16 +53,18 @@ create_dirs() {
 
 download_kube_env() {
   # Fetch kube-env from GCE metadata server.
+  readonly tmp_install_dir="/var/cache/kubernetes-install"
+  mkdir -p ${tmp_install_dir}
   curl --fail --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
-    -o /tmp/kube-env-yaml \
+    -o "${tmp_install_dir}/kube_env.yaml" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
   # Convert the yaml format file into a shell-style file.
   eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
-''' < /tmp/kube-env-yaml > /etc/kube-env)
+''' < "${tmp_install_dir}/kube_env.yaml" > /etc/kube-env)
 }
 
 create_kubelet_kubeconfig() {
@@ -181,6 +183,11 @@ install_kube_binary_config() {
   cp /tmp/kubernetes/server/bin/*.docker_tag /run/kube-docker-files/
   if [ "${KUBERNETES_MASTER:-}" = "false" ]; then
     cp /tmp/kubernetes/server/bin/kube-proxy.tar /run/kube-docker-files/
+  else
+    cp /tmp/kubernetes/server/bin/kube-apiserver.tar /run/kube-docker-files/
+    cp /tmp/kubernetes/server/bin/kube-controller-manager.tar /run/kube-docker-files/
+    cp /tmp/kubernetes/server/bin/kube-scheduler.tar /run/kube-docker-files/
+    cp -r /tmp/kubernetes/addons /run/kube-docker-files/
   fi
   # For a testing cluster, we use kubelet, kube-proxy, and kubectl binaries
   # from the release tarball and place them in /usr/local/bin. For a non-test
@@ -245,4 +252,441 @@ prepare_log_file() {
   touch $1
   chmod 644 $1
   chown root:root $1
+}
+
+# It monitors the health of several master and node components.
+health_monitoring() {
+  sleep_seconds=10
+  max_seconds=10
+  # We simply kill the process when there is a failure. Another upstart job will automatically
+  # restart the process.
+  while [ 1 ]; do
+    if ! timeout 20 docker ps > /dev/null; then
+      echo "Docker daemon failed!"
+      pkill docker
+    fi
+    if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
+      echo "Kubelet is unhealthy!"
+      pkill kubelet
+    fi
+    # TODO(andyzheng0831): Add master side health monitoring.
+    sleep ${sleep_seconds}
+  done
+}
+
+
+########## The functions below are for master only ##########
+
+# Mounts a persistent disk (formatting if needed) to store the persistent data
+# on the master -- etcd's data, a few settings, and security certs/keys/tokens.
+# safe_format_and_mount only formats an unformatted disk, and mkdir -p will
+# leave a directory be if it already exists.
+mount_master_pd() {
+  readonly pd_path="/dev/disk/by-id/google-master-pd"
+  readonly mount_point="/mnt/disks/master-pd"
+
+  # TODO(zmerlynn): GKE is still lagging in master-pd creation
+  if [ ! -e ${pd_path} ]; then
+    return
+  fi
+  # Format and mount the disk, create directories on it for all of the master's
+  # persistent data, and link them to where they're used.
+  mkdir -p ${mount_point}
+  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" ${pd_path} ${mount_point} >/var/log/master-pd-mount.log || \
+    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
+  # Contains all the data stored in etcd
+  mkdir -m 700 -p "${mount_point}/var/etcd"
+  # Contains the dynamically generated apiserver auth certs and keys
+  mkdir -p "${mount_point}/etc/srv/kubernetes"
+  # Directory for kube-apiserver to store SSH key (if necessary)
+  mkdir -p /"${mount_point}/etc/srv/sshproxy"
+  ln -s -f "${mount_point}/var/etcd" /var/etcd
+  mkdir -p /etc/srv
+  ln -s -f /"${mount_point}/etc/srv/kubernetes" /etc/srv/kubernetes
+  ln -s -f /"${mount_point}/etc/srv/sshproxy" /etc/srv/sshproxy
+
+  if ! id etcd &>/dev/null; then
+    useradd -s /sbin/nologin -d /var/etcd etcd
+  fi
+  chown -R etcd /"${mount_point}/var/etcd"
+  chgrp -R etcd "${mount_point}/var/etcd"
+}
+
+# A helper function that adds an entry to a token file.
+# $1: account information
+# $2: token file
+add_token_entry() {
+  current_token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  echo "${tcurrent_token},$1,$1" >> $2
+}
+
+# After the first boot and on upgrade, these files exists on the master-pd
+# and should never be touched again (except perhaps an additional service
+# account, see NB below.)
+create_master_auth() {
+  readonly auth_dir="/etc/srv/kubernetes"
+  if [ ! -e "${auth_dir}/ca.crt" ]; then
+    if  [ ! -z "${CA_CERT:-}" ] && [ ! -z "${MASTER_CERT:-}" ] && [ ! -z "${MASTER_KEY:-}" ]; then
+      echo "${CA_CERT}" | base64 -d > "${auth_dir}/ca.crt"
+      echo "${MASTER_CERT}" | base64 -d > "${auth_dir}/server.cert"
+      echo "${MASTER_KEY}" | base64 -d > "${auth_dir}/server.key"
+      # Kubecfg cert/key are optional and included for backwards compatibility.
+      # TODO(roberthbailey): Remove these two lines once GKE no longer requires
+      # fetching clients certs from the master VM.
+      echo "${KUBECFG_CERT:-}" | base64 -d > "${auth_dir}/kubecfg.crt"
+      echo "${KUBECFG_KEY:-}" | base64 -d > "${auth_dir}/kubecfg.key"
+    fi
+  fi
+  readonly basic_auth_csv="${auth_dir}/basic_auth.csv"
+  if [ ! -e "${basic_auth_csv}" ]; then
+    echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
+  fi
+  readonly known_tokens_csv="${auth_dir}/known_tokens.csv"
+  if [ ! -e "${known_tokens_csv}" ]; then
+    echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
+    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
+    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
+
+    # Generate tokens for other "service accounts".  Append to known_tokens.
+    #
+    # NB: If this list ever changes, this script actually has to
+    # change to detect the existence of this file, kill any deleted
+    # old tokens and add any new tokens (to handle the upgrade case).
+    add_token_entry "system:scheduler" ${known_tokens_csv}
+    add_token_entry "system:controller_manager" ${known_tokens_csv}
+    add_token_entry "system:logging" ${known_tokens_csv}
+    add_token_entry "system:monitoring" ${known_tokens_csv}
+    add_token_entry "system:dns" ${known_tokens_csv}
+  fi
+
+  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+    cat <<EOF >/etc/gce.conf
+[global]
+token-url = ${TOKEN_URL}
+token-body = ${TOKEN_BODY}
+project-id = ${PROJECT_ID}
+network-name = ${NODE_NETWORK}
+EOF
+  fi
+}
+
+# Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
+# to generate a kubeconfig file for the kubelet to securely connect to the apiserver.
+create_master_kubelet_auth() {
+  # Only configure the kubelet on the master if the required variables are
+  # set in the environment.
+  if [ -n "${KUBELET_APISERVER:-}" ] && [ -n "${KUBELET_CERT:-}" ] && [ -n "${KUBELET_KEY:-}" ]; then
+    create_kubelet_kubeconfig
+  fi
+}
+
+# Replaces the variables in the etcd manifest file with the real values, and then
+# copy the file to the manifest dir
+# $1: value for variable 'suffix'
+# $2: value for variable 'port'
+# $3: value for variable 'server_port'
+# $4: value for variable 'cpulimit'
+# $5: pod name, which should be either etcd or etcd-events
+prepare_etcd_manifest() {
+  readonly etcd_temp_file="/tmp/$5"
+  cp /run/kube-manifests/kubernetes/trusty/etcd.manifest "${etcd_temp_file}"
+  sed -i -e "s@{{ *suffix *}}@$1@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *port *}}@$2@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *server_port *}}@$3@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${etcd_temp_file}"
+  # Replace the volume host path
+  sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${etcd_temp_file}"
+  mv "${etcd_temp_file}" /etc/kubernetes/manifests
+}
+
+# Starts etcd server pod (and etcd-events pod if needed).
+# More specifically, it prepares dirs and files, sets the variable value
+# in the manifests, and copies them to /etc/kubernetes/manifests.
+start_etcd_servers() {
+  if [ -d /etc/etcd ]; then
+    rm -rf /etc/etcd
+  fi
+  if [ -e /etc/default/etcd ]; then
+    rm -f /etc/default/etcd
+  fi
+  if [ -e /etc/systemd/system/etcd.service ]; then
+    rm -f /etc/systemd/system/etcd.service
+  fi
+  if [ -e /etc/init.d/etcd ]; then
+    rm -f /etc/init.d/etcd
+  fi
+  prepare_log_file /var/log/etcd.log
+  prepare_etcd_manifest "" "4001" "2380" "200m" "etcd.manifest"
+
+  # Switch on the second etcd instance if there are more than 50 nodes.
+  if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 50 ]; then
+    prepare_log_file /var/log/etcd-events.log
+    prepare_etcd_manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
+  fi
+}
+
+# Calculates the following variables based on env variables, which will be used
+# by the manifests of several kube-master components.
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
+#   DOCKER_REGISTRY
+compute_master_manifest_variables() {
+  CLOUD_CONFIG_VOLUME=""
+  CLOUD_CONFIG_MOUNT=""
+  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+    CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\"}},"
+    CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
+  fi
+  DOCKER_REGISTRY="gcr.io/google_containers"
+  if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
+    DOCKER_REGISTRY=${KUBE_DOCKER_REGISTRY}
+  fi
+}
+
+# Starts k8s apiserver.
+# It prepares the log file, loads the docker image, calculates variables, sets them
+# in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
+#
+# Assumed vars (which are calculated in function compute_master_manifest_variables)
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
+#   DOCKER_REGISTRY
+start_kube_apiserver() {
+  prepare_log_file /var/log/kube-apiserver.log
+  # Load the docker image from file.
+  echo "Try to load docker image file kube-apiserver.tar"
+  timeout 30 docker load -i /run/kube-docker-files/kube-apiserver.tar
+
+  # Calculate variables and assemble the command line.
+  params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true"
+  if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 50 ]; then
+    params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+  fi
+  if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
+    params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
+  fi
+  if [ -n "${ADMISSION_CONTROL:-}" ]; then
+    params="${params} --admission-control=${ADMISSION_CONTROL}"
+  fi
+  if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
+    params="${params} --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
+  fi
+  if [ -n "${RUNTIME_CONFIG:-}" ]; then
+    params="${params} --runtime-config=${RUNTIME_CONFIG}"
+  fi
+  if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
+    params="${params} ${APISERVER_TEST_ARGS}"
+  fi
+  log_level="--v=2"
+  if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
+    log_level="${API_SERVER_TEST_LOG_LEVEL}"
+  fi
+  params="${params} ${log_level}"
+
+  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+    readonly vm_external_ip=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+    params="${params} --cloud-config=/etc/gce.conf --advertise-address=${vm_external_ip} --ssh-user=${PROXY_SSH_USER} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+  fi
+  readonly kube_apiserver_docker_tag=$(cat /run/kube-docker-files/kube-apiserver.docker_tag)
+
+  src_file="/run/kube-manifests/kubernetes/trusty/kube-apiserver.manifest"
+  sed -i -e "s@{{params}}@${params}@g" ${src_file}
+  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" ${src_file}
+  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" ${src_file}
+  sed -i -e "s@{{kube_docker_registry}}@${DOCKER_REGISTRY}@g" ${src_file}
+  sed -i -e "s@{{kube-apiserver_docker_tag}}@${kube_apiserver_docker_tag}@g" ${src_file}
+  cp ${src_file} /etc/kubernetes/manifests
+}
+
+# Starts k8s controller manager.
+# It prepares the log file, loads the docker image, calculates variables, sets them
+# in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
+#
+# Assumed vars (which are calculated in function compute_master_manifest_variables)
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
+#   DOCKER_REGISTRY
+start_kube_controller_manager() {
+  prepare_log_file /var/log/kube-controller-manager.log
+  # Load the docker image from file.
+  echo "Try to load docker image file kube-controller-manager.tar"
+  timeout 30 docker load -i /run/kube-docker-files/kube-controller-manager.tar
+
+  # Calculate variables and assemble the command line.
+  params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+  if [ -n "${INSTANCE_PREFIX:-}" ]; then
+    params="${params} --cluster-name=${INSTANCE_PREFIX}"
+  fi
+  if [ -n "${CLUSTER_IP_RANGE:-}" ]; then
+    params="${params} --cluster-cidr=${CLUSTER_IP_RANGE}"
+  fi
+  if [ "${ALLOCATE_NODE_CIDRS:-}" = "true" ]; then
+    params="${params} --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
+  fi
+  if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
+    params="${params} --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+  fi
+  log_level="--v=2"
+  if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
+    log_level="${CONTROLLER_MANAGER_TEST_LOG_LEVEL}"
+  fi
+  params="${params} ${log_level}"
+  if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
+    params="${params} ${CONTROLLER_MANAGER_TEST_ARGS}"
+  fi
+  readonly kube_rc_docker_tag=$(cat /run/kube-docker-files/kube-controller-manager.docker_tag)
+
+  src_file="/run/kube-manifests/kubernetes/trusty/kube-controller-manager.manifest"
+  sed -i -e "s@{{params}}@${params}@g" ${src_file}
+  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" ${src_file}
+  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" ${src_file}
+  sed -i -e "s@{{kube_docker_registry}}@${DOCKER_REGISTRY}@g" ${src_file}
+  sed -i -e "s@{{kube-controller-manager_docker_tag}}@${kube_rc_docker_tag}@g" ${src_file}
+  cp ${src_file} /etc/kubernetes/manifests
+}
+
+# Start k8s scheduler.
+# It prepares the log file, loads the docker image, calculates variables, sets them
+# in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
+#
+# Assumed vars (which are calculated in compute_master_manifest_variables())
+#   DOCKER_REGISTRY
+start_kube_scheduler() {
+  prepare_log_file /var/log/kube-scheduler.log
+  # Load the docker image from file.
+  echo "Try to load docker image file kube-scheduler.tar"
+  timeout 30 docker load -i /run/kube-docker-files/kube-scheduler.tar
+
+  # Calculate variables and set them in the manifest.
+  params=""
+  log_level="--v=2"
+  if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
+    log_level="${SCHEDULER_TEST_LOG_LEVEL}"
+  fi
+  params="${params} ${log_level}"
+  if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
+    params="${params} ${SCHEDULER_TEST_ARGS}"
+  fi
+  readonly kube_scheduler_docker_tag=$(cat /run/kube-docker-files/kube-scheduler.docker_tag)
+
+  # Remove salt comments and replace variables with values
+  src_file="/run/kube-manifests/kubernetes/trusty/kube-scheduler.manifest"
+  sed -i "/^ *{%/d" ${src_file}
+  sed -i -e "s@{{params}}@${params}@g" ${src_file}
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" ${src_file}
+  sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" ${src_file}
+  cp ${src_file} /etc/kubernetes/manifests
+}
+
+# Start a fluentd static pod for logging.
+start_fluentd() {
+  if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
+    if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
+      cp /run/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
+    elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
+      cp /run/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
+    fi
+  fi
+}
+
+# A helper function for copying addon manifests and set dir/files
+# permissions.
+# $1: addon category under /etc/kubernetes
+# $2: manifest source dir
+setup_addon_manifests() {
+  src_dir="/run/kube-manifests/kubernetes/trusty/$2"
+  dst_dir="/etc/kubernetes/$1/$2"
+  if [ ! -d "${dst_dir}" ]; then
+    mkdir -p "${dst_dir}"
+  fi
+  files=$(find "${src_dir}" -name "*.yaml")
+  if [ -n "${files}" ]; then
+    cp "${src_dir}/"*.yaml "${dst_dir}"
+  fi
+  files=$(find "${src_dir}" -name "*.json")
+  if [ -n "${files}" ]; then
+    cp "${src_dir}/"*.json "${dst_dir}"
+  fi
+  files=$(find "${src_dir}" -name "*.yaml.in")
+  if [ -n "${files}" ]; then
+    cp "${src_dir}/"*.yaml.in "${dst_dir}"
+  fi
+  chown -R root:root "${dst_dir}"
+  chmod 755 "${dst_dir}"
+  chmod 644 "${dst_dir}"/*
+}
+
+# Start k8s addons static pods.
+prepare_kube_addons() {
+  addon_src_dir="/run/kube-manifests/kubernetes/trusty"
+  addon_dst_dir="/etc/kubernetes/addons"
+  # Set up manifests of other addons.
+  if [ "${ENABLE_CLUSTER_MONITORING:-}" = "influxdb" ] || \
+     [ "${ENABLE_CLUSTER_MONITORING:-}" = "google" ] || \
+     [ "${ENABLE_CLUSTER_MONITORING:-}" = "standalone" ] || \
+     [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
+    file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
+    setup_addon_manifests "addons" "${file_dir}"
+    # Replace the salt configurations with variable values.
+    heapster_memory="300Mi"
+    if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 1 ]; then
+      heapster_memory="$((${NUM_NODES} * 12 + 200))Mi"
+    fi
+    controller_yaml="${addon_dst_dir}/${file_dir}"
+    if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
+      controller_yaml="${controller_yaml}/heapster-controller-combined.yaml"
+    else
+      controller_yaml="${controller_yaml}/heapster-controller.yaml"
+    fi
+    sed -i "/^ *{%/d" "${controller_yaml}"
+    sed -i -e "s@{{ *heapster_memory *}}@${heapster_memory}@g" "${controller_yaml}"
+  fi
+  cp "${addon_src_dir}/namespace.yaml" "${addon_dst_dir}"
+  if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
+    setup_addon_manifests "addons" "cluster-loadbalancing/glbc"
+  fi
+  if [ "${ENABLE_CLUSTER_DNS:-}" = "true" ]; then
+    setup_addon_manifests "addons" "dns"
+    dns_rc_file="${addon_dst_dir}/dns/skydns-rc.yaml"
+    dns_svc_file="${addon_dst_dir}/dns/skydns-svc.yaml"
+    mv "${addon_dst_dir}/dns/skydns-rc.yaml.in" "${dns_rc_file}"
+    mv "${addon_dst_dir}/dns/skydns-svc.yaml.in" "${dns_svc_file}"
+    # Replace the salt configurations with variable values.
+    sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
+    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
+    sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
+  fi
+  if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
+    setup_addon_manifests "addons" "registry"
+    registry_pv_file="${addon_dst_dir}/registry/registry-pv.yaml"
+    registry_pvc_file="${addon_dst_dir}/registry/registry-pvc.yaml"
+    mv "${addon_dst_dir}/registry/registry-pv.yaml.in" "${registry_pv_file}"
+    mv "${addon_dst_dir}/registry/registry-pvc.yaml.in" "${registry_pvc_file}"
+    # Replace the salt configurations with variable values.
+    sed -i "/^ *{%/d" "${registry_pv_file}"
+    sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pv_file}"
+    sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pvc_file}"
+    sed -i -e "s@{{ *pillar\['cluster_registry_disk_name'\] *}}@${CLUSTER_REGISTRY_DISK}@g" "${registry_pvc_file}"
+  fi
+  if [ "${ENABLE_NODE_LOGGING:-}" = "true" ] && \
+     [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ] && \
+     [ "${ENABLE_CLUSTER_LOGGING:-}" = "true" ]; then
+    setup_addon_manifests "addons" "fluentd-elasticsearch"
+  fi
+  if [ "${ENABLE_CLUSTER_UI:-}" = "true" ]; then
+    setup_addon_manifests "addons" "dashboard"
+  fi
+  if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
+    setup_addon_manifests "admission-controls" "limit-range"
+  fi
+
+  # Prepare the scripts for running addons.
+  addon_script_dir="/var/lib/cloud/scripts/kubernetes"
+  mkdir -p "${addon_script_dir}"
+  cp "${addon_src_dir}/kube-addons.sh" "${addon_script_dir}"
+  cp "${addon_src_dir}/kube-addon-update.sh" "${addon_script_dir}"
+  chmod 544 "${addon_script_dir}/"*.sh
+  # In case that some GCE customized trusty may have a read-only /root.
+  mount -t tmpfs tmpfs /root
+  mount --bind -o remount,rw,noexec /root
 }

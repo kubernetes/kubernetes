@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -40,13 +41,13 @@ const (
 )
 
 type StatusUpdater struct {
-	client          *client.Client
+	client          *clientset.Clientset
 	relistPeriod    time.Duration
 	heartBeatPeriod time.Duration
 	nowFunc         func() time.Time
 }
 
-func NewStatusUpdater(client *client.Client, relistPeriod time.Duration, nowFunc func() time.Time) *StatusUpdater {
+func NewStatusUpdater(client *clientset.Clientset, relistPeriod time.Duration, nowFunc func() time.Time) *StatusUpdater {
 	kubecfg := options.NewKubeletServer() // only create to get the config, this is without side-effects
 	return &StatusUpdater{
 		client:          client,
@@ -58,7 +59,7 @@ func NewStatusUpdater(client *client.Client, relistPeriod time.Duration, nowFunc
 
 func (u *StatusUpdater) Run(terminate <-chan struct{}) error {
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	nodeLW := cache.NewListWatchFromClient(u.client, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(u.client.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, nodeStore, u.relistPeriod).Run()
 
 	monitor := func() {

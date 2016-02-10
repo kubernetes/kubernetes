@@ -30,7 +30,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -162,7 +161,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 	})
 
 	f := NewFramework("cluster-upgrade")
-	var w *ServerTest
+	var w *ServiceTestFixture
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")
 		w = NewServerTest(f.Client, f.Namespace.Name, svcName)
@@ -290,7 +289,7 @@ func testMasterUpgrade(ip, v string, mUp func(v string) error) {
 	done := make(chan struct{}, 1)
 	// Let's make sure we've finished the heartbeat before shutting things down.
 	var wg sync.WaitGroup
-	go util.Until(func() {
+	go wait.Until(func() {
 		defer GinkgoRecover()
 		wg.Add(1)
 		defer wg.Done()
@@ -609,4 +608,58 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	}
 	Logf("MIG rolling update complete after %v", time.Since(start))
 	return nil
+}
+
+func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
+	return testLoadBalancerReachableInTime(ingress, port, loadBalancerLagTimeout)
+}
+
+func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
+	ip := ingress.IP
+	if ip == "" {
+		ip = ingress.Hostname
+	}
+
+	return testReachableInTime(conditionFuncDecorator(ip, port, testReachableHTTP, "/", "test-webserver"), timeout)
+
+}
+
+func conditionFuncDecorator(ip string, port int, fn func(string, int, string, string) (bool, error), request string, expect string) wait.ConditionFunc {
+	return func() (bool, error) {
+		return fn(ip, port, request, expect)
+	}
+}
+
+func testReachableInTime(testFunc wait.ConditionFunc, timeout time.Duration) bool {
+	By(fmt.Sprintf("Waiting up to %v", timeout))
+	err := wait.PollImmediate(poll, timeout, testFunc)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Error waiting")
+		return false
+	}
+	return true
+}
+
+func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string) (*api.Service, error) {
+	// TODO: once support ticket 21807001 is resolved, reduce this timeout
+	// back to something reasonable
+	const timeout = 20 * time.Minute
+	var service *api.Service
+	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a LoadBalancer ingress point", timeout, serviceName, namespace))
+	i := 1
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(3 * time.Second) {
+		service, err := c.Services(namespace).Get(serviceName)
+		if err != nil {
+			Logf("Get service failed, ignoring for 5s: %v", err)
+			continue
+		}
+		if len(service.Status.LoadBalancer.Ingress) > 0 {
+			return service, nil
+		}
+		if i%5 == 0 {
+			Logf("Waiting for service %s in namespace %s to have a LoadBalancer ingress point (%v)", serviceName, namespace, time.Since(start))
+		}
+		i++
+	}
+	return service, fmt.Errorf("service %s in namespace %s doesn't have a LoadBalancer ingress point after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }

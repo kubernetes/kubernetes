@@ -1,0 +1,272 @@
+From nobody Tue Feb 1 11:33:00 2016
+Content-Type: multipart/mixed; boundary="===================================="
+MIME-Version: 1.0
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-env.conf"
+
+#upstart-job
+
+description "Prepare kube master environment"
+
+start on cloud-config
+
+script
+	set -o errexit
+	set -o nounset
+
+	# Fetch the script for configuring the instance.
+	curl --fail --silent --show-error \
+		-H "X-Google-Metadata-Request: True" \
+		-o /etc/kube-configure.sh \
+		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+	. /etc/kube-configure.sh
+
+	echo "Configuring hostname"
+	config_hostname
+	echo "Configuring IP firewall rules"
+	config_ip_firewall
+	echo "Downloading kube-env file"
+	download_kube_env
+	. /etc/kube-env
+	echo "Creating required directories"
+	create_dirs
+	echo "Mount master PD"
+	mount_master_pd
+	echo "Creating kuberntes master auth file"
+	create_master_auth
+	echo "Creating master instance kubelet auth file"
+  create_master_kubelet_auth
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-packages.conf"
+
+#upstart-job
+
+description "Install packages needed to run kubernetes"
+
+start on stopped kube-env
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	install_critical_packages
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-additional-packages.conf"
+
+#upstart-job
+
+description "Install additional packages used by kubernetes"
+
+start on stopped kube-install-packages
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	install_additional_packages
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-master.conf"
+
+#upstart-job
+
+description "Download and install k8s binaries and configurations"
+
+start on stopped kube-env
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	install_kube_binary_config
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kubelet.conf"
+
+#upstart-job
+
+description "Run kubelet service"
+
+start on stopped kube-install-packages and stopped kube-install-master
+
+respawn
+
+script
+	set -o errexit
+	set -o nounset
+
+	echo "Start kubelet upstart job"
+
+	. /etc/kube-env
+	BINARY_PATH="/usr/bin/kubelet"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/kubelet"
+	fi
+	# Assemble command line flags based on env variables.
+	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+		ARGS="${KUBELET_TEST_ARGS}"
+	fi
+	if [ ! -z "${KUBELET_APISERVER:-}" ] && [ ! -z "${KUBELET_CERT:-}" ] && [ ! -z "${KUBELET_KEY:-}" ]; then
+		ARGS="${ARGS} --api-servers=https://${KUBELET_APISERVER}"
+		ARGS="${ARGS} --register-schedulable=false --reconcile-cidr=false"
+		ARGS="${ARGS} --pod-cidr=10.123.45.0/30"
+	else
+		ARGS="${ARGS} --pod-cidr=${MASTER_IP_RANGE}"
+	fi
+	if [ "${ENABLE_MANIFEST_URL:-}" = "true" ]; then
+		ARGS="${ARGS} --manifest-url=${MANIFEST_URL} --manifest-url-header=${MANIFEST_URL_HEADER}"
+	fi
+	
+	${BINARY_PATH} \
+		--enable-debugging-handlers=false \
+		--cloud-provider=gce \
+		--config=/etc/kubernetes/manifests \
+		--allow-privileged=true \
+		--cluster-dns=${DNS_SERVER_IP} \
+		--cluster-domain=${DNS_DOMAIN} \
+		--configure-cbr0=${ALLOCATE_NODE_CIDRS} \
+		--cgroup-root=/ \
+		--system-container=/system \
+		--nosystemd=true \
+		${ARGS}
+end script
+
+# Wait for 10s to start kubelet again.
+post-stop exec sleep 10
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-docker.conf"
+
+#upstart-job
+
+description "Restart docker daemon"
+
+# The condition "stopped kube-install-additional-packages" is to avoid
+# breaking nsenter installation, which is through a docker container.
+# It can be removed if we find a better way to install nsenter.
+start on started kubelet and stopped kube-install-additional-packages
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	restart_docker_daemon
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-master-components.conf"
+
+#upstart-job
+
+description "Start kube-master components and addons pods"
+
+start on stopped kube-docker
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	start_etcd_servers
+	start_fluentd
+	compute_master_manifest_variables
+	start_kube_apiserver
+	start_kube_controller_manager
+	start_kube_scheduler
+	prepare_kube_addons
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-addons.conf"
+
+#upstart-job
+
+description "Run kubernetes addon pods"
+
+start on stopped kube-master-components
+
+respawn
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-env
+
+	export HOME="/root"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		export KUBECTL_BIN="/usr/local/bin/kubectl"
+	else
+		export KUBECTL_BIN="/usr/bin/kubectl"
+	fi
+	export TOKEN_DIR="/etc/srv/kubernetes"
+	export kubelet_kubeconfig_file="/var/lib/kubelet/kubeconfig"
+	export TRUSTY_MASTER="true"
+	# Run the script to start and monitoring addon manifest changes.
+	exec /var/lib/cloud/scripts/kubernetes/kube-addons.sh
+end script
+
+# Wait for 10s to start it again.
+post-stop exec sleep 10
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-master-health-monitoring.conf"
+
+#upstart-job
+
+description "Kubenetes master health monitoring"
+
+start on stopped kube-docker
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	health_monitoring
+end script
+
+--====================================--

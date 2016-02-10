@@ -79,7 +79,7 @@ func TestTcpHealthChecker(t *testing.T) {
 			t.Errorf("#%d: expected error=%v, get=%v", i, tt.expectedError, err)
 		}
 		if !containsAny(output, tt.expectedOutputs) {
-			t.Errorf("#%d: expected output=one of %#v, get=%s", tt.expectedOutputs, output)
+			t.Errorf("#%d: expected output=one of %#v, get=%s", i, tt.expectedOutputs, output)
 		}
 	}
 }

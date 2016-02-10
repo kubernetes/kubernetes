@@ -63,6 +63,8 @@ spec:
           requests:
             cpu: 100m
             memory: 50Mi
+        command:
+        - /glbc
         args:
         - --default-backend-service=kube-system/default-http-backend
         - --sync-period=300s

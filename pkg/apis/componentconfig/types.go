@@ -31,6 +31,9 @@ type KubeProxyConfiguration struct {
 	HealthzPort int `json:"healthzPort"`
 	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
+	// the pure iptables proxy mode. Values must be within the range [0, 31].
+	IPTablesMasqueradeBit *int `json:"iptablesMasqueradeBit"`
 	// iptablesSyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
 	IPTablesSyncPeriod unversioned.Duration `json:"iptablesSyncPeriodSeconds"`
@@ -63,9 +66,9 @@ type KubeProxyConfiguration struct {
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (experimental). If blank, look at the Node object on the Kubernetes API and respect the
+// (newer, faster). If blank, look at the Node object on the Kubernetes API and respect the
 // 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
-// best-available proxy (currently userspace, but may change in future versions).  If the
+// best-available proxy (currently iptables, but may change in future versions).  If the
 // iptables proxy is selected, regardless of how, but the system's kernel or iptables
 // versions are insufficient, this always falls back to the userspace proxy.
 type ProxyMode string
@@ -205,6 +208,8 @@ type KubeletConfiguration struct {
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
 	LowDiskSpaceThresholdMB int `json:"lowDiskSpaceThresholdMB"`
+	// How frequently to calculate and cache volume disk usage for all pods
+	VolumeStatsAggPeriod unversioned.Duration `json:volumeStatsAggPeriod`
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
@@ -239,6 +244,11 @@ type KubeletConfiguration struct {
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`
+	// Should the kubelet set the hairpin flag on veth interfaces for containers
+	// it creates? Setting this flag allows endpoints in a Service to
+	// loadbalance back to themselves if they should try to access their own
+	// Service.
+	HairpinMode bool `json:"configureHairpinMode"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int `json:"maxPods"`
 	// dockerExecHandlerName is the handler to use when executing a command
@@ -288,9 +298,13 @@ type KubeletConfiguration struct {
 	NodeLabels map[string]string `json:"nodeLabels"`
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
+	// enable gathering custom metrics.
+	EnableCustomMetrics bool `json:"enableCustomMetrics"`
 }
 
 type KubeSchedulerConfiguration struct {
+	unversioned.TypeMeta
+
 	// port is the port that the scheduler's http service runs on.
 	Port int `json:"port"`
 	// address is the IP address to serve on.

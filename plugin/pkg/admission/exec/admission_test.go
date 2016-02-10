@@ -22,6 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -87,8 +89,8 @@ func TestAdmission(t *testing.T) {
 }
 
 func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept bool) {
-	mockClient := &testclient.Fake{}
-	mockClient.AddReactor("get", "pods", func(action testclient.Action) (bool, runtime.Object, error) {
+	mockClient := &fake.Clientset{}
+	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		if action.(testclient.GetAction).GetName() == pod.Name {
 			return true, pod, nil
 		}

@@ -57,14 +57,14 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
 	apiPath := func(group string) string {
-		if group == "legacy" {
+		if group == "core" {
 			return `"/api"`
 		}
 		return `"/apis"`
 	}
 
 	canonize := func(group string) string {
-		if group == "legacy" {
+		if group == "core" {
 			return ""
 		}
 		return group

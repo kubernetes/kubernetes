@@ -54,8 +54,12 @@ func TestNew(t *testing.T) {
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
+	config.Serializer = api.Codecs
 
-	s := New(&config)
+	s, err := New(&config)
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableLogsSupport, config.EnableLogsSupport)
@@ -96,7 +100,11 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.APIGroupPrefix = "/apiGroupPrefix"
 	config.Serializer = api.Codecs
 
-	s := New(&config)
+	s, err := New(&config)
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
 	apiGroupMeta := registered.GroupOrDie(api.GroupName)
 	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 	apiGroupsInfo := []APIGroupInfo{

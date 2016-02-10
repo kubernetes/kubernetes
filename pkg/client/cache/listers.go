@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -235,33 +236,34 @@ func (s *StoreToDeploymentLister) List() (deployments []extensions.Deployment, e
 	return deployments, nil
 }
 
-// GetDeploymentsForRC returns a list of deployments managing a replication controller. Returns an error only if no matching deployments are found.
-func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationController) (deployments []extensions.Deployment, err error) {
-	var selector labels.Selector
+// GetDeploymentsForReplicaSet returns a list of deployments managing a replica set. Returns an error only if no matching deployments are found.
+func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.ReplicaSet) (deployments []extensions.Deployment, err error) {
 	var d extensions.Deployment
 
-	if len(rc.Labels) == 0 {
-		err = fmt.Errorf("no deployments found for replication controller %v because it has no labels", rc.Name)
+	if len(rs.Labels) == 0 {
+		err = fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)
 		return
 	}
 
 	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
 	for _, m := range s.Store.List() {
 		d = *m.(*extensions.Deployment)
-		if d.Namespace != rc.Namespace {
+		if d.Namespace != rs.Namespace {
 			continue
 		}
-		labelSet := labels.Set(d.Spec.Selector)
-		selector = labels.Set(d.Spec.Selector).AsSelector()
 
+		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+		}
 		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
-		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(rc.Labels)) {
+		if selector.Empty() || !selector.Matches(labels.Set(rs.Labels)) {
 			continue
 		}
 		deployments = append(deployments, d)
 	}
 	if len(deployments) == 0 {
-		err = fmt.Errorf("could not find deployments set for replication controller %s in namespace %s with labels: %v", rc.Name, rc.Namespace, rc.Labels)
+		err = fmt.Errorf("could not find deployments set for ReplicaSet %s in namespace %s with labels: %v", rs.Name, rs.Namespace, rs.Labels)
 	}
 	return
 }
@@ -289,6 +291,27 @@ func (s *StoreToReplicaSetLister) List() (rss []extensions.ReplicaSet, err error
 	return rss, nil
 }
 
+type storeReplicaSetsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s storeReplicaSetsNamespacer) List(selector labels.Selector) (rss []extensions.ReplicaSet, err error) {
+	for _, c := range s.store.List() {
+		rs := *(c.(*extensions.ReplicaSet))
+		if s.namespace == api.NamespaceAll || s.namespace == rs.Namespace {
+			if selector.Matches(labels.Set(rs.Labels)) {
+				rss = append(rss, rs)
+			}
+		}
+	}
+	return
+}
+
+func (s *StoreToReplicaSetLister) ReplicaSets(namespace string) storeReplicaSetsNamespacer {
+	return storeReplicaSetsNamespacer{s.Store, namespace}
+}
+
 // GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
 func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensions.ReplicaSet, err error) {
 	var selector labels.Selector
@@ -304,7 +327,7 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensi
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			err = fmt.Errorf("failed to convert pod selector to selector: %v", err)
 			return
@@ -361,7 +384,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = extensions.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -483,7 +506,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 			continue
 		}
 
-		selector, _ = extensions.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}

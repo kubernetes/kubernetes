@@ -21,10 +21,11 @@ import (
 	"errors"
 	"sync"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	log "github.com/golang/glog"
 )
@@ -69,7 +70,7 @@ type (
 	}
 
 	registryImpl struct {
-		client     *client.Client
+		client     *clientset.Clientset
 		updates    chan *PodEvent
 		m          sync.RWMutex
 		boundTasks map[string]*api.Pod
@@ -108,7 +109,7 @@ func (rp *PodEvent) FormatShort() string {
 	return "task '" + rp.taskID + "' pod '" + rp.pod.Namespace + "/" + rp.pod.Name + "'"
 }
 
-func NewRegistry(client *client.Client) Registry {
+func NewRegistry(client *clientset.Clientset) Registry {
 	r := &registryImpl{
 		client:     client,
 		updates:    make(chan *PodEvent, updatesBacklogSize),
@@ -305,7 +306,7 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		log.Infof("Binding task %v pod '%v/%v' to '%v' with annotations %+v...",
 			taskID, pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
 		ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-		err := r.client.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+		err := r.client.CoreClient.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 		if err != nil {
 			log.Warningf("failed to bind task %v pod %v/%v: %v", taskID, pod.Namespace, pod.Name, err)
 			return errCreateBindingFailed
@@ -320,7 +321,7 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		patch.Metadata.Annotations = pod.Annotations
 		patchJson, _ := json.Marshal(patch)
 		log.V(4).Infof("Patching annotations %v of task %v pod %v/%v: %v", pod.Annotations, taskID, pod.Namespace, pod.Name, string(patchJson))
-		err := r.client.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
+		err := r.client.CoreClient.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
 		if err != nil {
 			log.Errorf("Error updating annotations of ready-to-launch task %v pod %v/%v: %v", taskID, pod.Namespace, pod.Name, err)
 			return errAnnotationUpdateFailure

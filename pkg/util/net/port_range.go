@@ -102,7 +102,7 @@ func ParsePortRange(value string) (*PortRange, error) {
 func ParsePortRangeOrDie(value string) *PortRange {
 	pr, err := ParsePortRange(value)
 	if err != nil {
-		panic(fmt.Sprintf("couldn't parse port range: %v"))
+		panic(fmt.Sprintf("couldn't parse port range %q: %v", value, err))
 	}
 	return pr
 }

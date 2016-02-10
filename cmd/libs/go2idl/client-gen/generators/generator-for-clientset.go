@@ -21,6 +21,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -30,10 +31,11 @@ import (
 // genClientset generates a package for a clientset.
 type genClientset struct {
 	generator.DefaultGen
-	groupVersions   []unversioned.GroupVersion
-	typedClientPath string
-	outputPackage   string
-	imports         *generator.ImportTracker
+	groupVersions      []unversioned.GroupVersion
+	typedClientPath    string
+	outputPackage      string
+	imports            *generator.ImportTracker
+	clientsetGenerated bool
 }
 
 var _ generator.Generator = &genClientset{}
@@ -44,36 +46,21 @@ func (g *genClientset) Namers(c *generator.Context) namer.NameSystems {
 	}
 }
 
-var generate_clientset = true
-
 // We only want to call GenerateType() once.
 func (g *genClientset) Filter(c *generator.Context, t *types.Type) bool {
-	ret := generate_clientset
-	generate_clientset = false
+	ret := !g.clientsetGenerated
+	g.clientsetGenerated = true
 	return ret
 }
 
-func normalizeGroup(group string) string {
-	if group == "api" {
-		return "legacy"
-	}
-	return group
-}
-
-func normalizeVersion(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
-}
-
 func (g *genClientset) Imports(c *generator.Context) (imports []string) {
+	imports = append(imports, g.imports.ImportLines()...)
 	for _, gv := range g.groupVersions {
-		group := normalizeGroup(gv.Group)
-		version := normalizeVersion(gv.Version)
+		group := normalization.Group(gv.Group)
+		version := normalization.Version(gv.Version)
 		typedClientPath := filepath.Join(g.typedClientPath, group, version)
-		imports = append(imports, g.imports.ImportLines()...)
 		imports = append(imports, fmt.Sprintf("%s_%s \"%s\"", group, version, typedClientPath))
+		imports = append(imports, "github.com/golang/glog")
 	}
 	return
 }
@@ -91,8 +78,8 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	allGroups := []arg{}
 	for _, gv := range g.groupVersions {
-		group := normalizeGroup(gv.Group)
-		version := normalizeVersion(gv.Version)
+		group := normalization.Group(gv.Group)
+		version := normalization.Version(gv.Version)
 		allGroups = append(allGroups, arg{namer.IC(group), group + "_" + version})
 	}
 
@@ -158,14 +145,14 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	var err error
 $range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(c)
 	if err!=nil {
-		return nil, err
+		return &clientset, err
 	}
 $end$
 	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(c)
 	if err!=nil {
-		return nil, err
+		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
-	return &clientset, nil
+	return &clientset, err
 }
 `
 

@@ -230,6 +230,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"ingress":              &extensions.Ingress{},
 			"nginx-deployment":     &extensions.Deployment{},
 			"new-nginx-deployment": &extensions.Deployment{},
+			"replication":          &api.ReplicationController{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
@@ -320,6 +321,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../docs/user-guide/node-selection": {
 			"pod": &api.Pod{},
+			"pod-with-node-affinity": &api.Pod{},
 		},
 		"../examples/openshift-origin": {
 			"openshift-origin-namespace": &api.Namespace{},
@@ -400,6 +402,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-pod":     &api.Pod{},
 			"redis-service": &api.Service{},
 			"job":           &extensions.Job{},
+		},
+		"../examples/azure_file": {
+			"azure": &api.Pod{},
 		},
 	}
 

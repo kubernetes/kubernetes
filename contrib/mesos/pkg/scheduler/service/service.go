@@ -70,9 +70,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -102,7 +104,9 @@ type SchedulerServer struct {
 	port                  int
 	address               net.IP
 	enableProfiling       bool
-	authPath              string
+	kubeconfig            string
+	kubeAPIQPS            float32
+	kubeAPIBurst          int
 	apiServerList         []string
 	etcdServerList        []string
 	allowPrivileged       bool
@@ -172,7 +176,7 @@ type SchedulerServer struct {
 	conntrackTCPTimeoutEstablished int
 
 	executable  string // path to the binary running this service
-	client      *client.Client
+	client      *clientset.Clientset
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -192,6 +196,8 @@ func NewSchedulerServer() *SchedulerServer {
 		address:           net.ParseIP("127.0.0.1"),
 		failoverTimeout:   time.Duration((1 << 62) - 1).Seconds(),
 		frameworkStoreURI: "etcd://",
+		kubeAPIQPS:        50.0,
+		kubeAPIBurst:      100,
 
 		runProxy:                 true,
 		executorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
@@ -248,7 +254,9 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.address, "address", s.address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.enableProfiling, "profiling", s.enableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.apiServerList, "api-servers", s.apiServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
-	fs.StringVar(&s.authPath, "auth-path", s.authPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	fs.StringVar(&s.kubeconfig, "kubeconfig", s.kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.Float32Var(&s.kubeAPIQPS, "kube-api-qps", s.kubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.kubeAPIBurst, "kube-api-burst", s.kubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
 	fs.BoolVar(&s.allowPrivileged, "allow-privileged", s.allowPrivileged, "Enable privileged containers in the kubelet (compare the same flag in the apiserver).")
 	fs.StringVar(&s.clusterDomain, "cluster-domain", s.clusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
@@ -434,11 +442,11 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 
-	if s.authPath != "" {
+	if s.kubeconfig != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
-		uri, basename := s.serveFrameworkArtifact(s.authPath)
+		uri, basename := s.serveFrameworkArtifact(s.kubeconfig)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
-		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--auth-path=%s", basename))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--kubeconfig=%s", basename))
 	}
 	appendOptional := func(name string, value string) {
 		if value != "" {
@@ -518,34 +526,17 @@ func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, stati
 	return
 }
 
-// TODO(jdef): hacked from kubelet/server/server.go
-// TODO(k8s): replace this with clientcmd
-func (s *SchedulerServer) createAPIServerClient() (*client.Client, error) {
-	authInfo, err := clientauth.LoadFromFile(s.authPath)
-	if err != nil {
-		log.Warningf("Could not load kubernetes auth path: %v. Continuing with defaults.", err)
-	}
-	if authInfo == nil {
-		// authInfo didn't load correctly - continue with defaults.
-		authInfo = &clientauth.Info{}
-	}
-	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
+// TODO(jdef): hacked from plugin/cmd/kube-scheduler/app/server.go
+func (s *SchedulerServer) createAPIServerClientConfig() (*client.Config, error) {
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.apiServerList[0], s.kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	if len(s.apiServerList) < 1 {
-		return nil, fmt.Errorf("no api servers specified")
-	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.apiServerList) > 1 {
-		log.Infof("Multiple api servers specified.  Picking first one")
-	}
-	clientConfig.Host = s.apiServerList[0]
-	c, err := client.New(&clientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = s.kubeAPIQPS
+	kubeconfig.Burst = s.kubeAPIBurst
+	return kubeconfig, nil
 }
 
 func (s *SchedulerServer) setDriver(driver bindings.SchedulerDriver) {
@@ -689,11 +680,14 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatal("No api servers specified.")
 	}
 
-	client, err := s.createAPIServerClient()
+	clientConfig, err := s.createAPIServerClientConfig()
 	if err != nil {
-		log.Fatalf("Unable to make apiserver client: %v", err)
+		log.Fatalf("Unable to make apiserver client config: %v", err)
 	}
-	s.client = client
+	s.client, err = clientset.NewForConfig(clientConfig)
+	if err != nil {
+		log.Fatalf("Unable to make apiserver clientset: %v", err)
+	}
 
 	if s.reconcileCooldown < defaultReconcileCooldown {
 		s.reconcileCooldown = defaultReconcileCooldown
@@ -717,11 +711,12 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	// mirror all nodes into the nodeStore
 	var eiRegistry executorinfo.Registry
-	nodesClient, err := s.createAPIServerClient()
+	nodesClientConfig := *clientConfig
+	nodesClient, err := clientset.NewForConfig(&nodesClientConfig)
 	if err != nil {
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
-	nodeLW := cache.NewListWatchFromClient(nodesClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			node := obj.(*api.Node)
@@ -758,7 +753,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 	framework := framework.New(framework.Config{
 		SchedulerConfig:   *sc,
-		Client:            client,
+		Client:            s.client,
 		FailoverTimeout:   s.failoverTimeout,
 		ReconcileInterval: s.reconcileInterval,
 		ReconcileCooldown: s.reconcileCooldown,
@@ -789,18 +784,23 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	// create event recorder sending events to the "" namespace of the apiserver
+	eventsClientConfig := *clientConfig
+	eventsClient, err := clientset.NewForConfig(&eventsClientConfig)
+	if err != nil {
+		log.Fatalf("Invalid API configuration: %v", err)
+	}
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	broadcaster.StartLogging(log.Infof)
-	broadcaster.StartRecordingToSink(client.Events(""))
+	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{eventsClient.Events("")})
 
 	// create scheduler core with all components arranged around it
-	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(
 		sc,
 		framework,
 		fcfs,
-		client,
+		s.client,
 		recorder,
 		schedulerProcess.Terminal(),
 		s.mux,

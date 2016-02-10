@@ -18,14 +18,15 @@ package master
 
 import (
 	"io/ioutil"
-	"math/rand"
 	"net"
+	"net/url"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
+	"k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,12 +44,12 @@ type Tunneler interface {
 }
 
 type SSHTunneler struct {
-	SSHUser       string
-	SSHKeyfile    string
-	InstallSSHKey InstallSSHKey
+	SSHUser        string
+	SSHKeyfile     string
+	InstallSSHKey  InstallSSHKey
+	HealthCheckURL *url.URL
 
-	tunnels        *util.SSHTunnelList
-	tunnelsLock    sync.Mutex
+	tunnels        *ssh.SSHTunnelList
 	lastSync       int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
 	clock          util.Clock
@@ -57,13 +58,13 @@ type SSHTunneler struct {
 	stopChan     chan struct{}
 }
 
-func NewSSHTunneler(sshUser string, sshKeyfile string, installSSHKey InstallSSHKey) Tunneler {
+func NewSSHTunneler(sshUser, sshKeyfile string, healthCheckURL *url.URL, installSSHKey InstallSSHKey) Tunneler {
 	return &SSHTunneler{
-		SSHUser:       sshUser,
-		SSHKeyfile:    sshKeyfile,
-		InstallSSHKey: installSSHKey,
-
-		clock: util.RealClock{},
+		SSHUser:        sshUser,
+		SSHKeyfile:     sshKeyfile,
+		InstallSSHKey:  installSSHKey,
+		HealthCheckURL: healthCheckURL,
+		clock:          util.RealClock{},
 	}
 }
 
@@ -93,14 +94,17 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 		glog.Errorf("Error detecting if key exists: %v", err)
 	} else if !exists {
 		glog.Infof("Key doesn't exist, attempting to create")
-		err := c.generateSSHKey(c.SSHUser, c.SSHKeyfile, publicKeyFile)
-		if err != nil {
+		if err := generateSSHKey(c.SSHKeyfile, publicKeyFile); err != nil {
 			glog.Errorf("Failed to create key pair: %v", err)
 		}
 	}
-	c.tunnels = &util.SSHTunnelList{}
-	c.setupSecureProxy(c.SSHUser, c.SSHKeyfile, publicKeyFile)
+
+	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
+	// Sync loop to ensure that the SSH key has been installed.
+	c.installSSHKeySyncLoop(c.SSHUser, publicKeyFile)
+	// Sync tunnelList w/ nodes.
 	c.lastSync = c.clock.Now().Unix()
+	c.nodesSyncLoop()
 }
 
 // Stop gracefully shuts down the tunneler
@@ -112,23 +116,7 @@ func (c *SSHTunneler) Stop() {
 }
 
 func (c *SSHTunneler) Dial(net, addr string) (net.Conn, error) {
-	// Only lock while picking a tunnel.
-	tunnel, err := func() (util.SSHTunnelEntry, error) {
-		c.tunnelsLock.Lock()
-		defer c.tunnelsLock.Unlock()
-		return c.tunnels.PickRandomTunnel()
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	start := time.Now()
-	id := rand.Int63() // So you can match begins/ends in the log.
-	glog.V(3).Infof("[%x: %v] Dialing...", id, tunnel.Address)
-	defer func() {
-		glog.V(3).Infof("[%x: %v] Dialed in %v.", id, tunnel.Address, time.Now().Sub(start))
-	}()
-	return tunnel.Tunnel.Dial(net, addr)
+	return c.tunnels.Dial(net, addr)
 }
 
 func (c *SSHTunneler) SecondsSinceSync() int64 {
@@ -137,72 +125,18 @@ func (c *SSHTunneler) SecondsSinceSync() int64 {
 	return now - then
 }
 
-func (c *SSHTunneler) needToReplaceTunnels(addrs []string) bool {
-	c.tunnelsLock.Lock()
-	defer c.tunnelsLock.Unlock()
-	if c.tunnels == nil || c.tunnels.Len() != len(addrs) {
-		return true
-	}
-	// TODO (cjcullen): This doesn't need to be n^2
-	for ix := range addrs {
-		if !c.tunnels.Has(addrs[ix]) {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *SSHTunneler) replaceTunnels(user, keyfile string, newAddrs []string) error {
-	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
-	tunnels := util.MakeSSHTunnels(user, keyfile, newAddrs)
-	if err := tunnels.Open(); err != nil {
-		return err
-	}
-	c.tunnelsLock.Lock()
-	defer c.tunnelsLock.Unlock()
-	if c.tunnels != nil {
-		c.tunnels.Close()
-	}
-	c.tunnels = tunnels
-	atomic.StoreInt64(&c.lastSync, c.clock.Now().Unix())
-	return nil
-}
-
-func (c *SSHTunneler) loadTunnels(user, keyfile string) error {
-	addrs, err := c.getAddresses()
-	if err != nil {
-		return err
-	}
-	if !c.needToReplaceTunnels(addrs) {
-		return nil
-	}
-	// TODO: This is going to unnecessarily close connections to unchanged nodes.
-	// See comment about using Watch above.
-	glog.Info("found different nodes. Need to replace tunnels")
-	return c.replaceTunnels(user, keyfile, addrs)
-}
-
-func (c *SSHTunneler) refreshTunnels(user, keyfile string) error {
-	addrs, err := c.getAddresses()
-	if err != nil {
-		return err
-	}
-	return c.replaceTunnels(user, keyfile, addrs)
-}
-
-func (c *SSHTunneler) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
-	// Sync loop to ensure that the SSH key has been installed.
-	go util.Until(func() {
+func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
+	go wait.Until(func() {
 		if c.InstallSSHKey == nil {
 			glog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
 			return
 		}
-		key, err := util.ParsePublicKeyFromFile(publicKeyfile)
+		key, err := ssh.ParsePublicKeyFromFile(publicKeyfile)
 		if err != nil {
 			glog.Errorf("Failed to load public key: %v", err)
 			return
 		}
-		keyData, err := util.EncodeSSHKey(key)
+		keyData, err := ssh.EncodeSSHKey(key)
 		if err != nil {
 			glog.Errorf("Failed to encode public key: %v", err)
 			return
@@ -211,31 +145,25 @@ func (c *SSHTunneler) setupSecureProxy(user, privateKeyfile, publicKeyfile strin
 			glog.Errorf("Failed to install ssh key: %v", err)
 		}
 	}, 5*time.Minute, c.stopChan)
-	// Sync loop for tunnels
-	// TODO: switch this to watch.
-	go util.Until(func() {
-		if err := c.loadTunnels(user, privateKeyfile); err != nil {
-			glog.Errorf("Failed to load SSH Tunnels: %v", err)
-		}
-		if c.tunnels != nil && c.tunnels.Len() != 0 {
-			// Sleep for 10 seconds if we have some tunnels.
-			// TODO (cjcullen): tunnels can lag behind actually existing nodes.
-			time.Sleep(9 * time.Second)
-		}
-	}, 1*time.Second, c.stopChan)
-	// Refresh loop for tunnels
-	// TODO: could make this more controller-ish
-	go util.Until(func() {
-		time.Sleep(5 * time.Minute)
-		if err := c.refreshTunnels(user, privateKeyfile); err != nil {
-			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
-		}
-	}, 0*time.Second, c.stopChan)
 }
 
-func (c *SSHTunneler) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
-	// TODO: user is not used. Consider removing it as an input to the function.
-	private, public, err := util.GenerateKey(2048)
+// nodesSyncLoop lists nodes ever 15 seconds, calling Update() on the TunnelList
+// each time (Update() is a noop if no changes are necessary).
+func (c *SSHTunneler) nodesSyncLoop() {
+	// TODO (cjcullen) make this watch.
+	go wait.Until(func() {
+		addrs, err := c.getAddresses()
+		glog.Infof("Calling update w/ addrs: %v", addrs)
+		if err != nil {
+			glog.Errorf("Failed to getAddresses: %v", err)
+		}
+		c.tunnels.Update(addrs)
+		atomic.StoreInt64(&c.lastSync, c.clock.Now().Unix())
+	}, 15*time.Second, c.stopChan)
+}
+
+func generateSSHKey(privateKeyfile, publicKeyfile string) error {
+	private, public, err := ssh.GenerateKey(2048)
 	if err != nil {
 		return err
 	}
@@ -250,10 +178,10 @@ func (c *SSHTunneler) generateSSHKey(user, privateKeyfile, publicKeyfile string)
 			glog.Errorf("Failed to remove stale private key: %v", err)
 		}
 	}
-	if err := ioutil.WriteFile(privateKeyfile, util.EncodePrivateKey(private), 0600); err != nil {
+	if err := ioutil.WriteFile(privateKeyfile, ssh.EncodePrivateKey(private), 0600); err != nil {
 		return err
 	}
-	publicKeyBytes, err := util.EncodePublicKey(public)
+	publicKeyBytes, err := ssh.EncodePublicKey(public)
 	if err != nil {
 		return err
 	}

@@ -23,12 +23,13 @@ import (
 	"strings"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 var (
@@ -46,7 +47,7 @@ const (
 
 // WARNING: this feature is experimental and will definitely change.
 func init() {
-	admission.RegisterPlugin("InitialResources", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("InitialResources", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		s, err := newDataSource(*source)
 		if err != nil {
 			return nil, err

@@ -18,6 +18,7 @@ package unversioned
 
 import "k8s.io/kubernetes/pkg/apis/extensions"
 
+// The DeploymentExpansion interface allows manually adding extra methods to the DeploymentInterface.
 type DeploymentExpansion interface {
 	Rollback(*extensions.DeploymentRollback) error
 }

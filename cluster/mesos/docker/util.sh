@@ -289,7 +289,7 @@ function kube-up {
 
   # Wait for addons to deploy
   cluster::mesos::docker::await_ready "kube-dns" "${MESOS_DOCKER_ADDON_TIMEOUT}"
-  cluster::mesos::docker::await_ready "kube-ui" "${MESOS_DOCKER_ADDON_TIMEOUT}"
+  cluster::mesos::docker::await_ready "kubernetes-dashboard" "${MESOS_DOCKER_ADDON_TIMEOUT}"
 
   trap - EXIT
 }
@@ -302,7 +302,7 @@ function validate-cluster {
 
   # Validate immediate cluster reachability and responsiveness
   echo "KubeDNS: $(cluster::mesos::docker::addon_status 'kube-dns')"
-  echo "KubeUI: $(cluster::mesos::docker::addon_status 'kube-ui')"
+  echo "Kubernetes Dashboard: $(cluster::mesos::docker::addon_status 'kubernetes-dashboard')"
 }
 
 # Delete a kubernetes cluster

@@ -46,19 +46,8 @@ func funlock(f *os.File) error {
 
 // mmap memory maps a DB's data file.
 func mmap(db *DB, sz int) error {
-	// Truncate and fsync to ensure file size metadata is flushed.
-	// https://github.com/boltdb/bolt/issues/284
-	if !db.NoGrowSync && !db.readOnly {
-		if err := db.file.Truncate(int64(sz)); err != nil {
-			return fmt.Errorf("file resize error: %s", err)
-		}
-		if err := db.file.Sync(); err != nil {
-			return fmt.Errorf("file sync error: %s", err)
-		}
-	}
-
 	// Map the data file to memory.
-	b, err := syscall.Mmap(int(db.file.Fd()), 0, sz, syscall.PROT_READ, syscall.MAP_SHARED)
+	b, err := syscall.Mmap(int(db.file.Fd()), 0, sz, syscall.PROT_READ, syscall.MAP_SHARED|db.MmapFlags)
 	if err != nil {
 		return err
 	}

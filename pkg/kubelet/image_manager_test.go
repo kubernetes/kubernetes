@@ -431,8 +431,8 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		},
 	}
 
-	fakeClock := util.FakeClock{Time: time.Now()}
-	fmt.Println(fakeClock.Now())
+	fakeClock := util.NewFakeClock(time.Now())
+	t.Log(fakeClock.Now())
 	require.NoError(t, manager.detectImages(fakeClock.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 	// no space freed since one image is in used, and another one is not old enough

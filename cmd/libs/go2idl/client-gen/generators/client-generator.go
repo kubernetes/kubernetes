@@ -174,9 +174,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				continue
 			}
 			group := filepath.Base(t.Name.Package)
-			// Special case for the legacy API.
+			// Special case for the core API.
 			if group == "api" {
-				group = "legacy"
+				group = "core"
 			}
 			if _, found := groupToTypes[group]; !found {
 				groupToTypes[group] = []*types.Type{}
@@ -193,6 +193,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList []generator.Package
 
 	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
+	if customArgs.FakeClient {
+		packageList = append(packageList, fake.PackageForClientset(arguments.OutputPackagePath, customArgs.GroupVersions, boilerplate))
+	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
 	if customArgs.ClientsetOnly {

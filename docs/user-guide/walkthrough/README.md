@@ -129,21 +129,21 @@ For this example we'll be creating a Redis pod with a named volume and volume mo
 
 1. Define a volume:
 
-  ```yaml
-    volumes:
-    - name: redis-persistent-storage
-      emptyDir: {}
-  ```
+   ```yaml
+     volumes:
+     - name: redis-persistent-storage
+       emptyDir: {}
+   ```
 
 2. Define a volume mount within a container definition:
 
-  ```yaml
-    volumeMounts:
-    # name must match the volume name below
-    - name: redis-persistent-storage
-      # mount path within the container
-      mountPath: /data/redis
-  ```
+   ```yaml
+     volumeMounts:
+     # name must match the volume name below
+     - name: redis-persistent-storage
+       # mount path within the container
+       mountPath: /data/redis
+   ```
 
 Example Redis pod definition with a persistent storage volume ([pod-redis.yaml](pod-redis.yaml)):
 

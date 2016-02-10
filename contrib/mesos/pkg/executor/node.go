@@ -16,9 +16,7 @@ limitations under the License.
 
 package executor
 
-import (
-	mesos "github.com/mesos/mesos-go/mesosproto"
-)
+import mesos "github.com/mesos/mesos-go/mesosproto"
 
 type NodeInfo struct {
 	Cores int

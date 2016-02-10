@@ -212,8 +212,8 @@ func (c *Fake$.type|publicPlural$) Delete(name string, options *$.apiDeleteOptio
 
 var deleteCollectionTemplate = `
 func (c *Fake$.type|publicPlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
-	$if .namespaced$action := $.NewDeleteCollectionAction|raw$("events", c.ns, listOptions)
-	$else$action := $.NewRootDeleteCollectionAction|raw$("events", listOptions)
+	$if .namespaced$action := $.NewDeleteCollectionAction|raw$("$.type|allLowercasePlural$", c.ns, listOptions)
+	$else$action := $.NewRootDeleteCollectionAction|raw$("$.type|allLowercasePlural$", listOptions)
 	$end$
 	_, err := c.Fake.Invokes(action, &$.type|raw$List{})
 	return err

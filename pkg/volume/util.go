@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -89,15 +89,15 @@ type realRecyclerClient struct {
 }
 
 func (c *realRecyclerClient) CreatePod(pod *api.Pod) (*api.Pod, error) {
-	return c.client.Legacy().Pods(pod.Namespace).Create(pod)
+	return c.client.Core().Pods(pod.Namespace).Create(pod)
 }
 
 func (c *realRecyclerClient) GetPod(name, namespace string) (*api.Pod, error) {
-	return c.client.Legacy().Pods(namespace).Get(name)
+	return c.client.Core().Pods(namespace).Get(name)
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.Legacy().Pods(namespace).Delete(name, nil)
+	return c.client.Core().Pods(namespace).Delete(name, nil)
 }
 
 // WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
@@ -109,11 +109,11 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 	podLW := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return c.client.Legacy().Pods(namespace).List(options)
+			return c.client.Core().Pods(namespace).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return c.client.Legacy().Pods(namespace).Watch(options)
+			return c.client.Core().Pods(namespace).Watch(options)
 		},
 	}
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)

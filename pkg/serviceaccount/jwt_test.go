@@ -26,8 +26,8 @@ import (
 	"github.com/dgrijalva/jwt-go"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -159,7 +159,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		Client client.Interface
+		Client clientset.Interface
 		Keys   []*rsa.PublicKey
 
 		ExpectedErr      bool
@@ -199,7 +199,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"valid lookup": {
-			Client:           testclient.NewSimpleFake(serviceAccount, secret),
+			Client:           fake.NewSimpleClientset(serviceAccount, secret),
 			Keys:             []*rsa.PublicKey{getPublicKey(publicKey)},
 			ExpectedErr:      false,
 			ExpectedOK:       true,
@@ -208,13 +208,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"invalid secret lookup": {
-			Client:      testclient.NewSimpleFake(serviceAccount),
+			Client:      fake.NewSimpleClientset(serviceAccount),
 			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
 		"invalid serviceaccount lookup": {
-			Client:      testclient.NewSimpleFake(secret),
+			Client:      fake.NewSimpleClientset(secret),
 			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
 			ExpectedErr: true,
 			ExpectedOK:  false,

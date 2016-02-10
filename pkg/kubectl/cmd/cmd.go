@@ -125,6 +125,7 @@ __custom_func() {
    * persistentvolumeclaims (aka 'pvc')
    * quota
    * resourcequotas (aka 'quota')
+   * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
    * secrets
    * serviceaccounts

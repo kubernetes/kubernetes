@@ -48,9 +48,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -73,7 +74,7 @@ func (srv *TestServer) LookupNode(name string) *api.Node {
 }
 
 func (srv *TestServer) WaitForNode(name string) {
-	assertext.EventuallyTrue(srv.t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(srv.t, wait.ForeverTestTimeout, func() bool {
 		return srv.LookupNode(name) != nil
 	})
 }
@@ -365,7 +366,7 @@ func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.
 
 func (a *EventAssertions) Event(observer *EventObserver, pred EventPredicate, msgAndArgs ...interface{}) bool {
 	// parse msgAndArgs: first possibly a duration, otherwise a format string with further args
-	timeout := util.ForeverTestTimeout
+	timeout := wait.ForeverTestTimeout
 	msg := "event not received"
 	msgArgStart := 0
 	if len(msgAndArgs) > 0 {
@@ -488,7 +489,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	ei.Data = []byte{0, 1, 2}
 
 	// create framework
-	client := client.NewOrDie(&client.Config{
+	client := clientset.NewForConfigOrDie(&client.Config{
 		Host:          apiServer.server.URL,
 		ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 	})
@@ -684,7 +685,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		// and wait that framework message is sent to executor
 		lt.driver.AssertNumberOfCalls(t, "SendFrameworkMessage", 1)
 
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for launchTasks call")
 	}
 
@@ -720,7 +721,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 			}
 			t.Fatalf("unknown offer used to start a pod")
 			return nil, nil, nil
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatal("timed out waiting for launchTasks")
 			return nil, nil, nil
 		}
@@ -783,7 +784,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 			newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_FINISHED),
 		)
 
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatal("timed out waiting for KillTask")
 	}
 
@@ -819,7 +820,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		lt.framework.StatusUpdate(lt.driver, status)
 
 		// wait until pod is looked up at the apiserver
-		assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+		assertext.EventuallyTrue(t, wait.ForeverTestTimeout, func() bool {
 			return lt.apiServer.Stats(pod.Name) == beforePodLookups+1
 		}, "expect that reconcileTask will access apiserver for pod %v", pod.Name)
 	}
@@ -837,7 +838,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	failPodFromExecutor(launchedTask.taskInfo)
 
 	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, wait.ForeverTestTimeout, func() bool {
 		t, _ := lt.sched.Tasks().ForPod(podKey)
 		return t == nil
 	})
