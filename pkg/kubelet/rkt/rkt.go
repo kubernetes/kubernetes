@@ -1449,7 +1449,7 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 	for _, pod := range listResp.Pods {
 		manifest, creationTime, restartCount, err := getPodInfo(pod)
 		if err != nil {
-			glog.Warning("rkt: Couldn't get necessary info from the rkt pod, (uuid %q): %v", pod.Id, err)
+			glog.Warningf("rkt: Couldn't get necessary info from the rkt pod, (uuid %q): %v", pod.Id, err)
 			continue
 		}
 

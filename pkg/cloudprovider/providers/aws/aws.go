@@ -1234,7 +1234,7 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
 
-		glog.V(2).Info("AttachVolume request returned %v", attachResponse)
+		glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
 	}
 
 	err = disk.waitForAttachmentStatus("attached")
@@ -1890,7 +1890,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 
 	err = s.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
-		glog.Warning("Error registering instances with the load balancer: %v", err)
+		glog.Warningf("Error registering instances with the load balancer: %v", err)
 		return nil, err
 	}
 
