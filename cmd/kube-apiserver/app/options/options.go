@@ -80,8 +80,12 @@ type APIServer struct {
 	ServiceClusterIPRange      net.IPNet // TODO: make this a list
 	ServiceNodePortRange       utilnet.PortRange
 	StorageVersions            string
-	TokenAuthFile              string
-	WatchCacheSizes            []string
+	// The default values for StorageVersions. StorageVersions overrides
+	// these; you can change this if you want to change the defaults (e.g.,
+	// for testing). This is not actually exposed as a flag.
+	DefaultStorageVersions string
+	TokenAuthFile          string
+	WatchCacheSizes        []string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -99,6 +103,7 @@ func NewAPIServer() *APIServer {
 		MasterServiceNamespace: api.NamespaceDefault,
 		RuntimeConfig:          make(util.ConfigurationMap),
 		StorageVersions:        registered.AllPreferredGroupVersions(),
+		DefaultStorageVersions: registered.AllPreferredGroupVersions(),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
@@ -112,6 +117,9 @@ func NewAPIServer() *APIServer {
 // dest must be a map of group to groupVersion.
 func gvToMap(gvList string, dest map[string]string) {
 	for _, gv := range strings.Split(gvList, ",") {
+		if gv == "" {
+			continue
+		}
 		// We accept two formats. "group/version" OR
 		// "group=group/version". The latter is used when types
 		// move between groups.
@@ -127,6 +135,7 @@ func gvToMap(gvList string, dest map[string]string) {
 
 // StorageGroupsToGroupVersions returns a map from group name to group version,
 // computed from the s.DeprecatedStorageVersion and s.StorageVersions flags.
+// TODO: can we move the whole storage version concept to the generic apiserver?
 func (s *APIServer) StorageGroupsToGroupVersions() map[string]string {
 	storageVersionMap := map[string]string{}
 	if s.DeprecatedStorageVersion != "" {
@@ -134,7 +143,7 @@ func (s *APIServer) StorageGroupsToGroupVersions() map[string]string {
 	}
 
 	// First, get the defaults.
-	gvToMap(registered.AllPreferredGroupVersions(), storageVersionMap)
+	gvToMap(s.DefaultStorageVersions, storageVersionMap)
 	// Override any defaults with the user settings.
 	gvToMap(s.StorageVersions, storageVersionMap)
 
