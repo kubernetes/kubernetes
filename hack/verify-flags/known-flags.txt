@@ -383,3 +383,4 @@ leader-elect-renew-deadline
 leader-elect-retry-period
 watch-cache-sizes
 configure-hairpin-mode
+lock-file
