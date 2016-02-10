@@ -10234,13 +10234,14 @@ func (x *GCEPersistentDiskVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq683 [4]bool
 			_, _, _ = yysep683, yyq683, yy2arr683
 			const yyr683 bool = false
+			yyq683[1] = x.FSType != ""
 			yyq683[2] = x.Partition != 0
 			yyq683[3] = x.ReadOnly != false
 			var yynn683 int
 			if yyr683 || yy2arr683 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn683 = 2
+				yynn683 = 1
 				for _, b := range yyq683 {
 					if b {
 						yynn683++
@@ -10270,21 +10271,27 @@ func (x *GCEPersistentDiskVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr683 || yy2arr683 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym688 := z.EncBinary()
-				_ = yym688
-				if false {
+				if yyq683[1] {
+					yym688 := z.EncBinary()
+					_ = yym688
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("fsType"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym689 := z.EncBinary()
-				_ = yym689
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+				if yyq683[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("fsType"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym689 := z.EncBinary()
+					_ = yym689
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				}
 			}
 			if yyr683 || yy2arr683 {
@@ -10915,13 +10922,14 @@ func (x *AWSElasticBlockStoreVolumeSource) CodecEncodeSelf(e *codec1978.Encoder)
 			var yyq740 [4]bool
 			_, _, _ = yysep740, yyq740, yy2arr740
 			const yyr740 bool = false
+			yyq740[1] = x.FSType != ""
 			yyq740[2] = x.Partition != 0
 			yyq740[3] = x.ReadOnly != false
 			var yynn740 int
 			if yyr740 || yy2arr740 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn740 = 2
+				yynn740 = 1
 				for _, b := range yyq740 {
 					if b {
 						yynn740++
@@ -10951,21 +10959,27 @@ func (x *AWSElasticBlockStoreVolumeSource) CodecEncodeSelf(e *codec1978.Encoder)
 			}
 			if yyr740 || yy2arr740 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym745 := z.EncBinary()
-				_ = yym745
-				if false {
+				if yyq740[1] {
+					yym745 := z.EncBinary()
+					_ = yym745
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("fsType"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym746 := z.EncBinary()
-				_ = yym746
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+				if yyq740[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("fsType"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym746 := z.EncBinary()
+					_ = yym746
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				}
 			}
 			if yyr740 || yy2arr740 {
@@ -11893,12 +11907,13 @@ func (x *ISCSIVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep819, yyq819, yy2arr819
 			const yyr819 bool = false
 			yyq819[3] = x.ISCSIInterface != ""
+			yyq819[4] = x.FSType != ""
 			yyq819[5] = x.ReadOnly != false
 			var yynn819 int
 			if yyr819 || yy2arr819 {
 				r.EncodeArrayStart(6)
 			} else {
-				yynn819 = 4
+				yynn819 = 3
 				for _, b := range yyq819 {
 					if b {
 						yynn819++
@@ -11991,21 +12006,27 @@ func (x *ISCSIVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr819 || yy2arr819 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym833 := z.EncBinary()
-				_ = yym833
-				if false {
+				if yyq819[4] {
+					yym833 := z.EncBinary()
+					_ = yym833
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("fsType"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym834 := z.EncBinary()
-				_ = yym834
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+				if yyq819[4] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("fsType"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym834 := z.EncBinary()
+					_ = yym834
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				}
 			}
 			if yyr819 || yy2arr819 {
@@ -12273,12 +12294,13 @@ func (x *FCVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq855 [4]bool
 			_, _, _ = yysep855, yyq855, yy2arr855
 			const yyr855 bool = false
+			yyq855[2] = x.FSType != ""
 			yyq855[3] = x.ReadOnly != false
 			var yynn855 int
 			if yyr855 || yy2arr855 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn855 = 3
+				yynn855 = 2
 				for _, b := range yyq855 {
 					if b {
 						yynn855++
@@ -12345,21 +12367,27 @@ func (x *FCVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr855 || yy2arr855 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym865 := z.EncBinary()
-				_ = yym865
-				if false {
+				if yyq855[2] {
+					yym865 := z.EncBinary()
+					_ = yym865
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("fsType"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym866 := z.EncBinary()
-				_ = yym866
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+				if yyq855[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("fsType"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym866 := z.EncBinary()
+					_ = yym866
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+					}
 				}
 			}
 			if yyr855 || yy2arr855 {
