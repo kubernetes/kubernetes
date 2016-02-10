@@ -249,6 +249,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
 		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency.Duration,
+		HairpinMode:                    s.HairpinMode,
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
 		NodeIP: net.ParseIP(s.NodeIP),
@@ -734,6 +735,7 @@ type KubeletConfig struct {
 	ExperimentalFlannelOverlay bool
 	NodeIP                     net.IP
 	ContainerRuntimeOptions    []kubecontainer.Option
+	HairpinMode                bool
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -822,6 +824,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.EnableCustomMetrics,
 		kc.VolumeStatsAggPeriod,
 		kc.ContainerRuntimeOptions,
+		kc.HairpinMode,
 	)
 
 	if err != nil {
