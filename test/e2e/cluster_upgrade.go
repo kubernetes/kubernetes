@@ -611,6 +611,10 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 }
 
 func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
+	loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
+	if providerIs("aws") {
+		loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
+	}
 	return testLoadBalancerReachableInTime(ingress, port, loadBalancerLagTimeout)
 }
 
