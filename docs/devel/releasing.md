@@ -230,17 +230,23 @@ been automated that need to happen after the branch has been cut:
    the unversioned warning in docs point to the latest release series. Please
    send the changes as a PR titled "Update the latestReleaseBranch to
    release-X.Y in the munger".
-1. Add test jobs for the new branch.  See [End-2-End Testing in
-   Kubernetes](e2e-tests.md) for the test jobs that run in CI, which are under
-   version control in `hack/jenkins/e2e.sh` (on the release branch) and
-   `hack/jenkins/job-configs/kubernetes-e2e.yaml` (in `master`).  You'll want
-   to duplicate/munge these for the release branch so that, as we cherry-pick
-   fixes onto the branch, we know that it builds, etc.
-1. Make sure all features that are supposed to be GA are covered by tests.  You
-   can use `hack/list-feature-tests.sh` to see a list of tests labeled as
-   `[Feature:.+]`; make sure that these are all either covered in CI jobs or
-   are experimental features.  (The answer should already be 'yes', but this is
-   a good time to reconcile.)
+1. Add test jobs for the new branch.
+   1. See [End-2-End Testing in Kubernetes](e2e-tests.md) for the test jobs
+      that should be running in CI, which are under version control in
+      `hack/jenkins/e2e.sh` (on the release branch) and
+      `hack/jenkins/job-configs/kubernetes-e2e.yaml` (in `master`).  You'll
+      want to munge these for the release branch so that, as we cherry-pick
+      fixes onto the branch, we know that it builds, etc.  (Talk with
+      @ihmccreery for more details.)
+   1. Make sure all features that are supposed to be GA are covered by tests,
+      but remove feature tests on the release branch for features that aren't
+      GA.  You can use `hack/list-feature-tests.sh` to see a list of tests
+      labeled as `[Feature:.+]`; make sure that these are all either covered in
+      CI jobs on the release branch or are experimental features.  (The answer
+      should already be 'yes', but this is a good time to reconcile.)
+   1. Make a dashboard in Jenkins that contains all of the jobs for this
+      release cycle, and also add them to Critical Builds.  (Don't add them to
+      the merge-bot blockers; see kubernetes/contrib#156.)
 
 ## Injecting Version into Binaries
 
