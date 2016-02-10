@@ -28,7 +28,7 @@ package extensions
 // func ScaleFromDeployment(deployment *Deployment) (*Scale, error) {
 // 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 // 	if err != nil {
-// 		return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+// 		return nil, fmt.Errorf("invalid label selector: %v", err)
 // 	}
 // 	return &Scale{
 // 		ObjectMeta: api.ObjectMeta{
