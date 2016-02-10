@@ -113,7 +113,7 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		return err
 	}
 
-	// We have to make this check beecause the ListWatch that we use in
+	// We have to make this check because the ListWatch that we use in
 	// WatchServices requires Client functions that aren't in the interface
 	// for some reason.
 	if _, ok := s.kubeClient.(*clientset.Clientset); !ok {
@@ -287,11 +287,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 
 	if !wantsLoadBalancer(service) {
 		needDelete := true
-		if appliedState != nil {
-			if !wantsLoadBalancer(appliedState) {
-				needDelete = false
-			}
-		} else {
+		if appliedState == nil {
 			// If we don't have any cached memory of the load balancer, we have to ask
 			// the cloud provider for what it knows about it.
 			// Technically EnsureLoadBalancerDeleted can cope, but we want to post meaningful events
@@ -317,15 +313,40 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 	} else {
 		glog.V(2).Infof("Ensuring LB for service %s", namespacedName)
 
-		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
-
-		// The load balancer doesn't exist yet, so create it.
-		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-		err := s.createLoadBalancer(service)
-		if err != nil {
-			return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
+		// Check if there is old LB there and if it need to be update
+		// Check if the balancer has already existed
+		// Avoid the spurious cloud-calls & events when we restart
+		skipCreate := false
+		if appliedState != nil {
+			// We should delete the old LB if the old LB does not
+			// match what we need now
+			if wantsLoadBalancer(appliedState) && needsUpdate(appliedState, service) {
+				glog.Infof("Deleting existing load balancer for service %s that needs a new balancer.", namespacedName)
+				s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
+				if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(appliedState), s.zone.Region); err != nil {
+					return err, retryable
+				}
+				s.eventRecorder.Event(service, api.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
+			}
+		} else {
+			// Check if the LB already existed
+			// Not sure if it is right since it only check name and zone.rigion
+			// I think we should also check IP, port etc. Maybe need to delete the
+			// following four lines of code
+			_, exists, _ := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region)
+			if exists {
+				skipCreate = true
+			}
 		}
-		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
+		if !skipCreate {
+			// The load balancer doesn't exist yet, so create it.
+			s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
+			err := s.createLoadBalancer(service)
+			if err != nil {
+				return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
+			}
+			s.eventRecorder.Event(service, api.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
+		}
 	}
 
 	// Write the state if changed
