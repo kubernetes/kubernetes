@@ -98,7 +98,7 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Error: %v", err)
 		}
-		glog.Info("going to generate clientset from these input paths: %v", inputPath)
+		glog.Infof("going to generate clientset from these input paths: %v", inputPath)
 		arguments.InputDirs = append(inputPath, dependencies...)
 		// TODO: we need to make OutPackagePath a map[string]string. For example,
 		// we need clientset and the individual typed clients be output to different

@@ -84,7 +84,7 @@ func main() {
 	util.InitFlags()
 
 	if !knownMorphs.Has(config.Morph) {
-		glog.Fatal("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
