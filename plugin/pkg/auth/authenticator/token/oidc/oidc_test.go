@@ -99,10 +99,13 @@ func (op *oidcProvider) handleKeys(w http.ResponseWriter, req *http.Request) {
 	w.Write(b)
 }
 
-func (op *oidcProvider) generateToken(t *testing.T, iss, sub, aud string, usernameClaim, value string, iat, exp time.Time) string {
+func (op *oidcProvider) generateToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string, iat, exp time.Time) string {
 	signer := op.privKey.Signer()
 	claims := oidc.NewClaims(iss, sub, aud, iat, exp)
 	claims.Add(usernameClaim, value)
+	if groups != nil && groupsClaim != "" {
+		claims.Add(groupsClaim, groups)
+	}
 
 	jwt, err := jose.NewSignedJWT(claims, signer)
 	if err != nil {
@@ -112,16 +115,16 @@ func (op *oidcProvider) generateToken(t *testing.T, iss, sub, aud string, userna
 	return jwt.Encode()
 }
 
-func (op *oidcProvider) generateGoodToken(t *testing.T, iss, sub, aud string, usernameClaim, value string) string {
-	return op.generateToken(t, iss, sub, aud, usernameClaim, value, time.Now(), time.Now().Add(time.Hour))
+func (op *oidcProvider) generateGoodToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+	return op.generateToken(t, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour))
 }
 
-func (op *oidcProvider) generateMalformedToken(t *testing.T, iss, sub, aud string, usernameClaim, value string) string {
-	return op.generateToken(t, iss, sub, aud, usernameClaim, value, time.Now(), time.Now().Add(time.Hour)) + "randombits"
+func (op *oidcProvider) generateMalformedToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+	return op.generateToken(t, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour)) + "randombits"
 }
 
-func (op *oidcProvider) generateExpiredToken(t *testing.T, iss, sub, aud string, usernameClaim, value string) string {
-	return op.generateToken(t, iss, sub, aud, usernameClaim, value, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
+func (op *oidcProvider) generateExpiredToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+	return op.generateToken(t, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
 }
 
 // generateSelfSignedCert generates a self-signed cert/key pairs and writes to the certPath/keyPath.
@@ -192,7 +195,7 @@ func TestOIDCDiscoveryTimeout(t *testing.T) {
 	retryBackoff = time.Second
 	expectErr := fmt.Errorf("failed to fetch provider config after 3 retries")
 
-	_, err := New("https://foo/bar", "client-foo", "", "sub")
+	_, err := New("https://foo/bar", "client-foo", "", "sub", "")
 	if !reflect.DeepEqual(err, expectErr) {
 		t.Errorf("Expecting %v, but got %v", expectErr, err)
 	}
@@ -224,7 +227,7 @@ func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 		Issuer: srv.URL,
 	}
 
-	_, err = New(srv.URL, "client-foo", cert, "sub")
+	_, err = New(srv.URL, "client-foo", cert, "sub", "")
 	if !reflect.DeepEqual(err, expectErr) {
 		t.Errorf("Expecting %v, but got %v", expectErr, err)
 	}
@@ -247,7 +250,7 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 
 	expectErr := fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", srv.URL, "http")
 
-	_, err := New(srv.URL, "client-foo", "", "sub")
+	_, err := New(srv.URL, "client-foo", "", "sub", "")
 	if !reflect.DeepEqual(err, expectErr) {
 		t.Errorf("Expecting %v, but got %v", expectErr, err)
 	}
@@ -282,7 +285,7 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	}
 
 	// Create a client using cert2, should fail.
-	_, err = New(tlsSrv.URL, "client-foo", cert2, "sub")
+	_, err = New(tlsSrv.URL, "client-foo", cert2, "sub", "")
 	if err == nil {
 		t.Fatalf("Expecting error, but got nothing")
 	}
@@ -317,15 +320,17 @@ func TestOIDCAuthentication(t *testing.T) {
 	}
 
 	tests := []struct {
-		userClaim string
-		token     string
-		userInfo  user.Info
-		verified  bool
-		err       string
+		userClaim   string
+		groupsClaim string
+		token       string
+		userInfo    user.Info
+		verified    bool
+		err         string
 	}{
 		{
 			"sub",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo"),
+			"",
+			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
 			&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
 			true,
 			"",
@@ -333,14 +338,34 @@ func TestOIDCAuthentication(t *testing.T) {
 		{
 			// Use user defined claim (email here).
 			"email",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com"),
+			"",
+			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
 			&user.DefaultInfo{Name: "foo@example.com"},
 			true,
 			"",
 		},
 		{
+			// Use user defined claim (email here).
+			"email",
+			"",
+			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+			&user.DefaultInfo{Name: "foo@example.com"},
+			true,
+			"",
+		},
+		{
+			// Use user defined claim (email here).
+			"email",
+			"groups",
+			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+			&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
+			true,
+			"",
+		},
+		{
 			"sub",
-			op.generateMalformedToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo"),
+			"",
+			op.generateMalformedToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
 			nil,
 			false,
 			"malformed JWS, unable to decode signature",
@@ -348,7 +373,8 @@ func TestOIDCAuthentication(t *testing.T) {
 		{
 			// Invalid 'aud'.
 			"sub",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-bar", "sub", "user-foo"),
+			"",
+			op.generateGoodToken(t, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
 			nil,
 			false,
 			"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
@@ -356,14 +382,16 @@ func TestOIDCAuthentication(t *testing.T) {
 		{
 			// Invalid issuer.
 			"sub",
-			op.generateGoodToken(t, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo"),
+			"",
+			op.generateGoodToken(t, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
 			nil,
 			false,
 			"oidc: JWT claims invalid: invalid claim value: 'iss'.",
 		},
 		{
 			"sub",
-			op.generateExpiredToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo"),
+			"",
+			op.generateExpiredToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
 			nil,
 			false,
 			"oidc: JWT claims invalid: token is expired",
@@ -371,7 +399,7 @@ func TestOIDCAuthentication(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		client, err := New(srv.URL, "client-foo", cert, tt.userClaim)
+		client, err := New(srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
