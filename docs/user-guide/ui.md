@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 # Kubernetes Dashboard User Interface
 
 Kubernetes has a web-based user interface that allows users to manage applications running in
-the cluster, troubleshoot them, as well as manage the cluster itself.
+the cluster and troubleshoot them, as well as manage the cluster itself.
 
 ## Accessing the Dashboard
 
@@ -58,42 +58,46 @@ found at https://github.com/kubernetes/dashboard/releases.
 
 ## Overview
 
-The Dashboard can be used to introspect a cluster, such as show applications running on the
-cluster, or surface problems in in the state of services. You can also use the UI to modify
-your cluster. For example, you can deploy applications or change their number of replicas.
+The Dashboard can be used to provide an overview of applications running on the cluster and provide
+information on any errors that have occurred. You can also inspect your replication controllers and
+corresponding services, change the number of replicas and deploy new applications using a wizard.
 
 ### Using the Dashboard
 
-When the accessed Dashboard works on an empty cluster, it shows welcome page with links to user
-guide and documentation. It also allows to deploy to the cluster your first application.
+When first accessing the dashboard on an empty cluster, you should see the welcome page.
+This contains some useful links to the documentation, and a big button to deploy your first
+application.
 ![Kubernetes Dashboard welcome page](ui-dashboard-zerostate.png)
 
 ### Deploying applications
 
-With Dashboard you can deploy a replicated application using a simple form that guides through all
-required steps. All that is needed is a container image URI
-(e.g., on Google Container Registry or Docker Hub) and knowledge on what ports the image exposes.
-A replicated application that is deployed through the form is a replication controller plus optional
-service (if port mappings are specified).
+The Kubernetes Dashboard lets you create and deploy a Replication Controller with a simple wizard.
+You can simply provide the name for your application, the name of a Docker container (commonly
+hosted on the Google Container Registry or Docker Hub) and the target number of Pods you want deployed.
+Optionally, if your container listens on a port, you can also provide a port and target port. The
+wizard will create a corresponding Kubernetes Service which will route to your deployed Pods.
 
 ![Kubernetes Dashboard deploy form](ui-dashboard-deploy-simple.png)
 
-The application deploy form has more options view where advanced configuration settings for the
-deployed application can be changed, e.g., namespace or image pull secret.
+If needed, you can expand the "more options" section where you can change more advanced settings,
+such as the Kubernetes namespace that the resulting Pods run in, image pull secrets for private
+registries, resource limits, container entrypoint and privileged status.
 
 ![Kubernetes Dashboard deploy form advanced options](ui-dashboard-deploy-more.png)
 
 #### Applications view
 
-Main Dashboard view shows all applications that are running in the cluster. Applications are
-denoted by cards that represent a replication controller plus zero or more services. Cards show
-overview information of applications and allow for simple modifications (e.g., edit replica count)
-and logs viewing. If error state is detected for a card, it is surfaced to the user.
+If some applications are running on your cluster, the Dashboard will default to showing an overview.
+Individual applications are shown as cards - where an application is defined as a Replication Controller
+and its corresponding services. Each card shows the current number of replicas running and desired,
+along with any errors reported by Kubernetes. You can also view logs, make quick changes to the number
+of replicas or delete the application directly from the menu in the cards' corner.
 
 ![Kubernetes Dashboard applications view](ui-dashboard-rcs.png)
 
-The application details page lists all replicas together with basic information about them.
-The events page displays events that are related to replicas of the application.
+Clicking "View details" from the card menu will take you to the following screen, where you
+can view more information about the Pods that make up your application. The events tab can be useful
+in debugging flapping applications.
 
 ![Kubernetes Dashboard application detail](ui-dashboard-rcs-detail.png)
 
