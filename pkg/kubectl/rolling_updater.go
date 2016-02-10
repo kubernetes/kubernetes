@@ -412,7 +412,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.R
 			return nil, false, err
 		}
 		if controller.Spec.Replicas <= 0 {
-			return nil, false, fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d\n", controller.Name, controller.Spec)
+			return nil, false, fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d\n", controller.Name, controller.Spec.Replicas)
 		}
 		// The controller wasn't found, so create it.
 		if controller.Annotations == nil {
