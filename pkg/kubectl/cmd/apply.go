@@ -107,6 +107,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 	}
 
 	encoder := f.JSONEncoder()
+	decoder := f.Decoder(false)
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -161,8 +162,18 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", info), info.Source, err)
 		}
 
+		// Create the versioned struct from the original from the server for
+		// strategic patch.
+		// TODO: Move all structs in apply to use raw data. Can be done once
+		// builder has a RawResult method which delivers raw data instead of
+		// internal objects.
+		versionedObject, _, err := decoder.Decode(current, nil, nil)
+		if err != nil {
+			return cmdutil.AddSourceToErr(fmt.Sprintf("converting encoded server-side object back to versioned struct:\n%v\nfor:", info), info.Source, err)
+		}
+
 		// Compute a three way strategic merge patch to send to server.
-		patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, info.VersionedObject, true)
+		patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, true)
 		if err != nil {
 			format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfrom:\n%v\nfor:"
 			return cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current, info), info.Source, err)
