@@ -27,34 +27,34 @@ import (
 // Basic node information
 type NodeInfo struct {
 	// The number of cores on this node
-	NumCores uint `json:"num_cores"`
+	NumCores int32 `json:"numCores"`
 
-	// The amount of memory (in bytes) on this node
-	MemoryCapacity uint64 `json:"memory_capacity"`
+	// The amount of memory on this node
+	MemoryCapacityBytes int64 `json:"memoryCapacityBytes"`
 
 	// Machine ID that uniquely identifies a node across reboots or network changes
-	MachineID string `json:"machine_id"`
+	MachineID string `json:"machineId"`
 
 	// System UUID reported by a node
-	SystemUUID string `json:"system_uuid"`
+	SystemUUID string `json:"systemUuid"`
 
 	// The boot ID of a node, which changes upon reboots
-	BootID string `json:"boot_id"`
+	BootID string `json:"bootId"`
 }
 
 // Software version of a node
 type VersionInfo struct {
-	// Kernel version
-	KernelVersion string `json:"kernel_version"`
+	// Host machine kernel version
+	KernelVersion string `json:"kernelVersion"`
 
 	// OS image being used for collector container, or host image if running on host directly
-	ContainerOsVersion string `json:"container_os_version"`
+	ContainerOsVersion string `json:"containerOsVersion"`
 
-	// Container runtime version, e.g., Docker/Rkt version
-	ContainerRuntimeVersion string `json:"container_runtime_version"`
+	// Version of a specific container runtime, e.g. Docker/Rkt
+	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
 
-	// Collector version
-	CollectorVersion string `json:"collector_version"`
+	// Version of a collector instance
+	CollectorVersion string `json:"collectorVersion"`
 }
 
 const (
@@ -71,19 +71,19 @@ type FsInfo struct {
 	Device string `json:"device"`
 
 	// Path where the filesystem is mounted.
-	Mountpoint string `json:"mountpoint"`
+	MountPoint string `json:"mountPoint"`
 
-	// Filesystem usage in bytes.
-	Capacity uint64 `json:"capacity"`
+	// Total filesystem capacity
+	CapacityBytes int64 `json:"capacityBytes"`
 
 	// Bytes available for non-root use.
-	Available uint64 `json:"available"`
+	AvailableBytes int64 `json:"availableBytes"`
 
 	// Number of bytes used on this filesystem.
-	Usage uint64 `json:"usage"`
+	UsedBytes int64 `json:"usedBytes"`
 
 	// Labels associated with this filesystem.
-	Labels []string `json:"labels"`
+	Labels []string `json:"labels,omitempty"`
 }
 
 type EventType string
@@ -91,30 +91,27 @@ type EventType string
 // Event monitored and returned by collector
 type Event struct {
 	// The absolute container name for which the event occurred
-	ContainerName string `json:"container_name"`
+	ContainerName string `json:"containerName"`
 
 	// The time at which the event occurred
 	Timestamp time.Time `json:"timestamp"`
 
 	// The type of event. EventType is an enumerated type
-	EventType EventType `json:"event_type"`
+	EventType EventType `json:"eventType"`
 }
 
 const (
-	EventOom               EventType = "oom"
-	EventOomKill           EventType = "oomKill"
-	EventContainerCreation EventType = "containerCreation"
-	EventContainerDeletion EventType = "containerDeletion"
+	EventOom               EventType = "Oom"
+	EventOomKill           EventType = "OomKill"
+	EventContainerCreation EventType = "ContainerCreation"
+	EventContainerDeletion EventType = "ContainerDeletion"
 )
 
+// Request sent to the collector to monitor for various event types
 type EventRequest struct {
-	// EventType is a list of event types wanted
-	EventType map[EventType]bool
+	// EventType is a list of event types to be watched
+	EventType []EventType `json:"eventType"`
 
 	// The absolute container name for which the event occurred
-	ContainerName string
-
-	// If IncludeSubcontainers is false, only events occurring in the specific
-	// container, and not the subcontainers, will be returned
-	IncludeSubcontainers bool
+	ContainerName string `json:"containerName"`
 }
