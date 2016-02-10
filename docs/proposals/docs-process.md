@@ -28,7 +28,7 @@ This highly lubricates the ability for external users to make changes, as they c
 
 ## Why migrate to kubernetes.github.io instead of using a `gh-pages` branch?
 
-GitHub Pages also suppots using branches of an existing repo to host Jekyll sites; in this case you would reuse the repo, but check in the Jekyll site to a branch named `gh-pages`. While you still get auto-building and staging, it will build at `http://username.github.io/**repo**` -- and in our case that is problematic because absolute links to any URI within the site will not work the same as they will on kubernetes.io. If we use the `username.github.io` repo instead of the gh-pages branch, then including an image from `/images/example.png` will work the same on `http://kubernetes.github.io`, `http://your_username.github.io`, `http://kubernetes.io`, and your local machine (running `jekyll serve` off of a clone of our repo).
+GitHub Pages also supports using branches of an existing repo to host Jekyll sites; in this case you would reuse the repo, but check in the Jekyll site to a branch named `gh-pages`. While you still get auto-building and staging, it will build at `http://username.github.io/**repo**` -- and in our case that is problematic because absolute links to any URI within the site will not work the same as they will on kubernetes.io. If we use the `username.github.io` repo instead of the gh-pages branch, then including an image from `/images/example.png` will work the same on `http://kubernetes.github.io`, `http://your_username.github.io`, `http://kubernetes.io`, and your local machine (running `jekyll serve` off of a clone of our repo).
 
 ## Overview of docs migration and how release process will change
 
@@ -46,21 +46,15 @@ New releases can be developed under `http://kubernetets.io/vNEXT`. We can do thi
 
 ## Adapting the current docs process for releases
 
-Nuts and bolts: How would a pure-GitHub Pages process work? Let’s rewrite this doc that we provide to the community, which covers [how to contribute to our docs for a K8s release](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/update-release-docs.md).
+Nuts and bolts: How would a pure-GitHub Pages process work? 
 
-### Adding a new docs collection for a release
+At announce time we follow these steps, all within folders that represent Kubernetes releases:
 
-Whenever a new release series (release-X.Y) is cut from master, we push the corresponding set of docs to `http://kubernetes.io/vX.Y/docs`. The steps are as follows:
-
-* Create a `_vX.Y` folder in the `kubernetes.github.io` repo.
-
-* Add vX.Y as a valid collection in `_config.yml`.
-
-* Create a new `_includes/nav_vX.Y.html` file with the navigation menu. This can be a copy of `_includes/nav_vX.Y-1.html` with links to new docs added and links to deleted docs removed. Update _layouts/docwithnav.html to include this new navigation html file. Example PR: [#16143](https://github.com/kubernetes/kubernetes/pull/16143).
-
-* [Pull docs from release branch](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/update-release-docs.md#updating-docs-in-gh-pages-branch) in _vX.Y folder.
-
-Once these changes have been submitted, you should be able to reach the docs at http://kubernetes.io/vX.Y/docs/where you can test them.
+- Copy from vX.Y to vX.Y+1
+- vX.Y+1 becomes the new head for future, release-bound work that is related specifically to that release.
+- vX.Y (which was just announced) becomes the default docset (forwards from docs.k8s.io, etc), and the {HEAD} for the docs. All doc edits that aren't release-bound are made in vX.Y.
+- As vX.Y+1 is announced, a PR that makes sure all the edits done in vX.Y are pushed to vX.Y+1. Merge conflicts must be resolved, etc.
+- vX.Y+1 then becomes {HEAD} and default docset (forwarded from docs.k8s.io), and is copied into vX.Y+2. (vX.Y is then allowed to "go stale"). 
 
 To make X.Y the default version of docs:
 
