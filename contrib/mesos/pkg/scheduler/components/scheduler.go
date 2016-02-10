@@ -99,6 +99,9 @@ func New(
 				// "backs off" when it can't find an offer that matches up with a pod.
 				// The backoff period for a pod can terminate sooner if an offer becomes
 				// available that matches up.
+
+				// TODO(jdef) this will never match for a pod that uses a node selector,
+				// since we're passing a nil *api.Node here.
 				return !task.Has(podtask.Launched) && ps.Fit(task, offer, nil)
 			default:
 				// no point in continuing to check for matching offers
