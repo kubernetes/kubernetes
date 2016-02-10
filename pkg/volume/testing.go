@@ -134,12 +134,15 @@ type FakeVolumePlugin struct {
 	Host                   VolumeHost
 	Config                 VolumeConfig
 	LastProvisionerOptions VolumeOptions
+	NewAttacherCallCount   int
+	NewDetacherCallCount   int
 }
 
 var _ VolumePlugin = &FakeVolumePlugin{}
 var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
+var _ AttachableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
 	plugin.Host = host
@@ -161,6 +164,16 @@ func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts Volume
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
 	return &FakeVolume{podUID, volName, plugin, MetricsNil{}}, nil
+}
+
+func (plugin *FakeVolumePlugin) NewAttacher(spec *Spec) (Attacher, error) {
+	plugin.NewAttacherCallCount = plugin.NewAttacherCallCount + 1
+	return &FakeVolume{}, nil
+}
+
+func (plugin *FakeVolumePlugin) NewDetacher(name string, podUID types.UID) (Detacher, error) {
+	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
+	return &FakeVolume{}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
@@ -213,6 +226,14 @@ func (fv *FakeVolume) TearDown() error {
 
 func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
+}
+
+func (fv *FakeVolume) Attach() error {
+	return nil
+}
+
+func (fv *FakeVolume) Detach() error {
+	return nil
 }
 
 type fakeRecycler struct {
