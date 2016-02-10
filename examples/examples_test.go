@@ -231,6 +231,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"nginx-deployment":     &extensions.Deployment{},
 			"new-nginx-deployment": &extensions.Deployment{},
 			"replication":          &api.ReplicationController{},
+			"deployment":           &extensions.Deployment{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
@@ -387,9 +388,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../examples/fibre_channel": {
 			"fc": &api.Pod{},
-		},
-		"../examples/extensions": {
-			"deployment": &extensions.Deployment{},
 		},
 		"../examples/javaweb-tomcat-sidecar": {
 			"javaweb":   &api.Pod{},
