@@ -61,6 +61,8 @@ func NewDefaultProcurement(prototype *mesos.ExecutorInfo, eir executorinfo.Regis
 //
 // In contrast T.Spec is meant not to be filled by the procurement chain
 // but rather by a final scheduler instance.
+//
+// api.Node is an optional (possibly nil) param.
 type Procurement interface {
 	Procure(*T, *api.Node, *ProcureState) error
 }
@@ -129,7 +131,8 @@ func NewNodeProcurement() Procurement {
 
 		// check the NodeSelector
 		if len(t.Pod.Spec.NodeSelector) > 0 {
-			if n.Labels == nil {
+			// *api.Node is optional for procurement
+			if n == nil || n.Labels == nil {
 				return fmt.Errorf(
 					"NodeSelector %v does not match empty labels of pod %s/%s",
 					t.Pod.Spec.NodeSelector, t.Pod.Namespace, t.Pod.Name,
