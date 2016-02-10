@@ -81,13 +81,13 @@ func SetAsLabelSelector(ls labels.Set) *LabelSelector {
 
 // FormatLabelSelector convert labelSelector into plain string
 func FormatLabelSelector(labelSelector *LabelSelector) string {
-	var l string
-	if selector, err := LabelSelectorAsSelector(labelSelector); err != nil {
-		l = selector.String()
-	} else {
-		l = "<error>"
+	selector, err := LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return "<error>"
 	}
-	if l == "" {
+
+	l := selector.String()
+	if len(l) == 0 {
 		l = "<none>"
 	}
 	return l
