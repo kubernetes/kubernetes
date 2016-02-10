@@ -73,17 +73,19 @@ When building final release tars, they are first staged into `_output/release-st
 ## Proxy Settings
 
 
-If you are behind a proxy, you need to edit `build/build-image/Dockerfile` and add proxy settings to execute command in that container correctly.
+If you are behind a proxy, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
 
-example:
+```
+export KUBE_BUILD_HTTP_PROXY=http://username:password@proxyaddr:proxyport
+export KUBE_BUILD_HTTPS_PROXY=http://username:password@proxyaddr:proxyport
+```
 
-`ENV http_proxy http://username:password@proxyaddr:proxyport`
+Optionally, you can specify addresses of no proxy for kubernetes build, for example
 
-`ENV https_proxy http://username:password@proxyaddr:proxyport`
-
-Besides, to avoid integration test touch the proxy while connecting to local etcd service, you need to set
-
-`ENV no_proxy 127.0.0.1`
+```
+export KUBE_BUILD_NO_PROXY=127.0.0.1
+```
+If you are using sudo to make kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
 
 ## TODOs
 

@@ -22,6 +22,10 @@ MAINTAINER  Joe Beda <jbeda@google.com>
 
 ENV GOOS    linux
 ENV GOARCH  amd64
+ENV http_proxy KUBE_BUILD_HTTP_PROXY
+ENV https_proxy KUBE_BUILD_HTTPS_PROXY
+ENV no_proxy KUBE_BUILD_NO_PROXY
+
 
 # work around 64MB tmpfs size in Docker 1.6
 ENV TMPDIR /tmp.k8s
