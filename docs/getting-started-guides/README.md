@@ -117,7 +117,7 @@ writing a new solution](../../docs/devel/writing-a-getting-started-guide.md).
 
 These solutions are combinations of cloud provider and OS not covered by the above solutions.
 
-- [AWS + coreos](coreos.md)
+- [AWS + CoreOS](coreos.md)
 - [GCE + CoreOS](coreos.md)
 - [AWS + Ubuntu](juju.md)
 - [Joyent + Ubuntu](juju.md)
