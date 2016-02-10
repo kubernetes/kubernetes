@@ -289,8 +289,8 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-flannel"}
     ;;
 
-   # Runs only the ingress tests on GKE.
-   kubernetes-e2e-gke-ingress)
+  # Runs only the ingress tests on GKE.
+  kubernetes-e2e-gke-ingress)
     : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-ingress"}
     : ${E2E_NETWORK:="e2e-gke-ingress"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
