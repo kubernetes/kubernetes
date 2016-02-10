@@ -34,7 +34,12 @@ fi
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-echo "... Starting cluster using provider: $KUBERNETES_PROVIDER" >&2
+
+if [ -z "${ZONE-}" ]; then
+  echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2
+else
+  echo "... Starting cluster in ${ZONE} using provider ${KUBERNETES_PROVIDER}" >&2
+fi
 
 echo "... calling verify-prereqs" >&2
 verify-prereqs
