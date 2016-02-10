@@ -129,7 +129,7 @@ In contrast, in Mesos, API operations go to a particular framework. However, the
 in the API server rather than in the controller. Of course you can choose to make these operations be no-ops for
 your application-specific collection abstractions, and handle them in your controller.
 * On the node level, Mesos allows application-specific executors, whereas Kubernetes only has
-executors for Docker and Rocket containers.
+executors for Docker and rkt containers.
 
 The end-to-end flow is
 
