@@ -121,8 +121,11 @@ script
 
 	. /etc/kube-env
 	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+		ARGS="${KUBELET_TEST_LOG_LEVEL}"
+	fi
 	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-		ARGS="${KUBELET_TEST_ARGS}"
+		ARGS="${ARGS} ${KUBELET_TEST_ARGS}"
 	fi
 	BINARY_PATH="/usr/bin/kubelet"
 	if [ "${TEST_CLUSTER:-}" = "true" ]; then
@@ -140,7 +143,7 @@ script
 		--cgroup-root=/ \
 		--system-container=/system \
 		--nosystemd=true \
-		${ARGS}
+		${ARGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
 # Wait for 10s to start kubelet again.
@@ -206,11 +209,12 @@ script
 	fi
 	kube_proxy_docker_tag=$(cat /run/kube-docker-files/kube-proxy.docker_tag)
 	test_args=""
-	log_level="--v=2"
 	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
 		test_args="${KUBEPROXY_TEST_ARGS}"
-		# test_args should already contain log level setting.
-		log_level=""
+	fi
+	log_level="--v=2"
+	if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
+		log_level="${KUBEPROXY_TEST_LOG_LEVEL}"
 	fi
 	api_servers="--master=https:\/\/${KUBERNETES_MASTER_NAME}"
 	sed -i -e "s/{{kubeconfig}}/${kubeconfig}/g" ${tmp_file}
