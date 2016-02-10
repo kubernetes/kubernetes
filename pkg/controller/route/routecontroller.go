@@ -75,6 +75,10 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 		routeMap[route.TargetInstance] = route
 	}
 	for _, node := range nodes {
+		// Skip if the node hasn't been assigned a CIDR yet.
+		if node.Spec.PodCIDR == "" {
+			continue
+		}
 		// Check if we have a route for this node w/ the correct CIDR.
 		r := routeMap[node.Name]
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
