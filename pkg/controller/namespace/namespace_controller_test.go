@@ -108,6 +108,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		strings.Join([]string{"list", "pods", ""}, "-"),
 		strings.Join([]string{"delete-collection", "resourcequotas", ""}, "-"),
 		strings.Join([]string{"delete-collection", "secrets", ""}, "-"),
+		strings.Join([]string{"delete-collection", "configmaps", ""}, "-"),
 		strings.Join([]string{"delete-collection", "limitranges", ""}, "-"),
 		strings.Join([]string{"delete-collection", "events", ""}, "-"),
 		strings.Join([]string{"delete-collection", "serviceaccounts", ""}, "-"),
