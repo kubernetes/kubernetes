@@ -217,14 +217,30 @@ Finally, from a clone of upstream/master, *make sure* you still have
 `RELEASE_VERSION` set correctly, and run `./build/mark-stable-release.sh
 ${RELEASE_VERSION}`.
 
-### Updating the master branch
+### Manual tasks for new release series
 
-If you are cutting a new release series, please also update the master branch:
-change the `latestReleaseBranch` in `cmd/mungedocs/mungedocs.go` to the new
-release branch (`release-X.Y`), run `hack/update-generated-docs.sh`. This will
-let the unversioned warning in docs point to the latest release series. Please
-send the changes as a PR titled "Update the latestReleaseBranch to release-X.Y
-in the munger".
+*TODO(#20946) Burn this list down.*
+
+If you are cutting a new release series, there are a few tasks that haven't yet
+been automated that need to happen after the branch has been cut:
+
+1. Update the master branch constant for doc generation: change the
+   `latestReleaseBranch` in `cmd/mungedocs/mungedocs.go` to the new release
+   branch (`release-X.Y`), run `hack/update-generated-docs.sh`.  This will let
+   the unversioned warning in docs point to the latest release series. Please
+   send the changes as a PR titled "Update the latestReleaseBranch to
+   release-X.Y in the munger".
+1. Add test jobs for the new branch.  See [End-2-End Testing in
+   Kubernetes](e2e-tests.md) for the test jobs that run in CI, which are under
+   version control in `hack/jenkins/e2e.sh` (on the release branch) and
+   `hack/jenkins/job-configs/kubernetes-e2e.yaml` (in `master`).  You'll want
+   to duplicate/munge these for the release branch so that, as we cherry-pick
+   fixes onto the branch, we know that it builds, etc.
+1. Make sure all features that are supposed to be GA are covered by tests.  You
+   can use `hack/list-feature-tests.sh` to see a list of tests labeled as
+   `[Feature:.+]`; make sure that these are all either covered in CI jobs or
+   are experimental features.  (The answer should already be 'yes', but this is
+   a good time to reconcile.)
 
 ## Injecting Version into Binaries
 
