@@ -87,6 +87,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
+		extensions.Kind("ReplicaSet"):              &ReplicaSetDescriber{c},
 		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
 		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
@@ -421,10 +422,7 @@ type PodDescriber struct {
 }
 
 func (d *PodDescriber) Describe(namespace, name string) (string, error) {
-	rc := d.ReplicationControllers(namespace)
-	pc := d.Pods(namespace)
-
-	pod, err := pc.Get(name)
+	pod, err := d.Pods(namespace).Get(name)
 	if err != nil {
 		eventsInterface := d.Events(namespace)
 		selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
@@ -448,15 +446,10 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		events, _ = d.Events(namespace).Search(ref)
 	}
 
-	rcs, err := getReplicationControllersForLabels(rc, labels.Set(pod.Labels))
-	if err != nil {
-		return "", err
-	}
-
-	return describePod(pod, rcs, events)
+	return describePod(pod, events)
 }
 
-func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.EventList) (string, error) {
+func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
@@ -475,10 +468,6 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		fmt.Fprintf(out, "Reason:\t%s\n", pod.Status.Reason)
 		fmt.Fprintf(out, "Message:\t%s\n", pod.Status.Message)
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
-		var matchingRCs []*api.ReplicationController
-		for _, rc := range rcs {
-			matchingRCs = append(matchingRCs, &rc)
-		}
 		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
 		fmt.Fprintf(out, "Containers:\n")
 		describeContainers(pod, out)
@@ -895,6 +884,58 @@ func DescribePodTemplate(template *api.PodTemplateSpec) (string, error) {
 		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(template.Annotations))
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&template.Spec))
 		describeVolumes(template.Spec.Volumes, out)
+		return nil
+	})
+}
+
+// ReplicaSetDescriber generates information about a ReplicaSet and the pods it has created.
+type ReplicaSetDescriber struct {
+	client.Interface
+}
+
+func (d *ReplicaSetDescriber) Describe(namespace, name string) (string, error) {
+	rsc := d.Extensions().ReplicaSets(namespace)
+	pc := d.Pods(namespace)
+
+	rs, err := rsc.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
+
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
+	if err != nil {
+		return "", err
+	}
+
+	events, _ := d.Events(namespace).Search(rs)
+
+	return describeReplicaSet(rs, events, running, waiting, succeeded, failed)
+}
+
+func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", rs.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
+		if rs.Spec.Template != nil {
+			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
+		} else {
+			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
+		}
+		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(rs.Labels))
+		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
+		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		if rs.Spec.Template != nil {
+			describeVolumes(rs.Spec.Template.Spec.Volumes, out)
+		}
+		if events != nil {
+			DescribeEvents(events, out)
+		}
 		return nil
 	})
 }
@@ -1670,29 +1711,6 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 		}
 	}
 	return matchingDaemonSets, nil
-}
-
-// Get all replication controllers whose selectors would match a given set of
-// labels.
-// TODO Move this to pkg/client and ideally implement it server-side (instead
-// of getting all RC's and searching through them manually).
-func getReplicationControllersForLabels(c client.ReplicationControllerInterface, labelsToMatch labels.Labels) ([]api.ReplicationController, error) {
-	// Get all replication controllers.
-	// TODO this needs a namespace scope as argument
-	rcs, err := c.List(api.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error getting replication controllers: %v", err)
-	}
-
-	// Find the ones that match labelsToMatch.
-	var matchingRCs []api.ReplicationController
-	for _, controller := range rcs.Items {
-		selector := labels.SelectorFromSet(controller.Spec.Selector)
-		if selector.Matches(labelsToMatch) {
-			matchingRCs = append(matchingRCs, controller)
-		}
-	}
-	return matchingRCs, nil
 }
 
 func printReplicationControllersByLabels(matchingRCs []*api.ReplicationController) string {
