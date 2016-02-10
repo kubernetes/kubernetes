@@ -90,15 +90,15 @@ There is a [proposal](https://github.com/docker/docker/pull/14632) to add a bind
 Docker to change the ownership of a volume to the effective UID and GID of a container, but this has
 not yet been accepted.
 
-### Rocket
+### rkt
 
-Rocket
+rkt
 [image manifests](https://github.com/appc/spec/blob/master/spec/aci.md#image-manifest-schema) can
-specify users and groups, similarly to how a Docker image can.  A Rocket
+specify users and groups, similarly to how a Docker image can.  A rkt
 [pod manifest](https://github.com/appc/spec/blob/master/spec/pods.md#pod-manifest-schema) can also
 override the default user and group specified by the image manifest.
 
-Rocket does not currently support supplemental groups or changing the owning UID or
+rkt does not currently support supplemental groups or changing the owning UID or
 group of a volume, but it has been [requested](https://github.com/coreos/rkt/issues/1309).
 
 ## Use Cases
