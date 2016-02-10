@@ -119,7 +119,7 @@ func setupProviderConfig() error {
 		managedZones := []string{zone} // Only single-zone for now
 		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
 		if err != nil {
-			return fmt.Errorf("Error building GCE/GKE provider: ", err)
+			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
 
 	case "aws":
@@ -137,7 +137,7 @@ func setupProviderConfig() error {
 		var err error
 		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
 		if err != nil {
-			return fmt.Errorf("Error building AWS provider: ", err)
+			return fmt.Errorf("Error building AWS provider: %v", err)
 		}
 
 	}
