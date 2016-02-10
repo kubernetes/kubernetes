@@ -48,9 +48,6 @@
         - 'gce-flaky':
             description: 'Run E2E tests on GCE using the latest successful build. Limit to known-flaky tests.'
             timeout: 180
-        - 'gce-parallel-flaky':
-            description: 'Run E2E tests using Ginkgo''s parallel test runner on GCE using the latest successful build. Limit to known-flaky tests.'
-            timeout: 90
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
             timeout: 120

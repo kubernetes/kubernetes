@@ -312,20 +312,6 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     ;;
 
-  # Runs the flaky tests on GCE in parallel.
-  kubernetes-e2e-gce-parallel-flaky)
-    : ${E2E_CLUSTER_NAME:="parallel-flaky"}
-    : ${E2E_NETWORK:="e2e-parallel-flaky"}
-    : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Feature:.+\]"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
-    : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # Override GCE defaults.
-    NUM_NODES=${NUM_NODES_PARALLEL}
-    ;;
-
   # GKE core jobs
 
   # Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel.
