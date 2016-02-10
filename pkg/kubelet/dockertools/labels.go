@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -47,6 +48,8 @@ const (
 
 	// TODO(random-liu): Keep this for old containers, remove this when we drop support for v1.1.
 	kubernetesPodLabel = "io.kubernetes.pod.data"
+
+	cadvisorPrometheusMetricsLabel = "io.cadvisor.metric.prometheus"
 )
 
 // Container information which has been labelled on each docker container
@@ -64,7 +67,23 @@ type labelledContainerInfo struct {
 	PreStopHandler            *api.Handler
 }
 
-func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
+func GetContainerName(labels map[string]string) string {
+	return labels[kubernetesContainerNameLabel]
+}
+
+func GetPodName(labels map[string]string) string {
+	return labels[kubernetesPodNameLabel]
+}
+
+func GetPodUID(labels map[string]string) string {
+	return labels[kubernetesPodUIDLabel]
+}
+
+func GetPodNamespace(labels map[string]string) string {
+	return labels[kubernetesPodNamespaceLabel]
+}
+
+func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
 	labels := map[string]string{}
 	labels[kubernetesPodNameLabel] = pod.Name
 	labels[kubernetesPodNamespaceLabel] = pod.Namespace
@@ -87,6 +106,13 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[str
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
 			labels[kubernetesContainerPreStopHandlerLabel] = string(rawPreStop)
+		}
+	}
+
+	if enableCustomMetrics {
+		path, err := custommetrics.GetCAdvisorCustomMetricsDefinitionPath(container)
+		if path != nil && err == nil {
+			labels[cadvisorPrometheusMetricsLabel] = *path
 		}
 	}
 

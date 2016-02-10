@@ -70,6 +70,10 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'master'
+        - 'gce-2':
+            deploy-description: Clone of kubernetes-soak-weekly-deploy-gce.
+            e2e-description: Clone of kubernetes-soak-continuous-e2e-gce.
+            branch: 'master'
         - 'gce-1.1':
             deploy-description: |
                 Deploy Kubernetes to soak cluster using the latest successful

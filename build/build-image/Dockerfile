@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,10 +20,12 @@ FROM KUBE_BUILD_IMAGE_CROSS
 
 MAINTAINER  Joe Beda <jbeda@google.com>
 
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
 ENV GOOS    linux
 ENV GOARCH  amd64
+ENV http_proxy KUBE_BUILD_HTTP_PROXY
+ENV https_proxy KUBE_BUILD_HTTPS_PROXY
+ENV no_proxy KUBE_BUILD_NO_PROXY
+
 
 # work around 64MB tmpfs size in Docker 1.6
 ENV TMPDIR /tmp.k8s
@@ -34,8 +36,10 @@ RUN mkdir $TMPDIR && \
 
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`
-RUN rm -rf /var/lib/apt/lists/
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
+RUN rm -rf /var/lib/apt/lists/ \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y rsync \
+    && rm -rf /var/lib/apt/lists/
 
 # Download and symlink etcd.  We need this for our integration tests.
 RUN export ETCD_VERSION=v2.2.1; \

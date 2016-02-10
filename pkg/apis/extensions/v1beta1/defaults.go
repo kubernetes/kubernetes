@@ -67,8 +67,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			labels := obj.Spec.Template.Labels
 
 			if labels != nil {
-				if len(obj.Spec.Selector) == 0 {
-					obj.Spec.Selector = labels
+				if obj.Spec.Selector == nil {
+					obj.Spec.Selector = &LabelSelector{MatchLabels: labels}
 				}
 				if len(obj.Labels) == 0 {
 					obj.Labels = labels
@@ -99,10 +99,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 					maxSurge := intstr.FromInt(1)
 					strategy.RollingUpdate.MaxSurge = &maxSurge
 				}
-			}
-			if obj.Spec.UniqueLabelKey == nil {
-				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = DefaultDeploymentUniqueLabelKey
 			}
 		},
 		func(obj *Job) {

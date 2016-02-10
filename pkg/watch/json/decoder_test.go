@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -99,7 +99,7 @@ func TestDecoder_SourceClose(t *testing.T) {
 	select {
 	case <-done:
 		break
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Error("Timeout")
 	}
 }

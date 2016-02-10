@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -69,7 +69,7 @@ type framework struct {
 	// Config related, write-once
 	sched             scheduler.Scheduler
 	schedulerConfig   *schedcfg.Config
-	client            *client.Client
+	client            *clientset.Clientset
 	failoverTimeout   float64 // in seconds
 	reconcileInterval int64
 	nodeRegistrator   node.Registrator
@@ -98,7 +98,7 @@ type framework struct {
 type Config struct {
 	SchedulerConfig   schedcfg.Config
 	ExecutorId        *mesos.ExecutorID
-	Client            *client.Client
+	Client            *clientset.Clientset
 	StoreFrameworkId  frameworkid.StoreFunc
 	FailoverTimeout   float64
 	ReconcileInterval int64
@@ -526,7 +526,7 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 		// TODO(jdef) for case #2 don't delete the pod, just update it's status to Failed
 		pod := &task.Pod
 		log.Warningf("deleting rogue pod %v/%v for lost task %v", pod.Namespace, pod.Name, task.ID)
-		if err := k.client.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
+		if err := k.client.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
 			log.Errorf("failed to delete pod %v/%v for terminal task %v: %v", pod.Namespace, pod.Name, task.ID, err)
 		}
 	} else if taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED || taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED {
@@ -578,7 +578,7 @@ func (k *framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, ta
 		// possible rogue pod exists at this point because we can't identify it; should kill the task
 		log.Errorf("possible rogue pod; illegal api.PodStatusResult, unable to parse full pod name from: '%v' for task %v: %v",
 			podStatus.Name, taskId, err)
-	} else if pod, err := k.client.Pods(namespace).Get(name); err == nil {
+	} else if pod, err := k.client.Core().Pods(namespace).Get(name); err == nil {
 		if t, ok, err := podtask.RecoverFrom(*pod); ok {
 			log.Infof("recovered task %v from metadata in pod %v/%v", taskId, namespace, name)
 			_, err := k.sched.Tasks().Register(t)
@@ -593,7 +593,7 @@ func (k *framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, ta
 		} else if err != nil {
 			//should kill the pod and the task
 			log.Errorf("killing pod, failed to recover task from pod %v/%v: %v", namespace, name, err)
-			if err := k.client.Pods(namespace).Delete(name, nil); err != nil {
+			if err := k.client.Core().Pods(namespace).Delete(name, nil); err != nil {
 				log.Errorf("failed to delete pod %v/%v: %v", namespace, name, err)
 			}
 		} else {
@@ -683,7 +683,7 @@ func (k *framework) makeTaskRegistryReconciler() taskreconciler.Action {
 // tasks identified by annotations in the Kubernetes pod registry.
 func (k *framework) makePodRegistryReconciler() taskreconciler.Action {
 	return taskreconciler.Action(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
-		podList, err := k.client.Pods(api.NamespaceAll).List(api.ListOptions{})
+		podList, err := k.client.Core().Pods(api.NamespaceAll).List(api.ListOptions{})
 		if err != nil {
 			return proc.ErrorChanf("failed to reconcile pod registry: %v", err)
 		}
@@ -759,7 +759,7 @@ func (k *framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, ta
 }
 
 func (ks *framework) recoverTasks() error {
-	podList, err := ks.client.Pods(api.NamespaceAll).List(api.ListOptions{})
+	podList, err := ks.client.Core().Pods(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		log.V(1).Infof("failed to recover pod registry, madness may ensue: %v", err)
 		return err
@@ -778,7 +778,7 @@ func (ks *framework) recoverTasks() error {
 		}
 		if t, ok, err := podtask.RecoverFrom(pod); err != nil {
 			log.Errorf("failed to recover task from pod, will attempt to delete '%v/%v': %v", pod.Namespace, pod.Name, err)
-			err := ks.client.Pods(pod.Namespace).Delete(pod.Name, nil)
+			err := ks.client.Core().Pods(pod.Namespace).Delete(pod.Name, nil)
 			//TODO(jdef) check for temporary or not-found errors
 			if err != nil {
 				log.Errorf("failed to delete pod '%v/%v': %v", pod.Namespace, pod.Name, err)

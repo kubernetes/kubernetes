@@ -162,7 +162,7 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:    "scrub-checker",
-					Image:   "gcr.io/google_containers/busybox",
+					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test ! -e /mnt/index.html || exit 1"},
 					VolumeMounts: []api.VolumeMount{

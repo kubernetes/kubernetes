@@ -129,7 +129,7 @@ func TestCheckLogLocation(t *testing.T) {
 				Status: api.PodStatus{},
 			},
 			opts:        &api.PodLogOptions{},
-			expectedErr: errors.NewBadRequest("a container name must be specified for pod test"),
+			expectedErr: errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2]"),
 		},
 		{
 			in: &api.Pod{

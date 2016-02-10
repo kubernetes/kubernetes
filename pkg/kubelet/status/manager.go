@@ -21,17 +21,19 @@ import (
 	"sync"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // A wrapper around api.PodStatus that includes a version to enforce that stale pod statuses are
@@ -53,7 +55,7 @@ type podStatusSyncRequest struct {
 // Updates pod statuses in apiserver. Writes only when new status has changed.
 // All methods are thread-safe.
 type manager struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	podManager kubepod.Manager
 	// Map from pod UID to sync status of the corresponding pod.
 	podStatuses      map[types.UID]versionedPodStatus
@@ -93,7 +95,7 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient client.Interface, podManager kubepod.Manager) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
@@ -124,7 +126,7 @@ func (m *manager) Start() {
 	glog.Info("Starting to sync pod status with apiserver")
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
-	go util.Forever(func() {
+	go wait.Forever(func() {
 		select {
 		case syncRequest := <-m.podStatusChannel:
 			m.syncPod(syncRequest.podUID, syncRequest.status)
@@ -346,7 +348,7 @@ func (m *manager) syncBatch() {
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.Pods(status.podNamespace).Get(status.podName)
+	pod, err := m.kubeClient.Core().Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
 		glog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
 		// If the Pod is deleted the status will be cleared in
@@ -366,7 +368,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		}
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
-		pod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(pod)
+		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
@@ -381,7 +383,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
-			if err := m.kubeClient.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
+			if err := m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
 				return

@@ -15,6 +15,10 @@
 # limitations under the License.
 
 # Validates that the cluster is healthy.
+# Error codes are:
+# 0 - success
+# 1 - fatal (cluster is unlikely to work)
+# 2 - non-fatal (encountered some errors, but cluster should be working correctly)
 
 set -o errexit
 set -o nounset
@@ -29,11 +33,14 @@ fi
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
+ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
+
 EXPECTED_NUM_NODES="${NUM_NODES}"
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+1))
 fi
 # Make several attempts to deal with slow cluster birth.
+return_value=0
 attempt=0
 while true; do
   # The "kubectl get nodes -o template" exports node information.
@@ -59,7 +66,12 @@ while true; do
     if (( attempt > 100 )); then
       echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
       "${KUBE_ROOT}/cluster/kubectl.sh" get nodes
-      exit 2
+      if [ "$((${EXPECTED_NUM_NODES} - ${found}))" -gt "${ALLOWED_NOTREADY_NODES}" ]; then
+        exit 1
+      else
+        return_value=2
+        break
+      fi
 		else
       echo -e "${color_yellow}Waiting for ${EXPECTED_NUM_NODES} ready nodes. ${ready} ready nodes, ${found} registered. Retrying.${color_norm}"
     fi
@@ -99,4 +111,10 @@ done
 
 echo "Validate output:"
 "${KUBE_ROOT}/cluster/kubectl.sh" get cs
-echo -e "${color_green}Cluster validation succeeded${color_norm}"
+if [ "${return_value}" == "0" ]; then 
+  echo -e "${color_green}Cluster validation succeeded${color_norm}"
+else
+  echo -e "${color_yellow}Cluster validation encountered some problems, but cluster should be in working order${color_norm}"
+fi
+
+exit "${return_value}"

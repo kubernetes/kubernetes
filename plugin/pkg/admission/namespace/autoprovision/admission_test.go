@@ -23,14 +23,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // TestAdmission verifies a namespace is created on create requests for namespace managed resources
 func TestAdmission(t *testing.T) {
 	namespace := "test"
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	handler := &provision{
 		client: mockClient,
 		store:  cache.NewStore(cache.MetaNamespaceKeyFunc),
@@ -58,7 +59,7 @@ func TestAdmission(t *testing.T) {
 // TestAdmissionNamespaceExists verifies that no client call is made when a namespace already exists
 func TestAdmissionNamespaceExists(t *testing.T) {
 	namespace := "test"
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	store.Add(&api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: namespace},
@@ -86,7 +87,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 // TestIgnoreAdmission validates that a request is ignored if its not a create
 func TestIgnoreAdmission(t *testing.T) {
 	namespace := "test"
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	handler := admission.NewChainHandler(createProvision(mockClient, nil))
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -107,8 +108,8 @@ func TestIgnoreAdmission(t *testing.T) {
 // TestAdmissionNamespaceExistsUnknownToHandler
 func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	namespace := "test"
-	mockClient := &testclient.Fake{}
-	mockClient.AddReactor("create", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+	mockClient := &fake.Clientset{}
+	mockClient.AddReactor("create", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.NewAlreadyExists(api.Resource("namespaces"), namespace)
 	})
 

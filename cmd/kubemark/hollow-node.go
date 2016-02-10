@@ -23,6 +23,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -83,11 +84,12 @@ func main() {
 	util.InitFlags()
 
 	if !knownMorphs.Has(config.Morph) {
-		glog.Fatal("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
 	cl, err := createClientFromFile(config.KubeconfigPath)
+	clientset := clientset.FromUnversionedClient(cl)
 	if err != nil {
 		glog.Fatal("Failed to create a Client. Exiting.")
 	}
@@ -102,7 +104,7 @@ func main() {
 
 		hollowKubelet := kubemark.NewHollowKubelet(
 			config.NodeName,
-			cl,
+			clientset,
 			cadvisorInterface,
 			fakeDockerClient,
 			config.KubeletPort,

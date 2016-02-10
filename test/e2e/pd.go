@@ -314,7 +314,8 @@ func createPD() (string, error) {
 			return "", err
 		}
 
-		err = gceCloud.CreateDisk(pdName, testContext.CloudConfig.Zone, 10 /* sizeGb */)
+		tags := map[string]string{}
+		err = gceCloud.CreateDisk(pdName, testContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
 		if err != nil {
 			return "", err
 		}
@@ -326,7 +327,7 @@ func createPD() (string, error) {
 		}
 		volumeOptions := &awscloud.VolumeOptions{}
 		volumeOptions.CapacityGB = 10
-		return volumes.CreateVolume(volumeOptions)
+		return volumes.CreateDisk(volumeOptions)
 	}
 }
 
@@ -353,7 +354,15 @@ func deletePD(pdName string) error {
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
-		return volumes.DeleteVolume(pdName)
+		deleted, err := volumes.DeleteDisk(pdName)
+		if err != nil {
+			return err
+		} else {
+			if !deleted {
+				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			}
+			return nil
+		}
 	}
 }
 
@@ -383,7 +392,8 @@ func detachPD(hostName, pdName string) error {
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
-		return volumes.DetachDisk(hostName, pdName)
+		_, err := volumes.DetachDisk(pdName, hostName)
+		return err
 	}
 }
 
@@ -395,7 +405,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 			containers[i].Name = fmt.Sprintf("mycontainer%v", i+1)
 		}
 
-		containers[i].Image = "gcr.io/google_containers/busybox"
+		containers[i].Image = "gcr.io/google_containers/busybox:1.24"
 
 		containers[i].Command = []string{"sleep", "6000"}
 

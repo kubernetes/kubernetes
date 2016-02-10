@@ -46,7 +46,7 @@ const (
 	nodeHttpPort            = 32080
 	nodeUdpPort             = 32081
 	loadBalancerHttpPort    = 100
-	netexecImageName        = "gcr.io/google_containers/netexec:1.0"
+	netexecImageName        = "gcr.io/google_containers/netexec:1.4"
 	testPodName             = "test-container-pod"
 	hostTestPodName         = "host-test-container-pod"
 	nodePortServiceName     = "node-port-service"
@@ -185,18 +185,20 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	By("dialing(http) endpoint container --> node1:nodeHttpPort")
 	config.dialFromEndpointContainer("http", node1_IP, nodeHttpPort, tries, epCount)
 
-	// TODO: doesn't work because masquerading is not done
-	By("TODO: Test disabled. dialing(udp) node --> 127.0.0.1:nodeUdpPort")
-	//config.dialFromNode("udp", "127.0.0.1", nodeUdpPort, tries, epCount)
-	// TODO: doesn't work because masquerading is not done
-	By("Test disabled. dialing(http) node --> 127.0.0.1:nodeHttpPort")
-	//config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
+	By("dialing(udp) node --> 127.0.0.1:nodeUdpPort")
+	config.dialFromNode("udp", "127.0.0.1", nodeUdpPort, tries, epCount)
+	By("dialing(http) node --> 127.0.0.1:nodeHttpPort")
+	config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
 
 	node2_IP := config.externalAddrs[1]
 	By("dialing(udp) node1 --> node2:nodeUdpPort")
 	config.dialFromNode("udp", node2_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1 --> node2:nodeHttpPort")
 	config.dialFromNode("http", node2_IP, nodeHttpPort, tries, epCount)
+
+	By("checking kube-proxy URLs")
+	config.getSelfURL("/healthz", "ok")
+	config.getSelfURL("/proxyMode", "iptables") // the default
 }
 
 func (config *KubeProxyTestConfig) hitEndpoints() {
@@ -250,6 +252,13 @@ func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targe
 	By(fmt.Sprintf("Dialing from node. command:%s", forLoop))
 	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, forLoop)
 	Expect(strconv.Atoi(strings.TrimSpace(stdout))).To(BeNumerically("==", expectedCount))
+}
+
+func (config *KubeProxyTestConfig) getSelfURL(path string, expected string) {
+	cmd := fmt.Sprintf("curl -s --connect-timeout 1 http://localhost:10249%s", path)
+	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
+	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, cmd)
+	Expect(strings.Contains(stdout, expected)).To(BeTrue())
 }
 
 func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {
@@ -497,12 +506,12 @@ func (config *KubeProxyTestConfig) deleteNetProxyPod() {
 	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
 	config.endpointPods = config.endpointPods[1:]
 	// wait for pod being deleted.
-	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, util.ForeverTestTimeout)
+	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
 	// wait for endpoint being removed.
-	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, util.ForeverTestTimeout)
+	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}

@@ -20,6 +20,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -44,6 +45,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -58,6 +60,7 @@ type ProxyServer struct {
 	Broadcaster  record.EventBroadcaster
 	Recorder     record.EventRecorder
 	Conntracker  Conntracker // if nil, ignored
+	ProxyMode    string
 }
 
 const (
@@ -83,6 +86,7 @@ func NewProxyServer(
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
 	conntracker Conntracker,
+	proxyMode string,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
 		Client:       client,
@@ -92,6 +96,7 @@ func NewProxyServer(
 		Broadcaster:  broadcaster,
 		Recorder:     recorder,
 		Conntracker:  conntracker,
+		ProxyMode:    proxyMode,
 	}, nil
 }
 
@@ -184,20 +189,25 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var proxier proxy.ProxyProvider
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
 
-	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface)
+	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIptables {
-		glog.V(2).Info("Using iptables Proxier.")
-		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll)
+		glog.V(0).Info("Using iptables Proxier.")
+		if config.IPTablesMasqueradeBit == nil {
+			// IPTablesMasqueradeBit must be specified or defaulted.
+			return nil, fmt.Errorf("Unable to read IPTablesMasqueradeBit from config")
+		}
+
+		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, *config.IPTablesMasqueradeBit)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierIptables
 		endpointsHandler = proxierIptables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
-		glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
+		glog.V(0).Info("Tearing down userspace rules.")
 		userspace.CleanupLeftovers(iptInterface)
 	} else {
-		glog.V(2).Info("Using userspace Proxier.")
+		glog.V(0).Info("Using userspace Proxier.")
 		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 		// our config.EndpointsConfigHandler.
 		loadBalancer := userspace.NewLoadBalancerRR()
@@ -217,7 +227,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
-		glog.V(2).Info("Tearing down pure-iptables proxy rules. Errors here are acceptable.")
+		glog.V(0).Info("Tearing down pure-iptables proxy rules.")
 		iptables.CleanupLeftovers(iptInterface)
 	}
 	iptInterface.AddReloadFunc(proxier.Sync)
@@ -248,7 +258,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	conntracker := realConntracker{}
 
-	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker)
+	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -265,14 +275,17 @@ func (s *ProxyServer) Run() error {
 
 	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
 
-	// Start up Healthz service if requested
+	// Start up a webserver if requested
 	if s.Config.HealthzPort > 0 {
-		go util.Until(func() {
+		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "%s", s.ProxyMode)
+		})
+		go wait.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(s.Config.HealthzPort), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second, util.NeverStop)
+		}, 5*time.Second, wait.NeverStop)
 	}
 
 	// Tune conntrack, if requested
@@ -301,28 +314,28 @@ type nodeGetter interface {
 	Get(hostname string) (*api.Node, error)
 }
 
-func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IptablesVersioner) string {
+func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IptablesVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
 	} else if proxyMode == proxyModeIptables {
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	} else if proxyMode != "" {
 		glog.V(1).Infof("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	// proxyMode == "" - choose the best option.
 	if client == nil {
 		glog.Errorf("nodeGetter is nil: assuming iptables proxy")
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	node, err := client.Get(hostname)
 	if err != nil {
 		glog.Errorf("Can't get Node %q, assuming iptables proxy: %v", hostname, err)
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	if node == nil {
 		glog.Errorf("Got nil Node %q, assuming iptables proxy: %v", hostname)
-		return tryIptablesProxy(iptver)
+		return tryIptablesProxy(iptver, kcompat)
 	}
 	proxyMode, found := node.Annotations[betaProxyModeAnnotation]
 	if found {
@@ -338,13 +351,13 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 		glog.V(1).Infof("Annotation demands userspace proxy")
 		return proxyModeUserspace
 	}
-	return tryIptablesProxy(iptver)
+	return tryIptablesProxy(iptver, kcompat)
 }
 
-func tryIptablesProxy(iptver iptables.IptablesVersioner) string {
+func tryIptablesProxy(iptver iptables.IptablesVersioner, kcompat iptables.KernelCompatTester) string {
 	var err error
 	// guaranteed false on error, error only necessary for debugging
-	useIptablesProxy, err := iptables.CanUseIptablesProxier(iptver)
+	useIptablesProxy, err := iptables.CanUseIptablesProxier(iptver, kcompat)
 	if err != nil {
 		glog.Errorf("Can't determine whether to use iptables proxy, using userspace proxier: %v", err)
 		return proxyModeUserspace

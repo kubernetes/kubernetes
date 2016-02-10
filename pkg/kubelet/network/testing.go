@@ -21,15 +21,15 @@ package network
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type fakeNetworkHost struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 }
 
-func NewFakeHost(kubeClient client.Interface) *fakeNetworkHost {
+func NewFakeHost(kubeClient clientset.Interface) *fakeNetworkHost {
 	host := &fakeNetworkHost{kubeClient: kubeClient}
 	return host
 }
@@ -38,7 +38,7 @@ func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool
 	return nil, false
 }
 
-func (fnh *fakeNetworkHost) GetKubeClient() client.Interface {
+func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 	return nil
 }
 

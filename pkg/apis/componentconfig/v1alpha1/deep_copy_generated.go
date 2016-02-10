@@ -43,6 +43,12 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
+	if in.IPTablesMasqueradeBit != nil {
+		out.IPTablesMasqueradeBit = new(int32)
+		*out.IPTablesMasqueradeBit = *in.IPTablesMasqueradeBit
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
 	if err := deepCopy_unversioned_Duration(in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, c); err != nil {
 		return err
 	}
@@ -68,11 +74,55 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	return nil
 }
 
+func deepCopy_v1alpha1_KubeSchedulerConfiguration(in KubeSchedulerConfiguration, out *KubeSchedulerConfiguration, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Port = in.Port
+	out.Address = in.Address
+	out.AlgorithmProvider = in.AlgorithmProvider
+	out.PolicyConfigFile = in.PolicyConfigFile
+	if in.EnableProfiling != nil {
+		out.EnableProfiling = new(bool)
+		*out.EnableProfiling = *in.EnableProfiling
+	} else {
+		out.EnableProfiling = nil
+	}
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.SchedulerName = in.SchedulerName
+	if err := deepCopy_v1alpha1_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1alpha1_LeaderElectionConfiguration(in LeaderElectionConfiguration, out *LeaderElectionConfiguration, c *conversion.Cloner) error {
+	if in.LeaderElect != nil {
+		out.LeaderElect = new(bool)
+		*out.LeaderElect = *in.LeaderElect
+	} else {
+		out.LeaderElect = nil
+	}
+	if err := deepCopy_unversioned_Duration(in.LeaseDuration, &out.LeaseDuration, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Duration(in.RenewDeadline, &out.RenewDeadline, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Duration(in.RetryPeriod, &out.RetryPeriod, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_unversioned_Duration,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1alpha1_KubeProxyConfiguration,
+		deepCopy_v1alpha1_KubeSchedulerConfiguration,
+		deepCopy_v1alpha1_LeaderElectionConfiguration,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

@@ -21,11 +21,11 @@ package replication
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicaCount(rcClient unversioned_legacy.ReplicationControllerInterface, controller api.ReplicationController, numReplicas int) (updateErr error) {
+func updateReplicaCount(rcClient unversioned_core.ReplicationControllerInterface, controller api.ReplicationController, numReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.

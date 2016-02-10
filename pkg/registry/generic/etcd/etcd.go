@@ -387,7 +387,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if pendingGraceful {
 		return e.finalizeDelete(obj, false)
 	}
-	if graceful {
+	if graceful && *options.GracePeriodSeconds > 0 {
 		out := e.NewFunc()
 		lastGraceful := int64(0)
 		err := e.Storage.GuaranteedUpdate(

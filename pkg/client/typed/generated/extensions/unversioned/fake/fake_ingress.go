@@ -68,7 +68,7 @@ func (c *FakeIngresses) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakeIngresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("ingresses", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.IngressList{})
 	return err

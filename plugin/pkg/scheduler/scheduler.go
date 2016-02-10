@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
 
@@ -104,7 +104,7 @@ func New(c *Config) *Scheduler {
 
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
 func (s *Scheduler) Run() {
-	go util.Until(s.scheduleOne, 0, s.config.StopEverything)
+	go wait.Until(s.scheduleOne, 0, s.config.StopEverything)
 }
 
 func (s *Scheduler) scheduleOne() {

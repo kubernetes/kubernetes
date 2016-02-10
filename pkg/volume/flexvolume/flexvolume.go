@@ -110,7 +110,7 @@ func (plugin *flexVolumePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vo
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
 
-		secretName, err := kubeClient.Legacy().Secrets(pod.Namespace).Get(fv.SecretRef.Name)
+		secretName, err := kubeClient.Core().Secrets(pod.Namespace).Get(fv.SecretRef.Name)
 		if err != nil {
 			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", pod.Namespace, fv.SecretRef, err)
 			return nil, err

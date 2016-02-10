@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -46,7 +46,7 @@ func TestFinalized(t *testing.T) {
 }
 
 func TestFinalizeNamespaceFunc(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
@@ -64,7 +64,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	if !actions[0].Matches("create", "namespaces") || actions[0].GetSubresource() != "finalize" {
 		t.Errorf("Expected finalize-namespace action %v", actions[0])
 	}
-	finalizers := actions[0].(testclient.CreateAction).GetObject().(*api.Namespace).Spec.Finalizers
+	finalizers := actions[0].(core.CreateAction).GetObject().(*api.Namespace).Spec.Finalizers
 	if len(finalizers) != 1 {
 		t.Errorf("There should be a single finalizer remaining")
 	}
@@ -103,25 +103,26 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	// TODO: Reuse the constants for all these strings from testclient
 	pendingActionSet := sets.NewString(
 		strings.Join([]string{"get", "namespaces", ""}, "-"),
-		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
+		strings.Join([]string{"delete-collection", "replicationcontrollers", ""}, "-"),
 		strings.Join([]string{"list", "services", ""}, "-"),
 		strings.Join([]string{"list", "pods", ""}, "-"),
-		strings.Join([]string{"list", "resourcequotas", ""}, "-"),
-		strings.Join([]string{"list", "secrets", ""}, "-"),
-		strings.Join([]string{"list", "limitranges", ""}, "-"),
+		strings.Join([]string{"delete-collection", "resourcequotas", ""}, "-"),
+		strings.Join([]string{"delete-collection", "secrets", ""}, "-"),
+		strings.Join([]string{"delete-collection", "configmaps", ""}, "-"),
+		strings.Join([]string{"delete-collection", "limitranges", ""}, "-"),
 		strings.Join([]string{"delete-collection", "events", ""}, "-"),
-		strings.Join([]string{"list", "serviceaccounts", ""}, "-"),
-		strings.Join([]string{"list", "persistentvolumeclaims", ""}, "-"),
+		strings.Join([]string{"delete-collection", "serviceaccounts", ""}, "-"),
+		strings.Join([]string{"delete-collection", "persistentvolumeclaims", ""}, "-"),
 		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
 	)
 
 	if containsVersion(versions, "extensions/v1beta1") {
 		pendingActionSet.Insert(
-			strings.Join([]string{"list", "daemonsets", ""}, "-"),
-			strings.Join([]string{"list", "deployments", ""}, "-"),
-			strings.Join([]string{"list", "jobs", ""}, "-"),
-			strings.Join([]string{"list", "horizontalpodautoscalers", ""}, "-"),
-			strings.Join([]string{"list", "ingresses", ""}, "-"),
+			strings.Join([]string{"delete-collection", "daemonsets", ""}, "-"),
+			strings.Join([]string{"delete-collection", "deployments", ""}, "-"),
+			strings.Join([]string{"delete-collection", "jobs", ""}, "-"),
+			strings.Join([]string{"delete-collection", "horizontalpodautoscalers", ""}, "-"),
+			strings.Join([]string{"delete-collection", "ingresses", ""}, "-"),
 			strings.Join([]string{"get", "resource", ""}, "-"),
 		)
 	}
@@ -144,7 +145,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	}
 
 	for scenario, testInput := range scenarios {
-		mockClient := testclient.NewSimpleFake(testInput.testNamespace)
+		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		if containsVersion(versions, "extensions/v1beta1") {
 			resources := []unversioned.APIResource{}
 			for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingresses"} {
@@ -175,9 +176,9 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 }
 
 func TestRetryOnConflictError(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	numTries := 0
-	retryOnce := func(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+	retryOnce := func(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
 			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR!"))
@@ -203,7 +204,7 @@ func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
-	mockClient := &testclient.Fake{}
+	mockClient := &fake.Clientset{}
 	testNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
@@ -222,27 +223,5 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	}
 	if len(mockClient.Actions()) != 0 {
 		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())
-	}
-}
-
-func TestRunStop(t *testing.T) {
-	mockClient := &testclient.Fake{}
-
-	nsController := NewNamespaceController(mockClient, &unversioned.APIVersions{}, 1*time.Second)
-
-	if nsController.StopEverything != nil {
-		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)
-	}
-
-	nsController.Run()
-
-	if nsController.StopEverything == nil {
-		t.Errorf("Running manager should have a stop channel.  Got nil")
-	}
-
-	nsController.Stop()
-
-	if nsController.StopEverything != nil {
-		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)
 	}
 }

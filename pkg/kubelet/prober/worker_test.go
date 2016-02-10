@@ -24,13 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -118,7 +117,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			m.statusManager = status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil))
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil))
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
@@ -232,12 +231,14 @@ func TestCleanUp(t *testing.T) {
 			return ready == results.Success, nil
 		}
 		if ready, _ := condition(); !ready {
-			if err := wait.Poll(100*time.Millisecond, util.ForeverTestTimeout, condition); err != nil {
+			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, condition); err != nil {
 				t.Fatalf("[%s] Error waiting for worker ready: %v", probeType, err)
 			}
 		}
 
-		close(w.stop)
+		for i := 0; i < 10; i++ {
+			w.stop() // Stop should be callable multiple times without consequence.
+		}
 		if err := waitForWorkerExit(m, []probeKey{key}); err != nil {
 			t.Fatalf("[%s] error waiting for worker exit: %v", probeType, err)
 		}

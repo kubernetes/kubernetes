@@ -18,7 +18,7 @@ package serviceaccount
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/secret"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
@@ -28,23 +28,23 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// clientGetter implements ServiceAccountTokenGetter using a client.Interface
+// clientGetter implements ServiceAccountTokenGetter using a clientset.Interface
 type clientGetter struct {
-	client client.Interface
+	client clientset.Interface
 }
 
 // NewGetterFromClient returns a ServiceAccountTokenGetter that
 // uses the specified client to retrieve service accounts and secrets.
 // The client should NOT authenticate using a service account token
 // the returned getter will be used to retrieve, or recursion will result.
-func NewGetterFromClient(c client.Interface) serviceaccount.ServiceAccountTokenGetter {
+func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTokenGetter {
 	return clientGetter{c}
 }
 func (c clientGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
-	return c.client.ServiceAccounts(namespace).Get(name)
+	return c.client.Core().ServiceAccounts(namespace).Get(name)
 }
 func (c clientGetter) GetSecret(namespace, name string) (*api.Secret, error) {
-	return c.client.Secrets(namespace).Get(name)
+	return c.client.Core().Secrets(namespace).Get(name)
 }
 
 // registryGetter implements ServiceAccountTokenGetter using a service account and secret registry

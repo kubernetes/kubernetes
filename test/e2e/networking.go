@@ -64,7 +64,7 @@ var _ = Describe("Networking", func() {
 				Containers: []api.Container{
 					{
 						Name:    contName,
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"wget", "-s", "google.com"},
 					},
 				},

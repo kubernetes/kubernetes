@@ -176,7 +176,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// all entries inserted with fakeTime will expire.
 	ttl := 30 * time.Second
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{Time: fakeTime}
+	fakeClock := util.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	assumedPodsStore := cache.NewFakeExpirationStore(
 		cache.MetaNamespaceKeyFunc, nil, ttlPolicy, fakeClock)
@@ -274,7 +274,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// Second scheduling pass will fail to schedule if the store hasn't expired
 	// the deleted pod. This would normally happen with a timeout.
 	//expirationPolicy.NeverExpire = util.NewStringSet()
-	fakeClock.Time = fakeClock.Time.Add(ttl + 1)
+	fakeClock.Step(ttl + 1)
 
 	called = make(chan struct{})
 	events = eventBroadcaster.StartEventWatcher(func(e *api.Event) {

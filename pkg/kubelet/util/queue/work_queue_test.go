@@ -26,7 +26,7 @@ import (
 )
 
 func newTestBasicWorkQueue() (*basicWorkQueue, *util.FakeClock) {
-	fakeClock := &util.FakeClock{Time: time.Now()}
+	fakeClock := util.NewFakeClock(time.Now())
 	wq := &basicWorkQueue{
 		clock: fakeClock,
 		queue: make(map[types.UID]time.Time),

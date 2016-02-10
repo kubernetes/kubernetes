@@ -22,12 +22,13 @@ import (
 	"math/rand"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -35,25 +36,25 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("ResourceQuota", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("ResourceQuota", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewResourceQuota(client), nil
 	})
 }
 
 type quota struct {
 	*admission.Handler
-	client  client.Interface
+	client  clientset.Interface
 	indexer cache.Indexer
 }
 
 // NewResourceQuota creates a new resource quota admission control handler
-func NewResourceQuota(client client.Interface) admission.Interface {
+func NewResourceQuota(client clientset.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(options)
+			return client.Core().ResourceQuotas(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.ResourceQuotas(api.NamespaceAll).Watch(options)
+			return client.Core().ResourceQuotas(api.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)
@@ -61,7 +62,7 @@ func NewResourceQuota(client client.Interface) admission.Interface {
 	return createResourceQuota(client, indexer)
 }
 
-func createResourceQuota(client client.Interface, indexer cache.Indexer) admission.Interface {
+func createResourceQuota(client clientset.Interface, indexer cache.Indexer) admission.Interface {
 	return &quota{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 		client:  client,
@@ -142,7 +143,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 						Annotations:     quota.Annotations},
 				}
 				usage.Status = *status
-				_, err = q.client.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+				_, err = q.client.Core().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 				if err == nil {
 					break
 				}
@@ -153,7 +154,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 				}
 				time.Sleep(interval)
 				// manually get the latest quota
-				quota, err = q.client.ResourceQuotas(usage.Namespace).Get(quota.Name)
+				quota, err = q.client.Core().ResourceQuotas(usage.Namespace).Get(quota.Name)
 				if err != nil {
 					return admission.NewForbidden(a, err)
 				}
@@ -166,7 +167,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 // IncrementUsage updates the supplied ResourceQuotaStatus object based on the incoming operation
 // Return true if the usage must be recorded prior to admitting the new resource
 // Return an error if the operation should not pass admission control
-func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
+func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client clientset.Interface) (bool, error) {
 	// on update, the only resource that can modify the value of a quota is pods
 	// so if your not a pod, we exit quickly
 	if a.GetOperation() == admission.Update && a.GetResource() != api.Resource("pods") {
@@ -227,7 +228,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 
 			// if this operation is an update, we need to find the delta usage from the previous state
 			if a.GetOperation() == admission.Update {
-				oldPod, err := client.Pods(a.GetNamespace()).Get(pod.Name)
+				oldPod, err := client.Core().Pods(a.GetNamespace()).Get(pod.Name)
 				if err != nil {
 					return false, err
 				}

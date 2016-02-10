@@ -68,7 +68,7 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOp
 }
 
 func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction("horizontalpodautoscalers", c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.HorizontalPodAutoscalerList{})
 	return err

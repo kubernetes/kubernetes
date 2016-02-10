@@ -167,3 +167,13 @@ var percentRegexp = regexp.MustCompile("^" + percentFmt + "$")
 func IsValidPercent(percent string) bool {
 	return percentRegexp.MatchString(percent)
 }
+
+const HTTPHeaderNameFmt string = "[-A-Za-z0-9]+"
+
+var httpHeaderNameRegexp = regexp.MustCompile("^" + HTTPHeaderNameFmt + "$")
+
+// IsHTTPHeaderName checks that a string conforms to the Go HTTP library's
+// definition of a valid header field name (a stricter subset than RFC7230).
+func IsHTTPHeaderName(value string) bool {
+	return httpHeaderNameRegexp.MatchString(value)
+}

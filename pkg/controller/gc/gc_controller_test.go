@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -66,7 +66,7 @@ func TestGC(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		client := testclient.NewSimpleFake()
+		client := fake.NewSimpleClientset()
 		gcc := New(client, controller.NoResyncPeriodFunc, test.threshold)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex

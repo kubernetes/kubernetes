@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,17 +15,20 @@
 # This file creates a standard build environment for building cross
 # platform go binary for the architecture kubernetes cares about.
 
-FROM  golang:1.5.3
-# Original MAINTAINER  Joe Beda <jbeda@google.com>
-MAINTAINER Brendan Burns <bburns@google.com>
+FROM  golang:1.4.2
+MAINTAINER  Joe Beda <jbeda@google.com>
+
+ENV GOARM 6
+ENV KUBE_DYNAMIC_CROSSPLATFORMS \
+  armel
 
 ENV KUBE_CROSSPLATFORMS \
-  linux/386 linux/arm \
+  linux/386 \
+  linux/arm \
   darwin/amd64 darwin/386 \
   windows/amd64 windows/386
 
-# Pre-compile the standard go library when cross-compiling. This is much easier now when we have go1.5
-RUN for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} go install std; done
+RUN cd /usr/src/go/src && for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
 
 # Install g++, then download and install protoc for generating protobuf output
 RUN apt-get install -y g++ && apt-get clean && rm -rf /var/lib/apt/lists/* &&\
@@ -40,3 +43,12 @@ RUN apt-get install -y g++ && apt-get clean && rm -rf /var/lib/apt/lists/* &&\
     rm -rf protobuf-3.0.0-beta-2 &&\
     protoc --version
 
+# Use dynamic cgo linking for architectures other than amd64 for the server platforms
+# More info here: https://wiki.debian.org/CrossToolchains
+RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
+  && curl -s http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do dpkg --add-architecture ${platform}; done \
+  && apt-get update \
+  && apt-get install -y build-essential \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*

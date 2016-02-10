@@ -86,6 +86,10 @@ the new service will re\-use the labels from the resource it exposes.
     The network protocol for the service to be created. Default is 'tcp'.
 
 .PP
+\fB\-\-record\fP=false
+    Record current kubectl command in the resource annotation.
+
+.PP
 \fB\-\-save\-config\fP=false
     If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
 
@@ -100,6 +104,10 @@ the new service will re\-use the labels from the resource it exposes.
 .PP
 \fB\-a\fP, \fB\-\-show\-all\fP=false
     When printing, show all resources (default hide terminated pods.)
+
+.PP
+\fB\-\-show\-labels\fP=false
+    When printing, show all labels as the last column (default hide labels column)
 
 .PP
 \fB\-\-sort\-by\fP=""

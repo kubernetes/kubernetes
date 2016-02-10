@@ -27,14 +27,15 @@ package alwayspullimages
 import (
 	"io"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysPullImages", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("AlwaysPullImages", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewAlwaysPullImages(), nil
 	})
 }

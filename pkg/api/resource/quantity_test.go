@@ -65,6 +65,70 @@ func TestQuantityParseZero(t *testing.T) {
 	}
 }
 
+// TestQuantityAddZeroPreservesSuffix verifies that a suffix is preserved
+// independent of the order of operations when adding a zero and non-zero val
+func TestQuantityAddZeroPreservesSuffix(t *testing.T) {
+	testValues := []string{"100m", "1Gi"}
+	zero := MustParse("0")
+	for _, testValue := range testValues {
+		value := MustParse(testValue)
+		v1 := *value.Copy()
+		// ensure non-zero + zero = non-zero (suffix preserved)
+		err := v1.Add(zero)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		// ensure zero + non-zero = non-zero (suffix preserved)
+		v2 := *zero.Copy()
+		err = v2.Add(value)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		// ensure we preserved the input value
+		if v1.String() != testValue {
+			t.Errorf("Expected %v, actual %v", testValue, v1.String())
+		}
+		if v2.String() != testValue {
+			t.Errorf("Expected %v, actual %v", testValue, v2.String())
+		}
+	}
+}
+
+// TestQuantitySubZeroPreservesSuffix verifies that a suffix is preserved
+// independent of the order of operations when subtracting a zero and non-zero val
+func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
+	testValues := []string{"100m", "1Gi"}
+	zero := MustParse("0")
+	for _, testValue := range testValues {
+		value := MustParse(testValue)
+		v1 := *value.Copy()
+		// ensure non-zero - zero = non-zero (suffix preserved)
+		err := v1.Sub(zero)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		// ensure we preserved the input value
+		if v1.String() != testValue {
+			t.Errorf("Expected %v, actual %v", testValue, v1.String())
+		}
+
+		// ensure zero - non-zero = -non-zero (suffix preserved)
+		v2 := *zero.Copy()
+		err = v2.Sub(value)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		negVal := *value.Copy()
+		err = negVal.Neg(negVal)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if v2.String() != negVal.String() {
+			t.Errorf("Expected %v, actual %v", negVal.String(), v2.String())
+		}
+	}
+}
+
 // Verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
 func TestQuantityCanocicalizeZero(t *testing.T) {
 	val := MustParse("1000m")
@@ -663,6 +727,62 @@ func TestSub(t *testing.T) {
 		test.a.Sub(test.b)
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
+func TestNeg(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        Quantity
+		expected Quantity
+	}{
+		{
+			a:        Quantity{dec(0, 0), DecimalSI},
+			b:        Quantity{dec(10, 0), DecimalSI},
+			expected: Quantity{dec(-10, 0), DecimalSI},
+		},
+		{
+			a:        Quantity{dec(0, 0), DecimalSI},
+			b:        Quantity{dec(-10, 0), DecimalSI},
+			expected: Quantity{dec(10, 0), DecimalSI},
+		},
+		{
+			a:        Quantity{dec(0, 0), DecimalSI},
+			b:        Quantity{dec(10, 0), BinarySI},
+			expected: Quantity{dec(-10, 0), BinarySI},
+		},
+		{
+			a:        Quantity{dec(0, 0), DecimalSI},
+			b:        Quantity{dec(0, 0), BinarySI},
+			expected: Quantity{dec(0, 0), BinarySI},
+		},
+		{
+			a:        Quantity{},
+			b:        Quantity{dec(10, 0), BinarySI},
+			expected: Quantity{dec(-10, 0), BinarySI},
+		},
+		{
+			a:        Quantity{dec(10, 0), BinarySI},
+			b:        Quantity{},
+			expected: Quantity{},
+		},
+		{
+			a:        Quantity{dec(10, 0), BinarySI},
+			b:        Quantity{Format: DecimalSI},
+			expected: Quantity{dec(0, 0), DecimalSI},
+		},
+	}
+
+	for i, test := range tests {
+		test.a.Neg(test.b)
+		// ensure value is same
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+		// ensure format is updated
+		if test.a.Format != test.expected.Format {
+			t.Errorf("[%d] Expected format %v, got format %v", i, test.expected.Format, test.a.Format)
 		}
 	}
 }

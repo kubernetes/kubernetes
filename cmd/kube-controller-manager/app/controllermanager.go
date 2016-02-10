@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -53,6 +53,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
@@ -173,18 +174,18 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig *client.Config, stop <-chan struct{}) error {
-	go endpointcontroller.NewEndpointController(client.NewOrDie(client.AddUserAgent(kubeconfig, "endpoint-controller")), ResyncPeriod(s)).
-		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+	go endpointcontroller.NewEndpointController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "endpoint-controller")), ResyncPeriod(s)).
+		Run(s.ConcurrentEndpointSyncs, wait.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(
 		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replication-controller")),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
-	).Run(s.ConcurrentRCSyncs, util.NeverStop)
+	).Run(s.ConcurrentRCSyncs, wait.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go gc.New(client.NewOrDie(client.AddUserAgent(kubeconfig, "garbage-collector")), ResyncPeriod(s), s.TerminatedPodGCThreshold).
-			Run(util.NeverStop)
+		go gc.New(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "garbage-collector")), ResyncPeriod(s), s.TerminatedPodGCThreshold).
+			Run(wait.NeverStop)
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
@@ -192,13 +193,13 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
-	nodeController := nodecontroller.NewNodeController(cloud, client.NewOrDie(client.AddUserAgent(kubeconfig, "node-controller")),
+	nodeController := nodecontroller.NewNodeController(cloud, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "node-controller")),
 		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, &s.ClusterCIDR, s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
-	serviceController := servicecontroller.New(cloud, client.NewOrDie(client.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
+	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
 	if err := serviceController.Run(s.ServiceSyncPeriod, s.NodeSyncPeriod); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
@@ -209,7 +210,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
 		} else {
-			routeController := routecontroller.New(routes, client.NewOrDie(client.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, &s.ClusterCIDR)
+			routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, &s.ClusterCIDR)
 			routeController.Run(s.NodeSyncPeriod)
 		}
 	} else {
@@ -217,8 +218,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(
-		client.NewOrDie(client.AddUserAgent(kubeconfig, "resourcequota-controller")),
-		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
+		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "resourcequota-controller")),
+		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -240,7 +241,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
 
-	namespacecontroller.NewNamespaceController(client.NewOrDie(client.AddUserAgent(kubeconfig, "namespace-controller")), versions, s.NamespaceSyncPeriod).Run()
+	namespaceController := namespacecontroller.NewNamespaceController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "namespace-controller")), &unversioned.APIVersions{}, s.NamespaceSyncPeriod)
+	go namespaceController.Run(s.ConcurrentNamespaceSyncs, wait.NeverStop)
 
 	groupVersion := "extensions/v1beta1"
 	resources, found := resourceMap[groupVersion]
@@ -249,7 +251,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
-			hpaClient := client.NewOrDie(client.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
+			hpaClient := clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
 			metricsClient := metrics.NewHeapsterMetricsClient(
 				hpaClient,
 				metrics.DefaultHeapsterNamespace,
@@ -257,26 +259,32 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
 			)
-			podautoscaler.NewHorizontalController(hpaClient, hpaClient, hpaClient, metricsClient).
+			podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient, metricsClient).
 				Run(s.HorizontalPodAutoscalerSyncPeriod)
 		}
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
 			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "daemon-set-controller")), ResyncPeriod(s)).
-				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+				Run(s.ConcurrentDSCSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
 			go job.NewJobController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "job-controller")), ResyncPeriod(s)).
-				Run(s.ConcurrentJobSyncs, util.NeverStop)
+				Run(s.ConcurrentJobSyncs, wait.NeverStop)
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
 			go deployment.NewDeploymentController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "deployment-controller")), ResyncPeriod(s)).
-				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
+				Run(s.ConcurrentDeploymentSyncs, wait.NeverStop)
+		}
+
+		if containsResource(resources, "replicasets") {
+			glog.Infof("Starting ReplicaSet controller")
+			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas).
+				Run(s.ConcurrentRSSyncs, wait.NeverStop)
 		}
 	}
 
@@ -289,7 +297,13 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-binder")), s.PVClaimBinderSyncPeriod)
 	pvclaimBinder.Run()
 
-	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-recycler")), s.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins(s.VolumeConfigFlags), cloud)
+	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
+		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
+		s.PVClaimBinderSyncPeriod,
+		s.VolumeConfigFlags.PersistentVolumeRecyclerMaximumRetry,
+		ProbeRecyclableVolumePlugins(s.VolumeConfigFlags),
+		cloud,
+	)
 	if err != nil {
 		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
 	}
@@ -323,7 +337,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			glog.Errorf("Error reading key for service account token controller: %v", err)
 		} else {
 			serviceaccountcontroller.NewTokensController(
-				client.NewOrDie(client.AddUserAgent(kubeconfig, "tokens-controller")),
+				clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "tokens-controller")),
 				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
@@ -333,7 +347,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	}
 
 	serviceaccountcontroller.NewServiceAccountsController(
-		client.NewOrDie(client.AddUserAgent(kubeconfig, "service-account-controller")),
+		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "service-account-controller")),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run()
 

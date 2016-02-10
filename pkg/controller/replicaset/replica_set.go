@@ -26,16 +26,17 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -93,7 +94,7 @@ type ReplicaSetController struct {
 func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicaSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 
 	rsc := &ReplicaSetController{
 		kubeClient: kubeClient,
@@ -150,10 +151,10 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 	rsc.podStore.Store, rsc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rsc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
+				return rsc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rsc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return rsc.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -187,7 +188,7 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	go rsc.rsController.Run(stopCh)
 	go rsc.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(rsc.worker, time.Second, stopCh)
+		go wait.Until(rsc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down ReplicaSet Controller")
@@ -436,7 +437,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(rsKey)
-	selector, err := extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		glog.Errorf("Error converting pod selector to selector: %v", err)
 		return err

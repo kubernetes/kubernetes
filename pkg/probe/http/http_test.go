@@ -42,8 +42,8 @@ func containsAny(s string, substrs []string) bool {
 }
 
 func TestHTTPProbeChecker(t *testing.T) {
-	handleReq := func(s int, body string) func(w http.ResponseWriter) {
-		return func(w http.ResponseWriter) {
+	handleReq := func(s int, body string) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(s)
 			w.Write([]byte(body))
 		}
@@ -51,8 +51,9 @@ func TestHTTPProbeChecker(t *testing.T) {
 
 	prober := New()
 	testCases := []struct {
-		handler func(w http.ResponseWriter)
-		health  probe.Result
+		handler    func(w http.ResponseWriter, r *http.Request)
+		reqHeaders http.Header
+		health     probe.Result
 		// go1.5: error message changed for timeout, need to support
 		// both old and new
 		accBodies []string
@@ -60,18 +61,41 @@ func TestHTTPProbeChecker(t *testing.T) {
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{
 			handleReq(http.StatusOK, "ok body"),
+			nil,
 			probe.Success,
 			[]string{"ok body"},
 		},
 		{
+			// Echo handler that returns the contents of request headers in the body
+			func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(200)
+				output := ""
+				for k, arr := range r.Header {
+					for _, v := range arr {
+						output += fmt.Sprintf("%s: %s\n", k, v)
+					}
+				}
+				w.Write([]byte(output))
+			},
+			http.Header{
+				"X-Muffins-Or-Cupcakes": {"muffins"},
+			},
+			probe.Success,
+			[]string{
+				"X-Muffins-Or-Cupcakes: muffins",
+			},
+		},
+		{
 			handleReq(FailureCode, "fail body"),
+			nil,
 			probe.Failure,
 			[]string{fmt.Sprintf("HTTP probe failed with statuscode: %d", FailureCode)},
 		},
 		{
-			func(w http.ResponseWriter) {
+			func(w http.ResponseWriter, r *http.Request) {
 				time.Sleep(3 * time.Second)
 			},
+			nil,
 			probe.Failure,
 			[]string{
 				"use of closed network connection",
@@ -82,7 +106,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 	for _, test := range testCases {
 		// TODO: Close() this when fix #19254
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			test.handler(w)
+			test.handler(w, r)
 		}))
 		u, err := url.Parse(server.URL)
 		if err != nil {
@@ -96,7 +120,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		health, output, err := prober.Probe(u, 1*time.Second)
+		health, output, err := prober.Probe(u, test.reqHeaders, 1*time.Second)
 		if test.health == probe.Unknown && err == nil {
 			t.Errorf("Expected error")
 		}

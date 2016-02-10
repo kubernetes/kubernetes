@@ -215,6 +215,8 @@ type VolumeSource struct {
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	FC *FCVolumeSource `json:"fc,omitempty"`
+	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -251,6 +253,8 @@ type PersistentVolumeSource struct {
 	FC *FCVolumeSource `json:"fc,omitempty"`
 	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
 	Flocker *FlockerVolumeSource `json:"flocker,omitempty"`
+	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -442,9 +446,9 @@ const (
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Partition on the disk to mount.
@@ -469,9 +473,9 @@ type ISCSIVolumeSource struct {
 	Lun int `json:"lun,omitempty"`
 	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
 	ISCSIInterface string `json:"iscsiInterface,omitempty"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
@@ -487,11 +491,11 @@ type FCVolumeSource struct {
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
 	Lun *int `json:"lun"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	FSType string `json:"fsType"`
+	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -502,9 +506,9 @@ type FCVolumeSource struct {
 type FlexVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	Driver string `json:"driver"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
 	FSType string `json:"fsType,omitempty"`
 	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
@@ -524,9 +528,9 @@ type FlexVolumeSource struct {
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the persistent disk resource. Used to identify the disk in AWS
 	VolumeID string `json:"volumeID"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Partition on the disk to mount.
@@ -599,9 +603,9 @@ type RBDVolumeSource struct {
 	CephMonitors []string `json:"monitors"`
 	// Required: RBDImage is the rados image name
 	RBDImage string `json:"image"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: RadosPool is the rados pool name,default is rbd
@@ -626,6 +630,7 @@ type CinderVolumeSource struct {
 	VolumeID string `json:"volumeID"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -670,6 +675,17 @@ type DownwardAPIVolumeFile struct {
 	Path string `json:"path"`
 	// Required: Selects a field of the pod: only annotations, labels, name and  namespace are supported.
 	FieldRef ObjectFieldSelector `json:"fieldRef"`
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+type AzureFileVolumeSource struct {
+	// the name of secret that contains Azure Storage Account Name and Key
+	SecretName string `json:"secretName"`
+	// Share Name
+	ShareName string `json:"shareName"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container
@@ -752,16 +768,27 @@ type SecretKeySelector struct {
 	Key string `json:"key"`
 }
 
+// HTTPHeader describes a custom header to be used in HTTP probes
+type HTTPHeader struct {
+	// The header field name
+	Name string `json:"name"`
+	// The header field value
+	Value string `json:"value"`
+}
+
 // HTTPGetAction describes an action based on HTTP Get requests.
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty"`
 	// Required: Name or number of the port to access on the container.
 	Port intstr.IntOrString `json:"port,omitempty"`
-	// Optional: Host name to connect to, defaults to the pod IP.
+	// Optional: Host name to connect to, defaults to the pod IP. You
+	// probably want to set "Host" in httpHeaders instead.
 	Host string `json:"host,omitempty"`
 	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
 	Scheme URIScheme `json:"scheme,omitempty"`
+	// Optional: Custom headers to set in the request. HTTP allows repeated headers.
+	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty"`
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions
@@ -1042,6 +1069,93 @@ const (
 	// determined by kubelet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
 )
+
+// A node selector represents the union of the results of one or more label queries
+// over a set of nodes; that is, it represents the OR of the selectors represented
+// by the node selector terms.
+type NodeSelector struct {
+	//Required. A list of node selector terms. The terms are ORed.
+	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms"`
+}
+
+// A null or empty node selector term matches no objects.
+type NodeSelectorTerm struct {
+	//Required. A list of node selector requirements. The requirements are ANDed.
+	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions"`
+}
+
+// A node selector requirement is a selector that contains values, a key, and an operator
+// that relates the key and values.
+type NodeSelectorRequirement struct {
+	// The label key that the selector applies to.
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key"`
+	// Represents a key's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+	Operator NodeSelectorOperator `json:"operator"`
+	// An array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty. If the operator is Gt or Lt, the values
+	// array must have a single element, which will be interpreted as an integer.
+	// This array is replaced during a strategic merge patch.
+	Values []string `json:"values,omitempty"`
+}
+
+// A node selector operator is the set of operators that can be used in
+// a node selector requirement.
+type NodeSelectorOperator string
+
+const (
+	NodeSelectorOpIn           NodeSelectorOperator = "In"
+	NodeSelectorOpNotIn        NodeSelectorOperator = "NotIn"
+	NodeSelectorOpExists       NodeSelectorOperator = "Exists"
+	NodeSelectorOpDoesNotExist NodeSelectorOperator = "DoesNotExist"
+	NodeSelectorOpGt           NodeSelectorOperator = "Gt"
+	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
+)
+
+// Affinity is a group of affinity scheduling requirements.
+type Affinity struct {
+	// Describes node affinity scheduling requirements for the pod.
+	NodeAffinity *NodeAffinity `json:"nodeAffinity,omitempty"`
+}
+
+// Node affinity is a group of node affinity scheduling requirements.
+// If RequiredDuringSchedulingRequiredDuringExecution and
+// RequiredDuringSchedulingIgnoredDuringExecution are both set,
+// then both node selectors must be satisfied.
+type NodeAffinity struct {
+	// If the affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to an update), the system
+	// will try to eventually evict the pod from its node.
+	RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// If the affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to an update), the system
+	// may or may not try to eventually evict the pod from its node.
+	RequiredDuringSchedulingIgnoredDuringExecution *NodeSelector `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
+	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// the affinity expressions specified by this field, but it may choose
+	// a node that violates one or more of the expressions. The node that is
+	// most preferred is the one with the greatest sum of weights, i.e.
+	// for each node that meets all of the scheduling requirements (resource
+	// request, requiredDuringScheduling affinity expressions, etc.),
+	// compute a sum by iterating through the elements of this field and adding
+	// "weight" to the sum if the node matches the corresponding matchExpressions; the
+	// node(s) with the highest sum are the most preferred.
+	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
+}
+
+// An empty preferred scheduling term matches all objects with implicit weight 0
+// (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
+type PreferredSchedulingTerm struct {
+	// Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
+	Weight int `json:"weight"`
+	// A node selector term, associated with the corresponding weight.
+	Preference NodeSelectorTerm `json:"preference"`
+}
 
 // PodSpec is a description of a pod
 type PodSpec struct {
@@ -2143,6 +2257,21 @@ const (
 
 	// SSHAuthPrivateKey is the key of the required SSH private key for SecretTypeSSHAuth secrets
 	SSHAuthPrivateKey = "ssh-privatekey"
+
+	// SecretTypeTLS contains information about a TLS client or server secret. It
+	// is primarily used with TLS termination of the Ingress resource, but may be
+	// used in other types.
+	//
+	// Required fields:
+	// - Secret.Data["tls.key"] - TLS private key.
+	//   Secret.Data["tls.crt"] - TLS certificate.
+	// TODO: Consider supporting different formats, specifying CA/destinationCA.
+	SecretTypeTLS SecretType = "kubernetes.io/tls"
+
+	// TLSCertKey is the key for tls certificates in a TLS secert.
+	TLSCertKey = "tls.crt"
+	// TLSPrivateKeyKey is the key for the private key field in a TLS secret.
+	TLSPrivateKeyKey = "tls.key"
 )
 
 type SecretList struct {
@@ -2151,6 +2280,8 @@ type SecretList struct {
 
 	Items []Secret `json:"items"`
 }
+
+// +genclient=true
 
 // ConfigMap holds configuration data for components or applications to consume.
 type ConfigMap struct {

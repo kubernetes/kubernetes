@@ -22,12 +22,13 @@ import (
 	"sort"
 	"strings"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
@@ -38,7 +39,7 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin("LimitRanger", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("LimitRanger", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewLimitRanger(client, Limit), nil
 	})
 }
@@ -46,7 +47,7 @@ func init() {
 // limitRanger enforces usage limits on a per resource basis in the namespace
 type limitRanger struct {
 	*admission.Handler
-	client    client.Interface
+	client    clientset.Interface
 	limitFunc LimitFunc
 	indexer   cache.Indexer
 }
@@ -94,13 +95,13 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
-func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
+func NewLimitRanger(client clientset.Interface, limitFunc LimitFunc) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.LimitRanges(api.NamespaceAll).List(options)
+			return client.Core().LimitRanges(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.LimitRanges(api.NamespaceAll).Watch(options)
+			return client.Core().LimitRanges(api.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)

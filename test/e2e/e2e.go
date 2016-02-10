@@ -63,6 +63,7 @@ func RegisterFlags() {
 
 	flag.StringVar(&testContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embedded authinfo.")
 	flag.StringVar(&testContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
+	flag.StringVar(&testContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&testContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&testContext.Host, "host", "", "The host, or apiserver, to connect to")
 	flag.StringVar(&testContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
@@ -118,7 +119,7 @@ func setupProviderConfig() error {
 		managedZones := []string{zone} // Only single-zone for now
 		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
 		if err != nil {
-			return fmt.Errorf("Error building GCE/GKE provider: ", err)
+			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
 
 	case "aws":
@@ -136,7 +137,7 @@ func setupProviderConfig() error {
 		var err error
 		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
 		if err != nil {
-			return fmt.Errorf("Error building AWS provider: ", err)
+			return fmt.Errorf("Error building AWS provider: %v", err)
 		}
 
 	}

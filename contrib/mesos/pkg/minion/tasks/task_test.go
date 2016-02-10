@@ -77,7 +77,7 @@ func newFakeProcess() *fakeProcess {
 func TestBadLogger(t *testing.T) {
 	err := errors.New("qux")
 	fp := newFakeProcess()
-	tt := New("foo", "bar", nil, nil, func() io.WriteCloser {
+	tt := New("foo", "bar", nil, func() io.WriteCloser {
 		defer func() {
 			fp.pid = 123   // sanity check
 			fp.Kill(false) // this causes Wait() to return
@@ -126,7 +126,7 @@ func TestMergeOutput(t *testing.T) {
 	tasksDone.Add(2)
 	tasksStarted.Add(2)
 
-	t1 := New("foo", "", nil, nil, devNull)
+	t1 := New("foo", "", nil, devNull)
 	t1exited := make(chan struct{})
 	t1.RestartDelay = 0 // don't slow the test down for no good reason
 	t1.Finished = func(ok bool) bool {
@@ -145,7 +145,7 @@ func TestMergeOutput(t *testing.T) {
 		return taskRunning
 	})
 
-	t2 := New("bar", "", nil, nil, devNull)
+	t2 := New("bar", "", nil, devNull)
 	t2exited := make(chan struct{})
 	t2.RestartDelay = 0 // don't slow the test down for no good reason
 	t2.Finished = func(ok bool) bool {
@@ -235,7 +235,7 @@ func (t *fakeTimer) reset()                  { t.ch = nil }
 
 func TestAfterDeath(t *testing.T) {
 	// test kill escalation since that's not covered by other unit tests
-	t1 := New("foo", "", nil, nil, devNull)
+	t1 := New("foo", "", nil, devNull)
 	kills := 0
 	waitCh := make(chan *Completion, 1)
 	timer := &fakeTimer{}

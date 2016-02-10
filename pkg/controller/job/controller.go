@@ -27,15 +27,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -74,7 +74,7 @@ func NewJobController(kubeClient clientset.Interface, resyncPeriod controller.Re
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 
 	jm := &JobController{
 		kubeClient: kubeClient,
@@ -113,10 +113,10 @@ func NewJobController(kubeClient clientset.Interface, resyncPeriod controller.Re
 	jm.podStore.Store, jm.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return jm.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
+				return jm.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return jm.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
+				return jm.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -140,7 +140,7 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	go jm.jobController.Run(stopCh)
 	go jm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(jm.worker, time.Second, stopCh)
+		go wait.Until(jm.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down Job Manager")
@@ -317,7 +317,7 @@ func (jm *JobController) syncJob(key string) error {
 		return err
 	}
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
-	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
+	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 	podList, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
 		glog.Errorf("Error getting pods for job %q: %v", key, err)

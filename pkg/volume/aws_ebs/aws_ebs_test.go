@@ -68,11 +68,12 @@ func TestGetAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
+
 	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) {
-		t.Errorf("Expected to find AccessMode:  %s", api.ReadWriteOnce)
+		t.Errorf("Expected to support AccessModeTypes:  %s", api.ReadWriteOnce)
 	}
-	if len(plug.GetAccessModes()) != 1 {
-		t.Errorf("Expected to find exactly one AccessMode")
+	if contains(plug.GetAccessModes(), api.ReadOnlyMany) {
+		t.Errorf("Expected not to support AccessModeTypes:  %s", api.ReadOnlyMany)
 	}
 }
 
@@ -85,7 +86,10 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-type fakePDManager struct{}
+type fakePDManager struct {
+	attachCalled bool
+	detachCalled bool
+}
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
@@ -95,6 +99,10 @@ func (fake *fakePDManager) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, gl
 	if err != nil {
 		return err
 	}
+	fake.attachCalled = true
+	// Simulate the global mount so that the fakeMounter returns the
+	// expected number of mounts for the attached disk.
+	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 	return nil
 }
 
@@ -104,6 +112,7 @@ func (fake *fakePDManager) DetachDisk(c *awsElasticBlockStoreCleaner) error {
 	if err != nil {
 		return err
 	}
+	fake.detachCalled = true
 	return nil
 }
 
@@ -121,7 +130,7 @@ func (fake *fakePDManager) DeleteVolume(cd *awsElasticBlockStoreDeleter) error {
 func TestPlugin(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
 	if err != nil {
-		t.Fatalf("can't make a temp dir: %v")
+		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
@@ -140,13 +149,16 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.(*awsElasticBlockStorePlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	fakeManager := &fakePDManager{}
+	fakeMounter := &mount.FakeMounter{}
+	builder, err := plug.(*awsElasticBlockStorePlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
 	if builder == nil {
 		t.Errorf("Got a nil Builder")
 	}
+
 	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~aws-ebs/vol1")
 	path := builder.GetPath()
 	if path != volPath {
@@ -170,8 +182,12 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
+	if !fakeManager.attachCalled {
+		t.Errorf("Attach watch not called")
+	}
 
-	cleaner, err := plug.(*awsElasticBlockStorePlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	fakeManager = &fakePDManager{}
+	cleaner, err := plug.(*awsElasticBlockStorePlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -187,9 +203,12 @@ func TestPlugin(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
+	if !fakeManager.detachCalled {
+		t.Errorf("Detach watch not called")
+	}
 
 	// Test Provisioner
-	cap := resource.MustParse("100Gi")
+	cap := resource.MustParse("100Mi")
 	options := volume.VolumeOptions{
 		Capacity: cap,
 		AccessModes: []api.PersistentVolumeAccessMode{

@@ -308,3 +308,30 @@ func TestIsValidIP(t *testing.T) {
 		}
 	}
 }
+
+func TestIsHTTPHeaderName(t *testing.T) {
+	goodValues := []string{
+		// Common ones
+		"Accept-Encoding", "Host", "If-Modified-Since", "X-Forwarded-For",
+		// Weirdo, but still conforming names
+		"a", "ab", "abc", "a1", "-a", "a-", "a-b", "a-1", "a--1--2--b", "--abc-123",
+		"A", "AB", "AbC", "A1", "-A", "A-", "A-B", "A-1", "A--1--2--B", "--123-ABC",
+	}
+	for _, val := range goodValues {
+		if !IsHTTPHeaderName(val) {
+			t.Errorf("expected true for '%s'", val)
+		}
+	}
+
+	badValues := []string{
+		"Host:", "X-Forwarded-For:", "X-@Home",
+		"", "_", "a_", "_a", "1_", "1_2", ".", "a.", ".a", "a.b", "1.", ".1", "1.2",
+		" ", "a ", " a", "a b", "1 ", " 1", "1 2", "#a#", "^", ",", ";", "=", "<",
+		"?", "@", "{",
+	}
+	for _, val := range badValues {
+		if IsHTTPHeaderName(val) {
+			t.Errorf("expected false for '%s'", val)
+		}
+	}
+}

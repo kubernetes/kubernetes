@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"sync"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
@@ -41,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // sched implements the Scheduler interface.
@@ -59,7 +60,7 @@ func New(
 	c *config.Config,
 	fw framework.Framework,
 	ps podschedulers.PodScheduler,
-	client *client.Client,
+	client *clientset.Clientset,
 	recorder record.EventRecorder,
 	terminate <-chan struct{},
 	mux *http.ServeMux,
@@ -98,6 +99,9 @@ func New(
 				// "backs off" when it can't find an offer that matches up with a pod.
 				// The backoff period for a pod can terminate sooner if an offer becomes
 				// available that matches up.
+
+				// TODO(jdef) this will never match for a pod that uses a node selector,
+				// since we're passing a nil *api.Node here.
 				return !task.Has(podtask.Launched) && ps.Fit(task, offer, nil)
 			default:
 				// no point in continuing to check for matching offers

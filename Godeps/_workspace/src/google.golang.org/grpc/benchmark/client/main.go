@@ -92,13 +92,6 @@ func closeLoopUnary() {
 
 func closeLoopStream() {
 	s, conn, tc := buildConnection()
-	stream, err := tc.StreamingCall(context.Background())
-	if err != nil {
-		grpclog.Fatalf("%v.StreamingCall(_) = _, %v", tc, err)
-	}
-	for i := 0; i < 100; i++ {
-		streamCaller(tc, stream)
-	}
 	ch := make(chan int, *maxConcurrentRPCs*4)
 	var (
 		mu sync.Mutex
@@ -108,7 +101,15 @@ func closeLoopStream() {
 	// Distribute RPCs over maxConcurrentCalls workers.
 	for i := 0; i < *maxConcurrentRPCs; i++ {
 		go func() {
-			for _ = range ch {
+			stream, err := tc.StreamingCall(context.Background())
+			if err != nil {
+				grpclog.Fatalf("%v.StreamingCall(_) = _, %v", tc, err)
+			}
+			// Do some warm up.
+			for i := 0; i < 100; i++ {
+				streamCaller(tc, stream)
+			}
+			for range ch {
 				start := time.Now()
 				streamCaller(tc, stream)
 				elapse := time.Since(start)

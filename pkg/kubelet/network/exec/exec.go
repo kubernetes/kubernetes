@@ -120,6 +120,9 @@ func (plugin *execNetworkPlugin) getExecutable() string {
 	return path.Join(plugin.execPath, execName)
 }
 
+func (plugin *execNetworkPlugin) Event(name string, details map[string]interface{}) {
+}
+
 func (plugin *execNetworkPlugin) Name() string {
 	return plugin.execName
 }

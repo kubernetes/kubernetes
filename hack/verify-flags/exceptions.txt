@@ -1,13 +1,16 @@
 Vagrantfile:      node_ip = $node_ips[n]
 cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
 cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
-cluster/aws/templates/salt-minion.sh:  hostname_override: "${HOSTNAME_OVERRIDE}"
+cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
+cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
+cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
+cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
 cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
-cluster/gce/configure-vm.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
@@ -57,6 +60,7 @@ cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_p
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
 cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'

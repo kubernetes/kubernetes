@@ -462,6 +462,21 @@ var _ = Describe("Density", func() {
 				Logf("Approx throughput: %v pods/min",
 					float64(nodeCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
 			}
+
+			By("Deleting ReplicationController and all additional Pods")
+			// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
+			rc, err := c.ReplicationControllers(ns).Get(RCName)
+			if err == nil && rc.Spec.Replicas != 0 {
+				By("Cleaning up the replication controller")
+				err := DeleteRC(c, ns, RCName)
+				expectNoError(err)
+			}
+
+			By("Removing additional pods if any")
+			for i := 1; i <= nodeCount; i++ {
+				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+				c.Pods(ns).Delete(name, nil)
+			}
 		})
 	}
 })

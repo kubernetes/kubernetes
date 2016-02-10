@@ -62,7 +62,7 @@ var _ = Describe("ConfigMap", func() {
 				Containers: []api.Container{
 					{
 						Name:    "env-test",
-						Image:   "gcr.io/google_containers/busybox",
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 						Env: []api.EnvVar{
 							{

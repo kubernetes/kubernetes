@@ -27,6 +27,8 @@ NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
+PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
+
 
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20160127}
@@ -112,11 +114,14 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,Pe
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 
-# OpenContrail networking plugin specific settings
-NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail, flannel
+# Networking plugin specific settings.
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail, flannel, kubenet
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+
+# Should the kubelet configure hairpin mode on the bridge?
+HAIRPIN_MODE="${HAIRPIN_MODE:-true}" # true, false
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

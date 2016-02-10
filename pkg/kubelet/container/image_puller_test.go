@@ -98,7 +98,7 @@ func TestPuller(t *testing.T) {
 		}
 
 		backOff := util.NewBackOff(time.Second, time.Minute)
-		fakeClock := &util.FakeClock{Time: time.Now()}
+		fakeClock := util.NewFakeClock(time.Now())
 		backOff.Clock = fakeClock
 
 		fakeRuntime := &FakeRuntime{}

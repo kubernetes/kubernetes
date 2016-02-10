@@ -66,6 +66,7 @@ func (test currentContextTest) run(t *testing.T) {
 
 	pathOptions := NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
+	pathOptions.EnvVar = ""
 	options := CurrentContextOptions{
 		ConfigAccess: pathOptions,
 	}

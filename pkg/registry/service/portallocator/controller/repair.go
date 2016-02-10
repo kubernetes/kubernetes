@@ -25,9 +25,9 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
@@ -51,7 +51,7 @@ func NewRepair(interval time.Duration, registry service.Registry, portRange net.
 
 // RunUntil starts the controller until the provided ch is closed.
 func (c *Repair) RunUntil(ch chan struct{}) {
-	util.Until(func() {
+	wait.Until(func() {
 		if err := c.RunOnce(); err != nil {
 			runtime.HandleError(err)
 		}
@@ -88,8 +88,12 @@ func (c *Repair) runOnce() error {
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	options := &api.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
-	list, err := c.registry.ListServices(ctx, options)
+	// We explicitly send no resource version, since the resource version
+	// of 'latest' is from a different collection, it's not comparable to
+	// the service collection. The caching layer keeps per-collection RVs,
+	// and this is proper, since in theory the collections could be hosted
+	// in separate etcd (or even non-etcd) instances.
+	list, err := c.registry.ListServices(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}

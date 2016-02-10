@@ -300,6 +300,7 @@ func TestGenerateService(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.Flags().String("output", "", "")
 		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
+		cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation.")
 		addRunFlags(cmd)
 
 		if !test.expectPOST {

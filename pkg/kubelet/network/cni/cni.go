@@ -97,6 +97,9 @@ func (plugin *cniNetworkPlugin) Init(host network.Host) error {
 	return nil
 }
 
+func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
+}
+
 func (plugin *cniNetworkPlugin) Name() string {
 	return CNIPluginName
 }

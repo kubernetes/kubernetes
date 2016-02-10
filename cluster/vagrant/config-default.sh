@@ -46,6 +46,8 @@ for ((i=0; i < NUM_NODES; i++)) do
   VAGRANT_NODE_NAMES[$i]="node-$((i+1))"
 done
 
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.246.0.0/16}"
+
 SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
 
 # Since this isn't exposed on the network, default to a simple user/passwd
@@ -97,8 +99,12 @@ octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
 service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
 MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail, kubenet, etc
+if [ "${NETWORK_PROVIDER}" == "kubenet" ]; then
+  CLUSTER_IP_RANGE="${CONTAINER_SUBNET}"
+fi
+
 # OpenContrail networking plugin specific settings
-NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"

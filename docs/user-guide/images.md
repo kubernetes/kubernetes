@@ -51,6 +51,9 @@ The `image` property of a container supports the same syntax as the `docker` com
     - [Configuring Nodes to Authenticate to a Private Repository](#configuring-nodes-to-authenticate-to-a-private-repository)
     - [Pre-pulling Images](#pre-pulling-images)
     - [Specifying ImagePullSecrets on a Pod](#specifying-imagepullsecrets-on-a-pod)
+      - [Creating a Secret with a Docker Config](#creating-a-secret-with-a-docker-config)
+        - [Bypassing kubectl create secrets](#bypassing-kubectl-create-secrets)
+      - [Referring to an imagePullSecrets on a Pod](#referring-to-an-imagepullsecrets-on-a-pod)
     - [Use Cases](#use-cases)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -207,42 +210,40 @@ where node creation is automated.
 
 Kubernetes supports specifying registry keys on a pod.
 
-First, create a `.docker/config.json`, such as by running `docker login <registry.domain>`.
-Then put the resulting `.docker/config.json` file into a [secret resource](secrets.md).  For example:
+#### Creating a Secret with a Docker Config
+
+Run the following command, substituting the appropriate uppercase values:
 
 ```console
-$ docker login
-Username: janedoe
-Password: ●●●●●●●●●●●
-Email: jdoe@example.com
-WARNING: login credentials saved in /Users/jdoe/.docker/config.json.
-Login Succeeded
-
-$ echo $(cat ~/.docker/config.json)
-{ "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
-
-$ cat ~/.docker/config.json | base64
-eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
-
-$ cat > /tmp/image-pull-secret.yaml <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: myregistrykey
-data:
-  .dockerconfigjson: eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
-type: kubernetes.io/dockerconfigjson
-EOF
-
-$ kubectl create -f /tmp/image-pull-secret.yaml
-secrets/myregistrykey
+$ kubectl create secret docker-registry my-registry-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
+secret "my-registry-secret" created.
 ```
+
+If you need access to multiple registries, you can create one secret for each registry.
+Kubelet will merge any `imagePullSecrets` into a single virtual `.docker/config.json`
+when pulling images for your Pods.
+
+Pods can only reference image pull secrets in their own namespace,
+so this process needs to be done one time per namespace.
+
+##### Bypassing kubectl create secrets
+
+If for some reason you need multiple items in a single `.docker/config.json` or need
+control not given by the above command, then you can [create a secret using
+json or yaml](secrets.md#creating-a-secret-manually).
+
+Be sure to:
+
+- set the name of the data item to `.dockerconfigjson`
+- base64 encode the docker file and paste that string, unbroken
+  as the value for field `data[".dockerconfigjson"]`
+- set `type` to `kubernetes.io/dockerconfigjson`
 
 If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid.
 If you get an error message like `Secret "myregistrykey" is invalid: data[.dockerconfigjson]: invalid value ...` it means
 the data was successfully un-base64 encoded, but could not be parsed as a `.docker/config.json` file.
 
-This process needs to be done one time per namespace, or to any non-default service accounts you create.
+#### Referring to an imagePullSecrets on a Pod
 
 Now, you can create pods which reference that secret by adding an `imagePullSecrets`
 section to a pod definition.
@@ -261,6 +262,7 @@ spec:
 ```
 
 This needs to be done for each pod that is using a private registry.
+
 However, setting of this field can be automated by setting the imagePullSecrets
 in a [serviceAccount](service-accounts.md) resource.
 

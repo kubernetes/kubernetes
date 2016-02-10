@@ -84,7 +84,7 @@ kube::etcd::start
 
 kube::log::status "Running test for update etcd object scenario"
 
-"${KUBE_ROOT}/hack/build-go.sh"
+"${KUBE_ROOT}/hack/build-go.sh" cmd/kube-apiserver
 
 
 #######################################################

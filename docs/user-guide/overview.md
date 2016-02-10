@@ -38,7 +38,7 @@ Kubernetes is an open-source system for managing containerized applications acro
 
 Kubernetes provides mechanisms for application deployment, scheduling, updating, maintenance, and scaling. A key feature of Kubernetes is that it actively manages the containers to ensure that the state of the cluster continually matches the user's intentions. An operations user should be able to launch a micro-service, letting the scheduler find the right placement. We also want to improve the tools and experience for how users can roll-out applications through patterns like canary deployments.
 
-Kubernetes supports [Docker](http://www.docker.io) and [Rocket](https://coreos.com/blog/rocket/) containers, and other container image formats and container runtimes will be supported in the future.
+Kubernetes supports [Docker](http://www.docker.io) and [rkt](https://coreos.com/blog/rocket/) containers, and other container image formats and container runtimes will be supported in the future.
 
 While Kubernetes currently focuses on continuously-running stateless (e.g. web server or in-memory object cache) and "cloud native" stateful applications (e.g. NoSQL datastores), in the near future it will support all the other workload types commonly found in production cluster environments, such as batch, stream processing, and traditional databases.
 

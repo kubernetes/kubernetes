@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Registrator interface {
@@ -62,11 +63,11 @@ type LookupFunc func(hostName string) *api.Node
 
 type clientRegistrator struct {
 	lookupNode LookupFunc
-	client     *client.Client
+	client     *clientset.Clientset
 	queue      *queue.HistoricalFIFO
 }
 
-func NewRegistrator(client *client.Client, lookupNode LookupFunc) *clientRegistrator {
+func NewRegistrator(client *clientset.Clientset, lookupNode LookupFunc) *clientRegistrator {
 	return &clientRegistrator{
 		lookupNode: lookupNode,
 		client:     client,

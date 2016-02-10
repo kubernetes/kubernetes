@@ -457,73 +457,6 @@ function add-instance-metadata-from-file {
   done
 }
 
-# Create certificate pairs for the cluster.
-# $1: The public IP for the master.
-#
-# These are used for static cert distribution (e.g. static clustering) at
-# cluster creation time. This will be obsoleted once we implement dynamic
-# clustering.
-#
-# The following certificate pairs are created:
-#
-#  - ca (the cluster's certificate authority)
-#  - server
-#  - kubelet
-#  - kubecfg (for kubectl)
-#
-# TODO(roberthbailey): Replace easyrsa with a simple Go program to generate
-# the certs that we need.
-#
-# Assumed vars
-#   KUBE_TEMP
-#
-# Vars set:
-#   CERT_DIR
-#   CA_CERT_BASE64
-#   MASTER_CERT_BASE64
-#   MASTER_KEY_BASE64
-#   KUBELET_CERT_BASE64
-#   KUBELET_KEY_BASE64
-#   KUBECFG_CERT_BASE64
-#   KUBECFG_KEY_BASE64
-function create-certs {
-  local -r cert_ip="${1}"
-
-  local octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-  ((octets[3]+=1))
-  local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
-  local -r sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
-
-  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
-  # Note: This was heavily cribbed from make-ca-cert.sh
-  (set -x
-    cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
-    tar xzf easy-rsa.tar.gz
-    cd easy-rsa-master/easyrsa3
-    ./easyrsa init-pki
-    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass
-    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
-    ./easyrsa build-client-full kubelet nopass
-    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
-    cat "${cert_create_debug_output}" >&2
-    echo "=== Failed to generate certificates: Aborting ===" >&2
-    exit 2
-  }
-  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
-  # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
-  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
-  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
-  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
-  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
-  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64 | tr -d '\r\n')
-  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
-  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
-  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
-}
-
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -539,6 +472,9 @@ function kube-up {
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
   upload-server-tars
+
+  # ensure that environmental variables specifying number of migs to create
+  set_num_migs
 
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     create-nodes
@@ -683,21 +619,35 @@ function create-nodes-template() {
   create-node-instance-template $template_name
 }
 
-function create-nodes() {
-  local template_name="${NODE_INSTANCE_PREFIX}-template"
-
+# Assumes:
+# - MAX_INSTANCES_PER_MIG
+# - NUM_NODES
+# exports: 
+# - NUM_MIGS
+function set_num_migs() {
   local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
 
   if [[ ${defaulted_max_instances_per_mig} -le "0" ]]; then
     echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 500"
     defaulted_max_instances_per_mig=500
   fi
-  local num_migs=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
-  local instances_per_mig=$(((${NUM_NODES} + ${num_migs} - 1) / ${num_migs}))
-  local last_mig_size=$((${NUM_NODES} - (${num_migs} - 1) * ${instances_per_mig}))
+  export NUM_MIGS=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
+}
+
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - NUM_NODES
+# - PROJECT
+# - ZONE
+function create-nodes() {
+  local template_name="${NODE_INSTANCE_PREFIX}-template"
+
+  local instances_per_mig=$(((${NUM_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+  local last_mig_size=$((${NUM_NODES} - (${NUM_MIGS} - 1) * ${instances_per_mig}))
 
   #TODO: parallelize this loop to speed up the process
-  for i in $(seq $((${num_migs} - 1))); do
+  for i in $(seq $((${NUM_MIGS} - 1))); do
     gcloud compute instance-groups managed \
         create "${NODE_INSTANCE_PREFIX}-group-$i" \
         --project "${PROJECT}" \
@@ -726,35 +676,44 @@ function create-nodes() {
       --project "${PROJECT}" || true;
 }
 
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - PROJECT
+# - ZONE
+# - ENABLE_NODE_AUTOSCALER
+# - TARGET_NODE_UTILIZATION\
+# - AUTOSCALER_MAX_NODES
+# - AUTOSCALER_MIN_NODES
 function create-autoscaler() {
   # Create autoscaler for nodes if requested
   if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-    METRICS=""
+    local metrics=""
     # Current usage
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
     # Reservation
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
+    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
     echo "Creating node autoscalers."
 
-    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${num_migs} - 1) * ${max_instances_per_mig}))
-    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${num_migs} - 1) * ${min_instances_per_mig}))
+    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${NUM_MIGS} - 1) * ${max_instances_per_mig}))
+    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
+    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${NUM_MIGS} - 1) * ${min_instances_per_mig}))
 
-    for i in $(seq $((${num_migs} - 1))); do
+    for i in $(seq $((${NUM_MIGS} - 1))); do
       gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
-          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${METRICS} || true
+          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${metrics} || true
     done
     gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${METRICS} || true
+      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${metrics} || true
   fi
 }
 
@@ -1231,11 +1190,13 @@ function test-setup {
     "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
-  do sleep 5
+  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null; do
+    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-http-alt in ${PROJECT}" >&2
+      exit 1
+    fi
+    sleep 5
   done
-  # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
@@ -1248,11 +1209,13 @@ function test-setup {
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
-  do sleep 5
+  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null; do
+    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-nodeports in ${PROJECT}" >&2
+      exit 1
+    fi
+    sleep 5
   done
-  # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called

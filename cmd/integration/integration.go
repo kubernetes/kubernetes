@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -171,7 +171,10 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	masterConfig.CacheTimeout = 2 * time.Second
 
 	// Create a master and install handlers into mux.
-	m := master.New(masterConfig)
+	m, err := master.New(masterConfig)
+	if err != nil {
+		glog.Fatalf("Error in bringing up the master: %v", err)
+	}
 	handler.delegate = m.Handler
 
 	// Scheduler
@@ -187,14 +190,14 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	scheduler.New(schedulerConfig).Run()
 
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
-	go endpointcontroller.NewEndpointController(cl, controller.NoResyncPeriodFunc).
-		Run(3, util.NeverStop)
+	go endpointcontroller.NewEndpointController(clientset, controller.NoResyncPeriodFunc).
+		Run(3, wait.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
 	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
-		Run(3, util.NeverStop)
+		Run(3, wait.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
@@ -205,7 +208,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker1,
 		"localhost",
 		testRootDir,
@@ -237,7 +240,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 
 	kcfg = kubeletapp.SimpleKubelet(
-		cl,
+		clientset,
 		fakeDocker2,
 		"127.0.0.1",
 		testRootDir,
@@ -1042,11 +1045,11 @@ func main() {
 			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 pod infra containers + 2 containers from the replication controller +
+	// We expect 12: 2 pod infra containers + 2 containers from the replication controller +
 	//              1 pod infra container + 2 containers from the URL on first Kubelet +
 	//              1 pod infra container + 2 containers from the URL on second Kubelet +
 	//              1 pod infra container + 1 container from the service test.
-	// The total number of container created is 9
+	// The total number of container created is 12
 
 	if len(createdConts) != 12 {
 		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)

@@ -63,11 +63,11 @@ const (
 //    choose that node to be node with index 1.
 // 7. Observe that the pod in pending status schedules on that node.
 //
-// Flaky issue #17687
+// Flaky issue #20015.  We have no clear path for how to test this functionality in a non-flaky way.
 var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 	var c *client.Client
 	var unfilledNodeName, recoveredNodeName string
-	framework := Framework{BaseName: "node-outofdisk"}
+	framework := NewFramework("node-outofdisk")
 
 	BeforeEach(func() {
 		framework.beforeEach()
@@ -218,7 +218,7 @@ func availCpu(c *client.Client, node *api.Node) (int64, error) {
 func availSize(c *client.Client, node *api.Node) (uint64, error) {
 	statsResource := fmt.Sprintf("api/v1/proxy/nodes/%s/stats/", node.Name)
 	Logf("Querying stats for node %s using url %s", node.Name, statsResource)
-	res, err := c.Get().AbsPath(statsResource).Timeout(timeout).Do().Raw()
+	res, err := c.Get().AbsPath(statsResource).Timeout(time.Minute).Do().Raw()
 	if err != nil {
 		return 0, fmt.Errorf("error querying cAdvisor API: %v", err)
 	}

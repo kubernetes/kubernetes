@@ -25,14 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/testing/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -45,7 +45,7 @@ func newJob(parallelism, completions int) *extensions.Job {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.JobSpec{
-			Selector: &extensions.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: api.PodTemplateSpec{
@@ -496,7 +496,7 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
 					},
 				},
@@ -515,11 +515,11 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.LabelSelector{
-						MatchExpressions: []extensions.LabelSelectorRequirement{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
 							{
 								Key:      "foo",
-								Operator: extensions.LabelSelectorOpIn,
+								Operator: unversioned.LabelSelectorOpIn,
 								Values:   []string{"bar"},
 							},
 						},
@@ -626,7 +626,7 @@ func TestWatchJobs(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.jobController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	// We're sending new job to see if it reaches syncHandler.
 	testJob.Name = "foo"
@@ -691,7 +691,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.podController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, api.PodRunning, testJob)
 	testPod := pods[0]

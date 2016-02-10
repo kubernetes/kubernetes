@@ -47,7 +47,9 @@ cluster-name
 cluster-tag
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
+concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
+concurrent-namespace-syncs
 config-sync-period
 configure-cbr0
 conntrack-max
@@ -84,6 +86,7 @@ dry-run
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-custom-metrics
 enable-debugging-handlers
 enable-hostpath-provisioner
 enable-server
@@ -138,6 +141,7 @@ host-pid-sources
 hostname-override
 http-check-frequency
 http-port
+ignore-daemonsets
 ignore-not-found
 image-gc-high-threshold
 image-gc-low-threshold
@@ -145,6 +149,7 @@ input-dirs
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
+iptables-masquerade-bit
 iptables-sync-period
 ir-data-source
 ir-dbname
@@ -276,6 +281,7 @@ pv-recycler-minimum-timeout-hostpath
 pv-recycler-minimum-timeout-nfs
 pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
+pv-recycler-maximum-retry
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
 read-only-port
@@ -323,6 +329,7 @@ service-overrides
 service-sync-period
 session-affinity
 show-all
+show-labels
 shutdown-fd
 shutdown-fifo
 since-seconds
@@ -347,6 +354,7 @@ tcp-services
 terminated-pod-gc-threshold
 tls-cert-file
 tls-private-key-file
+to-version
 token-auth-file
 ttl-secs
 type-src
@@ -358,7 +366,9 @@ upgrade-target
 use-kubernetes-cluster-service
 user-whitelist
 verify-only
+volume-dir
 volume-plugin-dir
+volume-stats-agg-period
 watch-cache
 watch-only
 whitelist-override-label
@@ -371,3 +381,5 @@ leader-elect
 leader-elect-lease-duration
 leader-elect-renew-deadline
 leader-elect-retry-period
+watch-cache-sizes
+configure-hairpin-mode

@@ -33,6 +33,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -56,13 +58,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/limitwriter"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	auth        AuthInterface
-	host        HostInterface
-	restfulCont containerInterface
+	auth             AuthInterface
+	host             HostInterface
+	restfulCont      containerInterface
+	resourceAnalyzer stats.ResourceAnalyzer
 }
 
 type TLSOptions struct {
@@ -100,9 +104,9 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
+func ListenAndServeKubeletServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, auth, enableDebuggingHandlers)
+	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -117,9 +121,9 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, port uint) {
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, nil, false)
+	s := NewServer(host, resourceAnalyzer, nil, false)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -140,6 +144,7 @@ type AuthInterface interface {
 // For testablitiy.
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetPods() []*api.Pod
@@ -154,15 +159,21 @@ type HostInterface interface {
 	StreamingConnectionIdleTimeout() time.Duration
 	ResyncInterval() time.Duration
 	GetHostname() string
+	GetNode() (*api.Node, error)
+	GetNodeConfig() cm.NodeConfig
 	LatestLoopEntryTime() time.Time
+	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
+	RootFsInfo() (cadvisorapiv2.FsInfo, error)
+	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, auth AuthInterface, enableDebuggingHandlers bool) Server {
+func NewServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, auth AuthInterface, enableDebuggingHandlers bool) Server {
 	server := Server{
-		host:        host,
-		auth:        auth,
-		restfulCont: &filteringContainer{Container: restful.NewContainer()},
+		host:             host,
+		resourceAnalyzer: resourceAnalyzer,
+		auth:             auth,
+		restfulCont:      &filteringContainer{Container: restful.NewContainer()},
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
@@ -222,7 +233,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Add(stats.CreateHandlers(s.host))
+	s.restfulCont.Add(stats.CreateHandlers(s.host, s.resourceAnalyzer))
 	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	ws = new(restful.WebService)
@@ -606,6 +617,15 @@ func standardShellChannels(stdin, stdout, stderr bool) []wsstream.ChannelType {
 	return channels
 }
 
+// streamAndReply holds both a Stream and a channel that is closed when the stream's reply frame is
+// enqueued. Consumers can wait for replySent to be closed prior to proceeding, to ensure that the
+// replyFrame is enqueued before the connection's goaway frame is sent (e.g. if a stream was
+// received and right after, the connection gets closed).
+type streamAndReply struct {
+	httpstream.Stream
+	replySent <-chan struct{}
+}
+
 func (s *Server) createStreams(request *restful.Request, response *restful.Response) (io.Reader, io.WriteCloser, io.WriteCloser, io.WriteCloser, Closer, bool, bool) {
 	tty := request.QueryParameter(api.ExecTTYParam) == "1"
 	stdin := request.QueryParameter(api.ExecStdinParam) == "1"
@@ -664,11 +684,11 @@ func (s *Server) createStreams(request *restful.Request, response *restful.Respo
 		return nil, nil, nil, nil, nil, false, false
 	}
 
-	streamCh := make(chan httpstream.Stream)
+	streamCh := make(chan streamAndReply)
 
 	upgrader := spdy.NewResponseUpgrader()
-	conn := upgrader.UpgradeResponse(response.ResponseWriter, request.Request, func(stream httpstream.Stream) error {
-		streamCh <- stream
+	conn := upgrader.UpgradeResponse(response.ResponseWriter, request.Request, func(stream httpstream.Stream, replySent <-chan struct{}) error {
+		streamCh <- streamAndReply{Stream: stream, replySent: replySent}
 		return nil
 	})
 	// from this point on, we can no longer call methods on response
@@ -686,6 +706,9 @@ func (s *Server) createStreams(request *restful.Request, response *restful.Respo
 
 	var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 	receivedStreams := 0
+	replyChan := make(chan struct{})
+	stop := make(chan struct{})
+	defer close(stop)
 WaitForStreams:
 	for {
 		select {
@@ -694,19 +717,21 @@ WaitForStreams:
 			switch streamType {
 			case api.StreamTypeError:
 				errorStream = stream
-				receivedStreams++
+				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdin:
 				stdinStream = stream
-				receivedStreams++
+				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdout:
 				stdoutStream = stream
-				receivedStreams++
+				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStderr:
 				stderrStream = stream
-				receivedStreams++
+				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
 				glog.Errorf("Unexpected stream type: '%s'", streamType)
 			}
+		case <-replyChan:
+			receivedStreams++
 			if receivedStreams == expectedStreams {
 				break WaitForStreams
 			}
@@ -719,6 +744,16 @@ WaitForStreams:
 	}
 
 	return stdinStream, stdoutStream, stderrStream, errorStream, conn, tty, true
+}
+
+// waitStreamReply waits until either replySent or stop is closed. If replySent is closed, it sends
+// an empty struct to the notify channel.
+func waitStreamReply(replySent <-chan struct{}, notify chan<- struct{}, stop <-chan struct{}) {
+	select {
+	case <-replySent:
+		notify <- struct{}{}
+	case <-stop:
+	}
 }
 
 func getPodCoordinates(request *restful.Request) (namespace, pod string, uid types.UID) {
@@ -796,8 +831,8 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 // forward streams. It checks each stream's port and stream type headers,
 // rejecting any streams that with missing or invalid values. Each valid
 // stream is sent to the streams channel.
-func portForwardStreamReceived(streams chan httpstream.Stream) func(httpstream.Stream) error {
-	return func(stream httpstream.Stream) error {
+func portForwardStreamReceived(streams chan httpstream.Stream) func(httpstream.Stream, <-chan struct{}) error {
+	return func(stream httpstream.Stream, replySent <-chan struct{}) error {
 		// make sure it has a valid port header
 		portString := stream.Headers().Get(api.PortHeader)
 		if len(portString) == 0 {

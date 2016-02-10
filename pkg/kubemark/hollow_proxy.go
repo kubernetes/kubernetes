@@ -75,7 +75,7 @@ func NewHollowProxyOrDie(
 		endpointsConfig.Channel("api"),
 	)
 
-	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil)
+	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
 	if err != nil {
 		glog.Fatalf("Error while creating ProxyServer: %v\n", err)
 	}

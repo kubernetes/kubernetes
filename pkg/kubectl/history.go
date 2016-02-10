@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -58,7 +58,7 @@ type DeploymentHistoryViewer struct {
 	c clientset.Interface
 }
 
-// History returns a revision-to-RC map as the revision history of a deployment
+// History returns a revision-to-replicaset map as the revision history of a deployment
 func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, error) {
 	historyInfo := HistoryInfo{
 		RevisionToTemplate: make(map[int64]*api.PodTemplateSpec),
@@ -67,31 +67,26 @@ func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, 
 	if err != nil {
 		return historyInfo, fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRCs, err := deploymentutil.GetOldRCs(*deployment, h.c)
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, h.c)
 	if err != nil {
-		return historyInfo, fmt.Errorf("failed to retrieve old RCs from deployment %s: %v", name, err)
+		return historyInfo, fmt.Errorf("failed to retrieve old replica sets from deployment %s: %v", name, err)
 	}
-	newRC, err := deploymentutil.GetNewRC(*deployment, h.c)
+	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, h.c)
 	if err != nil {
-		return historyInfo, fmt.Errorf("failed to retrieve new RC from deployment %s: %v", name, err)
+		return historyInfo, fmt.Errorf("failed to retrieve new replica set from deployment %s: %v", name, err)
 	}
-	allRCs := append(allOldRCs, newRC)
-	for _, rc := range allRCs {
-		v, err := deploymentutil.Revision(rc)
+	allRSs := append(allOldRSs, newRS)
+	for _, rs := range allRSs {
+		v, err := deploymentutil.Revision(rs)
 		if err != nil {
-			return historyInfo, fmt.Errorf("failed to retrieve revision out of RC %s from deployment %s: %v", rc.Name, name, err)
+			continue
 		}
-		historyInfo.RevisionToTemplate[v] = rc.Spec.Template
-		changeCause, err := getChangeCause(rc)
-		if err != nil {
-			return historyInfo, fmt.Errorf("failed to retrieve change-cause out of RC %s from deployment %s: %v", rc.Name, name, err)
+		historyInfo.RevisionToTemplate[v] = rs.Spec.Template
+		changeCause := getChangeCause(rs)
+		if historyInfo.RevisionToTemplate[v].Annotations == nil {
+			historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)
 		}
-		if len(changeCause) > 0 {
-			if historyInfo.RevisionToTemplate[v].Annotations == nil {
-				historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)
-			}
-			historyInfo.RevisionToTemplate[v].Annotations[ChangeCauseAnnotation] = changeCause
-		}
+		historyInfo.RevisionToTemplate[v].Annotations[ChangeCauseAnnotation] = changeCause
 	}
 	return historyInfo, nil
 }
@@ -130,10 +125,10 @@ func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string
 }
 
 // getChangeCause returns the change-cause annotation of the input object
-func getChangeCause(obj runtime.Object) (string, error) {
+func getChangeCause(obj runtime.Object) string {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return "", err
+		return ""
 	}
-	return meta.Annotations[ChangeCauseAnnotation], nil
+	return meta.Annotations[ChangeCauseAnnotation]
 }

@@ -91,7 +91,7 @@ type ContainerStats struct {
 	// Stats pertaining to container logs usage of filesystem resources.
 	// Logs.UsedBytes is the number of bytes used for the container logs.
 	Logs *FsStats `json:"logs,omitempty"`
-	// User defined metrics are arbitrary metrics exposed by containers in pods.
+	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
 	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 

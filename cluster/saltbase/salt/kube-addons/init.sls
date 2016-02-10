@@ -146,9 +146,9 @@ addon-dir-create:
 {% endif %}
 
 {% if pillar.get('enable_cluster_ui', '').lower() == 'true' %}
-/etc/kubernetes/addons/kube-ui:
+/etc/kubernetes/addons/dashboard:
   file.recurse:
-    - source: salt://kube-addons/kube-ui
+    - source: salt://kube-addons/dashboard
     - include_pat: E@^.+\.yaml$
     - user: root
     - group: root

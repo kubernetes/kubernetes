@@ -47,7 +47,7 @@ func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:  "test-container",
-					Image: "gcr.io/google_containers/busybox",
+					Image: "gcr.io/google_containers/busybox:1.24",
 				},
 			},
 			RestartPolicy: api.RestartPolicyNever,
@@ -154,8 +154,8 @@ func testPodSELinuxLabeling(framework *Framework, hostIPC bool, hostPID bool) {
 
 	// Confirm that the file can be accessed from a second
 	// pod using host_path with the same MCS label
-	volumeHostPath := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/kubernetes.io~empty-dir/%s", foundPod.UID, volumeName)
-	By("confirming a container with the same label can read the file")
+	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", testContext.KubeVolumeDir, foundPod.UID, volumeName)
+	By(fmt.Sprintf("confirming a container with the same label can read the file under --volume-dir=%s", testContext.KubeVolumeDir))
 	pod = scTestPod(hostIPC, hostPID)
 	pod.Spec.NodeName = foundPod.Spec.NodeName
 	volumeMounts := []api.VolumeMount{

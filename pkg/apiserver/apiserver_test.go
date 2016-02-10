@@ -179,9 +179,9 @@ func init() {
 			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
+				nsMapper.Add(gvk, meta.RESTScopeRoot)
 			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
+				nsMapper.Add(gvk, meta.RESTScopeNamespace)
 			}
 		}
 	}
@@ -297,7 +297,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	}
 
 	ws := new(restful.WebService)
-	InstallSupport(mux, ws, false)
+	InstallSupport(mux, ws)
 	container.Add(ws)
 	return &defaultAPIServer{mux, container}
 }

@@ -242,7 +242,7 @@ func TestDrain(t *testing.T) {
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/daemonsets/ds",
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &extensions.LabelSelector{MatchLabels: labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 		},
 	}
 
@@ -270,7 +270,7 @@ func TestDrain(t *testing.T) {
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
 		},
 		Spec: extensions.JobSpec{
-			Selector: &extensions.LabelSelector{MatchLabels: labels},
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 		},
 	}
 
@@ -323,8 +323,18 @@ func TestDrain(t *testing.T) {
 			pods:         []api.Pod{ds_pod},
 			rcs:          []api.ReplicationController{rc},
 			args:         []string{"node"},
+			expectFatal:  true,
+			expectDelete: false,
+		},
+		{
+			description:  "DS-managed pod with --ignore-daemonsets",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{ds_pod},
+			rcs:          []api.ReplicationController{rc},
+			args:         []string{"node", "--ignore-daemonsets"},
 			expectFatal:  false,
-			expectDelete: true,
+			expectDelete: false,
 		},
 		{
 			description:  "Job-managed pod",

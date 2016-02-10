@@ -26,8 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -321,7 +322,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 	if labels.Set(pod.Labels).AsSelector().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
-	if newPod, err := r.KubeClient.Legacy().Pods(namespace).Create(pod); err != nil {
+	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
 		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
@@ -336,7 +337,7 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
-	if err := r.KubeClient.Legacy().Pods(namespace).Delete(podID, nil); err != nil {
+	if err := r.KubeClient.Core().Pods(namespace).Delete(podID, nil); err != nil {
 		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	} else {
@@ -449,7 +450,7 @@ func SyncAllPodsWithStore(kubeClient clientset.Interface, store cache.Store) {
 	var err error
 	listOptions := api.ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything()}
 	for {
-		if allPods, err = kubeClient.Legacy().Pods(api.NamespaceAll).List(listOptions); err != nil {
+		if allPods, err = kubeClient.Core().Pods(api.NamespaceAll).List(listOptions); err != nil {
 			glog.Warningf("Retrying pod list: %v", err)
 			continue
 		}
@@ -472,6 +473,19 @@ func (o ControllersByCreationTimestamp) Len() int      { return len(o) }
 func (o ControllersByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o ControllersByCreationTimestamp) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+// ReplicaSetsByCreationTimestamp sorts a list of ReplicationSets by creation timestamp, using their names as a tie breaker.
+type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
+
+func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
+func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
