@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func TestCreate(t *testing.T) {
@@ -117,19 +118,19 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory.CreateFromConfig(policy)
 }
 
-func PredicateOne(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func PredicateOne(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return true, nil
 }
 
-func PredicateTwo(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func PredicateTwo(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return true, nil
 }
 
-func PriorityOne(pod *api.Pod, m2p map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *api.Pod, m2p map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 

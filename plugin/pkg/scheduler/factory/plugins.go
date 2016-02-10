@@ -168,6 +168,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			pcf = &PriorityConfigFactory{
 				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
 					return priorities.NewServiceAntiAffinityPriority(
+						args.PodLister,
 						args.ServiceLister,
 						policy.Argument.ServiceAntiAffinity.Label,
 					)

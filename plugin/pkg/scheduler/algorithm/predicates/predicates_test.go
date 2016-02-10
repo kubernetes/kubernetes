@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 type FakeNodeInfo api.Node
@@ -105,53 +106,48 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		fits         bool
-		test         string
-		wErr         error
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
+		wErr     error
 	}{
 		{
 			pod: &api.Pod{},
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
 			fits: true,
 			test: "no resources requested always fits",
 			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
 			fits: false,
 			test: "too many resources fails",
 			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
 			fits: true,
 			test: "both resources fit",
 			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
 			test: "one resources fits",
 			wErr: newInsufficientResourceError(memoryResoureceName, 2, 19, 20),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: true,
 			test: "equal edge case",
 			wErr: nil,
@@ -162,7 +158,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
-		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
+		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -172,35 +168,32 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	notEnoughPodsTests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		fits         bool
-		test         string
-		wErr         error
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
+		wErr     error
 	}{
 		{
 			pod: &api.Pod{},
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
 			fits: false,
 			test: "even without specified resources predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
 			fits: false,
 			test: "even if both resources fit predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
-			existingPods: []*api.Pod{
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
 			test: "even for equal edge case predicate fails when there's no space for additional pod",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
@@ -210,7 +203,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
-		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
+		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -256,7 +249,7 @@ func TestPodFitsHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := PodFitsHost(test.pod, []*api.Pod{}, test.node)
+		result, err := PodFitsHost(test.pod, test.node, schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -285,52 +278,48 @@ func newPod(host string, hostPorts ...int) *api.Pod {
 
 func TestPodFitsHostPorts(t *testing.T) {
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		fits         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
 	}{
 		{
-			pod:          &api.Pod{},
-			existingPods: []*api.Pod{},
-			fits:         true,
-			test:         "nothing running",
+			pod:      &api.Pod{},
+			nodeInfo: schedulercache.NewNodeInfo(),
+			fits:     true,
+			test:     "nothing running",
 		},
 		{
 			pod: newPod("m1", 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 9090),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 9090)),
 			fits: true,
 			test: "other port",
 		},
 		{
 			pod: newPod("m1", 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 8080),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 8080)),
 			fits: false,
 			test: "same port",
 		},
 		{
 			pod: newPod("m1", 8000, 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 8080),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 8080)),
 			fits: false,
 			test: "second port",
 		},
 		{
 			pod: newPod("m1", 8000, 8080),
-			existingPods: []*api.Pod{
-				newPod("m1", 8001, 8080),
-			},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newPod("m1", 8001, 8080)),
 			fits: false,
 			test: "second port",
 		},
 	}
 	for _, test := range tests {
-		fits, err := PodFitsHostPorts(test.pod, test.existingPods, "machine")
+		fits, err := PodFitsHostPorts(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -400,27 +389,27 @@ func TestDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		isOk         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
 	}{
-		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
-		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
-		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
-		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.existingPods, "machine")
+		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -449,27 +438,27 @@ func TestAWSDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		isOk         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
 	}{
-		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
-		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
-		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
-		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.existingPods, "machine")
+		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -504,27 +493,27 @@ func TestRBDDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		isOk         bool
-		test         string
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
 	}{
-		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
-		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
-		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
-		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.existingPods, "machine")
+		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %v %s", test.pod, test.existingPods, test.test)
+			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -989,7 +978,7 @@ func TestPodFitsSelector(t *testing.T) {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 
 		fit := NodeSelector{FakeNodeInfo(node)}
-		fits, err := fit.PodSelectorMatches(test.pod, []*api.Pod{}, "machine")
+		fits, err := fit.PodSelectorMatches(test.pod, "machine", schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1002,12 +991,11 @@ func TestPodFitsSelector(t *testing.T) {
 func TestNodeLabelPresence(t *testing.T) {
 	label := map[string]string{"foo": "bar", "bar": "foo"}
 	tests := []struct {
-		pod          *api.Pod
-		existingPods []*api.Pod
-		labels       []string
-		presence     bool
-		fits         bool
-		test         string
+		pod      *api.Pod
+		labels   []string
+		presence bool
+		fits     bool
+		test     string
 	}{
 		{
 			labels:   []string{"baz"},
@@ -1049,7 +1037,7 @@ func TestNodeLabelPresence(t *testing.T) {
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
 		labelChecker := NodeLabelChecker{FakeNodeInfo(node), test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, test.existingPods, "machine")
+		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, "machine", schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1189,7 +1177,7 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
 		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, []*api.Pod{}, test.node)
+		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, test.node, schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1409,7 +1397,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
-		fits, err := pred(test.newPod, test.existingPods, "some-node")
+		fits, err := pred(test.newPod, "some-node", schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
