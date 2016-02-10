@@ -112,9 +112,9 @@
     {% set cgroup_root = "--cgroup-root=docker" -%}
   {% else %}
     {% set cgroup_root = "--cgroup-root=/" -%}
-    {% set system_container = "--system-container=/system" -%}    
-    {% set runtime_container = "--runtime-container=/docker-daemon" -%}
-    {% set  kubelet_container= "--resource-container=/kubelet" -%}
+    {% set system_container = "--system-cgroups=/system" -%}    
+    {% set runtime_container = "--runtime-cgroups=/docker-daemon" -%}
+    {% set  kubelet_container= "--kubelet-cgroups=/kubelet" -%}
   {% endif %}
 {% endif -%}
 {% if grains['oscodename'] == 'vivid' -%}
