@@ -1887,7 +1887,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 		runningSet.Insert(string(pod.ID))
 	}
 
-	for name, vol := range currentVolumes {
+	for name, cleanerTuple := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
 			parts := strings.Split(name, "/")
 			if runningSet.Has(parts[0]) {
@@ -1900,9 +1900,18 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 			// TODO(yifan): Refactor this hacky string manipulation.
 			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
-			err := vol.TearDown()
+			err := cleanerTuple.Cleaner.TearDown()
 			if err != nil {
 				glog.Errorf("Could not tear down volume %q: %v", name, err)
+			}
+
+			// volume is unmounted.  some volumes also require detachment from the node.
+			if cleanerTuple.Detacher != nil {
+				detacher := *cleanerTuple.Detacher
+				err = detacher.Detach()
+				if err != nil {
+					glog.Errorf("Could not detach volume %q: %v", name, err)
+				}
 			}
 		}
 	}

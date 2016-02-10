@@ -117,13 +117,24 @@ type Provisioner interface {
 	NewPersistentVolumeTemplate() (*api.PersistentVolume, error)
 }
 
-// Delete removes the resource from the underlying storage provider.  Calls to this method should block until
+// Deleter removes the resource from the underlying storage provider.  Calls to this method should block until
 // the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
 // A nil return indicates success.
 type Deleter interface {
 	Volume
 	// This method should block until completion.
 	Delete() error
+}
+
+// Attacher can attach a volume to a node.
+type Attacher interface {
+	Volume
+	Attach() error
+}
+
+// Detacher can detach a volume from a node.
+type Detacher interface {
+	Detach() error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
