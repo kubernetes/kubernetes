@@ -83,7 +83,7 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 func TestPlugin(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "azurefileTest")
 	if err != nil {
-		t.Fatalf("can't make a temp dir: %v")
+		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}

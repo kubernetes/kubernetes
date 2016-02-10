@@ -246,7 +246,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api
 	glog.V(5).Infof("PersistentVolume[%s] provisioning in progress", pv.Name)
 	err := provisionVolume(pv, controller)
 	if err != nil {
-		return fmt.Errorf("Error provisioning PersistentVolume[%s]: %v", err)
+		return fmt.Errorf("Error provisioning PersistentVolume[%s]: %v", pv.Name, err)
 	}
 
 	return nil
@@ -283,7 +283,7 @@ func provisionVolume(pv *api.PersistentVolume, controller *PersistentVolumeProvi
 		if pv, apiErr := controller.client.UpdatePersistentVolumeStatus(pv); apiErr != nil {
 			return fmt.Errorf("PersistentVolume[%s] failed provisioning and also failed status update: %v  -  %v", pv.Name, err, apiErr)
 		}
-		return fmt.Errorf("PersistentVolume[%s] failed provisioning : %v", pv.Name, err, err)
+		return fmt.Errorf("PersistentVolume[%s] failed provisioning: %v", pv.Name, err)
 	}
 
 	clone, err := conversion.NewCloner().DeepCopy(pv)
