@@ -75,7 +75,8 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
   (umask u=rw,go= ;
    echo "$KUBELET_TOKEN,kubelet,kubelet" > $known_tokens_file;
-   echo "$KUBE_PROXY_TOKEN,kube_proxy,kube_proxy" >> $known_tokens_file)
+   echo "$KUBE_PROXY_TOKEN,kube_proxy,kube_proxy" >> $known_tokens_file;
+   echo "$KUBE_BEARER_TOKEN,admin,admin" >> $known_tokens_file)
 
   mkdir -p /srv/salt-overlay/salt/kubelet
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
