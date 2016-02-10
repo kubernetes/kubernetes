@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -104,25 +103,25 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	// TODO: Reuse the constants for all these strings from testclient
 	pendingActionSet := sets.NewString(
 		strings.Join([]string{"get", "namespaces", ""}, "-"),
-		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
+		strings.Join([]string{"delete-collection", "replicationcontrollers", ""}, "-"),
 		strings.Join([]string{"list", "services", ""}, "-"),
 		strings.Join([]string{"list", "pods", ""}, "-"),
-		strings.Join([]string{"list", "resourcequotas", ""}, "-"),
-		strings.Join([]string{"list", "secrets", ""}, "-"),
-		strings.Join([]string{"list", "limitranges", ""}, "-"),
+		strings.Join([]string{"delete-collection", "resourcequotas", ""}, "-"),
+		strings.Join([]string{"delete-collection", "secrets", ""}, "-"),
+		strings.Join([]string{"delete-collection", "limitranges", ""}, "-"),
 		strings.Join([]string{"delete-collection", "events", ""}, "-"),
-		strings.Join([]string{"list", "serviceaccounts", ""}, "-"),
-		strings.Join([]string{"list", "persistentvolumeclaims", ""}, "-"),
+		strings.Join([]string{"delete-collection", "serviceaccounts", ""}, "-"),
+		strings.Join([]string{"delete-collection", "persistentvolumeclaims", ""}, "-"),
 		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
 	)
 
 	if containsVersion(versions, "extensions/v1beta1") {
 		pendingActionSet.Insert(
-			strings.Join([]string{"list", "daemonsets", ""}, "-"),
-			strings.Join([]string{"list", "deployments", ""}, "-"),
-			strings.Join([]string{"list", "jobs", ""}, "-"),
-			strings.Join([]string{"list", "horizontalpodautoscalers", ""}, "-"),
-			strings.Join([]string{"list", "ingresses", ""}, "-"),
+			strings.Join([]string{"delete-collection", "daemonsets", ""}, "-"),
+			strings.Join([]string{"delete-collection", "deployments", ""}, "-"),
+			strings.Join([]string{"delete-collection", "jobs", ""}, "-"),
+			strings.Join([]string{"delete-collection", "horizontalpodautoscalers", ""}, "-"),
+			strings.Join([]string{"delete-collection", "ingresses", ""}, "-"),
 			strings.Join([]string{"get", "resource", ""}, "-"),
 		)
 	}
@@ -223,27 +222,5 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	}
 	if len(mockClient.Actions()) != 0 {
 		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())
-	}
-}
-
-func TestRunStop(t *testing.T) {
-	mockClient := &fake.Clientset{}
-
-	nsController := NewNamespaceController(mockClient, &unversioned.APIVersions{}, 1*time.Second)
-
-	if nsController.StopEverything != nil {
-		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)
-	}
-
-	nsController.Run()
-
-	if nsController.StopEverything == nil {
-		t.Errorf("Running manager should have a stop channel.  Got nil")
-	}
-
-	nsController.Stop()
-
-	if nsController.StopEverything != nil {
-		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)
 	}
 }
