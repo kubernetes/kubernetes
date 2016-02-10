@@ -200,7 +200,7 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerD
 	expectedTimeout := int64(5)
 	expectedInterval := int64(10)
 
-	// We only a TCP health-check on the first port
+	// We only configure a TCP health-check on the first port
 	expectedTarget := ""
 	for _, listener := range listeners {
 		if listener.InstancePort == nil {
