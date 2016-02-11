@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # separated by comma, lists are separated by semicolon. e.g.,
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # TODO: It's going to be:
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1,batch/v1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1;v1,extensions/v1beta1,batch/v1"}
 
 # Give integration tests longer to run
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
