@@ -66,6 +66,9 @@ var _ = Describe("Deployment", func() {
 	It("[Flaky] deployment should support rollback when there's replica set with no revision", func() {
 		testRollbackDeploymentRSNoRevision(f)
 	})
+	It("deployment should label adopted RSs and pods", func() {
+		testDeploymentLabelAdopted(f)
+	})
 })
 
 func newRS(rsName string, replicas int, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
@@ -272,6 +275,17 @@ func testRollingUpdateDeployment(f *Framework) {
 
 	// Check if it's updated to revision 1 correctly
 	checkDeploymentRevision(c, ns, deploymentName, "1", "redis", "redis")
+
+	// There should be 1 old RS (nginx-controller, which is adopted)
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(allOldRSs)).Should(Equal(1))
+	// The old RS should contain pod-template-hash in its selector, label, and template label
+	Expect(len(allOldRSs[0].Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	Expect(len(allOldRSs[0].Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	Expect(len(allOldRSs[0].Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
 }
 
 func testRollingUpdateDeploymentEvents(f *Framework) {
@@ -796,4 +810,72 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 
 	// Check if it's still revision 3
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
+}
+
+func testDeploymentLabelAdopted(f *Framework) {
+	ns := f.Namespace.Name
+	// TODO: remove unversionedClient when the refactoring is done. Currently some
+	// functions like verifyPod still expects a unversioned#Client.
+	unversionedClient := f.Client
+	c := clientset.FromUnversionedClient(unversionedClient)
+	// Create nginx pods.
+	podName := "nginx"
+	podLabels := map[string]string{"name": podName}
+
+	rsName := "nginx-controller"
+	replicas := 3
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, podName))
+	Expect(err).NotTo(HaveOccurred())
+	// Verify that the required pods have come up.
+	err = verifyPods(unversionedClient, ns, podName, false, 3)
+	if err != nil {
+		Logf("error in waiting for pods to come up: %s", err)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Create a nginx deployment to adopt the old rs.
+	deploymentName := "nginx-deployment"
+	Logf("Creating deployment %s", deploymentName)
+	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, podName, podName, extensions.RollingUpdateDeploymentStrategyType, nil))
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
+		Logf("deleting deployment %s", deploymentName)
+		Expect(c.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete replica sets with deployment
+		newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.Extensions().ReplicaSets(ns).Delete(newRS.Name, nil)).NotTo(HaveOccurred())
+	}()
+
+	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Check if it's updated to revision 1 correctly
+	checkDeploymentRevision(c, ns, deploymentName, "1", "nginx", "nginx")
+
+	// There should be no old RSs (overlapping RS)
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+	oldRSs, allOldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(oldRSs)).Should(Equal(0))
+	Expect(len(allOldRSs)).Should(Equal(0))
+	// New RS should contain pod-template-hash in its selector, label, and template label
+	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	Expect(len(newRS.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	Expect(len(newRS.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	Expect(err).NotTo(HaveOccurred())
+	options := api.ListOptions{LabelSelector: selector}
+	pods, err := c.Core().Pods(ns).List(options)
+	Expect(err).NotTo(HaveOccurred())
+	for _, pod := range pods.Items {
+		Expect(len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	}
+	Expect(len(pods.Items)).Should(Equal(replicas))
 }

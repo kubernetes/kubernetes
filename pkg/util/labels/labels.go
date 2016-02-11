@@ -55,7 +55,7 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 }
 
 // AddLabel returns a map with the given key and value added to the given map.
-func AddLabel(labels map[string]string, labelKey string, labelValue uint32) map[string]string {
+func AddLabel(labels map[string]string, labelKey string, labelValue string) map[string]string {
 	if labelKey == "" {
 		// Dont need to add a label.
 		return labels
@@ -63,7 +63,7 @@ func AddLabel(labels map[string]string, labelKey string, labelValue uint32) map[
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	labels[labelKey] = fmt.Sprintf("%d", labelValue)
+	labels[labelKey] = labelValue
 	return labels
 }
 
@@ -108,7 +108,7 @@ func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey stri
 }
 
 // AddLabelToSelector returns a selector with the given key and value added to the given selector's MatchLabels.
-func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
+func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, labelValue string) *unversioned.LabelSelector {
 	if labelKey == "" {
 		// Dont need to add a label.
 		return selector
@@ -116,7 +116,7 @@ func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, la
 	if selector.MatchLabels == nil {
 		selector.MatchLabels = make(map[string]string)
 	}
-	selector.MatchLabels[labelKey] = fmt.Sprintf("%d", labelValue)
+	selector.MatchLabels[labelKey] = labelValue
 	return selector
 }
 
