@@ -74,6 +74,7 @@ readonly KUBE_CLIENT_PLATFORMS=(
 
 # The set of test targets that we are building for all platforms
 kube::golang::test_targets() {
+  # targets array: Note that for tests we append .test to signify different compilation strategy
   local targets=(
     cmd/integration
     cmd/gendocs

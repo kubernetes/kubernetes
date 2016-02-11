@@ -56,6 +56,12 @@ The output for the end-2-end tests will be a single binary called `e2e.test` und
 
 `$ ./e2e.test --help`
 
+Implementation detail for test developers:  These tests are compiled using `go test -c`, and like any golang test, they end with an _test suffix.
+
+The build machinery of kuberentes declares the test target and `go test -c` is used to compile a binary from that test target's directory, and this binary is included as a kubernetes build artifact.  To learn more about this, read about the go test command.
+
+To see precisely how the e2e tests are compiled and built, see [the build script] (https://github.com/kubernetes/kubernetes/blob/master/hack/build-go.sh).
+
 ### Running the Tests
 
 For the purposes of brevity, we will look at a subset of the options, which are listed below:
