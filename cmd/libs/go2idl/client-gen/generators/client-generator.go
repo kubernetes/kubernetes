@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -38,6 +39,11 @@ type ClientGenArgs struct {
 	// unversioned package, which is part of our API. Tools like client-gen
 	// shouldn't depend on an API.
 	GroupVersions []unversioned.GroupVersion
+
+	// GroupVersionToInputPath is a map between GroupVersion and the path to
+	// the respective types.go. We still need GroupVersions in the struct because
+	// we need an order.
+	GroupVersionToInputPath map[unversioned.GroupVersion]string
 	// ClientsetName is the name of the clientset to be generated. It's
 	// populated from command-line arguments.
 	ClientsetName string
@@ -73,10 +79,10 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func packageForGroup(group string, version string, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte) generator.Package {
-	outputPackagePath := filepath.Join(packageBasePath, group, version)
+func packageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte) generator.Package {
+	outputPackagePath := filepath.Join(packageBasePath, gv.Group, gv.Version)
 	return &generator.DefaultPackage{
-		PackageName: version,
+		PackageName: gv.Version,
 		PackagePath: outputPackagePath,
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
@@ -97,7 +103,7 @@ func packageForGroup(group string, version string, typeList []*types.Type, packa
 						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
-					group:         group,
+					group:         gv.Group,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
@@ -105,10 +111,10 @@ func packageForGroup(group string, version string, typeList []*types.Type, packa
 
 			generators = append(generators, &genGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: group + "_client",
+					OptionalName: gv.Group + "_client",
 				},
 				outputPackage: outputPackagePath,
-				group:         group,
+				group:         gv.Group,
 				types:         typeList,
 				imports:       generator.NewImportTracker(),
 			})
@@ -166,28 +172,23 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		glog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	groupToTypes := map[string][]*types.Type{}
-	for _, inputDir := range arguments.InputDirs {
+	customArgs, ok := arguments.CustomArgs.(ClientGenArgs)
+	if !ok {
+		glog.Fatalf("cannot convert arguments.CustomArgs to ClientGenArgs")
+	}
+
+	gvToTypes := map[unversioned.GroupVersion][]*types.Type{}
+	for gv, inputDir := range customArgs.GroupVersionToInputPath {
 		p := context.Universe.Package(inputDir)
 		for _, t := range p.Types {
 			if types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] != "true" {
 				continue
 			}
-			group := filepath.Base(t.Name.Package)
-			// Special case for the core API.
-			if group == "api" {
-				group = "core"
+			if _, found := gvToTypes[gv]; !found {
+				gvToTypes[gv] = []*types.Type{}
 			}
-			if _, found := groupToTypes[group]; !found {
-				groupToTypes[group] = []*types.Type{}
-			}
-			groupToTypes[group] = append(groupToTypes[group], t)
+			gvToTypes[gv] = append(gvToTypes[gv], t)
 		}
-	}
-
-	customArgs, ok := arguments.CustomArgs.(ClientGenArgs)
-	if !ok {
-		glog.Fatalf("cannot convert arguments.CustomArgs to ClientGenArgs")
 	}
 
 	var packageList []generator.Package
@@ -203,10 +204,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	orderer := namer.Orderer{namer.NewPrivateNamer(0)}
-	for group, types := range groupToTypes {
-		packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+	for _, gv := range customArgs.GroupVersions {
+		types := gvToTypes[gv]
+		packageList = append(packageList, packageForGroup(normalization.GroupVersion(gv), orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
 		if customArgs.FakeClient {
-			packageList = append(packageList, fake.PackageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+			packageList = append(packageList, fake.PackageForGroup(normalization.GroupVersion(gv), orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
 		}
 	}
 

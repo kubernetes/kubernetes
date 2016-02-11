@@ -14,24 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package normalization
+package v1
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+type ComponentStatusExpansion interface{}
 
-func Group(group string) string {
-	if group == "api" {
-		return "core"
-	}
-	return group
-}
+type EndpointsExpansion interface{}
 
-func Version(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
-}
+type LimitRangeExpansion interface{}
 
-func GroupVersion(gv unversioned.GroupVersion) unversioned.GroupVersion {
-	return unversioned.GroupVersion{Group(gv.Group), Version(gv.Version)}
-}
+type NodeExpansion interface{}
+
+type PersistentVolumeExpansion interface{}
+
+type PersistentVolumeClaimExpansion interface{}
+
+type PodTemplateExpansion interface{}
+
+type ReplicationControllerExpansion interface{}
+
+type ResourceQuotaExpansion interface{}
+
+type SecretExpansion interface{}
+
+type ServiceAccountExpansion interface{}
+
+type ConfigMapExpansion interface{}
