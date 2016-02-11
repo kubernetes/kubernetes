@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+# A single script that lists all of the [Feature:.+] tests in our e2e suite.
+set -o errexit
+set -o nounset
+set -o pipefail
 
-TAG = 1
-
-container:
-	docker build -t gcr.io/google_containers/kubekins-job-builder:$(TAG) .
-
-push: container
-	gcloud docker push gcr.io/google_containers/kubekins-job-builder:$(TAG)
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+grep "\[Feature:(.+?)\]" "${KUBE_ROOT}"/test/e2e/*.go -Poh | sort | uniq

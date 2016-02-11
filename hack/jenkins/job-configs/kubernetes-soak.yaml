@@ -4,7 +4,12 @@
     logrotate:
         daysToKeep: 14
     builders:
-        - shell: curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+        - shell: |
+            {env}
+            export E2E_DOWN="false"
+            export E2E_TEST="false"
+            export E2E_UP="true"
+            curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -30,7 +35,19 @@
     logrotate:
         daysToKeep: 7
     builders:
-        - shell: curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+        - shell: |
+            {env}
+            export E2E_DOWN="false"
+            export E2E_UP="false"
+            # Clear out any orphaned namespaces in case previous run was interrupted.
+            export E2E_CLEAN_START="true"
+            # TODO(ihmccreery) We should be able to check version skew here
+            export E2E_OPT="--check_version_skew=false"
+            # We should be testing the reliability of a long-running cluster. The
+            # [Disruptive] tests kill/restart components or nodes in the cluster,
+            # defeating the purpose of a soak cluster. (#15722)
+            export GINKGO_TEST_ARGS="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+            curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -70,10 +87,21 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'master'
+            env: |
+                export E2E_CLUSTER_NAME="gce-soak-weekly"
+                export E2E_NETWORK="gce-soak-weekly"
+                export KUBE_GCE_INSTANCE_PREFIX="gce-soak-weekly"
+                export HAIRPIN_MODE="false"
+                export PROJECT="kubernetes-jenkins"
         - 'gce-2':
             deploy-description: Clone of kubernetes-soak-weekly-deploy-gce.
             e2e-description: Clone of kubernetes-soak-continuous-e2e-gce.
             branch: 'master'
+            env: |
+                export E2E_CLUSTER_NAME="gce-soak-weekly-2"
+                export E2E_NETWORK="gce-soak-weekly-2"
+                export KUBE_GCE_INSTANCE_PREFIX="gce-soak-weekly-2"
+                export PROJECT="kubernetes-jenkins"
         - 'gce-1.1':
             deploy-description: |
                 Deploy Kubernetes to soak cluster using the latest successful
@@ -88,6 +116,8 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'release-1.1'
+            env: |
+                # Environment provided in e2e.sh before v1.2
         - 'gke':
             deploy-description: |
                 Deploy Kubernetes to a GKE soak cluster using the staging GKE
@@ -108,6 +138,14 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'master'
+            env: |
+                export E2E_CLUSTER_NAME="jenkins-gke-soak-weekly"
+                export E2E_NETWORK="gke-soak-weekly"
+                export PROJECT="kubernetes-jenkins"
+                export E2E_SET_CLUSTER_API_VERSION=y
+                export JENKINS_PUBLISHED_VERSION="ci/latest"
+                # Need at least n1-standard-2 nodes to run kubelet_perf tests
+                export NODE_SIZE="n1-standard-2"
     jobs:
         - 'kubernetes-soak-weekly-deploy-{suffix}'
         - 'kubernetes-soak-continuous-e2e-{suffix}'
