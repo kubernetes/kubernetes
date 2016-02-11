@@ -325,6 +325,7 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 		return err
 	}
 	secret.Data[api.ServiceAccountTokenKey] = []byte(token)
+	secret.Data[api.ServiceAccountNamespaceKey] = []byte(serviceAccount.Namespace)
 	if e.rootCA != nil && len(e.rootCA) > 0 {
 		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
 	}
@@ -364,16 +365,22 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 	caData := secret.Data[api.ServiceAccountRootCAKey]
 	needsCA := len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
 
+	needsNamespace := len(secret.Data[api.ServiceAccountNamespaceKey]) == 0
+
 	tokenData := secret.Data[api.ServiceAccountTokenKey]
 	needsToken := len(tokenData) == 0
 
-	if !needsCA && !needsToken {
+	if !needsCA && !needsToken && !needsNamespace {
 		return nil
 	}
 
 	// Set the CA
 	if needsCA {
 		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
+	}
+	// Set the namespace
+	if needsNamespace {
+		secret.Data[api.ServiceAccountNamespaceKey] = []byte(secret.Namespace)
 	}
 
 	// Generate the token
