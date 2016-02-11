@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -474,6 +475,17 @@ func NewMainKubelet(
 	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
+
+	// For development only.  Delete before sending PR.  Do not merge.
+	go util.Until(func() {
+		a := klet.getKubeletMetrics()
+		j, err := json.Marshal(a)
+
+		var pretty bytes.Buffer
+		json.Indent(&pretty, j, "", "\t")
+		glog.Infof("pwittroc Volume Accounting: %s %v", string(pretty.Bytes()), err)
+	}, 10*time.Second, util.NeverStop)
+
 	return klet, nil
 }
 
@@ -2004,6 +2016,113 @@ func (kl *Kubelet) podIsTerminated(pod *api.Pod) bool {
 	}
 
 	return false
+}
+
+// KubeletMetrics represents metrics calculated for the Kubelet.
+type KubeletMetrics struct {
+	// Pods represent the metrics for each Pod hosted on this Node
+	Pods []*PodMetrics `json:"pods,omitempty"`
+}
+
+// PodMetrics represents metrics calculated for the Pod.
+type PodMetrics struct {
+	// Uid represents the Uid of the Pod
+	Uid types.UID `json:"uid,omitempty"`
+
+	// Name represents the name of the Pod
+	Name string `json:"name,omitempty"`
+
+	// Volumes represent the metrics for each Volume owned by the Pod
+	Volumes []*VolumeMetrics `json:"volumes,omitempty"`
+}
+
+// VolumeMetrics represents metrics calculated for a Volume
+type VolumeMetrics struct {
+	// Path represents the Volume Path (see volume.Volume.GetPath for details)
+	Path string `json:"path,omitempty"`
+
+	// Used represents the total bytes used by the Volume.  (see volume.Metrics.Used for details)
+	Used *resource.Quantity `json:"used,omitempty"`
+
+	// Capacity represents the total capacity (bytes) of the volume's underlying storage.
+	// (see volume.Metrics.Capacity for details)
+	Capacity *resource.Quantity `json:"capacity,omitempty"`
+
+	// Available represents the storage space available (bytes) for the Volume.
+	// (see volume.Metrics.Available for details)
+	Available *resource.Quantity `json:"available,omitempty"`
+}
+
+const accountingWorkerPoolSize = 4
+
+// getKubeletMetrics calculates and returns the KubeletMetrics
+func (kl *Kubelet) getKubeletMetrics() *KubeletMetrics {
+	// Create a worker pool to process the pods in parallel
+	// RFC(pwittrock): Can we abstract away the worker pool details and keep typesafety somehow?
+	wpInput := make(chan *api.Pod, 10)              // Inputs for workerpool
+	wpOutput := make(chan *PodMetrics, 10)          // Outputs from workerpool
+	for i := 0; i < accountingWorkerPoolSize; i++ { // Start a go routine for each worker
+		// Workers read the pods from inputs and write accounting to results
+		go kl.volumeStatWorker(wpInput, wpOutput)
+	}
+	pods := kl.podManager.GetPods()
+	pcnt := len(pods)
+	go func() {
+		// Write all of the pods to the worker input channel
+		for _, p := range pods {
+			wpInput <- p
+		}
+		close(wpInput)
+	}()
+
+	// Initialize the result, expect pcnt results
+	ta := &KubeletMetrics{
+		Pods: make([]*PodMetrics, 0, pcnt),
+	}
+
+	// Read the results from the workers, expect pcnt results
+	for i := 0; i < pcnt; i++ {
+		r := <-wpOutput
+		ta.Pods = append(ta.Pods, r)
+	}
+	close(wpOutput)
+	return ta
+}
+
+// volumeStatWorker reads each Pod from in, calculates the metrics, and writes thes results to out
+func (kl *Kubelet) volumeStatWorker(in <-chan *api.Pod, out chan<- *PodMetrics) {
+	// For each Pod, calculate the PodMetrics and write the result to the output channel
+	for p := range in {
+		out <- kl.getPodMetrics(p)
+	}
+}
+
+// getPodMetrics calculates PodMetrics for the Pod.  VolumeMetrics are calculated for each Volume owned
+// by the Pod.
+func (kl *Kubelet) getPodMetrics(p *api.Pod) *PodMetrics {
+	pa := &PodMetrics{
+		Volumes: []*VolumeMetrics{},
+		Name:    p.Name,
+		Uid:     p.UID,
+	}
+	volMap, found := kl.volumeManager.GetVolumes(p.UID)
+	if found {
+		for _, vol := range volMap {
+			b := vol.Builder
+			a, err := b.GetMetrics()
+			if err != nil {
+				glog.Errorf("Could not get volume metrics. Pod Name %v Volume %s Error %v", p.Name, b.GetPath(), err)
+			}
+			vm := &VolumeMetrics{
+				Path:      vol.Builder.GetPath(),
+				Used:      a.Used,
+				Capacity:  a.Capacity,
+				Available: a.Available,
+			}
+			pa.Volumes = append(pa.Volumes, vm)
+		}
+	}
+	return pa
 }
 
 func (kl *Kubelet) filterOutTerminatedPods(pods []*api.Pod) []*api.Pod {
