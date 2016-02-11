@@ -30,7 +30,7 @@ func (self *ResourceList) Cpu() *resource.Quantity {
 	if val, ok := (*self)[ResourceCPU]; ok {
 		return &val
 	}
-	return &resource.Quantity{}
+	return &resource.Quantity{Format: resource.DecimalSI}
 }
 
 // Returns the Memory limit if specified.
@@ -38,7 +38,7 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	if val, ok := (*self)[ResourceMemory]; ok {
 		return &val
 	}
-	return &resource.Quantity{}
+	return &resource.Quantity{Format: resource.BinarySI}
 }
 
 func (self *ResourceList) Pods() *resource.Quantity {
