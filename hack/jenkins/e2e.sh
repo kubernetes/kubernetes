@@ -412,6 +412,17 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
+  # Runs only the elasticsearch logging tests on GCE.
+  kubernetes-e2e-gce-es-logging)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-es-logging"}
+    : ${E2E_NETWORK:="e2e-es-logging"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Elasticsearch\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-es-logging"}
+    : ${PROJECT:="kubernetes-es-logging"}
+    # Enable elasticsearch logging addon
+    KUBE_LOGGING_DESTINATION="elasticsearch"
+    ;;
+
   # Runs only the autoscaling tests on GCE.
   kubernetes-e2e-gce-autoscaling)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-autoscaling"}
