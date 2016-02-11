@@ -95,13 +95,51 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	By("Reporting overall resource usage")
 	logPodsOnNodes(framework.Client, nodeNames.List())
 	rm.LogLatest()
+	usageSummary, err := rm.GetLatest()
+	Expect(err).NotTo(HaveOccurred())
+	Logf("%s", rm.FormatResourceUsage(usageSummary))
+	// TODO(yujuhong): Set realistic values after gathering enough data.
+	verifyMemoryLimits(resourceUsagePerContainer{
+		"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
+		"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
+	}, usageSummary)
 
-	summary := rm.GetCPUSummary()
-	Logf("%s", rm.FormatCPUSummary(summary))
-	verifyCPULimits(expected, summary)
+	cpuSummary := rm.GetCPUSummary()
+	Logf("%s", rm.FormatCPUSummary(cpuSummary))
+	verifyCPULimits(expected, cpuSummary)
 
 	By("Deleting the RC")
 	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
+}
+
+func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsagePerNode) {
+	if expected == nil {
+		return
+	}
+	var errList []string
+	for nodeName, nodeSummary := range actual {
+		var nodeErrs []string
+		for cName, expectedResult := range expected {
+			container, ok := nodeSummary[cName]
+			if !ok {
+				nodeErrs = append(nodeErrs, fmt.Sprintf("container %q: missing", cName))
+				continue
+			}
+
+			expectedValue := expectedResult.MemoryRSSInBytes
+			actualValue := container.MemoryRSSInBytes
+			if expectedValue != 0 && actualValue > expectedValue {
+				nodeErrs = append(nodeErrs, fmt.Sprintf("container %q: expected RSS memory (MB) < %d; got %d",
+					cName, expectedValue, actualValue))
+			}
+		}
+		if len(nodeErrs) > 0 {
+			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
+		}
+	}
+	if len(errList) > 0 {
+		Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+	}
 }
 
 func verifyCPULimits(expected containersCPUSummary, actual nodesCPUSummary) {
