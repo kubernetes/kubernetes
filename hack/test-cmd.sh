@@ -146,6 +146,7 @@ kube::log::status "Running kubectl with no options"
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really-crash-for-testing=true \
+  --lock-file="$(mktemp /tmp/kubelet.XXXX.lock)" \
   --root-dir=/tmp/kubelet.$$ \
   --cert-dir="${TMPDIR:-/tmp/}" \
   --docker-endpoint="fake://" \
