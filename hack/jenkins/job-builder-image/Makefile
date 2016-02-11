@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+all: push
+
 TAG = 1
 
-all:
+container:
 	docker build -t gcr.io/google_containers/kubekins-job-builder:$(TAG) .
+
+push: container
 	gcloud docker push gcr.io/google_containers/kubekins-job-builder:$(TAG)
