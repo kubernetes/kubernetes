@@ -312,6 +312,9 @@ function kube-up() {
   # downloading tarball release
   "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
 
+  # Fetch the hacked easyrsa that make-ca-cert.sh will use
+  curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+
   setClusterInfo
   local ii=0
 
@@ -357,6 +360,7 @@ function provision-master() {
   # copy the binaries and scripts to the ~/kube directory on the master
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
+    easy-rsa.tar.gz \
     ubuntu/reconfDocker.sh \
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
@@ -404,7 +408,7 @@ function provision-master() {
       cp ~/kube/init_scripts/* /etc/init.d/
 
       groupadd -f -r kube-cert
-      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
@@ -478,6 +482,7 @@ function provision-masterandnode() {
   # scp order matters
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
+    easy-rsa.tar.gz \
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/minion/* \
@@ -536,7 +541,7 @@ function provision-masterandnode() {
       cp ~/kube/init_scripts/* /etc/init.d/
 
       groupadd -f -r kube-cert
-      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       cp ~/kube/minion/* /opt/bin/
