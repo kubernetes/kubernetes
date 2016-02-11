@@ -38,6 +38,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
+	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -767,13 +768,11 @@ func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*extensions.Repl
 		return true, err
 	}
 	// Check if we can scale up.
-	maxSurge, isPercent, err := intstrutil.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxSurge)
+	maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Replicas)
 	if err != nil {
-		return false, fmt.Errorf("invalid value for MaxSurge: %v", err)
+		return false, err
 	}
-	if isPercent {
-		maxSurge = intstrutil.GetValueFromPercent(maxSurge, deployment.Spec.Replicas)
-	}
+
 	// Find the total number of pods
 	currentPodCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	maxTotalPods := deployment.Spec.Replicas + maxSurge
@@ -815,12 +814,9 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*extensions.Rep
 		return false, fmt.Errorf("could not find available pods: %v", err)
 	}
 
-	maxUnavailable, isPercent, err := intstrutil.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable)
+	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
 	if err != nil {
-		return false, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
-	}
-	if isPercent {
-		maxUnavailable = intstrutil.GetValueFromPercent(maxUnavailable, deployment.Spec.Replicas)
+		return false, err
 	}
 
 	// Check if we can scale down. We can scale down in the following 2 cases:
@@ -919,13 +915,11 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*extensions.Re
 // scaleDownOldReplicaSetsForRollingUpdate scales down old replica sets when deployment strategy is "RollingUpdate".
 // Need check maxUnavailable to ensure availability
 func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs []*extensions.ReplicaSet, oldRSs []*extensions.ReplicaSet, deployment extensions.Deployment) (int, error) {
-	maxUnavailable, isPercent, err := intstrutil.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable)
+	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
 	if err != nil {
-		return 0, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
+		return 0, err
 	}
-	if isPercent {
-		maxUnavailable = intstrutil.GetValueFromPercent(maxUnavailable, deployment.Spec.Replicas)
-	}
+
 	// Check if we can scale down.
 	minAvailable := deployment.Spec.Replicas - maxUnavailable
 	minReadySeconds := deployment.Spec.MinReadySeconds
