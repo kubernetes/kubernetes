@@ -979,7 +979,7 @@ __EOF__
   # kubectl delete rs --all "${kube_flags[@]}"
 
   ### Expose a deployment as a service
-  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '3'
   # Command
@@ -1098,7 +1098,7 @@ __EOF__
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   # autoscale 2~3 pods, default CPU utilization (80%)
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
@@ -1113,7 +1113,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   # Create a deployment (revision 1)
-  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
   # Rollback to revision 1 - should be no-op
