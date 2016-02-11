@@ -102,15 +102,19 @@
   {% set experimental_flannel_overlay = "--experimental-flannel-overlay=true" %}
 {% endif -%}
 
-# Run containers under the root cgroup and create a system container.
-{% set system_container = "" -%}
+# Setup cgroups hierarchies.
 {% set cgroup_root = "" -%}
-{% if grains['os_family'] == 'Debian' -%}
-  {% set system_container = "--system-container=/system" -%}
+{% set system_container = "" -%}
+{% set kubelet_container = "" -%}
+{% set runtime_container = "" -%}
+{% if grains['os_family'] == 'Debian' -%}  
   {% if pillar.get('is_systemd') %}
     {% set cgroup_root = "--cgroup-root=docker" -%}
   {% else %}
     {% set cgroup_root = "--cgroup-root=/" -%}
+    {% set system_container = "--system-cgroups=/system" -%}    
+    {% set runtime_container = "--runtime-cgroups=/docker-daemon" -%}
+    {% set  kubelet_container= "--kubelet-cgroups=/kubelet" -%}
   {% endif %}
 {% endif -%}
 {% if grains['oscodename'] == 'vivid' -%}
