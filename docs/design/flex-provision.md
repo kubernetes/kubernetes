@@ -16,6 +16,7 @@ Storage provisioning is often a filesystem and site specific behavior.  Its impo
 * **User** - End user of Kubernetes.  Submits applications to running framework.
 * **PV** - Persistent Volume
 * **PVC** - Persistent Volume Claim
+* **DPF** - Dynamic Provisioning Framework
 * **Storage Control Plane** - Storage Administrator operation interface for create/delete/modify type functions of the storage subsystem external from Kubernetes. Example: Browser interface to SAN fabric configuration.
 
 
@@ -45,7 +46,11 @@ Storage provisioning is often a filesystem and site specific behavior.  Its impo
 
 
 # Design
-This design covers all of the use cases above and runs on the established dynamic provisioning framework.
+The proposed design alters the Dynamic Provisioning Frameworks API to allow asynchronous volume provisioning and faciliate generic volume creation by provisioners.  
+
+The current flow requires a provisioner plugin to provide a volume template which the DPF uses to create and pre-bind the volume to claim before explicitly creating the phsyical storage asset.  The DPF waits for the provisioner to complete and return the real PV before updating the previously created&bound PV with the new PV properties.
+
+In the proposed new flow the DPF would pass a unique ID to the provisioner plugin. This unique ID is either an existing (CLAIMREF?) PVC field or add a new PVC field for UUID.   The provisioner plugin then creates the physical storage asset and a new PV with an ANNOTATION of CLAIM_UUID as passed in by the DPF.  The claim binding controller watch will trigger and bind the original claim to the newly created PV based on the CLAIMREF annotation.  A new PROVISION_TS field is required on the PVC object to indicate the last provisioning attempt for cluster restart/recovery.
 
 ## Creation of Provisioner
 The Storage Administrator is responsible for creating a provisioning container.  The details and contents of the provisioning container aren't important only that it creates a new Persistent Volume before exit.  This requires *kubectl* on the provisioner and a service account token passed into the container.  
@@ -136,8 +141,15 @@ data:
 
 **Kubernetes User** - Same workflow as standard provisioner.
 
+# Technical Motivation of DPF design change
+* The proposed design is asynchronous
+* No orphaned PV objects
+* Delegation of recovery to provisioner.  For out-of-tree provisioners this allows greater flexability.
+* No need to re-write volume template in the Provision() call which requires specific volume object Types. The current limitation restricts provisioners to volumes of their plugin type.  So no out of tree NFS provisioning.
+
 
 # Design Alternatives
 **Alternative 1**: Use a binary/shell script on the master instead of a POD.  This violates Use Case  9 and possibly Use Case 5.  It also complicates the passing of properties from kubernets API to provisioners.
+
 
 
