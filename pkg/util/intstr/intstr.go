@@ -19,7 +19,9 @@ package intstr
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 
 	"github.com/google/gofuzz"
 )
@@ -112,4 +114,23 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 		intstr.IntVal = 0
 		c.Fuzz(&intstr.StrVal)
 	}
+}
+
+func GetIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
+	switch intOrStr.Type {
+	case Int:
+		return intOrStr.IntValue(), false, nil
+	case String:
+		s := strings.Replace(intOrStr.StrVal, "%", "", -1)
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
+		}
+		return int(v), true, nil
+	}
+	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
+}
+
+func GetValueFromPercent(percent int, value int) int {
+	return int(math.Ceil(float64(percent) * (float64(value)) / 100))
 }
