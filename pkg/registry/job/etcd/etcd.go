@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/job"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+
+	"github.com/golang/glog"
 )
 
 // REST implements a RESTStorage for jobs against etcd
@@ -40,7 +42,26 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &extensions.JobList{} }
 	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Jobs), &extensions.Job{}, prefix, job.Strategy, newListFunc)
+		s, cachesize.GetWatchCacheSizeByResource(cachesize.Jobs),
+		&extensions.Job{}, prefix, job.Strategy, newListFunc,
+	)
+
+	{
+		// Test the storage interface.
+		external, err := runtime.Encode(storageInterface.Codec(), &extensions.Job{})
+		if err != nil {
+			panic(err)
+		}
+		_, err = runtime.Decode(storageInterface.Codec(), []byte(`{"kind":"Job","apiVersion":"batch/v1"}`))
+		if err != nil {
+			panic(err)
+		}
+		_, err = runtime.Decode(storageInterface.Codec(), []byte(`{"kind":"Job","apiVersion":"extensions/v1"}`))
+		if err != nil {
+			panic(err)
+		}
+		glog.Infof("Job version looks like: %s", external)
+	}
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Job{} },
