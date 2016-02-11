@@ -38,7 +38,7 @@ func getLoadBalancerControllers(repoRoot string, client *client.Client) []LBCTes
 	return []LBCTester{
 		&haproxyControllerTester{
 			name:   "haproxy",
-			cfg:    filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "haproxyrc.yaml"),
+			cfg:    filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "serviceloadbalancer", "haproxyrc.yaml"),
 			client: client,
 		},
 	}
@@ -49,8 +49,8 @@ func getIngManagers(repoRoot string, client *client.Client) []*ingManager {
 	return []*ingManager{
 		{
 			name:        "netexec",
-			rcCfgPaths:  []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "netexecrc.yaml")},
-			svcCfgPaths: []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "netexecsvc.yaml")},
+			rcCfgPaths:  []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "serviceloadbalancer", "netexecrc.yaml")},
+			svcCfgPaths: []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "serviceloadbalancer", "netexecsvc.yaml")},
 			svcNames:    []string{},
 			client:      client,
 		},
