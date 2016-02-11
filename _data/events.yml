@@ -13,12 +13,33 @@
     speaker: ""
     url: "https://kubecon.io/" 
 -
-    date: 2016-02-17 00:18:30 -0800
+    date: 2016-02-22 18:30:00 +0100
+    title: "Kubernetes München Meetup"
+    location: "München, Germany"
+    venue: "ConSol Consulting & Solutions Software GmbH"
+    speaker: "Marcin Wielgus"
+    url: "http://www.meetup.com/Munchen-Kubernetes-Meetup/events/228613006/"
+-
+    date: 2016-02-17 18:30:00 +0100
+    title: "Kubernetes Hamburg Meetup"
+    location: "Hamburg, Germany"
+    venue: "Jimdo"
+    speaker: "Piotr Szczesniak"
+    url: "http://www.meetup.com/Hamburg-Kubernetes-Meetup/events/228478189/"
+-
+    date: 2016-02-17 18:30:00 -0800
     title: "Kubernetes San Francisco Meetup"
     location: "San Francisco, California"
     venue: "Engineyard/Deis"
     speaker: "Aaron Levy, Craig Peters and Bhasker Nallapothula"
     url: "http://www.meetup.com/San-Francisco-Kubernetes-Meetup/events/228419934/"
+-
+    date: 2016-02-16 18:30:00 -0500
+    title: "Microservices NYC Meetup"
+    location: "New York City, New York"
+    venue: "ThoughtWorks"
+    speaker: "Gabriel Monroy"
+    url: "http://www.meetup.com/Microservices-NYC/events/228531766/"
 -
     date: 2016-02-16 00:00:00 -0800
     title: "Container World 16"
@@ -27,21 +48,21 @@
     speaker: "Craig McLuckie"
     url: "http://containerevent.com/"
 -
-    date: 2016-02-11 00:18:30 -0800
+    date: 2016-02-11 18:30:00 -0800
     title: "Kubernetes Bay Area Meetup"
     location: "Santa Clara, Washington"
     venue: "Ooyala"
     speaker: "Tim Hockin, Chris Marino, Mike Danese and Xiang Li"
     url: "http://www.meetup.com/Bay-Area-Kubernetes-Meetup/events/228213245/"
 -
-    date: 2016-02-04 00:19:30 -0500
+    date: 2016-02-04 19:30:00 -0500
     title: "DC Linux Users Group Meetup"
     location: "Washington DC"
     venue: "Google Washington DC"
     speaker: ""
     url: "http://www.meetup.com/DC-Linux-Users-Group/events/228060751/"
 -
-    date: 2016-02-02 00:18:30 -0800
+    date: 2016-02-02 18:30:00 -0800
     title: "Kubernetes Seattle Meetup"
     location: "Seattle, Washington"
     venue: "Google Seattle"
