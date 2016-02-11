@@ -32,33 +32,91 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# End-2-End Testing in Kubernetes
+# End-to-End Testing in Kubernetes
 
 ## Overview
 
-The end-2-end tests for kubernetes provide a mechanism to test behavior of the system, and to ensure end user operations match developer specifications.  In distributed systems it is not uncommon that a minor change may pass all unit tests, but cause unforseen changes at the system level.  Thus, the primary objectives of the end-2-end tests are to ensure a consistent and reliable behavior of the kubernetes code base, and to catch bugs early.
+End-to-end (e2e) tests for Kubernetes provide a mechanism to test end-to-end behavior of the system, and is the last signal to ensure end user operations match developer specifications.  Although unit and integration tests should ideally provide a good signal, the reality is in a distributed system like Kubernetes it is not uncommon that a minor change may pass all unit and integration tests, but cause unforseen changes at the system level.  e2e testing is very costly, both in time to run tests and difficulty debugging, though: it takes a long time to build, deploy, and exercise a cluster.  Thus, the primary objectives of the e2e tests are to ensure a consistent and reliable behavior of the kubernetes code base, and to catch hard-to-test bugs before users do, when unit and integration tests are insufficient.
 
-The end-2-end tests in kubernetes are built atop of [ginkgo] (http://onsi.github.io/ginkgo/) and [gomega] (http://onsi.github.io/gomega/).  There are a host of features that this BDD testing framework provides, and it is recommended that the developer read the documentation prior to diving into the tests.
+The e2e tests in kubernetes are built atop of [Ginkgo](http://onsi.github.io/ginkgo/) and [Gomega](http://onsi.github.io/gomega/).  There are a host of features that this BDD testing framework provides, and it is recommended that the developer read the documentation prior to diving into the tests.
 
-The purpose of *this* document is to serve as a primer for developers who are looking to execute, or add tests, using a local development environment.
+The purpose of *this* document is to serve as a primer for developers who are looking to execute or add tests using a local development environment.
 
 ## Building and Running the Tests
 
-**NOTE:** The tests have an array of options.  For simplicity, the examples will focus on leveraging the tests on a local cluster using `sudo ./hack/local-up-cluster.sh`
+There are a variety of ways to run e2e tests, but we aim to decrease the number of ways to run e2e tests to a canonical way: `hack/e2e.go`.
 
-### Building the Tests
+You can run an end-to-end test which will bring up a master and nodes, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `KUBERNETES_PROVIDER` environment variable to something other than "gce").
 
-The tests are built into a single binary which can be run against any deployed kubernetes system.  To build the tests, navigate to your source directory and execute:
+To build Kubernetes, up a cluster, run tests, and tear everything down, use:
 
-`$ make all`
+```sh
+go run hack/e2e.go -v --build --up --test --down
+```
 
-The output for the end-2-end tests will be a single binary called `e2e.test` under the default output directory, which is typically `_output/local/bin/linux/amd64/`.  Within the repository there are scripts that are provided under the `./hack` directory that are helpful for automation, but may not apply for a local development purposes.  Instead, we recommend familiarizing yourself with the executable options.  To obtain the full list of options, run the following:
+If you'd like to just perform one of these steps, here are some examples:
 
-`$ ./e2e.test --help`
+```sh
+# Build binaries for testing
+go run hack/e2e.go -v --build
 
-### Running the Tests
+# Create a fresh cluster.  Deletes a cluster first, if it exists
+go run hack/e2e.go -v --up
 
-For the purposes of brevity, we will look at a subset of the options, which are listed below:
+# Create a fresh cluster at a specific release version.
+go run hack/e2e.go -v --up --version=0.7.0
+
+# Test if a cluster is up.
+go run hack/e2e.go -v --isup
+
+# Push code to an existing cluster
+go run hack/e2e.go -v --push
+
+# Push to an existing cluster, or bring up a cluster if it's down.
+go run hack/e2e.go -v --pushup
+
+# Run all tests
+go run hack/e2e.go -v --test
+
+# Run tests matching the regex "\[Conformance\]" (the conformance tests)
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Conformance\]"
+
+# Conversely, exclude tests that match the regex "Pods.*env"
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+
+# Flags can be combined, and their actions will take place in this order:
+# --build, --push|--up|--pushup, --test|--tests=..., --down
+#
+# You can also specify an alternative provider, such as 'aws'
+#
+# e.g.:
+KUBERNETES_PROVIDER=aws go run hack/e2e.go -v --build --pushup --test --down
+
+# -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
+# cleaning up after a failed test or viewing logs. Use -v to avoid suppressing
+# kubectl output.
+go run hack/e2e.go -v -ctl='get events'
+go run hack/e2e.go -v -ctl='delete pod foobar'
+
+# Alternately, if you have the e2e cluster up and no desire to see the event stream, you can run ginkgo-e2e.sh directly:
+hack/ginkgo-e2e.sh --ginkgo.focus=\[Conformance\]
+```
+
+The tests are built into a single binary which can be run used to deploy a Kubernetes system or run tests against an already-deployed Kubernetes system.  See `go run hack/e2e.go --help` (or the flag definitions in `hack/e2e.go`) for more options, such as reusing an existing cluster.
+
+### Cleaning up
+
+During a run, pressing `control-C` should result in an orderly shutdown, but if something goes wrong and you still have some VMs running you can force a cleanup with this command:
+
+```sh
+go run hack/e2e.go -v --down
+```
+
+## Advanced testing
+
+### Bringing up a cluster for testing
+
+If you want, you may bring up a cluster in some other manner and run tests against it.  To do so, or to do other non-standard test things, you can pass arguments into Ginkgo using `--test_args` (e.g. see above).  For the purposes of brevity, we will look at a subset of the options, which are listed below:
 
 ```
 -ginkgo.dryRun=false: If set, ginkgo will walk the test hierarchy without actually running anything.  Best paired with -v.
@@ -75,7 +133,7 @@ For the purposes of brevity, we will look at a subset of the options, which are 
 -repo-root="../../": Root directory of kubernetes repository, for finding test files.
 ```
 
-Prior to running the tests, it is recommended that you first create a simple auth file in your home directory, e.g. `$HOME/.kube/config` , with the following:
+Prior to running the tests, you may want to first create a simple auth file in your home directory, e.g. `$HOME/.kube/config` , with the following:
 
 ```
 {
@@ -84,23 +142,39 @@ Prior to running the tests, it is recommended that you first create a simple aut
 }
 ```
 
-Next, you will need a cluster that you can test against.  As mentioned earlier, you will want to execute `sudo ./hack/local-up-cluster.sh`.  To get a sense of what tests exist, you may want to run:
-
-`e2e.test --host="127.0.0.1:8080" --provider="local" --ginkgo.v=true -ginkgo.dryRun=true --kubeconfig="$HOME/.kube/config" --repo-root="$KUBERNETES_SRC_PATH"`
-
-If you wish to execute a specific set of tests you can use the `-ginkgo.focus=` regex, e.g.:
-
-`e2e.test ... --ginkgo.focus="DNS|(?i)nodeport(?-i)|kubectl guestbook"`
-
-Conversely, if you wish to exclude a set of tests, you can run:
-
-`e2e.test ... --ginkgo.skip="Density|Scale"`
-
-As mentioned earlier there are a host of other options that are available, but are left to the developer
+As mentioned earlier there are a host of other options that are available, but they are left to the developer.
 
 **NOTE:** If you are running tests on a local cluster repeatedly, you may need to periodically perform some manual cleanup.
+
 - `rm -rf /var/run/kubernetes`, clear kube generated credentials, sometimes stale permissions can cause problems.
 - `sudo iptables -F`, clear ip tables rules left by the kube-proxy.
+
+### Local clusters
+
+It can be much faster to iterate on a local cluster instead of a cloud-based one.  To start a local cluster, you can run:
+
+```sh
+# The PATH construction is needed because PATH is one of the special-cased
+# environment variables not passed by sudo -E
+sudo PATH=$PATH hack/local-up-cluster.sh
+```
+
+This will start a single-node Kubernetes cluster than runs pods using the local docker daemon.  Press Control-C to stop the cluster.
+
+#### Testing against local clusters
+
+In order to run an E2E test against a locally running cluster, point the tests at a custom host directly:
+
+```sh
+export KUBECONFIG=/path/to/kubeconfig
+go run hack/e2e.go -v --test_args="--host=http://127.0.0.1:8080"
+```
+
+To control the tests that are run:
+
+```sh
+go run hack/e2e.go -v --test_args="--host=http://127.0.0.1:8080" --ginkgo.focus="Secrets"
+```
 
 ## Kinds of tests
 
@@ -114,7 +188,13 @@ We are working on implementing clearer partitioning of our e2e tests to make run
 - `[Skipped]`: `[Skipped]` is a legacy label that we're phasing out.  If a test is marked `[Skipped]`, there should be an issue open to label it properly.  `[Skipped]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
 - `[Feature:.+]`: If a test has non-default requirements to run or targets some non-core functionality, and thus should not be run as part of the standard suite, it receives a `[Feature:.+]` label, e.g. `[Feature:Performance]` or `[Feature:Ingress]`.  `[Feature:.+]` tests are not run in our core suites, instead running in custom suites. If a feature is experimental or alpha and is not enabled by default due to being incomplete or potentially subject to breaking changes, it does *not* block the merge-queue, and thus should run in some separate test suites owned by the feature owner(s) (see #continuous_integration below).
 
-Finally, `[Conformance]` tests are tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.  `[Conformance]` test policies are a work-in-progress; see #18162.
+### Conformance tests
+
+Finally, `[Conformance]` tests are tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.  `[Conformance]` test policies are a work-in-progress (see #18162).
+
+End-to-end testing, as described above, is for [development distributions](writing-a-getting-started-guide.md).  A conformance test is used on a [versioned distro](writing-a-getting-started-guide.md).  (Links WIP)
+
+The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not require support for up/push/down and other operations.  To run a conformance test, you need to know the IP of the master for your cluster and the authorization arguments to use.  The conformance test is intended to run against a cluster at a specific binary release of Kubernetes.  See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
 
 ## Continuous Integration
 
@@ -166,7 +246,7 @@ If we have determined that a test is known-flaky and cannot be fixed in the shor
 
 ## Performance Evaluation
 
-Another benefit of the end-2-end tests is the ability to create reproducible loads on the system, which can then be used to determine the responsiveness, or analyze other characteristics of the system.  For example, the density tests load the system to 30,50,100 pods per/node and measures the different characteristics of the system, such as throughput, api-latency, etc.
+Another benefit of the e2e tests is the ability to create reproducible loads on the system, which can then be used to determine the responsiveness, or analyze other characteristics of the system.  For example, the density tests load the system to 30,50,100 pods per/node and measures the different characteristics of the system, such as throughput, api-latency, etc.
 
 For a good overview of how we analyze performance data, please read the following [post](http://blog.kubernetes.io/2015/09/kubernetes-performance-measurements-and.html)
 
