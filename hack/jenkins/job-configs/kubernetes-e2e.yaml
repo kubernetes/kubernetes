@@ -42,6 +42,12 @@
         - 'gce-slow':
             description: 'Run slow E2E tests on GCE using the latest successful build.'
             timeout: 60
+        - 'gce-serial':
+            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GCE using the latest successful build.'
+            timeout: 300
+        - 'gce-reboot':
+            description: 'Run [Feature:Reboot] tests on GCE using the latest successful build.'
+            timeout: 180
         - 'gce-autoscaling':
             description: 'Run autoscaling E2E tests on GCE using the latest successful build.'
             timeout: 210
@@ -76,6 +82,12 @@
         - 'gke-slow':
             description: 'Run slow E2E tests on GKE using the latest successful build.'
             timeout: 60
+        - 'gke-serial':
+            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GKE using the latest successful build.'
+            timeout: 300
+        - 'gke-reboot':
+            description: 'Run [Feature:Reboot] tests on GKE using the latest successful build.'
+            timeout: 180
         - 'gke-flaky':
             description: |
                 Run flaky e2e tests using the following config:<br>
@@ -179,16 +191,6 @@
     trigger-job: 'kubernetes-build'
     branch: 'master'
     suffix:
-        - 'gce-serial':
-            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GCE using the latest successful build.'
-            timeout: 300
-            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
-            test-owner: 'ihmccreery'
-        - 'gke-serial':
-            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GKE using the latest successful build.'
-            timeout: 300
-            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
-            test-owner: 'ihmccreery'
         - 'gke-ingress':
             description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
             timeout: 90
