@@ -489,8 +489,7 @@ var _ = Describe("Services", func() {
 		staticIPName := ""
 		if providerIs("gce", "gke") {
 			By("creating a static load balancer IP")
-			rand.Seed(time.Now().UTC().UnixNano())
-			staticIPName = fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
+			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", runId)
 			requestedIP, err = createGCEStaticIP(staticIPName)
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
@@ -789,6 +788,7 @@ var _ = Describe("Services", func() {
 		}
 
 		outOfRangeNodePort := 0
+		rand.Seed(time.Now().UTC().UnixNano())
 		for {
 			outOfRangeNodePort = 1 + rand.Intn(65535)
 			if !ServiceNodePortRange.Contains(outOfRangeNodePort) {
