@@ -161,3 +161,46 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		deletePodOrErrorf(t, client, ns, pod.Name)
 	}
 }
+
+func TestPodReadOnlyFilesystem(t *testing.T) {
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
+
+	isReadOnly := true
+	ns := "pod-readonly-root"
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
+
+	framework.DeleteAllEtcdKeys()
+	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "XXX",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+					SecurityContext: &api.SecurityContext{
+						ReadOnlyRootFilesystem: &isReadOnly,
+					},
+				},
+			},
+		},
+	}
+
+	if _, err := client.Pods(ns).Create(pod); err != nil {
+		t.Errorf("Failed to create pod: %v", err)
+	}
+
+	deletePodOrErrorf(t, client, ns, pod.Name)
+}

@@ -354,6 +354,8 @@ type RunContainerOptions struct {
 	DNSSearch []string
 	// The parent cgroup to pass to Docker
 	CgroupParent string
+	// The type of container rootfs
+	ReadOnly bool
 }
 
 // VolumeInfo contains information about the volume.
