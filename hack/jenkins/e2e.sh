@@ -526,7 +526,7 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
-    : ${KUBEMARK_TESTS:="\[Feature:Performance\]"}
+    : ${KUBEMARK_TESTS:="should\sallow\sstarting\s30\spods\sper\snode"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     KUBE_GCE_INSTANCE_PREFIX="kubemark100"
     NUM_NODES="10"
