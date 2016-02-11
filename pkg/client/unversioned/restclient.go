@@ -121,16 +121,12 @@ func readExpBackoffConfig() BackoffManager {
 // list, ok := resp.(*api.PodList)
 //
 func (c *RESTClient) Verb(verb string) *Request {
-	if c.Throttle != nil {
-		c.Throttle.Accept()
-	}
-
 	backoff := readExpBackoffConfig()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff)
+		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff)
+	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff, c.Throttle)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
