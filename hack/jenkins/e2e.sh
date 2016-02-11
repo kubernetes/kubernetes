@@ -592,6 +592,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="true"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${HAIRPIN_MODE:="false"}
+    : ${HUNG_TASK_PANIC:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
@@ -611,6 +612,7 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${HAIRPIN_MODE:="false"}
+    : ${HUNG_TASK_PANIC:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
