@@ -2218,6 +2218,8 @@ const (
 	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
 	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
 	ServiceAccountRootCAKey = "ca.crt"
+	// ServiceAccountNamespaceKey is the key of the optional namespace to use as the default for namespaced API calls
+	ServiceAccountNamespaceKey = "namespace"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//
