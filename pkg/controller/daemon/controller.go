@@ -187,7 +187,6 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting Daemon Sets controller manager")
-	controller.SyncAllPodsWithStore(dsc.kubeClient, dsc.podStore.Store)
 	go dsc.dsController.Run(stopCh)
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
@@ -472,6 +471,7 @@ func storeDaemonSetStatus(dsClient unversioned_extensions.DaemonSetInterface, ds
 	if ds.Status.DesiredNumberScheduled == desiredNumberScheduled && ds.Status.CurrentNumberScheduled == currentNumberScheduled && ds.Status.NumberMisscheduled == numberMisscheduled {
 		return nil
 	}
+
 	var updateErr, getErr error
 	for i := 0; i <= StatusUpdateRetries; i++ {
 		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
