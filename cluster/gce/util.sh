@@ -744,6 +744,18 @@ function check-cluster() {
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
+          if [[ ${KUBE_TEST_DEBUG-} =~ ^[yY]$ ]]; then
+            local tmp_log="$(mktemp)"
+            local file
+            for file in /var/log/startupscript.log /var/log/kube-apiserver.log; do
+              echo "${MASTER_NAME}:${file} contents:"
+              if gcloud compute copy-files --project "${PROJECT}" \
+                --zone "${ZONE}" "${MASTER_NAME}:${file}" "${tmp_log}"; then
+                cat "${tmp_log}"
+              fi
+            done
+            rm -f "${tmp_log}"
+          fi
           exit 2
       fi
       printf "."
