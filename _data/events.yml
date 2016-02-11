@@ -20,14 +20,36 @@
     speaker: ""
     url: "http://www.meetup.com/Kubernetes-Paris/events/228698679/"
 -
+    date: 2016-02-22 18:30:00 +0100
+    title: "Kubernetes München Meetup"
+    location: "München, Germany"
+    venue: "ConSol Consulting & Solutions Software GmbH"
+    speaker: "Marcin Wielgus"
+    url: "http://www.meetup.com/Munchen-Kubernetes-Meetup/events/228613006/"
+-
+    date: 2016-02-17 18:30:00 +0100
+    title: "Kubernetes Hamburg Meetup"
+    location: "Hamburg, Germany"
+    venue: "Jimdo"
+    speaker: "Piotr Szczesniak"
+    url: "http://www.meetup.com/Hamburg-Kubernetes-Meetup/events/228478189/"
+-
     date: 2016-02-17 18:30:00 -0800
     title: "Kubernetes San Francisco Meetup"
     location: "San Francisco, California"
     venue: "Engineyard/Deis"
     speaker: "Aaron Levy, Craig Peters and Bhasker Nallapothula"
     url: "http://www.meetup.com/San-Francisco-Kubernetes-Meetup/events/228419934/"
+
 -
-    date: 2016-02-16 00:18:00 -0800
+    date: 2016-02-16 18:30:00 -0500
+    title: "Microservices NYC Meetup"
+    location: "New York City, New York"
+    venue: "ThoughtWorks"
+    speaker: "Gabriel Monroy"
+    url: "http://www.meetup.com/Microservices-NYC/events/228531766/"
+-
+    date: 2016-02-16 18:00:00 -0800
     title: "Bay Area Open Source Meetup"
     location: "Palo Alto, California"
     venue: "SAP Labs"
