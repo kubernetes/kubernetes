@@ -66,7 +66,7 @@ while true; do
     if (( attempt > 100 )); then
       echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
       "${KUBE_ROOT}/cluster/kubectl.sh" get nodes
-      if [ "$((${EXPECTED_NUM_NODES} - ${found}))" -gt "${ALLOWED_NOTREADY_NODES}" ]; then
+      if [ "$((${EXPECTED_NUM_NODES} - ${ready}))" -gt "${ALLOWED_NOTREADY_NODES}" ]; then
         exit 1
       else
         return_value=2
