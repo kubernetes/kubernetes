@@ -966,15 +966,14 @@ __EOF__
   # Clean-up
   kubectl delete job/pi "${kube_flags[@]}"
 
-  # TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
-  # ### Scale a deployment
-  # kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
-  # # Command
-  # kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
-  # # Post-condition: 1 replica for nginx-deployment
-  # kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
-  # # Clean-up
-  # kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
+  ### Scale a deployment
+  kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
+  # Command
+  kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
+  # Post-condition: 1 replica for nginx-deployment
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
+  # Clean-up
+  kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
 
   ### Expose a deployment as a service
   kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"

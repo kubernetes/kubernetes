@@ -535,19 +535,6 @@ func TestDeploymentStop(t *testing.T) {
 						Replicas: 0,
 					},
 				},
-				&extensions.Scale{ // UPDATE
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: extensions.ScaleSpec{
-						Replicas: 0,
-					},
-					Status: extensions.ScaleStatus{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1"},
-					},
-				},
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:deployments", "update:deployments",
@@ -558,19 +545,6 @@ func TestDeploymentStop(t *testing.T) {
 			Name: "Deployment with single replicaset",
 			Objs: []runtime.Object{
 				&deployment, // GET
-				&extensions.Scale{ // UPDATE
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: extensions.ScaleSpec{
-						Replicas: 0,
-					},
-					Status: extensions.ScaleStatus{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1"},
-					},
-				},
 				&extensions.ReplicaSetList{ // LIST
 					Items: []extensions.ReplicaSet{
 						{
