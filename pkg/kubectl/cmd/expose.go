@@ -37,12 +37,14 @@ type ExposeOptions struct {
 }
 
 const (
-	expose_long = `Take a replication controller, service, or pod and expose it as a new Kubernetes service.
+	expose_long = `Take a replication controller, service, replica set or pod and expose it as a new Kubernetes service.
 
-Looks up a replication controller, service, or pod by name and uses the selector for that resource as the
-selector for a new service on the specified port. Note that if no port is specified via --port and the 
-exposed resource has multiple ports, all will be re-used by the new service. Also if no labels are specified,
-the new service will re-use the labels from the resource it exposes.`
+Looks up a replication controller, service, replica set or pod by name and uses the selector for that
+resource as the selector for a new service on the specified port. A replica set will be exposed as a
+service only if it's selector is convertible to a selector that service supports, i.e. when the
+replica set selector contains only the matchLabels component. Note that if no port is specified
+via --port and the exposed resource has multiple ports, all will be re-used by the new service. Also
+if no labels are specified, the new service will re-use the labels from the resource it exposes.`
 
 	expose_example = `# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx --port=80 --target-port=8000
@@ -57,7 +59,10 @@ $ kubectl expose pod valid-pod --port=444 --name=frontend
 $ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
 # Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-$ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream`
+$ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
+
+# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
+$ kubectl expose rs nginx --port=80 --target-port=8000`
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -82,7 +87,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().MarkDeprecated("create-external-load-balancer", "use --type=\"LoadBalancer\" instead")
 	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
-	cmd.Flags().String("selector", "", "A label selector to use for this service. If empty (the default) infer the selector from the replication controller.")
+	cmd.Flags().String("selector", "", "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
