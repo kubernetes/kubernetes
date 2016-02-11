@@ -28,6 +28,8 @@ version=""
 readonly timestamp=$(date +%s)
 readonly location="gs://kubernetes-jenkins/logs/${JOB_NAME}/${BUILD_NUMBER}/started.json"
 
+echo -n 'Run starting at '; date -d "@${timestamp}"
+
 # Try to discover the kubernetes version.
 if [[ -e "version" ]]; then
     version=$(cat "version")

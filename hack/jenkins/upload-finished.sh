@@ -33,6 +33,8 @@ readonly result="$1"
 readonly timestamp=$(date +%s)
 readonly location="gs://kubernetes-jenkins/logs/${JOB_NAME}/${BUILD_NUMBER}/finished.json"
 
+echo -n 'Run finished at '; date -d "@${timestamp}"
+
 echo "Uploading build result to: ${location}"
 gsutil -q cp -a "public-read" <(
     echo "{"
