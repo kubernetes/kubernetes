@@ -157,7 +157,7 @@ var _ = Describe("Networking", func() {
 				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.6")
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.7")
 
 		// Clean up the pods
 		defer func() {
