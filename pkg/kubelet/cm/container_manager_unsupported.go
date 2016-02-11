@@ -31,14 +31,18 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ NodeConfig) error {
+func (unsupportedContainerManager) Start() error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
+func (unsupportedContainerManager) SystemCgroupsLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 
-func NewContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface) (ContainerManager, error) {
+func (unsupportedContainerManager) GetNodeConfig() NodeConfig {
+	return NodeConfig{}
+}
+
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

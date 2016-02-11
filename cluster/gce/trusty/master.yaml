@@ -156,7 +156,9 @@ script
 		--cluster-domain=${DNS_DOMAIN} \
 		--configure-cbr0=${ALLOCATE_NODE_CIDRS} \
 		--cgroup-root=/ \
-		--system-container=/system \
+		--system-cgroups=/system \
+		--runtime-cgroups=/docker-daemon \
+		--kubelet-cgroups=/kubelet \
 		--nosystemd=true \
 		${ARGS} 1>>/var/log/kubelet.log 2>&1
 end script

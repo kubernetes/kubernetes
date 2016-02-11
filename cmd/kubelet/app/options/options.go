@@ -47,8 +47,7 @@ type KubeletServer struct {
 	KubeConfig    util.StringFlag
 	APIServerList []string
 
-	DockerDaemonContainer string
-	RunOnce               bool
+	RunOnce bool
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -61,9 +60,8 @@ type KubeletServer struct {
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
-		AuthPath:              util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		KubeConfig:            util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-		DockerDaemonContainer: "/docker-daemon",
+		AuthPath:   util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		KubeConfig: util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 
 		SystemReserved: make(util.ConfigurationMap),
 		KubeReserved:   make(util.ConfigurationMap),
@@ -113,14 +111,15 @@ func NewKubeletServer() *KubeletServer {
 			RegisterSchedulable:            true,
 			RegistryBurst:                  10,
 			RegistryPullQPS:                5.0,
-			ResourceContainer:              "/kubelet",
+			KubeletCgroups:                 "",
 			RktPath:                        "",
 			RktStage1Image:                 "",
 			RootDirectory:                  defaultRootDir,
+			RuntimeCgroups:                 "",
 			SerializeImagePulls:            true,
 			StreamingConnectionIdleTimeout: unversioned.Duration{4 * time.Hour},
 			SyncFrequency:                  unversioned.Duration{1 * time.Minute},
-			SystemContainer:                "",
+			SystemCgroups:                  "",
 			ReconcileCIDR:                  true,
 			KubeAPIQPS:                     5.0,
 			KubeAPIBurst:                   10,
@@ -192,13 +191,20 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+
+	fs.StringVar(&s.KubeletCgroups, "resource-container", s.KubeletCgroups, "Optional absolute name of the resource-only container to create and run the Kubelet in.")
+	fs.MarkDeprecated("resource-container", "Use --kubelet-cgroups instead. Will be removed in a future version.")
+	fs.StringVar(&s.KubeletCgroups, "kubelet-cgroups", s.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
+
+	fs.StringVar(&s.SystemCgroups, "system-container", s.SystemCgroups, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
+	fs.MarkDeprecated("system-container", "Use --system-cgroups instead. Will be removed in a future version.")
+	fs.StringVar(&s.SystemCgroups, "system-cgroups", s.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
+
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'")
 	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used")
-	fs.StringVar(&s.SystemContainer, "system-container", s.SystemContainer, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 	fs.BoolVar(&s.HairpinMode, "configure-hairpin-mode", s.HairpinMode, "If true, kubelet will set the hairpin mode flag on container interfaces. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service.")
 	fs.IntVar(&s.MaxPods, "max-pods", s.MaxPods, "Number of Pods that can run on this Kubelet.")
@@ -223,4 +229,5 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
+	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 }

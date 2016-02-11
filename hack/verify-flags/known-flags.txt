@@ -171,6 +171,7 @@ kubectl-path
 kubelet-address
 kubelet-cadvisor-port
 kubelet-certificate-authority
+kubelet-cgroups
 kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
@@ -311,6 +312,7 @@ root-ca-file
 root-dir
 run-proxy
 runtime-config
+runtime-cgroups
 save-config
 scheduler-config
 scheduler-name
@@ -347,6 +349,7 @@ storage-versions
 streaming-connection-idle-timeout
 suicide-timeout
 sync-frequency
+system-cgroups
 system-container
 system-reserved
 target-port

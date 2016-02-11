@@ -178,7 +178,6 @@ func NewMainKubelet(
 	cloud cloudprovider.Interface,
 	nodeLabels map[string]string,
 	nodeStatusUpdateFrequency time.Duration,
-	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
 	containerRuntime string,
@@ -186,8 +185,6 @@ func NewMainKubelet(
 	rktStage1Image string,
 	mounter mount.Interface,
 	writer kubeio.Writer,
-	dockerDaemonContainer string,
-	systemContainer string,
 	configureCBR0 bool,
 	nonMasqueradeCIDR string,
 	podCIDR string,
@@ -214,9 +211,6 @@ func NewMainKubelet(
 	}
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
-	}
-	if systemContainer != "" && cgroupRoot == "" {
-		return nil, fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 	}
 	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
@@ -311,25 +305,24 @@ func NewMainKubelet(
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
-		resourceContainer:              resourceContainer,
-		os:                             osInterface,
-		oomWatcher:                     oomWatcher,
-		cgroupRoot:                     cgroupRoot,
-		mounter:                        mounter,
-		writer:                         writer,
-		configureCBR0:                  configureCBR0,
-		nonMasqueradeCIDR:              nonMasqueradeCIDR,
-		reconcileCIDR:                  reconcileCIDR,
-		maxPods:                        maxPods,
-		syncLoopMonitor:                atomic.Value{},
-		resolverConfig:                 resolverConfig,
-		cpuCFSQuota:                    cpuCFSQuota,
-		daemonEndpoints:                daemonEndpoints,
-		containerManager:               containerManager,
-		flannelExperimentalOverlay:     flannelExperimentalOverlay,
-		flannelHelper:                  NewFlannelHelper(),
-		nodeIP:                         nodeIP,
-		clock:                          util.RealClock{},
+		os:                         osInterface,
+		oomWatcher:                 oomWatcher,
+		cgroupRoot:                 cgroupRoot,
+		mounter:                    mounter,
+		writer:                     writer,
+		configureCBR0:              configureCBR0,
+		nonMasqueradeCIDR:          nonMasqueradeCIDR,
+		reconcileCIDR:              reconcileCIDR,
+		maxPods:                    maxPods,
+		syncLoopMonitor:            atomic.Value{},
+		resolverConfig:             resolverConfig,
+		cpuCFSQuota:                cpuCFSQuota,
+		daemonEndpoints:            daemonEndpoints,
+		containerManager:           containerManager,
+		flannelExperimentalOverlay: flannelExperimentalOverlay,
+		flannelHelper:              NewFlannelHelper(),
+		nodeIP:                     nodeIP,
+		clock:                      util.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
@@ -414,8 +407,6 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		// No Docker daemon to put in a container.
-		dockerDaemonContainer = ""
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
@@ -438,13 +429,6 @@ func NewMainKubelet(
 	}
 	klet.imageManager = imageManager
 
-	// Setup container manager, can fail if the devices hierarchy is not mounted
-	// (it is required by Docker however).
-	klet.nodeConfig = cm.NodeConfig{
-		DockerDaemonContainerName: dockerDaemonContainer,
-		SystemContainerName:       systemContainer,
-		KubeletContainerName:      resourceContainer,
-	}
 	klet.runtimeState.setRuntimeSync(klet.clock.Now())
 
 	klet.runner = klet.containerRuntime
@@ -612,10 +596,6 @@ type Kubelet struct {
 
 	// Store kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.Cache
-
-	// The name of the resource-only container to run the Kubelet in (empty for no container).
-	// Name must be absolute.
-	resourceContainer string
 
 	os kubecontainer.OSInterface
 
@@ -913,42 +893,32 @@ func (kl *Kubelet) StartGarbageCollection() {
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
 // Note that the modules here must not depend on modules that are not initialized here.
 func (kl *Kubelet) initializeModules() error {
-	// Step 1: Move Kubelet to a container, if required.
-	if kl.resourceContainer != "" {
-		// Fixme: I need to reside inside ContainerManager interface.
-		err := util.RunInResourceContainer(kl.resourceContainer)
-		if err != nil {
-			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
-		}
-		glog.Infof("Running in container %q", kl.resourceContainer)
-	}
-
-	// Step 2: Promethues metrics.
+	// Step 1: Promethues metrics.
 	metrics.Register(kl.runtimeCache)
 
-	// Step 3: Setup filesystem directories.
+	// Step 2: Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return err
 	}
 
-	// Step 4: If the container logs directory does not exist, create it.
+	// Step 3: If the container logs directory does not exist, create it.
 	if _, err := os.Stat(containerLogsDir); err != nil {
 		if err := kl.os.Mkdir(containerLogsDir, 0755); err != nil {
 			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
 		}
 	}
 
-	// Step 5: Start the image manager.
+	// Step 4: Start the image manager.
 	if err := kl.imageManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
-	// Step 6: Start container manager.
-	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
+	// Step 5: Start container manager.
+	if err := kl.containerManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 7: Start out of memory watcher.
+	// Step 6: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
@@ -3513,7 +3483,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 	}
 }
 func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
-	return kl.nodeConfig
+	return kl.containerManager.GetNodeConfig()
 }
 
 var minRsrc = resource.MustParse("1k")
