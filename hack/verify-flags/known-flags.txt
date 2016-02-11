@@ -377,6 +377,7 @@ www-prefix
 clientset-name
 clientset-only
 clientset-path
+fake-clientset
 leader-elect
 leader-elect-lease-duration
 leader-elect-renew-deadline

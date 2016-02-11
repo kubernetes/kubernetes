@@ -14,24 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package normalization
-
-import "k8s.io/kubernetes/pkg/api/unversioned"
-
-func Group(group string) string {
-	if group == "api" {
-		return "core"
-	}
-	return group
-}
-
-func Version(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
-}
-
-func GroupVersion(gv unversioned.GroupVersion) unversioned.GroupVersion {
-	return unversioned.GroupVersion{Group(gv.Group), Version(gv.Version)}
-}
+// Package unversioned has the automatically generated clients for unversioned resources.
+package v1

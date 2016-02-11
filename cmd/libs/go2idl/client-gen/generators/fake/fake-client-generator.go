@@ -25,10 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func PackageForGroup(group string, version string, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte) generator.Package {
-	outputPackagePath := filepath.Join(packageBasePath, group, version, "fake")
+func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte) generator.Package {
+	outputPackagePath := filepath.Join(packageBasePath, gv.Group, gv.Version, "fake")
 	// TODO: should make this a function, called by here and in client-generator.go
-	realClientPath := filepath.Join(packageBasePath, group, version)
+	realClientPath := filepath.Join(packageBasePath, gv.Group, gv.Version)
 	return &generator.DefaultPackage{
 		PackageName: "fake",
 		PackagePath: outputPackagePath,
@@ -51,7 +51,7 @@ func PackageForGroup(group string, version string, typeList []*types.Type, packa
 						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
-					group:         group,
+					group:         gv.Group,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
@@ -59,11 +59,11 @@ func PackageForGroup(group string, version string, typeList []*types.Type, packa
 
 			generators = append(generators, &genFakeForGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: "fake_" + group + "_client",
+					OptionalName: "fake_" + gv.Group + "_client",
 				},
 				outputPackage:  outputPackagePath,
 				realClientPath: realClientPath,
-				group:          group,
+				group:          gv.Group,
 				types:          typeList,
 				imports:        generator.NewImportTracker(),
 			})
