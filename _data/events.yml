@@ -27,6 +27,13 @@
     speaker: "Aaron Levy, Craig Peters and Bhasker Nallapothula"
     url: "http://www.meetup.com/San-Francisco-Kubernetes-Meetup/events/228419934/"
 -
+    date: 2016-02-16 00:18:00 -0800
+    title: "Bay Area Open Source Meetup"
+    location: "Palo Alto, California"
+    venue: "SAP Labs"
+    speaker: "Daniel Smith"
+    url: "http://www.meetup.com/Bay-Area-Open-Source-Meetup/events/227892246/"
+-
     date: 2016-02-16 00:00:00 -0800
     title: "Container World 16"
     location: "Santa Clara, California"
