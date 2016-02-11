@@ -120,6 +120,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		pendingActionSet.Insert(
 			strings.Join([]string{"delete-collection", "daemonsets", ""}, "-"),
 			strings.Join([]string{"delete-collection", "deployments", ""}, "-"),
+			strings.Join([]string{"delete-collection", "replicasets", ""}, "-"),
 			strings.Join([]string{"delete-collection", "jobs", ""}, "-"),
 			strings.Join([]string{"delete-collection", "horizontalpodautoscalers", ""}, "-"),
 			strings.Join([]string{"delete-collection", "ingresses", ""}, "-"),
@@ -148,7 +149,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		if containsVersion(versions, "extensions/v1beta1") {
 			resources := []unversioned.APIResource{}
-			for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingresses"} {
+			for _, resource := range []string{"daemonsets", "deployments", "replicasets", "jobs", "horizontalpodautoscalers", "ingresses"} {
 				resources = append(resources, unversioned.APIResource{Name: resource})
 			}
 			mockClient.Resources = map[string]*unversioned.APIResourceList{
