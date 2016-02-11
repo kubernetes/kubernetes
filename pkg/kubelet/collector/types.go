@@ -101,8 +101,8 @@ type Event struct {
 }
 
 const (
-	EventOom               EventType = "Oom"
-	EventOomKill           EventType = "OomKill"
+	EventOOM               EventType = "OOM"
+	EventOOMKill           EventType = "OOMKill"
 	EventContainerCreation EventType = "ContainerCreation"
 	EventContainerDeletion EventType = "ContainerDeletion"
 )
