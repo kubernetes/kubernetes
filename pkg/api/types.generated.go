@@ -22211,15 +22211,14 @@ func (x *NodeAffinity) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2 := !z.EncBinary()
 			yy2arr2 := z.EncBasicHandle().StructToArray
-			var yyq2 [3]bool
+			var yyq2 [2]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[0] = x.RequiredDuringSchedulingRequiredDuringExecution != nil
-			yyq2[1] = x.RequiredDuringSchedulingIgnoredDuringExecution != nil
-			yyq2[2] = len(x.PreferredDuringSchedulingIgnoredDuringExecution) != 0
+			yyq2[0] = x.RequiredDuringSchedulingIgnoredDuringExecution != nil
+			yyq2[1] = len(x.PreferredDuringSchedulingIgnoredDuringExecution) != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
-				r.EncodeArrayStart(3)
+				r.EncodeArrayStart(2)
 			} else {
 				yynn2 = 0
 				for _, b := range yyq2 {
@@ -22233,29 +22232,6 @@ func (x *NodeAffinity) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[0] {
-					if x.RequiredDuringSchedulingRequiredDuringExecution == nil {
-						r.EncodeNil()
-					} else {
-						x.RequiredDuringSchedulingRequiredDuringExecution.CodecEncodeSelf(e)
-					}
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq2[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("requiredDuringSchedulingRequiredDuringExecution"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.RequiredDuringSchedulingRequiredDuringExecution == nil {
-						r.EncodeNil()
-					} else {
-						x.RequiredDuringSchedulingRequiredDuringExecution.CodecEncodeSelf(e)
-					}
-				}
-			}
-			if yyr2 || yy2arr2 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[1] {
 					if x.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 						r.EncodeNil()
 					} else {
@@ -22265,7 +22241,7 @@ func (x *NodeAffinity) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2[1] {
+				if yyq2[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("requiredDuringSchedulingIgnoredDuringExecution"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -22278,12 +22254,12 @@ func (x *NodeAffinity) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[2] {
+				if yyq2[1] {
 					if x.PreferredDuringSchedulingIgnoredDuringExecution == nil {
 						r.EncodeNil()
 					} else {
-						yym10 := z.EncBinary()
-						_ = yym10
+						yym7 := z.EncBinary()
+						_ = yym7
 						if false {
 						} else {
 							h.encSlicePreferredSchedulingTerm(([]PreferredSchedulingTerm)(x.PreferredDuringSchedulingIgnoredDuringExecution), e)
@@ -22293,15 +22269,15 @@ func (x *NodeAffinity) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2[2] {
+				if yyq2[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("preferredDuringSchedulingIgnoredDuringExecution"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.PreferredDuringSchedulingIgnoredDuringExecution == nil {
 						r.EncodeNil()
 					} else {
-						yym11 := z.EncBinary()
-						_ = yym11
+						yym8 := z.EncBinary()
+						_ = yym8
 						if false {
 						} else {
 							h.encSlicePreferredSchedulingTerm(([]PreferredSchedulingTerm)(x.PreferredDuringSchedulingIgnoredDuringExecution), e)
@@ -22370,17 +22346,6 @@ func (x *NodeAffinity) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "requiredDuringSchedulingRequiredDuringExecution":
-			if r.TryDecodeAsNil() {
-				if x.RequiredDuringSchedulingRequiredDuringExecution != nil {
-					x.RequiredDuringSchedulingRequiredDuringExecution = nil
-				}
-			} else {
-				if x.RequiredDuringSchedulingRequiredDuringExecution == nil {
-					x.RequiredDuringSchedulingRequiredDuringExecution = new(NodeSelector)
-				}
-				x.RequiredDuringSchedulingRequiredDuringExecution.CodecDecodeSelf(d)
-			}
 		case "requiredDuringSchedulingIgnoredDuringExecution":
 			if r.TryDecodeAsNil() {
 				if x.RequiredDuringSchedulingIgnoredDuringExecution != nil {
@@ -22396,12 +22361,12 @@ func (x *NodeAffinity) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.PreferredDuringSchedulingIgnoredDuringExecution = nil
 			} else {
-				yyv6 := &x.PreferredDuringSchedulingIgnoredDuringExecution
-				yym7 := z.DecBinary()
-				_ = yym7
+				yyv5 := &x.PreferredDuringSchedulingIgnoredDuringExecution
+				yym6 := z.DecBinary()
+				_ = yym6
 				if false {
 				} else {
-					h.decSlicePreferredSchedulingTerm((*[]PreferredSchedulingTerm)(yyv6), d)
+					h.decSlicePreferredSchedulingTerm((*[]PreferredSchedulingTerm)(yyv5), d)
 				}
 			}
 		default:
@@ -22415,37 +22380,16 @@ func (x *NodeAffinity) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj8 int
-	var yyb8 bool
-	var yyhl8 bool = l >= 0
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	var yyj7 int
+	var yyb7 bool
+	var yyhl7 bool = l >= 0
+	yyj7++
+	if yyhl7 {
+		yyb7 = yyj7 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb7 = r.CheckBreak()
 	}
-	if yyb8 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		if x.RequiredDuringSchedulingRequiredDuringExecution != nil {
-			x.RequiredDuringSchedulingRequiredDuringExecution = nil
-		}
-	} else {
-		if x.RequiredDuringSchedulingRequiredDuringExecution == nil {
-			x.RequiredDuringSchedulingRequiredDuringExecution = new(NodeSelector)
-		}
-		x.RequiredDuringSchedulingRequiredDuringExecution.CodecDecodeSelf(d)
-	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
-	} else {
-		yyb8 = r.CheckBreak()
-	}
-	if yyb8 {
+	if yyb7 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -22460,13 +22404,13 @@ func (x *NodeAffinity) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 		x.RequiredDuringSchedulingIgnoredDuringExecution.CodecDecodeSelf(d)
 	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	yyj7++
+	if yyhl7 {
+		yyb7 = yyj7 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb7 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb7 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -22474,26 +22418,26 @@ func (x *NodeAffinity) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.PreferredDuringSchedulingIgnoredDuringExecution = nil
 	} else {
-		yyv11 := &x.PreferredDuringSchedulingIgnoredDuringExecution
-		yym12 := z.DecBinary()
-		_ = yym12
+		yyv9 := &x.PreferredDuringSchedulingIgnoredDuringExecution
+		yym10 := z.DecBinary()
+		_ = yym10
 		if false {
 		} else {
-			h.decSlicePreferredSchedulingTerm((*[]PreferredSchedulingTerm)(yyv11), d)
+			h.decSlicePreferredSchedulingTerm((*[]PreferredSchedulingTerm)(yyv9), d)
 		}
 	}
 	for {
-		yyj8++
-		if yyhl8 {
-			yyb8 = yyj8 > l
+		yyj7++
+		if yyhl7 {
+			yyb7 = yyj7 > l
 		} else {
-			yyb8 = r.CheckBreak()
+			yyb7 = r.CheckBreak()
 		}
-		if yyb8 {
+		if yyb7 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj8-1, "")
+		z.DecStructFieldNotFound(yyj7-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }

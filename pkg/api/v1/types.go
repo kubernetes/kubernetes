@@ -1349,24 +1349,23 @@ const (
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
 
-// Affinity is a group of affinity scheduling requirements,
-// including node affinity and inter pod affinity.
+// Affinity is a group of affinity scheduling rules, currently
+// only node affinity, but in the future also inter-pod affinity.
 type Affinity struct {
-	// Describes node affinity scheduling requirements for the pod.
+	// Describes node affinity scheduling rules for the pod.
 	NodeAffinity *NodeAffinity `json:"nodeAffinity,omitempty"`
 }
 
-// Node affinity is a group of node affinity scheduling requirements.
-// If RequiredDuringSchedulingRequiredDuringExecution and
-// RequiredDuringSchedulingIgnoredDuringExecution are both set,
-// then both node selectors must be satisfied.
+// Node affinity is a group of node affinity scheduling rules.
 type NodeAffinity struct {
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
 	// at some point during pod execution (e.g. due to an update), the system
 	// will try to eventually evict the pod from its node.
-	RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
