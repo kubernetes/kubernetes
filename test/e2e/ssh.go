@@ -20,20 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("SSH", func() {
-	var c *client.Client
+
+	f := NewFramework("ssh")
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-
 		// When adding more providers here, also implement their functionality in util.go's getSigner(...).
 		SkipUnlessProviderIs(providersWithSSH...)
 	})
@@ -41,7 +35,7 @@ var _ = Describe("SSH", func() {
 	It("should SSH to all nodes and run commands", func() {
 		// Get all nodes' external IPs.
 		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := NodeSSHHosts(c)
+		hosts, err := NodeSSHHosts(f.Client)
 		if err != nil {
 			Failf("Error getting node hostnames: %v", err)
 		}
