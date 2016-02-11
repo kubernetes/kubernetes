@@ -54,6 +54,19 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 	return newLabels
 }
 
+// AddLabel returns a map with the given key and value added to the given map.
+func AddLabel(labels map[string]string, labelKey string, labelValue uint32) map[string]string {
+	if labelKey == "" {
+		// Dont need to add a label.
+		return labels
+	}
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels[labelKey] = fmt.Sprintf("%d", labelValue)
+	return labels
+}
+
 // Clones the given selector and returns a new selector with the given key and value added.
 // Returns the given selector, if labelKey is empty.
 func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
@@ -92,4 +105,31 @@ func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey stri
 	}
 
 	return newSelector
+}
+
+// AddLabelToSelector returns a selector with the given key and value added to the given selector's MatchLabels.
+func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
+	if labelKey == "" {
+		// Dont need to add a label.
+		return selector
+	}
+	if selector.MatchLabels == nil {
+		selector.MatchLabels = make(map[string]string)
+	}
+	selector.MatchLabels[labelKey] = fmt.Sprintf("%d", labelValue)
+	return selector
+}
+
+// SelectorHasLabel checks if the given selector contains the given label key in its MatchLabels or MatchExpressions
+func SelectorHasLabel(selector *unversioned.LabelSelector, labelKey string) bool {
+	_, found := selector.MatchLabels[labelKey]
+	if found {
+		return true
+	}
+	for _, exp := range selector.MatchExpressions {
+		if exp.Key == labelKey && exp.Operator != unversioned.LabelSelectorOpDoesNotExist {
+			return true
+		}
+	}
+	return false
 }
