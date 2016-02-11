@@ -2723,12 +2723,12 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -2958,12 +2958,12 @@ func TestDockerRuntimeVersion(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -3142,12 +3142,12 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -3422,12 +3422,12 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
