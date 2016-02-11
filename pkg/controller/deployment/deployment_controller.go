@@ -681,7 +681,8 @@ func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deploymen
 	} else if existingNewRS != nil {
 		// Set existing new replica set's annotation
 		if setNewReplicaSetAnnotations(&deployment, existingNewRS, newRevision) {
-			return dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(existingNewRS)
+			dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(existingNewRS)
+			return existingNewRS, nil
 		}
 		return existingNewRS, nil
 	}
