@@ -872,6 +872,7 @@ export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -
 export FAIL_ON_GCP_RESOURCE_LEAK="${FAIL_ON_GCP_RESOURCE_LEAK:-false}"
 export ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-}
 export EXIT_ON_WEAK_ERROR=${EXIT_ON_WEAK_ERROR:-}
+export HAIRPIN_MODE=${HAIRPIN_MODE:-}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
