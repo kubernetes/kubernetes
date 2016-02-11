@@ -103,7 +103,7 @@ func NewKubeletServer() *KubeletServer {
 			NodeStatusUpdateFrequency:   unversioned.Duration{10 * time.Second},
 			NodeLabels:                  make(map[string]string),
 			OOMScoreAdj:                 qos.KubeletOOMScoreAdj,
-			LockFilePath:                "/var/run/lock/kubelet.lock",
+			LockFilePath:                "",
 			PodInfraContainerImage:      kubetypes.PodInfraContainerImage,
 			Port:                           ports.KubeletPort,
 			ReadOnlyPort:                   ports.KubeletReadOnlyPort,
