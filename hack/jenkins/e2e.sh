@@ -910,6 +910,7 @@ export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}
 export PATH=${PATH}:/usr/local/go/bin
 export KUBE_SKIP_UPDATE=y
 export KUBE_SKIP_CONFIRMATIONS=y
+export HAIRPIN_MODE="${HAIRPIN_MODE:-true}"
 
 # Kubemark
 export USE_KUBEMARK="${USE_KUBEMARK:-false}"
