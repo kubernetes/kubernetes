@@ -253,6 +253,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	//       initialize the cloud provider. We explicitly wouldn't want
 	//       that because then every kubelet instance would query the master
 	//       state.json which does not scale.
+	s.KubeletServer.LockFilePath = "" // disable lock file
 	err = kubeletapp.Run(s.KubeletServer, kcfg)
 	return
 }
