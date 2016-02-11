@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -406,8 +407,7 @@ func testDeploymentCleanUpPolicy(f *Framework) {
 	}
 	rsName := "nginx-controller"
 	replicas := 1
-	revisionHistoryLimit := new(int)
-	*revisionHistoryLimit = 0
+	revisionHistoryLimit := util.IntPtr(0)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 
