@@ -89,12 +89,17 @@ var _ = Describe("Generated release_1_2 clientset", func() {
 		// the test so we can ensure that we clean up after
 		// ourselves
 		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		_, err = podClient.Create(pod)
+		pod, err = podClient.Create(pod)
 		if err != nil {
 			Failf("Failed to create pod: %v", err)
 		}
 
 		By("verifying the pod is in kubernetes")
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = api.ListOptions{
+			LabelSelector:   selector,
+			ResourceVersion: pod.ResourceVersion,
+		}
 		pods, err = podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
