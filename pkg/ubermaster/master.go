@@ -77,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
+	clusteretcd "k8s.io/kubernetes/pkg/registry/cluster/etcd"
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
@@ -320,6 +321,8 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"), storageDecorator)
 
+	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(dbClient("clusters"), storageDecorator)
+
 	m.v1ResourcesStorage = map[string]rest.Storage{
 		"pods":             podStorage.Pod,
 		"pods/attach":      podStorage.Attach,
@@ -357,6 +360,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"configMaps":                    configMapStorage,
 
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
+
+		"clusters":        clusterStorage,
+		"clusters/status": clusterStatusStorage,
 	}
 }
 
