@@ -135,11 +135,6 @@ func (f *Framework) afterEach() {
 		dumpAllNodeInfo(f.Client)
 	}
 
-	// Check whether all nodes are ready after the test.
-	if err := allNodesReady(f.Client, time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
-	}
-
 	summaries := make([]TestDataSummary, 0)
 	if testContext.GatherKubeSystemResourceUsageData {
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
@@ -196,6 +191,13 @@ func (f *Framework) afterEach() {
 		default:
 			Logf("Unknown ouptut type: %v. Skipping.", printType)
 		}
+	}
+
+	// Check whether all nodes are ready after the test.
+	// This is explicitly done at the very end of the test, to avoid
+	// e.g. not removing namespace in case of this failure.
+	if err := allNodesReady(f.Client, time.Minute); err != nil {
+		Failf("All nodes should be ready after test, %v", err)
 	}
 
 	// Paranoia-- prevent reuse!
