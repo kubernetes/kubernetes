@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/util/rand"
+
 	"github.com/rackspace/gophercloud"
 )
 
@@ -213,7 +215,7 @@ func TestVolumes(t *testing.T) {
 	tags := map[string]string{
 		"test": "value",
 	}
-	vol, err := os.CreateVolume(1, &tags)
+	vol, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, &tags)
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}
