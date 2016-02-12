@@ -248,7 +248,8 @@ function create-kube-proxy-opts() {
 KUBE_PROXY_OPTS="\
  --hostname-override=${1} \
  --master=http://${2}:8080 \
- --logtostderr=true"
+ --logtostderr=true \
+ ${3}"
 EOF
 
 }
@@ -450,7 +451,8 @@ function provision-node() {
       '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${1#*@}' \
-      '${MASTER_IP}' 
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '${MASTER_IP}' '${1#*@}'
 
     sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '    
@@ -526,7 +528,8 @@ function provision-masterandnode() {
       '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${MASTER_IP}' \
-      '${MASTER_IP}'
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
     FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
