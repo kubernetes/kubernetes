@@ -18,6 +18,12 @@
 
 function ensure-local-disks() {
 
+# Skip if already mounted (a reboot)
+if ( grep "/mnt/ephemeral" /proc/mounts ); then
+  echo "Found /mnt/ephemeral in /proc/mounts; skipping local disk initialization"
+  return
+fi
+
 block_devices=()
 
 ephemeral_devices=$(curl --silent http://169.254.169.254/2014-11-05/meta-data/block-device-mapping/ | grep ephemeral)
@@ -61,10 +67,14 @@ else
   # Remove any existing mounts
   for block_device in ${block_devices}; do
     echo "Unmounting ${block_device}"
-    /bin/umount ${block_device}
+    /bin/umount ${block_device} || echo "Ignoring failure umounting ${block_device}"
     sed -i -e "\|^${block_device}|d" /etc/fstab
   done
 
+  # Remove any existing /mnt/ephemeral entry in /etc/fstab
+  sed -i -e "\|/mnt/ephemeral|d" /etc/fstab
+
+  # Mount the storage
   if [[ ${docker_storage} == "btrfs" ]]; then
     apt-get-install btrfs-tools
 
@@ -75,7 +85,7 @@ else
       echo "Found multiple ephemeral block devices, formatting with btrfs as RAID-0"
       mkfs.btrfs -f --data raid0 ${block_devices[@]}
     fi
-    echo "${block_devices[0]}  /mnt/ephemeral  btrfs  noatime  0 0" >> /etc/fstab
+    echo "${block_devices[0]}  /mnt/ephemeral  btrfs  noatime,nofail  0 0" >> /etc/fstab
     mkdir -p /mnt/ephemeral
     mount /mnt/ephemeral
 
@@ -89,7 +99,7 @@ else
     fi
 
     mkfs -t ext4 ${block_devices[0]}
-    echo "${block_devices[0]}  /mnt/ephemeral  ext4     noatime  0 0" >> /etc/fstab
+    echo "${block_devices[0]}  /mnt/ephemeral  ext4     noatime,nofail  0 0" >> /etc/fstab
     mkdir -p /mnt/ephemeral
     mount /mnt/ephemeral
 
@@ -129,7 +139,7 @@ else
       lvcreate -l 100%FREE -n kubernetes vg-ephemeral
       mkfs -t ext4 /dev/vg-ephemeral/kubernetes
       mkdir -p /mnt/ephemeral/kubernetes
-      echo "/dev/vg-ephemeral/kubernetes  /mnt/ephemeral/kubernetes  ext4  noatime  0 0" >> /etc/fstab
+      echo "/dev/vg-ephemeral/kubernetes  /mnt/ephemeral/kubernetes  ext4  noatime,nofail  0 0" >> /etc/fstab
       mount /mnt/ephemeral/kubernetes
 
       move_kubelet="/mnt/ephemeral/kubernetes"
@@ -146,7 +156,7 @@ else
       lvcreate -l 100%VG -n ephemeral vg-ephemeral
       mkfs -t ext4 /dev/vg-ephemeral/ephemeral
       mkdir -p /mnt/ephemeral
-      echo "/dev/vg-ephemeral/ephemeral  /mnt/ephemeral  ext4  noatime  0 0" >> /etc/fstab
+      echo "/dev/vg-ephemeral/ephemeral  /mnt/ephemeral  ext4  noatime,nofail 0 0" >> /etc/fstab
       mount /mnt/ephemeral
 
       mkdir -p /mnt/ephemeral/kubernetes
@@ -183,7 +193,9 @@ if [[ -n "${move_docker}" ]]; then
     mv /var/lib/docker ${move_docker}/
   fi
   mkdir -p ${move_docker}/docker
-  ln -s ${move_docker}/docker /var/lib/docker
+  if [[ ! -e /var/lib/docker ]]; then
+    ln -s ${move_docker}/docker /var/lib/docker
+  fi
   DOCKER_ROOT="${move_docker}/docker"
   DOCKER_OPTS="${DOCKER_OPTS:-} -g ${DOCKER_ROOT}"
 fi
@@ -195,7 +207,9 @@ if [[ -n "${move_kubelet}" ]]; then
     mv /var/lib/kubelet ${move_kubelet}/
   fi
   mkdir -p ${move_kubelet}/kubelet
-  ln -s ${move_kubelet}/kubelet /var/lib/kubelet
+  if [[ ! -e /var/lib/kubelet ]]; then
+    ln -s ${move_kubelet}/kubelet /var/lib/kubelet
+  fi
   KUBELET_ROOT="${move_kubelet}/kubelet"
 fi
 
