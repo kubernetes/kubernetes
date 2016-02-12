@@ -61,7 +61,6 @@ function configure_upgrade_step() {
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
     KUBE_GCE_INSTANCE_PREFIX="$cluster_name"
     NUM_NODES=5
-    KUBE_ENABLE_DEPLOYMENTS=true
     KUBE_ENABLE_DAEMONSETS=true
   fi
 
@@ -230,7 +229,6 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
-    : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
     NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
@@ -248,7 +246,6 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
-    : ${ENABLE_DEPLOYMENTS:=true}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
@@ -393,7 +390,6 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
-    : ${ENABLE_DEPLOYMENTS:=true}
     : ${AWS_CONFIG_FILE:='/var/lib/jenkins/.aws/credentials'}
     : ${AWS_SSH_KEY:='/var/lib/jenkins/.ssh/kube_aws_rsa'}
     : ${KUBE_SSH_USER:='ubuntu'}
@@ -439,7 +435,6 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-autoscaling"}
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE default for cluster size autoscaling purposes.
     ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
@@ -798,7 +793,6 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
-    : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
 
@@ -831,7 +825,6 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_NODES:=5}
-    : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
 

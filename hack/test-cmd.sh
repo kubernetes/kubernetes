@@ -188,7 +188,6 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
-  --runtime_config="extensions/v1beta1/deployments=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
