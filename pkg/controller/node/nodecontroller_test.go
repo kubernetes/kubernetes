@@ -30,7 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -59,7 +61,8 @@ type FakeNodeHandler struct {
 	RequestCount        int
 
 	// Synchronization
-	createLock sync.Mutex
+	createLock     sync.Mutex
+	deleteWaitChan chan struct{}
 }
 
 type FakeLegacyHandler struct {
@@ -125,6 +128,11 @@ func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
 }
 
 func (m *FakeNodeHandler) Delete(id string, opt *api.DeleteOptions) error {
+	defer func() {
+		if m.deleteWaitChan != nil {
+			m.deleteWaitChan <- struct{}{}
+		}
+	}()
 	m.DeletedNodes = append(m.DeletedNodes, newNode(id))
 	m.RequestCount++
 	return nil
@@ -448,6 +456,58 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			t.Errorf("expected pod eviction: %+v, got %+v for %+v", item.expectedEvictPods,
 				podEvicted, item.description)
 		}
+	}
+}
+
+// TestCloudProviderNoRateLimit tests that monitorNodes() immediately deletes
+// pods and the node when kubelet has not reported, and the cloudprovider says
+// the node is gone.
+func TestCloudProviderNoRateLimit(t *testing.T) {
+	fnh := &FakeNodeHandler{
+		Existing: []*api.Node{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:               api.NodeReady,
+							Status:             api.ConditionUnknown,
+							LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		Clientset:      fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node0")}}),
+		deleteWaitChan: make(chan struct{}),
+	}
+	nodeController := NewNodeController(nil, fnh, 10*time.Minute,
+		util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),
+		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
+		testNodeMonitorPeriod, nil, false)
+	nodeController.cloud = &fakecloud.FakeCloud{}
+	nodeController.now = func() unversioned.Time { return unversioned.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
+	nodeController.nodeExistsInCloudProvider = func(nodeName string) (bool, error) {
+		return false, nil
+	}
+	// monitorNodeStatus should allow this node to be immediately deleted
+	if err := nodeController.monitorNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	select {
+	case <-fnh.deleteWaitChan:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("Timed out waiting %v for node to be deleted", wait.ForeverTestTimeout)
+	}
+	if len(fnh.DeletedNodes) != 1 || fnh.DeletedNodes[0].Name != "node0" {
+		t.Errorf("Node was not deleted")
+	}
+	if nodeOnQueue := nodeController.podEvictor.Remove("node0"); nodeOnQueue {
+		t.Errorf("Node was queued for eviction. Should have been immediately deleted.")
 	}
 }
 
