@@ -125,20 +125,20 @@ coreos:
         Restart=always
         RestartSec=10
 
-    - name: docker.service
-      command: start
-      drop-ins:
-        - name: 50-docker-opts.conf
-          content: |
-            [Service]
-            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'
-            MountFlags=slave
-            LimitNOFILE=1048576
-            LimitNPROC=1048576
-            LimitCORE=infinity
-            Restart=always
-            RestartSec=2s
-            StartLimitInterval=0
+#    - name: docker.service
+#      command: start
+#      drop-ins:
+#        - name: 50-docker-opts.conf
+#          content: |
+#            [Service]
+#            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'
+#            MountFlags=slave
+#            LimitNOFILE=1048576
+#            LimitNPROC=1048576
+#            LimitCORE=infinity
+#            Restart=always
+#            RestartSec=2s
+#            StartLimitInterval=0
 
     - name: kubernetes-configure-node.service
       command: start
