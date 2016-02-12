@@ -105,6 +105,9 @@ func TestReconcileClaim(t *testing.T) {
 
 	// watch would have added the claim to the store
 	controller.claimStore.Add(pvc)
+	// store it in fake API server
+	mockClient.UpdatePersistentVolumeClaim(pvc)
+
 	err := controller.reconcileClaim(pvc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -116,6 +119,8 @@ func TestReconcileClaim(t *testing.T) {
 	}
 
 	pvc.Annotations[qosProvisioningKey] = "foo"
+	// store it in fake API server
+	mockClient.UpdatePersistentVolumeClaim(pvc)
 
 	err = controller.reconcileClaim(pvc)
 	if err != nil {
@@ -129,6 +134,40 @@ func TestReconcileClaim(t *testing.T) {
 
 	if mockClient.volume.Spec.ClaimRef.Name != pvc.Name {
 		t.Errorf("Expected PV to be bound to %s but got %s", mockClient.volume.Spec.ClaimRef.Name, pvc.Name)
+	}
+
+	// the PVC should have correct annotation
+	if mockClient.claim.Annotations[pvProvisioningRequiredAnnotationKey] != pvProvisioningCompletedAnnotationValue {
+		t.Errorf("Annotation %q not set", pvProvisioningRequiredAnnotationKey)
+	}
+
+	// Run the syncClaim 2nd time to simulate periodic sweep running in parallel
+	// to the previous syncClaim. There is a lock in handleUpdateVolume(), so
+	// they will be called sequentially, but the second call will have old
+	// version of the claim.
+	oldPVName := mockClient.volume.Name
+
+	// Make the "old" claim
+	pvc2 := makeTestClaim()
+	pvc2.Annotations[qosProvisioningKey] = "foo"
+	// Add a dummy annotation so we recognize the claim was updated (i.e.
+	// stored in mockClient)
+	pvc2.Annotations["test"] = "test"
+
+	err = controller.reconcileClaim(pvc2)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// The 2nd PVC should be ignored, no new PV was created
+	if val, found := pvc2.Annotations[pvProvisioningRequiredAnnotationKey]; found {
+		t.Errorf("2nd PVC got unexpected annotation %q: %q", pvProvisioningRequiredAnnotationKey, val)
+	}
+	if mockClient.volume.Name != oldPVName {
+		t.Errorf("2nd PVC unexpectedly provisioned a new volume")
+	}
+	if _, found := mockClient.claim.Annotations["test"]; found {
+		t.Errorf("2nd PVC was unexpectedly updated")
 	}
 }
 
