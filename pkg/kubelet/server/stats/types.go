@@ -22,9 +22,6 @@ import (
 
 // Summary is a top-level container for holding NodeStats and PodStats.
 type Summary struct {
-	// The time the most recent data included in this summary was collect at, rounded to the nearest
-	// second.
-	Time unversioned.Time `json:"time"`
 	// Overall node stats.
 	Node NodeStats `json:"node"`
 	// Per-pod stats.
@@ -104,6 +101,8 @@ type PodReference struct {
 
 // NetworkStats contains data about network resources.
 type NetworkStats struct {
+	// The time at which these stats were updated.
+	Time unversioned.Time `json:"time"`
 	// Cumulative count of bytes received.
 	RxBytes *uint64 `json:"rxBytes,omitempty"`
 	// Cumulative count of receive errors encountered.
@@ -116,6 +115,8 @@ type NetworkStats struct {
 
 // CPUStats contains data about CPU usage.
 type CPUStats struct {
+	// The time at which these stats were updated.
+	Time unversioned.Time `json:"time"`
 	// Total CPU usage (sum of all cores) averaged over the sample window.
 	// The "core" unit can be interpreted as CPU core-nanoseconds per second.
 	UsageNanoCores *uint64 `json:"usageNanoCores,omitempty"`
@@ -125,6 +126,8 @@ type CPUStats struct {
 
 // MemoryStats contains data about memory usage.
 type MemoryStats struct {
+	// The time at which these stats were updated.
+	Time unversioned.Time `json:"time"`
 	// Total memory in use. This includes all memory regardless of when it was accessed.
 	UsageBytes *uint64 `json:"usageBytes,omitempty"`
 	// The amount of working set memory. This includes recently accessed memory,
@@ -188,6 +191,8 @@ type UserDefinedMetricDescriptor struct {
 // UserDefinedMetric represents a metric defined and generate by users.
 type UserDefinedMetric struct {
 	UserDefinedMetricDescriptor `json:",inline"`
+	// The time at which these stats were updated.
+	Time unversioned.Time `json:"time"`
 	// Value of the metric. Float64s have 53 bit precision.
 	// We do not forsee any metrics exceeding that value.
 	Value float64 `json:"value"`
