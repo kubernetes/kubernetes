@@ -225,6 +225,14 @@ func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *a
 func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api.PersistentVolume) error {
 	glog.V(5).Infof("PersistentVolume[%s] reconciling", pv.Name)
 
+	// The PV may have been modified by parallel call to reconcileVolume, load
+	// the current version.
+	newPv, err := controller.client.GetPersistentVolume(pv.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot reload volume %s: %v", pv.Name, err)
+	}
+	pv = newPv
+
 	if pv.Spec.ClaimRef == nil {
 		glog.V(5).Infof("PersistentVolume[%s] is not bound to a claim.  No provisioning required", pv.Name)
 		return nil
@@ -258,7 +266,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api
 
 	// provisioning is incomplete.  Attempt to provision the volume.
 	glog.V(5).Infof("PersistentVolume[%s] provisioning in progress", pv.Name)
-	err := provisionVolume(pv, controller)
+	err = provisionVolume(pv, controller)
 	if err != nil {
 		return fmt.Errorf("Error provisioning PersistentVolume[%s]: %v", pv.Name, err)
 	}

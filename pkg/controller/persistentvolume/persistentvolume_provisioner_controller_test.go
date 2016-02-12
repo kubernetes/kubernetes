@@ -183,6 +183,7 @@ func TestReconcileVolume(t *testing.T) {
 	controller, mockClient, mockVolumePlugin := makeTestController()
 	pv := makeTestVolume()
 	pvc := makeTestClaim()
+	mockClient.volume = pv
 
 	err := controller.reconcileVolume(pv)
 	if err != nil {
@@ -197,6 +198,7 @@ func TestReconcileVolume(t *testing.T) {
 	// pretend the claim and volume are bound, no provisioning required
 	claimRef, _ := api.GetReference(pvc)
 	pv.Spec.ClaimRef = claimRef
+	mockClient.volume = pv
 	err = controller.reconcileVolume(pv)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -204,6 +206,7 @@ func TestReconcileVolume(t *testing.T) {
 
 	pv.Annotations[pvProvisioningRequiredAnnotationKey] = "!pvProvisioningCompleted"
 	pv.Annotations[qosProvisioningKey] = "foo"
+	mockClient.volume = pv
 	err = controller.reconcileVolume(pv)
 
 	if !isAnnotationMatch(pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue, mockClient.volume.Annotations) {

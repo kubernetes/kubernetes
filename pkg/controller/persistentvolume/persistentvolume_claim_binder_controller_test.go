@@ -120,6 +120,7 @@ func TestClaimRace(t *testing.T) {
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{}
+	mockClient.volume = v
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
@@ -276,7 +277,8 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{
-		claim: claim,
+		claim:  claim,
+		volume: pv,
 	}
 
 	plugMgr := volume.VolumePluginMgr{}

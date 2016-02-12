@@ -193,6 +193,14 @@ func (binder *PersistentVolumeClaimBinder) deleteClaim(obj interface{}) {
 func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderClient, volume *api.PersistentVolume) (err error) {
 	glog.V(5).Infof("Synchronizing PersistentVolume[%s], current phase: %s\n", volume.Name, volume.Status.Phase)
 
+	// The PV may have been modified by parallel call to syncVolume, load
+	// the current version.
+	newPv, err := binderClient.GetPersistentVolume(volume.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot reload volume %s: %v", volume.Name, err)
+	}
+	volume = newPv
+
 	// volumes can be in one of the following states:
 	//
 	// VolumePending -- default value -- not bound to a claim and not yet processed through this controller.
@@ -203,12 +211,15 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	currentPhase := volume.Status.Phase
 	nextPhase := currentPhase
 
+	// Always store the newest volume state in local cache.
 	_, exists, err := volumeIndex.Get(volume)
 	if err != nil {
 		return err
 	}
 	if !exists {
 		volumeIndex.Add(volume)
+	} else {
+		volumeIndex.Update(volume)
 	}
 
 	if isBeingProvisioned(volume) {
