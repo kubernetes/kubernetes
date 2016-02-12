@@ -186,4 +186,5 @@ type VersionInfo struct {
 type MachineInfoFactory interface {
 	GetMachineInfo() (*MachineInfo, error)
 	GetVersionInfo() (*VersionInfo, error)
+	GetRuntime() string
 }

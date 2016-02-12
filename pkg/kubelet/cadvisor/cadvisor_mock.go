@@ -73,6 +73,11 @@ func (c *Mock) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }
 
+func (c *Mock) RktImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	args := c.Called()
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
+}
+
 func (c *Mock) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	args := c.Called()
 	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)

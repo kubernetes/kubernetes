@@ -38,6 +38,7 @@ import (
 const (
 	LabelSystemRoot   = "root"
 	LabelDockerImages = "docker-images"
+	LabelRktImages    = "rkt-images"
 )
 
 type partition struct {
@@ -62,6 +63,7 @@ type Context struct {
 	// docker root directory.
 	DockerRoot string
 	DockerInfo map[string]string
+	RktPath    string
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
@@ -102,7 +104,13 @@ func NewFsInfo(context Context) (FsInfo, error) {
 
 	// need to call this before the log line below printing out the partitions, as this function may
 	// add a "partition" for devicemapper to fsInfo.partitions
-	fsInfo.addDockerImagesLabel(context)
+	if context.DockerRoot != "" {
+		fsInfo.addDockerImagesLabel(context)
+	}
+
+	if context.RktPath != "" {
+		fsInfo.addRktImagesLabel(context)
+	}
 
 	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
 	fsInfo.addSystemRootLabel()
@@ -165,8 +173,16 @@ func (self *RealFsInfo) addDockerImagesLabel(context Context) {
 		dockerPaths := getDockerImagePaths(context)
 
 		for src, p := range self.partitions {
-			self.updateDockerImagesPath(src, p.mountpoint, dockerPaths)
+			self.updateContainerLabelImagesPath(LabelDockerImages, src, p.mountpoint, dockerPaths)
 		}
+	}
+}
+
+func (self *RealFsInfo) addRktImagesLabel(context Context) {
+	rktPaths := []string{context.RktPath}
+
+	for src, p := range self.partitions {
+		self.updateContainerLabelImagesPath(LabelRktImages, src, p.mountpoint, rktPaths)
 	}
 }
 
@@ -190,17 +206,17 @@ func getDockerImagePaths(context Context) []string {
 
 // This method compares the mountpoint with possible docker image mount points. If a match is found,
 // docker images label is added to the partition.
-func (self *RealFsInfo) updateDockerImagesPath(source string, mountpoint string, dockerImagePaths []string) {
+func (self *RealFsInfo) updateContainerLabelImagesPath(label string, source string, mountpoint string, dockerImagePaths []string) {
 	for _, v := range dockerImagePaths {
 		if v == mountpoint {
 			if i, ok := self.labels[LabelDockerImages]; ok {
 				// pick the innermost mountpoint.
 				mnt := self.partitions[i].mountpoint
 				if len(mnt) < len(mountpoint) {
-					self.labels[LabelDockerImages] = source
+					self.labels[label] = source
 				}
 			} else {
-				self.labels[LabelDockerImages] = source
+				self.labels[label] = source
 			}
 		}
 	}

@@ -58,15 +58,26 @@ func init() {
 	}
 }
 
+//
+
 // Creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint) (Interface, error) {
+func New(port uint, containerRuntime string) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
 		return nil, err
 	}
 
+	config := manager.Config{
+                MemoryCache:		  memory.New(statsCacheDuration, nil),
+                MaxHousekeepingInterval:  maxHousekeepingInterval,
+                AllowDynamicHousekeeping: allowDynamicHousekeeping,
+                ContainerRuntime:         containerRuntime,
+	}
+
+	config.Sysfs = sysFs
+
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping)
+	m, err := manager.NewWithConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +175,10 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 
 func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cc.getFsInfo(cadvisorfs.LabelDockerImages)
+}
+
+func (cc *cadvisorClient) RktImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cc.getFsInfo(cadvisorfs.LabelRktImages)
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
