@@ -347,6 +347,11 @@ func (m *manager) syncBatch() {
 
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
+	if !m.needsUpdate(uid, status) {
+		glog.V(1).Infof("Status for pod %q is up-to-date; skipping", uid)
+		return
+	}
+
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.Core().Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
@@ -360,10 +365,6 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		if len(translatedUID) > 0 && translatedUID != uid {
 			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", format.Pod(pod))
 			m.deletePodStatus(uid)
-			return
-		}
-		if !m.needsUpdate(pod.UID, status) {
-			glog.V(1).Infof("Status for pod %q is up-to-date; skipping", format.Pod(pod))
 			return
 		}
 		pod.Status = status.status
