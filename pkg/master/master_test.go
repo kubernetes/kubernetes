@@ -260,6 +260,82 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
 }
 
+// Because we need to be backwards compatible with release 1.1, at endpoints
+// that exist in release 1.1, the responses should have empty APIVersion.
+func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
+	master, etcdserver, _, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+
+	// /api exists in release-1.1
+	resp, err := http.Get(server.URL + "/api")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	apiVersions := unversioned.APIVersions{}
+	assert.NoError(decodeResponse(resp, &apiVersions))
+	assert.Equal(apiVersions.APIVersion, "")
+
+	// /api/v1 exists in release-1.1
+	resp, err = http.Get(server.URL + "/api/v1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	resourceList := unversioned.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &resourceList))
+	assert.Equal(resourceList.APIVersion, "")
+
+	// /apis exists in release-1.1
+	resp, err = http.Get(server.URL + "/apis")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	groupList := unversioned.APIGroupList{}
+	assert.NoError(decodeResponse(resp, &groupList))
+	assert.Equal(groupList.APIVersion, "")
+
+	// /apis/extensions exists in release-1.1
+	resp, err = http.Get(server.URL + "/apis/extensions")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	group := unversioned.APIGroup{}
+	assert.NoError(decodeResponse(resp, &group))
+	assert.Equal(group.APIVersion, "")
+
+	// /apis/extensions/v1beta1 exists in release-1.1
+	resp, err = http.Get(server.URL + "/apis/extensions/v1beta1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	resourceList = unversioned.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &resourceList))
+	assert.Equal(resourceList.APIVersion, "")
+
+	// /apis/autoscaling doesn't exist in release-1.1, so the APIVersion field
+	// should be non-empty in the results returned by the server.
+	resp, err = http.Get(server.URL + "/apis/autoscaling")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	group = unversioned.APIGroup{}
+	assert.NoError(decodeResponse(resp, &group))
+	assert.Equal(group.APIVersion, "v1")
+
+	// apis/autoscaling/v1 doesn't exist in release-1.1, so the APIVersion field
+	// should be non-empty in the results returned by the server.
+
+	resp, err = http.Get(server.URL + "/apis/autoscaling/v1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	resourceList = unversioned.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &resourceList))
+	assert.Equal(resourceList.APIVersion, "v1")
+
+}
+
 func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
