@@ -100,10 +100,6 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 	if !found {
 		return nil, fmt.Errorf("Missing stats for root container")
 	}
-	cstat, found := sb.latestContainerStats(&rootInfo)
-	if !found {
-		return nil, fmt.Errorf("Missing stats for root container")
-	}
 
 	rootStats := sb.containerInfoV2ToStats("", &rootInfo)
 	nodeStats := NodeStats{
@@ -130,7 +126,6 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 	}
 
 	summary := Summary{
-		Time: unversioned.NewTime(cstat.Timestamp),
 		Node: nodeStats,
 		Pods: sb.buildSummaryPods(),
 	}
@@ -250,15 +245,17 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 	name string,
 	info *cadvisorapiv2.ContainerInfo) ContainerStats {
 	stats := ContainerStats{
-		Name:      name,
 		StartTime: unversioned.NewTime(info.Spec.CreationTime),
+		Name:      name,
 	}
 	cstat, found := sb.latestContainerStats(info)
 	if !found {
 		return stats
 	}
 	if info.Spec.HasCpu {
-		cpuStats := CPUStats{}
+		cpuStats := CPUStats{
+			Time: unversioned.NewTime(cstat.Timestamp),
+		}
 		if cstat.CpuInst != nil {
 			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
 		}
@@ -271,6 +268,7 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 		pageFaults := cstat.Memory.ContainerData.Pgfault
 		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
 		stats.Memory = &MemoryStats{
+			Time:            unversioned.NewTime(cstat.Timestamp),
 			UsageBytes:      &cstat.Memory.Usage,
 			WorkingSetBytes: &cstat.Memory.WorkingSet,
 			PageFaults:      &pageFaults,
@@ -304,6 +302,7 @@ func (sb *summaryBuilder) containerInfoV2ToNetworkStats(info *cadvisorapiv2.Cont
 		txErrors += inter.TxErrors
 	}
 	return &NetworkStats{
+		Time:     unversioned.NewTime(cstat.Timestamp),
 		RxBytes:  &rxBytes,
 		RxErrors: &rxErrors,
 		TxBytes:  &txBytes,
@@ -353,6 +352,7 @@ func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv
 	for _, specVal := range udmMap {
 		udm = append(udm, UserDefinedMetric{
 			UserDefinedMetricDescriptor: specVal.ref,
+			Time:  unversioned.NewTime(specVal.time),
 			Value: specVal.value,
 		})
 	}
