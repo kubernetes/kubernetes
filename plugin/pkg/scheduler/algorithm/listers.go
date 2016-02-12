@@ -95,7 +95,7 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 // ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
 type ControllerLister interface {
 	// Lists all the replication controllers
-	List() ([]api.ReplicationController, error)
+	List() (api.ReplicationControllerList, error)
 	// Gets the services for the given pod
 	GetPodControllers(*api.Pod) ([]api.ReplicationController, error)
 }
@@ -104,8 +104,8 @@ type ControllerLister interface {
 type EmptyControllerLister struct{}
 
 // List returns nil
-func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
-	return nil, nil
+func (f EmptyControllerLister) List() (api.ReplicationControllerList, error) {
+	return api.ReplicationControllerList{}, nil
 }
 
 // GetPodControllers returns nil
@@ -117,8 +117,8 @@ func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []ap
 type FakeControllerLister []api.ReplicationController
 
 // List returns []api.ReplicationController, the list of all ReplicationControllers.
-func (f FakeControllerLister) List() ([]api.ReplicationController, error) {
-	return f, nil
+func (f FakeControllerLister) List() (api.ReplicationControllerList, error) {
+	return api.ReplicationControllerList{Items: f}, nil
 }
 
 // GetPodControllers gets the ReplicationControllers that have the selector that match the labels on the given pod

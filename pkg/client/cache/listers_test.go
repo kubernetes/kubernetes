@@ -137,7 +137,8 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
 			list: func() ([]api.ReplicationController, error) {
-				return lister.List()
+				list, err := lister.List()
+				return list.Items, err
 			},
 			outRCNames: sets.NewString("basic"),
 		},
