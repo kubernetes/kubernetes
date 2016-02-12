@@ -52,7 +52,7 @@ Make it really hard to accidentally create a job which has an overlapping select
 
 `extensions/v1beta1 Job` remains the same. `batch/v1 Job` changes change as follows.
 
-Field `job.spec.noAutoSelector` is added.  It controls whether selectors are automatically
+Field `job.spec.manualSelector` is added.  It controls whether selectors are automatically
 generated.  In automatic mode, user cannot make the mistake of creating non-unique selectors.
 In manual mode, certain rare use cases are supported.
 
@@ -63,7 +63,7 @@ Defaulting changes.  Defaulting happens in one of two modes:
 ### Automatic Mode
 
 - User does not specify `job.spec.selector`.
-- User is probably unaware of the `job.spec.noAutoSelector` field and does not think about it.
+- User is probably unaware of the `job.spec.manualSelector` field and does not think about it.
 - User optionally puts labels on pod template (optional).  user does not think about uniqueness, just labeling for user's own reasons.
 - Defaulting logic sets `job.spec.selector` to `matchLabels["controller-uid"]="$UIDOFJOB"`
 - Defaulting logic  appends 2 labels to the `.spec.template.metadata.labels`.
@@ -74,7 +74,7 @@ Defaulting changes.  Defaulting happens in one of two modes:
 
 - User means User or Controller for the rest of this list.
 - User does specify `job.spec.selector`.
-- User does specify `job.spec.noAutoSelector=true`
+- User does specify `job.spec.manualSelector=true`
 - User puts a unique label or label(s) on pod template (required).  user does think carefully about uniqueness.
 - No defaulting of pod labels or the selector happen.
 
@@ -97,11 +97,11 @@ users looking at a stored pod spec do not need to be aware of this field.
 
 ### Overriding Unique Labels
 
-If user does specify `job.spec.selector` then the user must also specify `job.spec.noAutoSelector`.
+If user does specify `job.spec.selector` then the user must also specify `job.spec.manualSelector`.
 This ensures the user knows that what he is doing is not the normal thing to do.
 
-To prevent users from copying the `job.spec.noAutoSelector` flag from existing jobs, it will be
-optional and default to false, which means when you ask GET and existing job back that didn't use this feature, you don't even see the  `job.spec.noAutoSelector` flag, so you are not tempted to wonder if you should fiddle with it.
+To prevent users from copying the `job.spec.manualSelector` flag from existing jobs, it will be
+optional and default to false, which means when you ask GET and existing job back that didn't use this feature, you don't even see the  `job.spec.manualSelector` flag, so you are not tempted to wonder if you should fiddle with it.
 
 ## Job Controller
 
@@ -119,9 +119,9 @@ Recommend `kubectl get jobs -l job-name=name` as the way to find pods of a job.
 
 # Cross Version Compat
 
-`v1beta1` will not have a `job.spec.noAutoSelector` and will not provide a default selector.
+`v1beta1` will not have a `job.spec.manualSelector` and will not provide a default selector.
 
-Conversion from v1beta1 to v1 will use the user-provided selector and set `job.spec.noAutoSelector=true`.
+Conversion from v1beta1 to v1 will use the user-provided selector and set `job.spec.manualSelector=true`.
 
 # Future Work
 
