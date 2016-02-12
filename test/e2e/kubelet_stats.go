@@ -197,8 +197,8 @@ type containerResourceUsage struct {
 	Name                    string
 	Timestamp               time.Time
 	CPUUsageInCores         float64
-	MemoryUsageInBytes      int64
-	MemoryWorkingSetInBytes int64
+	MemoryUsageInBytes      uint64
+	MemoryWorkingSetInBytes uint64
 	MemoryRSSInBytes        uint64
 	// The interval used to calculate CPUUsageInCores.
 	CPUInterval time.Duration
@@ -303,16 +303,16 @@ func formatResourceUsageStats(nodeName string, containerStats resourceUsagePerCo
 	return fmt.Sprintf("Resource usage on node %q:\n%s", nodeName, buf.String())
 }
 
-type int64arr []int64
+type uint64arr []uint64
 
-func (a int64arr) Len() int           { return len(a) }
-func (a int64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a int64arr) Less(i, j int) bool { return a[i] < a[j] }
+func (a uint64arr) Len() int           { return len(a) }
+func (a uint64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a uint64arr) Less(i, j int) bool { return a[i] < a[j] }
 
 type usageDataPerContainer struct {
 	cpuData        []float64
-	memUseData     []int64
-	memWorkSetData []int64
+	memUseData     []uint64
+	memWorkSetData []uint64
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
@@ -365,8 +365,8 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapi.
 		Name:                    name,
 		Timestamp:               newStats.Timestamp,
 		CPUUsageInCores:         float64(newStats.Cpu.Usage.Total-oldStats.Cpu.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
-		MemoryUsageInBytes:      int64(newStats.Memory.Usage),
-		MemoryWorkingSetInBytes: int64(newStats.Memory.WorkingSet),
+		MemoryUsageInBytes:      newStats.Memory.Usage,
+		MemoryWorkingSetInBytes: newStats.Memory.WorkingSet,
 		MemoryRSSInBytes:        newStats.Memory.RSS,
 		CPUInterval:             newStats.Timestamp.Sub(oldStats.Timestamp),
 	}
