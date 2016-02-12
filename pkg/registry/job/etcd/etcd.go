@@ -17,7 +17,10 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -27,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/job"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-
-	"github.com/golang/glog"
 )
 
 // REST implements a RESTStorage for jobs against etcd
@@ -46,21 +47,13 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		&extensions.Job{}, prefix, job.Strategy, newListFunc,
 	)
 
-	{
-		// Test the storage interface.
-		external, err := runtime.Encode(storageInterface.Codec(), &extensions.Job{})
-		if err != nil {
-			panic(err)
-		}
-		_, err = runtime.Decode(storageInterface.Codec(), []byte(`{"kind":"Job","apiVersion":"batch/v1"}`))
-		if err != nil {
-			panic(err)
-		}
-		_, err = runtime.Decode(storageInterface.Codec(), []byte(`{"kind":"Job","apiVersion":"extensions/v1beta1"}`))
-		if err != nil {
-			panic(err)
-		}
-		glog.Infof("Job version looks like: %s", external)
+	if err := runtime.CheckCodec(
+		storageInterface.Codec(),
+		&extensions.Job{},
+		unversioned.GroupVersionKind{"batch", "v1", "Job"},
+		unversioned.GroupVersionKind{"extensions", "v1beta1", "Job"},
+	); err != nil {
+		panic(fmt.Errorf("Job REST object construction: provided storage object has a defective codec: %v", err))
 	}
 
 	store := &etcdgeneric.Etcd{

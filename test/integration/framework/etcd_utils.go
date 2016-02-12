@@ -25,6 +25,7 @@ import (
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -66,21 +67,17 @@ func NewBatchEtcdStorage(client etcd.Client) storage.Interface {
 		client = NewEtcdClient()
 	}
 	c := testapi.Batch.Codec()
-	// Test the storage interface.
-	external, err := runtime.Encode(c, &extensions.Job{})
-	if err != nil {
-		panic(err)
+
+	if err := runtime.CheckCodec(
+		c,
+		&extensions.Job{},
+		unversioned.GroupVersionKind{"batch", "v1", "Job"},
+		unversioned.GroupVersionKind{"extensions", "v1beta1", "Job"},
+	); err != nil {
+		panic(fmt.Errorf("Job REST storage: provided storage object has a defective codec: %v", err))
 	}
-	_, err = runtime.Decode(c, []byte(`{"kind":"Job","apiVersion":"batch/v1"}`))
-	if err != nil {
-		panic(err)
-	}
-	_, err = runtime.Decode(c, []byte(`{"kind":"Job","apiVersion":"extensions/v1beta1"}`))
-	if err != nil {
-		panic(err)
-	}
-	glog.Infof("Job version looks like: %s", external)
-	return etcdstorage.NewEtcdStorage(client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false)
+
+	return etcdstorage.NewEtcdStorage(client, c, etcdtest.PathPrefix(), false)
 }
 
 func RequireEtcd() {
