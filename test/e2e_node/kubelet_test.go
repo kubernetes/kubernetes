@@ -151,17 +151,15 @@ var _ = Describe("Kubelet", func() {
 				Expect(summary.Node.Fs.UsedBytes).NotTo(BeNil())
 				Expect(*summary.Node.Fs.UsedBytes).NotTo(BeZero())
 
-				//				TODO: Enable these once system containers are working on all distros
-				//				See issue #20993
-				//				By("Having resources for kubelet and runtime system containers")
-				//				sysContainers := map[string]stats.ContainerStats{}
-				//				sysContainersList := []string{}
-				//				for _, container := range summary.Node.SystemContainers {
-				//					sysContainers[container.Name] = container
-				//					sysContainersList = append(sysContainersList, container.Name)
-				//					ExpectContainerStatsNotEmpty(&container)
-				//				}
-				//				Expect(sysContainersList).To(ConsistOf("kubelet", "runtime"))
+				By("Having resources for kubelet and runtime system containers")
+				sysContainers := map[string]stats.ContainerStats{}
+				sysContainersList := []string{}
+				for _, container := range summary.Node.SystemContainers {
+					sysContainers[container.Name] = container
+					sysContainersList = append(sysContainersList, container.Name)
+					ExpectContainerStatsNotEmpty(&container)
+				}
+				Expect(sysContainersList).To(ConsistOf("kubelet", "runtime"))
 
 				// Verify Pods Stats are present
 				podsList := []string{}
