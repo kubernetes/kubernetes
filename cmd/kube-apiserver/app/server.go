@@ -109,6 +109,7 @@ func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGr
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for JSON")
 	}
+	glog.Infof("constructing etcd storage interface.\n  sv: %v\n  mv: %v\n", storageVersion, memoryVersion)
 	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, memoryVersion))
 	return storageConfig.NewStorage()
 }
@@ -274,6 +275,7 @@ func Run(s *options.APIServer) error {
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
+		glog.Infof("Configuring extensions/v1beta1 storage destination")
 		expGroup, err := registered.Group(extensions.GroupName)
 		if err != nil {
 			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
@@ -286,6 +288,11 @@ func Run(s *options.APIServer) error {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
+
+		// Since Job has been moved to the batch group, we need to make
+		// sure batch has a storage destination. If the batch group
+		// itself is on, it will overwrite this decision below.
+		storageDestinations.AddAPIGroup(batch.GroupName, expEtcdStorage)
 	}
 
 	// batch/v1/job is a move from extensions/v1beta1/job. The storage
@@ -293,6 +300,7 @@ func Run(s *options.APIServer) error {
 	// must roll forward while using 1.2, because we will require the
 	// latter for 1.3.
 	if !apiGroupVersionOverrides["batch/v1"].Disable {
+		glog.Infof("Configuring batch/v1 storage destination")
 		batchGroup, err := registered.Group(batch.GroupName)
 		if err != nil {
 			glog.Fatalf("Batch API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
@@ -515,5 +523,6 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 			apiGroupVersionOverrides[extensionsGroupVersion] = apiGroupVersionOverride
 		}
 	}
+
 	return apiGroupVersionOverrides, nil
 }

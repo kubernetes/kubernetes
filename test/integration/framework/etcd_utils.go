@@ -25,6 +25,8 @@ import (
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
@@ -57,6 +59,28 @@ func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 		client = NewEtcdClient()
 	}
 	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
+}
+
+func NewBatchEtcdStorage(client etcd.Client) storage.Interface {
+	if client == nil {
+		client = NewEtcdClient()
+	}
+	c := testapi.Batch.Codec()
+	// Test the storage interface.
+	external, err := runtime.Encode(c, &extensions.Job{})
+	if err != nil {
+		panic(err)
+	}
+	_, err = runtime.Decode(c, []byte(`{"kind":"Job","apiVersion":"batch/v1"}`))
+	if err != nil {
+		panic(err)
+	}
+	_, err = runtime.Decode(c, []byte(`{"kind":"Job","apiVersion":"extensions/v1beta1"}`))
+	if err != nil {
+		panic(err)
+	}
+	glog.Infof("Job version looks like: %s", external)
+	return etcdstorage.NewEtcdStorage(client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false)
 }
 
 func RequireEtcd() {

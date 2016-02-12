@@ -79,6 +79,7 @@ func NewStorageDestinations() StorageDestinations {
 
 // AddAPIGroup replaces 'group' if it's already registered.
 func (s *StorageDestinations) AddAPIGroup(group string, defaultStorage storage.Interface) {
+	glog.Infof("Adding storage destination for group %v", group)
 	s.APIGroups[group] = &StorageDestinationsForAPIGroup{
 		Default:   defaultStorage,
 		Overrides: map[string]storage.Interface{},

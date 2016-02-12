@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -35,12 +36,15 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+
+	"github.com/golang/glog"
 )
 
 var (
 	Groups     = make(map[string]TestGroup)
 	Default    TestGroup
 	Extensions TestGroup
+	Batch      TestGroup
 )
 
 type TestGroup struct {
@@ -53,6 +57,8 @@ func init() {
 	if len(kubeTestAPI) != 0 {
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
 		for _, gvString := range testGroupVersions {
+			glog.Infof("KUBE_TEST_API: %v is on", gvString)
+
 			groupVersion, err := unversioned.ParseGroupVersion(gvString)
 			if err != nil {
 				panic(fmt.Sprintf("Error parsing groupversion %v: %v", gvString, err))
@@ -77,9 +83,28 @@ func init() {
 			internalGroupVersion: extensions.SchemeGroupVersion,
 		}
 	}
+	if g, ok := Groups[batch.GroupName]; !ok {
+		// Make "batch/v1beta1" refer to the old location, in extensions
+		if g.externalGroupVersion.Version == "v1beta1" {
+			g.externalGroupVersion.Group = "extensions"
+		}
+		// Not a typo; the internal types for batch are in extensions until we move them.
+		g.internalGroupVersion = extensions.SchemeGroupVersion
+		Groups[batch.GroupName] = g
+	} else {
+		Groups[batch.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{
+				Group:   "batch",
+				Version: "v1",
+			},
+			internalGroupVersion: extensions.SchemeGroupVersion,
+		}
+		// Groups[extensions.GroupName]
+	}
 
 	Default = Groups[api.GroupName]
 	Extensions = Groups[extensions.GroupName]
+	Batch = Groups[batch.GroupName]
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
@@ -100,7 +125,14 @@ func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
-	return api.Codecs.LegacyCodec(g.externalGroupVersion)
+	s, ok := api.Codecs.SerializerForMediaType("application/json", nil)
+	if !ok {
+		panic("unable to find serializer for JSON")
+	}
+	return runtime.NewCodec(
+		api.Codecs.EncoderForVersion(s, g.externalGroupVersion),
+		api.Codecs.DecoderToVersion(s, g.internalGroupVersion),
+	)
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the

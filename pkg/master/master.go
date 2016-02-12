@@ -177,6 +177,15 @@ func resetMetrics(w http.ResponseWriter, req *http.Request) {
 func (m *Master) InstallAPIs(c *Config) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
+	// Print something so users have some idea what effect their runtime
+	// config setting had.
+	for group, or := range m.ApiGroupVersionOverrides {
+		glog.Infof("API group %q enabled: %v", group, !or.Disable)
+		for resource, enabled := range or.ResourceOverrides {
+			glog.Infof("   but %v/%v enabled: %v", group, resource, enabled)
+		}
+	}
+
 	// Install v1 unless disabled.
 	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
 		// Install v1 API.
@@ -660,11 +669,8 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["deployments/scale"] = deploymentStorage.Scale
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
-	// XXX Need something like this for new api group, with just job.
 	if isEnabled("jobs") {
-		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
-		storage["jobs"] = jobStorage
-		storage["jobs/status"] = jobStatusStorage
+		m.constructJobResources(c, storage)
 	}
 	if isEnabled("ingresses") {
 		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
@@ -684,29 +690,37 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
-// getBatchResources returns the resources for batch api
-func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
-	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("jobs")
-	resourceOverrides := m.ApiGroupVersionOverrides["batch/v1"].ResourceOverrides
-	isEnabled := func(resource string) bool {
-		// Check if the resource has been overriden.
-		enabled, ok := resourceOverrides[resource]
-		if !ok {
-			return enabledResources.Has(resource)
-		}
-		return enabled
-	}
+// constructJobResources makes Job resources and adds them to the storage map.
+// They're installed in both batch and extensions. It's assumed that you've
+// already done the check that they should be on.
+func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.Storage) {
+	// Note that job's storage settings are changed by changing the batch
+	// group. Clearly we want all jobs to be stored in the same place no
+	// matter where they're accessed from.
 	storageDecorator := m.StorageDecorator()
 	dbClient := func(resource string) storage.Interface {
 		return c.StorageDestinations.Get(batch.GroupName, resource)
 	}
 
+	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
+	restStorage["jobs"] = jobStorage
+	restStorage["jobs/status"] = jobStatusStorage
+}
+
+// getBatchResources returns the resources for batch api
+func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
+	resourceOverrides := m.ApiGroupVersionOverrides["batch/v1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		if enabled, ok := resourceOverrides[resource]; ok {
+			return enabled
+		}
+		return !m.ApiGroupVersionOverrides["batch/v1"].Disable
+	}
+
 	storage := map[string]rest.Storage{}
 	if isEnabled("jobs") {
-		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
-		storage["jobs"] = jobStorage
-		storage["jobs/status"] = jobStatusStorage
+		m.constructJobResources(c, storage)
 	}
 	return storage
 }

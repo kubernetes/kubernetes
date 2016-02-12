@@ -56,7 +56,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		if err != nil {
 			panic(err)
 		}
-		_, err = runtime.Decode(storageInterface.Codec(), []byte(`{"kind":"Job","apiVersion":"extensions/v1"}`))
+		_, err = runtime.Decode(storageInterface.Codec(), []byte(`{"kind":"Job","apiVersion":"extensions/v1beta1"}`))
 		if err != nil {
 			panic(err)
 		}
