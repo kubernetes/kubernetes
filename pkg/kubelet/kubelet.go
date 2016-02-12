@@ -2371,11 +2371,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		if update.Result == proberesults.Failure {
 			// We should not use the pod from livenessManager, because it is never updated after
 			// initialization.
-			// TODO(random-liu): This is just a quick fix. We should:
-			//  * Just pass pod UID in probe updates to make this less confusing.
-			//  * Maybe probe manager should rely on pod manager, or at least the pod in probe manager
-			//  should be updated.
-			pod, ok := kl.podManager.GetPodByUID(update.Pod.UID)
+			pod, ok := kl.podManager.GetPodByUID(update.PodUID)
 			if !ok {
 				// If the pod no longer exists, ignore the update.
 				glog.V(4).Infof("SyncLoop (container unhealthy): ignore irrelevant update: %#v", update)
