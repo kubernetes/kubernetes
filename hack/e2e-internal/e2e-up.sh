@@ -31,5 +31,5 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
-"${KUBE_VERSION_ROOT}/cluster/kube-up.sh"
+KUBE_TEST_DEBUG=y "${KUBE_VERSION_ROOT}/cluster/kube-up.sh"
 test-setup
