@@ -51,7 +51,6 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Optional: enable v1beta1 related features
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-true}"
 ENABLE_REPLICASETS="${KUBE_ENABLE_REPLICASETS:-true}"
 
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
