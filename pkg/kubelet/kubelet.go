@@ -113,7 +113,7 @@ const (
 
 	etcHostsPath = "/etc/hosts"
 
-	// Capacity of the channel for recieving pod lifecycle events. This number
+	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity = 1000
 
@@ -1579,7 +1579,7 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 }
 
 // One of the following aruguements must be non-nil: runningPod, status.
-// TODO: Modify containerRuntime.KillPod() to accept the right arguements.
+// TODO: Modify containerRuntime.KillPod() to accept the right arguments.
 func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus) error {
 	var p kubecontainer.Pod
 	if runningPod != nil {
@@ -2114,7 +2114,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		glog.Errorf("Failed to cleanup terminated pods: %v", err)
 	}
 
-	// Clear out any old bandwith rules
+	// Clear out any old bandwidth rules
 	if err = kl.cleanupBandwidthLimits(allPods); err != nil {
 		return err
 	}

@@ -93,7 +93,7 @@ fi
 # is an intentionally broken symlink. Linux can use --no-dereference. OS X cannot.
 # So we --exclude='symlink' so diff -r doesn't die following a bad symlink.
 if ! _out="$(diff -Naupr --exclude='symlink' ${KUBE_ROOT}/Godeps/_workspace/src ${_kubetmp}/Godeps/_workspace/src)"; then
-  echo "Your godeps changes are not reproducable"
+  echo "Your godeps changes are not reproducible"
   echo "${_out}"
   exit 1
 fi

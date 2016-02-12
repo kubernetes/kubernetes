@@ -26,7 +26,7 @@ import (
 // Returns the given map, if labelKey is empty.
 func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint32) map[string]string {
 	if labelKey == "" {
-		// Dont need to add a label.
+		// Don't need to add a label.
 		return labels
 	}
 	// Clone.
@@ -42,7 +42,7 @@ func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint
 // Returns the given map, if labelKey is empty.
 func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]string {
 	if labelKey == "" {
-		// Dont need to add a label.
+		// Don't need to add a label.
 		return labels
 	}
 	// Clone.
@@ -58,7 +58,7 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 // Returns the given selector, if labelKey is empty.
 func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
 	if labelKey == "" {
-		// Dont need to add a label.
+		// Don't need to add a label.
 		return selector
 	}
 

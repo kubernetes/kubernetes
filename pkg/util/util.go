@@ -122,7 +122,7 @@ func IntPtr(i int) *int {
 	return &o
 }
 
-// IntPtrDerefOr derefrence the int ptr and returns it i not nil,
+// IntPtrDerefOr dereference the int ptr and returns it i not nil,
 // else returns def.
 func IntPtrDerefOr(ptr *int, def int) int {
 	if ptr != nil {

@@ -37,7 +37,7 @@ if [ "$1" = 'mysqld' ]; then
   DATADIR="$("$@" --verbose --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
  
   # only check if system tables not created from mysql_install_db and permissions 
-  # set with initial SQL script before proceding to build SQL script
+  # set with initial SQL script before proceeding to build SQL script
   if [ ! -d "$DATADIR/mysql" ]; then
   # fail if user didn't supply a root password  
     if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" ]; then
@@ -95,7 +95,7 @@ EOSQL
   chown -R mysql:mysql "$DATADIR"
 fi
 
-# if cluster is turned on, then procede to build cluster setting strings
+# if cluster is turned on, then proceed to build cluster setting strings
 # that will be interpolated into the config files
 if [ -n "$GALERA_CLUSTER" ]; then
   # this is the Single State Transfer user (SST, initial dump or xtrabackup user)

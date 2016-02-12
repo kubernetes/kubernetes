@@ -247,7 +247,7 @@ type resourceUsagePerNode map[string]resourceUsagePerContainer
 // write the actual interval used for calculation (based on the timestamps of
 // the stats points in containerResourceUsage.CPUInterval.
 //
-// containerNames is a function returning a collection of contianer names in which
+// containerNames is a function returning a collection of container names in which
 // user is interested in. ExpectMissingContainers is a flag which says if the test
 // should fail if one of containers listed by containerNames is missing on any node
 // (useful e.g. when looking for system containers or daemons). If set to true function
