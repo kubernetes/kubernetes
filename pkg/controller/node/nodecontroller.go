@@ -514,14 +514,20 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 	}
 	for _, node := range nodes.Items {
 		if node.Spec.PodCIDR == "" {
-			podCIDR, found := availableCIDRs.PopAny()
-			if !found {
-				nc.recordNodeStatusChange(&node, "CIDRNotAvailable")
+			// Re-GET node (because ours might be stale by now).
+			n, err := nc.kubeClient.Core().Nodes().Get(node.Name)
+			if err != nil {
+				glog.Errorf("Failed to get node %q: %v", node.Name, err)
 				continue
 			}
-			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
-			node.Spec.PodCIDR = podCIDR
-			if _, err := nc.kubeClient.Core().Nodes().Update(&node); err != nil {
+			podCIDR, found := availableCIDRs.PopAny()
+			if !found {
+				nc.recordNodeStatusChange(n, "CIDRNotAvailable")
+				continue
+			}
+			glog.V(4).Infof("Assigning node %s CIDR %s", n.Name, podCIDR)
+			n.Spec.PodCIDR = podCIDR
+			if _, err := nc.kubeClient.Core().Nodes().Update(n); err != nil {
 				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
 			}
 		}
