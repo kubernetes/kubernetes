@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
@@ -211,12 +211,12 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "", client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil)
+		c := restclient.NewRESTClient(url, "", restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil)
 		req := c.Post().Resource("testing")
 		req.SetHeader(httpstream.HeaderProtocolVersion, StreamProtocolV2Name)
 		req.Param("command", "ls")
 		req.Param("command", "/")
-		conf := &client.Config{
+		conf := &restclient.Config{
 			Host: server.URL,
 		}
 		e, err := NewExecutor(conf, "POST", req.URL())
@@ -296,10 +296,10 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, 1))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "", client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil)
+		c := restclient.NewRESTClient(url, "", restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil)
 		req := c.Post().Resource("testing")
 
-		conf := &client.Config{
+		conf := &restclient.Config{
 			Host: server.URL,
 		}
 		e, err := NewExecutor(conf, "POST", req.URL())

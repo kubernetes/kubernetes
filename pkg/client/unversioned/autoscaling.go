@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type AutoscalingInterface interface {
@@ -28,26 +29,26 @@ type AutoscalingInterface interface {
 
 // AutoscalingClient is used to interact with Kubernetes autoscaling features.
 type AutoscalingClient struct {
-	*RESTClient
+	*restclient.RESTClient
 }
 
 func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
 	return newHorizontalPodAutoscalersV1(c, namespace)
 }
 
-func NewAutoscaling(c *Config) (*AutoscalingClient, error) {
+func NewAutoscaling(c *restclient.Config) (*AutoscalingClient, error) {
 	config := *c
 	if err := setAutoscalingDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := RESTClientFor(&config)
+	client, err := restclient.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
 	return &AutoscalingClient{client}, nil
 }
 
-func NewAutoscalingOrDie(c *Config) *AutoscalingClient {
+func NewAutoscalingOrDie(c *restclient.Config) *AutoscalingClient {
 	client, err := NewAutoscaling(c)
 	if err != nil {
 		panic(err)
@@ -55,7 +56,7 @@ func NewAutoscalingOrDie(c *Config) *AutoscalingClient {
 	return client
 }
 
-func setAutoscalingDefaults(config *Config) error {
+func setAutoscalingDefaults(config *restclient.Config) error {
 	// if autoscaling group is not registered, return an error
 	g, err := registered.Group(autoscaling.GroupName)
 	if err != nil {
@@ -63,7 +64,7 @@ func setAutoscalingDefaults(config *Config) error {
 	}
 	config.APIPath = defaultAPIPath
 	if config.UserAgent == "" {
-		config.UserAgent = DefaultKubernetesUserAgent()
+		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {

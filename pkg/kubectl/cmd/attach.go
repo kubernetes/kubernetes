@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -74,13 +75,13 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 
 // RemoteAttach defines the interface accepted by the Attach command - provided for test stubbing
 type RemoteAttach interface {
-	Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
 }
 
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
-func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	exec, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -102,7 +103,7 @@ type AttachOptions struct {
 
 	Attach RemoteAttach
 	Client *client.Client
-	Config *client.Config
+	Config *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment

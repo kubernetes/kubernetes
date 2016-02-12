@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/metrics"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -79,7 +80,7 @@ type Factory struct {
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
-	ClientConfig func() (*client.Config, error)
+	ClientConfig func() (*restclient.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -106,7 +107,7 @@ type Factory struct {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
-	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
 	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
 	PauseObject func(object runtime.Object) (bool, error)
 	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
@@ -225,7 +226,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func() (*restclient.Config, error) {
 			return clients.ClientConfigForVersion(nil)
 		},
 		ClientForMapping: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -365,7 +366,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
 			return meta.NewAccessor().Labels(object)
 		},
-		LogsForObject: func(object, options runtime.Object) (*client.Request, error) {
+		LogsForObject: func(object, options runtime.Object) (*restclient.Request, error) {
 			c, err := clients.ClientForVersion(nil)
 			if err != nil {
 				return nil, err
@@ -633,7 +634,7 @@ type clientSwaggerSchema struct {
 const schemaFileName = "schema.json"
 
 type schemaClient interface {
-	Get() *client.Request
+	Get() *restclient.Request
 }
 
 func recursiveSplit(dir string) []string {

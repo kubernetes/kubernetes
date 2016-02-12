@@ -88,7 +88,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
 	)
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	e.secrets, e.secretController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {

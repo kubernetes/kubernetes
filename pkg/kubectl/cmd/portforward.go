@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -62,12 +62,12 @@ func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
 }
 
 type portForwarder interface {
-	ForwardPorts(method string, url *url.URL, config *client.Config, ports []string, stopChan <-chan struct{}) error
+	ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error
 }
 
 type defaultPortForwarder struct{}
 
-func (*defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *client.Config, ports []string, stopChan <-chan struct{}) error {
+func (*defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
 	dialer, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err

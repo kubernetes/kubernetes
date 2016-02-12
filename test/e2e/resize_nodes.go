@@ -590,7 +590,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 					if !isNodeConditionSetAsExpected(&node, api.NodeReady, true) {
 						return false
 					}
-					podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, node.Name)}
+					podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
 					pods, err := c.Pods(api.NamespaceAll).List(podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
@@ -601,7 +601,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 					Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, node.Name)}
+				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
 				if err = waitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, podRunningReady); err != nil {
 					Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}

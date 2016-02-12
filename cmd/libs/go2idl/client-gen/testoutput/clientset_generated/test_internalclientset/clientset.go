@@ -19,6 +19,7 @@ package test_internalclientset
 import (
 	"github.com/golang/glog"
 	unversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -45,7 +46,7 @@ func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
-func NewForConfig(c *unversioned.Config) (*Clientset, error) {
+func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	var clientset Clientset
 	var err error
 	clientset.TestgroupClient, err = unversionedtestgroup.NewForConfig(c)
@@ -62,7 +63,7 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversioned.Config) *Clientset {
+func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = unversionedtestgroup.NewForConfigOrDie(c)
 
@@ -71,7 +72,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *unversioned.RESTClient) *Clientset {
+func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = unversionedtestgroup.New(c)
 

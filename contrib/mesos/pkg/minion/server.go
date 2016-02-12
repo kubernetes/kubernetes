@@ -27,18 +27,17 @@ import (
 	"strings"
 	"syscall"
 
+	log "github.com/golang/glog"
+	"github.com/kardianos/osext"
+	"github.com/spf13/pflag"
+	"gopkg.in/natefinch/lumberjack.v2"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-
-	log "github.com/golang/glog"
-	"github.com/kardianos/osext"
-	"github.com/spf13/pflag"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 const (
@@ -53,7 +52,7 @@ type MinionServer struct {
 
 	privateMountNS bool
 	hks            hyperkube.Interface
-	clientConfig   *client.Config
+	clientConfig   *restclient.Config
 	kmBinary       string
 	tasks          []*tasks.Task
 

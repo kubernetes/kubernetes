@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -254,7 +254,7 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("error in parsing runtime-config: %s", err)
 	}
 
-	clientConfig := &client.Config{
+	clientConfig := &restclient.Config{
 		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 	}
 	if len(s.DeprecatedStorageVersion) != 0 {

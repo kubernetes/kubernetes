@@ -68,7 +68,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // Info holds Kubernetes API authorization config.  It is intended
@@ -104,8 +104,8 @@ func LoadFromFile(path string) (*Info, error) {
 // MergeWithConfig returns a copy of a client.Config with values from the Info.
 // The fields of client.Config with a corresponding field in the Info are set
 // with the value from the Info.
-func (info Info) MergeWithConfig(c client.Config) (client.Config, error) {
-	var config client.Config = c
+func (info Info) MergeWithConfig(c restclient.Config) (restclient.Config, error) {
+	var config restclient.Config = c
 	config.Username = info.User
 	config.Password = info.Password
 	config.CAFile = info.CAFile

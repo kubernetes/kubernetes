@@ -350,7 +350,7 @@ func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatc
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
 func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// TODO: Filter out nodes that doesn't have NodeReady condition.
-	fields := fields.Set{client.NodeUnschedulable: "false"}.AsSelector()
+	fields := fields.Set{api.NodeUnschedulableField: "false"}.AsSelector()
 	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)
 }
 

@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/probe"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -65,7 +65,7 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 	config := &KubeletClientConfig{
 		EnableHttps: true,
 		//Invalid certificate and key path
-		TLSClientConfig: client.TLSClientConfig{
+		TLSClientConfig: restclient.TLSClientConfig{
 			CertFile: "../../client/testdata/mycertinvalid.cer",
 			KeyFile:  "../../client/testdata/mycertinvalid.key",
 			CAFile:   "../../client/testdata/myCA.cer",
@@ -85,7 +85,7 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	config := &KubeletClientConfig{
 		Port:        1234,
 		EnableHttps: true,
-		TLSClientConfig: client.TLSClientConfig{
+		TLSClientConfig: restclient.TLSClientConfig{
 			CertFile: "../../client/testdata/mycertvalid.cer",
 			// TLS Configuration, only applies if EnableHttps is true.
 			KeyFile: "../../client/testdata/mycertvalid.key",

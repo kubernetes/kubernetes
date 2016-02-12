@@ -1421,7 +1421,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, erro
 
 	tokens := []api.Secret{}
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	options := api.ListOptions{FieldSelector: tokenSelector}
 	secrets, err := d.Secrets(namespace).List(options)
 	if err == nil {
