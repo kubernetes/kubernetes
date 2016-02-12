@@ -21,6 +21,7 @@ package integration
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -40,7 +41,8 @@ func TestKubectlValidation(t *testing.T) {
 		// TOOD: Replace with something more robust. These may move.
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Ingress"}`, false},
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Job"}`, false},
-		{`{"apiVersion": "batch/v1", "kind": "Job"}`, false},
+		// This should work or not work depending on whether batch/v1 is on or not.
+		{`{"apiVersion": "batch/v1", "kind": "Job"}`, testapi.Batch.GroupVersion().Group != "batch"},
 		{`{"apiVersion": "vNotAVersion", "kind": "Job"}`, true},
 	}
 	components := framework.NewMasterComponents(&framework.Config{})
