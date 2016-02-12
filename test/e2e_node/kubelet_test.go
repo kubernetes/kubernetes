@@ -120,7 +120,6 @@ var _ = Describe("Kubelet", func() {
 			It("it should report resource usage through the stats api", func() {
 				By("Returning stats summary")
 				resp, err := http.Get(*kubeletAddress + "/stats/summary")
-				now := time.Now()
 				Expect(err).To(BeNil(), fmt.Sprintf("Failed to get /stats/summary"))
 				summary := stats.Summary{}
 				contentsBytes, err := ioutil.ReadAll(resp.Body)
@@ -129,9 +128,6 @@ var _ = Describe("Kubelet", func() {
 				decoder := json.NewDecoder(strings.NewReader(contents))
 				err = decoder.Decode(&summary)
 				Expect(err).To(BeNil(), fmt.Sprintf("Failed to parse /stats/summary to go struct: %+v", resp))
-
-				By("Having the correct time")
-				Expect(summary.Time.Time).To(BeTemporally("~", now, 20*time.Second))
 
 				By("Having resources for node")
 				Expect(summary.Node.NodeName).To(Equal(*nodeName))
