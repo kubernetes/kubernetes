@@ -77,6 +77,7 @@ var (
 	fakeDocker2 = dockertools.NewFakeDockerClient()
 	// Limit the number of concurrent tests.
 	maxConcurrency int
+	watchCache     bool
 
 	longTestTimeout = time.Second * 500
 
@@ -169,6 +170,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	masterConfig.ReadWritePort = portNumber
 	masterConfig.PublicAddress = hostIP
 	masterConfig.CacheTimeout = 2 * time.Second
+	masterConfig.EnableWatchCache = watchCache
 
 	// Create a master and install handlers into mux.
 	m, err := master.New(masterConfig)
@@ -961,6 +963,8 @@ type testFunc func(*client.Client)
 func addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(
 		&maxConcurrency, "max-concurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
+	fs.BoolVar(
+		&watchCache, "watch-cache", false, "Turn on watch cache on API server.")
 }
 
 func main() {
