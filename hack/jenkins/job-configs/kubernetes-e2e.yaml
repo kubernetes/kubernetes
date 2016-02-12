@@ -38,7 +38,7 @@
     suffix:
         - 'gce':
             description: 'Run E2E tests on GCE using the latest successful build.'
-            timeout: 30
+            timeout: 45
         - 'gce-slow':
             description: 'Run slow E2E tests on GCE using the latest successful build.'
             timeout: 60
@@ -78,7 +78,7 @@
     suffix:
         - 'gke':
             description: Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)
-            timeout: 30
+            timeout: 45
         - 'gke-slow':
             description: 'Run slow E2E tests on GKE using the latest successful build.'
             timeout: 60
