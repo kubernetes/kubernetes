@@ -42,25 +42,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 					obj.Labels = labels
 				}
 			}
-			updateStrategy := &obj.Spec.UpdateStrategy
-			if updateStrategy.Type == "" {
-				updateStrategy.Type = RollingUpdateDaemonSetStrategyType
-			}
-			if updateStrategy.Type == RollingUpdateDaemonSetStrategyType {
-				if updateStrategy.RollingUpdate == nil {
-					rollingUpdate := RollingUpdateDaemonSet{}
-					updateStrategy.RollingUpdate = &rollingUpdate
-				}
-				if updateStrategy.RollingUpdate.MaxUnavailable == nil {
-					// Set default MaxUnavailable as 1 by default.
-					maxUnavailable := intstr.FromInt(1)
-					updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-				}
-			}
-			if obj.Spec.UniqueLabelKey == nil {
-				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = DefaultDaemonSetUniqueLabelKey
-			}
 		},
 		func(obj *Deployment) {
 			// Default labels and selector to labels from pod template spec.

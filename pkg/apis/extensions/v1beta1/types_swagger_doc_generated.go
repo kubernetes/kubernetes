@@ -115,11 +115,9 @@ func (DaemonSetList) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetSpec = map[string]string{
-	"":               "DaemonSetSpec is the specification of a daemon set.",
-	"selector":       "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
-	"template":       "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template",
-	"updateStrategy": "Update strategy to replace existing DaemonSet pods with new pods.",
-	"uniqueLabelKey": "Label key that is added to DaemonSet pods to distinguish between old and new pod templates during DaemonSet update. Users can set this to an empty string to indicate that the system should not add any label. If unspecified, system uses DefaultDaemonSetUniqueLabelKey(\"daemonset.kubernetes.io/podTemplateHash\"). Value of this key is hash of DaemonSetSpec.PodTemplateSpec. No label is added if this is set to empty string.",
+	"":         "DaemonSetSpec is the specification of a daemon set.",
+	"selector": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+	"template": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template",
 }
 
 func (DaemonSetSpec) SwaggerDoc() map[string]string {
@@ -135,15 +133,6 @@ var map_DaemonSetStatus = map[string]string{
 
 func (DaemonSetStatus) SwaggerDoc() map[string]string {
 	return map_DaemonSetStatus
-}
-
-var map_DaemonSetUpdateStrategy = map[string]string{
-	"type":          "Type of daemon set update. Only \"RollingUpdate\" is supported at this time. Default is RollingUpdate.",
-	"rollingUpdate": "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
-}
-
-func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
-	return map_DaemonSetUpdateStrategy
 }
 
 var map_Deployment = map[string]string{
@@ -587,16 +576,6 @@ var map_RollbackConfig = map[string]string{
 
 func (RollbackConfig) SwaggerDoc() map[string]string {
 	return map_RollbackConfig
-}
-
-var map_RollingUpdateDaemonSet = map[string]string{
-	"":                "Spec to control the desired behavior of daemon set rolling update.",
-	"maxUnavailable":  "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
-	"minReadySeconds": "Minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
-}
-
-func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
-	return map_RollingUpdateDaemonSet
 }
 
 var map_RollingUpdateDeployment = map[string]string{
