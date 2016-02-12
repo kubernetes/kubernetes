@@ -77,7 +77,9 @@ func NewStorageDestinations() StorageDestinations {
 	}
 }
 
+// AddAPIGroup replaces 'group' if it's already registered.
 func (s *StorageDestinations) AddAPIGroup(group string, defaultStorage storage.Interface) {
+	glog.Infof("Adding storage destination for group %v", group)
 	s.APIGroups[group] = &StorageDestinationsForAPIGroup{
 		Default:   defaultStorage,
 		Overrides: map[string]storage.Interface{},
@@ -97,7 +99,11 @@ func (s *StorageDestinations) AddStorageOverride(group, resource string, overrid
 func (s *StorageDestinations) Get(group, resource string) storage.Interface {
 	apigroup, ok := s.APIGroups[group]
 	if !ok {
-		glog.Errorf("No storage defined for API group: '%s'", apigroup)
+		// TODO: return an error like a normal function. For now,
+		// Fatalf is better than just logging an error, because this
+		// condition guarantees future problems and this is a less
+		// mysterious failure point.
+		glog.Fatalf("No storage defined for API group: '%s'. Defined groups: %#v", group, s.APIGroups)
 		return nil
 	}
 	if apigroup.Overrides != nil {

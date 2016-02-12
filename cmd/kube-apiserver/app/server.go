@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
@@ -85,15 +85,20 @@ func verifyClusterIPFlags(s *options.APIServer) {
 	}
 }
 
-type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string, bool) (storage.Interface, error)
+// For testing.
+type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string, string, bool) (storage.Interface, error)
 
-func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, pathPrefix string, quorum bool) (etcdStorage storage.Interface, err error) {
+func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, memoryGroupVersionString, pathPrefix string, quorum bool) (etcdStorage storage.Interface, err error) {
 	if storageGroupVersionString == "" {
 		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
 	}
 	storageVersion, err := unversioned.ParseGroupVersion(storageGroupVersionString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't understand storage version %v: %v", storageGroupVersionString, err)
+	}
+	memoryVersion, err := unversioned.ParseGroupVersion(memoryGroupVersionString)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't understand memory version %v: %v", memoryGroupVersionString, err)
 	}
 
 	var storageConfig etcdstorage.EtcdConfig
@@ -104,23 +109,9 @@ func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGr
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for JSON")
 	}
-	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, unversioned.GroupVersion{Group: storageVersion.Group, Version: runtime.APIVersionInternal}))
+	glog.Infof("constructing etcd storage interface.\n  sv: %v\n  mv: %v\n", storageVersion, memoryVersion)
+	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, memoryVersion))
 	return storageConfig.NewStorage()
-}
-
-// convert to a map between group and groupVersions.
-func generateStorageVersionMap(legacyVersion string, storageVersions string) map[string]string {
-	storageVersionMap := map[string]string{}
-	if legacyVersion != "" {
-		storageVersionMap[""] = legacyVersion
-	}
-	if storageVersions != "" {
-		groupVersions := strings.Split(storageVersions, ",")
-		for _, gv := range groupVersions {
-			storageVersionMap[apiutil.GetGroup(gv)] = gv
-		}
-	}
-	return storageVersionMap
 }
 
 // parse the value of --etcd-servers-overrides and update given storageDestinations.
@@ -153,7 +144,11 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		}
 
 		servers := strings.Split(tokens[1], ";")
-		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], prefix, quorum)
+		// Note, internalGV will be wrong for things like batch or
+		// autoscalers, but they shouldn't be using the override
+		// storage.
+		internalGV := apigroup.GroupVersion.Group + "/__internal"
+		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], internalGV, prefix, quorum)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -269,17 +264,18 @@ func Run(s *options.APIServer) error {
 
 	storageDestinations := genericapiserver.NewStorageDestinations()
 
-	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
+	storageVersions := s.StorageGroupsToGroupVersions()
 	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
 		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix, s.EtcdQuorumRead)
+	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], "/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
+		glog.Infof("Configuring extensions/v1beta1 storage destination")
 		expGroup, err := registered.Group(extensions.GroupName)
 		if err != nil {
 			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
@@ -287,11 +283,43 @@ func Run(s *options.APIServer) error {
 		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix, s.EtcdQuorumRead)
+		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
+
+		// Since Job has been moved to the batch group, we need to make
+		// sure batch has a storage destination. If the batch group
+		// itself is on, it will overwrite this decision below.
+		storageDestinations.AddAPIGroup(batch.GroupName, expEtcdStorage)
+	}
+
+	// batch/v1/job is a move from extensions/v1beta1/job. The storage
+	// version needs to be either extensions/v1beta1 or batch/v1. Users
+	// must roll forward while using 1.2, because we will require the
+	// latter for 1.3.
+	if !apiGroupVersionOverrides["batch/v1"].Disable {
+		glog.Infof("Configuring batch/v1 storage destination")
+		batchGroup, err := registered.Group(batch.GroupName)
+		if err != nil {
+			glog.Fatalf("Batch API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		}
+		// Figure out what storage group/version we should use.
+		storageGroupVersion, found := storageVersions[batchGroup.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", batchGroup.GroupVersion.Group, storageVersions)
+		}
+
+		if storageGroupVersion != "batch/v1" && storageGroupVersion != "extensions/v1beta1" {
+			glog.Fatalf("The storage version for batch must be either 'batch/v1' or 'extensions/v1beta1'")
+		}
+		glog.Infof("Using %v for batch group storage version", storageGroupVersion)
+		batchEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+		if err != nil {
+			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
+		}
+		storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
 	}
 
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd)
@@ -472,6 +500,15 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 		}
 	}
 
+	disableBatch := disableAllAPIs
+	batchGroupVersion := "batch/v1"
+	disableBatch = !getRuntimeConfigValue(s, batchGroupVersion, !disableBatch)
+	if disableBatch {
+		apiGroupVersionOverrides[batchGroupVersion] = genericapiserver.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
+
 	for key := range s.RuntimeConfig {
 		if strings.HasPrefix(key, v1GroupVersion+"/") {
 			return nil, fmt.Errorf("api/v1 resources cannot be enabled/disabled individually")
@@ -486,5 +523,6 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 			apiGroupVersionOverrides[extensionsGroupVersion] = apiGroupVersionOverride
 		}
 	}
+
 	return apiGroupVersionOverrides, nil
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -152,10 +153,13 @@ func NewMasterConfig() *master.Config {
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
+	batchEtcdStorage := NewBatchEtcdStorage(etcdClient)
+	storageVersions[batch.GroupName] = testapi.Batch.GroupVersion().String()
 
 	storageDestinations := genericapiserver.NewStorageDestinations()
 	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
 	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
+	storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
 
 	return &master.Config{
 		Config: &genericapiserver.Config{
