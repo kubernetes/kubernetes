@@ -441,7 +441,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
 func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRevision *int64) (*extensions.Deployment, error) {
-	newRS, allOldRSs, err := dc.getNewAndAllOldReplicaSets(*deployment)
+	newRS, allOldRSs, err := dc.getAllReplicaSets(*deployment)
 	if err != nil {
 		return nil, err
 	}
@@ -493,14 +493,14 @@ func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(deployment *e
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getNewAndOldReplicaSets(deployment)
+	newRS, oldRSs, err := dc.getAllReplicaSets(deployment)
 	if err != nil {
 		return err
 	}
-	allRSs := append(oldRSs, newRS)
+	allRSs := append(controller.FilterActiveReplicaSets(oldRSs), newRS)
 
 	// scale down old replica sets
-	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(oldRSs, deployment)
+	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(controller.FilterActiveReplicaSets(oldRSs), deployment)
 	if err != nil {
 		return err
 	}
@@ -526,16 +526,14 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 
 	// Sync deployment status
 	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
-
-	// TODO: raise an event, neither scaled up nor down.
 }
 
 func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getNewAndOldReplicaSets(deployment)
+	newRS, oldRSs, err := dc.getAllReplicaSets(deployment)
 	if err != nil {
 		return err
 	}
-	allRSs := append(oldRSs, newRS)
+	allRSs := append(controller.FilterActiveReplicaSets(oldRSs), newRS)
 
 	// Scale up, if we can.
 	scaledUp, err := dc.reconcileNewReplicaSet(allRSs, newRS, deployment)
@@ -548,7 +546,7 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 	}
 
 	// Scale down, if we can.
-	scaledDown, err := dc.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment, true)
+	scaledDown, err := dc.reconcileOldReplicaSets(allRSs, controller.FilterActiveReplicaSets(oldRSs), newRS, deployment, true)
 	if err != nil {
 		return err
 	}
@@ -564,8 +562,6 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 
 	// Sync deployment status
 	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
-
-	// TODO: raise an event, neither scaled up nor down.
 }
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
@@ -580,10 +576,9 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 	return nil
 }
 
-// getNewAndMaybeFilteredOldReplicaSets returns new replica set and old replica sets of the deployment. If ignoreNoPod is true,
-// the returned old replica sets won't include the ones with no pods; otherwise, all old replica sets will be returned.
-func (dc *DeploymentController) getNewAndMaybeFilteredOldReplicaSets(deployment extensions.Deployment, ignoreNoPod bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	oldRSs, allOldRSs, err := dc.getOldReplicaSets(deployment)
+// getAllReplicaSets returns all the replica sets for the provided deployment (new and all old).
+func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployment) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+	_, allOldRSs, err := dc.getOldReplicaSets(deployment)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -604,22 +599,7 @@ func (dc *DeploymentController) getNewAndMaybeFilteredOldReplicaSets(deployment 
 		}
 	}
 
-	if !ignoreNoPod {
-		return newRS, allOldRSs, nil
-	}
-	return newRS, oldRSs, nil
-}
-
-// getNewAndOldReplicaSets returns new replica set and old replica sets of the deployment.
-// Note that the returned old replica sets don't include the ones with no pods.
-func (dc *DeploymentController) getNewAndOldReplicaSets(deployment extensions.Deployment) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	return dc.getNewAndMaybeFilteredOldReplicaSets(deployment, true)
-}
-
-// getNewAndAllOldReplicaSets returns new replica set and old replica sets of the deployment.
-// Note that all old replica sets are returned, include the ones with no pods.
-func (dc *DeploymentController) getNewAndAllOldReplicaSets(deployment extensions.Deployment) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	return dc.getNewAndMaybeFilteredOldReplicaSets(deployment, false)
+	return newRS, allOldRSs, nil
 }
 
 func maxRevision(allRSs []*extensions.ReplicaSet) int64 {
