@@ -432,6 +432,17 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
+// FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
+func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
+	active := []*extensions.ReplicaSet{}
+	for i := range replicaSets {
+		if replicaSets[i].Spec.Replicas > 0 {
+			active = append(active, replicaSets[i])
+		}
+	}
+	return active
+}
+
 // ControllersByCreationTimestamp sorts a list of ReplicationControllers by creation timestamp, using their names as a tie breaker.
 type ControllersByCreationTimestamp []*api.ReplicationController
 
