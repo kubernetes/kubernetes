@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 
 ## Support
 
-At v1.1, Kubernetes supports clusters up to 250 nodes with 30 pods per node and 1-2 containers per pod.
+At v1.2, Kubernetes supports clusters up to 1000 nodes with 30 pods per node and 1-2 containers per pod.
 
 ## Setup
 
@@ -75,6 +75,10 @@ However, this is done only for clusters having more than 50 nodes.
 
 ### Addon Resources
 
+** TODO: Update this to reflect
+[https://github.com/kubernetes/kubernetes/pull/16185/](https://github.com/kubernetes/kubernetes/pull/16185/)
+and any other changes since it was written. **
+
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](http://pr.k8s.io/10653/files) and [#10778](http://pr.k8s.io/10778/files)).
 
 For example:
@@ -105,6 +109,15 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
 
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.md#troubleshooting).
 
+### Allowing minor node failure at startup
+
+For various reasons (see [#18969](https://github.com/kubernetes/kubernetes/issues/18969) for more details) running
+`kube-up.sh` with a very large `NUM_NODES` may fail due to a very small number of nodes not coming up properly.
+Currently you have two choices: restart the cluster (`kube-down.sh` and then `kube-up.sh` again), or before
+running `kube-up.sh` set the environment variable `ALLOWED_NOTREADY_NODES` to whatever value you feel comfortable
+with. This will allow `kube-up.sh` to succeed with fewer than `NUM_NODES` coming up. Depending on the
+reason for the failure, those additional nodes may join later or the cluster may remain at a size of
+`NUM_NODES - ALLOWED_NOTREADY_NODES`.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-large.md?pixel)]()
