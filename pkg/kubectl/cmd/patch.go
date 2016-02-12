@@ -67,7 +67,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
+	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file, or - to use files on STDIN as the patch source.")
 	cmd.MarkFlagRequired("patch")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -87,10 +87,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if len(patch) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify -p to patch")
 	}
-	patchBytes, err := yaml.ToJSON([]byte(patch))
-	if err != nil {
-		return fmt.Errorf("unable to parse %q: %v", patch, err)
-	}
+	patchWithRaw := patch == "-"
 
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
@@ -105,36 +102,49 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	infos, err := r.Infos()
+	count := 0
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		var patchBytes []byte
+		if patchWithRaw {
+			if info.Raw == nil {
+				return fmt.Errorf("unable to get raw data from object, you must pass files on disk when using --patch -")
+			}
+			patchBytes = info.Raw
+		} else {
+			patchBytes, err = yaml.ToJSON([]byte(patch))
+			if err != nil {
+				return fmt.Errorf("unable to parse %q: %v", patch, err)
+			}
+			if cmdutil.ShouldRecord(cmd, info) {
+				patchBytes, err = cmdutil.ChangeResourcePatch(info, f.Command())
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		helper := resource.NewHelper(info.Client, info.Mapping)
+		obj, err := helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patchBytes)
+		if err != nil {
+			return err
+		}
+
+		count++
+		info.Refresh(obj, true)
+		printObjectSpecificMessage(obj, out)
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "patched")
+		return nil
+	})
+
 	if err != nil {
 		return err
 	}
-	if len(infos) > 1 {
-		return fmt.Errorf("multiple resources provided")
-	}
-	info := infos[0]
-	name, namespace := info.Name, info.Namespace
-	mapping := info.ResourceMapping()
-	client, err := f.ClientForMapping(mapping)
-	if err != nil {
-		return err
+	if count == 0 {
+		return fmt.Errorf("no objects passed to patch")
 	}
 
-	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	if cmdutil.ShouldRecord(cmd, info) {
-		patchBytes, err = cmdutil.ChangeResourcePatch(info, f.Command())
-		if err != nil {
-			return err
-		}
-		_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
-		if err != nil {
-			return err
-		}
-	}
-	cmdutil.PrintSuccess(mapper, shortOutput, out, "", name, "patched")
 	return nil
 }
