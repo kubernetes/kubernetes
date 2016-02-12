@@ -144,7 +144,7 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
-		serverObj, err := c.Get().Namespace(namespace).Resource(m.Resource).Name(name).Do().Get()
+		serverObj, err := c.Get().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(m.Resource).Name(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
 			return m.replaceResource(c, m.Resource, namespace, name, obj)
