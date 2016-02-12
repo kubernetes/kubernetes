@@ -84,6 +84,20 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 	return allErrs
 }
 
+// ValidateHasLabel requires that api.ObjectMeta has a Label with key and expectedValue
+func ValidateHasLabel(meta api.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	actualValue, found := meta.Labels[key]
+	if !found {
+		allErrs = append(allErrs, field.Required(fldPath.Child("labels"), key+"="+expectedValue))
+		return allErrs
+	}
+	if actualValue != expectedValue {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("labels"), meta.Labels, "expected "+key+"="+expectedValue))
+	}
+	return allErrs
+}
+
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
