@@ -699,7 +699,7 @@ func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.St
 	// matter where they're accessed from.
 	storageDecorator := m.StorageDecorator()
 	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.Get(batch.GroupName, resource)
+		return c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource)
 	}
 
 	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)

@@ -209,6 +209,8 @@ func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type
 			continue
 		}
 
+		fmt.Printf("%v has type %v\n", gv.String(), gvk.Kind)
+
 		types[gvk.Kind] = t
 	}
 	return types

@@ -84,36 +84,26 @@ func init() {
 		}
 	}
 	if g, ok := Groups[batch.GroupName]; ok {
-		// Make "batch/v1beta1" refer to the old location, in extensions
+		// Make "batch/v1beta1" refer to the old location, in extensions, just in case.
 		if g.externalGroupVersion.Version == "v1beta1" {
 			g.externalGroupVersion.Group = "extensions"
 		}
-		// Not a typo; the internal types for batch are in extensions until we move them.
-		g.internalGroupVersion = extensions.SchemeGroupVersion
+		g.internalGroupVersion = batch.SchemeGroupVersion
 		Groups[batch.GroupName] = g
 	} else {
+		// If batch is "off", then use the extensions group as the external version.
 		Groups[batch.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{
-				Group:   "batch",
-				Version: "v1",
+				Group:   "extensions",
+				Version: "v1beta1",
 			},
-			internalGroupVersion: extensions.SchemeGroupVersion,
+			internalGroupVersion: batch.SchemeGroupVersion,
 		}
-		// Groups[extensions.GroupName]
 	}
 
 	Default = Groups[api.GroupName]
 	Extensions = Groups[extensions.GroupName]
 	Batch = Groups[batch.GroupName]
-
-	if err := runtime.CheckCodec(
-		Batch.Codec(),
-		&extensions.Job{},
-		//unversioned.GroupVersionKind{"batch", "v1", "Job"},
-		//unversioned.GroupVersionKind{"extensions", "v1beta1", "Job"},
-	); err != nil {
-		panic(fmt.Errorf("Test codec setup: defective batch codec %#v: %v", Batch, err))
-	}
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
@@ -135,14 +125,6 @@ func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
 	return api.Codecs.LegacyCodec(g.externalGroupVersion)
-	s, ok := api.Codecs.SerializerForMediaType("application/json", nil)
-	if !ok {
-		panic("unable to find serializer for JSON")
-	}
-	return runtime.NewCodec(
-		api.Codecs.EncoderForVersion(s, g.externalGroupVersion),
-		api.Codecs.DecoderToVersion(s, g.internalGroupVersion),
-	)
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the

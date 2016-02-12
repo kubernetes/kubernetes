@@ -96,6 +96,8 @@ func (s *StorageDestinations) AddStorageOverride(group, resource string, overrid
 	s.APIGroups[group].Overrides[resource] = override
 }
 
+// Get finds the storage destination for the given group and resource. It will
+// Fatalf if the group has no storage destination configured.
 func (s *StorageDestinations) Get(group, resource string) storage.Interface {
 	apigroup, ok := s.APIGroups[group]
 	if !ok {
@@ -112,6 +114,30 @@ func (s *StorageDestinations) Get(group, resource string) storage.Interface {
 		}
 	}
 	return apigroup.Default
+}
+
+// Search is like Get, but can be used to search a list of groups. It tries the
+// groups in order (and Fatalf's if none of them exist). The intention is for
+// this to be used for resources that move between groups.
+func (s *StorageDestinations) Search(groups []string, resource string) storage.Interface {
+	for _, group := range groups {
+		apigroup, ok := s.APIGroups[group]
+		if !ok {
+			continue
+		}
+		if apigroup.Overrides != nil {
+			if client, exists := apigroup.Overrides[resource]; exists {
+				return client
+			}
+		}
+		return apigroup.Default
+	}
+	// TODO: return an error like a normal function. For now,
+	// Fatalf is better than just logging an error, because this
+	// condition guarantees future problems and this is a less
+	// mysterious failure point.
+	glog.Fatalf("No storage defined for any of the groups: %v. Defined groups: %#v", groups, s.APIGroups)
+	return nil
 }
 
 // Get all backends for all registered storage destinations.
