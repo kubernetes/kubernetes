@@ -12,7 +12,7 @@
     "name": "kube-controller-manager",
     "image": "{{kube_docker_registry}}/kube-controller-manager:{{kube-controller-manager_docker_tag}}",
     "resources": {
-      "limits": {
+      "requests": {
         "cpu": "200m"
       }
     },
