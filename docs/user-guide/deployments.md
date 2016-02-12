@@ -39,7 +39,6 @@ Documentation for other releases can be found at
 
 - [Deployments](#deployments)
   - [What is a _Deployment_?](#what-is-a-deployment)
-  - [Enabling Deployments on a Kubernetes cluster](#enabling-deployments-on-a-kubernetes-cluster)
   - [Creating a Deployment](#creating-a-deployment)
   - [Updating a Deployment](#updating-a-deployment)
     - [Multiple Updates](#multiple-updates)
@@ -69,21 +68,6 @@ by new ones.
 A typical use case is:
 * Create a Deployment to bring up a replication controller and pods.
 * Later, update that Deployment to recreate the pods (for example, to use a new image).
-
-## Enabling Deployments on a Kubernetes cluster
-
-Deployment objects are part of the [`extensions` API Group](../api.md#api-groups) and this feature
-is not enabled by default.
-Set `--runtime-config=extensions/v1beta1/deployments=true` on the API server to
-enable it.
-This can be achieved by exporting `KUBE_ENABLE_DEPLOYMENTS=true` before running the
-`kube-up.sh` script on GCE.
-
-Note that Deployment objects effectively have [API version
-`v1alpha1`](../api.md#api-versioning).
-Alpha objects may change or even be discontinued in future software releases.
-However, due to to a known issue, they will appear as API version `v1beta1` if
-enabled.
 
 ## Creating a Deployment
 
