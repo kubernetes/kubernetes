@@ -247,6 +247,7 @@ runTests() {
   secret_data=".data"
   secret_type=".type"
   deployment_image_field="(index .spec.template.spec.containers 0).image"
+  change_cause_annotation='.*kubernetes.io/change-cause.*'
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -458,9 +459,11 @@ runTests() {
 
   ## Patch pod can change image
   # Command
-  kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
+  kubectl patch "${kube_flags[@]}" pod valid-pod --record -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  # Post-condition: valid-pod has the record annotation
+  kube::test::get_object_assert pods "{{range.items}}{{$annotations_field}}:{{end}}" "${change_cause_annotation}"
   # prove that patch can use different types 
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx2"}]'
   # Post-condition: valid-pod POD has image nginx
