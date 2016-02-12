@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
@@ -46,7 +46,7 @@ var (
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
 
 type WebhookAuthorizer struct {
-	restClient *client.RESTClient
+	restClient *restclient.RESTClient
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -88,7 +88,7 @@ func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
 	serializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
 	clientConfig.ContentConfig.Codec = versioning.NewCodecForScheme(api.Scheme, serializer, encodeVersions, decodeVersions)
 
-	restClient, err := client.UnversionedRESTClientFor(clientConfig)
+	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
 		return nil, err
 	}

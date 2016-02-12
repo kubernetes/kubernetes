@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -70,7 +71,7 @@ type SwaggerSchemaInterface interface {
 // DiscoveryClient implements the functions that discover server-supported API groups,
 // versions and resources.
 type DiscoveryClient struct {
-	*RESTClient
+	*restclient.RESTClient
 }
 
 // Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
@@ -207,7 +208,7 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 	return &schema, nil
 }
 
-func setDiscoveryDefaults(config *Config) error {
+func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
 	config.Codec = runtime.NoopEncoder{api.Codecs.UniversalDecoder()}
@@ -216,18 +217,18 @@ func setDiscoveryDefaults(config *Config) error {
 
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. This client
 // can be used to discover supported resources in the API server.
-func NewDiscoveryClientForConfig(c *Config) (*DiscoveryClient, error) {
+func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error) {
 	config := *c
 	if err := setDiscoveryDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := UnversionedRESTClientFor(&config)
+	client, err := restclient.UnversionedRESTClientFor(&config)
 	return &DiscoveryClient{client}, err
 }
 
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. If
 // there is an error, it panics.
-func NewDiscoveryClientForConfigOrDie(c *Config) *DiscoveryClient {
+func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 	client, err := NewDiscoveryClientForConfig(c)
 	if err != nil {
 		panic(err)
@@ -237,6 +238,6 @@ func NewDiscoveryClientForConfigOrDie(c *Config) *DiscoveryClient {
 }
 
 // New creates a new DiscoveryClient for the given RESTClient.
-func NewDiscoveryClient(c *RESTClient) *DiscoveryClient {
+func NewDiscoveryClient(c *restclient.RESTClient) *DiscoveryClient {
 	return &DiscoveryClient{c}
 }

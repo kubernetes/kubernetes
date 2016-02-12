@@ -70,6 +70,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
+	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 
 	type arg struct {
 		Group       string
@@ -85,9 +86,9 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	m := map[string]interface{}{
 		"allGroups":                        allGroups,
-		"Config":                           c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
-		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
+		"Config":                           c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
+		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
+		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
 		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryInterface"}),
 		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryClient"}),
 		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfig"}),

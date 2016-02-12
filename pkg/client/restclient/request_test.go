@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package restclient
 
 import (
 	"bytes"
@@ -1094,7 +1094,7 @@ func TestAbsPath(t *testing.T) {
 		absPath        string
 		wantsAbsPath   string
 	}{
-		{"", "", "", "/"},
+		{"/", "", "", "/"},
 		{"", "", "/", "/"},
 		{"", "", "/api", "/api"},
 		{"", "", "/api/", "/api/"},
@@ -1114,8 +1114,8 @@ func TestAbsPath(t *testing.T) {
 		{"/p1/api/p2", "/r1", "/api/", "/p1/api/p2/api/"},
 		{"/p1/api/p2", "/api/r1", "/api/", "/p1/api/p2/api/"},
 	} {
-		c := NewOrDie(&Config{Host: "http://localhost:123" + tc.configPrefix})
-		r := c.Post().Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
+		u, _ := url.Parse("http://localhost:123" + tc.configPrefix)
+		r := NewRequest(nil, "POST", u, "", ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "test"}}, nil, nil).Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
 		if r.pathPrefix != tc.wantsAbsPath {
 			t.Errorf("test case %d failed, unexpected path: %q, expected %q", i, r.pathPrefix, tc.wantsAbsPath)
 		}

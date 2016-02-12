@@ -20,80 +20,26 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path"
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func TestIsConfigTransportTLS(t *testing.T) {
-	testCases := []struct {
-		Config       *Config
-		TransportTLS bool
-	}{
-		{
-			Config:       &Config{},
-			TransportTLS: false,
-		},
-		{
-			Config: &Config{
-				Host: "https://localhost",
-			},
-			TransportTLS: true,
-		},
-		{
-			Config: &Config{
-				Host: "localhost",
-				TLSClientConfig: TLSClientConfig{
-					CertFile: "foo",
-				},
-			},
-			TransportTLS: true,
-		},
-		{
-			Config: &Config{
-				Host: "///:://localhost",
-				TLSClientConfig: TLSClientConfig{
-					CertFile: "foo",
-				},
-			},
-			TransportTLS: false,
-		},
-		{
-			Config: &Config{
-				Host:     "1.2.3.4:567",
-				Insecure: true,
-			},
-			TransportTLS: true,
-		},
-	}
-	for _, testCase := range testCases {
-		if err := SetKubernetesDefaults(testCase.Config); err != nil {
-			t.Errorf("setting defaults failed for %#v: %v", testCase.Config, err)
-			continue
-		}
-		useTLS := IsConfigTransportTLS(*testCase.Config)
-		if testCase.TransportTLS != useTLS {
-			t.Errorf("expected %v for %#v", testCase.TransportTLS, testCase.Config)
-		}
-	}
-}
-
 func TestSetKubernetesDefaults(t *testing.T) {
 	testCases := []struct {
-		Config Config
-		After  Config
+		Config restclient.Config
+		After  restclient.Config
 		Err    bool
 	}{
 		{
-			Config{},
-			Config{
+			restclient.Config{},
+			restclient.Config{
 				APIPath: "/api",
-				ContentConfig: ContentConfig{
+				ContentConfig: restclient.ContentConfig{
 					GroupVersion: testapi.Default.GroupVersion(),
 					Codec:        testapi.Default.Codec(),
 				},
@@ -104,10 +50,10 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		},
 		// Add this test back when we fixed config and SetKubernetesDefaults
 		// {
-		// 	Config{
+		// 	restclient.Config{
 		// 		GroupVersion: &unversioned.GroupVersion{Group: "not.a.group", Version: "not_an_api"},
 		// 	},
-		// 	Config{},
+		// 	restclient.Config{},
 		// 	true,
 		// },
 	}
@@ -128,16 +74,6 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		if !reflect.DeepEqual(*val, testCase.After) {
 			t.Errorf("unexpected result object: %#v", val)
 		}
-	}
-}
-
-func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
-	config := &Config{}
-	if err := SetKubernetesDefaults(config); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !strings.Contains(config.UserAgent, "kubernetes/") {
-		t.Errorf("no user agent set: %#v", config)
 	}
 }
 
@@ -190,7 +126,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	got, err := ServerAPIVersions(&Config{Host: server.URL, ContentConfig: ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()}})
+	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()}})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -210,7 +146,19 @@ func TestSetsCodec(t *testing.T) {
 		// "invalidVersion":                       {true, "", nil},
 	}
 	for version, expected := range testCases {
-		client, err := New(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: version}}})
+		conf := &restclient.Config{
+			Host: "127.0.0.1",
+			ContentConfig: restclient.ContentConfig{
+				GroupVersion: &unversioned.GroupVersion{Version: version},
+			},
+		}
+
+		var versionedPath string
+		err := SetKubernetesDefaults(conf)
+		if err == nil {
+			_, versionedPath, err = restclient.DefaultServerURL(conf.Host, conf.APIPath, *conf.GroupVersion, false)
+		}
+
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -221,60 +169,11 @@ func TestSetsCodec(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		if e, a := expected.Prefix, client.RESTClient.versionedAPIPath; e != a {
+		if e, a := expected.Prefix, versionedPath; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
-		if e, a := expected.Codec, client.RESTClient.contentConfig.Codec; !reflect.DeepEqual(e, a) {
+		if e, a := expected.Codec, conf.Codec; !reflect.DeepEqual(e, a) {
 			t.Errorf("expected %#v, got %#v", e, a)
-		}
-	}
-}
-
-func TestRESTClientRequires(t *testing.T) {
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{Codec: testapi.Default.Codec()}}); err == nil {
-		t.Errorf("unexpected non-error")
-	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}); err == nil {
-		t.Errorf("unexpected non-error")
-	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}}); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestValidatesHostParameter(t *testing.T) {
-	testCases := []struct {
-		Host    string
-		APIPath string
-
-		URL string
-		Err bool
-	}{
-		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Default.GroupVersion().Version, false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Default.GroupVersion().Version, false},
-		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host/prefix", "", "http://host/prefix/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "", "http://host/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "/", "http://host/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "/other", "http://host/other/" + testapi.Default.GroupVersion().Version, false},
-		{"host/server", "", "", true},
-	}
-	for i, testCase := range testCases {
-		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, *testapi.Default.GroupVersion(), false)
-		switch {
-		case err == nil && testCase.Err:
-			t.Errorf("expected error but was nil")
-			continue
-		case err != nil && !testCase.Err:
-			t.Errorf("unexpected error %v", err)
-			continue
-		case err != nil:
-			continue
-		}
-		u.Path = path.Join(u.Path, versionedAPIPath)
-		if e, a := testCase.URL, u.String(); e != a {
-			t.Errorf("%d: expected host %s, got %s", i, e, a)
-			continue
 		}
 	}
 }

@@ -20,6 +20,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -112,7 +114,7 @@ func (c *Client) ConfigMaps(namespace string) ConfigMapsInterface {
 
 // Client is the implementation of a Kubernetes client.
 type Client struct {
-	*RESTClient
+	*restclient.RESTClient
 	*AutoscalingClient
 	*BatchClient
 	*ExtensionsClient

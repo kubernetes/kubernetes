@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -54,7 +54,7 @@ type DecoratedSimpleClient struct {
 func (c *DecoratedSimpleClient) Setup(t *testing.T) *DecoratedSimpleClient {
 	c.simpleClient.Setup(t)
 	url := c.simpleClient.ServerURL()
-	c.TestgroupClient = NewForConfigOrDie(&client.Config{
+	c.TestgroupClient = NewForConfigOrDie(&restclient.Config{
 		Host: url,
 	})
 	return c

@@ -20,17 +20,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/hawkular/hawkular-client-go/metrics"
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/api"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"github.com/golang/glog"
+	"github.com/hawkular/hawkular-client-go/metrics"
+	"k8s.io/kubernetes/pkg/api"
+
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
@@ -172,7 +173,7 @@ func (hs *hawkularSource) init() error {
 			if err != nil {
 				return err
 			}
-			tC, err = client.TLSConfigFor(kubeConfig)
+			tC, err = restclient.TLSConfigFor(kubeConfig)
 			if err != nil {
 				return err
 			}
