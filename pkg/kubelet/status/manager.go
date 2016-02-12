@@ -81,7 +81,7 @@ type Manager interface {
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
-	SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool)
+	SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
 
 	// TerminatePods resets the container status for the provided pods to terminated and triggers
 	// a status update. This function may not enqueue all the provided pods, in which case it will
@@ -150,9 +150,15 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	m.updateStatusInternal(pod, status)
 }
 
-func (m *manager) SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool) {
+func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		glog.V(4).Infof("Pod %q has been deleted, no need to update readiness", string(podUID))
+		return
+	}
 
 	oldStatus, found := m.podStatuses[pod.UID]
 	if !found {
