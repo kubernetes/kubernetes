@@ -217,6 +217,15 @@ net.ipv4.ip_forward:
 {% set override_deb='docker-engine_1.8.3-0~vivid_amd64.deb' %}
 {% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.8.3-0~vivid_amd64.deb' %}
 {% set override_deb_sha1='f0259b1f04635977325c0cfa7c0006e1e5de1341' %}
+{% elif grains.get('cloud', '') == 'aws'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'wily' -%}
+# TODO: Get from google storage?
+{% set docker_pkg_name='docker-engine' %}
+{% set override_docker_ver='1.8.3-0~wily' %}
+{% set override_deb='docker-engine_1.8.3-0~wily_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.8.3-0~wily_amd64.deb' %}
+{% set override_deb_sha1='aa00313498e0e8e73d9eedb39cbdff33b1474c16' %}
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
 {% set override_docker_ver='1.7.1' %}
