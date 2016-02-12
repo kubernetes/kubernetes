@@ -335,7 +335,15 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 }
 
 func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderClient, claim *api.PersistentVolumeClaim) (err error) {
-	glog.V(5).Infof("Synchronizing PersistentVolumeClaim[%s]\n", claim.Name)
+	glog.V(5).Infof("Synchronizing PersistentVolumeClaim[%s] for binding", claim.Name)
+
+	// The claim may have been modified by parallel call to syncClaim, load
+	// the current version.
+	newClaim, err := binderClient.GetPersistentVolumeClaim(claim.Namespace, claim.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot reload claim %s/%s: %v", claim.Namespace, claim.Name, err)
+	}
+	claim = newClaim
 
 	switch claim.Status.Phase {
 	case api.ClaimPending:

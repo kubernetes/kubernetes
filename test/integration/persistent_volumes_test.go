@@ -46,9 +46,11 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer s.Close()
 
 	deleteAllEtcdKeys()
-	binderClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	recyclerClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	testClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	// Use higher QPS and Burst, there is a test for race condition below, which
+	// creates many claims and default values were too low.
+	binderClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	recyclerClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	testClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	host := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
 	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0}}
