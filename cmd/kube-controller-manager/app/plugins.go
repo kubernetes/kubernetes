@@ -23,9 +23,8 @@ import (
 
 	"fmt"
 
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-
 	// Cloud providers
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
@@ -45,7 +44,7 @@ import (
 )
 
 // ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.
-func ProbeRecyclableVolumePlugins(flags options.VolumeConfigFlags) []volume.VolumePlugin {
+func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -53,27 +52,27 @@ func ProbeRecyclableVolumePlugins(flags options.VolumeConfigFlags) []volume.Volu
 	// initialized later.
 
 	// Each plugin can make use of VolumeConfig.  The single arg to this func contains *all* enumerated
-	// CLI flags meant to configure volume plugins.  From that single config, create an instance of volume.VolumeConfig
+	// options meant to configure volume plugins.  From that single config, create an instance of volume.VolumeConfig
 	// for a specific plugin and pass that instance to the plugin's ProbeVolumePlugins(config) func.
 
 	// HostPath recycling is for testing and development purposes only!
 	hostPathConfig := volume.VolumeConfig{
-		RecyclerMinimumTimeout:   flags.PersistentVolumeRecyclerMinimumTimeoutHostPath,
-		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutHostPath,
+		RecyclerMinimumTimeout:   config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath,
+		RecyclerTimeoutIncrement: config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, &hostPathConfig); err != nil {
-		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, err)
+	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
+		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
 	}
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
 
 	nfsConfig := volume.VolumeConfig{
-		RecyclerMinimumTimeout:   flags.PersistentVolumeRecyclerMinimumTimeoutNFS,
-		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutNFS,
+		RecyclerMinimumTimeout:   config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS,
+		RecyclerTimeoutIncrement: config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, &nfsConfig); err != nil {
-		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, err)
+	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
+		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
@@ -88,9 +87,9 @@ func ProbeRecyclableVolumePlugins(flags options.VolumeConfigFlags) []volume.Volu
 // The beta implementation of provisioning allows 1 implied provisioner per cloud, until we allow configuration of many.
 // We explicitly map clouds to volume plugins here which allows us to configure many later without backwards compatibility issues.
 // Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
-func NewVolumeProvisioner(cloud cloudprovider.Interface, flags options.VolumeConfigFlags) (volume.ProvisionableVolumePlugin, error) {
+func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
-	case cloud == nil && flags.EnableHostPathProvisioning:
+	case cloud == nil && config.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
