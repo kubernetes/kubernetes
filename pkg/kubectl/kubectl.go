@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
@@ -97,32 +96,36 @@ func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) 
 	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
 }
 
+// shortForms is the list of short names to their expanded names
+var shortForms = map[string]string{
+	// Please keep this alphabetized
+	"cs":     "componentstatuses",
+	"ds":     "daemonsets",
+	"ep":     "endpoints",
+	"ev":     "events",
+	"hpa":    "horizontalpodautoscalers",
+	"ing":    "ingresses",
+	"limits": "limitranges",
+	"no":     "nodes",
+	"ns":     "namespaces",
+	"po":     "pods",
+	"psp":    "podSecurityPolicies",
+	"pvc":    "persistentvolumeclaims",
+	"pv":     "persistentvolumes",
+	"quota":  "resourcequotas",
+	"rc":     "replicationcontrollers",
+	"rs":     "replicasets",
+	"svc":    "services",
+}
+
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
 func expandResourceShortcut(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
-	shortForms := map[string]unversioned.GroupVersionResource{
-		// Please keep this alphabetized
-		"cs":     api.SchemeGroupVersion.WithResource("componentstatuses"),
-		"ds":     extensions.SchemeGroupVersion.WithResource("daemonsets"),
-		"ep":     api.SchemeGroupVersion.WithResource("endpoints"),
-		"ev":     api.SchemeGroupVersion.WithResource("events"),
-		"hpa":    extensions.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
-		"ing":    extensions.SchemeGroupVersion.WithResource("ingresses"),
-		"limits": api.SchemeGroupVersion.WithResource("limitranges"),
-		"no":     api.SchemeGroupVersion.WithResource("nodes"),
-		"ns":     api.SchemeGroupVersion.WithResource("namespaces"),
-		"po":     api.SchemeGroupVersion.WithResource("pods"),
-		"psp":    api.SchemeGroupVersion.WithResource("podSecurityPolicies"),
-		"pvc":    api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-		"pv":     api.SchemeGroupVersion.WithResource("persistentvolumes"),
-		"quota":  api.SchemeGroupVersion.WithResource("resourcequotas"),
-		"rc":     api.SchemeGroupVersion.WithResource("replicationcontrollers"),
-		"rs":     extensions.SchemeGroupVersion.WithResource("replicasets"),
-		"svc":    api.SchemeGroupVersion.WithResource("services"),
-	}
 	if expanded, ok := shortForms[resource.Resource]; ok {
-		return expanded
+		// don't change the group or version that's already been specified
+		resource.Resource = expanded
+		return resource
 	}
 	return resource
 }

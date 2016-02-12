@@ -666,7 +666,7 @@ runTests() {
   # Command: autoscale rc "frontend"
   kubectl autoscale -f examples/guestbook/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
-  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  [[ "$(kubectl get hpa.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up
   kubectl delete rc,hpa frontend "${kube_flags[@]}"
 
@@ -1125,10 +1125,10 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   # autoscale 2~3 pods, default CPU utilization (80%)
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kube::test::get_object_assert 'hpa.extensions nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
-  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment.extensions nginx-deployment "${kube_flags[@]}"
 
   ### Rollback a deployment
   # Pre-condition: no deployment exists
@@ -1143,7 +1143,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
   # Rollback to revision 1
   kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
   sleep 1
