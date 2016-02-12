@@ -18,6 +18,7 @@ package internalclientset
 
 import (
 	"github.com/golang/glog"
+	batch_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/batch/unversioned"
 	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
@@ -27,6 +28,7 @@ type Interface interface {
 	Discovery() unversioned.DiscoveryInterface
 	Core() core_unversioned.CoreInterface
 	Extensions() extensions_unversioned.ExtensionsInterface
+	Batch() batch_unversioned.BatchInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -35,6 +37,7 @@ type Clientset struct {
 	*unversioned.DiscoveryClient
 	*core_unversioned.CoreClient
 	*extensions_unversioned.ExtensionsClient
+	*batch_unversioned.BatchClient
 }
 
 // Core retrieves the CoreClient
@@ -45,6 +48,11 @@ func (c *Clientset) Core() core_unversioned.CoreInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
 	return c.ExtensionsClient
+}
+
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() batch_unversioned.BatchInterface {
+	return c.BatchClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -64,6 +72,10 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	if err != nil {
 		return &clientset, err
 	}
+	clientset.BatchClient, err = batch_unversioned.NewForConfig(c)
+	if err != nil {
+		return &clientset, err
+	}
 
 	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
 	if err != nil {
@@ -78,6 +90,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = core_unversioned.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = extensions_unversioned.NewForConfigOrDie(c)
+	clientset.BatchClient = batch_unversioned.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -88,6 +101,7 @@ func New(c *unversioned.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = core_unversioned.New(c)
 	clientset.ExtensionsClient = extensions_unversioned.New(c)
+	clientset.BatchClient = batch_unversioned.New(c)
 
 	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset
