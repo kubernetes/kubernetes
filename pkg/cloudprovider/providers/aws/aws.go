@@ -241,6 +241,7 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 	service := ec2.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
+		Retryer:     &RequestRetryer{3},
 	}))
 
 	addHandlers(&service.Handlers)
@@ -255,6 +256,7 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	elbClient := elb.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
+		Retryer:     &RequestRetryer{3},
 	}))
 
 	addHandlers(&elbClient.Handlers)
@@ -266,6 +268,7 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 	client := autoscaling.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
+		Retryer:     &RequestRetryer{3},
 	}))
 
 	addHandlers(&client.Handlers)
