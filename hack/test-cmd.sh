@@ -493,6 +493,31 @@ runTests() {
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
   #cleaning
   rm /tmp/tmp-valid-pod.json
+  
+  ## replace of a cluster scoped resource can succeed
+  # Pre-condition: a node exists
+  kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-${version}-test"
+  }
+}
+__EOF__
+  kubectl replace -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-${version}-test",
+    "annotations": {"a":"b"}
+  }
+}
+__EOF__
+  # Post-condition: the node command succeeds
+  kube::test::get_object_assert "node node-${version}-test" "{{.metadata.annotations.a}}" 'b'
+  kubectl delete node node-${version}-test
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
   echo -e '#!/bin/bash\nsed -i "s/nginx/gcr.io\/google_containers\/serve_hostname/g" $1' > /tmp/tmp-editor.sh
