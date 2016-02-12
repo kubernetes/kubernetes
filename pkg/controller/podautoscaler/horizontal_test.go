@@ -333,6 +333,45 @@ func TestMinReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestZeroReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         3,
+		maxReplicas:         5,
+		initialReplicas:     0,
+		desiredReplicas:     3,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{},
+	}
+	tc.runTest(t)
+}
+
+func TestToFewReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         3,
+		maxReplicas:         5,
+		initialReplicas:     2,
+		desiredReplicas:     3,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{},
+	}
+	tc.runTest(t)
+}
+
+func TestTooManyReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         3,
+		maxReplicas:         5,
+		initialReplicas:     10,
+		desiredReplicas:     5,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{},
+	}
+	tc.runTest(t)
+}
+
 func TestMaxReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
