@@ -17,3 +17,7 @@ pkg-core:
 {% if grains['os'] == 'Ubuntu' %}
       - netcat-traditional
 {% endif %}
+# Make sure git is installed for mounting git volumes
+{% if grains['os'] == 'Ubuntu' %}
+      - git
+{% endif %}
