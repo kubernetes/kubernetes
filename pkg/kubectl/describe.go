@@ -45,7 +45,7 @@ import (
 )
 
 // Describer generates output for the named resource or an error
-// if the output could not be generated. Implementors typically
+// if the output could not be generated. Implementers typically
 // abstract the retrieval of the named object from a remote server.
 type Describer interface {
 	Describe(namespace, name string) (output string, err error)
@@ -53,7 +53,7 @@ type Describer interface {
 
 // ObjectDescriber is an interface for displaying arbitrary objects with extra
 // information. Use when an object is in hand (on disk, or already retrieved).
-// Implementors may ignore the additional information passed on extra, or use it
+// Implementers may ignore the additional information passed on extra, or use it
 // by default. ObjectDescribers may return ErrNoDescriber if no suitable describer
 // is found.
 type ObjectDescriber interface {

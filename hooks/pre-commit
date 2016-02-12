@@ -16,10 +16,10 @@ else
 fi
 echo "${reset}"
 
-# Check if changes to Godeps are reproducable...
+# Check if changes to Godeps are reproducible...
 files=($(git diff --cached --name-only --diff-filter ACM | grep "Godeps"))
 if [[ "${#files[@]}" -ne 0 ]]; then
-  echo -ne "Check if changes to Godeps are reproducable (this is pretty slow)..."
+  echo -ne "Check if changes to Godeps are reproducible (this is pretty slow)..."
   if ! OUT=$("hack/verify-godeps.sh" 2>&1); then
     echo
     echo "${red}${OUT}"

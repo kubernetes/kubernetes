@@ -127,7 +127,7 @@ func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
 	return entry
 }
 
-// After 2*maxDuration we restart the backoff factor to the begining
+// After 2*maxDuration we restart the backoff factor to the beginning
 func hasExpired(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
 	return eventTime.Sub(lastUpdate) > maxDuration*2 // consider stable if it's ok for twice the maxDuration
 }

@@ -104,7 +104,7 @@ The high level steps to update docs in an existing collection are:
 ## Updating docs on HEAD
 
 [Development guide](development.md) provides general instructions on how to contribute to kubernetes github repo.
-[Docs how to guide](how-to-doc.md) provides conventions to follow while writting docs.
+[Docs how to guide](how-to-doc.md) provides conventions to follow while writing docs.
 
 ## Updating docs in release branch
 

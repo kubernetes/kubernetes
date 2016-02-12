@@ -194,7 +194,7 @@ From the above, we know that label management must be applied:
 3.  To some volume types *sometimes*
 
 Volumes should be relabeled with the correct SELinux context.  Docker has this capability today; it
-is desireable for other container runtime implementations to provide similar functionality.
+is desirable for other container runtime implementations to provide similar functionality.
 
 Relabeling should be an optional aspect of a volume plugin to accommodate:
 

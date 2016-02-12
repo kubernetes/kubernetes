@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-// WorkQueue allows queueing items with a timestamp. An item is
+// WorkQueue allows queuing items with a timestamp. An item is
 // considered ready to process if the timestamp has expired.
 type WorkQueue interface {
 	// GetWork dequeues and returns all ready items.

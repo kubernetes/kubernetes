@@ -8246,7 +8246,7 @@
         "type": "string",
         "paramType": "query",
         "name": "sinceTime",
-        "description": "An RFC3339 timestamp from which to show logs. If this value preceeds the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+        "description": "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
         "required": false,
         "allowMultiple": false
        },
@@ -17236,7 +17236,7 @@
    },
    "v1.ServicePort": {
     "id": "v1.ServicePort",
-    "description": "ServicePort conatins information on service's port.",
+    "description": "ServicePort contains information on service's port.",
     "required": [
      "port"
     ],

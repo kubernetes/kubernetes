@@ -437,7 +437,7 @@ runTests() {
   kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:'
   # Command
   kubectl label pods valid-pod new-name=new-valid-pod "${kube_flags[@]}"
-  # Post-conditon: valid-pod is labelled
+  # Post-condition: valid-pod is labelled
   kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:new-valid-pod:'
 
   ### Delete POD by label

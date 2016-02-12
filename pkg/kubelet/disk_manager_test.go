@@ -196,7 +196,7 @@ func TestCache(t *testing.T) {
 	assert.NoError(err)
 	assert.True(ok)
 
-	// Ensure no more calls to the mockCadvisor occured
+	// Ensure no more calls to the mockCadvisor occurred
 	assert.Equal(cadvisorCallCount, len(mockCadvisor.Calls))
 }
 

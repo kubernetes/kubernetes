@@ -102,7 +102,7 @@ HTTP connections and are therefore neither authenticated nor encrypted. They
 can be run over a secure HTTPS connection by prefixing `https:` to the node,
 pod, or service name in the API URL, but they will not validate the certificate
 provided by the HTTPS endpoint nor provide client credentials so while the
-connection will by encrypted, it will not provide any guarentees of integrity.
+connection will by encrypted, it will not provide any guarantees of integrity.
 These connections **are not currently safe** to run over untrusted and/or
 public networks.
 

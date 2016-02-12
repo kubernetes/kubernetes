@@ -1126,7 +1126,7 @@ var map_PodLogOptions = map[string]string{
 	"follow":       "Follow the log stream of the pod. Defaults to false.",
 	"previous":     "Return previous terminated container logs. Defaults to false.",
 	"sinceSeconds": "A relative time in seconds before the current time from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
-	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value preceeds the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
 	"timestamps":   "If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
 	"tailLines":    "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
 	"limitBytes":   "If set, the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
@@ -1496,7 +1496,7 @@ func (ServiceList) SwaggerDoc() map[string]string {
 }
 
 var map_ServicePort = map[string]string{
-	"":           "ServicePort conatins information on service's port.",
+	"":           "ServicePort contains information on service's port.",
 	"name":       "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. This maps to the 'Name' field in EndpointPort objects. Optional if only one ServicePort is defined on this service.",
 	"protocol":   "The IP protocol for this port. Supports \"TCP\" and \"UDP\". Default is TCP.",
 	"port":       "The port that will be exposed by this service.",
