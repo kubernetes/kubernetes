@@ -67,6 +67,10 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
 # --insecure-registry for local registries.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 
+# Extra options to set on the kube-proxy command line.  This is useful
+# for selecting the iptables proxy-mode, for example.
+KUBE_PROXY_EXTRA_OPTS=${KUBE_PROXY_EXTRA_OPTS:-""}
+
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 # DNS_SERVER_IP must be a IP in SERVICE_CLUSTER_IP_RANGE
