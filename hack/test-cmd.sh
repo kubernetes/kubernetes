@@ -1492,6 +1492,33 @@ __EOF__
   # Command
   kubectl get pods --sort-by="{metadata.name}"
 
+  ############################
+  # Kubectl --all-namespaces #
+  ############################
+
+  # Pre-condition: the "default" namespace exists
+  kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:'
+
+  ### Create POD
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create "${kube_flags[@]}" -f docs/admin/limitrange/valid-pod.yaml
+  # Post-condition: valid-pod is created
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+
+  ### Verify a specific namespace is ignored when all-namespaces is provided
+  # Command
+  kubectl get pods --all-namespaces --namespace=default
+
+  ### Clean up
+  # Pre-condition: valid-pod exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Command
+  kubectl delete "${kube_flags[@]}" pod valid-pod --grace-period=0
+  # Post-condition: valid-pod doesn't exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
   kube::test::clear_all
 }
 
