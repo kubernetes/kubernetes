@@ -52,9 +52,9 @@ const (
 	// of all deployments that have fulfilled their expectations at least this often.
 	// This recomputation happens based on contents in the local caches.
 	FullDeploymentResyncPeriod = 30 * time.Second
-	// We must avoid creating new replica set until the replica set store has synced. If it hasn't synced, to
-	// avoid a hot loop, we'll wait this long between checks.
-	RSStoreSyncedPollPeriod = 100 * time.Millisecond
+	// We must avoid creating new replica set / counting pods until the replica set / pods store has synced.
+	// If it hasn't synced, to avoid a hot loop, we'll wait this long between checks.
+	StoreSyncedPollPeriod = 100 * time.Millisecond
 )
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -410,10 +410,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	d := *obj.(*extensions.Deployment)
-	if !dc.rsStoreSynced() {
-		// Sleep so we give the replica set reflector goroutine a chance to run.
-		time.Sleep(RSStoreSyncedPollPeriod)
-		glog.Infof("Waiting for replica set controller to sync, requeuing deployment %s", d.Name)
+	if !dc.rsStoreSynced() || !dc.podStoreSynced() {
+		// Sleep so we give the replica set / pod reflector goroutine a chance to run.
+		time.Sleep(StoreSyncedPollPeriod)
+		glog.Infof("Waiting for replica set / pod controller to sync, requeuing deployment %s", d.Name)
 		dc.enqueueDeployment(&d)
 		return nil
 	}
