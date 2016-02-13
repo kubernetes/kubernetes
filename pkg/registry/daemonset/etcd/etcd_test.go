@@ -103,6 +103,7 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.DaemonSet)
 			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
+			object.Spec.Template.Spec.DNSPolicy = api.DNSDefault
 			return object
 		},
 		// invalid updateFunc
@@ -119,11 +120,6 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.DaemonSet)
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
-			return object
-		},
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.DaemonSet)
-			object.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)
