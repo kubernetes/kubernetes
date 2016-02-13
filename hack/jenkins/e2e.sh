@@ -225,8 +225,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce.
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
     # Override GCE defaults
@@ -241,8 +240,7 @@ case ${JOB_NAME} in
     : ${E2E_PUBLISH_GREEN_VERSION:="true"}
     : ${E2E_NETWORK:="e2e-gce"}
     # This list should match the list in kubernetes-pull-build-test-e2e-gce.
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
@@ -253,9 +251,8 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-slow)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
     : ${E2E_NETWORK:="e2e-slow"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-slow"}
     : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
@@ -304,28 +301,12 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${E2E_DOWN:="true"}
-    ;;
-
-  # Runs the flaky tests on GCE in parallel.
-  kubernetes-e2e-gce-parallel-flaky)
-    : ${E2E_CLUSTER_NAME:="parallel-flaky"}
-    : ${E2E_NETWORK:="e2e-parallel-flaky"}
-    : ${GINKGO_PARALLEL:="y"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Feature:.+\]|\[Skipped\]"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
-    : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # Override GCE defaults.
-    NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
   # GKE core jobs
@@ -337,8 +318,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     ;;
 
@@ -348,9 +328,8 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-slow"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Slow\] \
-                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     ;;
 
@@ -371,9 +350,8 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Flaky\] \
-                           --ginkgo.skip=\[Feature:.+\]|\[Skipped\]"}
+                           --ginkgo.skip=\[Feature:.+\]"}
     ;;
 
   # AWS core jobs
@@ -385,8 +363,7 @@ case ${JOB_NAME} in
     : ${E2E_ZONE:="us-west-2a"}
     : ${ZONE:="us-west-2a"}
     : ${E2E_NETWORK:="e2e-aws"}
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${GINKGO_PARALLEL:="y"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
@@ -619,9 +596,7 @@ case ${JOB_NAME} in
     # We should be testing the reliability of a long-running cluster. The
     # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    #
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${HAIRPIN_MODE:="false"}
     : ${PROJECT:="kubernetes-jenkins"}
@@ -649,9 +624,7 @@ case ${JOB_NAME} in
     # We should be testing the reliability of a long-running cluster. The
     # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    #
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-2"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
@@ -683,9 +656,7 @@ case ${JOB_NAME} in
     # We should be testing the reliability of a long-running cluster. The
     # [Disruptive] tests kill/restart components or nodes in the cluster,
     # defeating the purpose of a soak cluster. (#15722)
-    #
-    # TODO(ihmccreery) remove [Skipped] once tests are relabeled
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[Skipped\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"}
     ;;
 
   # Upgrade jobs
@@ -754,109 +725,6 @@ case ${JOB_NAME} in
 
   kubernetes-upgrade-gce-1.1-master-step7-e2e-new)
     configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gce-1-1-master' 'k8s-jkns-gce-upgrade'
-    ;;
-
-  # kubernetes-upgrade-gce-1.0-current-release
-  #
-  # This suite:
-  #
-  # 1. launches a cluster at ci/latest-1.0,
-  # 2. upgrades the master to CURRENT_RELEASE_PUBLISHED_VERSION
-  # 3. runs ci/latest-1.0 e2es,
-  # 4. upgrades the rest of the cluster,
-  # 5. runs ci/latest-1.0 e2es again, then
-  # 6. runs CURRENT_RELEASE_PUBLISHED_VERSION e2es and tears down the cluster.
-
-  kubernetes-upgrade-1.0-current-release-gce-step1-deploy)
-    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
-    : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
-    : ${PROJECT:="k8s-jkns-gce-upgrade"}
-    : ${E2E_UP:="true"}
-    : ${E2E_TEST:="false"}
-    : ${E2E_DOWN:="false"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_NODES:=5}
-    ;;
-
-  kubernetes-upgrade-1.0-current-release-gce-step2-upgrade-master)
-    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
-    : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    : ${E2E_OPT:="--check_version_skew=false"}
-    # Use upgrade logic of version we're upgrading to.
-    : ${JENKINS_PUBLISHED_VERSION:="${CURRENT_RELEASE_PUBLISHED_VERSION}"}
-    : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${PROJECT:="k8s-jkns-gce-upgrade"}
-    : ${E2E_UP:="false"}
-    : ${E2E_TEST:="true"}
-    : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_NODES:=5}
-    : ${KUBE_ENABLE_DAEMONSETS:=true}
-    ;;
-
-  kubernetes-upgrade-1.0-current-release-gce-step3-e2e-old)
-    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
-    : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    : ${E2E_OPT:="--check_version_skew=false"}
-    : ${JENKINS_FORCE_GET_TARS:=y}
-    # Run old e2es
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
-    : ${PROJECT:="k8s-jkns-gce-upgrade"}
-    : ${E2E_UP:="false"}
-    : ${E2E_TEST:="true"}
-    : ${E2E_DOWN:="false"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_NODES:=5}
-    ;;
-
-  kubernetes-upgrade-1.0-current-release-gce-step4-upgrade-cluster)
-    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
-    : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    : ${E2E_OPT:="--check_version_skew=false"}
-    # Use upgrade logic of version we're upgrading to.
-    : ${JENKINS_PUBLISHED_VERSION:="${CURRENT_RELEASE_PUBLISHED_VERSION}"}
-    : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${PROJECT:="k8s-jkns-gce-upgrade"}
-    : ${E2E_UP:="false"}
-    : ${E2E_TEST:="true"}
-    : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_NODES:=5}
-    : ${KUBE_ENABLE_DAEMONSETS:=true}
-    ;;
-
-  kubernetes-upgrade-1.0-current-release-gce-step5-e2e-old)
-    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
-    : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    : ${E2E_OPT:="--check_version_skew=false"}
-    : ${JENKINS_FORCE_GET_TARS:=y}
-    # Run old e2es
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
-    : ${PROJECT:="k8s-jkns-gce-upgrade"}
-    : ${E2E_UP:="false"}
-    : ${E2E_TEST:="true"}
-    : ${E2E_DOWN:="false"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_NODES:=5}
-    ;;
-
-  kubernetes-upgrade-1.0-current-release-gce-step6-e2e-new)
-    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
-    : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    # TODO(15011): these really shouldn't be (very) version skewed, but because
-    # we have to get CURRENT_RELEASE_PUBLISHED_VERSION again, it could get slightly out of whack.
-    : ${E2E_OPT:="--check_version_skew=false"}
-    : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_PUBLISHED_VERSION:="${CURRENT_RELEASE_PUBLISHED_VERSION}"}
-    : ${PROJECT:="k8s-jkns-gce-upgrade"}
-    : ${E2E_UP:="false"}
-    : ${E2E_TEST:="true"}
-    : ${E2E_DOWN:="true"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_NODES:=5}
     ;;
 esac
 
