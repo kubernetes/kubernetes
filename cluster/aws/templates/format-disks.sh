@@ -175,7 +175,9 @@ if [[ ${docker_storage} == "btrfs" ]]; then
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
   # Install aufs kernel module
   # Fix issue #14162 with extra-virtual
-  apt-get-install linux-image-extra-$(uname -r) linux-image-extra-virtual
+  if [[ `lsb_release -i -s` == 'Ubuntu' ]]; then
+    apt-get-install linux-image-extra-$(uname -r) linux-image-extra-virtual
+  fi
 
   # Install aufs tools
   apt-get-install aufs-tools
