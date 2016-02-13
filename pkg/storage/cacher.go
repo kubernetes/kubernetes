@@ -145,6 +145,14 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
+	// Give this error when it is constructed rather than when you get the
+	// first watch item, because it's much easier to track down that way.
+	if obj, ok := config.Type.(runtime.Object); ok {
+		if err := runtime.CheckCodec(config.Storage.Codec(), obj); err != nil {
+			panic("storage codec doesn't seem to match given type: " + err.Error())
+		}
+	}
+
 	cacher := &Cacher{
 		usable:     sync.RWMutex{},
 		storage:    config.Storage,

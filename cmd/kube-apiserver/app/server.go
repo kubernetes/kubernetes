@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -110,7 +111,18 @@ func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGr
 		return nil, fmt.Errorf("unable to find serializer for JSON")
 	}
 	glog.Infof("constructing etcd storage interface.\n  sv: %v\n  mv: %v\n", storageVersion, memoryVersion)
-	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, memoryVersion))
+	encoder := ns.EncoderForVersion(s, storageVersion)
+	decoder := ns.DecoderToVersion(s, memoryVersion)
+	if memoryVersion.Group != storageVersion.Group {
+		// Allow this codec to translate between groups.
+		if err = versioning.EnableCrossGroupEncoding(encoder, memoryVersion.Group, storageVersion.Group); err != nil {
+			return nil, fmt.Errorf("error setting up encoder for %v: %v", storageGroupVersionString, err)
+		}
+		if err = versioning.EnableCrossGroupDecoding(decoder, storageVersion.Group, memoryVersion.Group); err != nil {
+			return nil, fmt.Errorf("error setting up decoder for %v: %v", storageGroupVersionString, err)
+		}
+	}
+	storageConfig.Codec = runtime.NewCodec(encoder, decoder)
 	return storageConfig.NewStorage()
 }
 
