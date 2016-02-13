@@ -339,6 +339,65 @@ func TestEtcdUpdate(t *testing.T) {
 
 }
 
+func TestNoOpUpdates(t *testing.T) {
+	server, registry := NewTestGenericEtcdRegistry(t)
+	defer server.Terminate(t)
+
+	newPod := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+				Name:      "foo",
+				Labels:    map[string]string{"prepare_create": "true"},
+			},
+			Spec: api.PodSpec{NodeName: "machine"},
+		}
+	}
+
+	var err error
+	var createResult runtime.Object
+	if createResult, err = registry.Create(api.NewDefaultContext(), newPod()); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	createdPod, err := registry.Get(api.NewDefaultContext(), "foo")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	var updateResult runtime.Object
+	if updateResult, _, err = registry.Update(api.NewDefaultContext(), newPod()); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Check whether we do not return empty result on no-op update.
+	if !reflect.DeepEqual(createResult, updateResult) {
+		t.Errorf("no-op update should return a correct value, got: %#v", updateResult)
+	}
+
+	updatedPod, err := registry.Get(api.NewDefaultContext(), "foo")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	createdMeta, err := meta.Accessor(createdPod)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	updatedMeta, err := meta.Accessor(updatedPod)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if createdMeta.GetResourceVersion() != updatedMeta.GetResourceVersion() {
+		t.Errorf("no-op update should be ignored and not written to etcd")
+	}
+}
+
+// TODO: Add a test to check no-op update if we have object with ResourceVersion
+// already stored in etcd. Currently there is no easy way to store object with
+// ResourceVersion in etcd.
+
 type testPodExport struct{}
 
 func (t testPodExport) Export(obj runtime.Object, exact bool) error {
