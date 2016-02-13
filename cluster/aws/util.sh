@@ -93,8 +93,6 @@ NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
 BLOCK_DEVICE_MAPPINGS_BASE="{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
-MASTER_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MASTER_ROOT_DISK_SIZE},\"VolumeType\":\"${MASTER_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
-NODE_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${NODE_ROOT_DISK_SIZE},\"VolumeType\":\"${NODE_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
 
 # TODO (bburns) Parameterize this for multiple cluster per project
 
@@ -347,6 +345,27 @@ function detect-trusty-image () {
         exit 1
     esac
   fi
+}
+
+# Detects the RootDevice to use in the Block Device Mapping (considering the AMI)
+#
+# Vars set:
+#   MASTER_BLOCK_DEVICE_MAPPINGS
+#   NODE_BLOCK_DEVICE_MAPPINGS
+#
+function detect-root-device {
+  local master_image=${AWS_IMAGE}
+  local node_image=${KUBE_NODE_IMAGE}
+
+  ROOT_DEVICE_MASTER=$($AWS_CMD describe-images --image-ids ${master_image} --query 'Images[].RootDeviceName')
+  if [[ "${master_image}" == "${node_image}" ]]; then
+      ROOT_DEVICE_NODE=${ROOT_DEVICE_MASTER}
+    else
+      ROOT_DEVICE_NODE=$($AWS_CMD describe-images --image-ids ${node_image} --query 'Images[].RootDeviceName')
+  fi
+
+  MASTER_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"${ROOT_DEVICE_MASTER}\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MASTER_ROOT_DISK_SIZE},\"VolumeType\":\"${MASTER_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
+  NODE_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"${ROOT_DEVICE_NODE}\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${NODE_ROOT_DISK_SIZE},\"VolumeType\":\"${NODE_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
 }
 
 # Computes the AWS fingerprint for a public key file ($1)
@@ -817,6 +836,8 @@ function kube-up {
 
   detect-image
   detect-minion-image
+
+  detect-root-device
 
   find-release-tars
 
