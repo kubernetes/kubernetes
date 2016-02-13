@@ -52,7 +52,6 @@ Documentation for other releases can be found at
     - [Bare Pods](#bare-pods)
     - [Static Pods](#static-pods)
     - [Replication Controller](#replication-controller)
-  - [Caveats](#caveats)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
