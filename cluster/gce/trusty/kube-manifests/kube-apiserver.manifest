@@ -12,7 +12,7 @@
     "name": "kube-apiserver",
     "image": "{{kube_docker_registry}}/kube-apiserver:{{kube-apiserver_docker_tag}}",
     "resources": {
-      "limits": {
+      "requests": {
         "cpu": "250m"
       }
     },

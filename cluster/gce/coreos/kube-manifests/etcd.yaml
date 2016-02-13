@@ -35,8 +35,6 @@ spec:
       name: clientport
       protocol: TCP
     resources:
-      limits:
-        cpu: 200m
       requests:
         cpu: 200m
     volumeMounts:
