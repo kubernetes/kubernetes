@@ -281,6 +281,27 @@ runTests() {
   fi
   stop-proxy
 
+  #########################
+  # RESTMapper evaluation #
+  #########################
+
+  kube::log::status "Testing RESTMapper"
+
+  RESTMAPPER_ERROR_FILE="${KUBE_TEMP}/restmapper-error"
+
+  ### Non-existent resource type should give a recognizeable error
+  # Pre-condition: None
+  # Command
+  kubectl get "${kube_flags[@]}" unknownresourcetype 2>${RESTMAPPER_ERROR_FILE} || true
+  if grep -q "the server doesn't have a resource type" "${RESTMAPPER_ERROR_FILE}"; then
+    kube::log::status "\"kubectl get unknownresourcetype\" returns error as expected: $(cat ${RESTMAPPER_ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl get unknownresourcetype\" returns unexpected error or non-error: $(cat ${RESTMAPPER_ERROR_FILE})"
+    exit 1
+  fi
+  rm "${RESTMAPPER_ERROR_FILE}"
+  # Post-condition: None
+
   ###########################
   # POD creation / deletion #
   ###########################
