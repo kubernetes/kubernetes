@@ -441,7 +441,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
 func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRevision *int64) (*extensions.Deployment, error) {
-	newRS, allOldRSs, err := dc.getAllReplicaSets(*deployment)
+	newRS, allOldRSs, err := dc.getAllReplicaSets(*deployment, true)
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +493,8 @@ func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(deployment *e
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment)
+	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down
+	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, false)
 	if err != nil {
 		return err
 	}
@@ -507,6 +508,16 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 	if scaledDown {
 		// Update DeploymentStatus
 		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+	}
+
+	// If we need to create a new RS, create it now
+	// TODO: Create a new RS without re-listing all RSs.
+	if newRS == nil {
+		newRS, oldRSs, err = dc.getAllReplicaSets(deployment, true)
+		if err != nil {
+			return err
+		}
+		allRSs = append(oldRSs, newRS)
 	}
 
 	// scale up new replica set
@@ -529,7 +540,7 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 }
 
 func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment)
+	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, true)
 	if err != nil {
 		return err
 	}
@@ -577,7 +588,7 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 }
 
 // getAllReplicaSets returns all the replica sets for the provided deployment (new and all old).
-func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployment) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployment, createIfNotExisted bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	_, allOldRSs, err := dc.getOldReplicaSets(deployment)
 	if err != nil {
 		return nil, nil, err
@@ -586,13 +597,13 @@ func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployme
 	maxOldV := maxRevision(allOldRSs)
 
 	// Get new replica set with the updated revision number
-	newRS, err := dc.getNewReplicaSet(deployment, maxOldV, oldRSs)
+	newRS, err := dc.getNewReplicaSet(deployment, maxOldV, allOldRSs, createIfNotExisted)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Sync deployment's revision number with new replica set
-	if newRS.Annotations != nil && len(newRS.Annotations[deploymentutil.RevisionAnnotation]) > 0 &&
+	if newRS != nil && newRS.Annotations != nil && len(newRS.Annotations[deploymentutil.RevisionAnnotation]) > 0 &&
 		(deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != newRS.Annotations[deploymentutil.RevisionAnnotation]) {
 		if err = dc.updateDeploymentRevision(deployment, newRS.Annotations[deploymentutil.RevisionAnnotation]); err != nil {
 			glog.V(4).Infof("Error: %v. Unable to update deployment revision, will retry later.", err)
@@ -648,7 +659,7 @@ func (dc *DeploymentController) getOldReplicaSets(deployment extensions.Deployme
 // Returns a replica set that matches the intent of the given deployment.
 // It creates a new replica set if required.
 // The revision of the new replica set will be updated to maxOldRevision + 1
-func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deployment, maxOldRevision int64, oldRSs []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deployment, maxOldRevision int64, oldRSs []*extensions.ReplicaSet, createIfNotExisted bool) (*extensions.ReplicaSet, error) {
 	// Calculate revision number for this new replica set
 	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
 
@@ -665,6 +676,11 @@ func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deploymen
 		}
 		return existingNewRS, nil
 	}
+
+	if !createIfNotExisted {
+		return nil, nil
+	}
+
 	// Check the replica set expectations of the deployment before creating a new one.
 	dKey, err := controller.KeyFunc(&deployment)
 	if err != nil {
