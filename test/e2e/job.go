@@ -160,7 +160,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should stop a job", func() {
+	It("should delete a job", func() {
 		By("Creating a job")
 		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
@@ -170,7 +170,7 @@ var _ = Describe("Job", func() {
 		err = waitForAllPodsRunning(f.Client, f.Namespace.Name, job.Name, parallelism)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("scale job down")
+		By("delete a job")
 		reaper, err := kubectl.ReaperFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
