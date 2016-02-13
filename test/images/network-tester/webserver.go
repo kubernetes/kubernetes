@@ -90,7 +90,8 @@ func (s *State) serveStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "running")
 		return
 	}
-	s.Logf("Declaring failure for %s/%s with %d sent and %d received and %d peers", *namespace, *service, len(s.Sent), len(s.Received), *peerCount)
+	// Logf can't be called while holding the lock, so defer using a goroutine
+	go s.Logf("Declaring failure for %s/%s with %d sent and %d received and %d peers", *namespace, *service, len(s.Sent), len(s.Received), *peerCount)
 	fmt.Fprintf(w, "fail")
 }
 
