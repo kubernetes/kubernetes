@@ -145,6 +145,14 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
+	// Give this error when it is constructed rather than when you get the
+	// first watch item, because it's much easier to track down that way.
+	if obj, ok := config.Type.(runtime.Object); ok {
+		if err := runtime.CheckCodec(config.Storage.Codec(), obj); err != nil {
+			panic("storage codec doesn't seem to match given type: " + err.Error())
+		}
+	}
+
 	cacher := &Cacher{
 		usable:     sync.RWMutex{},
 		storage:    config.Storage,
@@ -171,13 +179,14 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	stopCh := cacher.stopCh
 	cacher.stopWg.Add(1)
 	go func() {
+		defer cacher.stopWg.Done()
 		wait.Until(
 			func() {
 				if !cacher.isStopped() {
 					cacher.startCaching(stopCh)
 				}
-			}, 0, stopCh)
-		cacher.stopWg.Done()
+			}, time.Second, stopCh,
+		)
 	}()
 	return cacher
 }
@@ -197,12 +206,10 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	c.terminateAllWatchers()
 	// Note that since onReplace may be not called due to errors, we explicitly
 	// need to retry it on errors under lock.
-	for {
-		if err := c.reflector.ListAndWatch(stopChannel); err != nil {
-			glog.Errorf("unexpected ListAndWatch error: %v", err)
-		} else {
-			break
-		}
+	// Also note that startCaching is called in a loop, so there's no need
+	// to have another loop here.
+	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
+		glog.Errorf("unexpected ListAndWatch error: %v", err)
 	}
 }
 
