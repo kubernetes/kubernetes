@@ -90,3 +90,6 @@ cluster/libvirt-coreos/coreos_*.img
 
 # Downloaded Kubernetes binary release
 kubernetes/
+
+# direnv .envrc files
+.envrc
