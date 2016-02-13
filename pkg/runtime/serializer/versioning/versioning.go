@@ -24,6 +24,42 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// EnableCrossGroupDecoding modifies the given decoder in place, if it is a codec
+// from this package. It allows objects from one group to be auto-decoded into
+// another group. 'destGroup' must already exist in the codec.
+func EnableCrossGroupDecoding(d runtime.Decoder, sourceGroup, destGroup string) error {
+	internal, ok := d.(*codec)
+	if !ok {
+		return fmt.Errorf("unsupported decoder type")
+	}
+
+	dest, ok := internal.decodeVersion[destGroup]
+	if !ok {
+		return fmt.Errorf("group %q is not a possible destination group in the given codec", destGroup)
+	}
+	internal.decodeVersion[sourceGroup] = dest
+
+	return nil
+}
+
+// EnableCrossGroupEncoding modifies the given encoder in place, if it is a codec
+// from this package. It allows objects from one group to be auto-decoded into
+// another group. 'destGroup' must already exist in the codec.
+func EnableCrossGroupEncoding(e runtime.Encoder, sourceGroup, destGroup string) error {
+	internal, ok := e.(*codec)
+	if !ok {
+		return fmt.Errorf("unsupported encoder type")
+	}
+
+	dest, ok := internal.encodeVersion[destGroup]
+	if !ok {
+		return fmt.Errorf("group %q is not a possible destination group in the given codec", destGroup)
+	}
+	internal.encodeVersion[sourceGroup] = dest
+
+	return nil
+}
+
 // NewCodecForScheme is a convenience method for callers that are using a scheme.
 func NewCodecForScheme(
 	// TODO: I should be a scheme interface?
@@ -132,6 +168,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		targetGV.Group = group
 		targetGV.Version = runtime.APIVersionInternal
 	} else {
+		fmt.Printf("looking for %v in %#v\n", group, c.decodeVersion)
 		gv, ok := c.decodeVersion[group]
 		if !ok {
 			// unknown objects are left in their original version
