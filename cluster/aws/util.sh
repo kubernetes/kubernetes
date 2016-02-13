@@ -1155,7 +1155,7 @@ function build-config() {
   export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
   export KUBE_KEY="${CERT_DIR}/pki/private/kubecfg.key"
   export CA_CERT="${CERT_DIR}/pki/ca.crt"
-  export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
+  export CONTEXT="aws_${INSTANCE_PREFIX}"
   (
    umask 077
    create-kubeconfig
