@@ -23,9 +23,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -46,9 +46,8 @@ const (
 	fcPluginName = "kubernetes.io/fc"
 )
 
-func (plugin *fcPlugin) Init(host volume.VolumeHost) error {
+func (plugin *fcPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
-	return nil
 }
 
 func (plugin *fcPlugin) Name() string {
@@ -108,11 +107,11 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 			wwns:    fc.TargetWWNs,
 			lun:     lun,
 			manager: manager,
+			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 			io:      &osIOHandler{},
 			plugin:  plugin},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
-		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
 	}, nil
 }
 
@@ -122,16 +121,14 @@ func (plugin *fcPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cle
 }
 
 func (plugin *fcPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &fcDiskCleaner{
-		fcDisk: &fcDisk{
-			podUID:  podUID,
-			volName: volName,
-			manager: manager,
-			plugin:  plugin,
-			io:      &osIOHandler{},
-		},
+	return &fcDiskCleaner{&fcDisk{
+		podUID:  podUID,
+		volName: volName,
+		manager: manager,
 		mounter: mounter,
-	}, nil
+		plugin:  plugin,
+		io:      &osIOHandler{},
+	}}, nil
 }
 
 func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, error) {
@@ -146,42 +143,34 @@ type fcDisk struct {
 	wwns    []string
 	lun     string
 	plugin  *fcPlugin
+	mounter mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	// io handler interface
 	io ioHandler
-	volume.MetricsNil
 }
 
 func (fc *fcDisk) GetPath() string {
 	name := fcPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, strings.EscapeQualifiedNameForDisk(name), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, util.EscapeQualifiedNameForDisk(name), fc.volName)
 }
 
 type fcDiskBuilder struct {
 	*fcDisk
 	readOnly bool
 	fsType   string
-	mounter  *mount.SafeFormatAndMount
 }
 
 var _ volume.Builder = &fcDiskBuilder{}
 
-func (b *fcDiskBuilder) GetAttributes() volume.Attributes {
-	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
-	}
-}
-func (b *fcDiskBuilder) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *fcDiskBuilder) SetUp() error {
+	return b.SetUpAt(b.GetPath())
 }
 
-func (b *fcDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (b *fcDiskBuilder) SetUpAt(dir string) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("fc: failed to setup")
 	}
@@ -190,10 +179,13 @@ func (b *fcDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 
 type fcDiskCleaner struct {
 	*fcDisk
-	mounter mount.Interface
 }
 
 var _ volume.Cleaner = &fcDiskCleaner{}
+
+func (b *fcDiskBuilder) IsReadOnly() bool {
+	return b.readOnly
+}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
