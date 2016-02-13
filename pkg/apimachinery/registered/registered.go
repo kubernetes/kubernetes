@@ -58,6 +58,7 @@ func init() {
 				glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s.",
 					version, os.Getenv("KUBE_API_VERSIONS"))
 			}
+			glog.V(4).Infof("Enabling group/version: %s", gv)
 			envRequestedVersions[gv] = struct{}{}
 		}
 	}

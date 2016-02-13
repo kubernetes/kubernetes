@@ -25,6 +25,9 @@ import (
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
@@ -57,6 +60,24 @@ func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 		client = NewEtcdClient()
 	}
 	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
+}
+
+func NewBatchEtcdStorage(client etcd.Client) storage.Interface {
+	if client == nil {
+		client = NewEtcdClient()
+	}
+	c := testapi.Batch.Codec()
+
+	if err := runtime.CheckCodec(
+		c,
+		&extensions.Job{},
+		unversioned.GroupVersionKind{"batch", "v1", "Job"},
+		unversioned.GroupVersionKind{"extensions", "v1beta1", "Job"},
+	); err != nil {
+		panic(fmt.Errorf("Job REST storage: provided storage object has a defective codec: %v", err))
+	}
+
+	return etcdstorage.NewEtcdStorage(client, c, etcdtest.PathPrefix(), false)
 }
 
 func RequireEtcd() {

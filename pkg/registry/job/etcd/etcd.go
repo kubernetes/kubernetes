@@ -17,7 +17,10 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,7 +43,18 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &extensions.JobList{} }
 	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Jobs), &extensions.Job{}, prefix, job.Strategy, newListFunc)
+		s, cachesize.GetWatchCacheSizeByResource(cachesize.Jobs),
+		&extensions.Job{}, prefix, job.Strategy, newListFunc,
+	)
+
+	if err := runtime.CheckCodec(
+		storageInterface.Codec(),
+		&extensions.Job{},
+		unversioned.GroupVersionKind{"batch", "v1", "Job"},
+		unversioned.GroupVersionKind{"extensions", "v1beta1", "Job"},
+	); err != nil {
+		panic(fmt.Errorf("Job REST object construction: provided storage object has a defective codec: %v", err))
+	}
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Job{} },

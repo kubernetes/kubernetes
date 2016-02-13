@@ -278,6 +278,10 @@ func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
 
+func (c *Fake) Batch() client.BatchInterface {
+	return &FakeExperimental{c}
+}
+
 func (c *Fake) Discovery() client.DiscoveryInterface {
 	return &FakeDiscovery{c}
 }

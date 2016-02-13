@@ -256,6 +256,17 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
 }
 
+func findGroup(gl *unversioned.APIGroupList, targetGroupName string) (ix int, err error) {
+	names := []string{}
+	for i := range gl.Groups {
+		if gl.Groups[i].Name == targetGroupName {
+			return i, nil
+		}
+		names = append(names, gl.Groups[i].Name)
+	}
+	return 0, fmt.Errorf("No group named %q in %#v", targetGroupName, names)
+}
+
 func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
@@ -285,9 +296,14 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		GroupVersion: config.StorageVersions[extensions.GroupName],
 		Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
 	}
-	assert.Equal(extensionsGroupName, groupList.Groups[0].Name)
-	assert.Equal(extensionsVersions, groupList.Groups[0].Versions)
-	assert.Equal(extensionsPreferredVersion, groupList.Groups[0].PreferredVersion)
+
+	extIdx, err := findGroup(&groupList, "extensions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(extensionsGroupName, groupList.Groups[extIdx].Name)
+	assert.Equal(extensionsVersions, groupList.Groups[extIdx].Versions)
+	assert.Equal(extensionsPreferredVersion, groupList.Groups[extIdx].PreferredVersion)
 
 	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
 	master.addThirdPartyResourceStorage("/apis/company.com/v1", nil,
@@ -312,13 +328,21 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	thirdPartyGroupName := "company.com"
 	thirdPartyExpectVersions := []unversioned.GroupVersionForDiscovery{thirdPartyGV}
 
-	assert.Equal(2, len(groupList.Groups))
-	assert.Equal(thirdPartyGroupName, groupList.Groups[0].Name)
-	assert.Equal(thirdPartyExpectVersions, groupList.Groups[0].Versions)
-	assert.Equal(thirdPartyGV, groupList.Groups[0].PreferredVersion)
-	assert.Equal(extensionsGroupName, groupList.Groups[1].Name)
-	assert.Equal(extensionsVersions, groupList.Groups[1].Versions)
-	assert.Equal(extensionsPreferredVersion, groupList.Groups[1].PreferredVersion)
+	tpIdx, err := findGroup(&groupList, thirdPartyGroupName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(thirdPartyGroupName, groupList.Groups[tpIdx].Name)
+	assert.Equal(thirdPartyExpectVersions, groupList.Groups[tpIdx].Versions)
+	assert.Equal(thirdPartyGV, groupList.Groups[tpIdx].PreferredVersion)
+
+	extIdx, err = findGroup(&groupList, "extensions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(extensionsGroupName, groupList.Groups[extIdx].Name)
+	assert.Equal(extensionsVersions, groupList.Groups[extIdx].Versions)
+	assert.Equal(extensionsPreferredVersion, groupList.Groups[extIdx].PreferredVersion)
 }
 
 var versionsToTest = []string{"v1", "v3"}
