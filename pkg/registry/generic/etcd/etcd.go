@@ -254,6 +254,15 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	creating := false
 	out := e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		// Since we return 'obj' from this function and it can be modified outside this
+		// function, we are resetting resourceVersion to the initial value here.
+		//
+		// TODO: In fact, we should probably return a DeepCopy of obj in all places.
+		err := e.Storage.Versioner().UpdateObject(obj, nil, resourceVersion)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err

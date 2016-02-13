@@ -191,6 +191,24 @@ func (h *etcdHelper) Set(ctx context.Context, key string, obj, out runtime.Objec
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
+
+	version := uint64(0)
+	if h.versioner != nil {
+		var err error
+		if version, err = h.versioner.ObjectResourceVersion(obj); err != nil {
+			return errors.New("couldn't get resourceVersion from object")
+		}
+		if version != 0 {
+			// We cannot store object with resourceVersion in etcd, we need to clear it here.
+			if err := h.versioner.UpdateObject(obj, nil, 0); err != nil {
+				return errors.New("resourceVersion cannot be set on objects store in etcd")
+			}
+		}
+	}
+	// TODO: If versioner is nil, then we may end up with having ResourceVersion set
+	// in the object and this will be incorrect ResourceVersion. We should fix it by
+	// requiring "versioner != nil" at the constructor level for 1.3 milestone.
+
 	var response *etcd.Response
 	data, err := runtime.Encode(h.codec, obj)
 	if err != nil {
@@ -200,7 +218,7 @@ func (h *etcdHelper) Set(ctx context.Context, key string, obj, out runtime.Objec
 
 	create := true
 	if h.versioner != nil {
-		if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
+		if version != 0 {
 			create = false
 			startTime := time.Now()
 			opts := etcd.SetOptions{
@@ -558,6 +576,16 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 			ttl = *newTTL
 		}
 
+		// Since update object may have a resourceVersion set, we need to clear it here.
+		if h.versioner != nil {
+			if err := h.versioner.UpdateObject(ret, meta.Expiration, 0); err != nil {
+				return errors.New("resourceVersion cannot be set on objects store in etcd")
+			}
+		}
+		// TODO: If versioner is nil, then we may end up with having ResourceVersion set
+		// in the object and this will be incorrect ResourceVersion. We should fix it by
+		// requiring "versioner != nil" at the constructor level for 1.3 milestone.
+
 		data, err := runtime.Encode(h.codec, ret)
 		if err != nil {
 			return err
@@ -580,7 +608,10 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		}
 
 		if string(data) == origBody {
-			return nil
+			// If we don't send an update, we simply return the currently existing
+			// version of the object.
+			_, _, err := h.extractObj(res, nil, ptrToType, ignoreNotFound, false)
+			return err
 		}
 
 		startTime := time.Now()
