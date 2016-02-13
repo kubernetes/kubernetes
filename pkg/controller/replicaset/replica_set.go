@@ -407,6 +407,14 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		glog.V(4).Infof("Finished syncing replica set %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
+	if !rsc.podStoreSynced() {
+		// Sleep so we give the pod reflector goroutine a chance to run.
+		time.Sleep(PodStoreSyncedPollPeriod)
+		glog.Infof("Waiting for pods controller to sync, requeuing ReplicaSet %v", key)
+		rsc.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := rsc.rsStore.Store.GetByKey(key)
 	if !exists {
 		glog.Infof("ReplicaSet has been deleted %v", key)
@@ -419,13 +427,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 	rs := *obj.(*extensions.ReplicaSet)
-	if !rsc.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing ReplicaSet %v", rs.Name)
-		rsc.enqueueReplicaSet(&rs)
-		return nil
-	}
 
 	// Check the expectations of the ReplicaSet before counting active pods, otherwise a new pod can sneak
 	// in and update the expectations after we've retrieved active pods from the store. If a new pod enters
