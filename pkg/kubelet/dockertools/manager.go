@@ -1216,7 +1216,9 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 	if networkContainer != nil {
 		ins, err := dm.client.InspectContainer(networkContainer.ID.ID)
 		if err != nil {
-			glog.Errorf("Error inspecting container %v: %v", networkContainer.ID.ID, err)
+			err = fmt.Errorf("Error inspecting container %v: %v", networkContainer.ID.ID, err)
+			glog.Error(err)
+			result.Fail(err)
 			return
 		}
 		if ins.HostConfig != nil && ins.HostConfig.NetworkMode != namespaceModeHost {
