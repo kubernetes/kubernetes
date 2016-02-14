@@ -269,12 +269,25 @@ func contains(haystack []*string, needle string) bool {
 
 func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 	name := *filter.Name
+	glog.Infof("Checking filter %v on instance id %v", name, *instance.InstanceId)
+
 	if name == "private-dns-name" {
 		if instance.PrivateDnsName == nil {
 			return false
 		}
 		return contains(filter.Values, *instance.PrivateDnsName)
 	}
+
+	if strings.HasPrefix(name, "tag:") {
+		tagName := name[4:]
+		for _, tag := range instance.Tags {
+			if *tag.Key == tagName {
+				return contains(filter.Values, *tag.Value)
+			}
+		}
+		return false
+	}
+
 	panic("Unknown filter name: " + name)
 }
 
@@ -397,8 +410,65 @@ func (ec2 *FakeEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.S
 	return ec2.Subnets, nil
 }
 
-func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
-	panic("Not implemented")
+func (e *FakeEC2) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+	if len(input.Resources) != 1 {
+		return nil, fmt.Errorf("Expected a single resource id")
+	}
+
+	instanceId := input.Resources[0]
+
+	for _, instance := range e.aws.instances {
+		if *instance.InstanceId == *instanceId {
+			instance.Tags = append(instance.Tags, input.Tags...)
+			return &ec2.CreateTagsOutput{}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Could not find instance with id %v", instanceId)
+}
+
+func (e *FakeEC2) DescribeTags(input *ec2.DescribeTagsInput) (*ec2.DescribeTagsOutput, error) {
+	var resourceType, resourceId string
+	for _, filter := range input.Filters {
+		if *filter.Name == "resource-type" {
+			if len(filter.Values) != 1 {
+				return nil, fmt.Errorf("Only expected a single value for resource-type, but got %v", len(filter.Values))
+			}
+			resourceType = *filter.Values[0]
+		}
+
+		if *filter.Name == "resource-id" {
+			if len(filter.Values) != 1 {
+				return nil, fmt.Errorf("Only expected a single value for resource-id, but got %v", len(filter.Values))
+			}
+			resourceId = *filter.Values[0]
+		}
+	}
+
+	if resourceType == "" {
+		return nil, fmt.Errorf("No resource-type found")
+	}
+
+	if resourceId == "" {
+		return nil, fmt.Errorf("No resource-id found")
+	}
+
+	var matchedInstance *ec2.Instance
+	for _, instance := range e.aws.instances {
+		if resourceType == "instance" && *instance.InstanceId == resourceId {
+			matchedInstance = instance
+		}
+	}
+
+	if matchedInstance != nil {
+		var tagDescriptions []*ec2.TagDescription
+		for _, tag := range matchedInstance.Tags {
+			tagDescriptions = append(tagDescriptions, &ec2.TagDescription{Key: tag.Key, Value: tag.Value})
+		}
+		return &ec2.DescribeTagsOutput{Tags: tagDescriptions}, nil
+	}
+
+	return nil, fmt.Errorf("Could not find any matches for input: %v", *input)
 }
 
 func (s *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
@@ -478,10 +548,13 @@ func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGrou
 
 func mockInstancesResp(instances []*ec2.Instance) (*AWSCloud, *FakeAWSServices) {
 	awsServices := NewFakeAWSServices().withInstances(instances)
+	metadata, _ := awsServices.Metadata()
+	cfg, _ := readAWSCloudConfig(strings.NewReader("[global]\n"), metadata)
 	return &AWSCloud{
 		ec2:              awsServices.ec2,
 		availabilityZone: awsServices.availabilityZone,
 		metadata:         &FakeMetadata{aws: awsServices},
+		cfg:              cfg,
 	}, awsServices
 }
 
@@ -878,5 +951,166 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, true)
 	if equals {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+}
+
+func TestUseKubernetesNodeTagForCloudID(t *testing.T) {
+	instanceId := "i-node-tagged"
+	nodeName := "node-01"
+
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]\nuseKubernetesNodeTag = true"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	tests := []struct {
+		name            string
+		cloudIDFunc     func(string) (string, error)
+		tags            []*ec2.Tag
+		expectedCloudID string
+		expectError     bool
+	}{
+		{
+			"Node name tag is set for ExternalID",
+			c.ExternalID,
+			[]*ec2.Tag{
+				{Key: aws.String(TagNameKubernetesNode), Value: aws.String(nodeName)},
+				{Key: aws.String(TagNameKubernetesCluster), Value: aws.String(TestClusterId)},
+			},
+			instanceId,
+			false,
+		},
+		{
+			"Node name tag is not set for ExternalID",
+			c.ExternalID,
+			[]*ec2.Tag{
+				{Key: aws.String(TagNameKubernetesCluster), Value: aws.String(TestClusterId)},
+			},
+			"",
+			true,
+		},
+		{
+			"Node name tag is set for InstanceID",
+			c.InstanceID,
+			[]*ec2.Tag{
+				{Key: aws.String(TagNameKubernetesNode), Value: aws.String(nodeName)},
+				{Key: aws.String(TagNameKubernetesCluster), Value: aws.String(TestClusterId)},
+			},
+			"/" + awsServices.availabilityZone + "/" + instanceId,
+			false,
+		},
+		{
+			"Node name tag is not set for InstanceID",
+			c.InstanceID,
+			[]*ec2.Tag{
+				{Key: aws.String(TagNameKubernetesCluster), Value: aws.String(TestClusterId)},
+			},
+			"",
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+
+		var instance ec2.Instance
+		instance.InstanceId = &instanceId
+		instance.Tags = test.tags
+		instance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
+		instance.Placement = &ec2.Placement{AvailabilityZone: aws.String(awsServices.availabilityZone)}
+
+		awsServices.instances = []*ec2.Instance{&instance}
+
+		cloudID, err := test.cloudIDFunc(nodeName)
+
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Expected to fail finding ExternalID due to missing tag, but found %v", cloudID)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Error getting cloud ID: %v", err)
+				return
+			}
+
+			if cloudID != test.expectedCloudID {
+				t.Errorf("Expected %v but got %v", test.expectedCloudID, cloudID)
+			}
+		}
+	}
+}
+
+func TestUseProvidedNodeNameWhenUsingKubernetesNodeTag(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+
+	// node tag already exists
+	selfTaggedNodeName := "self-tag"
+	var clusterTag, nodeTag ec2.Tag
+	clusterTag.Key = aws.String(TagNameKubernetesCluster)
+	clusterTag.Value = aws.String(TestClusterId)
+	nodeTag.Key = aws.String(TagNameKubernetesNode)
+	nodeTag.Value = aws.String(selfTaggedNodeName)
+
+	selfInstance := awsServices.instances[0]
+	selfInstance.Tags = []*ec2.Tag{&nodeTag}
+
+	c, err := newAWSCloud(strings.NewReader("[global]\nuseKubernetesNodeTag = true"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	currentNodeName, err := c.CurrentNodeName("ignored")
+	//currentNodeName := "blah"
+	//err = nil
+
+	if err != nil {
+		t.Errorf("Failed getting current node name: %v", err)
+		return
+	}
+
+	if currentNodeName != selfTaggedNodeName {
+		t.Errorf("Expected current node name to match provided %v, but was %v", selfTaggedNodeName, currentNodeName)
+	}
+}
+
+func TestCreateNodeTagWhenUsingKubernetesNodeTags(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]\nuseKubernetesNodeTag = true"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	hostname := "self-custom-hostname"
+	currentNodeName, err := c.CurrentNodeName(hostname)
+
+	if err != nil {
+		t.Errorf("Failed getting current node name: %v", err)
+		return
+	}
+
+	if currentNodeName != hostname {
+		t.Errorf("Expected current node name to match custom hostname %v, but was %v", hostname, currentNodeName)
+		return
+	}
+
+	selfInstance := awsServices.instances[0]
+	if len(selfInstance.Tags) < 2 {
+		t.Errorf("Instance wasn't tagged with its node name")
+		return
+	}
+
+	nodenameTag := selfInstance.Tags[1]
+	if *nodenameTag.Key != TagNameKubernetesNode {
+		t.Errorf("Expected tag %v but was %v", TagNameKubernetesNode, *nodenameTag.Key)
+		return
+	}
+
+	if *nodenameTag.Value != hostname {
+		t.Errorf("Expected node name to be %v, but was %v", hostname, *nodenameTag.Value)
+		return
 	}
 }
