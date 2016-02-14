@@ -396,14 +396,14 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
-var replicaSetColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
-var jobColumns = []string{"JOB", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "SUCCESSFUL"}
-var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "SELECTOR", "AGE"}
+var replicationControllerColumns = []string{"CONTROLLER", "REPLICAS", "AGE"}
+var replicaSetColumns = []string{"CONTROLLER", "REPLICAS", "AGE"}
+var jobColumns = []string{"JOB", "SUCCESSFUL"}
+var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "STATUS", "AGE"}
-var daemonSetColumns = []string{"NAME", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "NODE-SELECTOR"}
+var daemonSetColumns = []string{"NAME", "NODE-SELECTOR"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
@@ -703,15 +703,21 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%s",
 		name,
-		firstContainer.Name,
-		firstContainer.Image,
-		labels.FormatLabels(controller.Spec.Selector),
 		controller.Spec.Replicas,
 		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
 		return err
+	}
+	if options.Wide {
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s",
+			firstContainer.Name,
+			firstContainer.Image,
+			labels.FormatLabels(controller.Spec.Selector),
+		); err != nil {
+			return err
+		}
 	}
 	if _, err := fmt.Fprint(w, appendLabels(controller.Labels, options.ColumnLabels)); err != nil {
 		return err
@@ -760,15 +766,21 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%s",
 		name,
-		firstContainer.Name,
-		firstContainer.Image,
-		unversioned.FormatLabelSelector(rs.Spec.Selector),
 		rs.Spec.Replicas,
 		translateTimestamp(rs.CreationTimestamp),
 	); err != nil {
 		return err
+	}
+	if options.Wide {
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s",
+			firstContainer.Name,
+			firstContainer.Image,
+			unversioned.FormatLabelSelector(rs.Spec.Selector),
+		); err != nil {
+			return err
+		}
 	}
 	if _, err := fmt.Fprint(w, appendLabels(rs.Labels, options.ColumnLabels)); err != nil {
 		return err
@@ -818,14 +830,20 @@ func printJob(job *extensions.Job, w io.Writer, options PrintOptions) error {
 	}
 
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d",
+	_, err := fmt.Fprintf(w, "%s\t%d",
 		name,
-		firstContainer.Name,
-		firstContainer.Image,
-		selector.String(),
 		job.Status.Succeeded)
 	if err != nil {
 		return err
+	}
+	if options.Wide {
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s",
+			firstContainer.Name,
+			firstContainer.Image,
+			selector.String(),
+		); err != nil {
+			return err
+		}
 	}
 	if _, err := fmt.Fprint(w, appendLabels(job.Labels, options.ColumnLabels)); err != nil {
 		return err
@@ -916,15 +934,19 @@ func printService(svc *api.Service, w io.Writer, options PrintOptions) error {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",
 		name,
 		internalIP,
 		externalIP,
 		makePortString(svc.Spec.Ports),
-		labels.FormatLabels(svc.Spec.Selector),
 		translateTimestamp(svc.CreationTimestamp),
 	); err != nil {
 		return err
+	}
+	if options.Wide {
+		if _, err := fmt.Fprintf(w, "\t%s", labels.FormatLabels(svc.Spec.Selector)); err != nil {
+			return err
+		}
 	}
 	if _, err := fmt.Fprint(w, appendLabels(svc.Labels, options.ColumnLabels)); err != nil {
 		return err
@@ -1031,14 +1053,20 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions)
 		// this shouldn't happen if LabelSelector passed validation
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s",
 		name,
-		firstContainer.Name,
-		firstContainer.Image,
-		selector,
 		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
 	); err != nil {
 		return err
+	}
+	if options.Wide {
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s",
+			firstContainer.Name,
+			firstContainer.Image,
+			selector,
+		); err != nil {
+			return err
+		}
 	}
 	if _, err := fmt.Fprint(w, appendLabels(ds.Labels, options.ColumnLabels)); err != nil {
 		return err
@@ -1683,6 +1711,21 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 	if wide {
 		if t.String() == "*api.Pod" || t.String() == "*api.PodList" {
 			return []string{"NODE"}
+		}
+		if t.String() == "*api.ReplicationController" || t.String() == "*api.ReplicationControllerList" {
+			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+		}
+		if t.String() == "*extensions.Job" || t.String() == "*extensions.JobList" {
+			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+		}
+		if t.String() == "*api.Service" || t.String() == "*api.ServiceList" {
+			return []string{"SELECTOR"}
+		}
+		if t.String() == "*extensions.DaemonSet" || t.String() == "*extensions.DaemonSetList" {
+			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+		}
+		if t.String() == "*extensions.ReplicaSet" || t.String() == "*extensions.ReplicaSetList" {
+			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 		}
 	}
 	return nil
