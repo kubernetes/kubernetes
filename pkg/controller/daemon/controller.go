@@ -582,11 +582,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false
 	}
-	// If the node is not ready, don't run on it.
-	// TODO(mikedanese): remove this once daemonpods forgive nodes
-	if !api.IsNodeReady(node) {
-		return false
-	}
 
 	for _, c := range node.Status.Conditions {
 		if c.Type == api.NodeOutOfDisk && c.Status == api.ConditionTrue {
