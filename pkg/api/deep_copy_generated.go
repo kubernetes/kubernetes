@@ -2597,6 +2597,13 @@ func DeepCopy_api_SecurityContext(in SecurityContext, out *SecurityContext, c *c
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		in, out := in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
