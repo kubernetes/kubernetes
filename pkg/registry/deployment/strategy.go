@@ -92,6 +92,7 @@ func (deploymentStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newDeployment := obj.(*extensions.Deployment)
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Spec = oldDeployment.Spec
+	newDeployment.Labels = oldDeployment.Labels
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
