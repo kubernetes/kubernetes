@@ -968,6 +968,9 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 		loadBalancerStatusStringer(ingress.Status.LoadBalancer)); err != nil {
 		return err
 	}
+	if _, err := fmt.Fprint(w, appendLabels(ingress.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
 
 	if _, err := fmt.Fprint(w, appendAllLabels(options.ShowLabels, ingress.Labels)); err != nil {
 		return err
