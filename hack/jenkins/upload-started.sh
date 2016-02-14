@@ -24,9 +24,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# TODO: DRY. Refactor into upload-to-gcs.sh ?
+: ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}
+: ${JENKINS_UPLOAD_TO_GCS:="y"}
+
+if [[ ! ${JENKINS_UPLOAD_TO_GCS:-} =~ ^[yY]$ ]]; then
+  exit 0
+fi
+
 version=""
 readonly timestamp=$(date +%s)
-readonly location="gs://kubernetes-jenkins/logs/${JOB_NAME}/${BUILD_NUMBER}/started.json"
+readonly location="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}/${BUILD_NUMBER}/started.json"
 
 echo -n 'Run starting at '; date -d "@${timestamp}"
 
