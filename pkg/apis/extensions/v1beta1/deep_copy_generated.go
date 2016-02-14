@@ -139,6 +139,23 @@ func deepCopy_v1_ConfigMapKeySelector(in v1.ConfigMapKeySelector, out *v1.Config
 	return nil
 }
 
+func deepCopy_v1_ConfigMapVolumeSource(in v1.ConfigMapVolumeSource, out *v1.ConfigMapVolumeSource, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]v1.KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_KeyToPath(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_Container(in v1.Container, out *v1.Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -458,6 +475,12 @@ func deepCopy_v1_ISCSIVolumeSource(in v1.ISCSIVolumeSource, out *v1.ISCSIVolumeS
 	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func deepCopy_v1_KeyToPath(in v1.KeyToPath, out *v1.KeyToPath, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Path = in.Path
 	return nil
 }
 
@@ -984,6 +1007,14 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 		}
 	} else {
 		out.AzureFile = nil
+	}
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(v1.ConfigMapVolumeSource)
+		if err := deepCopy_v1_ConfigMapVolumeSource(*in.ConfigMap, out.ConfigMap, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
 	}
 	return nil
 }
@@ -1972,6 +2003,7 @@ func init() {
 		deepCopy_v1_CephFSVolumeSource,
 		deepCopy_v1_CinderVolumeSource,
 		deepCopy_v1_ConfigMapKeySelector,
+		deepCopy_v1_ConfigMapVolumeSource,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerPort,
 		deepCopy_v1_DownwardAPIVolumeFile,
@@ -1991,6 +2023,7 @@ func init() {
 		deepCopy_v1_Handler,
 		deepCopy_v1_HostPathVolumeSource,
 		deepCopy_v1_ISCSIVolumeSource,
+		deepCopy_v1_KeyToPath,
 		deepCopy_v1_Lifecycle,
 		deepCopy_v1_LoadBalancerIngress,
 		deepCopy_v1_LoadBalancerStatus,

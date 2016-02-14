@@ -165,6 +165,15 @@ func (ConfigMapList) SwaggerDoc() map[string]string {
 	return map_ConfigMapList
 }
 
+var map_ConfigMapVolumeSource = map[string]string{
+	"":      "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
+	"items": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'.",
+}
+
+func (ConfigMapVolumeSource) SwaggerDoc() map[string]string {
+	return map_ConfigMapVolumeSource
+}
+
 var map_Container = map[string]string{
 	"":                       "A single application container that you want to run within a pod.",
 	"name":                   "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
@@ -574,6 +583,16 @@ var map_ISCSIVolumeSource = map[string]string{
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
 	return map_ISCSIVolumeSource
+}
+
+var map_KeyToPath = map[string]string{
+	"":     "Maps a string key to a path within a volume.",
+	"key":  "The key to project.",
+	"path": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
+}
+
+func (KeyToPath) SwaggerDoc() map[string]string {
+	return map_KeyToPath
 }
 
 var map_Lifecycle = map[string]string{
@@ -1555,6 +1574,7 @@ var map_VolumeSource = map[string]string{
 	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
 	"fc":          "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 	"azureFile":   "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":   "ConfigMap represents a configMap that should populate this volume",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {
