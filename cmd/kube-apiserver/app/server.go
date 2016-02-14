@@ -322,6 +322,7 @@ func Run(s *options.APIServer) error {
 		OIDCClientID:              s.OIDCClientID,
 		OIDCCAFile:                s.OIDCCAFile,
 		OIDCUsernameClaim:         s.OIDCUsernameClaim,
+		OIDCGroupsClaim:           s.OIDCGroupsClaim,
 		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
 		ServiceAccountLookup:      s.ServiceAccountLookup,
 		ServiceAccountTokenGetter: serviceAccountGetter,

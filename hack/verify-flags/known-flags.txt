@@ -252,6 +252,7 @@ num-nodes
 oidc-ca-file
 oidc-client-id
 oidc-issuer-url
+oidc-groups-claim
 oidc-username-claim
 only-idl
 oom-score-adj
