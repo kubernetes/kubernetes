@@ -49,6 +49,10 @@ type VolumeOptions struct {
 	AccessModes []api.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
+	// PV.Name of the appropriate PersistentVolume. Used to generate cloud volume name.
+	PVName string
+	// Unique name of Kubernetes cluster.
+	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
 }
