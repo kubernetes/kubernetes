@@ -238,6 +238,23 @@ func deepCopy_v1_ConfigMapList(in ConfigMapList, out *ConfigMapList, c *conversi
 	return nil
 }
 
+func deepCopy_v1_ConfigMapVolumeSource(in ConfigMapVolumeSource, out *ConfigMapVolumeSource, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_KeyToPath(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_Container(in Container, out *Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -815,6 +832,12 @@ func deepCopy_v1_ISCSIVolumeSource(in ISCSIVolumeSource, out *ISCSIVolumeSource,
 	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func deepCopy_v1_KeyToPath(in KeyToPath, out *KeyToPath, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Path = in.Path
 	return nil
 }
 
@@ -2543,6 +2566,14 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 	} else {
 		out.AzureFile = nil
 	}
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(ConfigMapVolumeSource)
+		if err := deepCopy_v1_ConfigMapVolumeSource(*in.ConfigMap, out.ConfigMap, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
+	}
 	return nil
 }
 
@@ -2590,6 +2621,7 @@ func init() {
 		deepCopy_v1_ConfigMap,
 		deepCopy_v1_ConfigMapKeySelector,
 		deepCopy_v1_ConfigMapList,
+		deepCopy_v1_ConfigMapVolumeSource,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerImage,
 		deepCopy_v1_ContainerPort,
@@ -2626,6 +2658,7 @@ func init() {
 		deepCopy_v1_Handler,
 		deepCopy_v1_HostPathVolumeSource,
 		deepCopy_v1_ISCSIVolumeSource,
+		deepCopy_v1_KeyToPath,
 		deepCopy_v1_Lifecycle,
 		deepCopy_v1_LimitRange,
 		deepCopy_v1_LimitRangeItem,
