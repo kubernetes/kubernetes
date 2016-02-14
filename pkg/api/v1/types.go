@@ -1021,7 +1021,7 @@ type Container struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md
 	Image string `json:"image,omitempty"`
 	// Entrypoint array. Not executed within a shell.
-	// The docker image's entrypoint is used if this is not provided.
+	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
@@ -1030,7 +1030,7 @@ type Container struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands
 	Command []string `json:"command,omitempty"`
 	// Arguments to the entrypoint.
-	// The docker image's cmd is used if this is not provided.
+	// The docker image's CMD is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
@@ -1039,11 +1039,16 @@ type Container struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands
 	Args []string `json:"args,omitempty"`
 	// Container's working directory.
-	// Defaults to Docker's default. D
-	// efaults to image's default.
+	// If not specified, the container runtime's default will be used, which
+	// might be configured in the container image.
 	// Cannot be updated.
 	WorkingDir string `json:"workingDir,omitempty"`
-	// List of ports to expose from the container.
+	// List of ports to expose from the container. Exposing a port here gives
+	// the system additional information about the network connections a
+	// container uses, but is primarily informational. Not specifying a port here
+	// DOES NOT prevent that port from being exposed. Any port which is
+	// listening on the default "0.0.0.0" address inside a container will be
+	// accessible from the network.
 	// Cannot be updated.
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort"`
 	// List of environment variables to set in the container.
