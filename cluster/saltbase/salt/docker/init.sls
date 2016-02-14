@@ -208,6 +208,16 @@ net.ipv4.ip_forward:
 {% set override_deb_sha1='' %}
 {% set override_docker_ver='' %}
 
+{% elif grains.get('cloud', '') == 'aws'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'jessie' -%}
+# TODO: Get from google storage?
+{% set docker_pkg_name='docker-engine' %}
+{% set override_docker_ver='1.9.1-0~jessie' %}
+{% set override_deb='docker-engine_1.9.1-0~jessie_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~jessie_amd64.deb' %}
+{% set override_deb_sha1='c58c39008fd6399177f6b2491222e4438f518d78' %}
+
 # Ubuntu presents as os_family=Debian, osfullname=Ubuntu
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
