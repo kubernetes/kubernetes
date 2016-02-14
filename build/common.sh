@@ -73,7 +73,10 @@ readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 
-readonly DOCKER_MOUNT_ARGS_BASE=(--volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}")
+readonly DOCKER_MOUNT_ARGS_BASE=(
+  --volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
+  --volume /etc/localtime:/etc/localtime:ro
+)
 # DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
 
 # We create a Docker data container to cache incremental build artifacts.  We
