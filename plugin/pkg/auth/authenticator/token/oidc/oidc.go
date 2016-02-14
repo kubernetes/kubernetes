@@ -42,13 +42,14 @@ type OIDCAuthenticator struct {
 	clientConfig     oidc.ClientConfig
 	client           *oidc.Client
 	usernameClaim    string
+	groupsClaim      string
 	stopSyncProvider chan struct{}
 }
 
 // New creates a new OpenID Connect client with the given issuerURL and clientID.
 // NOTE(yifan): For now we assume the server provides the "jwks_uri" so we don't
 // need to manager the key sets by ourselves.
-func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator, error) {
+func New(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (*OIDCAuthenticator, error) {
 	var cfg oidc.ProviderConfig
 	var err error
 	var roots *x509.CertPool
@@ -117,7 +118,7 @@ func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator,
 	// and maximum threshold.
 	stop := client.SyncProviderConfig(issuerURL)
 
-	return &OIDCAuthenticator{ccfg, client, usernameClaim, stop}, nil
+	return &OIDCAuthenticator{ccfg, client, usernameClaim, groupsClaim, stop}, nil
 }
 
 // AuthenticateToken decodes and verifies a JWT using the OIDC client, if the verification succeeds,
@@ -155,8 +156,20 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 		username = fmt.Sprintf("%s#%s", a.clientConfig.ProviderConfig.Issuer, claim)
 	}
 
-	// TODO(yifan): Add UID and Group, also populate the issuer to upper layer.
-	return &user.DefaultInfo{Name: username}, true, nil
+	// TODO(yifan): Add UID, also populate the issuer to upper layer.
+	info := &user.DefaultInfo{Name: username}
+
+	if a.groupsClaim != "" {
+		groups, found, err := claims.StringsClaim(a.groupsClaim)
+		if err != nil {
+			// Custom claim is present, but isn't an array of strings.
+			return nil, false, fmt.Errorf("custom group claim contains invalid object: %v", err)
+		}
+		if found {
+			info.Groups = groups
+		}
+	}
+	return info, true, nil
 }
 
 // Close closes the OIDC authenticator, this will close the provider sync goroutine.
