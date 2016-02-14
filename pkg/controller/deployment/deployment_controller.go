@@ -18,7 +18,6 @@ package deployment
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/integer"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -785,7 +785,7 @@ func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*extensions.Repl
 	// Scale up.
 	scaleUpCount := maxTotalPods - currentPodCount
 	// Do not exceed the number of desired replicas.
-	scaleUpCount = int(math.Min(float64(scaleUpCount), float64(deployment.Spec.Replicas-newRS.Spec.Replicas)))
+	scaleUpCount = integer.IntMin(scaleUpCount, deployment.Spec.Replicas-newRS.Spec.Replicas)
 	newReplicasCount := newRS.Spec.Replicas + scaleUpCount
 	_, err = dc.scaleReplicaSetAndRecordEvent(newRS, newReplicasCount, deployment)
 	return true, err
@@ -906,7 +906,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*extensions.Re
 			continue
 		}
 
-		scaledDownCount := int(math.Min(float64(maxCleanupCount-totalScaledDown), float64(targetRS.Spec.Replicas-readyPodCount)))
+		scaledDownCount := integer.IntMin(maxCleanupCount-totalScaledDown, targetRS.Spec.Replicas-readyPodCount)
 		newReplicasCount := targetRS.Spec.Replicas - scaledDownCount
 		_, err = dc.scaleReplicaSetAndRecordEvent(targetRS, newReplicasCount, deployment)
 		if err != nil {
@@ -954,7 +954,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs [
 			continue
 		}
 		// Scale down.
-		scaleDownCount := int(math.Min(float64(targetRS.Spec.Replicas), float64(totalScaleDownCount-totalScaledDown)))
+		scaleDownCount := integer.IntMin(targetRS.Spec.Replicas, totalScaleDownCount-totalScaledDown)
 		newReplicasCount := targetRS.Spec.Replicas - scaleDownCount
 		_, err = dc.scaleReplicaSetAndRecordEvent(targetRS, newReplicasCount, deployment)
 		if err != nil {
