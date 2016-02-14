@@ -263,7 +263,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *extensions.Deployment:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
-					return "", fmt.Errorf("failed to convert label selector to selector: %v", err)
+					return "", fmt.Errorf("invalid label selector: %v", err)
 				}
 				return selector.String(), nil
 			case *extensions.ReplicaSet:
@@ -505,13 +505,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *extensions.Deployment:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
-					return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
 				return GetFirstPod(client, t.Namespace, selector)
 			case *extensions.Job:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
-					return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
 				return GetFirstPod(client, t.Namespace, selector)
 			case *api.Pod:
