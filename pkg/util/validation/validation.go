@@ -234,14 +234,17 @@ func IsValidPercent(percent string) []string {
 	return nil
 }
 
-const HTTPHeaderNameFmt string = "[-A-Za-z0-9]+"
+const httpHeaderNameFmt string = "[-A-Za-z0-9]+"
 
-var httpHeaderNameRegexp = regexp.MustCompile("^" + HTTPHeaderNameFmt + "$")
+var httpHeaderNameRegexp = regexp.MustCompile("^" + httpHeaderNameFmt + "$")
 
 // IsHTTPHeaderName checks that a string conforms to the Go HTTP library's
 // definition of a valid header field name (a stricter subset than RFC7230).
-func IsHTTPHeaderName(value string) bool {
-	return httpHeaderNameRegexp.MatchString(value)
+func IsHTTPHeaderName(value string) []string {
+	if !httpHeaderNameRegexp.MatchString(value) {
+		return []string{RegexError(httpHeaderNameFmt, "X-Header-Name")}
+	}
+	return nil
 }
 
 // MaxLenError returns a string explanation of a "string too long" validation
