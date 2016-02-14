@@ -254,7 +254,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 
 		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(rs.Labels)) {
@@ -329,7 +329,7 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensi
 		}
 		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			err = fmt.Errorf("failed to convert pod selector to selector: %v", err)
+			err = fmt.Errorf("invalid selector: %v", err)
 			return
 		}
 
