@@ -152,6 +152,7 @@ readonly KUBE_ADDON_PATHS=(
 #   KUBE_BUILD_CONTAINER_NAME
 #   KUBE_BUILD_DATA_CONTAINER_NAME
 #   DOCKER_MOUNT_ARGS
+#   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::verify_prereqs() {
   kube::log::status "Verifying Prerequisites...."
   kube::build::ensure_tar || return 1
@@ -167,6 +168,7 @@ function kube::build::verify_prereqs() {
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
   DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
+  LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
 
 # ---------------------------------------------------------------------------
@@ -246,10 +248,10 @@ function kube::build::update_dockerfile() {
   else
     sed_opts=(-i)
   fi
-  sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
-  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTP_PROXY#${KUBE_BUILD_HTTP_PROXY:-\"\"}#" ${build_context_dir}/Dockerfile
-  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTPS_PROXY#${KUBE_BUILD_HTTPS_PROXY:-\"\"}#" ${build_context_dir}/Dockerfile
-  sed ${sed_opts[@]} "s#KUBE_BUILD_NO_PROXY#${KUBE_BUILD_NO_PROXY:-127.0.0.1}#" ${build_context_dir}/Dockerfile
+  sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTP_PROXY#${KUBE_BUILD_HTTP_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTPS_PROXY#${KUBE_BUILD_HTTPS_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s#KUBE_BUILD_NO_PROXY#${KUBE_BUILD_NO_PROXY:-127.0.0.1}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
 
 function kube::build::ensure_docker_in_path() {
@@ -510,22 +512,20 @@ function kube::build::source_targets() {
 function kube::build::build_image() {
   kube::build::ensure_tar
 
-  local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
-
   kube::build::build_image_cross
 
-  mkdir -p "${build_context_dir}"
-  "${TAR}" czf "${build_context_dir}/kube-source.tar.gz" $(kube::build::source_targets)
+  mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  "${TAR}" czf "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-source.tar.gz" $(kube::build::source_targets)
 
   kube::version::get_version_vars
-  kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
+  kube::version::save_version_vars "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-version-defs"
 
-  cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
+  cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   kube::build::update_dockerfile
 
   # We don't want to force-pull this image because it's based on a local image
   # (see kube::build::build_image_cross), not upstream.
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}" 'false'
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
 }
 
 # Build the kubernetes golang cross base image.
@@ -704,6 +704,7 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
+  kube::release::package_build_image_tarball &
   kube::release::package_client_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
@@ -713,6 +714,12 @@ function kube::release::package_tarballs() {
   kube::release::package_full_tarball & # _full depends on all the previous phases
   kube::release::package_test_tarball & # _test doesn't depend on anything
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
+}
+
+# Package the build image we used from the previous stage, for compliance/licensing/audit/yadda.
+function kube::release::package_build_image_tarball() {
+  kube::log::status "Building tarball: src"
+  "${TAR}" czf "${RELEASE_DIR}/kubernetes-src.tar.gz" -C "${LOCAL_OUTPUT_BUILD_CONTEXT}" .
 }
 
 # Package up all of the cross compiled clients. Over time this should grow into
