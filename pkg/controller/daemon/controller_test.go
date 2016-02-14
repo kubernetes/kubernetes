@@ -184,7 +184,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
-// DaemonSets should not place onto NotReady nodes
+// DaemonSets should place onto NotReady nodes
 func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("not-ready", nil)
@@ -196,7 +196,7 @@ func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager.nodeStore.Add(node)
 	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // DaemonSets should not place onto OutOfDisk nodes
