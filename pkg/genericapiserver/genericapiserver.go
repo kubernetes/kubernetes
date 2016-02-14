@@ -563,6 +563,9 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 			return err
 		}
 	}
+	if s.enableSwaggerSupport {
+		s.InstallSwaggerAPI()
+	}
 	return nil
 }
 
@@ -778,7 +781,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(groupMeta apimachinery.GroupMeta, 
 }
 
 // InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal.  It is optional to allow consumers of the Kubernetes GenericAPIServer to
+// and traversal. It is optional to allow consumers of the Kubernetes GenericAPIServer to
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {
