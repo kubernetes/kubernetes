@@ -1010,6 +1010,14 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			return nil, err
 		}
 
+		instanceType, err := instances.InstanceType(kl.nodeName)
+		if err != nil {
+			return nil, err
+		}
+		if instanceType != "" {
+			glog.Infof("Adding node label from cloud provider: %s=%s", unversioned.LabelInstanceType, instanceType)
+			node.ObjectMeta.Labels[unversioned.LabelInstanceType] = instanceType
+		}
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {

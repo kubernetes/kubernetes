@@ -52,6 +52,7 @@ type FakeCloud struct {
 	Calls         []string
 	Addresses     []api.NodeAddress
 	ExtID         map[string]string
+	InstanceTypes map[string]string
 	Machines      []string
 	NodeResources *api.NodeResources
 	ClusterList   []string
@@ -187,6 +188,12 @@ func (f *FakeCloud) ExternalID(instance string) (string, error) {
 func (f *FakeCloud) InstanceID(instance string) (string, error) {
 	f.addCall("instance-id")
 	return f.ExtID[instance], nil
+}
+
+// InstanceType returns the type of the specified instance.
+func (f *FakeCloud) InstanceType(instance string) (string, error) {
+	f.addCall("instance-type")
+	return f.InstanceTypes[instance], nil
 }
 
 // List is a test-spy implementation of Instances.List.
