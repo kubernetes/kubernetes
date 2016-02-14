@@ -321,8 +321,8 @@ func TestIsHTTPHeaderName(t *testing.T) {
 		"A", "AB", "AbC", "A1", "-A", "A-", "A-B", "A-1", "A--1--2--B", "--123-ABC",
 	}
 	for _, val := range goodValues {
-		if !IsHTTPHeaderName(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsHTTPHeaderName(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -333,7 +333,7 @@ func TestIsHTTPHeaderName(t *testing.T) {
 		"?", "@", "{",
 	}
 	for _, val := range badValues {
-		if IsHTTPHeaderName(val) {
+		if msgs := IsHTTPHeaderName(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
