@@ -65,8 +65,8 @@ A request has the following attributes that can be considered for authorization:
   - the request path.
     - allows authorizing access to miscellaneous endpoints like `/api` or `/healthz` (see [kubectl](#kubectl)).
   - the request verb.
-    - API verbs like `get`, `list`, `create`, `update`, and `watch` are used for API requests
-    - HTTP verbs like `get`, `post`, and `put` are used for non-API requests
+    - API verbs like `get`, `list`, `create`, `update`, `watch`, `delete`, and `deletecollection` are used for API requests
+    - HTTP verbs like `get`, `post`, `put`, and `delete` are used for non-API requests
   - what resource is being accessed (for API requests only)
   - the namespace of the object being accessed (for namespaced API requests only)
   - the API group being accessed (for API requests only)
