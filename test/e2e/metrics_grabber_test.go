@@ -100,15 +100,12 @@ var _ = Describe("MetricsGrabber", func() {
 	})
 
 	It("should grab all metrics from a Kubelet.", func() {
-		// We run this test only on GCE, as for some reason it flakes in GKE #19468
-		if providerIs("gce") {
-			By("Proxying to Node through the API server")
-			nodes := ListSchedulableNodesOrDie(c)
-			Expect(nodes.Items).NotTo(BeEmpty())
-			response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
-			expectNoError(err)
-			checkNecessaryMetrics(metrics.Metrics(response), metrics.NecessaryKubeletMetrics)
-		}
+		By("Proxying to Node through the API server")
+		nodes := ListSchedulableNodesOrDie(c)
+		Expect(nodes.Items).NotTo(BeEmpty())
+		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
+		expectNoError(err)
+		checkNecessaryMetrics(metrics.Metrics(response), metrics.NecessaryKubeletMetrics)
 	})
 
 	It("should grab all metrics from a Scheduler.", func() {
