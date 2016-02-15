@@ -20,14 +20,13 @@ import (
 	"fmt"
 
 	log "github.com/golang/glog"
-	"github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -42,14 +41,12 @@ type SchedulerAlgorithm interface {
 
 // SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
 type schedulerAlgorithm struct {
-	sched           scheduler.Scheduler
-	podUpdates      queue.FIFO
-	podScheduler    podschedulers.PodScheduler
-	prototype       *mesosproto.ExecutorInfo
-	frameworkRoles  []string
-	defaultPodRoles []string
-	defaultCpus     mresource.CPUShares
-	defaultMem      mresource.MegaBytes
+	sched        scheduler.Scheduler
+	podUpdates   queue.FIFO
+	podScheduler podschedulers.PodScheduler
+	taskConfig   podtask.Config
+	defaultCpus  resources.CPUShares
+	defaultMem   resources.MegaBytes
 }
 
 // New returns a new SchedulerAlgorithm
@@ -58,20 +55,17 @@ func New(
 	sched scheduler.Scheduler,
 	podUpdates queue.FIFO,
 	podScheduler podschedulers.PodScheduler,
-	prototype *mesosproto.ExecutorInfo,
-	frameworkRoles, defaultPodRoles []string,
-	defaultCpus mresource.CPUShares,
-	defaultMem mresource.MegaBytes,
+	taskConfig podtask.Config,
+	defaultCpus resources.CPUShares,
+	defaultMem resources.MegaBytes,
 ) SchedulerAlgorithm {
 	return &schedulerAlgorithm{
-		sched:           sched,
-		podUpdates:      podUpdates,
-		podScheduler:    podScheduler,
-		frameworkRoles:  frameworkRoles,
-		defaultPodRoles: defaultPodRoles,
-		prototype:       prototype,
-		defaultCpus:     defaultCpus,
-		defaultMem:      defaultMem,
+		sched:        sched,
+		podUpdates:   podUpdates,
+		podScheduler: podScheduler,
+		taskConfig:   taskConfig,
+		defaultCpus:  defaultCpus,
+		defaultMem:   defaultMem,
 	}
 }
 
@@ -109,7 +103,7 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 		// From here on we can expect that the pod spec of a task has proper limits for CPU and memory.
 		k.limitPod(pod)
 
-		podTask, err := podtask.New(ctx, "", pod, k.prototype, k.frameworkRoles, k.defaultPodRoles)
+		podTask, err := podtask.New(ctx, k.taskConfig, pod)
 		if err != nil {
 			log.Warningf("aborting Schedule, unable to create podtask object %+v: %v", pod, err)
 			return "", err
@@ -146,12 +140,12 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 
 // limitPod limits the given pod based on the scheduler's default limits.
 func (k *schedulerAlgorithm) limitPod(pod *api.Pod) error {
-	cpuRequest, cpuLimit, _, err := mresource.LimitPodCPU(pod, k.defaultCpus)
+	cpuRequest, cpuLimit, _, err := resources.LimitPodCPU(pod, k.defaultCpus)
 	if err != nil {
 		return err
 	}
 
-	memRequest, memLimit, _, err := mresource.LimitPodMem(pod, k.defaultMem)
+	memRequest, memLimit, _, err := resources.LimitPodMem(pod, k.defaultMem)
 	if err != nil {
 		return err
 	}

@@ -43,7 +43,8 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -524,11 +525,14 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		schedulerProc.Terminal(),
 		http.DefaultServeMux,
 		&podsListWatch.ListWatch,
-		ei,
-		[]string{"*"},
-		[]string{"*"},
-		mresource.DefaultDefaultContainerCPULimit,
-		mresource.DefaultDefaultContainerMemLimit,
+		podtask.Config{
+			Prototype:        ei,
+			FrameworkRoles:   []string{"*"},
+			DefaultPodRoles:  []string{"*"},
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
+		resources.DefaultDefaultContainerCPULimit,
+		resources.DefaultDefaultContainerMemLimit,
 	)
 	assert.NotNil(scheduler)
 

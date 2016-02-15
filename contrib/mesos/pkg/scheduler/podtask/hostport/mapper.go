@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podtask
+package hostport
 
 import (
 	"fmt"
@@ -22,38 +22,30 @@ import (
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
-const (
-	// maps a Container.HostPort to the same exact offered host port, ignores .HostPort = 0
-	HostPortMappingFixed = "fixed"
-	// same as HostPortMappingFixed, except that .HostPort of 0 are mapped to any port offered
-	HostPortMappingWildcard = "wildcard"
-)
-
-// Objects implementing the HostPortMapper interface generate port mappings
+// Objects implementing the Mapper interface generate port mappings
 // from k8s container ports to ports offered by mesos
-type HostPortMapper interface {
-	// Map maps the given pod task and the given mesos offer
-	// and returns a slice of port mappings
-	// or an error if the mapping failed
-	Map(t *T, offer *mesos.Offer) ([]HostPortMapping, error)
+type Mapper interface {
+	// Map maps the given pod and the given mesos offer and returns a
+	// slice of port mappings or an error if the mapping failed
+	Map(pod *api.Pod, roles []string, offer *mesos.Offer) ([]Mapping, error)
 }
 
-// HostPortMapperFunc is a function adapter to the HostPortMapper interface
-type HostPortMapperFunc func(*T, *mesos.Offer) ([]HostPortMapping, error)
+// MapperFunc is a function adapter to the Mapper interface
+type MapperFunc func(*api.Pod, []string, *mesos.Offer) ([]Mapping, error)
 
 // Map calls f(t, offer)
-func (f HostPortMapperFunc) Map(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
-	return f(t, offer)
+func (f MapperFunc) Map(pod *api.Pod, roles []string, offer *mesos.Offer) ([]Mapping, error) {
+	return f(pod, roles, offer)
 }
 
-// A HostPortMapping represents the mapping between k8s container ports
+// A Mapping represents the mapping between k8s container ports
 // ports offered by mesos. It references the k8s' container and port
 // and specifies the offered mesos port and the offered port's role
-type HostPortMapping struct {
+type Mapping struct {
 	ContainerIdx int    // index of the container in the pod spec
 	PortIdx      int    // index of the port in a container's port spec
 	OfferPort    uint64 // the port offered by mesos
@@ -61,27 +53,27 @@ type HostPortMapping struct {
 }
 
 type PortAllocationError struct {
-	PodId string
+	PodID string
 	Ports []uint64
 }
 
 func (err *PortAllocationError) Error() string {
-	return fmt.Sprintf("Could not schedule pod %s: %d port(s) could not be allocated", err.PodId, len(err.Ports))
+	return fmt.Sprintf("Could not schedule pod %s: %d port(s) could not be allocated", err.PodID, len(err.Ports))
 }
 
-type DuplicateHostPortError struct {
-	m1, m2 HostPortMapping
+type DuplicateError struct {
+	m1, m2 Mapping
 }
 
-func (err *DuplicateHostPortError) Error() string {
+func (err *DuplicateError) Error() string {
 	return fmt.Sprintf(
 		"Host port %d is specified for container %d, pod %d and container %d, pod %d",
 		err.m1.OfferPort, err.m1.ContainerIdx, err.m1.PortIdx, err.m2.ContainerIdx, err.m2.PortIdx)
 }
 
 // WildcardMapper maps k8s wildcard ports (hostPort == 0) to any available offer port
-func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
-	mapping, err := FixedMapper(t, offer)
+func WildcardMapper(pod *api.Pod, roles []string, offer *mesos.Offer) ([]Mapping, error) {
+	mapping, err := FixedMapper(pod, roles, offer)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +83,11 @@ func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 		taken[entry.OfferPort] = struct{}{}
 	}
 
-	wildports := []HostPortMapping{}
-	for i, container := range t.Pod.Spec.Containers {
+	wildports := []Mapping{}
+	for i, container := range pod.Spec.Containers {
 		for pi, port := range container.Ports {
 			if port.HostPort == 0 {
-				wildports = append(wildports, HostPortMapping{
+				wildports = append(wildports, Mapping{
 					ContainerIdx: i,
 					PortIdx:      pi,
 				})
@@ -104,7 +96,7 @@ func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 	}
 
 	remaining := len(wildports)
-	foreachPortsRange(offer.GetResources(), t.Roles(), func(bp, ep uint64, role string) {
+	resources.ForeachPortsRange(offer.GetResources(), roles, func(bp, ep uint64, role string) {
 		log.V(3).Infof("Searching for wildcard port in range {%d:%d}", bp, ep)
 		for i := range wildports {
 			if wildports[i].OfferPort != 0 {
@@ -115,7 +107,7 @@ func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 					continue
 				}
 				wildports[i].OfferPort = port
-				wildports[i].Role = starredRole(role)
+				wildports[i].Role = resources.CanonicalRole(role)
 				mapping = append(mapping, wildports[i])
 				remaining--
 				taken[port] = struct{}{}
@@ -126,7 +118,7 @@ func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 
 	if remaining > 0 {
 		err := &PortAllocationError{
-			PodId: t.Pod.Name,
+			PodID: pod.Namespace + "/" + pod.Name,
 		}
 		// it doesn't make sense to include a port list here because they were all zero (wildcards)
 		return nil, err
@@ -136,10 +128,10 @@ func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 }
 
 // FixedMapper maps k8s host ports to offered ports ignoring hostPorts == 0 (remaining pod-private)
-func FixedMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
-	requiredPorts := make(map[uint64]HostPortMapping)
-	mapping := []HostPortMapping{}
-	for i, container := range t.Pod.Spec.Containers {
+func FixedMapper(pod *api.Pod, roles []string, offer *mesos.Offer) ([]Mapping, error) {
+	requiredPorts := make(map[uint64]Mapping)
+	mapping := []Mapping{}
+	for i, container := range pod.Spec.Containers {
 		// strip all port==0 from this array; k8s already knows what to do with zero-
 		// ports (it does not create 'port bindings' on the minion-host); we need to
 		// remove the wildcards from this array since they don't consume host resources
@@ -147,24 +139,24 @@ func FixedMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 			if port.HostPort == 0 {
 				continue // ignore
 			}
-			m := HostPortMapping{
+			m := Mapping{
 				ContainerIdx: i,
 				PortIdx:      pi,
 				OfferPort:    uint64(port.HostPort),
 			}
 			if entry, inuse := requiredPorts[uint64(port.HostPort)]; inuse {
-				return nil, &DuplicateHostPortError{entry, m}
+				return nil, &DuplicateError{entry, m}
 			}
 			requiredPorts[uint64(port.HostPort)] = m
 		}
 	}
 
-	foreachPortsRange(offer.GetResources(), t.Roles(), func(bp, ep uint64, role string) {
+	resources.ForeachPortsRange(offer.GetResources(), roles, func(bp, ep uint64, role string) {
 		for port := range requiredPorts {
 			log.V(3).Infof("evaluating port range {%d:%d} %d", bp, ep, port)
 			if (bp <= port) && (port <= ep) {
 				m := requiredPorts[port]
-				m.Role = starredRole(role)
+				m.Role = resources.CanonicalRole(role)
 				mapping = append(mapping, m)
 				delete(requiredPorts, port)
 			}
@@ -174,7 +166,7 @@ func FixedMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 	unsatisfiedPorts := len(requiredPorts)
 	if unsatisfiedPorts > 0 {
 		err := &PortAllocationError{
-			PodId: t.Pod.Name,
+			PodID: pod.Namespace + "/" + pod.Name,
 		}
 		for p := range requiredPorts {
 			err.Ports = append(err.Ports, p)
@@ -185,15 +177,35 @@ func FixedMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 	return mapping, nil
 }
 
-// NewHostPortMapper returns a new mapper based
-// based on the port mapping key value
-func NewHostPortMapper(pod *api.Pod) HostPortMapper {
-	filter := map[string]string{
-		meta.PortMappingKey: HostPortMappingFixed,
+type Strategy string
+
+const (
+	// maps a Container.HostPort to the same exact offered host port, ignores .HostPort = 0
+	StrategyFixed = Strategy("fixed")
+	// same as MappingFixed, except that .HostPort of 0 are mapped to any port offered
+	StrategyWildcard = Strategy("wildcard")
+)
+
+var validStrategies = map[Strategy]MapperFunc{
+	StrategyFixed:    MapperFunc(FixedMapper),
+	StrategyWildcard: MapperFunc(WildcardMapper),
+}
+
+// NewMapper returns a new mapper based on the port mapping key value
+func (defaultStrategy Strategy) NewMapper(pod *api.Pod) Mapper {
+	strategy, ok := pod.Labels[meta.PortMappingKey]
+	if ok {
+		f, ok := validStrategies[Strategy(strategy)]
+		if ok {
+			return f
+		}
+		log.Warningf("invalid port mapping strategy %q, reverting to default %q", strategy, defaultStrategy)
 	}
-	selector := labels.Set(filter).AsSelector()
-	if selector.Matches(labels.Set(pod.Labels)) {
-		return HostPortMapperFunc(FixedMapper)
+
+	f, ok := validStrategies[defaultStrategy]
+	if ok {
+		return f
 	}
-	return HostPortMapperFunc(WildcardMapper)
+
+	panic("scheduler is misconfigured, unrecognized default strategy \"" + defaultStrategy + "\"")
 }
