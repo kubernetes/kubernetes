@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -50,12 +50,12 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		},
 		{
 			legacyVersion:   "",
-			storageVersions: "batch=extensions/v1beta1,v1",
-			defaultVersions: "extensions/v1beta1,v1,batch/v1",
+			storageVersions: "autoscaling=extensions/v1beta1,v1",
+			defaultVersions: "extensions/v1beta1,v1,autoscaling/v1",
 			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				batch.GroupName:      "extensions/v1beta1",
-				extensions.GroupName: "extensions/v1beta1",
+				api.GroupName:         "v1",
+				autoscaling.GroupName: "extensions/v1beta1",
+				extensions.GroupName:  "extensions/v1beta1",
 			},
 		},
 		{
