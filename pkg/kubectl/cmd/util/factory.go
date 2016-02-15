@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/metrics"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -202,7 +203,24 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				cmdApiVersion = *cfg.GroupVersion
 			}
 
-			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}, api.Scheme
+			outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
+
+			// eventually this should allow me choose a group priority based on the order of the discovery doc, for now hardcode a given order
+			priorityRESTMapper := meta.PriorityRESTMapper{
+				Delegate: outputRESTMapper,
+				ResourcePriority: []unversioned.GroupVersionResource{
+					{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: metrics.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+				},
+				KindPriority: []unversioned.GroupVersionKind{
+					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+				},
+			}
+
+			return priorityRESTMapper, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
