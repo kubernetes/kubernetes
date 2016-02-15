@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
@@ -299,6 +300,37 @@ func Run(s *options.APIServer) error {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
+
+		// Since HPA has been moved to the autoscaling group, we need to make
+		// sure autoscaling has a storage destination. If the autoscaling group
+		// itself is on, it will overwrite this decision below.
+		storageDestinations.AddAPIGroup(autoscaling.GroupName, expEtcdStorage)
+	}
+
+	// autoscaling/v1/horizontalpodautoscalers is a move from extensions/v1beta1/horizontalpodautoscalers.
+	// The storage version needs to be either extensions/v1beta1 or autoscaling/v1.
+	// Users must roll forward while using 1.2, because we will require the latter for 1.3.
+	if !apiGroupVersionOverrides["autoscaling/v1"].Disable {
+		glog.Infof("Configuring autoscaling/v1 storage destination")
+		autoscalingGroup, err := registered.Group(autoscaling.GroupName)
+		if err != nil {
+			glog.Fatalf("Autoscaling API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		}
+		// Figure out what storage group/version we should use.
+		storageGroupVersion, found := storageVersions[autoscalingGroup.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", autoscalingGroup.GroupVersion.Group, storageVersions)
+		}
+
+		if storageGroupVersion != "autoscaling/v1" && storageGroupVersion != "extensions/v1beta1" {
+			glog.Fatalf("The storage version for autoscaling must be either 'autoscaling/v1' or 'extensions/v1beta1'")
+		}
+		glog.Infof("Using %v for autoscaling group storage version", storageGroupVersion)
+		autoscalingEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+		if err != nil {
+			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
+		}
+		storageDestinations.AddAPIGroup(autoscaling.GroupName, autoscalingEtcdStorage)
 	}
 
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd)
@@ -476,6 +508,15 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 	disableExtensions = !getRuntimeConfigValue(s, extensionsGroupVersion, !disableExtensions)
 	if disableExtensions {
 		apiGroupVersionOverrides[extensionsGroupVersion] = genericapiserver.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
+
+	disableAutoscaling := disableAllAPIs
+	autoscalingGroupVersion := "autoscaling/v1"
+	disableAutoscaling = !getRuntimeConfigValue(s, autoscalingGroupVersion, !disableAutoscaling)
+	if disableAutoscaling {
+		apiGroupVersionOverrides[autoscalingGroupVersion] = genericapiserver.APIGroupVersionOverride{
 			Disable: true,
 		}
 	}

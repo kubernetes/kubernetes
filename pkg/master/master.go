@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
@@ -209,6 +210,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
+
 	// Install extensions unless disabled.
 	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
@@ -250,6 +252,39 @@ func (m *Master) InstallAPIs(c *Config) {
 		}
 		allGroups = append(allGroups, group)
 	}
+
+	// Install autoscaling unless disabled.
+	if !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable {
+		autoscalingResources := m.getAutoscalingResources(c)
+		autoscalingGroupMeta := registered.GroupOrDie(autoscaling.GroupName)
+
+		// Hard code preferred group version to autoscaling/v1
+		autoscalingGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *autoscalingGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": autoscalingResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		autoscalingGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: autoscalingGroupMeta.GroupVersion.String(),
+			Version:      autoscalingGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             autoscalingGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
+			PreferredVersion: autoscalingGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
@@ -586,9 +621,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 
 	storage := map[string]rest.Storage{}
 	if isEnabled("horizontalpodautoscalers") {
-		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
-		storage["horizontalpodautoscalers"] = autoscalerStorage
-		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
+		m.constructHPAResources(c, storage)
 		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
@@ -643,6 +676,40 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["replicasets/status"] = replicaSetStorage.Status
 	}
 
+	return storage
+}
+
+// constructHPAResources makes HPA resources and adds them to the storage map.
+// They're installed in both autoscaling and extensions. It's assumed that
+// you've already done the check that they should be on.
+func (m *Master) constructHPAResources(c *Config, restStorage map[string]rest.Storage) {
+	// Note that hpa's storage settings are changed by changing the autoscaling
+	// group. Clearly we want all hpas to be stored in the same place no
+	// matter where they're accessed from.
+	storageDecorator := m.StorageDecorator()
+	dbClient := func(resource string) storage.Interface {
+		return c.StorageDestinations.Search([]string{autoscaling.GroupName, extensions.GroupName}, resource)
+	}
+	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
+	restStorage["horizontalpodautoscalers"] = autoscalerStorage
+	restStorage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
+}
+
+// getAutoscalingResources returns the resources for autoscaling api
+func (m *Master) getAutoscalingResources(c *Config) map[string]rest.Storage {
+	resourceOverrides := m.ApiGroupVersionOverrides["autoscaling/v1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		if enabled, ok := resourceOverrides[resource]; ok {
+			return enabled
+		}
+		return !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable
+	}
+
+	storage := map[string]rest.Storage{}
+	if isEnabled("horizontalpodautoscalers") {
+		m.constructHPAResources(c, storage)
+	}
 	return storage
 }
 
