@@ -36,7 +36,12 @@ Documentation for other releases can be found at
 
 ## Support
 
-At v1.2, Kubernetes supports clusters up to 1000 nodes with 30 pods per node and 1-2 containers per pod.
+At v1.2, Kubernetes supports clusters with up to 1000 nodes. More specifically, we support configurations that meet *all* of the following criteria:
+
+* No more than 1000 nodes
+* No more than 30000 total pods
+* No more than 60000 total containers
+* No more than 100 pods per node
 
 ## Setup
 
@@ -71,33 +76,28 @@ When creating a cluster, existing salt scripts:
 * start and configure additional etcd instance
 * configure api-server to use it for storing events
 
-However, this is done only for clusters having more than 50 nodes.
+However, this is done automatically only for clusters having more than 50 nodes.
 
 ### Addon Resources
 
-** TODO: Update this to reflect
-[https://github.com/kubernetes/kubernetes/pull/16185/](https://github.com/kubernetes/kubernetes/pull/16185/)
-and any other changes since it was written. **
-
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](http://pr.k8s.io/10653/files) and [#10778](http://pr.k8s.io/10778/files)).
 
-For example:
+For [example](https://github.com/kubernetes/kubernetes/blob/master/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml):
 
 ```yaml
-containers:
-  - image: gcr.io/google_containers/heapster:v0.15.0
-    name: heapster
+  containers:
+  - name: fluentd-cloud-logging
+    image: gcr.io/google_containers/fluentd-gcp:1.16
     resources:
       limits:
         cpu: 100m
         memory: 200Mi
 ```
 
-These limits, however, are based on data collected from addons running on 4-node clusters (see [#10335](http://issue.k8s.io/10335#issuecomment-117861225)). The addons consume a lot more resources when running on large deployment clusters (see [#5880](http://issue.k8s.io/5880#issuecomment-113984085)). So, if a large cluster is deployed without adjusting these values, the addons may continuously get killed because they keep hitting the limits.
+Except for Heapster, these limits are static and are based on data we collected from addons running on 4-node clusters (see [#10335](http://issue.k8s.io/10335#issuecomment-117861225)). The addons consume a lot more resources when running on large deployment clusters (see [#5880](http://issue.k8s.io/5880#issuecomment-113984085)). So, if a large cluster is deployed without adjusting these values, the addons may continuously get killed because they keep hitting the limits.
 
 To avoid running into cluster addon resource issues, when creating a cluster with many nodes, consider the following:
-* Scale memory and CPU limits for each of the following addons, if used, along with the size of cluster (there is one replica of each handling the entire cluster so memory and CPU usage tends to grow proportionally with size/load on cluster):
-  * Heapster ([GCM/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/google/heapster-controller.yaml), [InfluxDB backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/heapster-controller.yaml), [InfluxDB/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/googleinfluxdb/heapster-controller-combined.yaml), [standalone](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/standalone/heapster-controller.yaml))
+* Scale memory and CPU limits for each of the following addons, if used, as you scale up the size of cluster (there is one replica of each handling the entire cluster so memory and CPU usage tends to grow proportionally with size/load on cluster):
   * [InfluxDB and Grafana](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml)
   * [skydns, kube2sky, and dns etcd](http://releases.k8s.io/HEAD/cluster/addons/dns/skydns-rc.yaml.in)
   * [Kibana](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml)
@@ -107,7 +107,13 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
   * [FluentD with ElasticSearch Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-es/fluentd-es.yaml)
   * [FluentD with GCP Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 
+Heapster's resource limits are set dynamically based on the initial size of your cluster (see [#16185](http://issue.k8s.io/16185)). If you find that Heapster is running
+out of resources, you should adjust the formulas in the files that were modified in that PR (and please let us know!).
+
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.md#troubleshooting).
+
+In the [future](http://issue.k8s.io/13048), we anticipate to set all cluster addon resource limits based on cluster size, and to dynamically adjust them if you grow or shrink your cluster.
+We welcome PRs that implement those features.
 
 ### Allowing minor node failure at startup
 
