@@ -38,7 +38,7 @@ const (
 
 type resourceConstraint struct {
 	cpuConstraint    float64
-	memoryConstraint int64
+	memoryConstraint uint64
 }
 
 type containerResourceGatherer struct {
@@ -51,7 +51,7 @@ type containerResourceGatherer struct {
 type SingleContainerSummary struct {
 	Name string
 	Cpu  float64
-	Mem  int64
+	Mem  uint64
 }
 
 // we can't have int here, as JSON does not accept integer keys.
@@ -165,8 +165,8 @@ func (g *containerResourceGatherer) computePercentiles(timeSeries map[time.Time]
 			if dataMap[name] == nil {
 				dataMap[name] = &usageDataPerContainer{
 					cpuData:        make([]float64, len(timeSeries)),
-					memUseData:     make([]int64, len(timeSeries)),
-					memWorkSetData: make([]int64, len(timeSeries)),
+					memUseData:     make([]uint64, len(timeSeries)),
+					memWorkSetData: make([]uint64, len(timeSeries)),
 				}
 			}
 			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)
@@ -176,8 +176,8 @@ func (g *containerResourceGatherer) computePercentiles(timeSeries map[time.Time]
 	}
 	for _, v := range dataMap {
 		sort.Float64s(v.cpuData)
-		sort.Sort(int64arr(v.memUseData))
-		sort.Sort(int64arr(v.memWorkSetData))
+		sort.Sort(uint64arr(v.memUseData))
+		sort.Sort(uint64arr(v.memWorkSetData))
 	}
 
 	result := make(map[int]resourceUsagePerContainer)
