@@ -17,7 +17,6 @@ limitations under the License.
 package aws
 
 import (
-	"math"
 	"math/rand"
 	"time"
 
@@ -25,6 +24,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 
 	"github.com/golang/glog"
+)
+
+const (
+	backoffMinTimeoutMs        float64 = 500
+	backoffMultiplier          float64 = 2
+	backoffRandomizationFactor float64 = 0.5
 )
 
 // throttlingCodes is a collection of service response codes which indicate
@@ -54,17 +59,17 @@ func (r RequestRetryer) MaxRetries() int {
 
 // RetryRules returns the delay duration before retrying this request again
 func (_ RequestRetryer) RetryRules(r *request.Request) time.Duration {
-	n, base := 30, 30
-	if r.Error != nil {
-		if awsError, ok := r.Error.(awserr.Error); ok {
-			if _, ok := throttlingCodes[awsError.Code()]; ok {
-				glog.Warningf("Got %s error on AWS request (%s)",
-					awsError.Code(), describeRequest(r))
-				n, base = 100, 500
-			}
-		}
+	interval := backoffMinTimeoutMs * backoffMultiplier * float64(r.RetryCount)
+	delta := backoffRandomizationFactor * float64(interval)
+	minInterval := float64(interval) - delta
+	maxInterval := float64(interval) + delta
+	// Get a random value from the range [minInterval, maxInterval].
+	delay := minInterval + (rand.Float64() * (maxInterval - minInterval + 1))
+	if awsError, throttled := isThrottled(r); throttled {
+		glog.Warningf("Got %s throttling error on AWS request (%s)",
+			awsError.Code(), describeRequest(r))
+		delay *= 2
 	}
-	delay := int(math.Pow(2, float64(r.RetryCount))) * (rand.Intn(n) + base)
 	return time.Duration(delay) * time.Millisecond
 }
 
@@ -86,4 +91,15 @@ func describeRequest(r *request.Request) string {
 	}
 
 	return service + "::" + name
+}
+
+// Returns the aws error and a boolean indicating if the error is a throttling error
+func isThrottled(r *request.Request) (awserr.Error, bool) {
+	if r.Error != nil {
+		if awsError, ok := r.Error.(awserr.Error); ok {
+			_, ok := throttlingCodes[awsError.Code()]
+			return awsError, ok
+		}
+	}
+	return nil, false
 }
