@@ -86,12 +86,6 @@ func (e ShortcutExpander) KindFor(resource unversioned.GroupVersionResource) (un
 	return e.RESTMapper.KindFor(resource)
 }
 
-// ResourceIsValid takes a string (kind) and checks if it's a valid resource.
-// It expands the resource first, then invokes the wrapped mapper.
-func (e ShortcutExpander) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
-	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
-}
-
 // ResourceSingularizer expands the named resource and then singularizes it.
 func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
 	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
