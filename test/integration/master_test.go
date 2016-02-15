@@ -31,7 +31,8 @@ import (
 
 func TestExperimentalPrefix(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	resp, err := http.Get(s.URL + "/apis/extensions/")
 	if err != nil {
@@ -44,7 +45,8 @@ func TestExperimentalPrefix(t *testing.T) {
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
 	if err != nil {
@@ -58,7 +60,8 @@ func TestWatchSucceedsWithoutArgs(t *testing.T) {
 
 func TestAccept(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	resp, err := http.Get(s.URL + "/api/")
 	if err != nil {
