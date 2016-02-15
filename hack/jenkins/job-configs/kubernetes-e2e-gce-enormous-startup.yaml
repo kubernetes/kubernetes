@@ -1,0 +1,29 @@
+- job:
+    name: 'kubernetes-e2e-gce-enormous-startup'
+    description: 'Starts and deletes empty 1000 node cluster. Does not allow Node failures. Test owner: gmarek'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: "gmarek@google.com"
+    triggers:
+        - reverse:
+            jobs: 'kubernetes-build'
+            result: success
+        - timed: 'H 20 * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 480
+            fail: true
+        - timestamps
+        - workspace-cleanup
