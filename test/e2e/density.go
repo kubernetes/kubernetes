@@ -86,7 +86,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 		memoryConstraint: 1800 * (1024 * 1024),
 	}
 	constraints["kibana-logging"] = resourceConstraint{
-		cpuConstraint:    0.05,
+		cpuConstraint:    0.1,
 		memoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["kube-proxy"] = resourceConstraint{
