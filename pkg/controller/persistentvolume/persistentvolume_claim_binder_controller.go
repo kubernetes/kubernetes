@@ -239,24 +239,31 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		if volume.Spec.ClaimRef != nil {
 			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if errors.IsNotFound(err) {
-				// Pending volumes that have a ClaimRef where the claim is missing were recently recycled.
-				// The Recycler set the phase to VolumePending to start the volume at the beginning of this lifecycle.
-				// removing ClaimRef unbinds the volume
-				clone, err := conversion.NewCloner().DeepCopy(volume)
-				if err != nil {
-					return fmt.Errorf("Error cloning pv: %v", err)
-				}
-				volumeClone, ok := clone.(*api.PersistentVolume)
-				if !ok {
-					return fmt.Errorf("Unexpected pv cast error : %v\n", volumeClone)
-				}
-				volumeClone.Spec.ClaimRef = nil
+				if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
+					// Pending volumes that have a ClaimRef where the claim is missing were recently recycled.
+					// The Recycler set the phase to VolumePending to start the volume at the beginning of this lifecycle.
+					// removing ClaimRef unbinds the volume
+					clone, err := conversion.NewCloner().DeepCopy(volume)
+					if err != nil {
+						return fmt.Errorf("Error cloning pv: %v", err)
+					}
+					volumeClone, ok := clone.(*api.PersistentVolume)
+					if !ok {
+						return fmt.Errorf("Unexpected pv cast error : %v\n", volumeClone)
+					}
+					volumeClone.Spec.ClaimRef = nil
 
-				if updatedVolume, err := binderClient.UpdatePersistentVolume(volumeClone); err != nil {
-					return fmt.Errorf("Unexpected error saving PersistentVolume: %+v", err)
+					if updatedVolume, err := binderClient.UpdatePersistentVolume(volumeClone); err != nil {
+						return fmt.Errorf("Unexpected error saving PersistentVolume: %+v", err)
+					} else {
+						volume = updatedVolume
+						volumeIndex.Update(volume)
+					}
 				} else {
-					volume = updatedVolume
-					volumeIndex.Update(volume)
+					// Pending volumes that has a ClaimRef and the claim is missing and is was not recycled.
+					// It must have been freshly provisioned and the claim was deleted during the provisioning.
+					// Mark the volume as Released, it will be deleted.
+					nextPhase = api.VolumeReleased
 				}
 			} else if err != nil {
 				return fmt.Errorf("Error getting PersistentVolumeClaim[%s/%s]: %v", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, err)
