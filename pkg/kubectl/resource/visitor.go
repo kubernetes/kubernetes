@@ -74,6 +74,8 @@ type Info struct {
 	// Optional, Source is the filename or URL to template file (.json or .yaml),
 	// or stdin to use to handle the resource
 	Source string
+	// Raw is the bytes for this object decoded off the wire
+	Raw []byte
 	// Optional, this is the provided object in a versioned type before defaulting
 	// and conversions into its corresponding internal type. This is useful for
 	// reflecting on user intent which may be lost after defaulting and conversions.
@@ -342,6 +344,8 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info, nil)
 		}
+		originalItems := make([]runtime.Object, len(items))
+		copy(originalItems, items)
 		if errs := runtime.DecodeList(items, struct {
 			runtime.ObjectTyper
 			runtime.Decoder
@@ -352,6 +356,9 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			item, err := v.InfoForObject(items[i])
 			if err != nil {
 				return err
+			}
+			if unk, ok := originalItems[i].(*runtime.Unknown); ok && unk != nil {
+				item.Raw = unk.RawJSON
 			}
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion

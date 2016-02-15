@@ -76,6 +76,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		Namespace:       namespace,
 		Name:            name,
 		Source:          source,
+		Raw:             data,
 		VersionedObject: versioned,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
