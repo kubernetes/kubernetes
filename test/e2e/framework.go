@@ -134,6 +134,31 @@ func (f *Framework) beforeEach() {
 func (f *Framework) afterEach() {
 	RemoveCleanupAction(f.cleanupHandle)
 
+	// DeleteNamespace at the very end in defer, to avoid any
+	// expectation failures preventing deleting the namespace.
+	defer func() {
+		if testContext.DeleteNamespace {
+			for _, ns := range f.namespacesToDelete {
+				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
+
+				timeout := 5 * time.Minute
+				if f.NamespaceDeletionTimeout != 0 {
+					timeout = f.NamespaceDeletionTimeout
+				}
+				if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
+					Failf("Couldn't delete ns %q: %s", ns.Name, err)
+				}
+			}
+			f.namespacesToDelete = nil
+		} else {
+			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+		}
+
+		// Paranoia-- prevent reuse!
+		f.Namespace = nil
+		f.Client = nil
+	}()
+
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
@@ -178,23 +203,6 @@ func (f *Framework) afterEach() {
 		}
 	}
 
-	if testContext.DeleteNamespace {
-		for _, ns := range f.namespacesToDelete {
-			By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-
-			timeout := 5 * time.Minute
-			if f.NamespaceDeletionTimeout != 0 {
-				timeout = f.NamespaceDeletionTimeout
-			}
-			if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
-				Failf("Couldn't delete ns %q: %s", ns.Name, err)
-			}
-		}
-		f.namespacesToDelete = nil
-	} else {
-		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-	}
-
 	outputTypes := strings.Split(testContext.OutputPrintType, ",")
 	for _, printType := range outputTypes {
 		switch printType {
@@ -219,10 +227,6 @@ func (f *Framework) afterEach() {
 	if err := allNodesReady(f.Client, time.Minute); err != nil {
 		Failf("All nodes should be ready after test, %v", err)
 	}
-
-	// Paranoia-- prevent reuse!
-	f.Namespace = nil
-	f.Client = nil
 }
 
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
