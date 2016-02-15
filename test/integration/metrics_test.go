@@ -86,7 +86,8 @@ func checkForExpectedMetrics(t *testing.T, metrics []*prometheuspb.MetricFamily,
 
 func TestMasterProcessMetrics(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	metrics, err := scrapeMetrics(s)
 	if err != nil {
@@ -103,7 +104,8 @@ func TestMasterProcessMetrics(t *testing.T) {
 
 func TestApiserverMetrics(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
