@@ -628,9 +628,9 @@ prepare_kube_addons() {
     file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    heapster_memory="300Mi"
+    heapster_memory="200Mi"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 1 ]; then
-      heapster_memory="$((${NUM_NODES} * 12 + 200))Mi"
+      heapster_memory="$((${NUM_NODES} * 3 + 200))Mi"
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
