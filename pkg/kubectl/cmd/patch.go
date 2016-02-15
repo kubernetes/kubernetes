@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -26,8 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
+
+var patchTypes = map[string]api.PatchType{"json": api.JSONPatchType, "merge": api.MergePatchType, "strategic": api.StrategicMergePatchType}
 
 // PatchOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
@@ -49,7 +53,10 @@ kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 kubectl patch -f node.json -p '{"spec":{"unschedulable":true}}'
 
 # Update a container's image; spec.containers[*].name is required because it's a merge key
-kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'`
+kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
+
+# Update a container's image using a json patch with positional arrays
+kubectl patch pod valid-pod -type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`
 )
 
 func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -69,6 +76,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
+	cmd.Flags().String("type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 
@@ -81,6 +89,16 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+
+	patchType := api.StrategicMergePatchType
+	patchTypeString := strings.ToLower(cmdutil.GetFlagString(cmd, "type"))
+	if len(patchTypeString) != 0 {
+		ok := false
+		patchType, ok = patchTypes[patchTypeString]
+		if !ok {
+			return cmdutil.UsageError(cmd, fmt.Sprintf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), patchTypeString))
+		}
 	}
 
 	patch := cmdutil.GetFlagString(cmd, "patch")
@@ -121,7 +139,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+	_, err = helper.Patch(namespace, name, patchType, patchBytes)
 	if err != nil {
 		return err
 	}
