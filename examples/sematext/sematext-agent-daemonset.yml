@@ -1,0 +1,36 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: sematext-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: sematext-agent
+    spec:
+      dnsPolicy: "ClusterFirst"
+      restartPolicy: "Always"
+      containers:
+      - name: sematext-agent
+        image: sematext/sematext-agent-docker:latest
+        imagePullPolicy: "Always"
+        env:
+        - name: SPM_TOKEN
+          value: "YOUR_SPM_TOKEN"
+        - name: LOGSENE_TOKEN
+          value: "YOUR_LOGSENE_TOKEN"
+        - name: KUBERNETES
+          value: 1
+        volumeMounts:
+          - mountPath: /var/run/docker.sock
+            name: docker-sock
+          - mountPath: /etc/localtime
+            name: localtime
+      volumes:
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+
