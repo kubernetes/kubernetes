@@ -636,6 +636,27 @@ Scaling foo-v2 up to 2
 Scaling foo-v1 down to 0
 `,
 		},
+		{
+			name:        "2->2 1/0 blocked oldRc",
+			oldRc:       oldRc(2, 2),
+			newRc:       newRc(0, 2),
+			newRcExists: false,
+			maxUnavail:  intstr.FromInt(1),
+			maxSurge:    intstr.FromInt(0),
+			expected: []interface{}{
+				down{oldReady: 1, newReady: 0, to: 1},
+				up{1},
+				down{oldReady: 1, newReady: 1, to: 0},
+				up{2},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 2 to 0 (keep 1 pods available, don't exceed 2 pods)
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 2
+`,
+		},
 	}
 
 	for i, test := range tests {
@@ -685,10 +706,10 @@ Scaling foo-v1 down to 0
 				expected := -1
 				switch {
 				case rc == test.newRc:
-					t.Logf("scaling up %s:%d", rc.Name, rc.Spec.Replicas)
+					t.Logf("scaling up %s to %d", rc.Name, rc.Spec.Replicas)
 					expected = next(&upTo)
 				case rc == test.oldRc:
-					t.Logf("scaling down %s:%d", rc.Name, rc.Spec.Replicas)
+					t.Logf("scaling down %s to %d", rc.Name, rc.Spec.Replicas)
 					expected = next(&downTo)
 				}
 				if expected == -1 {
@@ -709,13 +730,13 @@ Scaling foo-v1 down to 0
 			},
 		}
 		// Set up a mock readiness check which handles the test assertions.
-		updater.waitForReadyPods = func(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
+		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int, int, error) {
 			// Return simulated readiness, and throw an error if this call has no
 			// expectations defined.
 			oldReady := next(&oldReady)
 			newReady := next(&newReady)
 			if oldReady == -1 || newReady == -1 {
-				t.Fatalf("unexpected waitForReadyPods call for:\noldRc: %+v\nnewRc: %+v", oldRc, newRc)
+				t.Fatalf("unexpected getReadyPods call for:\noldRc: %+v\nnewRc: %+v", oldRc, newRc)
 			}
 			return oldReady, newReady, nil
 		}
@@ -759,7 +780,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 			return nil
 		},
 	}
-	updater.waitForReadyPods = func(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
+	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int, int, error) {
 		// Coerce a timeout by pods never becoming ready.
 		return 0, 0, nil
 	}
@@ -812,7 +833,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
 			return nil
 		},
-		waitForReadyPods: func(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
+		getReadyPods: func(oldRc, newRc *api.ReplicationController) (int, int, error) {
 			return 1, 1, nil
 		},
 	}
@@ -1442,7 +1463,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	}
 }
 
-func TestRollingUpdater_pollForReadyPods(t *testing.T) {
+func TestRollingUpdater_readyPods(t *testing.T) {
 	mkpod := func(owner *api.ReplicationController, ready bool) *api.Pod {
 		labels := map[string]string{}
 		for k, v := range owner.Spec.Selector {
@@ -1538,7 +1559,7 @@ func TestRollingUpdater_pollForReadyPods(t *testing.T) {
 			ns: "default",
 			c:  client,
 		}
-		oldReady, newReady, err := updater.pollForReadyPods(time.Millisecond, time.Second, test.oldRc, test.newRc)
+		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
