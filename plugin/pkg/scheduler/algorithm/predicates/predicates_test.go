@@ -881,41 +881,42 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: true,
 			test: "Pod with multiple NodeSelectorTerms ORed in affinity, matches the node's labels and will schedule onto the node",
 		},
-		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Annotations: map[string]string{
-						api.AffinityAnnotationKey: `
-						{"nodeAffinity": {
-							"requiredDuringSchedulingRequiredDuringExecution": {
-								"nodeSelectorTerms": [{
-									"matchExpressions": [{
-										"key": "foo",
-										"operator": "In",
-										"values": ["bar", "value2"]
-									}]
-								}]
-							},
-							"requiredDuringSchedulingIgnoredDuringExecution": {
-								"nodeSelectorTerms": [{
-									"matchExpressions": [{
-										"key": "foo",
-										"operator": "NotIn",
-										"values": ["bar", "value2"]
-									}]
-								}]
-							}
-						}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
-				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
-		},
+		// TODO: Uncomment this test when implement RequiredDuringSchedulingRequiredDuringExecution
+		//		{
+		//			pod: &api.Pod{
+		//				ObjectMeta: api.ObjectMeta{
+		//					Annotations: map[string]string{
+		//						api.AffinityAnnotationKey: `
+		//						{"nodeAffinity": {
+		//							"requiredDuringSchedulingRequiredDuringExecution": {
+		//								"nodeSelectorTerms": [{
+		//									"matchExpressions": [{
+		//										"key": "foo",
+		//										"operator": "In",
+		//										"values": ["bar", "value2"]
+		//									}]
+		//								}]
+		//							},
+		//							"requiredDuringSchedulingIgnoredDuringExecution": {
+		//								"nodeSelectorTerms": [{
+		//									"matchExpressions": [{
+		//										"key": "foo",
+		//										"operator": "NotIn",
+		//										"values": ["bar", "value2"]
+		//									}]
+		//								}]
+		//							}
+		//						}}`,
+		//					},
+		//				},
+		//			},
+		//			labels: map[string]string{
+		//				"foo": "bar",
+		//			},
+		//			fits: false,
+		//			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
+		//				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
+		//		},
 		{
 			pod: &api.Pod{
 				ObjectMeta: api.ObjectMeta{

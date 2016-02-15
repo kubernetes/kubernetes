@@ -1332,15 +1332,6 @@ func DeepCopy_api_NodeAddress(in NodeAddress, out *NodeAddress, c *conversion.Cl
 }
 
 func DeepCopy_api_NodeAffinity(in NodeAffinity, out *NodeAffinity, c *conversion.Cloner) error {
-	if in.RequiredDuringSchedulingRequiredDuringExecution != nil {
-		in, out := in.RequiredDuringSchedulingRequiredDuringExecution, &out.RequiredDuringSchedulingRequiredDuringExecution
-		*out = new(NodeSelector)
-		if err := DeepCopy_api_NodeSelector(*in, *out, c); err != nil {
-			return err
-		}
-	} else {
-		out.RequiredDuringSchedulingRequiredDuringExecution = nil
-	}
 	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 		in, out := in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
 		*out = new(NodeSelector)

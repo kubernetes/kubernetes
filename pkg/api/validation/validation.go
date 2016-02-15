@@ -1451,9 +1451,11 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 
 	if affinity.NodeAffinity != nil {
 		na := affinity.NodeAffinity
-		if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
-			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
-		}
+
+		// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+		// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+		// }
 
 		if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
