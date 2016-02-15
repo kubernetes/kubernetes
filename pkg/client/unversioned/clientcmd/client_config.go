@@ -19,8 +19,10 @@ package clientcmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
@@ -325,12 +327,19 @@ func (inClusterClientConfig) ClientConfig() (*client.Config, error) {
 }
 
 func (inClusterClientConfig) Namespace() (string, error) {
-	// TODO: generic way to figure out what namespace you are running in?
-	// This way assumes you've set the POD_NAMESPACE environment variable
-	// using the downward API.
+	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
+	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
 		return ns, nil
 	}
+
+	// Fall back to the namespace associated with the service account token, if available
+	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
+			return ns, nil
+		}
+	}
+
 	return "default", nil
 }
 

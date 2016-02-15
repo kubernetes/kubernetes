@@ -115,8 +115,9 @@ func createdTokenSecret() *api.Secret {
 		},
 		Type: api.SecretTypeServiceAccountToken,
 		Data: map[string][]byte{
-			"token":  []byte("ABC"),
-			"ca.crt": []byte("CA Data"),
+			"token":     []byte("ABC"),
+			"ca.crt":    []byte("CA Data"),
+			"namespace": []byte("default"),
 		},
 	}
 }
@@ -136,8 +137,9 @@ func serviceAccountTokenSecret() *api.Secret {
 		},
 		Type: api.SecretTypeServiceAccountToken,
 		Data: map[string][]byte{
-			"token":  []byte("ABC"),
-			"ca.crt": []byte("CA Data"),
+			"token":     []byte("ABC"),
+			"ca.crt":    []byte("CA Data"),
+			"namespace": []byte("default"),
 		},
 	}
 }
@@ -160,6 +162,20 @@ func serviceAccountTokenSecretWithoutCAData() *api.Secret {
 func serviceAccountTokenSecretWithCAData(data []byte) *api.Secret {
 	secret := serviceAccountTokenSecret()
 	secret.Data[api.ServiceAccountRootCAKey] = data
+	return secret
+}
+
+// serviceAccountTokenSecretWithoutNamespaceData returns an existing ServiceAccountToken secret that lacks namespace data
+func serviceAccountTokenSecretWithoutNamespaceData() *api.Secret {
+	secret := serviceAccountTokenSecret()
+	delete(secret.Data, api.ServiceAccountNamespaceKey)
+	return secret
+}
+
+// serviceAccountTokenSecretWithNamespaceData returns an existing ServiceAccountToken secret with the specified namespace data
+func serviceAccountTokenSecretWithNamespaceData(data []byte) *api.Secret {
+	secret := serviceAccountTokenSecret()
+	secret.Data[api.ServiceAccountNamespaceKey] = data
 	return secret
 }
 
@@ -379,6 +395,24 @@ func TestTokenCreation(t *testing.T) {
 				core.NewUpdateAction("secrets", api.NamespaceDefault, serviceAccountTokenSecret()),
 			},
 		},
+		"added token secret without namespace data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutNamespaceData()},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			AddedSecret: serviceAccountTokenSecretWithoutNamespaceData(),
+			ExpectedActions: []core.Action{
+				core.NewUpdateAction("secrets", api.NamespaceDefault, serviceAccountTokenSecret()),
+			},
+		},
+		"added token secret with custom namespace data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithNamespaceData([]byte("custom"))},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			AddedSecret:     serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
+			ExpectedActions: []core.Action{
+			// no update is performed... the custom namespace is preserved
+			},
+		},
 
 		"updated secret without serviceaccount": {
 			ClientObjects: []runtime.Object{serviceAccountTokenSecret()},
@@ -420,6 +454,24 @@ func TestTokenCreation(t *testing.T) {
 			UpdatedSecret: serviceAccountTokenSecretWithCAData([]byte("mismatched")),
 			ExpectedActions: []core.Action{
 				core.NewUpdateAction("secrets", api.NamespaceDefault, serviceAccountTokenSecret()),
+			},
+		},
+		"updated token secret without namespace data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutNamespaceData()},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			UpdatedSecret: serviceAccountTokenSecretWithoutNamespaceData(),
+			ExpectedActions: []core.Action{
+				core.NewUpdateAction("secrets", api.NamespaceDefault, serviceAccountTokenSecret()),
+			},
+		},
+		"updated token secret with custom namespace data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithNamespaceData([]byte("custom"))},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			UpdatedSecret:   serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
+			ExpectedActions: []core.Action{
+			// no update is performed... the custom namespace is preserved
 			},
 		},
 
