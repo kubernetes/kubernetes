@@ -44,6 +44,7 @@ func init() {
 		DeepCopy_api_ConfigMap,
 		DeepCopy_api_ConfigMapKeySelector,
 		DeepCopy_api_ConfigMapList,
+		DeepCopy_api_ConfigMapVolumeSource,
 		DeepCopy_api_Container,
 		DeepCopy_api_ContainerImage,
 		DeepCopy_api_ContainerPort,
@@ -81,6 +82,7 @@ func init() {
 		DeepCopy_api_Handler,
 		DeepCopy_api_HostPathVolumeSource,
 		DeepCopy_api_ISCSIVolumeSource,
+		DeepCopy_api_KeyToPath,
 		DeepCopy_api_Lifecycle,
 		DeepCopy_api_LimitRange,
 		DeepCopy_api_LimitRangeItem,
@@ -366,6 +368,24 @@ func DeepCopy_api_ConfigMapList(in ConfigMapList, out *ConfigMapList, c *convers
 		*out = make([]ConfigMap, len(in))
 		for i := range in {
 			if err := DeepCopy_api_ConfigMap(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_api_ConfigMapVolumeSource(in ConfigMapVolumeSource, out *ConfigMapVolumeSource, c *conversion.Cloner) error {
+	if err := DeepCopy_api_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]KeyToPath, len(in))
+		for i := range in {
+			if err := DeepCopy_api_KeyToPath(in[i], &(*out)[i], c); err != nil {
 				return err
 			}
 		}
@@ -1002,6 +1022,12 @@ func DeepCopy_api_ISCSIVolumeSource(in ISCSIVolumeSource, out *ISCSIVolumeSource
 	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func DeepCopy_api_KeyToPath(in KeyToPath, out *KeyToPath, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Path = in.Path
 	return nil
 }
 
@@ -2944,6 +2970,15 @@ func DeepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 		}
 	} else {
 		out.AzureFile = nil
+	}
+	if in.ConfigMap != nil {
+		in, out := in.ConfigMap, &out.ConfigMap
+		*out = new(ConfigMapVolumeSource)
+		if err := DeepCopy_api_ConfigMapVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
 	}
 	return nil
 }
