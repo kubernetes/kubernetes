@@ -19,6 +19,7 @@ package clientcmd
 import (
 	"io"
 	"reflect"
+	"sync"
 
 	"github.com/golang/glog"
 
@@ -35,35 +36,47 @@ type DeferredLoadingClientConfig struct {
 	loadingRules   *ClientConfigLoadingRules
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
+
+	clientConfig ClientConfig
+	loadingLock  sync.Mutex
 }
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
 func NewNonInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides) ClientConfig {
-	return DeferredLoadingClientConfig{loadingRules, overrides, nil}
+	return &DeferredLoadingClientConfig{loadingRules: loadingRules, overrides: overrides}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
 func NewInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return DeferredLoadingClientConfig{loadingRules, overrides, fallbackReader}
+	return &DeferredLoadingClientConfig{loadingRules: loadingRules, overrides: overrides, fallbackReader: fallbackReader}
 }
 
-func (config DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
-	mergedConfig, err := config.loadingRules.Load()
-	if err != nil {
-		return nil, err
+func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
+	if config.clientConfig == nil {
+		config.loadingLock.Lock()
+		defer config.loadingLock.Unlock()
+
+		if config.clientConfig == nil {
+			mergedConfig, err := config.loadingRules.Load()
+			if err != nil {
+				return nil, err
+			}
+
+			var mergedClientConfig ClientConfig
+			if config.fallbackReader != nil {
+				mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader)
+			} else {
+				mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides)
+			}
+
+			config.clientConfig = mergedClientConfig
+		}
 	}
 
-	var mergedClientConfig ClientConfig
-	if config.fallbackReader != nil {
-		mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader)
-	} else {
-		mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides)
-	}
-
-	return mergedClientConfig, nil
+	return config.clientConfig, nil
 }
 
-func (config DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
+func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	mergedConfig, err := config.createClientConfig()
 	if err != nil {
 		return clientcmdapi.Config{}, err
@@ -73,7 +86,7 @@ func (config DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, erro
 }
 
 // ClientConfig implements ClientConfig
-func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error) {
+func (config *DeferredLoadingClientConfig) ClientConfig() (*client.Config, error) {
 	mergedClientConfig, err := config.createClientConfig()
 	if err != nil {
 		return nil, err
@@ -94,7 +107,7 @@ func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error)
 }
 
 // Namespace implements KubeConfig
-func (config DeferredLoadingClientConfig) Namespace() (string, bool, error) {
+func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 	mergedKubeConfig, err := config.createClientConfig()
 	if err != nil {
 		return "", false, err
