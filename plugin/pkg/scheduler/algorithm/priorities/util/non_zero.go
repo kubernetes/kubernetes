@@ -16,10 +16,7 @@ limitations under the License.
 
 package util
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-)
+import "k8s.io/kubernetes/pkg/api"
 
 // For each of these resources, a pod that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose
@@ -32,21 +29,22 @@ import (
 const DefaultMilliCpuRequest int64 = 100             // 0.1 core
 const DefaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
 
+// GetNonzeroRequests returns the default resource request if none is found or what is provided on the request
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
 func GetNonzeroRequests(requests *api.ResourceList) (int64, int64) {
-	var out_millicpu, out_memory int64
+	var outMilliCPU, outMemory int64
 	// Override if un-set, but not if explicitly set to zero
-	if (*requests.Cpu() == resource.Quantity{}) {
-		out_millicpu = DefaultMilliCpuRequest
+	if _, found := (*requests)[api.ResourceCPU]; !found {
+		outMilliCPU = DefaultMilliCpuRequest
 	} else {
-		out_millicpu = requests.Cpu().MilliValue()
+		outMilliCPU = requests.Cpu().MilliValue()
 	}
 	// Override if un-set, but not if explicitly set to zero
-	if (*requests.Memory() == resource.Quantity{}) {
-		out_memory = DefaultMemoryRequest
+	if _, found := (*requests)[api.ResourceMemory]; !found {
+		outMemory = DefaultMemoryRequest
 	} else {
-		out_memory = requests.Memory().Value()
+		outMemory = requests.Memory().Value()
 	}
-	return out_millicpu, out_memory
+	return outMilliCPU, outMemory
 }
