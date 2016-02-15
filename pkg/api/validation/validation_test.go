@@ -1739,17 +1739,19 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
+				// TODO: Uncomment and move this block into Annotations map once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//					"requiredDuringSchedulingRequiredDuringExecution": {
+				//						"nodeSelectorTerms": [{
+				//							"matchExpressions": [{
+				//								"key": "key1",
+				//								"operator": "Exists"
+				//							}]
+				//						}]
+				//					},
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "key1",
-									"operator": "Exists"
-								}]
-							}]
-						},
 						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 								"matchExpressions": [{
@@ -1830,7 +1832,7 @@ func TestValidatePod(t *testing.T) {
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 					`,
 				},
@@ -1847,7 +1849,7 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {"requiredDuringSchedulingRequiredDuringExecution": {
+					{"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {
 						"nodeSelectorTerms": [{
 							"matchExpressions": [{
 								"key": "key1",
@@ -1888,14 +1890,14 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"invalid requiredDuringSchedulingRequiredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
+		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": []
 						},
 					}}`,
@@ -1907,14 +1909,14 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"invalid requiredDuringSchedulingRequiredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
+		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 								"matchExpressions": []
 							}]

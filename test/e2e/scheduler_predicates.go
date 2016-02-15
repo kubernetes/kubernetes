@@ -419,7 +419,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 								"matchExpressions": []
 							}]
