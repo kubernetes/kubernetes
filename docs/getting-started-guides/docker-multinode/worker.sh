@@ -186,19 +186,17 @@ start_k8s() {
         -d \
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw  \
-        -v /:/rootfs:ro \
         -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
-        /hyperkube kubelet \
+        /kubelet-runner.sh \
             --allow-privileged=true \
             --api-servers=http://${MASTER_IP}:8080 \
-            --address=0.0.0.0 \
+            --address=0.0.0.0
             --enable-server \
             --cluster-dns=10.0.0.10 \
             --cluster-domain=cluster.local \
-            --containerized \
             --v=2
     
     docker run \
