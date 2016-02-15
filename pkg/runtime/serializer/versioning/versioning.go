@@ -57,12 +57,20 @@ func NewCodec(
 	if encodeVersion != nil {
 		internal.encodeVersion = make(map[string]unversioned.GroupVersion)
 		for _, v := range encodeVersion {
+			// first one for a group wins.  This is consistent with best to worst order throughout the codebase
+			if _, ok := internal.encodeVersion[v.Group]; ok {
+				continue
+			}
 			internal.encodeVersion[v.Group] = v
 		}
 	}
 	if decodeVersion != nil {
 		internal.decodeVersion = make(map[string]unversioned.GroupVersion)
 		for _, v := range decodeVersion {
+			// first one for a group wins.  This is consistent with best to worst order throughout the codebase
+			if _, ok := internal.decodeVersion[v.Group]; ok {
+				continue
+			}
 			internal.decodeVersion[v.Group] = v
 		}
 	}
