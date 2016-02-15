@@ -2233,15 +2233,7 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
-			var requestValue, limitValue int64
-			requestValue = requestQuantity.Value()
-			limitValue = quantity.Value()
-			// Do a more precise comparison if possible (if the value won't overflow).
-			if requestValue <= resource.MaxMilliValue && limitValue <= resource.MaxMilliValue {
-				requestValue = requestQuantity.MilliValue()
-				limitValue = quantity.MilliValue()
-			}
-			if limitValue < requestValue {
+			if quantity.Cmp(requestQuantity) < 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "must be greater than or equal to request"))
 			}
 		}
