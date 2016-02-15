@@ -57,7 +57,7 @@ if [[ "${EXIT_ON_WEAK_ERROR}" == "true" ]]; then
 	validate-cluster
 else
 	if ! validate-cluster; then
-		local validate_result="$?"
+		validate_result="$?"
 		if [[ "${validate_result}" == "1" ]]; then
 			exit 1
 		elif [[ "${validate_result}" == "2" ]]; then
