@@ -70,7 +70,7 @@ func (c *RESTClient) Delete() *unversioned.Request {
 }
 
 func (c *RESTClient) request(verb string) *unversioned.Request {
-	return unversioned.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", unversioned.ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: c.Codec}, nil)
+	return unversioned.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", unversioned.ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: c.Codec}, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
