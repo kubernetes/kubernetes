@@ -197,7 +197,6 @@ Ok, now that your networking is set up, you can startup Kubernetes, this is the 
 sudo docker run \
     --volume=/:/rootfs:ro \
     --volume=/sys:/sys:ro \
-    --volume=/dev:/dev \
     --volume=/var/lib/docker/:/var/lib/docker:rw \
     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
     --volume=/var/run:/var/run:rw \
