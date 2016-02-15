@@ -72,5 +72,5 @@ grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
 
 rm -rf flannel* kubernetes* etcd*
 
-echo "Done! All your binaries locate in kubernetes/cluster/ubuntu/binaries directory"
+echo "Done! All binaries in kubernetes/cluster/ubuntu/binaries"
 popd

@@ -16,9 +16,12 @@
 
 # A library of helper functions that each provider hosting Kubernetes
 # must implement to use cluster/kube-*.sh scripts.
-set -e
+
+set -euo pipefail
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+
+KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
 
 MASTER=""
 MASTER_IP=""
@@ -44,27 +47,28 @@ function setClusterInfo() {
   for i in $nodes; do
     nodeIP=${i#*@}
 
-    if [[ "${roles[${ii}]}" == "ai" ]]; then
+    local n_role="${roles[${ii}]}"
+    if [[ $n_role == "ai" ]]; then
       MASTER_IP=$nodeIP
       MASTER=$i
       NODE_IPS="$nodeIP"
-    elif [[ "${roles[${ii}]}" == "a" ]]; then
+    elif [[ $n_role == "a" ]]; then
       MASTER_IP=$nodeIP
       MASTER=$i
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ $n_role == "i" ]]; then
       if [[ -z "${NODE_IPS}" ]];then
         NODE_IPS="$nodeIP"
       else
         NODE_IPS="$NODE_IPS,$nodeIP"
       fi
     else
+      echo $n_role
       echo "unsupported role for ${i}. please check"
       exit 1
     fi
 
     ((ii=ii+1))
   done
-
 }
 
 
@@ -307,7 +311,6 @@ function detect-nodes() {
 
 # Instantiate a kubernetes cluster on ubuntu
 function kube-up() {
-  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
   source "${KUBE_CONFIG_FILE}"
 
   # downloading tarball release
@@ -356,13 +359,14 @@ function provision-master() {
   ssh $SSH_OPTS "$MASTER" "mkdir -p ~/kube/default"
 
   # copy the binaries and scripts to the ~/kube directory on the master
+  CLUSTER_ROOT=${KUBE_ROOT}/cluster/
   scp -r $SSH_OPTS \
-    saltbase/salt/generate-cert/make-ca-cert.sh \
-    ubuntu/reconfDocker.sh \
+    ${CLUSTER_ROOT}/saltbase/salt/generate-cert/make-ca-cert.sh \
+    ${CLUSTER_ROOT}/ubuntu/reconfDocker.sh \
     "${KUBE_CONFIG_FILE}" \
-    ubuntu/util.sh \
-    ubuntu/master/* \
-    ubuntu/binaries/master/ \
+    ${CLUSTER_ROOT}/ubuntu/util.sh \
+    ${CLUSTER_ROOT}/ubuntu/master/* \
+    ${CLUSTER_ROOT}/ubuntu/binaries/master/ \
     "${MASTER}:~/kube"
 
   EXTRA_SANS=(
@@ -382,9 +386,13 @@ function provision-master() {
   fi
 
   # remote login to MASTER and configue k8s master
+  config_file_name=$(basename ${KUBE_CONFIG_FILE})
   ssh $SSH_OPTS -t "${MASTER}" "
     set +e
     ${BASH_DEBUG_FLAGS}
+    
+    export KUBE_ROOT=~/kube
+    source ~/kube/$config_file_name
     source ~/kube/util.sh
 
     setClusterInfo
@@ -399,6 +407,8 @@ function provision-master() {
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
     FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
       ${BASH_DEBUG_FLAGS}
+
+      export KUBE_ROOT=~/kube
 
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
@@ -423,12 +433,13 @@ function provision-node() {
   ssh $SSH_OPTS $1 "mkdir -p ~/kube/default"
 
   # copy the binaries and scripts to the ~/kube directory on the node
+  CLUSTER_ROOT=${KUBE_ROOT}/cluster/
   scp -r $SSH_OPTS \
     "${KUBE_CONFIG_FILE}" \
-    ubuntu/util.sh \
-    ubuntu/reconfDocker.sh \
-    ubuntu/minion/* \
-    ubuntu/binaries/minion \
+    ${CLUSTER_ROOT}/ubuntu/util.sh \
+    ${CLUSTER_ROOT}/ubuntu/reconfDocker.sh \
+    ${CLUSTER_ROOT}/ubuntu/minion/* \
+    ${CLUSTER_ROOT}/ubuntu/binaries/minion \
     "${1}:~/kube"
 
   BASH_DEBUG_FLAGS=""
@@ -437,9 +448,13 @@ function provision-node() {
   fi
 
   # remote login to node and configue k8s node
+  config_file_name=$(basename ${KUBE_CONFIG_FILE})
   ssh $SSH_OPTS -t "$1" "
     set +e
     ${BASH_DEBUG_FLAGS}
+
+    export KUBE_ROOT=~/kube
+    source ~/kube/$config_file_name
     source ~/kube/util.sh
 
     setClusterInfo
@@ -457,6 +472,7 @@ function provision-node() {
 
     sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '    
       ${BASH_DEBUG_FLAGS}
+      export KUBE_ROOT=~/kube
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
@@ -478,15 +494,16 @@ function provision-masterandnode() {
 
   # copy the binaries and scripts to the ~/kube directory on the master
   # scp order matters
+  CLUSTER_ROOT=${KUBE_ROOT}/cluster/
   scp -r $SSH_OPTS \
-    saltbase/salt/generate-cert/make-ca-cert.sh \
+    ${CLUSTER_ROOT}/saltbase/salt/generate-cert/make-ca-cert.sh \
     "${KUBE_CONFIG_FILE}" \
-    ubuntu/util.sh \
-    ubuntu/minion/* \
-    ubuntu/master/* \
-    ubuntu/reconfDocker.sh \
-    ubuntu/binaries/master/ \
-    ubuntu/binaries/minion \
+    ${CLUSTER_ROOT}/ubuntu/util.sh \
+    ${CLUSTER_ROOT}/ubuntu/minion/* \
+    ${CLUSTER_ROOT}/ubuntu/master/* \
+    ${CLUSTER_ROOT}/ubuntu/reconfDocker.sh \
+    ${CLUSTER_ROOT}/ubuntu/binaries/master/ \
+    ${CLUSTER_ROOT}/ubuntu/binaries/minion \
     "${MASTER}:~/kube"
 
   EXTRA_SANS=(
@@ -506,9 +523,13 @@ function provision-masterandnode() {
   fi
 
   # remote login to the master/node and configue k8s
+  config_file_name=$(basename ${KUBE_CONFIG_FILE})
   ssh $SSH_OPTS -t "$MASTER" "
     set +e
     ${BASH_DEBUG_FLAGS}
+
+    export KUBE_ROOT=~/kube
+    source ~/kube/$config_file_name
     source ~/kube/util.sh
 
     setClusterInfo
@@ -640,7 +661,7 @@ function prepare-push() {
   if [[ -z "${KUBE_VERSION}" ]]; then
     echo "Use local binaries for kube-push"
     if [[ ! -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
-      echo "No local binaries.Please check"
+      echo "No local binaries. Please check"
       exit 1
     else
       echo "Please make sure all the required local binaries are prepared ahead"
