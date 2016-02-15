@@ -363,8 +363,49 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS   AGE
-	// beep        foo          foo            someimage   foo=bar    1          10y
+	// NAMESPACE   CONTROLLER   REPLICAS   AGE
+	// beep        foo          1          10y
+}
+
+func ExamplePrintReplicationControllerWithWide() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
+	tf.Client = &fake.RESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// CONTROLLER   REPLICAS   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
+	// foo          1          10y       foo            someimage   foo=bar
 }
 
 func ExamplePrintPodWithWideFormat() {
@@ -635,9 +676,9 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           SELECTOR   AGE       L1|
-	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     s=magic    10y       value|
-	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   s=kazam    10y       dolla-bill-yall|
+	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE       L1|
+	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     10y       value|
+	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   10y       dolla-bill-yall|
 	// ||
 }
 
