@@ -84,7 +84,7 @@ func NewCMServer() *CMServer {
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	s.CMServer.AddFlags(fs)
-	fs.BoolVar(&s.UseHostPortEndpoints, "host_port_endpoints", s.UseHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
+	fs.BoolVar(&s.UseHostPortEndpoints, "host-port-endpoints", s.UseHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
 }
 
 func (s *CMServer) resyncPeriod() time.Duration {

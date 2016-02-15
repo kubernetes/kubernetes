@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -113,6 +113,6 @@ func Test_DefaultResourceLimits(t *testing.T) {
 	assert := assert.New(t)
 
 	s := NewSchedulerServer()
-	assert.Equal(s.defaultContainerCPULimit, mresource.DefaultDefaultContainerCPULimit)
-	assert.Equal(s.defaultContainerMemLimit, mresource.DefaultDefaultContainerMemLimit)
+	assert.Equal(s.defaultContainerCPULimit, resources.DefaultDefaultContainerCPULimit)
+	assert.Equal(s.defaultContainerMemLimit, resources.DefaultDefaultContainerMemLimit)
 }

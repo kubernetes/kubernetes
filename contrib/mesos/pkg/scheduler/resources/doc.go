@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package resource contains the Mesos scheduler specific resource functions
-package resource
+// Package resources contains the Mesos scheduler specific resource functions
+package resources
