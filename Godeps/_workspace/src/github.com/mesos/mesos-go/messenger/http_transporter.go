@@ -20,6 +20,7 @@ package messenger
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -27,11 +28,9 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	log "github.com/golang/glog"
@@ -39,30 +38,39 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	DefaultReadTimeout  = 10 * time.Second
+	DefaultWriteTimeout = 10 * time.Second
+)
+
 var (
+	ReadTimeout  = DefaultReadTimeout
+	WriteTimeout = DefaultWriteTimeout
+
 	discardOnStopError = fmt.Errorf("discarding message because transport is shutting down")
 	errNotStarted      = errors.New("HTTP transport has not been started")
 	errTerminal        = errors.New("HTTP transport is terminated")
 	errAlreadyRunning  = errors.New("HTTP transport is already running")
 
-	httpTransport, httpClient = &http.Transport{
+	httpTransport = http.Transport{
 		Dial: (&net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
-		TLSHandshakeTimeout: 10 * time.Second,
-	},
-		&http.Client{
-			Transport: httpTransport,
-			Timeout:   DefaultReadTimeout,
-		}
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: DefaultReadTimeout,
+	}
+
+	// HttpClient is used for sending messages to remote processes
+	HttpClient = http.Client{
+		Timeout: DefaultReadTimeout,
+	}
 )
 
 // httpTransporter is a subset of the Transporter interface
 type httpTransporter interface {
 	Send(ctx context.Context, msg *Message) error
 	Recv() (*Message, error)
-	Inject(ctx context.Context, msg *Message) error
 	Install(messageName string)
 	Start() (upid.UPID, <-chan error)
 	Stop(graceful bool) error
@@ -80,11 +88,10 @@ type runningState struct {
 
 /* -- not-started state */
 
-func (s *notStartedState) Send(ctx context.Context, msg *Message) error   { return errNotStarted }
-func (s *notStartedState) Recv() (*Message, error)                        { return nil, errNotStarted }
-func (s *notStartedState) Inject(ctx context.Context, msg *Message) error { return errNotStarted }
-func (s *notStartedState) Stop(graceful bool) error                       { return errNotStarted }
-func (s *notStartedState) Install(messageName string)                     { s.h.install(messageName) }
+func (s *notStartedState) Send(ctx context.Context, msg *Message) error { return errNotStarted }
+func (s *notStartedState) Recv() (*Message, error)                      { return nil, errNotStarted }
+func (s *notStartedState) Stop(graceful bool) error                     { return errNotStarted }
+func (s *notStartedState) Install(messageName string)                   { s.h.install(messageName) }
 func (s *notStartedState) Start() (upid.UPID, <-chan error) {
 	s.h.state = &runningState{s}
 	return s.h.start()
@@ -92,11 +99,10 @@ func (s *notStartedState) Start() (upid.UPID, <-chan error) {
 
 /* -- stopped state */
 
-func (s *stoppedState) Send(ctx context.Context, msg *Message) error   { return errTerminal }
-func (s *stoppedState) Recv() (*Message, error)                        { return nil, errTerminal }
-func (s *stoppedState) Inject(ctx context.Context, msg *Message) error { return errTerminal }
-func (s *stoppedState) Stop(graceful bool) error                       { return errTerminal }
-func (s *stoppedState) Install(messageName string)                     {}
+func (s *stoppedState) Send(ctx context.Context, msg *Message) error { return errTerminal }
+func (s *stoppedState) Recv() (*Message, error)                      { return nil, errTerminal }
+func (s *stoppedState) Stop(graceful bool) error                     { return errTerminal }
+func (s *stoppedState) Install(messageName string)                   {}
 func (s *stoppedState) Start() (upid.UPID, <-chan error) {
 	ch := make(chan error, 1)
 	ch <- errTerminal
@@ -105,9 +111,8 @@ func (s *stoppedState) Start() (upid.UPID, <-chan error) {
 
 /* -- running state */
 
-func (s *runningState) Send(ctx context.Context, msg *Message) error   { return s.h.send(ctx, msg) }
-func (s *runningState) Recv() (*Message, error)                        { return s.h.recv() }
-func (s *runningState) Inject(ctx context.Context, msg *Message) error { return s.h.inject(ctx, msg) }
+func (s *runningState) Send(ctx context.Context, msg *Message) error { return s.h.send(ctx, msg) }
+func (s *runningState) Recv() (*Message, error)                      { return s.h.recv() }
 func (s *runningState) Stop(graceful bool) error {
 	s.h.state = &stoppedState{}
 	return s.h.stop(graceful)
@@ -117,6 +122,9 @@ func (s *runningState) Start() (upid.UPID, <-chan error) {
 	ch <- errAlreadyRunning
 	return upid.UPID{}, ch
 }
+
+// httpOpt is a functional option type
+type httpOpt func(*HTTPTransporter)
 
 // HTTPTransporter implements the interfaces of the Transporter.
 type HTTPTransporter struct {
@@ -132,21 +140,49 @@ type HTTPTransporter struct {
 	shouldQuit   chan struct{}
 	stateLock    sync.RWMutex // protect lifecycle (start/stop) funcs
 	state        httpTransporter
+	server       *http.Server
 }
 
 // NewHTTPTransporter creates a new http transporter with an optional binding address.
-func NewHTTPTransporter(upid upid.UPID, address net.IP) *HTTPTransporter {
+func NewHTTPTransporter(upid upid.UPID, address net.IP, opts ...httpOpt) *HTTPTransporter {
+	transport := httpTransport
+	client := HttpClient
+	client.Transport = &transport
+	mux := http.NewServeMux()
+
 	result := &HTTPTransporter{
 		upid:         upid,
 		messageQueue: make(chan *Message, defaultQueueSize),
-		mux:          http.NewServeMux(),
-		client:       httpClient,
-		tr:           httpTransport,
+		mux:          mux,
+		client:       &client,
+		tr:           &transport,
 		address:      address,
 		shouldQuit:   make(chan struct{}),
+		server: &http.Server{
+			ReadTimeout:  ReadTimeout,
+			WriteTimeout: WriteTimeout,
+			Handler:      mux,
+		},
+	}
+	for _, f := range opts {
+		f(result)
 	}
 	result.state = &notStartedState{result}
 	return result
+}
+
+func ServerTLSConfig(config *tls.Config, nextProto map[string]func(*http.Server, *tls.Conn, http.Handler)) httpOpt {
+	return func(transport *HTTPTransporter) {
+		transport.server.TLSConfig = config
+		transport.server.TLSNextProto = nextProto
+	}
+}
+
+func ClientTLSConfig(config *tls.Config, handshakeTimeout time.Duration) httpOpt {
+	return func(transport *HTTPTransporter) {
+		transport.tr.TLSClientConfig = config
+		transport.tr.TLSHandshakeTimeout = handshakeTimeout
+	}
 }
 
 func (t *HTTPTransporter) getState() httpTransporter {
@@ -155,95 +191,59 @@ func (t *HTTPTransporter) getState() httpTransporter {
 	return t.state
 }
 
-// some network errors are probably recoverable, attempt to determine that here.
-func isRecoverableError(err error) bool {
-	if urlErr, ok := err.(*url.Error); ok {
-		log.V(2).Infof("checking url.Error for recoverability")
-		return urlErr.Op == "Post" && isRecoverableError(urlErr.Err)
-	} else if netErr, ok := err.(*net.OpError); ok && netErr.Err != nil {
-		log.V(2).Infof("checking net.OpError for recoverability: %#v", err)
-		if netErr.Temporary() {
-			return true
-		}
-		//TODO(jdef) this is pretty hackish, there's probably a better way
-		//TODO(jdef) should also check for EHOSTDOWN and EHOSTUNREACH
-		return (netErr.Op == "dial" && netErr.Net == "tcp" && netErr.Err == syscall.ECONNREFUSED)
-	}
-	log.V(2).Infof("unrecoverable error: %#v", err)
-	return false
-}
-
-type recoverableError struct {
-	Err error
-}
-
-func (e *recoverableError) Error() string {
-	if e == nil {
-		return ""
-	}
-	return e.Err.Error()
-}
-
 // Send sends the message to its specified upid.
 func (t *HTTPTransporter) Send(ctx context.Context, msg *Message) (sendError error) {
 	return t.getState().Send(ctx, msg)
 }
 
+type mesosError struct {
+	errorCode int
+	upid      string
+	uri       string
+	status    string
+}
+
+func (e *mesosError) Error() string {
+	return fmt.Sprintf("master %s rejected %s, returned status %q",
+		e.upid, e.uri, e.status)
+}
+
+type networkError struct {
+	cause error
+}
+
+func (e *networkError) Error() string {
+	return e.cause.Error()
+}
+
+// send delivers a message to a mesos component via HTTP, returns a mesosError if the
+// communication with the remote process was successful but rejected. A networkError
+// error indicates that communication with the remote process failed at the network layer.
 func (t *HTTPTransporter) send(ctx context.Context, msg *Message) (sendError error) {
 	log.V(2).Infof("Sending message to %v via http\n", msg.UPID)
 	req, err := t.makeLibprocessRequest(msg)
 	if err != nil {
-		log.Errorf("Failed to make libprocess request: %v\n", err)
 		return err
 	}
-	duration := 1 * time.Second
-	for attempt := 0; attempt < 5; attempt++ { //TODO(jdef) extract/parameterize constant
-		if sendError != nil {
-			duration *= 2
-			log.Warningf("attempting to recover from error '%v', waiting before retry: %v", sendError, duration)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(duration):
-				// ..retry request, continue
-			case <-t.shouldQuit:
-				return discardOnStopError
-			}
-		}
-		sendError = t.httpDo(ctx, req, func(resp *http.Response, err error) error {
-			if err != nil {
-				if isRecoverableError(err) {
-					return &recoverableError{Err: err}
-				}
-				log.Infof("Failed to POST: %v\n", err)
-				return err
-			}
-			defer resp.Body.Close()
 
-			// ensure master acknowledgement.
-			if (resp.StatusCode != http.StatusOK) &&
-				(resp.StatusCode != http.StatusAccepted) {
-				msg := fmt.Sprintf("Master %s rejected %s.  Returned status %s.",
-					msg.UPID, msg.RequestURI(), resp.Status)
-				log.Warning(msg)
-				return fmt.Errorf(msg)
-			}
-			return nil
-		})
-		if sendError == nil {
-			// success
-			return
-		} else if _, ok := sendError.(*recoverableError); ok {
-			// recoverable, attempt backoff?
-			continue
+	return t.httpDo(ctx, req, func(resp *http.Response, err error) error {
+		if err != nil {
+			log.V(1).Infof("Failed to POST: %v\n", err)
+			return &networkError{err}
 		}
-		// unrecoverable
-		break
-	}
-	if recoverable, ok := sendError.(*recoverableError); ok {
-		sendError = recoverable.Err
-	}
-	return
+		defer resp.Body.Close()
+
+		// ensure master acknowledgement.
+		if (resp.StatusCode != http.StatusOK) && (resp.StatusCode != http.StatusAccepted) {
+			return &mesosError{
+				errorCode: resp.StatusCode,
+				upid:      msg.UPID.String(),
+				uri:       msg.RequestURI(),
+				status:    resp.Status,
+			}
+		}
+		return nil
+	})
 }
 
 func (t *HTTPTransporter) httpDo(ctx context.Context, req *http.Request, f func(*http.Response, error) error) error {
@@ -287,30 +287,6 @@ func (t *HTTPTransporter) recv() (*Message, error) {
 	case <-t.shouldQuit:
 	}
 	return nil, discardOnStopError
-}
-
-//Inject places a message into the incoming message queue.
-func (t *HTTPTransporter) Inject(ctx context.Context, msg *Message) error {
-	return t.getState().Inject(ctx, msg)
-}
-
-func (t *HTTPTransporter) inject(ctx context.Context, msg *Message) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.shouldQuit:
-		return discardOnStopError
-	default: // continue
-	}
-
-	select {
-	case t.messageQueue <- msg:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.shouldQuit:
-		return discardOnStopError
-	}
 }
 
 // Install the request URI according to the message's name.
@@ -439,12 +415,7 @@ func (t *HTTPTransporter) start() (upid.UPID, <-chan error) {
 
 	// TODO(yifan): Set read/write deadline.
 	go func() {
-		s := &http.Server{
-			ReadTimeout:  DefaultReadTimeout,
-			WriteTimeout: DefaultWriteTimeout,
-			Handler:      t.mux,
-		}
-		err := s.Serve(t.listener)
+		err := t.server.Serve(t.listener)
 		select {
 		case <-t.shouldQuit:
 			log.V(1).Infof("HTTP server stopped because of shutdown")
@@ -587,7 +558,7 @@ func (t *HTTPTransporter) makeLibprocessRequest(msg *Message) (*http.Request, er
 	log.V(2).Infof("libproc target URL %s", targetURL)
 	req, err := http.NewRequest("POST", targetURL, bytes.NewReader(msg.Bytes))
 	if err != nil {
-		log.Errorf("Failed to create request: %v\n", err)
+		log.V(1).Infof("Failed to create request: %v\n", err)
 		return nil, err
 	}
 	if !msg.isV1API() {
