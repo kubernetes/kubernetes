@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -63,7 +64,6 @@ const (
 type Factory struct {
 	clients *ClientCache
 	flags   *pflag.FlagSet
-	cmd     string
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -190,7 +190,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	return &Factory{
 		clients: clients,
 		flags:   flags,
-		cmd:     recordCommand(os.Args),
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -547,15 +546,16 @@ func GetFirstPod(client *client.Client, namespace string, selector labels.Select
 	return pod, nil
 }
 
-func recordCommand(args []string) string {
-	if len(args) > 0 {
-		args[0] = "kubectl"
-	}
-	return strings.Join(args, " ")
-}
-
+// Command will stringify and return all environment arguments ie. a command run by a client
+// using the factory.
+// TODO: We need to filter out stuff like secrets.
 func (f *Factory) Command() string {
-	return f.cmd
+	if len(os.Args) == 0 {
+		return ""
+	}
+	base := filepath.Base(os.Args[0])
+	args := append([]string{base}, os.Args[1:]...)
+	return strings.Join(args, " ")
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
