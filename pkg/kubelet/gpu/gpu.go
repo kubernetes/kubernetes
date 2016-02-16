@@ -25,7 +25,7 @@ func ProbeGPUPlugins() []gpuTypes.GPUPlugin {
 	return allPlugins
 }
 
-func IsGPUAvaiable(pods []*api.Pod, gpuCapacity int) bool {
+func IsGPUAvailable(pods []*api.Pod, gpuCapacity int) bool {
 	glog.Infof("Hans: IsGPUAvaiable()")
 	totalGPU := gpuCapacity
 	totalGPURequest := int(0)
@@ -34,7 +34,8 @@ func IsGPUAvaiable(pods []*api.Pod, gpuCapacity int) bool {
 		totalGPURequest += getGPUResourceRequest(pod)
 	}
 
-	return totalGPURequest == 0 || (totalGPU-totalGPURequest) >= 0
+	glog.Infof("Hans: IsGPUAvailable: totalGPU: %d, totalGPURequest: %d", totalGPU, totalGPU)
+	return totalGPURequest == 0 || (totalGPU-totalGPU) >= 0
 }
 
 func getGPUResourceRequest(pod *api.Pod) int {
