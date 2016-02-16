@@ -89,7 +89,9 @@ func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
 		podUid := pod.GetUID()
 		stats, found := s.getPodVolumeStats(pod)
 		if !found {
-			glog.Warningf("Could not locate volumes for pod %s", format.Pod(pod))
+			if pod.Status.Phase == api.PodRunning {
+				glog.Warningf("Could not locate volumes for running pod %s", format.Pod(pod))
+			}
 			continue
 		}
 		newCache[podUid] = &stats
