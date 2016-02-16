@@ -100,11 +100,17 @@ A pod template in a DaemonSet must have a [`RestartPolicy`](../user-guide/pod-st
 ### Pod Selector
 
 The `.spec.selector` field is a pod selector.  It works the same as the `.spec.selector` of
-a [ReplicationController](../user-guide/replication-controller.md) or
-[Job](../user-guide/jobs.md).
+a [Job](../user-guide/jobs.md) or other new resources.
 
-If the `.spec.selector` is specified, it must equal the `.spec.template.metadata.labels`.  If not
-specified, the are default to be equal.  Config with these unequal will be rejected by the API.
+The `spec.selector` is an object consisting of two fields:
+* `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](../user-guide/replication-controller.md)
+* `matchExpressions` - allows to build more sophisticated selectors by specifying key,
+  list of values and an operator that relates the key and values.
+
+When the two are specified the result is ANDed.
+
+If the `.spec.selector` is specified, it must match the `.spec.template.metadata.labels`.  If not
+specified, they are defaulted to be equal.  Config with these not matching will be rejected by the API.
 
 Also you should not normally create any pods whose labels match this selector, either directly, via
 another DaemonSet, or via other controller such as ReplicationController.  Otherwise, the DaemonSet
