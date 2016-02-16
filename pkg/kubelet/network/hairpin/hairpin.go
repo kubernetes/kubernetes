@@ -38,44 +38,38 @@ const (
 
 var (
 	ethtoolOutputRegex = regexp.MustCompile("peer_ifindex: (\\d+)")
+	sysfsRegex         = regexp.MustCompile("\\s*(\\d+)\\s*")
 )
 
 func SetUpContainer(containerPid int, containerInterfaceName string) error {
-	e := exec.New()
-	return setUpContainerInternal(e, containerPid, containerInterfaceName)
-}
-
-func setUpContainerInternal(e exec.Interface, containerPid int, containerInterfaceName string) error {
-	hostIfName, err := findPairInterfaceOfContainerInterface(e, containerPid, containerInterfaceName)
+	hostIfName, err := findPairInterfaceOfContainerInterface(exec.New(), containerPid, containerInterfaceName)
 	if err != nil {
-		glog.Infof("Unable to find pair interface, setting up all interfaces: %v", err)
-		return setUpAllInterfaces()
+		return err
 	}
 	return setUpInterface(hostIfName)
 }
 
-func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, containerInterfaceName string) (string, error) {
+func getPeerIfindex(e exec.Interface, containerPid int, containerInterfaceName string, regex *regexp.Regexp, cmdArgs ...string) (string, error) {
 	nsenterPath, err := e.LookPath("nsenter")
 	if err != nil {
 		return "", err
 	}
-	ethtoolPath, err := e.LookPath("ethtool")
-	if err != nil {
-		return "", err
-	}
+
 	// Get container's interface index
-	output, err := e.Command(nsenterPath, "-t", fmt.Sprintf("%d", containerPid), "-n", "-F", "--", ethtoolPath, "--statistics", containerInterfaceName).CombinedOutput()
+	args := append([]string{"-t", fmt.Sprintf("%d", containerPid), "-n", "-F", "--"}, cmdArgs...)
+	output, err := e.Command(nsenterPath, args...).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("Unable to query interface %s of container %d: %v: %s", containerInterfaceName, containerPid, err, string(output))
 	}
+
 	// look for peer_ifindex
-	match := ethtoolOutputRegex.FindSubmatch(output)
+	match := regex.FindSubmatch(output)
 	if match == nil {
-		return "", fmt.Errorf("No peer_ifindex in interface statistics for %s of container %d", containerInterfaceName, containerPid)
+		return "", fmt.Errorf("Failed to match peer ifindex for %s of container %d in '%s'", containerInterfaceName, containerPid, string(output))
 	}
 	peerIfIndex, err := strconv.Atoi(string(match[1]))
 	if err != nil { // seems impossible (\d+ not numeric)
-		return "", fmt.Errorf("peer_ifindex wasn't numeric: %s: %v", match[1], err)
+		return "", fmt.Errorf("peer ifindex wasn't numeric: %s: %v", match[1], err)
 	}
 	iface, err := net.InterfaceByIndex(peerIfIndex)
 	if err != nil {
@@ -84,15 +78,34 @@ func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, c
 	return iface.Name, nil
 }
 
-func setUpAllInterfaces() error {
-	interfaces, err := net.Interfaces()
+func findPairInterfaceOfContainerInterfaceSysfs(e exec.Interface, containerPid int, containerInterfaceName string) (string, error) {
+	catPath, err := e.LookPath("cat")
 	if err != nil {
-		return err
+		return "", err
 	}
-	for _, netIf := range interfaces {
-		setUpInterface(netIf.Name) // ignore errors
+
+	sysfsPath := fmt.Sprintf("/sys/class/net/%s/iflink", containerInterfaceName)
+	return getPeerIfindex(e, containerPid, containerInterfaceName, sysfsRegex, catPath, sysfsPath)
+}
+
+func findPairInterfaceOfContainerInterfaceEthtool(e exec.Interface, containerPid int, containerInterfaceName string) (string, error) {
+	ethtoolPath, err := e.LookPath("ethtool")
+	if err != nil {
+		return "", err
 	}
-	return nil
+
+	return getPeerIfindex(e, containerPid, containerInterfaceName, ethtoolOutputRegex, ethtoolPath, "--statistics", containerInterfaceName)
+}
+
+func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, containerInterfaceName string) (string, error) {
+	hostIfName, err := findPairInterfaceOfContainerInterfaceSysfs(e, containerPid, containerInterfaceName)
+	if err != nil {
+		hostIfName, err = findPairInterfaceOfContainerInterfaceEthtool(e, containerPid, containerInterfaceName)
+		if err != nil {
+			return "", err
+		}
+	}
+	return hostIfName, nil
 }
 
 func setUpInterface(ifName string) error {

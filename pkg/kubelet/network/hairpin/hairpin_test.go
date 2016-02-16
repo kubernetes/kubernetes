@@ -30,45 +30,103 @@ import (
 func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
 	// there should be at least "lo" on any system
 	interfaces, _ := net.Interfaces()
-	validOutput := fmt.Sprintf("garbage\n   peer_ifindex: %d", interfaces[0].Index)
-	invalidOutput := fmt.Sprintf("garbage\n   unknown: %d", interfaces[0].Index)
+	validEthtoolOutput := fmt.Sprintf("garbage\n   peer_ifindex: %d", interfaces[0].Index)
+	invalidEthtoolOutput := fmt.Sprintf("garbage\n   unknown: %d", interfaces[0].Index)
+	validSysfsOutput := fmt.Sprintf("%d", interfaces[0].Index)
+	invalidSysfsOutput := fmt.Sprintf("adsfadsf")
 
 	tests := []struct {
-		output       string
-		err          error
-		expectedName string
-		expectErr    bool
+		sysfsOutput   string
+		ethtoolOutput string
+		err           error
+		expectedName  string
+		expectErr     bool
 	}{
 		{
-			output:       validOutput,
+			// cat exists; ethtool does not
+			sysfsOutput:  validSysfsOutput,
 			expectedName: interfaces[0].Name,
 		},
 		{
-			output:    invalidOutput,
-			expectErr: true,
+			// ethtool exists; cat does not
+			ethtoolOutput: validEthtoolOutput,
+			expectedName:  interfaces[0].Name,
 		},
 		{
-			output:    validOutput,
-			err:       errors.New("error"),
-			expectErr: true,
+			// neither binary exists
+			expectedName: interfaces[0].Name,
+			expectErr:    true,
+		},
+
+		{
+			// valid sysfs output
+			sysfsOutput:  validSysfsOutput,
+			expectedName: interfaces[0].Name,
+		},
+		{
+			// invalid sysfs output
+			sysfsOutput: invalidSysfsOutput,
+			expectErr:   true,
+		},
+		{
+			// valid sysfs output, but error
+			sysfsOutput: validSysfsOutput,
+			err:         errors.New("error"),
+			expectErr:   true,
+		},
+
+		{
+			// valid ethtool output
+			ethtoolOutput: validEthtoolOutput,
+			expectedName:  interfaces[0].Name,
+		},
+		{
+			// invalid ethtool output
+			ethtoolOutput: invalidEthtoolOutput,
+			expectErr:     true,
+		},
+		{
+			// valid ethtool output, but error
+			ethtoolOutput: validEthtoolOutput,
+			err:           errors.New("error"),
+			expectErr:     true,
 		},
 	}
+
 	for _, test := range tests {
-		fcmd := exec.FakeCmd{
+		fEthtoolCmd := exec.FakeCmd{
 			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
+				func() ([]byte, error) { return []byte(test.ethtoolOutput), test.err },
 			},
 		}
+		fSysfsCmd := exec.FakeCmd{
+			CombinedOutputScript: []exec.FakeCombinedOutputAction{
+				func() ([]byte, error) { return []byte(test.sysfsOutput), test.err },
+			},
+		}
+
 		fexec := exec.FakeExec{
 			CommandScript: []exec.FakeCommandAction{
 				func(cmd string, args ...string) exec.Cmd {
-					return exec.InitFakeCmd(&fcmd, cmd, args...)
+					allArgs := strings.Join(args, " ")
+					if strings.Index(allArgs, "ethtool") >= 0 {
+						return exec.InitFakeCmd(&fEthtoolCmd, cmd, args...)
+					} else if strings.Index(allArgs, "cat") >= 0 {
+						return exec.InitFakeCmd(&fSysfsCmd, cmd, args...)
+					}
+					panic("Invalid command")
 				},
 			},
 			LookPathFunc: func(file string) (string, error) {
+				if file == "cat" && test.sysfsOutput == "" {
+					return "", fmt.Errorf("cat not found")
+				} else if file == "ethtool" && test.ethtoolOutput == "" {
+					return "", fmt.Errorf("ethtool not found")
+				}
 				return fmt.Sprintf("/fake-bin/%s", file), nil
 			},
 		}
+
 		name, err := findPairInterfaceOfContainerInterface(&fexec, 123, "eth0")
 		if test.expectErr {
 			if err == nil {
@@ -79,7 +137,7 @@ func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}
-		if name != test.expectedName {
+		if !test.expectErr && name != test.expectedName {
 			t.Errorf("unexpected name: %s (expected: %s)", name, test.expectedName)
 		}
 	}
