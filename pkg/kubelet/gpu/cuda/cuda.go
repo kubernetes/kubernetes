@@ -280,6 +280,7 @@ func (cuda *Cuda) GenerateVolumeOpts(image string) (map[string]struct{}, error) 
 	if err != nil {
 		return result, fmt.Errorf("Failed to detect whether cuda volume need or not(%s)", err)
 	}
+	glog.Infof("Hans: cuda.GenerateVolumeOpts(): volumesNeeded(): vols: %+v, err: %+v", vols, err)
 	// the image needn't cuda support
 	if vols == nil {
 		return result, nil
@@ -330,6 +331,7 @@ func (cuda *Cuda) cudaSupported(image string, version string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// if there is no label $labelCUDAVersion, it assume cuda support this image.
 	if label == "" {
 		return true, nil
 	}
