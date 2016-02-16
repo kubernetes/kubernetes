@@ -1273,7 +1273,7 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	return cmd
 }
 
-// kubectlBuilder is used to build, custimize and execute a kubectl Command.
+// kubectlBuilder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
 type kubectlBuilder struct {
 	cmd     *exec.Cmd
