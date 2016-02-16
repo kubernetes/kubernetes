@@ -133,7 +133,7 @@ function configure-master-addons() {
   fi
 
   if [[ "${ENABLE_CLUSTER_UI}" == "true" ]]; then
-    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/kube-ui ${addon_dir}/kube-ui
+    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/dashboard ${addon_dir}/dashboard
   fi
 
   if [[ "${ENABLE_CLUSTER_MONITORING}" == "influxdb" ]]; then
