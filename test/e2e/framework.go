@@ -179,16 +179,19 @@ func (f *Framework) afterEach() {
 
 	summaries := make([]TestDataSummary, 0)
 	if testContext.GatherKubeSystemResourceUsageData {
+		By("Collecting resource usage data")
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
 	}
 
 	if testContext.GatherLogsSizes {
+		By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	if testContext.GatherMetricsAfterTest {
+		By("Gathering metrics")
 		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
 		grabber, err := metrics.NewMetricsGrabber(f.Client, true, false, false, true)
 		if err != nil {
