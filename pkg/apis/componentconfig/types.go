@@ -246,9 +246,11 @@ type KubeletConfiguration struct {
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
 	LockFilePath string `json:"lockFilePath"`
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	RktStage1Image string `json:"rktStage1Image,omitempty"`
+	// rktStage1Path is a path to an image to use as stage1.
+	// Absolute or relative paths are supported.
+	RktStage1Path string `json:"rktStage1Path,omitempty"`
+	// rktStage1Url is an URL to an image to use as stage1.
+	RktStage1Url string `json:"rktStage1Url,omniempty"`
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`

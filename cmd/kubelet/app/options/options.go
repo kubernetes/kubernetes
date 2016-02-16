@@ -114,7 +114,8 @@ func NewKubeletServer() *KubeletServer {
 			RegistryPullQPS:                5.0,
 			KubeletCgroups:                 "",
 			RktPath:                        "",
-			RktStage1Image:                 "",
+			RktStage1Path:                  "",
+			RktStage1Url:                   "",
 			RootDirectory:                  defaultRootDir,
 			RuntimeCgroups:                 "",
 			SerializeImagePulls:            true,
@@ -206,7 +207,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'")
-	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used")
+	fs.StringVar(&s.RktStage1Path, "rkt-stage1-path", s.RktStage1Path, "path to an image to use as stage1. Absolute or a relative paths are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used")
+	fs.StringVar(&s.RktStage1Url, "rkt-stage1-url", s.RktStage1Url, "an URL to an image to use as stage1")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 	fs.BoolVar(&s.HairpinMode, "configure-hairpin-mode", s.HairpinMode, "If true, kubelet will set the hairpin mode flag on container interfaces. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service.")
 	fs.IntVar(&s.MaxPods, "max-pods", s.MaxPods, "Number of Pods that can run on this Kubelet.")

@@ -773,9 +773,26 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 
 	// Run 'rkt prepare' to get the rkt UUID.
 	cmds := []string{"prepare", "--quiet", "--pod-manifest", manifestFile.Name()}
-	if r.config.Stage1Image != "" {
-		cmds = append(cmds, "--stage1-image", r.config.Stage1Image)
+
+	// TODO(woodbor): Remove block below after 1.0.0 rkt binary version will be minimumRktBinVersion.
+	if v, err := r.binVersion.Compare("1.0.0"); err != nil {
+		return "", nil, err
+	} else {
+		if r.config.Stage1Path != "" {
+			if v < 0 {
+				cmds = append(cmds, "--stage1-image", r.config.Stage1Path)
+			} else {
+				cmds = append(cmds, "--stage1-path", r.config.Stage1Path)
+			}
+		} else if r.config.Stage1Url != "" {
+			if v < 0 {
+				cmds = append(cmds, "--stage1-image", r.config.Stage1Url)
+			} else {
+				cmds = append(cmds, "--stage1-url", r.config.Stage1Url)
+			}
+		}
 	}
+
 	output, err := r.runCommand(cmds...)
 	if err != nil {
 		return "", nil, err
