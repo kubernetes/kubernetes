@@ -39,4 +39,4 @@ else
 	ARGS=$@
 fi
 
-${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" $ARGS
+go run ./hack/e2e.go -v --test --test_args="--e2e-verify-service-account=false ${ARGS}"
