@@ -704,6 +704,7 @@ func (dm *DockerManager) runContainer(
 		},
 	}
 
+	glog.Errorf("Hans: runContainer(): dockerOpts: %+v", dockerOpts)
 	glog.Errorf("Hans: runContainer(): container: %+v", container)
 	gpuRequest := uint(milliCPUToShares(container.Resources.Requests.Gpu().MilliValue()))
 	glog.Errorf("Hans: runContainer(): gpuRequest: %d", gpuRequest)
@@ -730,7 +731,9 @@ func (dm *DockerManager) runContainer(
 				dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 				return kubecontainer.ContainerID{}, err
 			}
-			dockerOpts.Config.Volumes = volOpts
+			if len(volOpts) > 0 {
+				dockerOpts.Config.Volumes = volOpts
+			}
 		}
 	}
 

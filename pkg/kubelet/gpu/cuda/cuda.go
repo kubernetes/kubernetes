@@ -53,7 +53,7 @@ func (cuda *Cuda) ReleasePlugin() error {
 }
 
 func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
-	glog.Infof("Hans: cuda.AllocGPU()")
+	glog.Infof("Hans: cuda.AllocGPU(): gpuReqs: %d", gpuReqs)
 	totalGPUNum := uint(len(cuda.gpuInfo.GPUDevices.Devices))
 	if gpuReqs > totalGPUNum {
 		return []uint{}, fmt.Errorf("Cannot alloc %d cuda gpu, because there are %d", gpuReqs, totalGPUNum)
