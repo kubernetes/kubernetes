@@ -225,7 +225,7 @@ func (cuda *Cuda) createLocalVolumes() error {
 }
 
 func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
-	glog.Infof("Hans: cuda.IsImageSupported()")
+	glog.Infof("Hans: cuda.IsImageSupported(): image: %s", image)
 	cv, err := nvidia.GetCUDAVersion()
 	if err != nil {
 		return false, fmt.Errorf("Failed to detect the host cuda version(%s)", err)
@@ -320,24 +320,28 @@ func (cuda *Cuda) volumesNeeded(image string) ([]string, error) {
 	return strings.Split(label, " "), nil
 }
 
-func (cuda *Cuda) cudaSupported(image, version string) (bool, error) {
-	glog.Infof("Hans: cuda.cudaSupported()")
+func (cuda *Cuda) cudaSupported(image string, version string) (bool, error) {
+	glog.Infof("Hans: cuda.cudaSupported(): image: %s, version: %s", image, version)
 	var vmaj, vmin int
 	var lmaj, lmin int
 
 	label, err := docker.Label(image, labelCUDAVersion)
+	glog.Infof("Hans: cuda.cudaSupported(): get label(%s): %s, err: %s", labelCUDAVersion, label, err)
 	if err != nil {
 		return false, err
 	}
 	if label == "" {
 		return true, nil
 	}
+	glog.Infof("Hans: cuda.cudaSupported(): version: %s, label: %s", version, label)
 	if _, err := fmt.Sscanf(version, "%d.%d", &vmaj, &vmin); err != nil {
 		return false, err
 	}
 	if _, err := fmt.Sscanf(label, "%d.%d", &lmaj, &lmin); err != nil {
 		return false, err
 	}
+	glog.Infof("Hans: cuda.cudaSupported(): vmaj:%d, vmin:%d", vmaj, vmin)
+	glog.Infof("Hans: cuda.cudaSupported(): lmaj:%d, lmin:%d", lmaj, lmin)
 	if lmaj > vmaj || (lmaj == vmaj && lmin > vmin) {
 		glog.Warningf("%s", fmt.Errorf("Unsupported CUDA version: %s < %s", label, version))
 		return false, nil
