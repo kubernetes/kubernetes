@@ -108,7 +108,7 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
   * [FluentD with GCP Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 
 Heapster's resource limits are set dynamically based on the initial size of your cluster (see [#16185](http://issue.k8s.io/16185) and [#21258](http://issue.k8s.io/21258)). If you find that Heapster is running
-out of resources, you should adjust the formulas in the files that were modified in that PR (and please let us know!).
+out of resources, you should adjust the formulas that compute heapster memory request (see those PRs for details).
 
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.md#troubleshooting).
 
