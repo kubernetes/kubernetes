@@ -282,8 +282,8 @@ function restart-apiserver() {
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
-# from hack/e2e-test.sh. This calls kube-down, so the cluster still exists when
-# this is called.
+# from hack/e2e.go. This calls kube-down, so the cluster still exists when this
+# is called.
 #
 # Assumed vars:
 #   CLUSTER_NAME
