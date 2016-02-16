@@ -22,7 +22,7 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 
-	//	"github.com/golang/glog"
+	"github.com/golang/glog"
 )
 
 type ContainerConfiguration interface {
@@ -31,6 +31,7 @@ type ContainerConfiguration interface {
 }
 
 func GetContConfigure(runtime string) (ContainerConfiguration, error) {
+	glog.Infof("runtime = %q", runtime)
 	switch runtime {
 	case "docker":
 		return dockerConfigure{}, nil
@@ -65,5 +66,6 @@ func (r rktConfigure) GetFsContext() (fs.Context, error) {
 }
 
 func (r rktConfigure) RegisterRuntime(m info.MachineInfoFactory, f fs.FsInfo) error {
-	return rkt.Register(m, f)
+//	return rkt.Register(m, f)
+	return nil
 }

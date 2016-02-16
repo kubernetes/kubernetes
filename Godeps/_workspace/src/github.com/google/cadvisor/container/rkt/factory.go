@@ -57,11 +57,11 @@ func (self *rktFactory) DebugInfo() map[string][]string {
 }
 
 func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo) error {
-	f := &rktFactory{
-		machineInfoFactory: factory,
-		fsInfo:             fsInfo,
-	}
-	container.RegisterContainerHandlerFactory(f)
+//	f := &rktFactory{
+//		machineInfoFactory: factory,
+//		fsInfo:             fsInfo,
+//	}
+//	container.RegisterContainerHandlerFactory(f)
 
 	return nil
 }
