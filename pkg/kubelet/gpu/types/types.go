@@ -63,7 +63,7 @@ type GPUPlugin interface {
 	GenerateDeviceOpts(gpuIdxs []uint) ([]dockerClient.Device, error)
 
 	// Generate Volume Options
-	GenerateVolumeOpts(image string) (map[string]struct{}, error)
+	GenerateVolumeOpts(image string) ([]string, error)
 
 	// Name returns the plugin's name. This will be used when searching
 	// for a plugin by name, e.g.

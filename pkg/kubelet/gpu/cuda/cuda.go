@@ -271,9 +271,9 @@ func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []uint) ([]dockerClient.Device, err
 	return devicesOpts, nil
 }
 
-func (cuda *Cuda) GenerateVolumeOpts(image string) (map[string]struct{}, error) {
+func (cuda *Cuda) GenerateVolumeOpts(image string) ([]string, error) {
 	glog.Infof("Hans: cuda.GenerateVolumeOpts()")
-	result := make(map[string]struct{})
+	result := []string{}
 
 	// check whether the image need cuda support
 	vols, err := cuda.volumesNeeded(image)
@@ -296,7 +296,7 @@ func (cuda *Cuda) GenerateVolumeOpts(image string) (map[string]struct{}, error) 
 				// Check if the volume exists locally otherwise fallback to using the plugin
 				n := fmt.Sprintf("%s_%s", vol.Name, drv)
 				if _, err := docker.InspectVolume(n); err == nil {
-					result[fmt.Sprintf("%s:%s:ro", n, vol.Mountpoint)] = struct{}{}
+					result = append(result, fmt.Sprintf("%s:%s:ro", n, vol.Mountpoint))
 				} else {
 					return result, fmt.Errorf("Cannot find the volume %s for cuda", n)
 				}
