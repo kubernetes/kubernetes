@@ -35,7 +35,7 @@ func TestCacheOperations(t *testing.T) {
 	_, found := m.Get(unsetID)
 	assert.False(t, found, "unset result found")
 
-	m.Set(setID, Success, nil)
+	m.Set(setID, Success, &api.Pod{})
 	result, found := m.Get(setID)
 	assert.True(t, result == Success, "set result")
 	assert.True(t, found, "set result found")
@@ -77,10 +77,10 @@ func TestUpdates(t *testing.T) {
 
 	// New result should always push an update.
 	m.Set(fooID, Success, pod)
-	expectUpdate(Update{fooID, Success, pod}, "new success")
+	expectUpdate(Update{fooID, Success, pod.UID}, "new success")
 
 	m.Set(barID, Failure, pod)
-	expectUpdate(Update{barID, Failure, pod}, "new failure")
+	expectUpdate(Update{barID, Failure, pod.UID}, "new failure")
 
 	// Unchanged results should not send an update.
 	m.Set(fooID, Success, pod)
@@ -91,8 +91,8 @@ func TestUpdates(t *testing.T) {
 
 	// Changed results should send an update.
 	m.Set(fooID, Failure, pod)
-	expectUpdate(Update{fooID, Failure, pod}, "changed foo")
+	expectUpdate(Update{fooID, Failure, pod.UID}, "changed foo")
 
 	m.Set(barID, Success, pod)
-	expectUpdate(Update{barID, Success, pod}, "changed bar")
+	expectUpdate(Update{barID, Success, pod.UID}, "changed bar")
 }
