@@ -86,7 +86,7 @@ function test_docker {
 # Shut down anyway if there's an error.
 set +e
 
-API_PORT=${API_PORT:-8080}
+API_PORT=${API_PORT:-60001}
 API_HOST=${API_HOST:-127.0.0.1}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
@@ -353,7 +353,7 @@ EOF
 }
 
 test_docker
-test_apiserver_off
+#test_apiserver_off
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
