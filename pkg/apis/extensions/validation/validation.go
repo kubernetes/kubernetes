@@ -124,9 +124,9 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *extensi
 	return allErrs
 }
 
-func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *extensions.HorizontalPodAutoscaler) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	status := controller.Status
+func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *extensions.HorizontalPodAutoscaler) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
+	status := newAutoscaler.Status
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
 	return allErrs
@@ -162,16 +162,16 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorL
 }
 
 // ValidateDaemonSet tests if required fields in the DaemonSet are set.
-func ValidateDaemonSet(controller *extensions.DaemonSet) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, ValidateDaemonSetName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec, field.NewPath("spec"))...)
+func ValidateDaemonSet(ds *extensions.DaemonSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ds.ObjectMeta, true, ValidateDaemonSetName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
-func ValidateDaemonSetUpdate(controller, oldController *extensions.DaemonSet) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec, field.NewPath("spec"))...)
+func ValidateDaemonSetUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
@@ -185,9 +185,9 @@ func validateDaemonSetStatus(status *extensions.DaemonSetStatus, fldPath *field.
 }
 
 // ValidateDaemonSetStatus validates tests if required fields in the DaemonSet Status section
-func ValidateDaemonSetStatusUpdate(controller, oldController *extensions.DaemonSet) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateDaemonSetStatus(&controller.Status, field.NewPath("status"))...)
+func ValidateDaemonSetStatusUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDaemonSetStatus(&ds.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
