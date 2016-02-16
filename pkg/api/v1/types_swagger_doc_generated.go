@@ -692,6 +692,7 @@ func (LoadBalancerStatus) SwaggerDoc() map[string]string {
 
 var map_LocalObjectReference = map[string]string{
 	"":     "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+	"kind": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
 	"name": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names",
 }
 

@@ -913,6 +913,7 @@ func TestValidateEnv(t *testing.T) {
 			ValueFrom: &api.EnvVarSource{
 				SecretKeyRef: &api.SecretKeySelector{
 					LocalObjectReference: api.LocalObjectReference{
+						Kind: "Secret",
 						Name: "some-secret",
 					},
 					Key: "secret-key",
@@ -924,6 +925,7 @@ func TestValidateEnv(t *testing.T) {
 			ValueFrom: &api.EnvVarSource{
 				ConfigMapKeyRef: &api.ConfigMapKeySelector{
 					LocalObjectReference: api.LocalObjectReference{
+						Kind: "ConfigMap",
 						Name: "some-config-map",
 					},
 					Key: "some-key",
@@ -975,6 +977,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 					SecretKeyRef: &api.SecretKeySelector{
 						LocalObjectReference: api.LocalObjectReference{
+							Kind: "Secret",
 							Name: "a-secret",
 						},
 						Key: "a-key",
@@ -994,6 +997,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 					ConfigMapKeyRef: &api.ConfigMapKeySelector{
 						LocalObjectReference: api.LocalObjectReference{
+							Kind: "ConfigMap",
 							Name: "some-config-map",
 						},
 						Key: "some-key",
@@ -1013,12 +1017,14 @@ func TestValidateEnv(t *testing.T) {
 					},
 					SecretKeyRef: &api.SecretKeySelector{
 						LocalObjectReference: api.LocalObjectReference{
+							Kind: "Secret",
 							Name: "a-secret",
 						},
 						Key: "a-key",
 					},
 					ConfigMapKeyRef: &api.ConfigMapKeySelector{
 						LocalObjectReference: api.LocalObjectReference{
+							Kind: "ConfigMap",
 							Name: "some-config-map",
 						},
 						Key: "some-key",

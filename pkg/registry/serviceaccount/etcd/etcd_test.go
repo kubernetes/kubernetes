@@ -70,7 +70,7 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ServiceAccount)
-			object.Secrets = []api.ObjectReference{{}}
+			object.Secrets = []api.ObjectReference{{Kind: "Secret", Name: "foo"}}
 			return object
 		},
 	)
