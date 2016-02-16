@@ -20,9 +20,6 @@ import (
 )
 
 const (
-	DefaultReadTimeout  = 5 * time.Second
-	DefaultWriteTimeout = 5 * time.Second
-
 	// writeFlushPeriod is the amount of time we're willing to wait for a single
 	// response buffer to be fully written to the underlying TCP connection; after
 	// this amount of time the remaining bytes of the response are discarded. see
@@ -43,12 +40,7 @@ func (did *decoderID) next() decoderID {
 var (
 	errHijackFailed = errors.New("failed to hijack http connection")
 	did             decoderID // decoder ID counter
-	closedChan      = make(chan struct{})
 )
-
-func init() {
-	close(closedChan)
-}
 
 type Decoder interface {
 	Requests() <-chan *Request
@@ -99,8 +91,8 @@ func DecodeHTTP(w http.ResponseWriter, r *http.Request) Decoder {
 		req:          r,
 		shouldQuit:   make(chan struct{}),
 		forceQuit:    make(chan struct{}),
-		readTimeout:  DefaultReadTimeout,
-		writeTimeout: DefaultWriteTimeout,
+		readTimeout:  ReadTimeout,
+		writeTimeout: WriteTimeout,
 		idtag:        id.String(),
 		outCh:        make(chan *bytes.Buffer),
 	}
