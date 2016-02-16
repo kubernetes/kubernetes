@@ -38,13 +38,15 @@ type SelectorSpread struct {
 	podLister        algorithm.PodLister
 	serviceLister    algorithm.ServiceLister
 	controllerLister algorithm.ControllerLister
+	replicaSetLister algorithm.ReplicaSetLister
 }
 
-func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister) algorithm.PriorityFunction {
+func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
 	selectorSpread := &SelectorSpread{
 		podLister:        podLister,
 		serviceLister:    serviceLister,
 		controllerLister: controllerLister,
+		replicaSetLister: replicaSetLister,
 	}
 	return selectorSpread.CalculateSpreadPriority
 }
@@ -86,10 +88,18 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
 		}
 	}
-	controllers, err := s.controllerLister.GetPodControllers(pod)
+	rcs, err := s.controllerLister.GetPodControllers(pod)
 	if err == nil {
-		for _, controller := range controllers {
-			selectors = append(selectors, labels.SelectorFromSet(controller.Spec.Selector))
+		for _, rc := range rcs {
+			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+		}
+	}
+	rss, err := s.replicaSetLister.GetPodReplicaSets(pod)
+	if err == nil {
+		for _, rs := range rss {
+			if selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
+				selectors = append(selectors, selector)
+			}
 		}
 	}
 
