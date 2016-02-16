@@ -261,7 +261,7 @@ health_monitoring() {
   # We simply kill the process when there is a failure. Another upstart job will automatically
   # restart the process.
   while [ 1 ]; do
-    if ! timeout 20 docker ps > /dev/null; then
+    if ! timeout 10 docker version > /dev/null; then
       echo "Docker daemon failed!"
       pkill docker
     fi
