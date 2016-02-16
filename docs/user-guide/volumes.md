@@ -319,8 +319,8 @@ See the [iSCSI example](../../examples/iscsi/) for more details.
 and orchestration of data volumes backed by a variety of storage backends.
 
 A `flocker` volume allows a Flocker dataset to be mounted into a pod. If the
-dataset does not already exist in Flocker, it needs to be created with Flocker
-CLI or the using the Flocker API. If the dataset already exists it will
+dataset does not already exist in Flocker, it needs to be first created with the Flocker
+CLI or by using the Flocker API. If the dataset already exists it will be
 reattached by Flocker to the node that the pod is scheduled. This means data
 can be "handed off" between pods as required.
 
