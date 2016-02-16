@@ -566,7 +566,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 }
 
-// getExperimentalResources returns the resources for extenstions api
+// getExperimentalResources returns the resources for extensions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
 	enabledResources := sets.NewString("horizontalpodautoscalers", "ingresses", "jobs", "replicasets", "deployments")
