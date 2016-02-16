@@ -138,6 +138,7 @@ horizontal-pod-autoscaler-sync-period
 host-ipc-sources
 host-network-sources
 host-pid-sources
+host-port-endpoints
 hostname-override
 http-check-frequency
 http-port
