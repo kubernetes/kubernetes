@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -74,11 +75,13 @@ func newSystemCgroups(containerName string) *systemContainer {
 }
 
 type containerManagerImpl struct {
+	sync.RWMutex
 	cadvisorInterface cadvisor.Interface
 	mountUtil         mount.Interface
 	NodeConfig
 	// External containers being managed.
 	systemContainers []*systemContainer
+	periodicTasks    []func()
 }
 
 var _ ContainerManager = &containerManagerImpl{}
@@ -225,12 +228,16 @@ func (cm *containerManagerImpl) setupNode() error {
 			}
 			systemContainers = append(systemContainers, cont)
 		} else {
-			cont, err := getContainerNameForProcess("docker")
-			if err != nil {
-				glog.Error(err)
-			} else {
+			cm.periodicTasks = append(cm.periodicTasks, func() {
+				cont, err := getContainerNameForProcess("docker")
+				if err != nil {
+					glog.Error(err)
+					return
+				}
+				cm.Lock()
+				defer cm.Unlock()
 				cm.RuntimeCgroupsName = cont
-			}
+			})
 		}
 	}
 
@@ -267,12 +274,17 @@ func (cm *containerManagerImpl) setupNode() error {
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
-		cont, err := getContainer(os.Getpid())
-		if err != nil {
-			glog.Error("failed to find cgroups of kubelet - %v", err)
-		} else {
+		cm.periodicTasks = append(cm.periodicTasks, func() {
+			cont, err := getContainer(os.Getpid())
+			if err != nil {
+				glog.Error("failed to find cgroups of kubelet - %v", err)
+				return
+			}
+			cm.Lock()
+			defer cm.Unlock()
+
 			cm.KubeletCgroupsName = cont
-		}
+		})
 	}
 
 	cm.systemContainers = systemContainers
@@ -295,6 +307,8 @@ func getContainerNameForProcess(name string) (string, error) {
 }
 
 func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
+	cm.RLock()
+	defer cm.RUnlock()
 	return cm.NodeConfig
 }
 
@@ -324,6 +338,14 @@ func (cm *containerManagerImpl) Start() error {
 			}
 		}
 	}, time.Minute, wait.NeverStop)
+
+	go wait.Until(func() {
+		for _, task := range cm.periodicTasks {
+			if task != nil {
+				task()
+			}
+		}
+	}, 5*time.Minute, wait.NeverStop)
 
 	return nil
 }
