@@ -52,11 +52,22 @@ func getTestRunningStatus() api.PodStatus {
 	return podStatus
 }
 
-func getTestPod(probeType probeType, probeSpec api.Probe) api.Pod {
+func getTestPod() *api.Pod {
 	container := api.Container{
 		Name: testContainerName,
 	}
+	pod := api.Pod{
+		Spec: api.PodSpec{
+			Containers:    []api.Container{container},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	pod.Name = "testPod"
+	pod.UID = testPodUID
+	return &pod
+}
 
+func setTestProbe(pod *api.Pod, probeType probeType, probeSpec api.Probe) {
 	// All tests rely on the fake exec prober.
 	probeSpec.Handler = api.Handler{
 		Exec: &api.ExecAction{},
@@ -78,26 +89,20 @@ func getTestPod(probeType probeType, probeSpec api.Probe) api.Pod {
 
 	switch probeType {
 	case readiness:
-		container.ReadinessProbe = &probeSpec
+		pod.Spec.Containers[0].ReadinessProbe = &probeSpec
 	case liveness:
-		container.LivenessProbe = &probeSpec
+		pod.Spec.Containers[0].LivenessProbe = &probeSpec
 	}
-	pod := api.Pod{
-		Spec: api.PodSpec{
-			Containers:    []api.Container{container},
-			RestartPolicy: api.RestartPolicyNever,
-		},
-	}
-	pod.Name = "testPod"
-	pod.UID = testPodUID
-	return pod
 }
 
 func newTestManager() *manager {
 	refManager := kubecontainer.NewRefManager()
 	refManager.SetRef(testContainerID, &api.ObjectReference{}) // Suppress prober warnings.
+	podManager := kubepod.NewBasicPodManager(nil)
+	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
+	podManager.AddPod(getTestPod())
 	m := NewManager(
-		status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil)),
+		status.NewManager(&fake.Clientset{}, podManager),
 		results.NewManager(),
 		nil, // runner
 		refManager,
@@ -109,8 +114,9 @@ func newTestManager() *manager {
 }
 
 func newTestWorker(m *manager, probeType probeType, probeSpec api.Probe) *worker {
-	pod := getTestPod(probeType, probeSpec)
-	return newWorker(m, probeType, &pod, pod.Spec.Containers[0])
+	pod := getTestPod()
+	setTestProbe(pod, probeType, probeSpec)
+	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
 }
 
 type fakeExecProber struct {

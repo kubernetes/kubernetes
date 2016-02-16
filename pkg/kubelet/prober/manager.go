@@ -33,7 +33,7 @@ import (
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
-// manager usse the cached probe results to set the appropriate Ready state in the PodStatus when
+// manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 // TODO: Move liveness probing out of the runtime, to here.
 type Manager interface {
@@ -234,5 +234,5 @@ func (m *manager) updateReadiness() {
 	update := <-m.readinessManager.Updates()
 
 	ready := update.Result == results.Success
-	m.statusManager.SetContainerReadiness(update.Pod, update.ContainerID, ready)
+	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
 }
