@@ -141,7 +141,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 }
 
 func NewWithConfig(c Config) (Manager, error) {
-	glog.Info("cAdvisor: containerRuntme = %v", c.ContainerRuntime)
+	glog.Infof("cAdvisor: containerRuntme = %q", c.ContainerRuntime)
 
 	if c.MemoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
@@ -236,7 +236,7 @@ type manager struct {
 func (self *manager) Start() error {
 	err := self.contConfigure.RegisterRuntime(self, self.fsInfo)
 	if err != nil {
-		glog.Errorf("Container Runtime (%v) factory registration failed: %v.", self.containerRuntime, err)
+		glog.Errorf("Container Runtime (%q) factory registration failed: %v.", self.containerRuntime, err)
 	}
 
 	err = raw.Register(self, self.fsInfo)
@@ -648,7 +648,7 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 }
 
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
-	glog.Infof("cadvisor: GetFsInfo: label = %v", label)
+	glog.Infof("cadvisor: GetFsInfo: label = %q", label)
 	var empty time.Time
 	// Get latest data from filesystems hanging off root container.
 	stats, err := self.memoryCache.RecentStats("/", empty, empty, 1)
@@ -683,7 +683,7 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 			Available:  fs.Available,
 			Labels:     labels,
 		}
-		glog.Infof("cadvisor: GetFsInfo: mount = %v free size = %v", mountpoint, fs.Available)
+		glog.Infof("cadvisor: GetFsInfo: mount = %q free size = %v", mountpoint, fs.Available)
 		fsInfo = append(fsInfo, fi)
 	}
 	return fsInfo, nil

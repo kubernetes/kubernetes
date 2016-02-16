@@ -104,6 +104,9 @@ func NewFsInfo(context Context) (FsInfo, error) {
 
 	// need to call this before the log line below printing out the partitions, as this function may
 	// add a "partition" for devicemapper to fsInfo.partitions
+	
+	glog.Infof("RktPath: %q", context.RktPath)
+	glog.Infof("Dockerroot: %q", context.DockerRoot)
 	if context.DockerRoot != "" {
 		fsInfo.addDockerImagesLabel(context)
 	}
