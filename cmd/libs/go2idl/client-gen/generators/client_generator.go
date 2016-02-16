@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
@@ -32,31 +33,6 @@ import (
 
 	"github.com/golang/glog"
 )
-
-// ClientGenArgs is a wrapper for arguments to client-gen.
-type ClientGenArgs struct {
-	// TODO: we should make another type declaration of GroupVersion out of the
-	// unversioned package, which is part of our API. Tools like client-gen
-	// shouldn't depend on an API.
-	GroupVersions []unversioned.GroupVersion
-
-	// GroupVersionToInputPath is a map between GroupVersion and the path to
-	// the respective types.go. We still need GroupVersions in the struct because
-	// we need an order.
-	GroupVersionToInputPath map[unversioned.GroupVersion]string
-	// ClientsetName is the name of the clientset to be generated. It's
-	// populated from command-line arguments.
-	ClientsetName string
-	// ClientsetOutputPath is the path the clientset will be generated at. It's
-	// populated from command-line arguments.
-	ClientsetOutputPath string
-	// ClientsetOnly determines if we should generate the clients for groups and
-	// types along with the clientset. It's populated from command-line
-	// arguments.
-	ClientsetOnly bool
-	// FakeClient determines if client-gen generates the fake clients.
-	FakeClient bool
-}
 
 // NameSystems returns the name system used by the generators in this package.
 func NameSystems() namer.NameSystems {
@@ -138,7 +114,7 @@ func packageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 	}
 }
 
-func packageForClientset(customArgs ClientGenArgs, typedClientBasePath string, boilerplate []byte) generator.Package {
+func packageForClientset(customArgs clientgenargs.Args, typedClientBasePath string, boilerplate []byte) generator.Package {
 	return &generator.DefaultPackage{
 		PackageName: customArgs.ClientsetName,
 		PackagePath: filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName),
@@ -172,9 +148,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		glog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	customArgs, ok := arguments.CustomArgs.(ClientGenArgs)
+	customArgs, ok := arguments.CustomArgs.(clientgenargs.Args)
 	if !ok {
-		glog.Fatalf("cannot convert arguments.CustomArgs to ClientGenArgs")
+		glog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.Args")
 	}
 
 	gvToTypes := map[unversioned.GroupVersion][]*types.Type{}
@@ -195,7 +171,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
 	if customArgs.FakeClient {
-		packageList = append(packageList, fake.PackageForClientset(arguments.OutputPackagePath, customArgs.GroupVersions, boilerplate))
+		packageList = append(packageList, fake.PackageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.

@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 
@@ -78,7 +79,6 @@ func main() {
 		"k8s.io/kubernetes/pkg/labels",
 		"k8s.io/kubernetes/pkg/watch",
 		"k8s.io/kubernetes/pkg/client/unversioned",
-		"k8s.io/kubernetes/pkg/client/testing/fake",
 		"k8s.io/kubernetes/pkg/apimachinery/registered",
 	}
 
@@ -88,7 +88,7 @@ func main() {
 		}...)
 		// We may change the output path later.
 		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
-		arguments.CustomArgs = generators.ClientGenArgs{
+		arguments.CustomArgs = clientgenargs.Args{
 			[]unversioned.GroupVersion{{"testgroup", ""}},
 			map[unversioned.GroupVersion]string{
 				unversioned.GroupVersion{"testgroup", ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
@@ -112,7 +112,7 @@ func main() {
 		// We may change the output path later.
 		arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/typed/generated"
 
-		arguments.CustomArgs = generators.ClientGenArgs{
+		arguments.CustomArgs = clientgenargs.Args{
 			groupVersions,
 			gvToPath,
 			*clientsetName,
