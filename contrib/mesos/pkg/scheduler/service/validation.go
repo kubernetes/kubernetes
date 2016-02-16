@@ -19,23 +19,23 @@ package service
 import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 // StaticPodValidator discards a pod if we can't calculate resource limits for it.
 func StaticPodValidator(
-	defaultContainerCPULimit resource.CPUShares,
-	defaultContainerMemLimit resource.MegaBytes,
+	defaultContainerCPULimit resources.CPUShares,
+	defaultContainerMemLimit resources.MegaBytes,
 	accumCPU, accumMem *float64,
 ) podutil.FilterFunc {
 	return podutil.FilterFunc(func(pod *api.Pod) (bool, error) {
-		_, cpu, _, err := resource.LimitPodCPU(pod, defaultContainerCPULimit)
+		_, cpu, _, err := resources.LimitPodCPU(pod, defaultContainerCPULimit)
 		if err != nil {
 			return false, err
 		}
 
-		_, mem, _, err := resource.LimitPodMem(pod, defaultContainerMemLimit)
+		_, mem, _, err := resources.LimitPodMem(pod, defaultContainerMemLimit)
 		if err != nil {
 			return false, err
 		}
