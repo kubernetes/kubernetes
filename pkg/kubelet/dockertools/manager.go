@@ -704,8 +704,9 @@ func (dm *DockerManager) runContainer(
 		},
 	}
 
+	glog.Errorf("Hans: runContainer(): container: %+v", container)
 	gpuRequest := uint(milliCPUToShares(container.Resources.Requests.Gpu().MilliValue()))
-	glog.Errorf("Hans: runContainer(): gpuRequest: %f", gpuRequest)
+	glog.Errorf("Hans: runContainer(): gpuRequest: %d", gpuRequest)
 	if gpuRequest > 0 {
 		// Init GPU environment if need
 		if err := dm.gpuPlugins[0].InitGPUEnv(); err != nil {
@@ -715,6 +716,7 @@ func (dm *DockerManager) runContainer(
 
 		// check whether the host gpu computing environment support this image.
 		isSupported, err := dm.gpuPlugins[0].IsImageSupported(container.Image)
+		glog.Errorf("Hans: runContainer(): IsImageSupported: %+v, err: %+v", isSupported, err)
 		if err != nil {
 			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 			return kubecontainer.ContainerID{}, err
@@ -723,6 +725,7 @@ func (dm *DockerManager) runContainer(
 		// if the image need host platform, do it
 		if isSupported {
 			volOpts, err := dm.gpuPlugins[0].GenerateVolumeOpts(container.Image)
+			glog.Errorf("Hans: runContainer(): GenerateVolumeOpts: %+v, err: %+v", volOpts, err)
 			if err != nil {
 				dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 				return kubecontainer.ContainerID{}, err
