@@ -567,14 +567,15 @@ var _ = Describe("Kubectl client", func() {
 				requiredStrings := [][]string{
 					{"Name:", "redis-master-"},
 					{"Namespace:", ns},
-					{"Image(s):", "redis"},
 					{"Node:"},
 					{"Labels:", "app=redis", "role=master"},
 					{"Status:", "Running"},
-					{"Reason:"},
-					{"Message:"},
 					{"IP:"},
-					{"Controllers:", "ReplicationController/redis-master"}}
+					{"Controllers:", "ReplicationController/redis-master"},
+					{"Image:", "redis"},
+					{"cpu:", "BestEffort"},
+					{"State:", "Running"},
+				}
 				checkOutput(output, requiredStrings)
 			})
 
