@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api/validation"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 const (
@@ -66,6 +67,8 @@ type ConfigFactory struct {
 	ServiceLister *cache.StoreToServiceLister
 	// a means to list all controllers
 	ControllerLister *cache.StoreToReplicationControllerLister
+	// a means to list all replicasets
+	ReplicaSetLister *cache.StoreToReplicaSetLister
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
@@ -91,6 +94,7 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		PVCLister:        &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ReplicaSetLister: &cache.StoreToReplicaSetLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		StopEverything:   make(chan struct{}),
 		SchedulerName:    schedulerName,
 	}
@@ -188,6 +192,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		PodLister:        f.PodLister,
 		ServiceLister:    f.ServiceLister,
 		ControllerLister: f.ControllerLister,
+		ReplicaSetLister: f.ReplicaSetLister,
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		NodeInfo:   &predicates.CachedNodeInfo{f.NodeLister},
@@ -220,14 +225,19 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	cache.NewReflector(f.createPersistentVolumeClaimLW(), &api.PersistentVolumeClaim{}, f.PVCLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers, so that it can spread them correctly.
+	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
 	// Cache this locally.
 	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all ReplicationController objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers, so that it can spread them correctly.
+	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
 	// Cache this locally.
 	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Store, 0).RunUntil(f.StopEverything)
+
+	// Watch and cache all ReplicaSet objects. Scheduler needs to find all pods
+	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
+	// Cache this locally.
+	cache.NewReflector(f.createReplicaSetLW(), &extensions.ReplicaSet{}, f.ReplicaSetLister.Store, 0).RunUntil(f.StopEverything)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -330,6 +340,11 @@ func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
 // Returns a cache.ListWatch that gets all changes to controllers.
 func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "replicationControllers", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+}
+
+// Returns a cache.ListWatch that gets all changes to replicasets.
+func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client.ExtensionsClient, "replicasets", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
