@@ -86,7 +86,7 @@ var averageFunction = func(metrics heapster.MetricResultList) (intAndFloat, int,
 var heapsterCpuUsageMetricDefinition = metricDefinition{"cpu-usage", averageFunction}
 
 func getHeapsterCustomMetricDefinition(metricName string) metricDefinition {
-	return metricDefinition{"CM:" + metricName, averageFunction}
+	return metricDefinition{"custom/" + metricName, averageFunction}
 }
 
 // NewHeapsterMetricsClient returns a new instance of Heapster-based implementation of MetricsClient interface.
