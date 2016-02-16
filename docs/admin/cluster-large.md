@@ -82,7 +82,7 @@ However, this is done automatically only for clusters having more than 50 nodes.
 
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](http://pr.k8s.io/10653/files) and [#10778](http://pr.k8s.io/10778/files)).
 
-For [example](https://github.com/kubernetes/kubernetes/blob/master/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml):
+For [example](../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml):
 
 ```yaml
   containers:
@@ -107,7 +107,7 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
   * [FluentD with ElasticSearch Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-es/fluentd-es.yaml)
   * [FluentD with GCP Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 
-Heapster's resource limits are set dynamically based on the initial size of your cluster (see [#16185](http://issue.k8s.io/16185)). If you find that Heapster is running
+Heapster's resource limits are set dynamically based on the initial size of your cluster (see [#16185](http://issue.k8s.io/16185) and [#21258](http://issue.k8s.io/21258)). If you find that Heapster is running
 out of resources, you should adjust the formulas in the files that were modified in that PR (and please let us know!).
 
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.md#troubleshooting).
