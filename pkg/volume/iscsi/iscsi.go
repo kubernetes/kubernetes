@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	ioutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -113,6 +114,7 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 		fsType:   iscsi.FSType,
 		readOnly: readOnly,
 		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
+		io:       ioutil.NewIOHandler(),
 	}, nil
 }
 
@@ -130,6 +132,7 @@ func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, 
 			plugin:  plugin,
 		},
 		mounter: mounter,
+		io:      ioutil.NewIOHandler(),
 	}, nil
 }
 
@@ -162,6 +165,7 @@ type iscsiDiskBuilder struct {
 	readOnly bool
 	fsType   string
 	mounter  *mount.SafeFormatAndMount
+	io       ioutil.IoUtil
 }
 
 var _ volume.Builder = &iscsiDiskBuilder{}
@@ -190,6 +194,7 @@ func (b *iscsiDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 type iscsiDiskCleaner struct {
 	*iscsiDisk
 	mounter mount.Interface
+	io      ioutil.IoUtil
 }
 
 var _ volume.Cleaner = &iscsiDiskCleaner{}

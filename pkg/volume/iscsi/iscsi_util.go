@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	ioutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // stat a path, if not exists, retry maxRetries times
@@ -98,6 +99,7 @@ func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
 }
 
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
+	io := b.io
 	var devicePath string
 	if b.iface == "default" {
 		devicePath = strings.Join([]string{"/dev/disk/by-path/ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
@@ -136,12 +138,38 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
 		return err
 	}
 
+	// check if the dev is using dmio and if so mount it via the dm-XX device
+	mappedDevicePath := io.FindMultipathDeviceForDevice(devicePath)
+	if mappedDevicePath != "" {
+		devicePath = mappedDevicePath
+	}
 	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
 		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
-
 	return err
+}
+
+func findDevicePath(disk string, io ioutil.IoUtil) (string, error) {
+	devPath := "/dev/disk/by-path/"
+	//if the disk is already a full path then return
+	if strings.HasPrefix(disk, devPath) {
+		return disk, nil
+	}
+	//List the path dir
+	if dirs, err := io.ReadDir(devPath); err == nil {
+		//read all the files in the path dir
+		for _, f := range dirs {
+			name := f.Name()
+			//if the symlink evals to the same as the disk then return it
+			if dst, _ := io.EvalSymlinks(devPath + name); strings.HasSuffix(dst, disk) {
+				return devPath + name, nil
+			}
+		}
+	} else if err != nil {
+		return "", err
+	}
+	return "", errors.New("Couldn't find path for disk " + disk)
 }
 
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
