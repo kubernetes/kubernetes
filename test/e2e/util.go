@@ -1753,7 +1753,7 @@ func (config *RCConfig) start() error {
 			//	- diagnose by noting the pod diff below.
 			// pod is unhealthy, so replication controller creates another to take its place
 			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
-			errorStr := fmt.Sprintf("Number of reported pods changed: %d vs %d", len(pods), len(oldPods))
+			errorStr := fmt.Sprintf("Number of reported pods for %s changed: %d vs %d", config.Name, len(pods), len(oldPods))
 			Logf("%v, pods that changed since the last iteration:", errorStr)
 			Diff(oldPods, pods).Print(sets.NewString())
 			return fmt.Errorf(errorStr)
@@ -1899,7 +1899,7 @@ func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
-		return err
+		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {
 		return nil
