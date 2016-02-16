@@ -18,32 +18,32 @@ package release_1_2
 
 import (
 	"github.com/golang/glog"
-	core_v1 "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
-	extensions_v1beta1 "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
+	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
+	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Interface interface {
 	Discovery() unversioned.DiscoveryInterface
-	Core() core_v1.CoreInterface
-	Extensions() extensions_v1beta1.ExtensionsInterface
+	Core() v1core.CoreInterface
+	Extensions() v1beta1extensions.ExtensionsInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*unversioned.DiscoveryClient
-	*core_v1.CoreClient
-	*extensions_v1beta1.ExtensionsClient
+	*v1core.CoreClient
+	*v1beta1extensions.ExtensionsClient
 }
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() core_v1.CoreInterface {
+func (c *Clientset) Core() v1core.CoreInterface {
 	return c.CoreClient
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() extensions_v1beta1.ExtensionsInterface {
+func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return c.ExtensionsClient
 }
 
@@ -56,11 +56,11 @@ func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
 func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	var clientset Clientset
 	var err error
-	clientset.CoreClient, err = core_v1.NewForConfig(c)
+	clientset.CoreClient, err = v1core.NewForConfig(c)
 	if err != nil {
 		return &clientset, err
 	}
-	clientset.ExtensionsClient, err = extensions_v1beta1.NewForConfig(c)
+	clientset.ExtensionsClient, err = v1beta1extensions.NewForConfig(c)
 	if err != nil {
 		return &clientset, err
 	}
@@ -76,8 +76,8 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = core_v1.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = extensions_v1beta1.NewForConfigOrDie(c)
+	clientset.CoreClient = v1core.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -86,8 +86,8 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c *unversioned.RESTClient) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = core_v1.New(c)
-	clientset.ExtensionsClient = extensions_v1beta1.New(c)
+	clientset.CoreClient = v1core.New(c)
+	clientset.ExtensionsClient = v1beta1extensions.New(c)
 
 	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset

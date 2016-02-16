@@ -59,9 +59,9 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		group := normalization.Group(gv.Group)
 		version := normalization.Version(gv.Version)
 		typedClientPath := filepath.Join(g.typedClientPath, group, version)
-		imports = append(imports, fmt.Sprintf("%s_%s \"%s\"", group, version, typedClientPath))
+		imports = append(imports, fmt.Sprintf("%s%s \"%s\"", version, group, typedClientPath))
 		fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
-		imports = append(imports, fmt.Sprintf("%s_%s_fake \"%s\"", group, version, fakeTypedClientPath))
+		imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", version, group, fakeTypedClientPath))
 	}
 	return
 }
@@ -79,7 +79,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	for _, gv := range g.groupVersions {
 		group := normalization.Group(gv.Group)
 		version := normalization.Version(gv.Version)
-		allGroups = append(allGroups, arg{namer.IC(group), group + "_" + version})
+		allGroups = append(allGroups, arg{namer.IC(group), version + group})
 	}
 
 	for _, g := range allGroups {
@@ -92,6 +92,6 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 var clientsetInterfaceImplTemplate = `
 // $.Group$ retrieves the $.Group$Client
 func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
-	return &$.PackageName$_fake.Fake$.Group${&c.Fake}
+	return &fake$.PackageName$.Fake$.Group${&c.Fake}
 }
 `

@@ -18,24 +18,24 @@ package test_internalclientset
 
 import (
 	"github.com/golang/glog"
-	testgroup_unversioned "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
+	unversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Interface interface {
 	Discovery() unversioned.DiscoveryInterface
-	Testgroup() testgroup_unversioned.TestgroupInterface
+	Testgroup() unversionedtestgroup.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*unversioned.DiscoveryClient
-	*testgroup_unversioned.TestgroupClient
+	*unversionedtestgroup.TestgroupClient
 }
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() testgroup_unversioned.TestgroupInterface {
+func (c *Clientset) Testgroup() unversionedtestgroup.TestgroupInterface {
 	return c.TestgroupClient
 }
 
@@ -48,7 +48,7 @@ func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
 func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 	var clientset Clientset
 	var err error
-	clientset.TestgroupClient, err = testgroup_unversioned.NewForConfig(c)
+	clientset.TestgroupClient, err = unversionedtestgroup.NewForConfig(c)
 	if err != nil {
 		return &clientset, err
 	}
@@ -64,7 +64,7 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 	var clientset Clientset
-	clientset.TestgroupClient = testgroup_unversioned.NewForConfigOrDie(c)
+	clientset.TestgroupClient = unversionedtestgroup.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -73,7 +73,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c *unversioned.RESTClient) *Clientset {
 	var clientset Clientset
-	clientset.TestgroupClient = testgroup_unversioned.New(c)
+	clientset.TestgroupClient = unversionedtestgroup.New(c)
 
 	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
 	return &clientset
