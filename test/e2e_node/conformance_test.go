@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,15 @@ package e2e_node
 import (
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+const (
+	serviceCreateTimeout = 2 * time.Minute
 )
 
 var _ = Describe("Container Conformance Test", func() {
@@ -39,24 +44,31 @@ var _ = Describe("Container Conformance Test", func() {
 			BeforeEach(func() {
 				terminateCase = ConformanceContainer{
 					Container: api.Container{
-						Image:           "gcc.io/google_testcontainers/busybox",
+						Image:           "gcr.io/google_containers/busybox:1.24",
 						Name:            "busybox",
-						Command:         []string{"echo", "'Hello World'"},
+						Command:         []string{"sh", "-c", "env"},
 						ImagePullPolicy: api.PullIfNotPresent,
 					},
-					Status: "terminated",
-					Client: cl,
+					Client:   cl,
+					Phase:    api.PodSucceeded,
+					NodeName: *nodeName,
 				}
 			})
 			It("it should start successfully [Conformance]", func() {
 				err := terminateCase.Create()
 				Expect(err).NotTo(HaveOccurred())
 
-				Eventually(func() bool {
-					return terminateCase.IsStarted()
-				}, time.Minute*1, time.Second*30).Should(BeTrue())
+				phase := api.PodPending
+				for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(time.Second * 30) {
+					ccontainer, err := terminateCase.Get()
+					if err != nil || ccontainer.Phase != api.PodPending {
+						phase = ccontainer.Phase
+						break
+					}
+				}
+				Expect(phase).Should(Equal(terminateCase.Phase))
 			})
-			It("it should report its status as 'terminated' [Conformance]", func() {
+			It("it should report its phase as 'succeeded' [Conformance]", func() {
 				ccontainer, err := terminateCase.Get()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ccontainer).Should(CContainerEqual(terminateCase))
@@ -76,19 +88,26 @@ var _ = Describe("Container Conformance Test", func() {
 						Command:         []string{"foo", "'Should not work'"},
 						ImagePullPolicy: api.PullIfNotPresent,
 					},
-					Status: "waiting",
-					Client: cl,
+					Client:   cl,
+					Phase:    api.PodPending,
+					NodeName: *nodeName,
 				}
 			})
 			It("it should not start successfully [Conformance]", func() {
 				err := invalidImageCase.Create()
 				Expect(err).NotTo(HaveOccurred())
 
-				Eventually(func() bool {
-					return invalidImageCase.IsStarted()
-				}, time.Minute*1, time.Second*30).ShouldNot(BeTrue())
+				phase := api.PodPending
+				for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(time.Second * 30) {
+					ccontainer, err := invalidImageCase.Get()
+					if err != nil || ccontainer.Phase != api.PodPending {
+						phase = ccontainer.Phase
+						break
+					}
+				}
+				Expect(phase).Should(Equal(invalidImageCase.Phase))
 			})
-			It("it should report its status as 'waiting' [Conformance]", func() {
+			It("it should report its phase as 'pending' [Conformance]", func() {
 				ccontainer, err := invalidImageCase.Get()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ccontainer).Should(CContainerEqual(invalidImageCase))

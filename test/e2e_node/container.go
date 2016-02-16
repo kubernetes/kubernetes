@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onsi/gomega/format"
-	"github.com/onsi/gomega/types"
-
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+
+	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/types"
 )
 
 //One pod one container
 type ConformanceContainer struct {
 	Container api.Container
 	Client    *client.Client
-	Status    string
+	Phase     api.PodPhase
+	NodeName  string
 }
 
 type ConformanceContainerEqualMatcher struct {
@@ -68,7 +69,7 @@ func (cc *ConformanceContainer) Create() error {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
-			NodeName:      *nodeName,
+			NodeName:      cc.NodeName,
 			RestartPolicy: api.RestartPolicyNever,
 			Containers: []api.Container{
 				cc.Container,
@@ -78,16 +79,6 @@ func (cc *ConformanceContainer) Create() error {
 
 	_, err := cc.Client.Pods(api.NamespaceDefault).Create(pod)
 	return err
-}
-
-func (cc *ConformanceContainer) IsStarted() bool {
-	if ccontainer, err := cc.Get(); err != nil {
-		return false
-	} else if ccontainer.Status == "running" || ccontainer.Status == "terminated" {
-		return true
-	} else {
-		return false
-	}
 }
 
 //Same with 'delete'
@@ -109,20 +100,5 @@ func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
 	if containers == nil || len(containers) != 1 {
 		return ConformanceContainer{}, errors.New("Failed to get container")
 	}
-
-	cstatuss := pod.Status.ContainerStatuses
-	if cstatuss == nil || len(cstatuss) != 1 {
-		return ConformanceContainer{}, errors.New("Failed to get container status")
-	}
-
-	var status string
-	if cstatuss[0].State.Running != nil {
-		status = "running"
-	} else if cstatuss[0].State.Terminated != nil {
-		status = "terminated"
-	} else {
-		status = "waiting"
-	}
-
-	return ConformanceContainer{containers[0], cc.Client, status}, nil
+	return ConformanceContainer{containers[0], cc.Client, pod.Status.Phase, cc.NodeName}, nil
 }
