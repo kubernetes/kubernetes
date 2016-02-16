@@ -58,7 +58,7 @@ Once Phase 1 has been implemented, Phase 2 will address:
 ### Shared development database
 
 A development team is working on an application that uses a database. The IT department manages the
-database (i.e., it's lives off-cluster). All developers share the same credentials to access the
+database (i.e., it lives off-cluster). All developers share the same credentials to access the
 database, but these credentials are managed by IT. Rather than having each developer create his or
 her own `Service` and `Secret` to connect to the database, IT creates a "db-app-xyz" `Service` and a
 "db-app-xyz" `Secret` in the "info-tech" namespace. IT also has lots of other `Service` resources in
@@ -68,15 +68,15 @@ service catalog and adds it to their namespace.
 
 ### Easy linking of a Service to a Deployable resource
 
-A user has developed an application that uses with a database. The user doesn't want to hard-code
+A user has developed an application that uses a database. The user doesn't want to hard-code
 the URL to the database, because that would be brittle and require rebuilding the application if the
 database coordinates change. Instead, the user wants to be able to create the application and link
 it to a database service. A typical sequence for this use case in a Platform as a Service (PaaS) might
 look like:
 
-1. user asks PaaS to create a new application A
-2. user asks PaaS to add a database to application A
-3. user pushes code to application A
+1. User asks PaaS to create a new application A
+2. User asks PaaS to add a database to application A
+3. User pushes code to application A
 4. PaaS builds and deploys application A
 5. Application A starts up, connecting to the database by looking up a well-known, predefined
    environment variable for the database's URL which was injected and set by the PaaS
@@ -144,7 +144,8 @@ If you want to have a `Service` included in a service catalog, add the following
 - kubernetes.io/catalog.entry.name = "awesome-etcd"
 - kubernetes.io/catalog.entry.description = "an etcd service"
 
-This example publishes a `Service` into the "default" `ServiceCatalog` with the entry name "awesome-etcd".
+This example publishes a `Service` into the "default" `ServiceCatalog` with the entry name
+"awesome-etcd".
 
 In order to appear in the listing of a service catalog's entries, we most likely will want to use a
 reflector/cache of some sort. Any time a `Service` is modified, the reflector inspects the updated
@@ -162,7 +163,8 @@ publish to this catalog?".
 
 - requires a cache for efficiency
 - checking security policy decisions could be difficult
-- users won't receive any indication that publishing an entry to a catalog was denied
+- users won't receive any immediate indication that publishing an entry to a catalog was denied
+  (but they could potentially see the denial in an annotation)
 
 #### Option 2: add `ServiceCatalogEntry` resource
 
@@ -170,7 +172,7 @@ If you want to have a `Service` included in a service catalog, create a new `Ser
 resource, such as:
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: catalog/v1beta1
 kind: ServiceCatalogEntry
 metadata:
   name: awesome-etcd
@@ -276,7 +278,7 @@ and to "unpoke" when the connectivity is no longer needed.
 ## Proposed API changes
 
 - Add annotation/field to `Service` to specify associated resources
-- Add `ServiceCatalog` types
+- Add `ServiceCatalog` types in a separate `catalog` API group
 
 ```go
 type ServiceCatalog struct {
@@ -284,6 +286,7 @@ type ServiceCatalog struct {
   ObjectMeta
 
   // Not sure exactly what we want/need here
+  // Could include who is allowed to publish
 }
 
 type ServiceCatalogList struct {
