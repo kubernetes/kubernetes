@@ -38,5 +38,11 @@ func FromUnversionedClient(c *unversioned.Client) *Clientset {
 		clientset.ExtensionsClient = extensions_unversioned.New(nil)
 	}
 
+	if c != nil && c.DiscoveryClient != nil {
+		clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
+	} else {
+		clientset.DiscoveryClient = unversioned.NewDiscoveryClient(nil)
+	}
+
 	return &clientset
 }
