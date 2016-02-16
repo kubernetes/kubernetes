@@ -201,25 +201,26 @@ func (cuda *Cuda) createLocalVolumes() error {
 	for _, v := range vols {
 		n := fmt.Sprintf("%s_%s", v.Name, drv)
 		if _, err := docker.InspectVolume(n); err == nil {
-			if err = docker.RemoveVolume(n); err != nil {
-				return fmt.Errorf("cannot remove %s: volume is in use", n)
+			glog.Infof("Hans: volumes %s already exist", n)
+			return nil
+		} else {
+			// volumes is not exist and create it.
+			if err := docker.CreateVolume(n); err != nil {
+				return err
+			}
+			path, err := docker.InspectVolume(n)
+			if err != nil {
+				docker.RemoveVolume(n)
+				return err
+			}
+			if err := v.CreateAt(path); err != nil {
+				docker.RemoveVolume(n)
+				return err
 			}
 		}
 
-		if err := docker.CreateVolume(n); err != nil {
-			return err
-		}
-		path, err := docker.InspectVolume(n)
-		if err != nil {
-			docker.RemoveVolume(n)
-			return err
-		}
-		if err := v.CreateAt(path); err != nil {
-			docker.RemoveVolume(n)
-			return err
-		}
-		fmt.Println(n)
 	}
+
 	return nil
 }
 
