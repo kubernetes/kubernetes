@@ -2465,10 +2465,13 @@ type ObjectReference struct {
 // LocalObjectReference contains enough information to let you locate the
 // referenced object inside the same namespace.
 type LocalObjectReference struct {
+	// Kind of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	Kind string `json:"kind,omitempty"`
 	// Name of the referent.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
-	// TODO: Add other useful fields. apiVersion, kind, uid?
 	Name string `json:"name,omitempty"`
+	// TODO: Add other useful fields. api version, group, uid?
 }
 
 // SerializedReference is a reference to serialized object.

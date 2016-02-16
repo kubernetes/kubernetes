@@ -601,6 +601,10 @@ func validateConfigMapVolumeSource(configMapSource *api.ConfigMapVolumeSource, f
 	if len(configMapSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
+	if configMapSource.Kind != "ConfigMap" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), configMapSource.Kind, "must reference a ConfigMap"))
+	}
+
 	return allErrs
 }
 
@@ -693,6 +697,9 @@ func validateRBDVolumeSource(rbd *api.RBDVolumeSource, fldPath *field.Path) fiel
 	if len(rbd.RBDImage) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
 	}
+	if rbd.SecretRef != nil && rbd.SecretRef.Kind != "Secret" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "kind"), rbd.SecretRef.Kind, "must reference a Secret"))
+	}
 	return allErrs
 }
 
@@ -709,6 +716,9 @@ func validateCephFSVolumeSource(cephfs *api.CephFSVolumeSource, fldPath *field.P
 	if len(cephfs.Monitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
+	if cephfs.SecretRef != nil && cephfs.SecretRef.Kind != "Secret" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "kind"), cephfs.SecretRef.Kind, "must reference a Secret"))
+	}
 	return allErrs
 }
 
@@ -716,6 +726,9 @@ func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+	}
+	if fv.SecretRef != nil && fv.SecretRef.Kind != "Secret" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "kind"), fv.SecretRef.Kind, "must reference a Secret"))
 	}
 	return allErrs
 }
@@ -1040,6 +1053,10 @@ func validateConfigMapKeySelector(s *api.ConfigMapKeySelector, fldPath *field.Pa
 	if len(s.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
+	if s.Kind != "ConfigMap" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), s.Kind, "must reference a ConfigMap"))
+	}
+
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
 	} else if !IsSecretKey(s.Key) {
@@ -1055,6 +1072,10 @@ func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) fi
 	if len(s.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
+	if s.Kind != "Secret" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), s.Kind, "must reference a Secret"))
+	}
+
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
 	} else if !IsSecretKey(s.Key) {
@@ -1375,6 +1396,13 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
 		}
 	}
+
+	for i := range spec.ImagePullSecrets {
+		if spec.ImagePullSecrets[i].Kind != "Secret" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("imagePullSecrets").Index(i).Child("kind"), spec.ImagePullSecrets[i].Kind, "must reference a Secret"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -2070,6 +2098,16 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 // ValidateServiceAccount tests if required fields in the ServiceAccount are set.
 func ValidateServiceAccount(serviceAccount *api.ServiceAccount) field.ErrorList {
 	allErrs := ValidateObjectMeta(&serviceAccount.ObjectMeta, true, ValidateServiceAccountName, field.NewPath("metadata"))
+	for i := range serviceAccount.ImagePullSecrets {
+		if serviceAccount.ImagePullSecrets[i].Kind != "Secret" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("imagePullSecrets").Index(i).Child("kind"), serviceAccount.ImagePullSecrets[i].Kind, "must reference a Secret"))
+		}
+	}
+	for i := range serviceAccount.Secrets {
+		if serviceAccount.Secrets[i].Kind != "Secret" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("secrets").Index(i).Child("kind"), serviceAccount.Secrets[i].Kind, "must reference a Secret"))
+		}
+	}
 	return allErrs
 }
 
