@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -333,27 +333,27 @@ func deletePersistentVolumeClaims(kubeClient clientset.Interface, ns string) err
 	return kubeClient.Core().PersistentVolumeClaims(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteHorizontalPodAutoscalers(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+func deleteHorizontalPodAutoscalers(expClient unversionedextensions.ExtensionsInterface, ns string) error {
 	return expClient.HorizontalPodAutoscalers(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteDaemonSets(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+func deleteDaemonSets(expClient unversionedextensions.ExtensionsInterface, ns string) error {
 	return expClient.DaemonSets(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteJobs(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+func deleteJobs(expClient unversionedextensions.ExtensionsInterface, ns string) error {
 	return expClient.Jobs(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteDeployments(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+func deleteDeployments(expClient unversionedextensions.ExtensionsInterface, ns string) error {
 	return expClient.Deployments(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteReplicaSets(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+func deleteReplicaSets(expClient unversionedextensions.ExtensionsInterface, ns string) error {
 	return expClient.ReplicaSets(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
-func deleteIngress(expClient extensions_unversioned.ExtensionsInterface, ns string) error {
+func deleteIngress(expClient unversionedextensions.ExtensionsInterface, ns string) error {
 	return expClient.Ingresses(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
