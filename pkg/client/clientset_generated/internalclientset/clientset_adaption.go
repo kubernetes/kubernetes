@@ -17,8 +17,8 @@ limitations under the License.
 package internalclientset
 
 import (
-	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -28,14 +28,14 @@ import (
 func FromUnversionedClient(c *unversioned.Client) *Clientset {
 	var clientset Clientset
 	if c != nil {
-		clientset.CoreClient = core_unversioned.New(c.RESTClient)
+		clientset.CoreClient = unversionedcore.New(c.RESTClient)
 	} else {
-		clientset.CoreClient = core_unversioned.New(nil)
+		clientset.CoreClient = unversionedcore.New(nil)
 	}
 	if c != nil && c.ExtensionsClient != nil {
-		clientset.ExtensionsClient = extensions_unversioned.New(c.ExtensionsClient.RESTClient)
+		clientset.ExtensionsClient = unversionedextensions.New(c.ExtensionsClient.RESTClient)
 	} else {
-		clientset.ExtensionsClient = extensions_unversioned.New(nil)
+		clientset.ExtensionsClient = unversionedextensions.New(nil)
 	}
 
 	return &clientset

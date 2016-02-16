@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	unversioned_extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -44,8 +44,8 @@ const (
 )
 
 type HorizontalController struct {
-	scaleNamespacer unversioned_extensions.ScalesGetter
-	hpaNamespacer   unversioned_extensions.HorizontalPodAutoscalersGetter
+	scaleNamespacer unversionedextensions.ScalesGetter
+	hpaNamespacer   unversionedextensions.HorizontalPodAutoscalersGetter
 
 	metricsClient metrics.MetricsClient
 	eventRecorder record.EventRecorder
@@ -54,7 +54,7 @@ type HorizontalController struct {
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func NewHorizontalController(evtNamespacer unversioned_core.EventsGetter, scaleNamespacer unversioned_extensions.ScalesGetter, hpaNamespacer unversioned_extensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient) *HorizontalController {
+func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(evtNamespacer.Events(""))
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
