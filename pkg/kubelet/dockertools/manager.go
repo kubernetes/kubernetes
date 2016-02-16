@@ -704,9 +704,9 @@ func (dm *DockerManager) runContainer(
 		},
 	}
 
-	glog.Errorf("Hans: runContainer(): dockerOpts: %+v", dockerOpts)
 	glog.Errorf("Hans: runContainer(): container: %+v", container)
-	gpuRequest := uint(milliCPUToShares(container.Resources.Requests.Gpu().MilliValue()))
+	glog.Errorf("Hans: runContainer(): gpu milliValue: %f", container.Resources.Requests.Gpu().MilliValue())
+	gpuRequest := uint(container.Resources.Requests.Gpu().MilliValue())
 	glog.Errorf("Hans: runContainer(): gpuRequest: %d", gpuRequest)
 	if gpuRequest > 0 {
 		// Init GPU environment if need
