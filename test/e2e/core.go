@@ -37,31 +37,11 @@ func CoreDump(dir string) {
 	}
 	provider := testContext.Provider
 
-	// requires ssh
-	if !providerIs(providersWithSSH...) {
+	// requires ssh to master machine
+	if !providerIs(providersWithMasterSSH...) {
 		fmt.Printf("Skipping SSH core dump, which is not implemented for %s", provider)
 		return
 	}
-
-	// Get all nodes' external IPs.
-	hosts, err := NodeSSHHosts(c)
-	if err != nil {
-		fmt.Printf("Error getting node hostnames: %v", err)
-		return
-	}
-
-	cmds := []command{{"cat /var/log/kube-proxy.log", "kube-proxy"}}
-	if isUsingSystemdKubelet(provider, hosts...) {
-		cmds = append(cmds, command{"sudo journalctl --output=cat -u kubelet.service", "kubelet"})
-	} else {
-		cmds = append(cmds, []command{
-			{"cat /var/log/kubelet.log", "kubelet"},
-			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
-			{"cat /var/log/dmesg", "dmesg"},
-		}...)
-	}
-
-	logCore(cmds, hosts, dir, provider)
 
 	// I wish there was a better way to get the master IP...
 	config, err := loadConfig()
@@ -71,7 +51,7 @@ func CoreDump(dir string) {
 	ix := strings.LastIndex(config.Host, "/")
 	master := net.JoinHostPort(config.Host[ix+1:], "22")
 
-	cmds = []command{
+	cmds := []command{
 		{"cat /var/log/kube-apiserver.log", "kube-apiserver"},
 		{"cat /var/log/kube-scheduler.log", "kube-scheduler"},
 		{"cat /var/log/kube-controller-manager.log", "kube-controller-manager"},
@@ -86,6 +66,32 @@ func CoreDump(dir string) {
 	}
 
 	logCore(cmds, []string{master}, dir, provider)
+
+	// requires ssh
+	if !providerIs(providersWithSSH...) {
+		fmt.Printf("Skipping SSH core dump for nodes, which is not implemented for %s", provider)
+		return
+	}
+
+	// Get all nodes' external IPs.
+	hosts, err := NodeSSHHosts(c)
+	if err != nil {
+		fmt.Printf("Error getting node hostnames: %v", err)
+		return
+	}
+
+	cmds = []command{{"cat /var/log/kube-proxy.log", "kube-proxy"}}
+	if isUsingSystemdKubelet(provider, hosts...) {
+		cmds = append(cmds, command{"sudo journalctl --output=cat -u kubelet.service", "kubelet"})
+	} else {
+		cmds = append(cmds, []command{
+			{"cat /var/log/kubelet.log", "kubelet"},
+			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
+			{"cat /var/log/dmesg", "dmesg"},
+		}...)
+	}
+
+	logCore(cmds, hosts, dir, provider)
 }
 
 func logCore(cmds []command, hosts []string, dir, provider string) {
