@@ -156,7 +156,8 @@ Type: kubernetes.io/service-account-token
 Data
 ====
 ca.crt: 1220 bytes
-token:  
+token: ...
+namespace: 7 bytes
 ```
 
 > Note that the content of `token` is elided here.
