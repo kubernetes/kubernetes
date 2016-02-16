@@ -96,7 +96,6 @@
             branch: 'master'
             provider-env: '{gce-provider-env}'
             job-env: |
-                export HAIRPIN_MODE="false"
                 export PROJECT="k8s-jkns-gce-soak"
         - 'gce-2':
             deploy-description: Clone of kubernetes-soak-weekly-deploy-gce.
@@ -104,6 +103,7 @@
             branch: 'master'
             provider-env: '{gce-provider-env}'
             job-env: |
+                export HAIRPIN_MODE="hairpin-veth"
                 export PROJECT="k8s-jkns-gce-soak-2"
         - 'gce-1.1':
             deploy-description: |
