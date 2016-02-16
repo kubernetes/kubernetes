@@ -380,6 +380,42 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, errors.New("provided options object is not a PodLogOptions")
 				}
 				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
+
+			case *api.ReplicationController:
+				opts, ok := options.(*api.PodLogOptions)
+				if !ok {
+					return nil, errors.New("provided options object is not a PodLogOptions")
+				}
+				selector := labels.SelectorFromSet(t.Spec.Selector)
+				pod, numPods, err := GetFirstPod(c, t.Namespace, selector)
+				if err != nil {
+					return nil, err
+				}
+				if numPods > 1 {
+					fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
+				}
+
+				return c.Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+
+			case *extensions.ReplicaSet:
+				opts, ok := options.(*api.PodLogOptions)
+				if !ok {
+					return nil, errors.New("provided options object is not a PodLogOptions")
+				}
+				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+				if err != nil {
+					return nil, fmt.Errorf("invalid label selector: %v", err)
+				}
+				pod, numPods, err := GetFirstPod(c, t.Namespace, selector)
+				if err != nil {
+					return nil, err
+				}
+				if numPods > 1 {
+					fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
+				}
+
+				return c.Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+
 			default:
 				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
@@ -527,19 +563,22 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch t := object.(type) {
 			case *api.ReplicationController:
 				selector := labels.SelectorFromSet(t.Spec.Selector)
-				return GetFirstPod(client, t.Namespace, selector)
+				pod, _, err := GetFirstPod(client, t.Namespace, selector)
+				return pod, err
 			case *extensions.Deployment:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				return GetFirstPod(client, t.Namespace, selector)
+				pod, _, err := GetFirstPod(client, t.Namespace, selector)
+				return pod, err
 			case *extensions.Job:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				return GetFirstPod(client, t.Namespace, selector)
+				pod, _, err := GetFirstPod(client, t.Namespace, selector)
+				return pod, err
 			case *api.Pod:
 				return t, nil
 			default:
@@ -556,21 +595,21 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 }
 
-// GetFirstPod returns the first pod of an object from its namespace and selector
-func GetFirstPod(client *client.Client, namespace string, selector labels.Selector) (*api.Pod, error) {
+// GetFirstPod returns the first pod of an object from its namespace and selector and the number of matching pods
+func GetFirstPod(client *client.Client, namespace string, selector labels.Selector) (*api.Pod, int, error) {
 	var pods *api.PodList
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
 		options := api.ListOptions{LabelSelector: selector}
 		if pods, err = client.Pods(namespace).List(options); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if len(pods.Items) == 0 {
 			time.Sleep(2 * time.Second)
 		}
 	}
 	pod := &pods.Items[0]
-	return pod, nil
+	return pod, len(pods.Items), nil
 }
 
 // Command will stringify and return all environment arguments ie. a command run by a client
