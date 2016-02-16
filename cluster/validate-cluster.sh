@@ -54,7 +54,7 @@ while true; do
   # available and then get restarted as the kubelet configures the docker bridge.
   node=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes) || true
   found=$(($(echo "${node}" | wc -l) - 1)) || true
-  ready=$(echo "${node}" | grep -c "Ready") || true
+  ready=$(($(echo "${node}" | grep -v "NotReady" | wc -l ) - 1)) || true
 
   if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
     break
