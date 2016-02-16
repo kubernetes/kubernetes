@@ -58,7 +58,7 @@ type KubeProxyConfiguration struct {
 	PortRange string `json:"portRange"`
 	// resourceContainer is the absolute name of the resource-only container to create and run
 	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"kubeletCgroups"`
+	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
@@ -102,6 +102,8 @@ const (
 
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
+	unversioned.TypeMeta
+
 	// config is the path to the config file or directory of files
 	Config string `json:"config"`
 	// syncFrequency is the max period between synchronizing running
@@ -123,10 +125,10 @@ type KubeletConfiguration struct {
 	// for all interfaces)
 	Address string `json:"address"`
 	// port is the port for the Kubelet to serve on.
-	Port uint `json:"port"`
+	Port int `json:"port"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
-	ReadOnlyPort uint `json:"readOnlyPort"`
+	ReadOnlyPort int `json:"readOnlyPort"`
 	// tLSCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
@@ -158,13 +160,13 @@ type KubeletConfiguration struct {
 	AllowPrivileged bool `json:"allowPrivileged"`
 	// hostNetworkSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use of host network. Defaults to "*".
-	HostNetworkSources string `json:"hostNetworkSources"`
+	HostNetworkSources []string `json:"hostNetworkSources"`
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
-	HostPIDSources string `json:"hostPIDSources"`
+	HostPIDSources []string `json:"hostPIDSources"`
 	// hostIPCSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
-	HostIPCSources string `json:"hostIPCSources"`
+	HostIPCSources []string `json:"hostIPCSources"`
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
 	RegistryPullQPS float64 `json:"registryPullQPS"`
@@ -192,7 +194,7 @@ type KubeletConfiguration struct {
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
-	CAdvisorPort uint `json:"cAdvisorPort"`
+	CAdvisorPort int `json:"cAdvisorPort"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve
@@ -221,7 +223,7 @@ type KubeletConfiguration struct {
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency unversioned.Duration `json:"nodeStatusUpdateFrequency"`
-	// minimumGCAge is the minimum age for a unused image before it is
+	// imageMinimumGCAge is the minimum age for a unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge unversioned.Duration `json:"imageMinimumGCAge"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
@@ -257,7 +259,7 @@ type KubeletConfiguration struct {
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
-	SystemCgroups string `json:"systemContainer,omitempty"`
+	SystemCgroups string `json:"systemCgroups,omitempty"`
 	// cgroupRoot is the root cgroup to use for pods. This is handled by the
 	// container runtime on a best effort basis.
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
@@ -318,7 +320,7 @@ type KubeletConfiguration struct {
 	// containerized should be set to true if kubelet is running in a container.
 	Containerized bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
-	MaxOpenFiles uint64 `json:"maxOpenFiles"`
+	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
 	// API server. No-op if register-node or configure-cbr0 is false.
 	ReconcileCIDR bool `json:"reconcileCIDR"`
