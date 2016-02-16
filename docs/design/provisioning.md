@@ -29,7 +29,7 @@ Documentation for other releases can be found at
 
 # Abstract
 
-This document proposes a model for the configuration and management of dynamically provisioned persistent volumes in Kubernetes.  Familiarity [Persistent Volumes](../user-guide/persistent-volumes/) is assumed.
+This document proposes a model for the configuration and management of dynamically provisioned persistent volumes in Kubernetes.  Familiarity with [Persistent Volumes](../user-guide/persistent-volumes/) is assumed.
 
 There are many kinds and classes of storage. Storage can be fast or slow, have different retention policies, be mounted in various ways, be manually created or dynamically provisioned, and more.  Each storage provider has distinct characteristics.  Administrators require the ability to define this diversity of storage with a flexible classification system that is easy to configure and easy to consume as an end user.
 
@@ -63,11 +63,11 @@ Admins will pass the namespace and label to the controller via CLI flag:
 CLI flags:
 
 --pv-provisioner-namespace=foobar
---pv-provisioner-label="type=provisioner-config
+--pv-provisioner-label="type=provisioner-config"
 
 example usage:
 
-kubectl --namespace=system-namespace get configmap -l type=provisioner-config
+kubectl --namespace=foobar get configmap -l type=provisioner-config
 
 ```
 
@@ -97,7 +97,6 @@ One configuration is shown below.  The remainder can be found [here](provisionin
       "plugin-name": "kubernetes.io/gce-pd",  
       "description": "Something human readable",
       // suggested as means to template params with values coming from claim's label selector
-      // "overrides": [ "zone" ],  
       "parameters": "{'volumeType':'ssd', 'zone':'us-east'}"  // OPAQUE JSON MAP OF PARAMS AS DEFINED BY THE PLUGIN
     }
   }
@@ -136,10 +135,7 @@ End users request specific storage by using a PersistentVolumeSelector on their 
 
 
 > Important! One provisioner currently supports create 1 type of volume, per its distinct params map.
-2 zones requires 2 provisioners.  A future enhancement is allowing "overrides" of param values with the value
-supplied in the user's claim.PersistentVolumeSelector.  Admins get to manage 1 provisioner object with a list
-of zones given to users.
-
+2 zones requires 2 provisioners.
 
 
 
@@ -175,9 +171,12 @@ apiVersion: v1
 
 The binder attempts to fulfill a claim in the following order:
 
-* If `pvc.Spec.PersistentVolumeSelector` is non-nil, attempt to find an available PV with a matching label set.
-* If `pvc.Spec.PersistentVolumeSelector` is non-nil and matches a provisioner's labels, create a PV using the provisioner
-* If `pvc.Spec.PersistentVolumeSelector` is nil, attempt to match an available PV by AccessModes and Capacity (current behavior).
+* If `pvc.Spec.PersistentVolumeSelector` is default selector (nil and empty), attempt to find an available PV with a matching label set, AccessModes, and Capacity (current behavior + labels).
+  * All labels in the selector must be found in the label set on the volume.
+  * AccessModes must match
+  * Capacity can be more than requested, but not less
+* If `pvc.Spec.PersistentVolumeSelector` matches a provisioner's labels, create a PV using the provisioner
+  * All labels in the selector must be found in the label set on the provisioner.
 
 Claims remain Pending indefinitely if a match is not found (with or without a selector).  The claim will be bound when a volume or provisioner is created that matches the claim.
 
@@ -220,6 +219,8 @@ The following plugins will be provided by Kubernetes:
 The example above contains `"params": "${OPAQUE-JSON-MAP}"`, which is a string representing a JSON map of parameters.   Each provisionable volume plugin will document and publish the parameters it accepts.
 
 Plugin params can vary by whatever attributes are exposed by a storage provider.  An AWS EBS volume, for example, can be a general purpose SSD (gp2), provisioned IOPs (io1) for speed and throughput, and magnetic (standard) for low cost.  Additionally, EBS volumes can optionally be encrypted.  Configuring each volume type with optional encryption would require 6 distinct provisioners.  Administrators can mix and match any attributes exposed by the provisioning plugin to create distinct storage classes.
+
+Plugins are responsible for applying to the volumes they create all the labels matching the provisioner. Plugins are also responsible for validating the parameters in terms of correctness for the storage provider's API.
 
 # Tasks
 
