@@ -1411,6 +1411,7 @@ func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerI
 // killContainer accepts a containerID and an optional container or pod containing shutdown policies. Invoke
 // KillContainerInPod if information must be retrieved first.
 func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, container *api.Container, pod *api.Pod, reason string) error {
+	glog.V(2).Infof("Hans: killContainer(): containerID: %s, container: %+v", containerID, container)
 	ID := containerID.ID
 	name := ID
 	if container != nil {
@@ -1461,6 +1462,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		return nil
 	}
 
+	glog.V(2).Infof("Hans: killContainer(): invoke FreeGPU()")
 	// free gpu resource for the container
 	if len(container.GPUIndexs) > 0 {
 		if err := dm.gpuPlugins[0].FreeGPU(container.GPUIndexs); err != nil {

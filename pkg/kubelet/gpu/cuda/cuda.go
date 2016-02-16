@@ -65,6 +65,7 @@ func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
 	// check whether there are enough free gpus
 	freeGPUIdx := []uint{}
 	freedGPUNum := uint(0)
+	glog.Infof("Hans: cuda.AllocGPU(): cuda.gpuInfo: %+v", cuda.gpuInfo)
 	for idx, gpuDevice := range cuda.gpuInfo.GPUDevices.Devices {
 		if !gpuDevice.GPUDeviceState.IsOccupied {
 			freedGPUNum++
@@ -72,6 +73,7 @@ func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
 		}
 	}
 
+	glog.Infof("Hans: cuda.AllocGPU(): freedGPUNum: %d, gpuReqs", freedGPUNum, cgpuReqs)
 	if freedGPUNum >= gpuReqs {
 		var result = make([]uint, gpuReqs)
 		cc := copy(result, freeGPUIdx[:gpuReqs])
