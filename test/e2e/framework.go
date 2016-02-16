@@ -220,7 +220,7 @@ func (f *Framework) afterEach() {
 				Logf("Finished")
 			}
 		default:
-			Logf("Unknown ouptut type: %v. Skipping.", printType)
+			Logf("Unknown output type: %v. Skipping.", printType)
 		}
 	}
 
