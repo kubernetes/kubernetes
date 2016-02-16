@@ -39,13 +39,13 @@
 # About the conformance test:
 # The conformance test checks whether a kubernetes cluster supports
 # a minimum set of features to be called "Kubernetes".  It is similar
-# to `hack/e2e-test.sh` but it differs in that:
-#  - hack/e2e-test.sh is intended to test a cluster with binaries built at HEAD,
+# to `hack/e2e.go` but it differs in that:
+#  - hack/e2e.go is intended to test a cluster with binaries built at HEAD,
 #    while this conformance test does not care what version the binaries are.
 #    - this means the user needs to setup a cluster first.
 #    - this means the user does not need to write any cluster/... scripts.  Custom
 #      clusters can be tested.
-#  - hack/e2e-test.sh is intended to run e2e tests built at HEAD, while
+#  - hack/e2e.go is intended to run e2e tests built at HEAD, while
 #    this conformance test is intended to be run e2e tests built at a particular
 #    version.  This ensures that all conformance testees run the same set of tests,
 #    regardless of when they test for conformance.
