@@ -361,21 +361,17 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	replicaSets := reaper.Extensions().ReplicaSets(namespace)
 	rsReaper, _ := ReaperFor(extensions.Kind("ReplicaSet"), reaper)
 
-	deployment, err := deployments.Get(name)
-	if err != nil {
-		return err
-	}
-
-	// set deployment's history and scale to 0
-	// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
-	zero := 0
-	deployment.Spec.RevisionHistoryLimit = &zero
-	deployment.Spec.Replicas = 0
-	// TODO: un-pausing should not be necessary, remove when this is fixed:
-	// https://github.com/kubernetes/kubernetes/issues/20966
-	// Instead deployment should be Paused at this point and not at next TODO.
-	deployment.Spec.Paused = false
-	deployment, err = deployments.Update(deployment)
+	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
+		// set deployment's history and scale to 0
+		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
+		zero := 0
+		d.Spec.RevisionHistoryLimit = &zero
+		d.Spec.Replicas = 0
+		// TODO: un-pausing should not be necessary, remove when this is fixed:
+		// https://github.com/kubernetes/kubernetes/issues/20966
+		// Instead deployment should be Paused at this point and not at next TODO.
+		d.Spec.Paused = false
+	})
 	if err != nil {
 		return err
 	}
@@ -439,6 +435,24 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 
 	// and finally deployment
 	return deployments.Delete(name, gracePeriod)
+}
+
+type updateDeploymentFunc func(d *extensions.Deployment)
+
+func (reaper *DeploymentReaper) updateDeploymentWithRetries(namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
+	deployments := reaper.Extensions().Deployments(namespace)
+	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if deployment, err = deployments.Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(deployment)
+		if deployment, err = deployments.Update(deployment); err == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	return deployment, err
 }
 
 func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
