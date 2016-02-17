@@ -314,6 +314,9 @@ func SkipUnlessServerVersionGTE(v semver.Version, c client.ServerVersionInterfac
 // providersWithSSH are those providers where each node is accessible with SSH
 var providersWithSSH = []string{"gce", "gke", "aws"}
 
+// providersWithMasterSSH are those providers where master node is accessible with SSH
+var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws"}
+
 type podCondition func(pod *api.Pod) (bool, error)
 
 // podReady returns whether pod has a condition of Ready with a status of true.
