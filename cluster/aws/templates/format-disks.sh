@@ -189,10 +189,13 @@ fi
 
 if [[ -n "${move_docker}" ]]; then
   # Move docker to e.g. /mnt
+  # but only if it is a directory, not a symlink left over from a previous run
   if [[ -d /var/lib/docker ]]; then
     mv /var/lib/docker ${move_docker}/
   fi
   mkdir -p ${move_docker}/docker
+  # If /var/lib/docker doesn't exist (it will exist if it is already a symlink),
+  # then symlink it to the ephemeral docker area
   if [[ ! -e /var/lib/docker ]]; then
     ln -s ${move_docker}/docker /var/lib/docker
   fi
@@ -203,10 +206,12 @@ fi
 if [[ -n "${move_kubelet}" ]]; then
   # Move /var/lib/kubelet to e.g. /mnt
   # (the backing for empty-dir volumes can use a lot of space!)
+  # (As with /var/lib/docker, only if it is a directory; skip if symlink)
   if [[ -d /var/lib/kubelet ]]; then
     mv /var/lib/kubelet ${move_kubelet}/
   fi
   mkdir -p ${move_kubelet}/kubelet
+  # Create symlink for /var/lib/kubelet, unless it is already a symlink
   if [[ ! -e /var/lib/kubelet ]]; then
     ln -s ${move_kubelet}/kubelet /var/lib/kubelet
   fi
