@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -221,6 +222,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return client.RESTClient, nil
 			case autoscaling.GroupName:
 				return client.AutoscalingClient.RESTClient, nil
+			case batch.GroupName:
+				return client.BatchClient.RESTClient, nil
 			case extensions.GroupName:
 				return client.ExtensionsClient.RESTClient, nil
 			}
@@ -709,6 +712,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no autoscaling client")
 		}
 		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+	}
+	if gvk.Group == batch.GroupName {
+		if c.c.BatchClient == nil {
+			return errors.New("unable to validate: no batch client")
+		}
+		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
 	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {

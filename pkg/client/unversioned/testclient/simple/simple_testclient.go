@@ -92,6 +92,10 @@ func (c *Client) Setup(t *testing.T) *Client {
 			Host:          c.server.URL,
 			ContentConfig: client.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
 		})
+		c.BatchClient = client.NewBatchOrDie(&client.Config{
+			Host:          c.server.URL,
+			ContentConfig: client.ContentConfig{GroupVersion: testapi.Batch.GroupVersion()},
+		})
 		c.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{
 			Host:          c.server.URL,
 			ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
