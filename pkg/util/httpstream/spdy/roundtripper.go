@@ -19,6 +19,7 @@ package spdy
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -95,6 +96,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		Method: "CONNECT",
 		URL:    &url.URL{},
 		Host:   targetHost,
+	}
+
+	if pa := s.proxyAuth(proxyURL); pa != "" {
+		proxyReq.Header = http.Header{}
+		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
 	proxyDialConn, err := s.dialWithoutProxy(proxyURL)
@@ -181,6 +187,16 @@ func (s *SpdyRoundTripper) dialWithoutProxy(url *url.URL) (net.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+// proxyAuth returns, for a given proxy URL, the value to be used for the Proxy-Authorization header
+func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
+	if proxyURL == nil || proxyURL.User == nil {
+		return ""
+	}
+	credentials := proxyURL.User.String()
+	encodedAuth := base64.StdEncoding.EncodeToString([]byte(credentials))
+	return fmt.Sprintf("Basic %s", encodedAuth)
 }
 
 // RoundTrip executes the Request and upgrades it. After a successful upgrade,
