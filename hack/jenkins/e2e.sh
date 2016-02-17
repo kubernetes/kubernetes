@@ -522,7 +522,7 @@ case ${JOB_NAME} in
     NUM_NODES="10"
     MASTER_SIZE="n1-standard-2"
     NODE_SIZE="n1-standard-1"
-    E2E_ZONE="asia-east1-a"
+    E2E_ZONE="us-central1-b"
     KUBEMARK_MASTER_SIZE="n1-standard-4"
     KUBEMARK_NUM_NODES="100"
     ;;
