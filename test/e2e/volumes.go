@@ -238,7 +238,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	expectNoError(waitForPodRunningInNamespace(client, clientPod.Name, config.namespace))
 
 	By("reading a web page from the client")
-	subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, client)
+	subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, client)
 	if err != nil {
 		Failf("Failed to get server version: %v", err)
 	}

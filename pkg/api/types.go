@@ -2002,6 +2002,14 @@ type PodProxyOptions struct {
 	Path string
 }
 
+// NodeProxyOptions is the query options to a Node's proxy call
+type NodeProxyOptions struct {
+	unversioned.TypeMeta
+
+	// Path is the URL path to use for the current proxy request
+	Path string
+}
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	Kind            string    `json:"kind,omitempty"`

@@ -104,6 +104,7 @@ func init() {
 		DeepCopy_api_NodeCondition,
 		DeepCopy_api_NodeDaemonEndpoints,
 		DeepCopy_api_NodeList,
+		DeepCopy_api_NodeProxyOptions,
 		DeepCopy_api_NodeResources,
 		DeepCopy_api_NodeSelector,
 		DeepCopy_api_NodeSelectorRequirement,
@@ -1398,6 +1399,14 @@ func DeepCopy_api_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) err
 	} else {
 		out.Items = nil
 	}
+	return nil
+}
+
+func DeepCopy_api_NodeProxyOptions(in NodeProxyOptions, out *NodeProxyOptions, c *conversion.Cloner) error {
+	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
 	return nil
 }
 
