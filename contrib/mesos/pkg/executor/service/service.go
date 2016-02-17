@@ -261,10 +261,10 @@ func (s *KubeletExecutorServer) runKubelet(
 	}()
 
 	// create main pod source, it will stop generating events once executorDone is closed
-	var containerOptions []podsource.Option
+	podsourceOptions := []podsource.Option{podsource.ClearPodsOnShutdown()}
 	if s.containerID != "" {
 		// tag all pod containers with the containerID so that they can be properly GC'd by Mesos
-		containerOptions = append(containerOptions, podsource.ContainerEnvOverlay([]api.EnvVar{
+		podsourceOptions = append(podsourceOptions, podsource.ContainerEnvOverlay([]api.EnvVar{
 			{Name: envContainerID, Value: s.containerID},
 		}))
 		kcfg.ContainerRuntimeOptions = append(kcfg.ContainerRuntimeOptions,
@@ -273,12 +273,15 @@ func (s *KubeletExecutorServer) runKubelet(
 			}))
 	}
 
-	podsource.Mesos(executorDone, kcfg.PodConfig.Channel(podsource.MesosSource), podLW, registry, containerOptions...)
+	podsource.Mesos(executorDone, kcfg.PodConfig.Channel(podsource.MesosSource), podLW, registry, podsourceOptions...)
 
-	// create static-pods directory file source
+	// create static-pods directory file source. we apply a clear-pods-on-shutdown filter here to shut down
+	// the static pod stream once the executor goes into shutdown mode.
 	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
+	filteredUpdates := make(chan interface{})
+	kconfig.NewSourceFile(staticPodsConfigPath, kcfg.HostnameOverride, kcfg.FileCheckFrequency, filteredUpdates)
 	fileSourceUpdates := kcfg.PodConfig.Channel(kubetypes.FileSource)
-	kconfig.NewSourceFile(staticPodsConfigPath, kcfg.HostnameOverride, kcfg.FileCheckFrequency, fileSourceUpdates)
+	podsource.Generic(executorDone, fileSourceUpdates, filteredUpdates, podsource.ClearPodsOnShutdown())
 
 	// run the kubelet
 	// NOTE: because kcfg != nil holds, the upstream Run function will not
