@@ -25,6 +25,7 @@ import (
 
 	log "github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
+	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/spf13/pflag"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -83,6 +84,25 @@ func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
 }
 
+type executorWrapper struct {
+	*executor.Executor
+	slaveID   string
+	slaveHost string
+}
+
+// Registered intercepts the registration callback from the slave and captures metadata
+// that we'll need in order to apply the proper annotations to mirror pods.
+func (k *executorWrapper) Registered(
+	driver bindings.ExecutorDriver,
+	executorInfo *mesos.ExecutorInfo,
+	frameworkInfo *mesos.FrameworkInfo,
+	slaveInfo *mesos.SlaveInfo,
+) {
+	k.slaveID = slaveInfo.GetId().GetValue()
+	k.slaveHost = slaveInfo.GetHostname()
+	k.Executor.Registered(driver, executorInfo, frameworkInfo, slaveInfo)
+}
+
 func (s *KubeletExecutorServer) runExecutor(
 	nodeInfos chan<- executor.NodeInfo,
 	kubeletFinished <-chan struct{},
@@ -90,12 +110,20 @@ func (s *KubeletExecutorServer) runExecutor(
 	apiclient *clientset.Clientset,
 	registry executor.Registry,
 ) (<-chan struct{}, error) {
+	executorWrapper := &executorWrapper{}
 	staticPodFilters := podutil.Filters{
-		// annotate the pod with BindingHostKey so that the scheduler will ignore the pod
-		// once it appears in the pod registry. the stock kubelet sets the pod host in order
-		// to accomplish the same; we do this because the k8sm scheduler works differently.
-		podutil.Annotator(map[string]string{
-			meta.BindingHostKey: s.HostnameOverride,
+		podutil.FilterFunc(func(pod *api.Pod) (bool, error) {
+			podutil.Annotate(&pod.ObjectMeta, map[string]string{
+				// grab the slaveID from the wrapper since it will have intercepted the registration
+				// callback just prior to these filters being run; this lets us clean up orphaned
+				// mirror pods if the slave is ever removed by the master.
+				meta.SlaveIdKey: executorWrapper.slaveID,
+				// annotate the pod with BindingHostKey so that the scheduler will ignore the pod
+				// once it appears in the pod registry. the stock kubelet sets the pod host in order
+				// to accomplish the same; we do this because the k8sm scheduler works differently.
+				meta.BindingHostKey: executorWrapper.slaveHost,
+			})
+			return true, nil
 		}),
 	}
 	if s.containerID != "" {
@@ -104,7 +132,7 @@ func (s *KubeletExecutorServer) runExecutor(
 			{Name: envContainerID, Value: s.containerID},
 		}))
 	}
-	exec := executor.New(executor.Config{
+	executorWrapper.Executor = executor.New(executor.Config{
 		Registry:        registry,
 		APIClient:       apiclient,
 		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
@@ -119,7 +147,7 @@ func (s *KubeletExecutorServer) runExecutor(
 
 	// initialize driver and initialize the executor with it
 	dconfig := bindings.DriverConfig{
-		Executor:         exec,
+		Executor:         executorWrapper,
 		HostnameOverride: s.HostnameOverride,
 		BindingAddress:   net.ParseIP(s.Address),
 	}
@@ -128,7 +156,7 @@ func (s *KubeletExecutorServer) runExecutor(
 		return nil, fmt.Errorf("failed to create executor driver: %v", err)
 	}
 	log.V(2).Infof("Initialize executor driver...")
-	exec.Init(driver)
+	executorWrapper.Init(driver)
 
 	// start the driver
 	go func() {
@@ -138,7 +166,7 @@ func (s *KubeletExecutorServer) runExecutor(
 		log.Info("executor Run completed")
 	}()
 
-	return exec.Done(), nil
+	return executorWrapper.Done(), nil
 }
 
 func (s *KubeletExecutorServer) runKubelet(
