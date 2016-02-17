@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -433,37 +432,15 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
-// SyncAllPodsWithStore lists all pods and inserts them into the given store.
-// Though this function is written in a generic manner, it is only used by the
-// controllers for a specific purpose, to synchronously populate the store
-// with the first batch of pods that would otherwise be sent by the Informer.
-// Doing this avoids more complicated forms of synchronization with the
-// Informer, though it also means that the controller calling this function
-// will receive "OnUpdate" events for all the pods in the store, instead of
-// "OnAdd". This should be ok, since most controllers are level triggered
-// and make decisions based on the contents of the store.
-//
-// TODO: Extend this logic to load arbitrary local state for the controllers
-// instead of just pods.
-func SyncAllPodsWithStore(kubeClient clientset.Interface, store cache.Store) {
-	var allPods *api.PodList
-	var err error
-	listOptions := api.ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything()}
-	for {
-		if allPods, err = kubeClient.Core().Pods(api.NamespaceAll).List(listOptions); err != nil {
-			glog.Warningf("Retrying pod list: %v", err)
-			continue
+// FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
+func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
+	active := []*extensions.ReplicaSet{}
+	for i := range replicaSets {
+		if replicaSets[i].Spec.Replicas > 0 {
+			active = append(active, replicaSets[i])
 		}
-		break
 	}
-	pods := []interface{}{}
-	for i := range allPods.Items {
-		p := allPods.Items[i]
-		glog.V(4).Infof("Initializing store with pod %v/%v", p.Namespace, p.Name)
-		pods = append(pods, &p)
-	}
-	store.Replace(pods, allPods.ResourceVersion)
-	return
+	return active
 }
 
 // ControllersByCreationTimestamp sorts a list of ReplicationControllers by creation timestamp, using their names as a tie breaker.

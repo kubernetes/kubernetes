@@ -45,8 +45,6 @@ spec:
       name: local
       protocol: TCP
     resources:
-      limits:
-        cpu: 250m
       requests:
         cpu: 250m
     volumeMounts:

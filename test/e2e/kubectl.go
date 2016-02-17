@@ -170,8 +170,8 @@ var _ = Describe("Kubectl client", func() {
 		var podPath string
 
 		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
-			By("creating the pod")
+			podPath = filepath.Join(testContext.RepoRoot, "test", "e2e", "testing-manifests", "kubectl", "pod-with-readiness-probe.yaml")
+			By(fmt.Sprintf("creating the pod from %v", podPath))
 			runKubectlOrDie("create", "-f", podPath, fmt.Sprintf("--namespace=%v", ns))
 			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
 		})
@@ -282,7 +282,7 @@ var _ = Describe("Kubectl client", func() {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
 
-			subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+			subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, c)
 			if err != nil {
 				Failf("Unable to determine server version.  Error: %s", err)
 			}
@@ -870,7 +870,7 @@ var _ = Describe("Kubectl client", func() {
 			image := "nginx"
 
 			By("running the image " + image)
-			runKubectlOrDie("run", rcName, "--image="+image, nsFlag)
+			runKubectlOrDie("run", rcName, "--image="+image, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
 			rc, err := c.ReplicationControllers(ns).Get(rcName)
 			if err != nil {
@@ -886,6 +886,49 @@ var _ = Describe("Kubectl client", func() {
 			podlist, err := waitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
+			}
+			pods := podlist.Items
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
+				runKubectlOrDie("get", "pods", "-L", "run", nsFlag)
+				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
+			}
+		})
+
+	})
+
+	Describe("Kubectl run deployment", func() {
+		var nsFlag string
+		var dName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			dName = "e2e-test-nginx-deployment"
+		})
+
+		AfterEach(func() {
+			runKubectlOrDie("delete", "deployment", dName, nsFlag)
+		})
+
+		It("should create a deployment from an image [Conformance]", func() {
+			image := "nginx"
+
+			By("running the image " + image)
+			runKubectlOrDie("run", dName, "--image="+image, nsFlag)
+			By("verifying the deployment " + dName + " was created")
+			d, err := c.Extensions().Deployments(ns).Get(dName)
+			if err != nil {
+				Failf("Failed getting deployment %s: %v", dName, err)
+			}
+			containers := d.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != image {
+				Failf("Failed creating deployment %s for 1 pod with expected image %s", dName, image)
+			}
+
+			By("verifying the pod controlled by deployment " + dName + " was created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": dName}))
+			podlist, err := waitForPodsWithLabel(c, ns, label)
+			if err != nil {
+				Failf("Failed getting pod controlled by deployment %s: %v", dName, err)
 			}
 			pods := podlist.Items
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
@@ -1241,7 +1284,7 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
-		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, c)
 		if err != nil {
 			return err
 		}

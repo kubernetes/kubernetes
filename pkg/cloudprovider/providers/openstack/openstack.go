@@ -480,6 +480,11 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	return "/" + srv.ID, nil
 }
 
+// InstanceType returns the type of the specified instance.
+func (i *Instances) InstanceType(name string) (string, error) {
+	return "", nil
+}
+
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -1038,7 +1043,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(size int, tags *map[string]string) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error) {
 
 	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -1049,7 +1054,10 @@ func (os *OpenStack) CreateVolume(size int, tags *map[string]string) (volumeName
 		return "", err
 	}
 
-	opts := volumes.CreateOpts{Size: size}
+	opts := volumes.CreateOpts{
+		Name: name,
+		Size: size,
+	}
 	if tags != nil {
 		opts.Metadata = *tags
 	}

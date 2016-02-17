@@ -24,10 +24,13 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 
 	. "github.com/onsi/ginkgo"
 )
+
+var serviceAccountTokenNamespaceVersion = version.MustParse("v1.2.0")
 
 var _ = Describe("ServiceAccounts", func() {
 	f := NewFramework("svcaccounts")
@@ -94,11 +97,28 @@ var _ = Describe("ServiceAccounts", func() {
 			},
 		}
 
+		supportsTokenNamespace, _ := serverVersionGTE(serviceAccountTokenNamespaceVersion, f.Client)
+		if supportsTokenNamespace {
+			pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
+				Name:  "namespace-test",
+				Image: "gcr.io/google_containers/mounttest:0.2",
+				Args: []string{
+					fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountNamespaceKey),
+				},
+			})
+		}
+
 		f.TestContainerOutput("consume service account token", pod, 0, []string{
 			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey, tokenContent),
 		})
 		f.TestContainerOutput("consume service account root CA", pod, 1, []string{
 			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountRootCAKey, rootCAContent),
 		})
+
+		if supportsTokenNamespace {
+			f.TestContainerOutput("consume service account namespace", pod, 2, []string{
+				fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountNamespaceKey, f.Namespace.Name),
+			})
+		}
 	})
 })

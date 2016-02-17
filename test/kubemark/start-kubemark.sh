@@ -216,10 +216,17 @@ kubectl create -f "${KUBE_ROOT}"/test/kubemark/hollow-node.json --namespace="kub
 rm "${KUBECONFIG_SECRET}"
 
 echo "Waiting for all HollowNodes to become Running..."
-echo "This can loop forever if something crashed."
+start=$(date +%s)
 until [[ "$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_NODES}" ]]; do
   echo -n .
   sleep 1
+  now=$(date +%s)
+  # Fail it if it already took more than 15 minutes.
+  if [ $((now - start)) -gt 900 ]; then
+    echo ""
+    echo "Timeout waiting for all HollowNodes to become Running"
+    exit 1
+  fi
 done
 echo ""
 echo "Password to kubemark master: ${password}"

@@ -35,6 +35,7 @@ var (
 	clientsetName = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
 	clientsetPath = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>. Default to \"k8s.io/kubernetes/pkg/client/clientset_generated/\"")
 	clientsetOnly = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
+	fakeClient    = flag.Bool("fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
 )
 
 func versionToPath(group string, version string) (path string) {
@@ -48,24 +49,25 @@ func versionToPath(group string, version string) (path string) {
 	return
 }
 
-func parseInputVersions() ([]string, []unversioned.GroupVersion, error) {
+func parseInputVersions() (paths []string, groupVersions []unversioned.GroupVersion, gvToPath map[unversioned.GroupVersion]string, err error) {
 	var visitedGroups = make(map[string]struct{})
-	var groupVersions []unversioned.GroupVersion
-	var paths []string
+	gvToPath = make(map[unversioned.GroupVersion]string)
 	for _, gvString := range *inputVersions {
 		gv, err := unversioned.ParseGroupVersion(gvString)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		if _, found := visitedGroups[gv.Group]; found {
-			return nil, nil, fmt.Errorf("group %q appeared more than once in the input. At most one version is allowed for each group.", gv.Group)
+			return nil, nil, nil, fmt.Errorf("group %q appeared more than once in the input. At most one version is allowed for each group.", gv.Group)
 		}
 		visitedGroups[gv.Group] = struct{}{}
 		groupVersions = append(groupVersions, gv)
-		paths = append(paths, versionToPath(gv.Group, gv.Version))
+		path := versionToPath(gv.Group, gv.Version)
+		paths = append(paths, path)
+		gvToPath[gv] = path
 	}
-	return paths, groupVersions, nil
+	return paths, groupVersions, gvToPath, nil
 }
 
 func main() {
@@ -88,13 +90,16 @@ func main() {
 		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
 		arguments.CustomArgs = generators.ClientGenArgs{
 			[]unversioned.GroupVersion{{"testgroup", ""}},
+			map[unversioned.GroupVersion]string{
+				unversioned.GroupVersion{"testgroup", ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+			},
 			"test_internalclientset",
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
 			false,
 			false,
 		}
 	} else {
-		inputPath, groupVersions, err := parseInputVersions()
+		inputPath, groupVersions, gvToPath, err := parseInputVersions()
 		if err != nil {
 			glog.Fatalf("Error: %v", err)
 		}
@@ -109,10 +114,11 @@ func main() {
 
 		arguments.CustomArgs = generators.ClientGenArgs{
 			groupVersions,
+			gvToPath,
 			*clientsetName,
 			*clientsetPath,
 			*clientsetOnly,
-			true,
+			*fakeClient,
 		}
 	}
 

@@ -52,9 +52,9 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string `json:"portRange"`
-	// resourceContainer is the bsolute name of the resource-only container to create and run
+	// resourceContainer is the absolute name of the resource-only container to create and run
 	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"resourceContainer"`
+	ResourceContainer string `json:"kubeletCgroups"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
@@ -197,6 +197,9 @@ type KubeletConfiguration struct {
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency unversioned.Duration `json:"nodeStatusUpdateFrequency"`
+	// minimumGCAge is the minimum age for a unused image before it is
+	// garbage collected.
+	ImageMinimumGCAge unversioned.Duration `json:"imageMinimumGCAge"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run.
 	ImageGCHighThresholdPercent int `json:"imageGCHighThresholdPercent"`
@@ -223,9 +226,14 @@ type KubeletConfiguration struct {
 	CloudProvider string `json:"cloudProvider,omitempty"`
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string `json:"cloudConfigFile,omitempty"`
-	// resourceContainer is the absolute name of the resource-only container
-	// to create and run the Kubelet in.
-	ResourceContainer string `json:"resourceContainer,omitempty"`
+	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
+	KubeletCgroups string `json:"kubeletCgroups,omitempty"`
+	// Cgroups that container runtime is expected to be isolated in.
+	RuntimeCgroups string `json:"runtimeCgroups,omitempty"`
+	// SystemCgroups is absolute name of cgroups in which to place
+	// all non-kernel processes that are not already in a container. Empty
+	// for no container. Rolling back the flag requires a reboot.
+	SystemCgroups string `json:"systemContainer,omitempty"`
 	// cgroupRoot is the root cgroup to use for pods. This is handled by the
 	// container runtime on a best effort basis.
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
@@ -234,13 +242,13 @@ type KubeletConfiguration struct {
 	// rktPath is hte path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath,omitempty"`
+	// lockFilePath is the path that kubelet will use to as a lock file.
+	// It uses this file as a lock to synchronize with other kubelet processes
+	// that may be running.
+	LockFilePath string `json:"lockFilePath"`
 	// rktStage1Image is the image to use as stage1. Local paths and
 	// http/https URLs are supported.
 	RktStage1Image string `json:"rktStage1Image,omitempty"`
-	// systemContainer is the resource-only container in which to place
-	// all non-kernel processes that are not already in a container. Empty
-	// for no container. Rolling back the flag requires a reboot.
-	SystemContainer string `json:"systemContainer"`
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`
@@ -350,4 +358,162 @@ type LeaderElectionConfiguration struct {
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod unversioned.Duration `json:"retryPeriod"`
+}
+
+type KubeControllerManagerConfiguration struct {
+	unversioned.TypeMeta
+
+	// port is the port that the controller-manager's http service runs on.
+	Port int `json:"port"`
+	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
+	Address string `json:"address"`
+	// cloudProvider is the provider for cloud services.
+	CloudProvider string `json:"cloudProvider"`
+	// cloudConfigFile is the path to the cloud provider configuration file.
+	CloudConfigFile string `json:"cloudConfigFile"`
+	// concurrentEndpointSyncs is the number of endpoint syncing operations
+	// that will be done concurrently. Larger number = faster endpoint updating,
+	// but more CPU (and network) load.
+	ConcurrentEndpointSyncs int `json:"concurrentEndpointSyncs"`
+	// concurrentRSSyncs is the number of replica sets that are  allowed to sync
+	// concurrently. Larger number = more reponsive replica  management, but more
+	// CPU (and network) load.
+	ConcurrentRSSyncs int `json:"concurrentRSSyncs"`
+	// concurrentRCSyncs is the number of replication controllers that are
+	// allowed to sync concurrently. Larger number = more reponsive replica
+	// management, but more CPU (and network) load.
+	ConcurrentRCSyncs int `json:"concurrentRCSyncs"`
+	// concurrentResourceQuotaSyncs is the number of resource quotas that are
+	// allowed to sync concurrently. Larger number = more responsive quota
+	// management, but more CPU (and network) load.
+	ConcurrentResourceQuotaSyncs int `json:"concurrentResourceQuotaSyncs"`
+	// concurrentDeploymentSyncs is the number of deployment objects that are
+	// allowed to sync concurrently. Larger number = more reponsive deployments,
+	// but more CPU (and network) load.
+	ConcurrentDeploymentSyncs int `json:"concurrentDeploymentSyncs"`
+	// concurrentDaemonSetSyncs is the number of daemonset objects that are
+	// allowed to sync concurrently. Larger number = more reponsive DaemonSet,
+	// but more CPU (and network) load.
+	ConcurrentDaemonSetSyncs int `json:"concurrentDaemonSetSyncs"`
+	// concurrentJobSyncs is the number of job objects that are
+	// allowed to sync concurrently. Larger number = more reponsive jobs,
+	// but more CPU (and network) load.
+	ConcurrentJobSyncs int `json:"concurrentJobSyncs"`
+	// concurrentNamespaceSyncs is the number of namespace objects that are
+	// allowed to sync concurrently.
+	ConcurrentNamespaceSyncs int `json:"concurrentNamespaceSyncs"`
+	// serviceSyncPeriod is the period for syncing services with their external
+	// load balancers.
+	ServiceSyncPeriod unversioned.Duration `json:"serviceSyncPeriod"`
+	// nodeSyncPeriod is the period for syncing nodes from cloudprovider. Longer
+	// periods will result in fewer calls to cloud provider, but may delay addition
+	// of new nodes to cluster.
+	NodeSyncPeriod unversioned.Duration `json:"nodeSyncPeriod"`
+	// resourceQuotaSyncPeriod is the period for syncing quota usage status
+	// in the system.
+	ResourceQuotaSyncPeriod unversioned.Duration `json:"resourceQuotaSyncPeriod"`
+	// namespaceSyncPeriod is the period for syncing namespace life-cycle
+	// updates.
+	NamespaceSyncPeriod unversioned.Duration `json:"namespaceSyncPeriod"`
+	// pvClaimBinderSyncPeriod is the period for syncing persistent volumes
+	// and persistent volume claims.
+	PVClaimBinderSyncPeriod unversioned.Duration `json:"pvClaimBinderSyncPeriod"`
+	// minResyncPeriod is the resync period in reflectors; will be random between
+	// minResyncPeriod and 2*minResyncPeriod.
+	MinResyncPeriod unversioned.Duration `json:"minResyncPeriod"`
+	// terminatedPodGCThreshold is the number of terminated pods that can exist
+	// before the terminated pod garbage collector starts deleting terminated pods.
+	// If <= 0, the terminated pod garbage collector is disabled.
+	TerminatedPodGCThreshold int `json:"terminatedPodGCThreshold"`
+	// horizontalPodAutoscalerSyncPeriod is the period for syncing the number of
+	// pods in horizontal pod autoscaler.
+	HorizontalPodAutoscalerSyncPeriod unversioned.Duration `json:"horizontalPodAutoscalerSyncPeriod"`
+	// deploymentControllerSyncPeriod is the period for syncing the deployments.
+	DeploymentControllerSyncPeriod unversioned.Duration `json:"deploymentControllerSyncPeriod"`
+	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
+	PodEvictionTimeout unversioned.Duration `json:"podEvictionTimeout"`
+	// deletingPodsQps is the number of nodes per second on which pods are deleted in
+	// case of node failure.
+	DeletingPodsQps float32 `json:"deletingPodsQps"`
+	// deletingPodsBurst is the number of nodes on which pods are bursty deleted in
+	// case of node failure. For more details look into RateLimiter.
+	DeletingPodsBurst int `json:"deletingPodsBurst"`
+	// nodeMontiorGracePeriod is the amount of time which we allow a running node to be
+	// unresponsive before marking it unhealty. Must be N times more than kubelet's
+	// nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
+	// to post node status.
+	NodeMonitorGracePeriod unversioned.Duration `json:"nodeMonitorGracePeriod"`
+	// registerRetryCount is the number of retries for initial node registration.
+	// Retry interval equals node-sync-period.
+	RegisterRetryCount int `json:"registerRetryCount"`
+	// nodeStartupGracePeriod is the amount of time which we allow starting a node to
+	// be unresponsive before marking it unhealty.
+	NodeStartupGracePeriod unversioned.Duration `json:"nodeStartupGracePeriod"`
+	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
+	NodeMonitorPeriod unversioned.Duration `json:"nodeMonitorPeriod"`
+	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
+	// used to sign service account tokens.
+	ServiceAccountKeyFile string `json:"serviceAccountKeyFile"`
+	// enableProfiling enables profiling via web interface host:port/debug/pprof/
+	EnableProfiling bool `json:"enableProfiling"`
+	// clusterName is the instance prefix for the cluster.
+	ClusterName string `json:"clusterName"`
+	// clusterCIDR is CIDR Range for Pods in cluster.
+	ClusterCIDR string `json:"clusterCIDR"`
+	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and set on the
+	// cloud provider.
+	AllocateNodeCIDRs bool `json:"allocateNodeCIDRs"`
+	// rootCAFile is the root certificate authority will be included in service
+	// account's token secret. This must be a valid PEM-encoded CA bundle.
+	RootCAFile string `json:"rootCAFile"`
+	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
+	KubeAPIQPS float32 `json:"kubeAPIQPS"`
+	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver.
+	KubeAPIBurst int `json:"kubeAPIBurst"`
+	// leaderElection defines the configuration of leader election client.
+	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
+	// vloumeConfiguration holds configuration for volume related features.
+	VolumeConfiguration VolumeConfiguration `json:"volumeConfiguration"`
+}
+
+// VolumeConfiguration contains *all* enumerated flags meant to configure all volume
+// plugins. From this config, the controller-manager binary will create many instances of
+// volume.VolumeConfig, each containing only the configuration needed for that plugin which
+// are then passed to the appropriate plugin. The ControllerManager binary is the only part
+// of the code which knows what plugins are supported and which flags correspond to each plugin.
+type VolumeConfiguration struct {
+	// enableHostPathProvisioning enables HostPath PV provisioning when running without a
+	// cloud provider. This allows testing and development of provisioning features. HostPath
+	// provisioning is not supported in any way, won't work in a multi-node cluster, and
+	// should not be used for anything other than testing or development.
+	EnableHostPathProvisioning bool `json:"enableHostPathProvisioning"`
+	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
+	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
+}
+
+type PersistentVolumeRecyclerConfiguration struct {
+	// maximumRetry is number of retries the PV recycler will execute on failure to recycle
+	// PV.
+	MaximumRetry int `json:"maximumRetry"`
+	// minimumTimeoutNFS is the minimum ActiveDeadlineSeconds to use for an NFS Recycler
+	// pod.
+	MinimumTimeoutNFS int `json:"minimumTimeoutNFS"`
+	// podTemplateFilePathNFS is the file path to a pod definition used as a template for
+	// NFS persistent volume recycling
+	PodTemplateFilePathNFS string `json:"podTemplateFilePathNFS"`
+	// incrementTimeoutNFS is the increment of time added per Gi to ActiveDeadlineSeconds
+	// for an NFS scrubber pod.
+	IncrementTimeoutNFS int `json:"incrementTimeoutNFS"`
+	// podTemplateFilePathHostPath is the file path to a pod definition used as a template for
+	// HostPath persistent volume recycling. This is for development and testing only and
+	// will not work in a multi-node cluster.
+	PodTemplateFilePathHostPath string `json:"podTemplateFilePathHostPath"`
+	// minimumTimeoutHostPath is the minimum ActiveDeadlineSeconds to use for a HostPath
+	// Recycler pod.  This is for development and testing only and will not work in a multi-node
+	// cluster.
+	MinimumTimeoutHostPath int `json:"minimumTimeoutHostPath"`
+	// incrementTimeoutHostPath is the increment of time added per Gi to ActiveDeadlineSeconds
+	// for a HostPath scrubber pod.  This is for development and testing only and will not work
+	// in a multi-node cluster.
+	IncrementTimeoutHostPath int `json:"incrementTimeoutHostPath"`
 }

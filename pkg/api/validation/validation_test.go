@@ -463,6 +463,89 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 	}
 }
 
+func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+	validUpdateClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+	invalidUpdateClaimResources := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+	invalidUpdateClaimAccessModes := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldClaim          *api.PersistentVolumeClaim
+		newClaim          *api.PersistentVolumeClaim
+	}{
+		"valid-update": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validUpdateClaim,
+		},
+		"invalid-update-change-resources-on-bound-claim": {
+			isExpectedFailure: true,
+			oldClaim:          validUpdateClaim,
+			newClaim:          invalidUpdateClaimResources,
+		},
+		"invalid-update-change-access-modes-on-bound-claim": {
+			isExpectedFailure: true,
+			oldClaim:          validUpdateClaim,
+			newClaim:          invalidUpdateClaimAccessModes,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		// ensure we have a resource version specified for updates
+		scenario.oldClaim.ResourceVersion = "1"
+		scenario.newClaim.ResourceVersion = "1"
+		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
 func TestValidateVolumes(t *testing.T) {
 	lun := 1
 	successCase := []api.Volume{
@@ -1739,17 +1822,19 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
+				// TODO: Uncomment and move this block into Annotations map once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//					"requiredDuringSchedulingRequiredDuringExecution": {
+				//						"nodeSelectorTerms": [{
+				//							"matchExpressions": [{
+				//								"key": "key1",
+				//								"operator": "Exists"
+				//							}]
+				//						}]
+				//					},
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "key1",
-									"operator": "Exists"
-								}]
-							}]
-						},
 						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 								"matchExpressions": [{
@@ -1830,7 +1915,7 @@ func TestValidatePod(t *testing.T) {
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 					`,
 				},
@@ -1847,7 +1932,7 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {"requiredDuringSchedulingRequiredDuringExecution": {
+					{"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {
 						"nodeSelectorTerms": [{
 							"matchExpressions": [{
 								"key": "key1",
@@ -1888,14 +1973,14 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"invalid requiredDuringSchedulingRequiredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
+		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": []
 						},
 					}}`,
@@ -1907,14 +1992,14 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"invalid requiredDuringSchedulingRequiredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
+		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.AffinityAnnotationKey: `
 					{"nodeAffinity": {
-						"requiredDuringSchedulingRequiredDuringExecution": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 								"matchExpressions": []
 							}]
@@ -5020,5 +5105,42 @@ func TestValidateConfigMapUpdate(t *testing.T) {
 		if !tc.isValid && len(errs) == 0 {
 			t.Errorf("%v: unexpected non-error", tc.name)
 		}
+	}
+}
+
+func TestValidateHasLabel(t *testing.T) {
+	successCase := api.ObjectMeta{
+		Name:      "123",
+		Namespace: "ns",
+		Labels: map[string]string{
+			"other": "blah",
+			"foo":   "bar",
+		},
+	}
+	if errs := ValidateHasLabel(successCase, field.NewPath("field"), "foo", "bar"); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	missingCase := api.ObjectMeta{
+		Name:      "123",
+		Namespace: "ns",
+		Labels: map[string]string{
+			"other": "blah",
+		},
+	}
+	if errs := ValidateHasLabel(missingCase, field.NewPath("field"), "foo", "bar"); len(errs) == 0 {
+		t.Errorf("expected failure")
+	}
+
+	wrongValueCase := api.ObjectMeta{
+		Name:      "123",
+		Namespace: "ns",
+		Labels: map[string]string{
+			"other": "blah",
+			"foo":   "notbar",
+		},
+	}
+	if errs := ValidateHasLabel(wrongValueCase, field.NewPath("field"), "foo", "bar"); len(errs) == 0 {
+		t.Errorf("expected failure")
 	}
 }

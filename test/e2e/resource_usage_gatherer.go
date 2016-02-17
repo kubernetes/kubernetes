@@ -38,7 +38,7 @@ const (
 
 type resourceConstraint struct {
 	cpuConstraint    float64
-	memoryConstraint int64
+	memoryConstraint uint64
 }
 
 type containerResourceGatherer struct {
@@ -51,7 +51,7 @@ type containerResourceGatherer struct {
 type SingleContainerSummary struct {
 	Name string
 	Cpu  float64
-	Mem  int64
+	Mem  uint64
 }
 
 // we can't have int here, as JSON does not accept integer keys.
@@ -87,10 +87,12 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 				now := time.Now()
 				data, err := g.getKubeSystemContainersResourceUsage(c)
 				if err != nil {
-					return err
+					Logf("Error while getting resource usage: %v", err)
+					continue
 				}
 				g.usageTimeseries[now] = data
 			case <-g.stopCh:
+				Logf("Stop channel is closed. Stopping gatherer.")
 				g.wg.Done()
 				return nil
 			}
@@ -100,8 +102,9 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 
 func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constraints map[string]resourceConstraint) *ResourceUsageSummary {
 	close(g.stopCh)
-	g.timer.Stop()
+	Logf("Closed stop channel.")
 	g.wg.Wait()
+	Logf("Waitgroup finished.")
 	if len(percentiles) == 0 {
 		Logf("Warning! Empty percentile list for stopAndPrintData.")
 		return &ResourceUsageSummary{}
@@ -165,8 +168,8 @@ func (g *containerResourceGatherer) computePercentiles(timeSeries map[time.Time]
 			if dataMap[name] == nil {
 				dataMap[name] = &usageDataPerContainer{
 					cpuData:        make([]float64, len(timeSeries)),
-					memUseData:     make([]int64, len(timeSeries)),
-					memWorkSetData: make([]int64, len(timeSeries)),
+					memUseData:     make([]uint64, len(timeSeries)),
+					memWorkSetData: make([]uint64, len(timeSeries)),
 				}
 			}
 			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)
@@ -176,8 +179,8 @@ func (g *containerResourceGatherer) computePercentiles(timeSeries map[time.Time]
 	}
 	for _, v := range dataMap {
 		sort.Float64s(v.cpuData)
-		sort.Sort(int64arr(v.memUseData))
-		sort.Sort(int64arr(v.memWorkSetData))
+		sort.Sort(uint64arr(v.memUseData))
+		sort.Sort(uint64arr(v.memWorkSetData))
 	}
 
 	result := make(map[int]resourceUsagePerContainer)

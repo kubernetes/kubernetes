@@ -117,7 +117,7 @@
     "name": "kube-apiserver",
     "image": "{{pillar['kube_docker_registry']}}/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
     "resources": {
-      "limits": {
+      "requests": {
         "cpu": "250m"
       }
     },

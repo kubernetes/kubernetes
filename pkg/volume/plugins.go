@@ -49,6 +49,10 @@ type VolumeOptions struct {
 	AccessModes []api.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
+	// PV.Name of the appropriate PersistentVolume. Used to generate cloud volume name.
+	PVName string
+	// Unique name of Kubernetes cluster.
+	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
 }
@@ -452,7 +456,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *api.Pod {
 					Name:    "pv-recycler",
 					Image:   "gcr.io/google_containers/busybox",
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "test -e /scrub && echo $(date) > /scrub/trash.txt && find /scrub -mindepth 1 -maxdepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
+					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "vol",

@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	unversioned_extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -99,7 +99,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
 
 	dsc := &DaemonSetsController{
 		kubeClient: kubeClient,
@@ -187,7 +187,6 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting Daemon Sets controller manager")
-	controller.SyncAllPodsWithStore(dsc.kubeClient, dsc.podStore.Store)
 	go dsc.dsController.Run(stopCh)
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
@@ -468,10 +467,11 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	deleteWait.Wait()
 }
 
-func storeDaemonSetStatus(dsClient unversioned_extensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
+func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
 	if ds.Status.DesiredNumberScheduled == desiredNumberScheduled && ds.Status.CurrentNumberScheduled == currentNumberScheduled && ds.Status.NumberMisscheduled == numberMisscheduled {
 		return nil
 	}
+
 	var updateErr, getErr error
 	for i := 0; i <= StatusUpdateRetries; i++ {
 		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
@@ -580,11 +580,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	}
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
-		return false
-	}
-	// If the node is not ready, don't run on it.
-	// TODO(mikedanese): remove this once daemonpods forgive nodes
-	if !api.IsNodeReady(node) {
 		return false
 	}
 

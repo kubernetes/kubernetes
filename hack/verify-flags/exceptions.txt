@@ -5,7 +5,6 @@ cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to th
 cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
-cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
@@ -92,16 +91,14 @@ hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credent
 hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
-hack/test-cmd.sh:  --runtime_config="extensions/v1beta1/deployments=true" \
 pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
 pkg/kubelet/qos/memory_policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
-pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to read oom_score_adj: %v", readErr)
-pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to set oom_score_adj to %d: %v", oomScoreAdj, writeErr)
 pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
 pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
+test/e2e/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 test/e2e/downwardapi_volume.go:					Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 test/e2e/es_cluster_logging.go:		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.

@@ -153,11 +153,6 @@ func New(c *Config) (*Master, error) {
 	}
 	m.InstallAPIs(c)
 
-	// TODO: Move this to generic api server.
-	if c.EnableSwaggerSupport {
-		m.InstallSwaggerAPI()
-	}
-
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
 		m.NewBootstrapController().Start()
@@ -282,13 +277,13 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), storageDecorator)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), storageDecorator, c.KubeletClient, m.ProxyTransport)
-	m.nodeRegistry = node.NewRegistry(nodeStorage)
+	nodeStorage := nodeetcd.NewStorage(dbClient("nodes"), storageDecorator, c.KubeletClient, m.ProxyTransport)
+	m.nodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
 		dbClient("pods"),
 		storageDecorator,
-		kubeletclient.ConnectionInfoGetter(nodeStorage),
+		kubeletclient.ConnectionInfoGetter(nodeStorage.Node),
 		m.ProxyTransport,
 	)
 
@@ -338,8 +333,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
 		"services/status":               serviceStatusStorage,
 		"endpoints":                     endpointsStorage,
-		"nodes":                         nodeStorage,
-		"nodes/status":                  nodeStatusStorage,
+		"nodes":                         nodeStorage.Node,
+		"nodes/status":                  nodeStorage.Status,
+		"nodes/proxy":                   nodeStorage.Proxy,
 		"events":                        eventStorage,
 
 		"limitRanges":                   limitRangeStorage,
@@ -571,10 +567,10 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 }
 
-// getExperimentalResources returns the resources for extenstions api
+// getExperimentalResources returns the resources for extensions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("horizontalpodautoscalers", "ingresses", "jobs", "replicasets")
+	enabledResources := sets.NewString("horizontalpodautoscalers", "ingresses", "jobs", "replicasets", "deployments")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.

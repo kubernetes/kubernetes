@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	yamlserializer "k8s.io/kubernetes/pkg/runtime/serializer/yaml"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/ghodss/yaml"
@@ -639,6 +640,41 @@ func contains(fields []string, field string) bool {
 		}
 	}
 	return false
+}
+
+func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
+	ingress := extensions.Ingress{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			Labels: map[string]string{
+				"app_name": "kubectl_test_ingress",
+			},
+		},
+		Spec: extensions.IngressSpec{
+			Backend: &extensions.IngressBackend{
+				ServiceName: "svc",
+				ServicePort: intstr.FromInt(93),
+			},
+		},
+		Status: extensions.IngressStatus{
+			LoadBalancer: api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						IP:       "2.3.4.5",
+						Hostname: "localhost.localdomain",
+					},
+				},
+			},
+		},
+	}
+	buff := bytes.Buffer{}
+	printIngress(&ingress, &buff, PrintOptions{false, false, false, false, false, false, []string{"app_name"}})
+	output := string(buff.Bytes())
+	appName := ingress.ObjectMeta.Labels["app_name"]
+	if !strings.Contains(output, appName) {
+		t.Errorf("expected to container app_name label value %s, but doesn't %s", appName, output)
+	}
 }
 
 func TestPrintHumanReadableService(t *testing.T) {

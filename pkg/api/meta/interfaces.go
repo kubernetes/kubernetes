@@ -172,7 +172,4 @@ type RESTMapper interface {
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
-
-	// ResourceIsValid takes a partial resource and returns back whether or not the resource matches at least one kind
-	ResourceIsValid(resource unversioned.GroupVersionResource) bool
 }

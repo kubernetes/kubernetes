@@ -59,7 +59,7 @@ func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.In
 	namespace := deployment.ObjectMeta.Namespace
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+		return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 	}
 
 	// 1. Find all pods whose labels match deployment.Spec.Selector
@@ -82,7 +82,7 @@ func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.In
 		for _, rs := range rsList {
 			rsLabelsSelector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
 			// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
 			if api.Semantic.DeepEqual(rs.Spec.Template, &newRSTemplate) {
@@ -123,7 +123,7 @@ func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Inte
 	namespace := deployment.ObjectMeta.Namespace
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+		return nil, fmt.Errorf("invalid label selector: %v", err)
 	}
 
 	rsList, err := getRSList(namespace, api.ListOptions{LabelSelector: selector})
@@ -213,7 +213,7 @@ func getPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.Repl
 	for _, rs := range replicaSets {
 		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert LabelSelector to Selector: %v", err)
+			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 		options := api.ListOptions{LabelSelector: selector}
 		podList, err := c.Core().Pods(rs.ObjectMeta.Namespace).List(options)

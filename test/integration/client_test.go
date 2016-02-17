@@ -39,7 +39,8 @@ import (
 
 func TestClient(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	ns := api.NamespaceDefault
 	framework.DeleteAllEtcdKeys()
@@ -109,7 +110,8 @@ func TestClient(t *testing.T) {
 
 func TestSingleWatch(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	ns := "blargh"
 	deleteAllEtcdKeys()
@@ -194,7 +196,8 @@ func TestMultiWatch(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 	defer framework.DeleteAllEtcdKeys()
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	ns := api.NamespaceDefault
 	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})

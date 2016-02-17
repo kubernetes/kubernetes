@@ -38,6 +38,8 @@ type ScaleStatus struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient=true,noMethods=true
+
 // represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -131,6 +133,8 @@ type HorizontalPodAutoscalerStatus struct {
 	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
+// +genclient=true
+
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -153,6 +157,8 @@ type HorizontalPodAutoscalerList struct {
 	// list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items"`
 }
+
+// +genclient=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -198,6 +204,8 @@ type ThirdPartyResourceData struct {
 	// Data is the raw JSON data for this data.
 	Data []byte `json:"data,omitempty"`
 }
+
+// +genclient=true
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
@@ -343,6 +351,8 @@ type DeploymentList struct {
 	Items []Deployment `json:"items"`
 }
 
+// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
+/* Commenting out for v1.2. We are planning to bring these types back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting the types out.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Only "RollingUpdate" is supported at this time. Default is RollingUpdate.
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty"`
@@ -385,6 +395,7 @@ type RollingUpdateDaemonSet struct {
 	// is ready).
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
+*/
 
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
@@ -401,6 +412,8 @@ type DaemonSetSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
 	Template v1.PodTemplateSpec `json:"template"`
 
+	// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
+	/* Commenting out for v1.2. We are planning to bring these fields back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting these fields out.
 	// Update strategy to replace existing DaemonSet pods with new pods.
 	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
 
@@ -412,6 +425,7 @@ type DaemonSetSpec struct {
 	// Value of this key is hash of DaemonSetSpec.PodTemplateSpec.
 	// No label is added if this is set to empty string.
 	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
+	*/
 }
 
 const (
@@ -438,6 +452,8 @@ type DaemonSetStatus struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
 }
+
+// +genclient=true
 
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
@@ -479,6 +495,8 @@ type ThirdPartyResourceDataList struct {
 	// Items is the list of ThirdpartyResourceData.
 	Items []ThirdPartyResourceData `json:"items"`
 }
+
+// +genclient=true
 
 // Job represents the configuration of a single job.
 type Job struct {
@@ -590,6 +608,8 @@ type JobCondition struct {
 	// Human readable message indicating details about last transition.
 	Message string `json:"message,omitempty"`
 }
+
+// +genclient=true
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
@@ -866,6 +886,8 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// +genclient=true
 
 // ReplicaSet represents the configuration of a ReplicaSet.
 type ReplicaSet struct {

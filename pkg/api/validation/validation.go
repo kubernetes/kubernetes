@@ -84,6 +84,20 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 	return allErrs
 }
 
+// ValidateHasLabel requires that api.ObjectMeta has a Label with key and expectedValue
+func ValidateHasLabel(meta api.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	actualValue, found := meta.Labels[key]
+	if !found {
+		allErrs = append(allErrs, field.Required(fldPath.Child("labels"), key+"="+expectedValue))
+		return allErrs
+	}
+	if actualValue != expectedValue {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("labels"), meta.Labels, "expected "+key+"="+expectedValue))
+	}
+	return allErrs
+}
+
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -491,8 +505,20 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		}
 	}
 	if source.FlexVolume != nil {
-		numVolumes++
-		allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("flexVolume"))...)
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("flexVolume"), "may not specifiy more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("flexVolume"))...)
+		}
+	}
+	if source.ConfigMap != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("configMap"), "may not specifiy more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateConfigMapVolumeSource(source.ConfigMap, fldPath.Child("configMap"))...)
+		}
 	}
 	if source.AzureFile != nil {
 		numVolumes++
@@ -580,6 +606,14 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource, fldPath *f
 	allErrs := field.ErrorList{}
 	if len(secretSource.SecretName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
+	}
+	return allErrs
+}
+
+func validateConfigMapVolumeSource(configMapSource *api.ConfigMapVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(configMapSource.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 	return allErrs
 }
@@ -883,8 +917,14 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) field.ErrorLi
 }
 
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = ValidatePersistentVolumeClaim(newPvc)
+	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePersistentVolumeClaim(newPvc)...)
+	// if a pvc had a bound volume, we should not allow updates to resources or access modes
+	if len(oldPvc.Spec.VolumeName) != 0 {
+		if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "spec is immutable once a claim has been bound to a volume"))
+		}
+	}
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
@@ -1431,9 +1471,11 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 
 	if affinity.NodeAffinity != nil {
 		na := affinity.NodeAffinity
-		if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
-			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
-		}
+
+		// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+		// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+		// }
 
 		if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
@@ -2211,15 +2253,7 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
-			var requestValue, limitValue int64
-			requestValue = requestQuantity.Value()
-			limitValue = quantity.Value()
-			// Do a more precise comparison if possible (if the value won't overflow).
-			if requestValue <= resource.MaxMilliValue && limitValue <= resource.MaxMilliValue {
-				requestValue = requestQuantity.MilliValue()
-				limitValue = quantity.MilliValue()
-			}
-			if limitValue < requestValue {
+			if quantity.Cmp(requestQuantity) < 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "must be greater than or equal to request"))
 			}
 		}

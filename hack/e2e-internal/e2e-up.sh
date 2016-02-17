@@ -31,5 +31,14 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
-"${KUBE_VERSION_ROOT}/cluster/kube-up.sh"
+if [[ ${MULTIZONE:-} == "true" ]]; then
+    for KUBE_GCE_ZONE in ${E2E_ZONES}
+    do
+	KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_USE_EXISTING_MASTER="${KUBE_USE_EXISTING_MASTER:-}" KUBE_TEST_DEBUG=y "${KUBE_VERSION_ROOT}/cluster/kube-up.sh"
+	KUBE_USE_EXISTING_MASTER="true" # For subsequent zones we use the existing master
+    done
+else
+    KUBE_TEST_DEBUG=y "${KUBE_VERSION_ROOT}/cluster/kube-up.sh"
+fi
+
 test-setup

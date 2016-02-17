@@ -22,6 +22,7 @@ It has these top-level messages:
 	InternalMasterChangeDetected
 	InternalTryAuthentication
 	InternalAuthenticationResult
+	InternalNetworkError
 	FrameworkID
 	OfferID
 	SlaveID

@@ -100,19 +100,16 @@ var _ = Describe("MetricsGrabber", func() {
 	})
 
 	It("should grab all metrics from a Kubelet.", func() {
-		// We run this test only on GCE, as for some reason it flakes in GKE #19468
-		if providerIs("gce") {
-			By("Connecting proxying to Node through the API server")
-			nodes := ListSchedulableNodesOrDie(c)
-			Expect(nodes.Items).NotTo(BeEmpty())
-			response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
-			expectNoError(err)
-			checkNecessaryMetrics(metrics.Metrics(response), metrics.NecessaryKubeletMetrics)
-		}
+		By("Proxying to Node through the API server")
+		nodes := ListSchedulableNodesOrDie(c)
+		Expect(nodes.Items).NotTo(BeEmpty())
+		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
+		expectNoError(err)
+		checkNecessaryMetrics(metrics.Metrics(response), metrics.NecessaryKubeletMetrics)
 	})
 
 	It("should grab all metrics from a Scheduler.", func() {
-		By("Connecting proxying to Pod through the API server")
+		By("Proxying to Pod through the API server")
 		// Check if master Node is registered
 		nodes, err := c.Nodes().List(api.ListOptions{})
 		expectNoError(err)
@@ -136,7 +133,7 @@ var _ = Describe("MetricsGrabber", func() {
 	})
 
 	It("should grab all metrics from a ControllerManager.", func() {
-		By("Connecting proxying to Pod through the API server")
+		By("Proxying to Pod through the API server")
 		// Check if master Node is registered
 		nodes, err := c.Nodes().List(api.ListOptions{})
 		expectNoError(err)

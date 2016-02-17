@@ -248,7 +248,8 @@ function create-kube-proxy-opts() {
 KUBE_PROXY_OPTS="\
  --hostname-override=${1} \
  --master=http://${2}:8080 \
- --logtostderr=true"
+ --logtostderr=true \
+ ${3}"
 EOF
 
 }
@@ -312,6 +313,9 @@ function kube-up() {
   # downloading tarball release
   "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
 
+  # Fetch the hacked easyrsa that make-ca-cert.sh will use
+  curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+
   setClusterInfo
   local ii=0
 
@@ -357,6 +361,7 @@ function provision-master() {
   # copy the binaries and scripts to the ~/kube directory on the master
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
+    easy-rsa.tar.gz \
     ubuntu/reconfDocker.sh \
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
@@ -404,7 +409,7 @@ function provision-master() {
       cp ~/kube/init_scripts/* /etc/init.d/
 
       groupadd -f -r kube-cert
-      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
@@ -450,7 +455,8 @@ function provision-node() {
       '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${1#*@}' \
-      '${MASTER_IP}' 
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '${MASTER_IP}' '${1#*@}'
 
     sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '    
@@ -478,6 +484,7 @@ function provision-masterandnode() {
   # scp order matters
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
+    easy-rsa.tar.gz \
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/minion/* \
@@ -526,7 +533,8 @@ function provision-masterandnode() {
       '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${MASTER_IP}' \
-      '${MASTER_IP}'
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
     FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
@@ -536,7 +544,7 @@ function provision-masterandnode() {
       cp ~/kube/init_scripts/* /etc/init.d/
 
       groupadd -f -r kube-cert
-      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       cp ~/kube/minion/* /opt/bin/

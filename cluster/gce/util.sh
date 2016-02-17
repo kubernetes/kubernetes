@@ -647,7 +647,7 @@ function create-nodes() {
   local last_mig_size=$((${NUM_NODES} - (${NUM_MIGS} - 1) * ${instances_per_mig}))
 
   #TODO: parallelize this loop to speed up the process
-  for i in $(seq $((${NUM_MIGS} - 1))); do
+  for ((i=1; i<${NUM_MIGS}; i++)); do
     gcloud compute instance-groups managed \
         create "${NODE_INSTANCE_PREFIX}-group-$i" \
         --project "${PROJECT}" \
@@ -708,7 +708,7 @@ function create-autoscaler() {
     local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
     local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${NUM_MIGS} - 1) * ${min_instances_per_mig}))
 
-    for i in $(seq $((${NUM_MIGS} - 1))); do
+    for ((i=1; i<${NUM_MIGS}; i++)); do
       gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
           --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${metrics} || true
     done
@@ -744,6 +744,27 @@ function check-cluster() {
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
+          if [[ ${KUBE_TEST_DEBUG-} =~ ^[yY]$ ]]; then
+            local savedir="${E2E_REPORT_DIR-}"
+            if [[ -z "${savedir}" ]]; then
+              savedir="$(mktemp -t -d k8s-e2e.XXX)"
+            fi
+            echo "Preserving master logs in ${savedir}"
+            local logdir=/var/log
+            local basename
+            for basename in startupscript kube-apiserver; do
+              # TODO(mml): Perhaps revisit how we name logs for preservation and
+              # centralize an implementation.  Options include putting basename
+              # before hostname and including a timestamp.
+              local src="${logdir}/${basename}.log"
+              local dst="${savedir}/${MASTER_NAME}-${basename}.log"
+              echo "Copying ${MASTER_NAME}:${src}"
+              gcloud compute copy-files \
+                --project "${PROJECT}" --zone "${ZONE}" \
+                "${MASTER_NAME}:${src}" "${dst}" \
+                || true
+            done
+          fi
           exit 2
       fi
       printf "."
@@ -1231,7 +1252,17 @@ function test-teardown {
     --project "${PROJECT}" \
     --quiet \
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" || true
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  if [[ ${MULTIZONE:-} == "true" ]]; then
+      local zones=( ${E2E_ZONES} )
+      # tear them down in reverse order, finally tearing down the master too.
+      for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--))
+      do
+	  KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
+      done
+      KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/cluster/kube-down.sh"
+  else
+      "${KUBE_ROOT}/cluster/kube-down.sh"
+  fi
 }
 
 # SSH to a node by name ($1) and run a command ($2).

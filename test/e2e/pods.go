@@ -758,7 +758,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "liveness",
-						Image: "gcr.io/google_containers/nettest:1.6",
+						Image: "gcr.io/google_containers/nettest:1.7",
 						// These args are garbage but the image will exit if they're not there
 						// we just care about /read serving a 200, which it always does.
 						Args: []string{

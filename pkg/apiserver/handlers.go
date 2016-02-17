@@ -554,6 +554,10 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
 		requestInfo.Verb = "list"
 	}
+	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection
+	if len(requestInfo.Name) == 0 && requestInfo.Verb == "delete" {
+		requestInfo.Verb = "deletecollection"
+	}
 
 	return requestInfo, nil
 }

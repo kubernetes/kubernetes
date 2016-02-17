@@ -31,6 +31,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -574,17 +575,15 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 // runSyncPod is a helper function to retrieve the running pods from the fake
 // docker client and runs SyncPod for the given pod.
-func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff, expectErr bool) {
+func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff, expectErr bool) kubecontainer.PodSyncResult {
 	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
 	fakeDocker.ClearCalls()
 	if backOff == nil {
 		backOff = util.NewBackOff(time.Second, time.Minute)
 	}
-	// TODO(random-liu): Add test for PodSyncResult
 	// api.PodStatus is not used in SyncPod now, pass in an empty one.
 	result := dm.SyncPod(pod, api.PodStatus{}, podStatus, []api.Secret{}, backOff)
 	err = result.Error()
@@ -593,6 +592,7 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 	} else if err == nil && expectErr {
 		t.Errorf("expected error didn't occur")
 	}
+	return result
 }
 
 func TestSyncPodCreateNetAndContainer(t *testing.T) {
@@ -867,7 +867,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 			ID:   infraContainerID,
 			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
 		}})
-	dm.livenessManager.Set(kubecontainer.DockerID(unhealthyContainerID).ContainerID(), proberesults.Failure, nil)
+	dm.livenessManager.Set(kubecontainer.DockerID(unhealthyContainerID).ContainerID(), proberesults.Failure, pod)
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
@@ -1073,6 +1073,8 @@ func TestSyncPodBackoff(t *testing.T) {
 
 	startCalls := []string{"inspect_container", "create", "start", "inspect_container"}
 	backOffCalls := []string{"inspect_container"}
+	startResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", nil, ""}
+	backoffResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", kubecontainer.ErrCrashLoopBackOff, ""}
 	tests := []struct {
 		tick      int
 		backoff   int
@@ -1097,8 +1099,15 @@ func TestSyncPodBackoff(t *testing.T) {
 		fakeDocker.SetFakeContainers(dockerContainers)
 		fakeClock.SetTime(startTime.Add(time.Duration(c.tick) * time.Second))
 
-		runSyncPod(t, dm, fakeDocker, pod, backOff, c.expectErr)
+		result := runSyncPod(t, dm, fakeDocker, pod, backOff, c.expectErr)
 		verifyCalls(t, fakeDocker, c.result)
+
+		// Verify whether the correct sync pod result is generated
+		if c.expectErr {
+			verifySyncResults(t, []*kubecontainer.SyncResult{backoffResult}, result)
+		} else {
+			verifySyncResults(t, []*kubecontainer.SyncResult{startResult}, result)
+		}
 
 		if backOff.Get(stableId) != time.Duration(c.backoff)*time.Second {
 			t.Errorf("At tick %s expected backoff=%s got=%s", time.Duration(c.tick)*time.Second, time.Duration(c.backoff)*time.Second, backOff.Get(stableId))
@@ -1416,7 +1425,7 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	parts := strings.Split(newContainer.HostConfig.Binds[0], ":")
-	if !matchString(t, testPodContainerDir+"/k8s_bar\\.[a-f0-9]", parts[0]) {
+	if !matchString(t, testPodContainerDir+"/[a-f0-9]", parts[0]) {
 		t.Errorf("Unexpected host path: %s", parts[0])
 	}
 	if parts[1] != "/dev/somepath" {
@@ -1631,4 +1640,144 @@ func TestGetIPCMode(t *testing.T) {
 	}
 }
 
-// TODO(random-liu): Add unit test for returned PodSyncResult (issue #20478)
+func TestSyncPodWithPullPolicy(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	puller := dm.dockerPuller.(*FakeDockerPuller)
+	puller.HasImages = []string{"existing_one", "want:latest"}
+	dm.podInfraContainerImage = "pod_infra_image"
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar", Image: "pull_always_image", ImagePullPolicy: api.PullAlways},
+				{Name: "bar2", Image: "pull_if_not_present_image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "bar3", Image: "existing_one", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "bar4", Image: "want:latest", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "bar5", Image: "pull_never_image", ImagePullPolicy: api.PullNever},
+			},
+		},
+	}
+
+	expectedResults := []*kubecontainer.SyncResult{
+		//Sync result for infra container
+		{kubecontainer.StartContainer, PodInfraContainerName, nil, ""},
+		{kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod), nil, ""},
+		//Sync result for user containers
+		{kubecontainer.StartContainer, "bar", nil, ""},
+		{kubecontainer.StartContainer, "bar2", nil, ""},
+		{kubecontainer.StartContainer, "bar3", nil, ""},
+		{kubecontainer.StartContainer, "bar4", nil, ""},
+		{kubecontainer.StartContainer, "bar5", kubecontainer.ErrImageNeverPull,
+			"Container image \"pull_never_image\" is not present with pull policy of Never"},
+	}
+
+	result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
+	verifySyncResults(t, expectedResults, result)
+
+	fakeDocker.Lock()
+	defer fakeDocker.Unlock()
+
+	pulledImageSorted := puller.ImagesPulled[:]
+	sort.Strings(pulledImageSorted)
+	assert.Equal(t, []string{"pod_infra_image", "pull_always_image", "pull_if_not_present_image"}, pulledImageSorted)
+
+	if len(fakeDocker.Created) != 5 {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+}
+
+// This test only covers SyncPod with PullImageFailure, CreateContainerFailure and StartContainerFailure.
+// There are still quite a few failure cases not covered.
+// TODO(random-liu): Better way to test the SyncPod failures.
+func TestSyncPodWithFailure(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	puller := dm.dockerPuller.(*FakeDockerPuller)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+	}
+	// Pretend that the pod infra container has already been created, so that
+	// we can run the user containers.
+	fakeDocker.SetFakeRunningContainers([]*docker.Container{{
+		ID:   "9876",
+		Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0",
+	}})
+
+	tests := map[string]struct {
+		container   api.Container
+		dockerError map[string]error
+		pullerError []error
+		expected    []*kubecontainer.SyncResult
+	}{
+		"PullImageFailure": {
+			api.Container{Name: "bar", Image: "realImage", ImagePullPolicy: api.PullAlways},
+			map[string]error{},
+			[]error{fmt.Errorf("can't pull image")},
+			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrImagePull, "can't pull image"}},
+		},
+		"CreateContainerFailure": {
+			api.Container{Name: "bar"},
+			map[string]error{"create": fmt.Errorf("can't create container")},
+			[]error{},
+			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrRunContainer, "can't create container"}},
+		},
+		"StartContainerFailure": {
+			api.Container{Name: "bar"},
+			map[string]error{"start": fmt.Errorf("can't start container")},
+			[]error{},
+			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrRunContainer, "can't start container"}},
+		},
+	}
+
+	for _, test := range tests {
+		pod.Spec.Containers = []api.Container{test.container}
+		fakeDocker.Errors = test.dockerError
+		puller.ErrorsToInject = test.pullerError
+		result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
+		verifySyncResults(t, test.expected, result)
+	}
+}
+
+// Verify whether all the expected results appear exactly only once in real result.
+func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult, realResult kubecontainer.PodSyncResult) {
+	if len(expectedResults) != len(realResult.SyncResults) {
+		t.Errorf("expected sync result number %d, got %d", len(expectedResults), len(realResult.SyncResults))
+		for _, r := range expectedResults {
+			t.Errorf("expected result: %+v", r)
+		}
+		for _, r := range realResult.SyncResults {
+			t.Errorf("real result: %+v", r)
+		}
+		return
+	}
+	// The container start order is not fixed, because SyncPod() uses a map to store the containers to start.
+	// Here we should make sure each expected result appears only once in the real result.
+	for _, expectR := range expectedResults {
+		found := 0
+		for _, realR := range realResult.SyncResults {
+			// For the same action of the same container, the result should be the same
+			if realR.Target == expectR.Target && realR.Action == expectR.Action {
+				// We use Contains() here because the message format may be changed, but at least we should
+				// make sure that the expected message is contained.
+				if realR.Error != expectR.Error || !strings.Contains(realR.Message, expectR.Message) {
+					t.Errorf("expected sync result %+v, got %+v", expectR, realR)
+				}
+				found++
+			}
+		}
+		if found == 0 {
+			t.Errorf("not found expected result %+v", expectR)
+		}
+		if found > 1 {
+			t.Errorf("got %d duplicate expected result %+v", found, expectR)
+		}
+	}
+}

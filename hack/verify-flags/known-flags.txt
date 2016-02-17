@@ -138,6 +138,7 @@ horizontal-pod-autoscaler-sync-period
 host-ipc-sources
 host-network-sources
 host-pid-sources
+host-port-endpoints
 hostname-override
 http-check-frequency
 http-port
@@ -171,6 +172,7 @@ kubectl-path
 kubelet-address
 kubelet-cadvisor-port
 kubelet-certificate-authority
+kubelet-cgroups
 kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
@@ -228,6 +230,7 @@ min-pr-number
 min-request-timeout
 min-resync-period
 minimum-container-ttl-duration
+minimum-image-ttl-duration
 minion-max-log-age
 minion-max-log-backups
 minion-max-log-size
@@ -251,6 +254,7 @@ num-nodes
 oidc-ca-file
 oidc-client-id
 oidc-issuer-url
+oidc-groups-claim
 oidc-username-claim
 only-idl
 oom-score-adj
@@ -311,6 +315,7 @@ root-ca-file
 root-dir
 run-proxy
 runtime-config
+runtime-cgroups
 save-config
 scheduler-config
 scheduler-name
@@ -347,6 +352,7 @@ storage-versions
 streaming-connection-idle-timeout
 suicide-timeout
 sync-frequency
+system-cgroups
 system-container
 system-reserved
 target-port
@@ -377,9 +383,11 @@ www-prefix
 clientset-name
 clientset-only
 clientset-path
+fake-clientset
 leader-elect
 leader-elect-lease-duration
 leader-elect-renew-deadline
 leader-elect-retry-period
 watch-cache-sizes
 configure-hairpin-mode
+lock-file

@@ -53,7 +53,7 @@ kubernetes/server/bin/kube-apiserver \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv &> /var/log/kube-apiserver.log &
 
 # kube-contoller-manager now needs running kube-api server to actually start
-until [ "$(curl 127.0.0.1:8080/healthz)" == "ok" ]; do
+until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
 	sleep 1
 done
 kubernetes/server/bin/kube-controller-manager --master=127.0.0.1:8080 --service-account-private-key-file=/srv/kubernetes/server.key --root-ca-file=/srv/kubernetes/ca.crt --v=2 &> /var/log/kube-controller-manager.log &

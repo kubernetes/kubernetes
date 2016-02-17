@@ -139,6 +139,23 @@ func deepCopy_v1_ConfigMapKeySelector(in v1.ConfigMapKeySelector, out *v1.Config
 	return nil
 }
 
+func deepCopy_v1_ConfigMapVolumeSource(in v1.ConfigMapVolumeSource, out *v1.ConfigMapVolumeSource, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]v1.KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_KeyToPath(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_Container(in v1.Container, out *v1.Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -458,6 +475,12 @@ func deepCopy_v1_ISCSIVolumeSource(in v1.ISCSIVolumeSource, out *v1.ISCSIVolumeS
 	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func deepCopy_v1_KeyToPath(in v1.KeyToPath, out *v1.KeyToPath, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Path = in.Path
 	return nil
 }
 
@@ -809,6 +832,12 @@ func deepCopy_v1_SecurityContext(in v1.SecurityContext, out *v1.SecurityContext,
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		out.ReadOnlyRootFilesystem = new(bool)
+		*out.ReadOnlyRootFilesystem = *in.ReadOnlyRootFilesystem
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
@@ -979,6 +1008,14 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 	} else {
 		out.AzureFile = nil
 	}
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(v1.ConfigMapVolumeSource)
+		if err := deepCopy_v1_ConfigMapVolumeSource(*in.ConfigMap, out.ConfigMap, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
+	}
 	return nil
 }
 
@@ -1090,15 +1127,6 @@ func deepCopy_v1beta1_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *con
 	if err := deepCopy_v1_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
 		return err
 	}
-	if err := deepCopy_v1beta1_DaemonSetUpdateStrategy(in.UpdateStrategy, &out.UpdateStrategy, c); err != nil {
-		return err
-	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
-	} else {
-		out.UniqueLabelKey = nil
-	}
 	return nil
 }
 
@@ -1106,19 +1134,6 @@ func deepCopy_v1beta1_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatus, 
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
-	return nil
-}
-
-func deepCopy_v1beta1_DaemonSetUpdateStrategy(in DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, c *conversion.Cloner) error {
-	out.Type = in.Type
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(RollingUpdateDaemonSet)
-		if err := deepCopy_v1beta1_RollingUpdateDaemonSet(*in.RollingUpdate, out.RollingUpdate, c); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
 	return nil
 }
 
@@ -1800,19 +1815,6 @@ func deepCopy_v1beta1_RollbackConfig(in RollbackConfig, out *RollbackConfig, c *
 	return nil
 }
 
-func deepCopy_v1beta1_RollingUpdateDaemonSet(in RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, c *conversion.Cloner) error {
-	if in.MaxUnavailable != nil {
-		out.MaxUnavailable = new(intstr.IntOrString)
-		if err := deepCopy_intstr_IntOrString(*in.MaxUnavailable, out.MaxUnavailable, c); err != nil {
-			return err
-		}
-	} else {
-		out.MaxUnavailable = nil
-	}
-	out.MinReadySeconds = in.MinReadySeconds
-	return nil
-}
-
 func deepCopy_v1beta1_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
 	if in.MaxUnavailable != nil {
 		out.MaxUnavailable = new(intstr.IntOrString)
@@ -2001,6 +2003,7 @@ func init() {
 		deepCopy_v1_CephFSVolumeSource,
 		deepCopy_v1_CinderVolumeSource,
 		deepCopy_v1_ConfigMapKeySelector,
+		deepCopy_v1_ConfigMapVolumeSource,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerPort,
 		deepCopy_v1_DownwardAPIVolumeFile,
@@ -2020,6 +2023,7 @@ func init() {
 		deepCopy_v1_Handler,
 		deepCopy_v1_HostPathVolumeSource,
 		deepCopy_v1_ISCSIVolumeSource,
+		deepCopy_v1_KeyToPath,
 		deepCopy_v1_Lifecycle,
 		deepCopy_v1_LoadBalancerIngress,
 		deepCopy_v1_LoadBalancerStatus,
@@ -2051,7 +2055,6 @@ func init() {
 		deepCopy_v1beta1_DaemonSetList,
 		deepCopy_v1beta1_DaemonSetSpec,
 		deepCopy_v1beta1_DaemonSetStatus,
-		deepCopy_v1beta1_DaemonSetUpdateStrategy,
 		deepCopy_v1beta1_Deployment,
 		deepCopy_v1beta1_DeploymentList,
 		deepCopy_v1beta1_DeploymentRollback,
@@ -2092,7 +2095,6 @@ func init() {
 		deepCopy_v1beta1_ReplicaSetStatus,
 		deepCopy_v1beta1_ReplicationControllerDummy,
 		deepCopy_v1beta1_RollbackConfig,
-		deepCopy_v1beta1_RollingUpdateDaemonSet,
 		deepCopy_v1beta1_RollingUpdateDeployment,
 		deepCopy_v1beta1_RunAsUserStrategyOptions,
 		deepCopy_v1beta1_SELinuxContextStrategyOptions,

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,7 +62,7 @@ func RegisterFlags() {
 	// Randomize specs as well as suites
 	config.GinkgoConfig.RandomizeAllSpecs = true
 
-	flag.StringVar(&testContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embedded authinfo.")
+	flag.StringVar(&testContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
 	flag.StringVar(&testContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&testContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&testContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
@@ -189,12 +190,54 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 })
 
+type CleanupActionHandle *int
+
+var cleanupActionsLock sync.Mutex
+var cleanupActions = map[CleanupActionHandle]func(){}
+
+// AddCleanupAction installs a function that will be called in the event of the
+// whole test being terminated.  This allows arbitrary pieces of the overall
+// test to hook into SynchronizedAfterSuite().
+func AddCleanupAction(fn func()) CleanupActionHandle {
+	p := CleanupActionHandle(new(int))
+	cleanupActionsLock.Lock()
+	defer cleanupActionsLock.Unlock()
+	cleanupActions[p] = fn
+	return p
+}
+
+// RemoveCleanupAction removes a function that was installed by
+// AddCleanupAction.
+func RemoveCleanupAction(p CleanupActionHandle) {
+	cleanupActionsLock.Lock()
+	defer cleanupActionsLock.Unlock()
+	delete(cleanupActions, p)
+}
+
+// RunCleanupActions runs all functions installed by AddCleanupAction.  It does
+// not remove them (see RemoveCleanupAction) but it does run unlocked, so they
+// may remove themselves.
+func RunCleanupActions() {
+	list := []func(){}
+	func() {
+		cleanupActionsLock.Lock()
+		defer cleanupActionsLock.Unlock()
+		for _, fn := range cleanupActions {
+			list = append(list, fn)
+		}
+	}()
+	// Run unlocked.
+	for _, fn := range list {
+		fn()
+	}
+}
+
 // Similar to SynchornizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
 // Here, the order of functions is reversed; first, the function which runs everywhere,
 // and then the function that only runs on the first Ginkgo node.
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	// Run on all Ginkgo nodes
-
+	RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
 	if testContext.ReportDir != "" {
@@ -221,8 +264,7 @@ func RunE2ETests(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		// TODO(ihmccreery) Remove [Skipped] once all [Skipped] labels have been reclassified.
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Skipped\]|\[Feature:.+\]`
+		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
 	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins

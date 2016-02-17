@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -95,7 +95,7 @@ type ReplicationManager struct {
 func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
@@ -187,7 +187,6 @@ func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting RC Manager")
-	controller.SyncAllPodsWithStore(rm.kubeClient, rm.podStore.Store)
 	go rm.rcController.Run(stopCh)
 	go rm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {

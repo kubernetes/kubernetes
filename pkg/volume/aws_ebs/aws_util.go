@@ -132,12 +132,22 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volum
 		return "", 0, err
 	}
 
-	requestBytes := c.options.Capacity.Value()
-	// The cloud provider works with gigabytes, convert to GiB with rounding up
-	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
+	// AWS volumes don't have Name field, store the name in Name tag
+	var tags map[string]string
+	if c.options.CloudTags == nil {
+		tags = make(map[string]string)
+	} else {
+		tags = *c.options.CloudTags
+	}
+	tags["Name"] = volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // AWS tags can have 255 characters
 
-	volumeOptions := &aws.VolumeOptions{}
-	volumeOptions.CapacityGB = int(requestGB)
+	requestBytes := c.options.Capacity.Value()
+	// AWS works with gigabytes, convert to GiB with rounding up
+	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	volumeOptions := &aws.VolumeOptions{
+		CapacityGB: requestGB,
+		Tags:       &tags,
+	}
 
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {

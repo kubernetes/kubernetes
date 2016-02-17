@@ -170,6 +170,13 @@ is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
 
+If available, a certificate bundle is placed into the filesystem tree of each
+container at `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`, and should be
+used to verify the serving certificate of the apiserver.
+
+Finally, the default namespace to be used for namespaced API operations is placed in a file
+at `/var/run/secrets/kubernetes.io/serviceaccount/namespace` in each container.
+
 From within a pod the recommended ways to connect to API are:
   - run a kubectl proxy as one of the containers in the pod, or as a background
     process within a container.  This proxies the

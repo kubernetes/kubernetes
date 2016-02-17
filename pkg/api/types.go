@@ -217,6 +217,8 @@ type VolumeSource struct {
 	FC *FCVolumeSource `json:"fc,omitempty"`
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
+	// ConfigMap represents a configMap that should populate this volume
+	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -688,6 +690,36 @@ type AzureFileVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
+// Adapts a ConfigMap into a volume.
+//
+// The contents of the target ConfigMap's Data field will be presented in a
+// volume as files using the keys in the Data field as the file names, unless
+// the items element is populated with specific mappings of keys to paths.
+// ConfigMap volumes support ownership management and SELinux relabeling.
+type ConfigMapVolumeSource struct {
+	LocalObjectReference `json:",inline"`
+	// If unspecified, each key-value pair in the Data field of the referenced
+	// ConfigMap will be projected into the volume as a file whose name is the
+	// key and content is the value. If specified, the listed keys will be
+	// projected into the specified paths, and unlisted keys will not be
+	// present. If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error. Paths must be relative and may not contain
+	// the '..' path or start with '..'.
+	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// Maps a string key to a path within a volume.
+type KeyToPath struct {
+	// The key to project.
+	Key string `json:"key"`
+
+	// The relative path of the file to map the key to.
+	// May not be an absolute path.
+	// May not contain the path element '..'.
+	// May not start with the string '..'.
+	Path string `json:"path"`
+}
+
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
@@ -1113,23 +1145,23 @@ const (
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
 
-// Affinity is a group of affinity scheduling requirements.
+// Affinity is a group of affinity scheduling rules, currently
+// only node affinity, but in the future also inter-pod affinity.
 type Affinity struct {
-	// Describes node affinity scheduling requirements for the pod.
+	// Describes node affinity scheduling rules for the pod.
 	NodeAffinity *NodeAffinity `json:"nodeAffinity,omitempty"`
 }
 
-// Node affinity is a group of node affinity scheduling requirements.
-// If RequiredDuringSchedulingRequiredDuringExecution and
-// RequiredDuringSchedulingIgnoredDuringExecution are both set,
-// then both node selectors must be satisfied.
+// Node affinity is a group of node affinity scheduling rules.
 type NodeAffinity struct {
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
 	// at some point during pod execution (e.g. due to an update), the system
 	// will try to eventually evict the pod from its node.
-	RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
@@ -1970,6 +2002,14 @@ type PodProxyOptions struct {
 	Path string
 }
 
+// NodeProxyOptions is the query options to a Node's proxy call
+type NodeProxyOptions struct {
+	unversioned.TypeMeta
+
+	// Path is the URL path to use for the current proxy request
+	Path string
+}
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	Kind            string    `json:"kind,omitempty"`
@@ -2218,6 +2258,8 @@ const (
 	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
 	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
 	ServiceAccountRootCAKey = "ca.crt"
+	// ServiceAccountNamespaceKey is the key of the optional namespace to use as the default for namespaced API calls
+	ServiceAccountNamespaceKey = "namespace"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//
@@ -2412,6 +2454,9 @@ type SecurityContext struct {
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
+	// The read-only root filesystem allows you to restrict the locations that an application can write
+	// files to, ensuring the persistent data can only be written to mounts.
+	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
 }
 
 // SELinuxOptions are the labels to be applied to the container.

@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flock"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -153,6 +154,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	}
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
+		MinAge:               s.ImageMinimumGCAge.Duration,
 		HighThresholdPercent: s.ImageGCHighThresholdPercent,
 		LowThresholdPercent:  s.ImageGCLowThresholdPercent,
 	}
@@ -193,7 +195,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		CPUCFSQuota:               s.CPUCFSQuota,
 		DiskSpacePolicy:           diskSpacePolicy,
 		DockerClient:              dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		DockerDaemonContainer:     s.DockerDaemonContainer,
+		RuntimeCgroups:            s.RuntimeCgroups,
 		DockerExecHandler:         dockerExecHandler,
 		EnableCustomMetrics:       s.EnableCustomMetrics,
 		EnableDebuggingHandlers:   s.EnableDebuggingHandlers,
@@ -235,7 +237,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		RegistryPullQPS:                s.RegistryPullQPS,
 		ResolverConfig:                 s.ResolverConfig,
 		Reservation:                    *reservation,
-		ResourceContainer:              s.ResourceContainer,
+		KubeletCgroups:                 s.KubeletCgroups,
 		RktPath:                        s.RktPath,
 		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
@@ -244,7 +246,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		StandaloneMode:                 (len(s.APIServerList) == 0),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout.Duration,
 		SyncFrequency:                  s.SyncFrequency.Duration,
-		SystemContainer:                s.SystemContainer,
+		SystemCgroups:                  s.SystemCgroups,
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
@@ -262,6 +264,12 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 // will be ignored.
 func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	var err error
+	if s.LockFilePath != "" {
+		glog.Infof("aquiring lock on %q", s.LockFilePath)
+		if err := flock.Acquire(s.LockFilePath); err != nil {
+			return fmt.Errorf("unable to aquire file lock on %q: %v", s.LockFilePath, err)
+		}
+	}
 	if kcfg == nil {
 		cfg, err := UnsecuredKubeletConfig(s)
 		if err != nil {
@@ -299,7 +307,16 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	}
 
 	if kcfg.ContainerManager == nil {
-		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface)
+		if kcfg.SystemCgroups != "" && kcfg.CgroupRoot == "" {
+			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+		}
+
+		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface, cm.NodeConfig{
+			RuntimeCgroupsName: kcfg.RuntimeCgroups,
+			SystemCgroupsName:  kcfg.SystemCgroups,
+			KubeletCgroupsName: kcfg.KubeletCgroups,
+			ContainerRuntime:   kcfg.ContainerRuntime,
+		})
 		if err != nil {
 			return err
 		}
@@ -494,7 +511,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		CPUCFSQuota:               true,
 		DiskSpacePolicy:           diskSpacePolicy,
 		DockerClient:              dockerClient,
-		DockerDaemonContainer:     "/docker-daemon",
+		RuntimeCgroups:            "",
 		DockerExecHandler:         &dockertools.NativeExecHandler{},
 		EnableCustomMetrics:       false,
 		EnableDebuggingHandlers:   true,
@@ -523,11 +540,11 @@ func SimpleKubelet(client *clientset.Clientset,
 		RegistryBurst:       10,
 		RegistryPullQPS:     5.0,
 		ResolverConfig:      kubetypes.ResolvConfDefault,
-		ResourceContainer:   "/kubelet",
+		KubeletCgroups:      "/kubelet",
 		RootDirectory:       rootDir,
 		SerializeImagePulls: true,
 		SyncFrequency:       syncFrequency,
-		SystemContainer:     "",
+		SystemCgroups:       "",
 		TLSOptions:          tlsOptions,
 		VolumePlugins:       volumePlugins,
 		Writer:              &io.StdWriter{},
@@ -570,7 +587,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kcfg.EventClient.Events("")})
+		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kcfg.EventClient.Events("")})
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
@@ -670,7 +687,7 @@ type KubeletConfig struct {
 	CPUCFSQuota                    bool
 	DiskSpacePolicy                kubelet.DiskSpacePolicy
 	DockerClient                   dockertools.DockerInterface
-	DockerDaemonContainer          string
+	RuntimeCgroups                 string
 	DockerExecHandler              dockertools.ExecHandler
 	EnableCustomMetrics            bool
 	EnableDebuggingHandlers        bool
@@ -717,7 +734,7 @@ type KubeletConfig struct {
 	RegistryPullQPS                float64
 	Reservation                    kubetypes.Reservation
 	ResolverConfig                 string
-	ResourceContainer              string
+	KubeletCgroups                 string
 	RktPath                        string
 	RktStage1Image                 string
 	RootDirectory                  string
@@ -726,7 +743,7 @@ type KubeletConfig struct {
 	StandaloneMode                 bool
 	StreamingConnectionIdleTimeout time.Duration
 	SyncFrequency                  time.Duration
-	SystemContainer                string
+	SystemCgroups                  string
 	TLSOptions                     *server.TLSOptions
 	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
@@ -795,7 +812,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.Cloud,
 		kc.NodeLabels,
 		kc.NodeStatusUpdateFrequency,
-		kc.ResourceContainer,
 		kc.OSInterface,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
@@ -803,8 +819,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,
-		kc.DockerDaemonContainer,
-		kc.SystemContainer,
 		kc.ConfigureCBR0,
 		kc.NonMasqueradeCIDR,
 		kc.PodCIDR,

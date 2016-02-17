@@ -66,13 +66,14 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
@@ -95,8 +96,8 @@ const (
 	defaultReconcileCooldown     = 15 * time.Second
 	defaultNodeRelistPeriod      = 5 * time.Minute
 	defaultFrameworkName         = "Kubernetes"
-	defaultExecutorCPUs          = mresource.CPUShares(0.25)  // initial CPU allocated for executor
-	defaultExecutorMem           = mresource.MegaBytes(128.0) // initial memory allocated for executor
+	defaultExecutorCPUs          = resources.CPUShares(0.25)  // initial CPU allocated for executor
+	defaultExecutorMem           = resources.MegaBytes(128.0) // initial memory allocated for executor
 	defaultExecutorInfoCacheSize = 10000
 )
 
@@ -119,8 +120,8 @@ type SchedulerServer struct {
 	mesosAuthPrincipal    string
 	mesosAuthSecretFile   string
 	mesosCgroupPrefix     string
-	mesosExecutorCPUs     mresource.CPUShares
-	mesosExecutorMem      mresource.MegaBytes
+	mesosExecutorCPUs     resources.CPUShares
+	mesosExecutorMem      resources.MegaBytes
 	checkpoint            bool
 	failoverTimeout       float64
 	generateTaskDiscovery bool
@@ -147,8 +148,8 @@ type SchedulerServer struct {
 	hostnameOverride               string
 	reconcileInterval              int64
 	reconcileCooldown              time.Duration
-	defaultContainerCPULimit       mresource.CPUShares
-	defaultContainerMemLimit       mresource.MegaBytes
+	defaultContainerCPULimit       resources.CPUShares
+	defaultContainerMemLimit       resources.MegaBytes
 	schedulerConfigFileName        string
 	graceful                       bool
 	frameworkName                  string
@@ -174,6 +175,7 @@ type SchedulerServer struct {
 	sandboxOverlay                 string
 	conntrackMax                   int
 	conntrackTCPTimeoutEstablished int
+	useHostPortEndpoints           bool
 
 	executable  string // path to the binary running this service
 	client      *clientset.Clientset
@@ -202,8 +204,8 @@ func NewSchedulerServer() *SchedulerServer {
 		runProxy:                 true,
 		executorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
 		launchGracePeriod:        execcfg.DefaultLaunchGracePeriod,
-		defaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
-		defaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
+		defaultContainerCPULimit: resources.DefaultDefaultContainerCPULimit,
+		defaultContainerMemLimit: resources.DefaultDefaultContainerMemLimit,
 
 		proxyMode: "userspace", // upstream default is "iptables" post-v1.1
 
@@ -231,6 +233,7 @@ func NewSchedulerServer() *SchedulerServer {
 		containPodResources:            true,
 		nodeRelistPeriod:               defaultNodeRelistPeriod,
 		conntrackTCPTimeoutEstablished: 0, // non-zero values may require hand-tuning other sysctl's on the host; do so with caution
+		useHostPortEndpoints:           true,
 
 		// non-zero values can trigger failures when updating /sys/module/nf_conntrack/parameters/hashsize
 		// when kube-proxy is running in a non-root netns (init_net); setting this to a non-zero value will
@@ -293,6 +296,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.defaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
 	fs.BoolVar(&s.containPodResources, "contain-pod-resources", s.containPodResources, "Reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
 	fs.DurationVar(&s.nodeRelistPeriod, "node-monitor-period", s.nodeRelistPeriod, "Period between relisting of all nodes from the apiserver.")
+	fs.BoolVar(&s.useHostPortEndpoints, "host-port-endpoints", s.useHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
 
 	fs.IntVar(&s.executorLogV, "executor-logv", s.executorLogV, "Logging verbosity of spawned minion and executor processes.")
 	fs.BoolVar(&s.executorBindall, "executor-bindall", s.executorBindall, "When true will set -address of the executor to 0.0.0.0.")
@@ -552,7 +556,6 @@ func (s *SchedulerServer) getDriver() (driver bindings.SchedulerDriver) {
 }
 
 func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
-	podtask.GenerateTaskDiscoveryEnabled = s.generateTaskDiscovery
 	if n := len(s.frameworkRoles); n == 0 || n > 2 || (n == 2 && s.frameworkRoles[0] != "*" && s.frameworkRoles[1] != "*") {
 		log.Fatalf(`only one custom role allowed in addition to "*"`)
 	}
@@ -792,10 +795,16 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	broadcaster.StartLogging(log.Infof)
-	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{eventsClient.Events("")})
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{eventsClient.Events("")})
+
+	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
+
+	hostPortStrategy := hostport.StrategyFixed
+	if s.useHostPortEndpoints {
+		hostPortStrategy = hostport.StrategyWildcard
+	}
 
 	// create scheduler core with all components arranged around it
-	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(
 		sc,
 		framework,
@@ -805,9 +814,13 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		schedulerProcess.Terminal(),
 		s.mux,
 		lw,
-		eiPrototype,
-		s.frameworkRoles,
-		s.defaultPodRoles,
+		podtask.Config{
+			DefaultPodRoles:              s.defaultPodRoles,
+			FrameworkRoles:               s.frameworkRoles,
+			GenerateTaskDiscoveryEnabled: s.generateTaskDiscovery,
+			HostPortStrategy:             hostPortStrategy,
+			Prototype:                    eiPrototype,
+		},
 		s.defaultContainerCPULimit,
 		s.defaultContainerMemLimit,
 	)

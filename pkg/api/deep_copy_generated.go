@@ -44,6 +44,7 @@ func init() {
 		DeepCopy_api_ConfigMap,
 		DeepCopy_api_ConfigMapKeySelector,
 		DeepCopy_api_ConfigMapList,
+		DeepCopy_api_ConfigMapVolumeSource,
 		DeepCopy_api_Container,
 		DeepCopy_api_ContainerImage,
 		DeepCopy_api_ContainerPort,
@@ -81,6 +82,7 @@ func init() {
 		DeepCopy_api_Handler,
 		DeepCopy_api_HostPathVolumeSource,
 		DeepCopy_api_ISCSIVolumeSource,
+		DeepCopy_api_KeyToPath,
 		DeepCopy_api_Lifecycle,
 		DeepCopy_api_LimitRange,
 		DeepCopy_api_LimitRangeItem,
@@ -102,6 +104,7 @@ func init() {
 		DeepCopy_api_NodeCondition,
 		DeepCopy_api_NodeDaemonEndpoints,
 		DeepCopy_api_NodeList,
+		DeepCopy_api_NodeProxyOptions,
 		DeepCopy_api_NodeResources,
 		DeepCopy_api_NodeSelector,
 		DeepCopy_api_NodeSelectorRequirement,
@@ -366,6 +369,24 @@ func DeepCopy_api_ConfigMapList(in ConfigMapList, out *ConfigMapList, c *convers
 		*out = make([]ConfigMap, len(in))
 		for i := range in {
 			if err := DeepCopy_api_ConfigMap(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_api_ConfigMapVolumeSource(in ConfigMapVolumeSource, out *ConfigMapVolumeSource, c *conversion.Cloner) error {
+	if err := DeepCopy_api_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]KeyToPath, len(in))
+		for i := range in {
+			if err := DeepCopy_api_KeyToPath(in[i], &(*out)[i], c); err != nil {
 				return err
 			}
 		}
@@ -1005,6 +1026,12 @@ func DeepCopy_api_ISCSIVolumeSource(in ISCSIVolumeSource, out *ISCSIVolumeSource
 	return nil
 }
 
+func DeepCopy_api_KeyToPath(in KeyToPath, out *KeyToPath, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Path = in.Path
+	return nil
+}
+
 func DeepCopy_api_Lifecycle(in Lifecycle, out *Lifecycle, c *conversion.Cloner) error {
 	if in.PostStart != nil {
 		in, out := in.PostStart, &out.PostStart
@@ -1306,15 +1333,6 @@ func DeepCopy_api_NodeAddress(in NodeAddress, out *NodeAddress, c *conversion.Cl
 }
 
 func DeepCopy_api_NodeAffinity(in NodeAffinity, out *NodeAffinity, c *conversion.Cloner) error {
-	if in.RequiredDuringSchedulingRequiredDuringExecution != nil {
-		in, out := in.RequiredDuringSchedulingRequiredDuringExecution, &out.RequiredDuringSchedulingRequiredDuringExecution
-		*out = new(NodeSelector)
-		if err := DeepCopy_api_NodeSelector(*in, *out, c); err != nil {
-			return err
-		}
-	} else {
-		out.RequiredDuringSchedulingRequiredDuringExecution = nil
-	}
 	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 		in, out := in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
 		*out = new(NodeSelector)
@@ -1381,6 +1399,14 @@ func DeepCopy_api_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) err
 	} else {
 		out.Items = nil
 	}
+	return nil
+}
+
+func DeepCopy_api_NodeProxyOptions(in NodeProxyOptions, out *NodeProxyOptions, c *conversion.Cloner) error {
+	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
 	return nil
 }
 
@@ -2597,6 +2623,13 @@ func DeepCopy_api_SecurityContext(in SecurityContext, out *SecurityContext, c *c
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		in, out := in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
@@ -2937,6 +2970,15 @@ func DeepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 		}
 	} else {
 		out.AzureFile = nil
+	}
+	if in.ConfigMap != nil {
+		in, out := in.ConfigMap, &out.ConfigMap
+		*out = new(ConfigMapVolumeSource)
+		if err := DeepCopy_api_ConfigMapVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
 	}
 	return nil
 }

@@ -31,20 +31,15 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-// TODO: quinton: debug issue #6541 and then remove Pending flag here.
-var _ = Describe("[Flaky] Monitoring", func() {
-	var c *client.Client
+var _ = Describe("Monitoring", func() {
+	f := NewFramework("monitoring")
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-
 		SkipUnlessProviderIs("gce")
 	})
 
 	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
-		testMonitoringUsingHeapsterInfluxdb(c)
+		testMonitoringUsingHeapsterInfluxdb(f.Client)
 	})
 })
 

@@ -32,10 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-const (
-	defaultGCAge = time.Minute * 1
-)
-
 // Manages lifecycle of all images.
 //
 // Implementation is thread-safe.
@@ -62,6 +58,9 @@ type ImageGCPolicy struct {
 	// Any usage below this threshold will never trigger garbage collection.
 	// This is the lowest threshold we will try to garbage collect to.
 	LowThresholdPercent int
+
+	// Minimum age at which a image can be garbage collected.
+	MinAge time.Duration
 }
 
 type realImageManager struct {
@@ -74,10 +73,6 @@ type realImageManager struct {
 
 	// The image garbage collection policy in use.
 	policy ImageGCPolicy
-
-	// Minimum age at which a image can be garbage collected, zero for no limit.
-	// TODO(mqliang): move it to ImageGCPolicy and make it configurable
-	minAge time.Duration
 
 	// cAdvisor instance.
 	cadvisor cadvisor.Interface
@@ -118,7 +113,6 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 	im := &realImageManager{
 		runtime:      runtime,
 		policy:       policy,
-		minAge:       defaultGCAge,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     cadvisorInterface,
 		recorder:     recorder,
@@ -279,7 +273,8 @@ func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (in
 
 		// Avoid garbage collect the image if the image is not old enough.
 		// In such a case, the image may have just been pulled down, and will be used by a container right away.
-		if freeTime.Sub(image.firstDetected) < im.minAge {
+
+		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
 			continue
 		}
 

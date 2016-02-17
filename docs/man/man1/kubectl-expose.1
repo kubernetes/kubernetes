@@ -13,13 +13,15 @@ kubectl expose \- Take a replication controller, service or pod and expose it as
 
 .SH DESCRIPTION
 .PP
-Take a replication controller, service, or pod and expose it as a new Kubernetes service.
+Take a replication controller, service, replica set or pod and expose it as a new Kubernetes service.
 
 .PP
-Looks up a replication controller, service, or pod by name and uses the selector for that resource as the
-selector for a new service on the specified port. Note that if no port is specified via \-\-port and the
-exposed resource has multiple ports, all will be re\-used by the new service. Also if no labels are specified,
-the new service will re\-use the labels from the resource it exposes.
+Looks up a replication controller, service, replica set or pod by name and uses the selector for that
+resource as the selector for a new service on the specified port. A replica set will be exposed as a
+service only if it's selector is convertible to a selector that service supports, i.e. when the
+replica set selector contains only the matchLabels component. Note that if no port is specified
+via \-\-port and the exposed resource has multiple ports, all will be re\-used by the new service. Also
+if no labels are specified, the new service will re\-use the labels from the resource it exposes.
 
 
 .SH OPTIONS
@@ -95,7 +97,7 @@ the new service will re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-selector\fP=""
-    A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
+    A label selector to use for this service. Only equality\-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.
 
 .PP
 \fB\-\-session\-affinity\fP=""
@@ -111,7 +113,7 @@ the new service will re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-sort\-by\fP=""
-    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
 \fB\-\-target\-port\fP=""
@@ -240,6 +242,9 @@ $ kubectl expose service nginx \-\-port=443 \-\-target\-port=8443 \-\-name=nginx
 
 # Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video\-stream'.
 $ kubectl expose rc streamer \-\-port=4100 \-\-protocol=udp \-\-name=video\-stream
+
+# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
+$ kubectl expose rs nginx \-\-port=80 \-\-target\-port=8000
 
 .fi
 .RE

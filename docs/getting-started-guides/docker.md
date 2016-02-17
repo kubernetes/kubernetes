@@ -66,7 +66,6 @@ Here's a diagram of what the final result will look like:
 docker run \
     --volume=/:/rootfs:ro \
     --volume=/sys:/sys:ro \
-    --volume=/dev:/dev \
     --volume=/var/lib/docker/:/var/lib/docker:rw \
     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
     --volume=/var/run:/var/run:rw \
@@ -83,10 +82,12 @@ docker run \
         --config=/etc/kubernetes/manifests \
         --cluster-dns=10.0.0.10 \
         --cluster-domain=cluster.local \
-        --allow-privileged=true --v=10
+        --allow-privileged=true --v=2
 ```
 
 > Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
+
+> If you would like to mount an external device as a volume, add `--volume=/dev:/dev` to the command above. It may however, cause some problems described in [#18230](https://github.com/kubernetes/kubernetes/issues/18230)
 
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
 

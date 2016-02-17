@@ -6,7 +6,6 @@ file_owner
 file_perm
 fs_type
 gke_context
-host_port_endpoints
 max_in_flight
 max_par
 new_file_0644

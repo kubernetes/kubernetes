@@ -61,26 +61,11 @@ var _ = Describe("Services", func() {
 	f := NewFramework("services")
 
 	var c *client.Client
-	var extraNamespaces []string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		if testContext.DeleteNamespace {
-			for _, ns := range extraNamespaces {
-				By(fmt.Sprintf("Destroying namespace %v", ns))
-				if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-					Failf("Couldn't delete namespace %s: %s", ns, err)
-				}
-			}
-			extraNamespaces = nil
-		} else {
-			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-		}
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -327,9 +312,9 @@ var _ = Describe("Services", func() {
 
 		By("Removing iptable rules")
 		result, err := SSH(`
-					sudo iptables -t nat -F KUBE-SERVICES || true;
-					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
+			sudo iptables -t nat -F KUBE-SERVICES || true;
+			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
+			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
 		if err != nil || result.Code != 0 {
 			LogSSHResult(result)
 			Failf("couldn't remove iptable rules: %v", err)
@@ -426,11 +411,10 @@ var _ = Describe("Services", func() {
 		Logf("namespace for TCP test: %s", ns1)
 
 		By("creating a second namespace")
-		namespacePtr, err := createTestingNS("services", c, nil)
+		namespacePtr, err := f.CreateNamespace("services", nil)
 		Expect(err).NotTo(HaveOccurred())
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		Logf("namespace for UDP test: %s", ns2)
-		extraNamespaces = append(extraNamespaces, ns2)
 
 		jig := NewServiceTestJig(c, serviceName)
 		nodeIP := pickNodeIP(jig.Client) // for later
@@ -489,8 +473,7 @@ var _ = Describe("Services", func() {
 		staticIPName := ""
 		if providerIs("gce", "gke") {
 			By("creating a static load balancer IP")
-			rand.Seed(time.Now().UTC().UnixNano())
-			staticIPName = fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
+			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", runId)
 			requestedIP, err = createGCEStaticIP(staticIPName)
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
@@ -789,6 +772,7 @@ var _ = Describe("Services", func() {
 		}
 
 		outOfRangeNodePort := 0
+		rand.Seed(time.Now().UTC().UnixNano())
 		for {
 			outOfRangeNodePort = 1 + rand.Intn(65535)
 			if !ServiceNodePortRange.Contains(outOfRangeNodePort) {

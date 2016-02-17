@@ -178,8 +178,6 @@ func Up() bool {
 		}
 	}
 
-	// Enable deployments for e2e tests.
-	os.Setenv("KUBE_ENABLE_DEPLOYMENTS", "true")
 	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 

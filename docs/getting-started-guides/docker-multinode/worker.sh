@@ -187,7 +187,6 @@ start_k8s() {
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw  \
         -v /:/rootfs:ro \
-        -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \

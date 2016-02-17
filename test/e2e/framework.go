@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -33,13 +34,20 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	maxKubectlExecRetries = 5
+)
+
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
 type Framework struct {
 	BaseName string
 
-	Namespace                *api.Namespace
-	Client                   *client.Client
+	Client        *client.Client
+	Clientset_1_2 *release_1_2.Clientset
+
+	Namespace                *api.Namespace   // Every test has at least one namespace
+	namespacesToDelete       []*api.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
 	gatherer containerResourceGatherer
@@ -51,6 +59,11 @@ type Framework struct {
 	logsSizeWaitGroup    sync.WaitGroup
 	logsSizeCloseChannel chan bool
 	logsSizeVerifier     *LogsSizeVerifier
+
+	// To make sure that this framework cleans up after itself, no matter what,
+	// we install a cleanup action before each test and clear it after.  If we
+	// should abort, the AfterSuite hook should run all cleanup actions.
+	cleanupHandle CleanupActionHandle
 }
 
 type TestDataSummary interface {
@@ -74,14 +87,19 @@ func NewFramework(baseName string) *Framework {
 
 // beforeEach gets a client and makes a namespace.
 func (f *Framework) beforeEach() {
+	// The fact that we need this feels like a bug in ginkgo.
+	// https://github.com/onsi/ginkgo/issues/222
+	f.cleanupHandle = AddCleanupAction(f.afterEach)
+
 	By("Creating a kubernetes client")
 	c, err := loadClient()
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Client = c
+	f.Clientset_1_2 = release_1_2.FromUnversionedClient(c)
 
 	By("Building a namespace api object")
-	namespace, err := createTestingNS(f.BaseName, f.Client, map[string]string{
+	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
 		"e2e-framework": f.BaseName,
 	})
 	Expect(err).NotTo(HaveOccurred())
@@ -114,6 +132,33 @@ func (f *Framework) beforeEach() {
 
 // afterEach deletes the namespace, after reading its events.
 func (f *Framework) afterEach() {
+	RemoveCleanupAction(f.cleanupHandle)
+
+	// DeleteNamespace at the very end in defer, to avoid any
+	// expectation failures preventing deleting the namespace.
+	defer func() {
+		if testContext.DeleteNamespace {
+			for _, ns := range f.namespacesToDelete {
+				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
+
+				timeout := 5 * time.Minute
+				if f.NamespaceDeletionTimeout != 0 {
+					timeout = f.NamespaceDeletionTimeout
+				}
+				if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
+					Failf("Couldn't delete ns %q: %s", ns.Name, err)
+				}
+			}
+			f.namespacesToDelete = nil
+		} else {
+			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+		}
+
+		// Paranoia-- prevent reuse!
+		f.Namespace = nil
+		f.Client = nil
+	}()
+
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
@@ -132,23 +177,21 @@ func (f *Framework) afterEach() {
 		dumpAllNodeInfo(f.Client)
 	}
 
-	// Check whether all nodes are ready after the test.
-	if err := allNodesReady(f.Client, time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
-	}
-
 	summaries := make([]TestDataSummary, 0)
 	if testContext.GatherKubeSystemResourceUsageData {
+		By("Collecting resource usage data")
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
 	}
 
 	if testContext.GatherLogsSizes {
+		By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	if testContext.GatherMetricsAfterTest {
+		By("Gathering metrics")
 		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
 		grabber, err := metrics.NewMetricsGrabber(f.Client, true, false, false, true)
 		if err != nil {
@@ -161,20 +204,6 @@ func (f *Framework) afterEach() {
 				summaries = append(summaries, (*MetricsForE2E)(&received))
 			}
 		}
-	}
-
-	if testContext.DeleteNamespace {
-		By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
-
-		timeout := 5 * time.Minute
-		if f.NamespaceDeletionTimeout != 0 {
-			timeout = f.NamespaceDeletionTimeout
-		}
-		if err := deleteNS(f.Client, f.Namespace.Name, timeout); err != nil {
-			Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
-		}
-	} else {
-		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
 
 	outputTypes := strings.Split(testContext.OutputPrintType, ",")
@@ -191,13 +220,24 @@ func (f *Framework) afterEach() {
 				Logf("Finished")
 			}
 		default:
-			Logf("Unknown ouptut type: %v. Skipping.", printType)
+			Logf("Unknown output type: %v. Skipping.", printType)
 		}
 	}
 
-	// Paranoia-- prevent reuse!
-	f.Namespace = nil
-	f.Client = nil
+	// Check whether all nodes are ready after the test.
+	// This is explicitly done at the very end of the test, to avoid
+	// e.g. not removing namespace in case of this failure.
+	if err := allNodesReady(f.Client, time.Minute); err != nil {
+		Failf("All nodes should be ready after test, %v", err)
+	}
+}
+
+func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
+	ns, err := createTestingNS(baseName, f.Client, labels)
+	if err == nil {
+		f.namespacesToDelete = append(f.namespacesToDelete, ns)
+	}
+	return ns, err
 }
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
@@ -283,7 +323,7 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 		}
 	}
 	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
-	stdout, stderr, err := kubectlExec(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
+	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
 		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
@@ -294,11 +334,32 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 func (f *Framework) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
 	By("reading a file in the container")
 
-	stdout, stderr, err := kubectlExec(f.Namespace.Name, podName, containerName, "--", "cat", path)
+	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
 	if err != nil {
 		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
+}
+
+func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
+	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
+		if numRetries > 0 {
+			Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
+		}
+
+		stdOutBytes, stdErrBytes, err := kubectlExec(namespace, podName, containerName, args...)
+		if err != nil {
+			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
+				// Retry on "i/o timeout" errors
+				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				continue
+			}
+		}
+
+		return stdOutBytes, stdErrBytes, err
+	}
+	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up.", maxKubectlExecRetries)
+	return nil, nil, err
 }
 
 func kubectlExec(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {

@@ -113,10 +113,10 @@ create their own API groups](design/extending-api.md), and to avoid naming colli
 
 ## Enabling resources in the extensions group
 
-HorizontalPodAutoscalers, Jobs, Ingress and ReplicaSets are enabled by default.
+HorizontalPodAutoscalers, Jobs, Ingress, Deployments and ReplicaSets are enabled by default.
 Other extensions resources can be enabled by setting runtime-config on
-apiserver. runtime-config accepts comma separated values. For ex: to enable deployments and disable jobs, set
-`--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/jobs=false`
+apiserver. runtime-config accepts comma separated values. For ex: to disable deployments and jobs, set
+`--runtime-config=extensions/v1beta1/deployments=false,extensions/v1beta1/jobs=false`
 
 ## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 

@@ -74,8 +74,37 @@ function set-broken-motd() {
   echo -e '\nBroken (or in progress) Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
 }
 
-function set-good-motd() {
-  echo -e '\n=== Kubernetes node setup complete ===\n' > /etc/motd
+function reset-motd() {
+  # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
+  local -r version="$(/usr/local/bin/kubelet --version=true | cut -f2 -d " ")"
+  # This regex grabs the minor version, e.g. v1.2.
+  local -r minor="$(echo ${version} | sed -r "s/(v[0-9]+\.[0-9]+).*/\1/g")"
+  # This logic grabs either a release tag (v1.2.1 or v1.2.1-alpha.1),
+  # or the git hash that's in the build info.
+  local gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
+  local devel=""
+  if [[ "${gitref}" != "${version}" ]]; then
+    devel="
+Note: This looks like a development version, which might not be present on GitHub.
+If it isn't, the closest tag is at:
+  https://github.com/kubernetes/kubernetes/tree/${gitref}
+"
+    gitref="${version//*+/}"
+  fi
+  cat > /etc/motd <<EOF
+
+Welcome to Kubernetes ${version}!
+
+You can find documentation for this release at:
+  http://kubernetes.io/${minor}/
+
+You can download the build image for this release at:
+  https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
+
+It is based on the Kubernetes source at:
+  https://github.com/kubernetes/kubernetes/tree/${gitref}
+${devel}
+EOF
 }
 
 function curl-metadata() {
@@ -779,7 +808,7 @@ if [[ -z "${is_push}" ]]; then
   configure-salt
   remove-docker-artifacts
   run-salt
-  set-good-motd
+  reset-motd
 
   run-user-script
   echo "== kube-up node config done =="
@@ -790,6 +819,7 @@ else
   set-kube-env
   create-salt-pillar
   download-release
+  reset-motd
   run-salt
   echo "== kube-push node config done =="
 fi

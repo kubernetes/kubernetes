@@ -17,18 +17,18 @@ limitations under the License.
 package fake
 
 import (
-	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	core_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned/fake"
-	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	extensions_unversioned_fake "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned/fake"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	fakeunversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned/fake"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	fakeunversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned/fake"
 )
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() core_unversioned.CoreInterface {
-	return &core_unversioned_fake.FakeCore{&c.Fake}
+func (c *Clientset) Core() unversionedcore.CoreInterface {
+	return &fakeunversionedcore.FakeCore{&c.Fake}
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
-	return &extensions_unversioned_fake.FakeExtensions{&c.Fake}
+func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+	return &fakeunversionedextensions.FakeExtensions{&c.Fake}
 }

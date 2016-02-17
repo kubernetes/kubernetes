@@ -49,6 +49,7 @@ type PersistentVolumeProvisionerController struct {
 	pluginMgr        volume.VolumePluginMgr
 	stopChannels     map[string]chan struct{}
 	mutex            sync.RWMutex
+	clusterName      string
 }
 
 // constant name values for the controllers stopChannels map.
@@ -57,11 +58,12 @@ const volumesStopChannel = "volumes"
 const claimsStopChannel = "claims"
 
 // NewPersistentVolumeProvisionerController creates a new PersistentVolumeProvisionerController
-func NewPersistentVolumeProvisionerController(client controllerClient, syncPeriod time.Duration, plugins []volume.VolumePlugin, provisioner volume.ProvisionableVolumePlugin, cloud cloudprovider.Interface) (*PersistentVolumeProvisionerController, error) {
+func NewPersistentVolumeProvisionerController(client controllerClient, syncPeriod time.Duration, clusterName string, plugins []volume.VolumePlugin, provisioner volume.ProvisionableVolumePlugin, cloud cloudprovider.Interface) (*PersistentVolumeProvisionerController, error) {
 	controller := &PersistentVolumeProvisionerController{
 		client:      client,
 		cloud:       cloud,
 		provisioner: provisioner,
+		clusterName: clusterName,
 	}
 
 	if err := controller.pluginMgr.InitPlugins(plugins, controller); err != nil {
@@ -153,6 +155,20 @@ func (controller *PersistentVolumeProvisionerController) handleUpdateClaim(oldOb
 }
 
 func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *api.PersistentVolumeClaim) error {
+	glog.V(5).Infof("Synchronizing PersistentVolumeClaim[%s] for dynamic provisioning", claim.Name)
+
+	// The claim may have been modified by parallel call to reconcileClaim, load
+	// the current version.
+	newClaim, err := controller.client.GetPersistentVolumeClaim(claim.Namespace, claim.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot reload claim %s/%s: %v", claim.Namespace, claim.Name, err)
+	}
+	claim = newClaim
+	err = controller.claimStore.Update(claim)
+	if err != nil {
+		return fmt.Errorf("Cannot update claim %s/%s: %v", claim.Namespace, claim.Name, err)
+	}
+
 	if controller.provisioner == nil {
 		return fmt.Errorf("No provisioner configured for controller")
 	}
@@ -172,7 +188,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *a
 	}
 
 	glog.V(5).Infof("PersistentVolumeClaim[%s] provisioning", claim.Name)
-	provisioner, err := newProvisioner(controller.provisioner, claim, nil)
+	provisioner, err := controller.newProvisioner(controller.provisioner, claim, nil)
 	if err != nil {
 		return fmt.Errorf("Unexpected error getting new provisioner for claim %s: %v\n", claim.Name, err)
 	}
@@ -211,6 +227,14 @@ func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *a
 func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api.PersistentVolume) error {
 	glog.V(5).Infof("PersistentVolume[%s] reconciling", pv.Name)
 
+	// The PV may have been modified by parallel call to reconcileVolume, load
+	// the current version.
+	newPv, err := controller.client.GetPersistentVolume(pv.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot reload volume %s: %v", pv.Name, err)
+	}
+	pv = newPv
+
 	if pv.Spec.ClaimRef == nil {
 		glog.V(5).Infof("PersistentVolume[%s] is not bound to a claim.  No provisioning required", pv.Name)
 		return nil
@@ -244,7 +268,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api
 
 	// provisioning is incomplete.  Attempt to provision the volume.
 	glog.V(5).Infof("PersistentVolume[%s] provisioning in progress", pv.Name)
-	err := provisionVolume(pv, controller)
+	err = provisionVolume(pv, controller)
 	if err != nil {
 		return fmt.Errorf("Error provisioning PersistentVolume[%s]: %v", pv.Name, err)
 	}
@@ -274,7 +298,7 @@ func provisionVolume(pv *api.PersistentVolume, controller *PersistentVolumeProvi
 	}
 	claim := obj.(*api.PersistentVolumeClaim)
 
-	provisioner, _ := newProvisioner(controller.provisioner, claim, pv)
+	provisioner, _ := controller.newProvisioner(controller.provisioner, claim, pv)
 	err := provisioner.Provision(pv)
 	if err != nil {
 		glog.Errorf("Could not provision %s", pv.Name)
@@ -330,7 +354,7 @@ func (controller *PersistentVolumeProvisionerController) Stop() {
 	}
 }
 
-func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.PersistentVolumeClaim, pv *api.PersistentVolume) (volume.Provisioner, error) {
+func (controller *PersistentVolumeProvisionerController) newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.PersistentVolumeClaim, pv *api.PersistentVolume) (volume.Provisioner, error) {
 	tags := make(map[string]string)
 	tags[cloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
 	tags[cloudVolumeCreatedForClaimNameTag] = claim.Name
@@ -345,6 +369,11 @@ func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.Persiste
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 		CloudTags:                     &tags,
+		ClusterName:                   controller.clusterName,
+	}
+
+	if pv != nil {
+		volumeOptions.PVName = pv.Name
 	}
 
 	provisioner, err := plugin.NewProvisioner(volumeOptions)

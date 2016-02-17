@@ -14,7 +14,7 @@ kubectl run \- Run a particular image on the cluster.
 .SH DESCRIPTION
 .PP
 Create and run a particular image, possibly replicated.
-Creates a replication controller or job to manage the created container(s).
+Creates a deployment or job to manage the created container(s).
 
 
 .SH OPTIONS
@@ -40,7 +40,7 @@ Creates a replication controller or job to manage the created container(s).
 
 .PP
 \fB\-\-generator\fP=""
-    The name of the API generator to use.  Default is 'run/v1' if \-\-restart=Always, otherwise the default is 'job/v1beta1'.
+    The name of the API generator to use.  Default is 'deployment/v1beta1' if \-\-restart=Always, otherwise the default is 'job/v1beta1'.
 
 .PP
 \fB\-\-hostport\fP=\-1
@@ -98,7 +98,7 @@ Creates a replication controller or job to manage the created container(s).
 
 .PP
 \fB\-\-restart\fP="Always"
-    The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, a job is created for this pod and \-\-replicas must be 1.  Default 'Always'
+    The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created for this pod, if set to OnFailure or Never, a job is created for this pod and \-\-replicas must be 1.  Default 'Always'
 
 .PP
 \fB\-\-rm\fP=false
@@ -126,7 +126,7 @@ Creates a replication controller or job to manage the created container(s).
 
 .PP
 \fB\-\-sort\-by\fP=""
-    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
 \fB\-i\fP, \fB\-\-stdin\fP=false
@@ -256,7 +256,7 @@ $ kubectl run nginx \-\-image=nginx \-\-replicas=5
 # Dry run. Print the corresponding API objects without creating them.
 $ kubectl run nginx \-\-image=nginx \-\-dry\-run
 
-# Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
+# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.
 $ kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.

@@ -71,6 +71,7 @@ type APIServer struct {
 	OIDCClientID               string
 	OIDCIssuerURL              string
 	OIDCUsernameClaim          string
+	OIDCGroupsClaim            string
 	RuntimeConfig              util.ConfigurationMap
 	SSHKeyfile                 string
 	SSHUser                    string
@@ -165,6 +166,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
 		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') is not "+
 		"guaranteed to be unique and immutable. This flag is experimental, please see the authentication documentation for further details.")
+	fs.StringVar(&s.OIDCGroupsClaim, "oidc-groups-claim", "", "If provided, the name of a custom OpenID Connect claim for specifying user groups. The claim value is expected to be an array of strings. This flag is experimental, please see the authentication documentation for further details.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, "File containing PEM-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup, "If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")

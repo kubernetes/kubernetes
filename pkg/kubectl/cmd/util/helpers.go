@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -116,6 +117,22 @@ func checkErr(err error, handleErr func(string)) {
 		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
+	}
+
+	if meta.IsNoResourceMatchError(err) {
+		noMatch := err.(*meta.NoResourceMatchError)
+
+		switch {
+		case len(noMatch.PartialResource.Group) > 0 && len(noMatch.PartialResource.Version) > 0:
+			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
+		case len(noMatch.PartialResource.Group) > 0:
+			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group))
+		case len(noMatch.PartialResource.Version) > 0:
+			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Version))
+		default:
+			handleErr(fmt.Sprintf("the server doesn't have a resource type %q", noMatch.PartialResource.Resource))
+		}
+		return
 	}
 
 	// handle multiline errors
@@ -318,8 +335,6 @@ func AddApplyAnnotationFlags(cmd *cobra.Command) {
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {

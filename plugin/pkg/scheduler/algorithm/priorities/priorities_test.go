@@ -24,8 +24,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -62,9 +64,9 @@ func TestZeroRequest(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						"cpu": resource.MustParse(
-							strconv.FormatInt(defaultMilliCpuRequest, 10) + "m"),
+							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
 						"memory": resource.MustParse(
-							strconv.FormatInt(defaultMemoryRequest, 10)),
+							strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
 					},
 				},
 			},
@@ -79,9 +81,9 @@ func TestZeroRequest(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						"cpu": resource.MustParse(
-							strconv.FormatInt(defaultMilliCpuRequest*3, 10) + "m"),
+							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
 						"memory": resource.MustParse(
-							strconv.FormatInt(defaultMemoryRequest*3, 10)),
+							strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
 					},
 				},
 			},
@@ -102,7 +104,7 @@ func TestZeroRequest(t *testing.T) {
 		// and when the zero-request pod is the one being scheduled.
 		{
 			pod:   &api.Pod{Spec: noResources},
-			nodes: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+			nodes: []api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
 			test:  "test priority of zero-request pod with machine with zero-request pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
@@ -111,7 +113,7 @@ func TestZeroRequest(t *testing.T) {
 		},
 		{
 			pod:   &api.Pod{Spec: small},
-			nodes: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+			nodes: []api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
 			test:  "test priority of nonzero-request pod with machine with zero-request pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
@@ -121,7 +123,7 @@ func TestZeroRequest(t *testing.T) {
 		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
 		{
 			pod:   &api.Pod{Spec: large},
-			nodes: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+			nodes: []api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
 			test:  "test priority of larger pod with machine with zero-request pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
@@ -140,7 +142,7 @@ func TestZeroRequest(t *testing.T) {
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
-			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{})), Weight: 1}},
+			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{}), algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})), Weight: 1}},
 			algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

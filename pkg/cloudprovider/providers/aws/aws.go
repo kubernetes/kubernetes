@@ -491,6 +491,10 @@ func readAWSCloudConfig(config io.Reader, metadata EC2Metadata) (*AWSCloudConfig
 	return &cfg, nil
 }
 
+func getInstanceType(metadata EC2Metadata) (string, error) {
+	return metadata.GetMetadata("instance-type")
+}
+
 func getAvailabilityZone(metadata EC2Metadata) (string, error) {
 	return metadata.GetMetadata("placement/availability-zone")
 }
@@ -751,6 +755,24 @@ func (aws *AWSCloud) InstanceID(name string) (string, error) {
 	}
 }
 
+// InstanceType returns the type of the specified instance.
+func (aws *AWSCloud) InstanceType(name string) (string, error) {
+	awsInstance, err := aws.getSelfAWSInstance()
+	if err != nil {
+		return "", err
+	}
+
+	if awsInstance.nodeName == name {
+		return awsInstance.instanceType, nil
+	} else {
+		inst, err := aws.getInstanceByNodeName(name)
+		if err != nil {
+			return "", err
+		}
+		return orEmpty(inst.InstanceType), nil
+	}
+}
+
 // Check if the instance is alive (running or pending)
 // We typically ignore instances that are not alive
 func isAlive(instance *ec2.Instance) bool {
@@ -873,6 +895,9 @@ type awsInstance struct {
 	// availability zone the instance resides in
 	availabilityZone string
 
+	// instance type
+	instanceType string
+
 	mutex sync.Mutex
 
 	// We must cache because otherwise there is a race condition,
@@ -880,8 +905,8 @@ type awsInstance struct {
 	deviceMappings map[mountDevice]string
 }
 
-func newAWSInstance(ec2 EC2, awsID, nodeName string, availabilityZone string) *awsInstance {
-	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName, availabilityZone: availabilityZone}
+func newAWSInstance(ec2 EC2, awsID, nodeName, availabilityZone, instanceType string) *awsInstance {
+	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName, availabilityZone: availabilityZone, instanceType: instanceType}
 
 	// We lazy-init deviceMappings
 	self.deviceMappings = nil
@@ -1157,8 +1182,12 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
 		}
+		instanceType, err := getInstanceType(s.metadata)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching instance type from ec2 metadata service: %v", err)
+		}
 
-		i = newAWSInstance(s.ec2, instanceId, privateDnsName, availabilityZone)
+		i = newAWSInstance(s.ec2, instanceId, privateDnsName, availabilityZone, instanceType)
 		s.selfAWSInstance = i
 	}
 
@@ -1180,7 +1209,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName), orEmpty(instance.Placement.AvailabilityZone))
+		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName), orEmpty(instance.Placement.AvailabilityZone), orEmpty(instance.InstanceType))
 	}
 
 	return awsInstance, nil
@@ -1496,15 +1525,25 @@ func ipPermissionExists(newPermission, existing *ec2.IpPermission, compareGroupU
 	if !isEqualStringPointer(newPermission.IpProtocol, existing.IpProtocol) {
 		return false
 	}
-	if len(newPermission.IpRanges) != len(existing.IpRanges) {
+	// Check only if newPermission is a subset of existing. Usually it has zero or one elements.
+	// Not doing actual CIDR math yet; not clear it's needed, either.
+	glog.V(4).Infof("Comparing %v to %v", newPermission, existing)
+	if len(newPermission.IpRanges) > len(existing.IpRanges) {
 		return false
 	}
+
 	for j := range newPermission.IpRanges {
-		if !isEqualStringPointer(newPermission.IpRanges[j].CidrIp, existing.IpRanges[j].CidrIp) {
+		found := false
+		for k := range existing.IpRanges {
+			if isEqualStringPointer(newPermission.IpRanges[j].CidrIp, existing.IpRanges[k].CidrIp) {
+				found = true
+				break
+			}
+		}
+		if found == false {
 			return false
 		}
 	}
-
 	for _, leftPair := range newPermission.UserIdGroupPairs {
 		for _, rightPair := range existing.UserIdGroupPairs {
 			if isEqualUserGroupPair(leftPair, rightPair, compareGroupUserIDs) {

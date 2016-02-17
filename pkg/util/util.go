@@ -18,34 +18,10 @@ package util
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"reflect"
 	"regexp"
-	"strconv"
-	"strings"
-
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
-
-func GetIntOrPercentValue(intOrStr *intstr.IntOrString) (int, bool, error) {
-	switch intOrStr.Type {
-	case intstr.Int:
-		return intOrStr.IntValue(), false, nil
-	case intstr.String:
-		s := strings.Replace(intOrStr.StrVal, "%", "", -1)
-		v, err := strconv.Atoi(s)
-		if err != nil {
-			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
-		}
-		return int(v), true, nil
-	}
-	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
-}
-
-func GetValueFromPercent(percent int, value int) int {
-	return int(math.Ceil(float64(percent) * (float64(value)) / 100))
-}
 
 // Takes a list of strings and compiles them into a list of regular expressions
 func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {

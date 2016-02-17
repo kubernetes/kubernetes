@@ -118,7 +118,8 @@ const (
 //
 // TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively
 // in v1.3).
-var subResourceProxyVersion = version.MustParse("v1.1.0")
+var subResourcePodProxyVersion = version.MustParse("v1.1.0")
+var subResourceServiceAndNodeProxyVersion = version.MustParse("v1.2.0")
 
 type CloudConfig struct {
 	ProjectID         string
@@ -313,6 +314,9 @@ func SkipUnlessServerVersionGTE(v semver.Version, c client.ServerVersionInterfac
 
 // providersWithSSH are those providers where each node is accessible with SSH
 var providersWithSSH = []string{"gce", "gke", "aws"}
+
+// providersWithMasterSSH are those providers where master node is accessible with SSH
+var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws"}
 
 type podCondition func(pod *api.Pod) (bool, error)
 
@@ -995,7 +999,7 @@ func (r podProxyResponseChecker) checkAllResponses() (done bool, err error) {
 		if !isElementOf(pod.UID, currentPods) {
 			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
 		}
-		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, r.c)
+		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, r.c)
 		if err != nil {
 			return false, err
 		}
@@ -1273,7 +1277,7 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	return cmd
 }
 
-// kubectlBuilder is used to build, custimize and execute a kubectl Command.
+// kubectlBuilder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
 type kubectlBuilder struct {
 	cmd     *exec.Cmd
@@ -1753,7 +1757,7 @@ func (config *RCConfig) start() error {
 			//	- diagnose by noting the pod diff below.
 			// pod is unhealthy, so replication controller creates another to take its place
 			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
-			errorStr := fmt.Sprintf("Number of reported pods changed: %d vs %d", len(pods), len(oldPods))
+			errorStr := fmt.Sprintf("Number of reported pods for %s changed: %d vs %d", config.Name, len(pods), len(oldPods))
 			Logf("%v, pods that changed since the last iteration:", errorStr)
 			Diff(oldPods, pods).Print(sets.NewString())
 			return fmt.Errorf(errorStr)
@@ -1899,7 +1903,7 @@ func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
-		return err
+		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {
 		return nil
@@ -2117,7 +2121,7 @@ func waitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName strin
 		if err != nil {
 			return false, err
 		}
-		oldRSs, _, err := deploymentutil.GetOldReplicaSets(*deployment, c)
+		_, oldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, c)
 		if err != nil {
 			return false, err
 		}

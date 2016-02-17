@@ -29,9 +29,19 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
+# TODO: DRY. Refactor into upload-to-gcs.sh ?
+: ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}
+: ${JENKINS_UPLOAD_TO_GCS:="y"}
+
+if [[ ! ${JENKINS_UPLOAD_TO_GCS:-} =~ ^[yY]$ ]]; then
+  exit 0
+fi
+
 readonly result="$1"
 readonly timestamp=$(date +%s)
-readonly location="gs://kubernetes-jenkins/logs/${JOB_NAME}/${BUILD_NUMBER}/finished.json"
+readonly location="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}/${BUILD_NUMBER}/finished.json"
+
+echo -n 'Run finished at '; date -d "@${timestamp}"
 
 echo "Uploading build result to: ${location}"
 gsutil -q cp -a "public-read" <(

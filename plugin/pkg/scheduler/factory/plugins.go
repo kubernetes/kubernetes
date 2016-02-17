@@ -36,6 +36,7 @@ type PluginFactoryArgs struct {
 	PodLister        algorithm.PodLister
 	ServiceLister    algorithm.ServiceLister
 	ControllerLister algorithm.ControllerLister
+	ReplicaSetLister algorithm.ReplicaSetLister
 	NodeLister       algorithm.NodeLister
 	NodeInfo         predicates.NodeInfo
 	PVInfo           predicates.PersistentVolumeInfo

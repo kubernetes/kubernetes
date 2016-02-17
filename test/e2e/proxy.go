@@ -52,11 +52,13 @@ func proxyContext(version string) {
 	prefix := "/api/" + version
 
 	// Port here has to be kept in sync with default kubelet port.
-	It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, version, ":10250/logs/") })
+	It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
+	It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
+	It("should proxy to cadvisor [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
 
-	It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, version, "/logs/") })
-
-	It("should proxy to cadvisor [Conformance]", func() { nodeProxyTest(f, version, ":4194/containers/") })
+	It("should proxy logs on node with explicit kubelet port using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
+	It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
+	It("should proxy to cadvisor using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
 	It("should proxy through a service and a pod [Conformance]", func() {
 		labels := map[string]string{"proxy-service-target": "true"}
@@ -258,15 +260,14 @@ func pickNode(c *client.Client) (string, error) {
 	return nodes.Items[0].Name, nil
 }
 
-func nodeProxyTest(f *Framework, version, nodeDest string) {
-	prefix := "/api/" + version
+func nodeProxyTest(f *Framework, prefix, nodeDest string) {
 	node, err := pickNode(f.Client)
 	Expect(err).NotTo(HaveOccurred())
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+"/proxy/nodes/"+node+nodeDest)
+		_, status, d, err := doProxy(f, prefix+node+nodeDest)
 		if status == http.StatusServiceUnavailable {
 			Logf("Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)

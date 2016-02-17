@@ -67,6 +67,8 @@ to the OpenID provider.
 - `--oidc-username-claim` (optional, experimental) specifies which OpenID claim to use as the user name. By default, `sub`
 will be used, which should be unique and immutable under the issuer's domain. Cluster administrator can
 choose other claims such as `email` to use as the user name, but the uniqueness and immutability is not guaranteed.
+- `--oidc-groups-claim` (optional, experimental) the name of a custom OpenID Connect claim for specifying user groups. The claim
+value is expected to be an array of strings.
 
 Please note that this flag is still experimental until we settle more on how to handle the mapping of the OpenID user to the Kubernetes user. Thus further changes are possible.
 

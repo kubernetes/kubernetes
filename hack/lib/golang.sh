@@ -99,8 +99,7 @@ readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
-  test/images/network-tester/rc.json
-  test/images/network-tester/service.json
+  test/e2e/testing-manifests
   test/kubemark
   hack/e2e.go
   hack/e2e-internal
@@ -114,6 +113,7 @@ readonly KUBE_TEST_PLATFORMS=(
   linux/amd64
   darwin/amd64
   windows/amd64
+  linux/arm
 )
 
 # Gigabytes desired for parallel platform builds. 11 is fairly

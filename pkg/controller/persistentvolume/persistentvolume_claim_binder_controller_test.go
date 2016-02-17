@@ -120,10 +120,10 @@ func TestClaimRace(t *testing.T) {
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{}
+	mockClient.volume = v
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
-
 	// adds the volume to the index, making the volume available
 	syncVolume(volumeIndex, mockClient, v)
 	if mockClient.volume.Status.Phase != api.VolumeAvailable {
@@ -133,6 +133,8 @@ func TestClaimRace(t *testing.T) {
 		t.Errorf("Expected to find volume in index but it did not exist")
 	}
 
+	// add the claim to fake API server
+	mockClient.UpdatePersistentVolumeClaim(c1)
 	// an initial sync for a claim matches the volume
 	err = syncClaim(volumeIndex, mockClient, c1)
 	if err != nil {
@@ -143,6 +145,8 @@ func TestClaimRace(t *testing.T) {
 	}
 
 	// before the volume gets updated w/ claimRef, a 2nd claim can attempt to bind and find the same volume
+	// add the 2nd claim to fake API server
+	mockClient.UpdatePersistentVolumeClaim(c2)
 	err = syncClaim(volumeIndex, mockClient, c2)
 	if err != nil {
 		t.Errorf("unexpected error for unmatched claim: %v", err)
@@ -273,7 +277,8 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{
-		claim: claim,
+		claim:  claim,
+		volume: pv,
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
@@ -470,6 +475,8 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Errorf("Expected phase %s but got %s", api.VolumeAvailable, mockClient.volume.Status.Phase)
 	}
 
+	// add the claim to fake API server
+	mockClient.UpdatePersistentVolumeClaim(claim)
 	// an initial sync for a claim will bind it to an unbound volume
 	syncClaim(volumeIndex, mockClient, claim)
 
@@ -538,6 +545,14 @@ func TestCasting(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Status:     api.PersistentVolumeClaimStatus{Phase: api.ClaimBound},
 	}
+
+	// Inject mockClient into the binder. This prevents weird errors on stderr
+	// as the binder wants to load PV/PVC from API server.
+	mockClient := &mockBinderClient{
+		volume: pv,
+		claim:  pvc,
+	}
+	binder.client = mockClient
 
 	// none of these should fail casting.
 	// the real test is not failing when passed DeletedFinalStateUnknown in the deleteHandler

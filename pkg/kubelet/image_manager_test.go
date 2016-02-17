@@ -38,7 +38,6 @@ func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.Fa
 	return &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
-		minAge:       0,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
 		recorder:     &record.FakeRecorder{},
@@ -406,13 +405,13 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
+		MinAge:               time.Minute * 1,
 	}
 	fakeRuntime := &container.FakeRuntime{}
 	mockCadvisor := new(cadvisor.Mock)
 	manager := &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
-		minAge:       defaultGCAge,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
 		recorder:     &record.FakeRecorder{},
@@ -443,7 +442,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	assert.Len(fakeRuntime.ImageList, 2)
 
 	// move clock by minAge duration, then 1 image will be garbage collected
-	fakeClock.Step(manager.minAge)
+	fakeClock.Step(policy.MinAge)
 	spaceFreed, err = manager.freeSpace(1024, fakeClock.Now())
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)

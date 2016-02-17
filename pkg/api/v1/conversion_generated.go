@@ -271,6 +271,30 @@ func Convert_api_ConfigMapList_To_v1_ConfigMapList(in *api.ConfigMapList, out *C
 	return autoConvert_api_ConfigMapList_To_v1_ConfigMapList(in, out, s)
 }
 
+func autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.ConfigMapVolumeSource, out *ConfigMapVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ConfigMapVolumeSource))(in)
+	}
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_api_KeyToPath_To_v1_KeyToPath(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.ConfigMapVolumeSource, out *ConfigMapVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in, out, s)
+}
+
 func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Container))(in)
@@ -1088,6 +1112,19 @@ func Convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolumeSo
 	return autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in, out, s)
 }
 
+func autoConvert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *KeyToPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.KeyToPath))(in)
+	}
+	out.Key = in.Key
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *KeyToPath, s conversion.Scope) error {
+	return autoConvert_api_KeyToPath_To_v1_KeyToPath(in, out, s)
+}
+
 func autoConvert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Lifecycle))(in)
@@ -1525,6 +1562,18 @@ func autoConvert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s 
 
 func Convert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s conversion.Scope) error {
 	return autoConvert_api_NodeList_To_v1_NodeList(in, out, s)
+}
+
+func autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in, out, s)
 }
 
 func autoConvert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conversion.Scope) error {
@@ -2827,6 +2876,12 @@ func autoConvert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityConte
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		out.ReadOnlyRootFilesystem = new(bool)
+		*out.ReadOnlyRootFilesystem = *in.ReadOnlyRootFilesystem
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
@@ -3228,6 +3283,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	} else {
 		out.AzureFile = nil
 	}
+	// unable to generate simple pointer conversion for api.ConfigMapVolumeSource -> v1.ConfigMapVolumeSource
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(ConfigMapVolumeSource)
+		if err := Convert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in.ConfigMap, out.ConfigMap, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
+	}
 	return nil
 }
 
@@ -3489,6 +3553,30 @@ func autoConvert_v1_ConfigMapList_To_api_ConfigMapList(in *ConfigMapList, out *a
 
 func Convert_v1_ConfigMapList_To_api_ConfigMapList(in *ConfigMapList, out *api.ConfigMapList, s conversion.Scope) error {
 	return autoConvert_v1_ConfigMapList_To_api_ConfigMapList(in, out, s)
+}
+
+func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *ConfigMapVolumeSource, out *api.ConfigMapVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ConfigMapVolumeSource))(in)
+	}
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_v1_KeyToPath_To_api_KeyToPath(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *ConfigMapVolumeSource, out *api.ConfigMapVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container, s conversion.Scope) error {
@@ -4321,6 +4409,19 @@ func Convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSource
 	return autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in, out, s)
 }
 
+func autoConvert_v1_KeyToPath_To_api_KeyToPath(in *KeyToPath, out *api.KeyToPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*KeyToPath))(in)
+	}
+	out.Key = in.Key
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_KeyToPath_To_api_KeyToPath(in *KeyToPath, out *api.KeyToPath, s conversion.Scope) error {
+	return autoConvert_v1_KeyToPath_To_api_KeyToPath(in, out, s)
+}
+
 func autoConvert_v1_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *api.Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Lifecycle))(in)
@@ -4713,6 +4814,18 @@ func autoConvert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s 
 
 func Convert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s conversion.Scope) error {
 	return autoConvert_v1_NodeList_To_api_NodeList(in, out, s)
+}
+
+func autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in *NodeProxyOptions, out *api.NodeProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*NodeProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in *NodeProxyOptions, out *api.NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *api.NodeSpec, s conversion.Scope) error {
@@ -5936,6 +6049,12 @@ func autoConvert_v1_SecurityContext_To_api_SecurityContext(in *SecurityContext, 
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		out.ReadOnlyRootFilesystem = new(bool)
+		*out.ReadOnlyRootFilesystem = *in.ReadOnlyRootFilesystem
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
@@ -6338,6 +6457,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.AzureFile = nil
 	}
+	// unable to generate simple pointer conversion for v1.ConfigMapVolumeSource -> api.ConfigMapVolumeSource
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(api.ConfigMapVolumeSource)
+		if err := Convert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in.ConfigMap, out.ConfigMap, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
+	}
 	return nil
 }
 
@@ -6358,6 +6486,7 @@ func init() {
 		autoConvert_api_ComponentStatus_To_v1_ComponentStatus,
 		autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector,
 		autoConvert_api_ConfigMapList_To_v1_ConfigMapList,
+		autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource,
 		autoConvert_api_ConfigMap_To_v1_ConfigMap,
 		autoConvert_api_ContainerImage_To_v1_ContainerImage,
 		autoConvert_api_ContainerPort_To_v1_ContainerPort,
@@ -6394,6 +6523,7 @@ func init() {
 		autoConvert_api_Handler_To_v1_Handler,
 		autoConvert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
+		autoConvert_api_KeyToPath_To_v1_KeyToPath,
 		autoConvert_api_Lifecycle_To_v1_Lifecycle,
 		autoConvert_api_LimitRangeItem_To_v1_LimitRangeItem,
 		autoConvert_api_LimitRangeList_To_v1_LimitRangeList,
@@ -6413,6 +6543,7 @@ func init() {
 		autoConvert_api_NodeCondition_To_v1_NodeCondition,
 		autoConvert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints,
 		autoConvert_api_NodeList_To_v1_NodeList,
+		autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions,
 		autoConvert_api_NodeSpec_To_v1_NodeSpec,
 		autoConvert_api_NodeStatus_To_v1_NodeStatus,
 		autoConvert_api_NodeSystemInfo_To_v1_NodeSystemInfo,
@@ -6485,6 +6616,7 @@ func init() {
 		autoConvert_v1_ComponentStatus_To_api_ComponentStatus,
 		autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector,
 		autoConvert_v1_ConfigMapList_To_api_ConfigMapList,
+		autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource,
 		autoConvert_v1_ConfigMap_To_api_ConfigMap,
 		autoConvert_v1_ContainerImage_To_api_ContainerImage,
 		autoConvert_v1_ContainerPort_To_api_ContainerPort,
@@ -6522,6 +6654,7 @@ func init() {
 		autoConvert_v1_Handler_To_api_Handler,
 		autoConvert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,
+		autoConvert_v1_KeyToPath_To_api_KeyToPath,
 		autoConvert_v1_Lifecycle_To_api_Lifecycle,
 		autoConvert_v1_LimitRangeItem_To_api_LimitRangeItem,
 		autoConvert_v1_LimitRangeList_To_api_LimitRangeList,
@@ -6541,6 +6674,7 @@ func init() {
 		autoConvert_v1_NodeCondition_To_api_NodeCondition,
 		autoConvert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints,
 		autoConvert_v1_NodeList_To_api_NodeList,
+		autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions,
 		autoConvert_v1_NodeSpec_To_api_NodeSpec,
 		autoConvert_v1_NodeStatus_To_api_NodeStatus,
 		autoConvert_v1_NodeSystemInfo_To_api_NodeSystemInfo,

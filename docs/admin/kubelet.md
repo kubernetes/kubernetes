@@ -104,6 +104,8 @@ kubelet
       --kube-api-qps=5: QPS to use while talking with kubernetes apiserver
       --kube-reserved=: A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]
       --kubeconfig="/var/lib/kubelet/kubeconfig": Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).
+      --kubelet-cgroups="": Optional absolute name of cgroups to create and run the Kubelet in.
+      --lock-file="": <Warning: Alpha feature> The path to file for kubelet to use as a lock file.
       --log-flush-frequency=5s: Maximum number of seconds between log flushes
       --low-diskspace-threshold-mb=256: The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256
       --manifest-url="": URL for accessing the container manifest
@@ -114,6 +116,7 @@ kubelet
       --maximum-dead-containers=100: Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 100.
       --maximum-dead-containers-per-container=2: Maximum number of old instances to retain per container.  Each container takes up some disk space.  Default: 2.
       --minimum-container-ttl-duration=1m0s: Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
+      --minimum-image-ttl-duration=2m0s: Minimum age for a unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'. Default: '2m'
       --network-plugin="": <Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle
       --network-plugin-dir="/usr/libexec/kubernetes/kubelet-plugins/net/exec/": <Warning: Alpha feature> The full path of the directory in which to search for network plugins
       --node-ip="": IP address of the node. If set, kubelet will use this IP address for the node
@@ -133,15 +136,15 @@ kubelet
       --registry-burst=10: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0
       --registry-qps=5: If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=5.0]
       --resolv-conf="/etc/resolv.conf": Resolver configuration file used as the basis for the container DNS resolution configuration.
-      --resource-container="/kubelet": Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).
       --rkt-path="": Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'
       --rkt-stage1-image="": image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used
       --root-dir="/var/lib/kubelet": Directory path for managing kubelet files (volume mounts,etc).
       --runonce[=false]: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server
+      --runtime-cgroups="": Optional absolute name of cgroups to create and run the runtime in.
       --serialize-image-pulls[=true]: Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]
       --streaming-connection-idle-timeout=4h0m0s: Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'
       --sync-frequency=1m0s: Max period between synchronizing running containers and config
-      --system-container="": Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: "").
+      --system-cgroups="": Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: "").
       --system-reserved=: A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]
       --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to the directory passed to --cert-dir.
       --tls-private-key-file="": File containing x509 private key matching --tls-cert-file.
@@ -149,7 +152,7 @@ kubelet
       --volume-stats-agg-period=1m0s: Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.  To disable volume calculations, set to 0.  Default: '1m'
 ```
 
-###### Auto generated by spf13/cobra on 9-Feb-2016
+###### Auto generated by spf13/cobra on 15-Feb-2016
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

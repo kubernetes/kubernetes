@@ -21,3 +21,10 @@ message InternalAuthenticationResult {
 	// master pid that this result pertains to
 	required string pid = 3;
 }
+
+message InternalNetworkError {
+	// master pid that this event pertains to
+	required string pid = 1;
+	// driver session UUID
+	optional string session = 2;
+}

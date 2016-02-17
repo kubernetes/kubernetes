@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/mesos/mesos-go/auth/callback"
 	"github.com/mesos/mesos-go/upid"
@@ -38,8 +39,14 @@ func Login(ctx context.Context, handler callback.Handler) error {
 type loginKeyType int
 
 const (
-	loginProviderNameKey loginKeyType = iota // name of login provider to use
-	parentUpidKey                            // upid.UPID of some parent process
+	// name of login provider to use
+	loginProviderNameKey loginKeyType = iota
+
+	// upid.UPID of some parent process
+	parentUpidKey
+
+	// time.Duration that limits the overall duration of an auth attempt
+	timeoutKey
 )
 
 // Return a context that inherits all values from the parent ctx and specifies
@@ -74,7 +81,20 @@ func ParentUPIDFrom(ctx context.Context) (pid upid.UPID, ok bool) {
 func ParentUPID(ctx context.Context) (upid *upid.UPID) {
 	if upid, ok := ParentUPIDFrom(ctx); ok {
 		return &upid
-	} else {
-		return nil
 	}
+	return nil
+}
+
+func TimeoutFrom(ctx context.Context) (d time.Duration, ok bool) {
+	d, ok = ctx.Value(timeoutKey).(time.Duration)
+	return
+}
+
+func Timeout(ctx context.Context) (d time.Duration) {
+	d, _ = TimeoutFrom(ctx)
+	return
+}
+
+func WithTimeout(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, timeoutKey, d)
 }
