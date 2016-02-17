@@ -56,12 +56,15 @@ echo "... calling validate-cluster" >&2
 if [[ "${EXIT_ON_WEAK_ERROR}" == "true" ]]; then
 	validate-cluster
 else
-	if ! validate-cluster; then
-		validate_result="$?"
+	validate-cluster
+	validate_result="$?"
+	if [[ ${validate_result} != "0" ]]; then
 		if [[ "${validate_result}" == "1" ]]; then
 			exit 1
 		elif [[ "${validate_result}" == "2" ]]; then
 			echo "...ignoring non-fatal errors in validate-cluster" >&2
+		else
+			echo "Got unknown validate result: ${validate_result}"
 		fi
 	fi
 fi
