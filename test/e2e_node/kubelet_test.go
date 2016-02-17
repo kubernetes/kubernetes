@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
@@ -69,7 +70,8 @@ var _ = Describe("Kubelet", func() {
 
 			It("it should print the output to logs", func() {
 				Eventually(func() string {
-					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
+					sinceTime := unversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
+					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
 					if err != nil {
 						return ""
 					}
