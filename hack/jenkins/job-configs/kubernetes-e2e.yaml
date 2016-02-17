@@ -88,10 +88,7 @@
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
             timeout: 120
-        - 'gce-flannel':
-            description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
-            timeout: 90
-        - 'gce-examples':
+       - 'gce-examples':
             description: 'Run e2e examples test on GCE using the latest successful Kubernetes build.'
             timeout: 90
     jobs:
@@ -262,12 +259,17 @@
         - 'gke-ingress':
             description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
             timeout: 90
-            emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
+            emails: 'beeps@google.com'
             test-owner: 'beeps'
         - 'gce-ingress':
             description: 'Run [Feature:Ingress] tests on GCE using the latest successful build.'
             timeout: 90
-            emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
+            emails: 'beeps@google.com'
+            test-owner: 'beeps'
+        - 'gce-flannel':
+            description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
+            timeout: 90
+            emails: 'beeps@google.com'
             test-owner: 'beeps'
     jobs:
         - 'kubernetes-e2e-{suffix}'
