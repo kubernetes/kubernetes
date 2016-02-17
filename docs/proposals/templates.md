@@ -142,8 +142,7 @@ does assume the specification will be k8s API friendly.
     as an ApiGroup consumed the same k8s object schema as the peer k8s apis rather than introducing a new one)
 * Self-contained parameter definitions.  This allows a template to be a portable object which includes metadata that describe
   the inputs it expects, making it easy to wrapper a user interface around the parameterization flow.
-
-  scheme should support all of those types for substitution.
+* Object field primitive types include string, int, boolean, byte[].  The substitution scheme should support all of those types.
   * complex types (struct/map/list) can be defined in terms of the available primitives, so it's preferred to avoid the complexity
     of allowing for full complex-type substitution.
 * Parameter metadata.  Parameters should include at a minimum, information describing the purpose of the parameter, whether it is
@@ -338,15 +337,15 @@ pod template.
                 "env": [
                   {
                     "name": "MONGODB_USER",
-                    "value": "${MONGODB_USER}"
+                    "value": "$(MONGODB_USER)"
                   },
                   {
                     "name": "MONGODB_PASSWORD",
-                    "value": "${MONGODB_PASSWORD}"
+                    "value": "$(MONGODB_PASSWORD)"
                   },
                   {
                     "name": "MONGODB_DATABASE",
-                    "value": "${MONGODB_DATABASE}"
+                    "value": "$(MONGODB_DATABASE)"
                   }
                 ]
               }
@@ -395,7 +394,8 @@ pod template.
 * **/processedtemplates** - when a template is POSTed to this endpoint, all parameters in the template are processed and
 substituted into appropriate locations in the object definitions.  Validation is performed to ensure required parameters have
 a value supplied.  In addition labels defined in the template are applied to the object definitions.  Finally the customized
-template (still a `Template` object) is returned to the caller.
+template (still a `Template` object) is returned to the caller.  (The possibility of returning a List instead has
+also been discussed and will be considered for implementation).
 
 The client is then responsible for iterating the objects returned and POSTing them to the appropriate resource api endpoint to
 create each object, if that is the desired end goal for the client.
@@ -437,10 +437,11 @@ The api endpoint will then:
     of the `$(PARAM)` parameter.
   * If a given $(VAL) could be resolved to either a parameter or an environment variable/downward api reference, an error will be
     returned.
-5. Return the processed template object.
+5. Return the processed template object. (or List, depending on the choice made when this is implemented)
 
 The client can now either return the processed template to the user in a desired form (eg json or yaml), or directly iterate the
-api objects within the template, invoking the appropriate object creation api endpoint for each element.
+api objects within the template, invoking the appropriate object creation api endpoint for each element.  (If the api returns
+a List, the client would simply iterate the list to create the objects).
 
 The result is a consistently recreatable application configuration, including well-defined labels for grouping objects created by
 the template, with end-user customizations as enabled by the template author.
