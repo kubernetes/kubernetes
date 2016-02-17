@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
 	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
