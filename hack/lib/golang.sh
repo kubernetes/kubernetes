@@ -113,6 +113,7 @@ readonly KUBE_TEST_PLATFORMS=(
   linux/amd64
   darwin/amd64
   windows/amd64
+  linux/arm
 )
 
 # Gigabytes desired for parallel platform builds. 11 is fairly
