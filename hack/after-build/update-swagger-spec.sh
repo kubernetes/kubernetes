@@ -40,6 +40,7 @@ kube::golang::setup_env
 
 apiserver=$(kube::util::find-binary "kube-apiserver")
 
+TMP_DIR=$(mktemp -d /tmp/update-swagger-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8050}
@@ -58,6 +59,7 @@ KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_OUTPUT
   --public-address-override="127.0.0.1" \
   --advertise-address="10.10.10.10" \
   --kubelet-port=${KUBELET_PORT} \
+  --cert-dir="${TMP_DIR}/certs" \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
 APISERVER_PID=$!
 
