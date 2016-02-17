@@ -1841,6 +1841,14 @@ func autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(i
 	} else {
 		out.AccessModes = nil
 	}
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> unversioned.LabelSelector
+	if in.PersistentVolumeSelector != nil {
+		if err := s.Convert(&in.PersistentVolumeSelector, &out.PersistentVolumeSelector, 0); err != nil {
+			return err
+		}
+	} else {
+		out.PersistentVolumeSelector = nil
+	}
 	if err := Convert_api_ResourceRequirements_To_v1_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
@@ -5094,6 +5102,14 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(i
 		}
 	} else {
 		out.AccessModes = nil
+	}
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> unversioned.LabelSelector
+	if in.PersistentVolumeSelector != nil {
+		if err := s.Convert(&in.PersistentVolumeSelector, &out.PersistentVolumeSelector, 0); err != nil {
+			return err
+		}
+	} else {
+		out.PersistentVolumeSelector = nil
 	}
 	if err := Convert_v1_ResourceRequirements_To_api_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err

@@ -442,6 +442,8 @@ type PersistentVolumeClaimSpec struct {
 	// AccessModes contains the desired access modes the volume should have.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	// PersistentVolumeSelector is a selector which must be true for the claim to bind to a volume
+	PersistentVolumeSelector *unversioned.LabelSelector `json:"persistentVolumeSelector,omitempty"`
 	// Resources represents the minimum resources the volume should have.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
 	Resources ResourceRequirements `json:"resources,omitempty"`

@@ -44,6 +44,42 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
+func deepCopy_unversioned_LabelSelector(in unversioned.LabelSelector, out *unversioned.LabelSelector, c *conversion.Cloner) error {
+	if in.MatchLabels != nil {
+		out.MatchLabels = make(map[string]string)
+		for key, val := range in.MatchLabels {
+			out.MatchLabels[key] = val
+		}
+	} else {
+		out.MatchLabels = nil
+	}
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]unversioned.LabelSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := deepCopy_unversioned_LabelSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func deepCopy_unversioned_LabelSelectorRequirement(in unversioned.LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
 func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
@@ -1373,6 +1409,14 @@ func deepCopy_v1_PersistentVolumeClaimSpec(in PersistentVolumeClaimSpec, out *Pe
 	} else {
 		out.AccessModes = nil
 	}
+	if in.PersistentVolumeSelector != nil {
+		out.PersistentVolumeSelector = new(unversioned.LabelSelector)
+		if err := deepCopy_unversioned_LabelSelector(*in.PersistentVolumeSelector, out.PersistentVolumeSelector, c); err != nil {
+			return err
+		}
+	} else {
+		out.PersistentVolumeSelector = nil
+	}
 	if err := deepCopy_v1_ResourceRequirements(in.Resources, &out.Resources, c); err != nil {
 		return err
 	}
@@ -2630,6 +2674,8 @@ func deepCopy_intstr_IntOrString(in intstr.IntOrString, out *intstr.IntOrString,
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_resource_Quantity,
+		deepCopy_unversioned_LabelSelector,
+		deepCopy_unversioned_LabelSelectorRequirement,
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,

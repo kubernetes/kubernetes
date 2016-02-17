@@ -179,6 +179,8 @@ func init() {
 		DeepCopy_unversioned_GroupVersion,
 		DeepCopy_unversioned_GroupVersionKind,
 		DeepCopy_unversioned_GroupVersionResource,
+		DeepCopy_unversioned_LabelSelector,
+		DeepCopy_unversioned_LabelSelectorRequirement,
 		DeepCopy_unversioned_ListMeta,
 		DeepCopy_unversioned_TypeMeta,
 	); err != nil {
@@ -1693,6 +1695,15 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in PersistentVolumeClaimSpec, out *P
 	} else {
 		out.AccessModes = nil
 	}
+	if in.PersistentVolumeSelector != nil {
+		in, out := in.PersistentVolumeSelector, &out.PersistentVolumeSelector
+		*out = new(unversioned.LabelSelector)
+		if err := DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.PersistentVolumeSelector = nil
+	}
 	if err := DeepCopy_api_ResourceRequirements(in.Resources, &out.Resources, c); err != nil {
 		return err
 	}
@@ -3052,6 +3063,43 @@ func DeepCopy_unversioned_GroupVersionResource(in unversioned.GroupVersionResour
 	out.Group = in.Group
 	out.Version = in.Version
 	out.Resource = in.Resource
+	return nil
+}
+
+func DeepCopy_unversioned_LabelSelector(in unversioned.LabelSelector, out *unversioned.LabelSelector, c *conversion.Cloner) error {
+	if in.MatchLabels != nil {
+		in, out := in.MatchLabels, &out.MatchLabels
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.MatchLabels = nil
+	}
+	if in.MatchExpressions != nil {
+		in, out := in.MatchExpressions, &out.MatchExpressions
+		*out = make([]unversioned.LabelSelectorRequirement, len(in))
+		for i := range in {
+			if err := DeepCopy_unversioned_LabelSelectorRequirement(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func DeepCopy_unversioned_LabelSelectorRequirement(in unversioned.LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		in, out := in.Values, &out.Values
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Values = nil
+	}
 	return nil
 }
 

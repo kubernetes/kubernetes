@@ -7763,15 +7763,16 @@ func (x *PersistentVolumeClaimSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2 := !z.EncBinary()
 			yy2arr2 := z.EncBasicHandle().StructToArray
-			var yyq2 [3]bool
+			var yyq2 [4]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[0] = len(x.AccessModes) != 0
-			yyq2[1] = true
-			yyq2[2] = x.VolumeName != ""
+			yyq2[1] = x.PersistentVolumeSelector != nil
+			yyq2[2] = true
+			yyq2[3] = x.VolumeName != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
-				r.EncodeArrayStart(3)
+				r.EncodeArrayStart(4)
 			} else {
 				yynn2 = 0
 				for _, b := range yyq2 {
@@ -7818,25 +7819,60 @@ func (x *PersistentVolumeClaimSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[1] {
-					yy7 := &x.Resources
-					yy7.CodecEncodeSelf(e)
+					if x.PersistentVolumeSelector == nil {
+						r.EncodeNil()
+					} else {
+						yym7 := z.EncBinary()
+						_ = yym7
+						if false {
+						} else if z.HasExtensions() && z.EncExt(x.PersistentVolumeSelector) {
+						} else {
+							z.EncFallback(x.PersistentVolumeSelector)
+						}
+					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
 				if yyq2[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("resources"))
+					r.EncodeString(codecSelferC_UTF81234, string("persistentVolumeSelector"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy9 := &x.Resources
-					yy9.CodecEncodeSelf(e)
+					if x.PersistentVolumeSelector == nil {
+						r.EncodeNil()
+					} else {
+						yym8 := z.EncBinary()
+						_ = yym8
+						if false {
+						} else if z.HasExtensions() && z.EncExt(x.PersistentVolumeSelector) {
+						} else {
+							z.EncFallback(x.PersistentVolumeSelector)
+						}
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					yym12 := z.EncBinary()
-					_ = yym12
+					yy10 := &x.Resources
+					yy10.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq2[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("resources"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy12 := &x.Resources
+					yy12.CodecEncodeSelf(e)
+				}
+			}
+			if yyr2 || yy2arr2 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2[3] {
+					yym15 := z.EncBinary()
+					_ = yym15
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.VolumeName))
@@ -7845,12 +7881,12 @@ func (x *PersistentVolumeClaimSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2[2] {
+				if yyq2[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("volumeName"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym13 := z.EncBinary()
-					_ = yym13
+					yym16 := z.EncBinary()
+					_ = yym16
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.VolumeName))
@@ -7930,12 +7966,29 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromMap(l int, d *codec1978.D
 					h.decSlicePersistentVolumeAccessMode((*[]PersistentVolumeAccessMode)(yyv4), d)
 				}
 			}
+		case "persistentVolumeSelector":
+			if r.TryDecodeAsNil() {
+				if x.PersistentVolumeSelector != nil {
+					x.PersistentVolumeSelector = nil
+				}
+			} else {
+				if x.PersistentVolumeSelector == nil {
+					x.PersistentVolumeSelector = new(pkg2_unversioned.LabelSelector)
+				}
+				yym7 := z.DecBinary()
+				_ = yym7
+				if false {
+				} else if z.HasExtensions() && z.DecExt(x.PersistentVolumeSelector) {
+				} else {
+					z.DecFallback(x.PersistentVolumeSelector, false)
+				}
+			}
 		case "resources":
 			if r.TryDecodeAsNil() {
 				x.Resources = ResourceRequirements{}
 			} else {
-				yyv6 := &x.Resources
-				yyv6.CodecDecodeSelf(d)
+				yyv8 := &x.Resources
+				yyv8.CodecDecodeSelf(d)
 			}
 		case "volumeName":
 			if r.TryDecodeAsNil() {
@@ -7954,16 +8007,16 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromArray(l int, d *codec1978
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj8 int
-	var yyb8 bool
-	var yyhl8 bool = l >= 0
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	var yyj10 int
+	var yyb10 bool
+	var yyhl10 bool = l >= 0
+	yyj10++
+	if yyhl10 {
+		yyb10 = yyj10 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb10 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb10 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -7971,21 +8024,48 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromArray(l int, d *codec1978
 	if r.TryDecodeAsNil() {
 		x.AccessModes = nil
 	} else {
-		yyv9 := &x.AccessModes
-		yym10 := z.DecBinary()
-		_ = yym10
+		yyv11 := &x.AccessModes
+		yym12 := z.DecBinary()
+		_ = yym12
 		if false {
 		} else {
-			h.decSlicePersistentVolumeAccessMode((*[]PersistentVolumeAccessMode)(yyv9), d)
+			h.decSlicePersistentVolumeAccessMode((*[]PersistentVolumeAccessMode)(yyv11), d)
 		}
 	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	yyj10++
+	if yyhl10 {
+		yyb10 = yyj10 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb10 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb10 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		if x.PersistentVolumeSelector != nil {
+			x.PersistentVolumeSelector = nil
+		}
+	} else {
+		if x.PersistentVolumeSelector == nil {
+			x.PersistentVolumeSelector = new(pkg2_unversioned.LabelSelector)
+		}
+		yym14 := z.DecBinary()
+		_ = yym14
+		if false {
+		} else if z.HasExtensions() && z.DecExt(x.PersistentVolumeSelector) {
+		} else {
+			z.DecFallback(x.PersistentVolumeSelector, false)
+		}
+	}
+	yyj10++
+	if yyhl10 {
+		yyb10 = yyj10 > l
+	} else {
+		yyb10 = r.CheckBreak()
+	}
+	if yyb10 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -7993,16 +8073,16 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromArray(l int, d *codec1978
 	if r.TryDecodeAsNil() {
 		x.Resources = ResourceRequirements{}
 	} else {
-		yyv11 := &x.Resources
-		yyv11.CodecDecodeSelf(d)
+		yyv15 := &x.Resources
+		yyv15.CodecDecodeSelf(d)
 	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	yyj10++
+	if yyhl10 {
+		yyb10 = yyj10 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb10 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb10 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -8013,17 +8093,17 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromArray(l int, d *codec1978
 		x.VolumeName = string(r.DecodeString())
 	}
 	for {
-		yyj8++
-		if yyhl8 {
-			yyb8 = yyj8 > l
+		yyj10++
+		if yyhl10 {
+			yyb10 = yyj10 > l
 		} else {
-			yyb8 = r.CheckBreak()
+			yyb10 = r.CheckBreak()
 		}
-		if yyb8 {
+		if yyb10 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj8-1, "")
+		z.DecStructFieldNotFound(yyj10-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -49256,7 +49336,7 @@ func (x codecSelfer1234) decSlicePersistentVolumeClaim(v *[]PersistentVolumeClai
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 296)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 304)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

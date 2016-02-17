@@ -973,10 +973,11 @@ func (PersistentVolumeClaimList) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeClaimSpec = map[string]string{
-	"":            "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
-	"accessModes": "AccessModes contains the desired access modes the volume should have. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1",
-	"resources":   "Resources represents the minimum resources the volume should have. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources",
-	"volumeName":  "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+	"":                         "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
+	"accessModes":              "AccessModes contains the desired access modes the volume should have. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1",
+	"persistentVolumeSelector": "PersistentVolumeSelector is a selector which must be true for the claim to bind to a volume",
+	"resources":                "Resources represents the minimum resources the volume should have. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources",
+	"volumeName":               "VolumeName is the binding reference to the PersistentVolume backing this claim.",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
