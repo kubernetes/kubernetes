@@ -149,6 +149,26 @@ docker:
     - pattern: '^net.ipv4.ip_forward=0'
     - repl: '# net.ipv4.ip_forward=0'
 
+{% if pillar.get('hung_task_panic', '').lower() == 'true' %}
+# TODO remove once github issue 20096 is resolved.
+# Reboot if a task hangs for 5m. This is currently in the docker init file
+# because it's the only known offender.
+/etc/sysctl.conf:
+  file.append:
+    - text:
+      # GCE's will reboot 10s after panic by default. This is just forcing a
+      # panic when a task hangs for 300s. These tunables are documented at:
+      # https://www.kernel.org/doc/Documentation/sysctl/kernel.txt
+      - "kernel.hung_task_panic = 1"
+      - "kernel.hung_task_timeout_secs = 300"
+
+'sysctl-reload':
+  cmd.run:
+    - name: 'sysctl --system'
+    - unless: 'sysctl -a | grep "kernel.hung_task_panic = 1"'
+
+{% endif %}
+
 /etc/init.d/docker:
   file.managed:
     - source: salt://docker/docker-init
