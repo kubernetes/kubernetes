@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: master
-      image: kubernetes/redis:v1
+      image: kubernetes/redis:v2
       env:
         - name: MASTER
           value: "true"
@@ -22,7 +22,7 @@ spec:
         - mountPath: /redis-master-data
           name: data
     - name: sentinel
-      image: kubernetes/redis:v1
+      image: kubernetes/redis:v2
       env:
         - name: SENTINEL
           value: "true"
