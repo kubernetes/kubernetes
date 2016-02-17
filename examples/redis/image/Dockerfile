@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM redis:2.8
-RUN apt-get update
-RUN apt-get install -yy -q python
+FROM alpine:3.4
+
+RUN apk add -U redis sed bash && rm -rf /var/cache/apk/*
 
 COPY redis-master.conf /redis-master/redis.conf
 COPY redis-slave.conf /redis-slave/redis.conf
 COPY run.sh /run.sh
 
 CMD [ "/run.sh" ]
-ENTRYPOINT [ "sh", "-c" ]
+
+ENTRYPOINT [ "bash", "-c" ]
