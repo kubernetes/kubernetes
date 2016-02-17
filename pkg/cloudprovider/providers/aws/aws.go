@@ -1901,31 +1901,27 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 }
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
-// TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
-func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations cloudprovider.ServiceAnnotation) (*api.LoadBalancerStatus, error) {
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts, serviceName, annotations)
+func (s *AWSCloud) EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)",
+		service.Namespace, service.Name, s.region, service.Spec.LoadBalancerIP, service.Spec.Ports, hosts)
 
-	if region != s.region {
-		return nil, fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
-	}
-
-	if affinity != api.ServiceAffinityNone {
+	if service.Spec.SessionAffinity != api.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
-		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
+		return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
 	}
 
-	if len(ports) == 0 {
+	if len(service.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
 
-	for _, port := range ports {
+	for _, port := range service.Spec.Ports {
 		if port.Protocol != api.ProtocolTCP {
 			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
 		}
 	}
 
-	if publicIP != nil {
-		return nil, fmt.Errorf("publicIP cannot be specified for AWS ELB")
+	if service.Spec.LoadBalancerIP != "" {
+		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
 	instances, err := s.getInstancesByNodeNames(hosts)
@@ -1946,6 +1942,9 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
+	name := cloudprovider.GetLoadBalancerName(service)
+	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+
 	// Create a security group for the load balancer
 	var securityGroupID string
 	{
@@ -1958,7 +1957,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		}
 
 		permissions := []*ec2.IpPermission{}
-		for _, port := range ports {
+		for _, port := range service.Spec.Ports {
 			portInt64 := int64(port.Port)
 			protocol := strings.ToLower(string(port.Protocol))
 			sourceIp := "0.0.0.0/0"
@@ -1980,7 +1979,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 
 	// Figure out what mappings we want on the load balancer
 	listeners := []*elb.Listener{}
-	for _, port := range ports {
+	for _, port := range service.Spec.Ports {
 		if port.NodePort == 0 {
 			glog.Errorf("Ignoring port without NodePort defined: %v", port)
 			continue
@@ -2030,12 +2029,8 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (s *AWSCloud) GetLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
-	if region != s.region {
-		return nil, false, fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
-	}
-
-	lb, err := s.describeLoadBalancer(name)
+func (s *AWSCloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+	lb, err := s.describeLoadBalancer(service.Name)
 	if err != nil {
 		return nil, false, err
 	}
@@ -2194,18 +2189,14 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 }
 
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
-func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
-	if region != s.region {
-		return fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
-	}
-
-	lb, err := s.describeLoadBalancer(name)
+func (s *AWSCloud) EnsureLoadBalancerDeleted(service *api.Service) error {
+	lb, err := s.describeLoadBalancer(service.Name)
 	if err != nil {
 		return err
 	}
 
 	if lb == nil {
-		glog.Info("Load balancer already deleted: ", name)
+		glog.Info("Load balancer already deleted: ", service.Name)
 		return nil
 	}
 
@@ -2240,7 +2231,7 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
 		securityGroupIDs := map[string]struct{}{}
 		for _, securityGroupID := range lb.SecurityGroups {
 			if isNilOrEmpty(securityGroupID) {
-				glog.Warning("Ignoring empty security group in ", name)
+				glog.Warning("Ignoring empty security group in ", service.Name)
 				continue
 			}
 			securityGroupIDs[*securityGroupID] = struct{}{}
@@ -2270,15 +2261,15 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
 			}
 
 			if len(securityGroupIDs) == 0 {
-				glog.V(2).Info("Deleted all security groups for load balancer: ", name)
+				glog.V(2).Info("Deleted all security groups for load balancer: ", service.Name)
 				break
 			}
 
 			if time.Now().After(timeoutAt) {
-				return fmt.Errorf("timed out waiting for load-balancer deletion: %s", name)
+				return fmt.Errorf("timed out waiting for load-balancer deletion: %s", service.Name)
 			}
 
-			glog.V(2).Info("Waiting for load-balancer to delete so we can delete security groups: ", name)
+			glog.V(2).Info("Waiting for load-balancer to delete so we can delete security groups: ", service.Name)
 
 			time.Sleep(5 * time.Second)
 		}
@@ -2288,17 +2279,13 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
 }
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
-func (s *AWSCloud) UpdateLoadBalancer(name, region string, hosts []string) error {
-	if region != s.region {
-		return fmt.Errorf("requested load balancer region '%s' does not match cluster region '%s'", region, s.region)
-	}
-
+func (s *AWSCloud) UpdateLoadBalancer(service *api.Service, hosts []string) error {
 	instances, err := s.getInstancesByNodeNames(hosts)
 	if err != nil {
 		return err
 	}
 
-	lb, err := s.describeLoadBalancer(name)
+	lb, err := s.describeLoadBalancer(service.Name)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,6 @@ limitations under the License.
 package aws
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -30,7 +29,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const TestClusterId = "clusterid.test"
@@ -694,40 +692,6 @@ func TestFindVPCID(t *testing.T) {
 	}
 	if vpcID != "vpc-mac0" {
 		t.Errorf("Unexpected vpcID: %s", vpcID)
-	}
-}
-
-func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
-	awsServices := NewFakeAWSServices()
-	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
-	if err != nil {
-		t.Errorf("Error building aws cloud: %v", err)
-		return
-	}
-
-	badELBRegion := "bad-elb-region"
-	errorMessage := fmt.Sprintf("requested load balancer region '%s' does not match cluster region '%s'", badELBRegion, c.region)
-
-	_, _, err = c.GetLoadBalancer("elb-name", badELBRegion)
-	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected GetLoadBalancer region mismatch error.")
-	}
-
-	serviceName := types.NamespacedName{Namespace: "foo", Name: "bar"}
-
-	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, serviceName, api.ServiceAffinityNone, nil)
-	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected EnsureLoadBalancer region mismatch error.")
-	}
-
-	err = c.EnsureLoadBalancerDeleted("elb-name", badELBRegion)
-	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected EnsureLoadBalancerDeleted region mismatch error.")
-	}
-
-	err = c.UpdateLoadBalancer("elb-name", badELBRegion, nil)
-	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected UpdateLoadBalancer region mismatch error.")
 	}
 }
 
