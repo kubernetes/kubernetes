@@ -429,8 +429,6 @@ func NewMainKubelet(
 	}
 	klet.imageManager = imageManager
 
-	klet.runtimeState.setRuntimeSync(klet.clock.Now())
-
 	klet.runner = klet.containerRuntime
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
