@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -41,6 +42,7 @@ var (
 	Groups      = make(map[string]TestGroup)
 	Default     TestGroup
 	Autoscaling TestGroup
+	Batch       TestGroup
 	Extensions  TestGroup
 )
 
@@ -78,6 +80,12 @@ func init() {
 			internalGroupVersion: extensions.SchemeGroupVersion,
 		}
 	}
+	if _, ok := Groups[batch.GroupName]; !ok {
+		Groups[batch.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: batch.GroupName, Version: registered.GroupOrDie(batch.GroupName).GroupVersion.Version},
+			internalGroupVersion: extensions.SchemeGroupVersion,
+		}
+	}
 	if _, ok := Groups[extensions.GroupName]; !ok {
 		Groups[extensions.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: registered.GroupOrDie(extensions.GroupName).GroupVersion.Version},
@@ -87,6 +95,7 @@ func init() {
 
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
+	Batch = Groups[batch.GroupName]
 	Extensions = Groups[extensions.GroupName]
 }
 
