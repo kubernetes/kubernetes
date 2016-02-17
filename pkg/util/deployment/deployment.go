@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/integer"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
@@ -183,8 +183,13 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 		return nil, err
 	}
 	for _, pod := range podList.Items {
+		// If the pod already has the new hash label, avoid re-labeling it
+		if len(pod.Labels) > 0 && len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) > 0 {
+			continue
+		}
 		pod.Labels = labelsutil.AddLabel(pod.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		delay, maxRetries := 3, 3
+		podName := pod.Name
 		for i := 0; i < maxRetries; i++ {
 			_, err = c.Core().Pods(namespace).Update(&pod)
 			if err == nil {
@@ -192,6 +197,11 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 			}
 			time.Sleep(time.Second * time.Duration(delay))
 			delay *= delay
+			getPod, err := c.Core().Pods(namespace).Get(podName)
+			if err != nil {
+				return nil, err
+			}
+			pod = *getPod
 		}
 		if err != nil {
 			return nil, err
@@ -233,7 +243,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 
 type updateFunc func(rs *extensions.ReplicaSet)
 
-func updateRSWithRetries(rsClient extensions_unversioned.ReplicaSetInterface, rs *extensions.ReplicaSet, applyUpdate updateFunc) (*extensions.ReplicaSet, error) {
+func updateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, applyUpdate updateFunc) (*extensions.ReplicaSet, error) {
 	var err error
 	oldRs := rs
 	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
