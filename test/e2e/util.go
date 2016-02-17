@@ -1806,6 +1806,23 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	dumpNodeDebugInfo(c, badNodes.List())
 }
 
+func dumpAllNamespaceInfo(c *client.Client, namespace string) {
+	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
+	events, err := c.Events(namespace).List(api.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	for _, e := range events.Items {
+		Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+	}
+	// Note that we don't wait for any cleanup to propagate, which means
+	// that if you delete a bunch of pods right before ending your test,
+	// you may or may not see the killing/deletion/cleanup events.
+
+	dumpAllPodInfo(c)
+
+	dumpAllNodeInfo(c)
+}
+
 func dumpAllPodInfo(c *client.Client) {
 	pods, err := c.Pods("").List(api.ListOptions{})
 	if err != nil {
