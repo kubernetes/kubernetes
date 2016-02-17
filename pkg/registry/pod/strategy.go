@@ -383,6 +383,18 @@ func ExecLocation(
 	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
 }
 
+// CommmitLocation returns the exec URL for a pod container. If opts.Container is blank
+// and only one container is present in the pod, that container is used.
+func CommitLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+	opts *api.PodExecOptions,
+) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "commit")
+}
+
 func streamLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,

@@ -94,6 +94,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&PodLogOptions{},
 		&PodExecOptions{},
 		&PodProxyOptions{},
+		&PodCommitOptions{},
 		&ComponentStatus{},
 		&ComponentStatusList{},
 		&SerializedReference{},
@@ -166,6 +167,7 @@ func (obj *PodAttachOptions) GetObjectKind() unversioned.ObjectKind          { r
 func (obj *PodLogOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
 func (obj *PodExecOptions) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
 func (obj *PodProxyOptions) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *PodCommitOptions) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *ComponentStatus) GetObjectMeta() meta.Object                      { return &obj.ObjectMeta }
 func (obj *ComponentStatus) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
 func (obj *ComponentStatusList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }

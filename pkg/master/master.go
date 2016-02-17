@@ -323,6 +323,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"pods/exec":        podStorage.Exec,
 		"pods/portforward": podStorage.PortForward,
 		"pods/proxy":       podStorage.Proxy,
+		"pods/commit":      podStorage.Commit,
 		"pods/binding":     podStorage.Binding,
 		"bindings":         podStorage.Binding,
 

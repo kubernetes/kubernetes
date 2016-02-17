@@ -2002,6 +2002,26 @@ type PodProxyOptions struct {
 	Path string
 }
 
+// PodCommitOptions is the query options to a Pod's commit call
+type PodCommitOptions struct {
+	unversioned.TypeMeta
+
+	// Container which to commit.
+	Container string
+
+	// Author(e.g.,"foo, <foo@bar.com>)
+	Author string
+
+	// Commit Message
+	Message string
+
+	// Pause container during commit
+	Pause bool
+
+	// Apply Dockerfile instruction to the created image
+	Change []string
+}
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	Kind            string    `json:"kind,omitempty"`
