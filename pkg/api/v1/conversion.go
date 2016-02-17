@@ -87,7 +87,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				"metadata.annotations",
 				"status.phase",
 				"status.podIP",
-				"spec.nodeName":
+				"spec.nodeName",
+				"spec.restartPolicy":
 				return label, value, nil
 				// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
