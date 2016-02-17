@@ -90,6 +90,8 @@ func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
 		stats, found := s.getPodVolumeStats(pod)
 		if !found {
 			if pod.Status.Phase == api.PodRunning {
+				// TODO: Also log warning for pods that are not yet-running, but at least partially setup
+				// Issue #21416
 				glog.Warningf("Could not locate volumes for running pod %s", format.Pod(pod))
 			}
 			continue
