@@ -1025,5 +1025,7 @@ export E2E_PUBLISH_GREEN_VERSION="${E2E_PUBLISH_GREEN_VERSION:-false}"
 export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
 export GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-}"
 
-# Use e2e-runner.sh from the master branch.
-source <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh")
+# Use e2e-runner.sh from the release-1.1 branch. The 1.1 branch is the last
+# branch that can use its own e2e runner script. All future branches must use
+# master's runner.
+source <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh")
