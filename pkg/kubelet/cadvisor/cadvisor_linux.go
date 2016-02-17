@@ -68,10 +68,10 @@ func New(port uint, containerRuntime string) (Interface, error) {
 	}
 
 	config := manager.Config{
-                MemoryCache:		  memory.New(statsCacheDuration, nil),
-                MaxHousekeepingInterval:  maxHousekeepingInterval,
-                AllowDynamicHousekeeping: allowDynamicHousekeeping,
-                ContainerRuntime:         containerRuntime,
+		MemoryCache:              memory.New(statsCacheDuration, nil),
+		MaxHousekeepingInterval:  maxHousekeepingInterval,
+		AllowDynamicHousekeeping: allowDynamicHousekeeping,
+		ContainerRuntime:         containerRuntime,
 	}
 
 	config.Sysfs = sysFs

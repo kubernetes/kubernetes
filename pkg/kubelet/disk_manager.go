@@ -156,11 +156,11 @@ func newDiskSpaceManager(containerRuntime string, cadvisorInterface cadvisor.Int
 	}
 
 	switch containerRuntime {
-		case "docker":
-			return &dockerDiskSpaceManager{dm}, nil
-		case "rkt":
-			return &rktDiskSpaceManager{dm}, nil
-		default:
-			return nil, fmt.Errorf("Unknown container runtime: %v", containerRuntime)
+	case "docker":
+		return &dockerDiskSpaceManager{dm}, nil
+	case "rkt":
+		return &rktDiskSpaceManager{dm}, nil
+	default:
+		return nil, fmt.Errorf("Unknown container runtime: %v", containerRuntime)
 	}
 }
