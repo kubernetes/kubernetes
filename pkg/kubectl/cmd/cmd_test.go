@@ -363,8 +363,8 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   REPLICAS   AGE
-	// beep        foo          1          10y
+	// NAMESPACE   NAME      REPLICAS   AGE
+	// beep        foo       1          10y
 }
 
 func ExamplePrintReplicationControllerWithWide() {
@@ -404,8 +404,8 @@ func ExamplePrintReplicationControllerWithWide() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// CONTROLLER   REPLICAS   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
-	// foo          1          10y       foo            someimage   foo=bar
+	// NAME      REPLICAS   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
+	// foo       1          10y       foo            someimage   foo=bar
 }
 
 func ExamplePrintPodWithWideFormat() {
