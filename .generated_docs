@@ -27,6 +27,7 @@ docs/man/man1/kubectl-create-namespace.1
 docs/man/man1/kubectl-create-secret-docker-registry.1
 docs/man/man1/kubectl-create-secret-generic.1
 docs/man/man1/kubectl-create-secret.1
+docs/man/man1/kubectl-create-serviceaccount.1
 docs/man/man1/kubectl-create.1
 docs/man/man1/kubectl-delete.1
 docs/man/man1/kubectl-describe.1
@@ -79,6 +80,7 @@ docs/user-guide/kubectl/kubectl_create_namespace.md
 docs/user-guide/kubectl/kubectl_create_secret.md
 docs/user-guide/kubectl/kubectl_create_secret_docker-registry.md
 docs/user-guide/kubectl/kubectl_create_secret_generic.md
+docs/user-guide/kubectl/kubectl_create_serviceaccount.md
 docs/user-guide/kubectl/kubectl_delete.md
 docs/user-guide/kubectl/kubectl_describe.md
 docs/user-guide/kubectl/kubectl_drain.md
