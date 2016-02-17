@@ -856,6 +856,28 @@ __EOF__
   kubectl delete configmap test-configmap --namespace=test-configmaps
   kubectl delete namespace test-configmaps
   
+  ####################
+  # Service Accounts #
+  ####################
+
+  ### Create a new namespace
+  # Pre-condition: the test-service-accounts namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-service-accounts\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-service-accounts
+  # Post-condition: namespace 'test-service-accounts' is created.
+  kube::test::get_object_assert 'namespaces/test-service-accounts' "{{$id_field}}" 'test-service-accounts'
+
+  ### Create a service account in a specific namespace
+  # Command
+  kubectl create serviceaccount test-service-account --namespace=test-service-accounts
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'serviceaccount/test-service-account --namespace=test-service-accounts' "{{$id_field}}" 'test-service-account'
+  # Clean-up
+  kubectl delete serviceaccount test-service-account --namespace=test-service-accounts
+  # Clean up
+  kubectl delete namespace test-service-accounts
+
   #################
   # Pod templates #
   #################
