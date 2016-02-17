@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -146,7 +147,11 @@ func (f *Framework) afterEach() {
 					timeout = f.NamespaceDeletionTimeout
 				}
 				if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
-					Failf("Couldn't delete ns %q: %s", ns.Name, err)
+					if !apierrs.IsNotFound(err) {
+						Failf("Couldn't delete ns %q: %s", ns.Name, err)
+					} else {
+						Logf("Namespace %v was already deleted", ns.Name)
+					}
 				}
 			}
 			f.namespacesToDelete = nil
