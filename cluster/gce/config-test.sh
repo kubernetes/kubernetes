@@ -80,7 +80,7 @@ KUBEPROXY_TEST_LOG_LEVEL="${KUBEPROXY_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 
 TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m}"
 
-KUBELET_TEST_ARGS="--max-pods=110 --serialize-image-pulls=false --outofdisk-transition-frequency=0"
+KUBELET_TEST_ARGS="--serialize-image-pulls=false --outofdisk-transition-frequency=0"
 APISERVER_TEST_ARGS="--runtime-config=extensions/v1beta1"
 CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_RESYNC_PERIOD}"
 SCHEDULER_TEST_ARGS=""
