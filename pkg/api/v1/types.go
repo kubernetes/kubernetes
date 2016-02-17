@@ -390,6 +390,8 @@ type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
+	// Current service state of volume
+	Conditions []PersistentVolumeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// A human-readable message indicating details about why the volume is in this state.
 	Message string `json:"message,omitempty"`
 	// Reason is a brief CamelCase string that describes any failure and is meant
@@ -453,6 +455,8 @@ type PersistentVolumeClaimSpec struct {
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim.
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
+	// Current service state of claim.
+	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// AccessModes contains the actual access modes the volume backing the PVC has.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
@@ -497,6 +501,63 @@ const (
 	// used for PersistentVolumeClaims that are bound
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
+
+// PersistentVolumeConditionType is a valid value for PersistentVolumeCondition.Type
+type PersistentVolumeConditionType string
+
+// These are valid conditions of PersistentVolume.
+const (
+	// PersistentVolumeBound means the volume is bound to a claim for storage and can be
+	// consumed as a storage resource by the claimant
+	PersistentVolumeBound PersistentVolumeConditionType = "Bound"
+	// PersistentVolumeRecycled is the recycled state of a PersistentVolume per the volume's reclaim policy
+	PersistentVolumeRecycled PersistentVolumeConditionType = "Recycled"
+	// PersistentVolumeProvisioned is the provisioned state of a PersistentVolume
+	PersistentVolumeProvisioned PersistentVolumeConditionType = "Provisioned"
+)
+
+// PersistentVolumeCondition contains the details for the current condition of this volume
+type PersistentVolumeCondition struct {
+	// The type can be one of Bound, Recycled, or Provisioned.
+	Type PersistentVolumeConditionType `json:"type"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status ConditionStatus `json:"status"`
+	// Last time we probed the condition.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}
+
+// PersistentVolumeClaimConditionType is a valid value for PersistentVolumeClaimCondition.Type
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of PersistentVolumeClaim.
+const (
+	// PersistentVolumeClaimBound means the claim is bound to persistent storage and can be consumed as a resource
+	PersistentVolumeClaimBound PersistentVolumeClaimConditionType = "Bound"
+)
+
+// PersistentVolumeClaim contains the details for the current condition of this claim
+type PersistentVolumeClaimCondition struct {
+	// Type is the type of the condition.
+	Type PersistentVolumeClaimConditionType `json:"type"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status ConditionStatus `json:"status"`
+	// Last time we probed the condition.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}
 
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.

@@ -52,6 +52,9 @@ This document describes the current state of `PersistentVolumes` in Kubernetes. 
     - [Capacity](#capacity)
     - [Access Modes](#access-modes)
     - [Recycling Policy](#recycling-policy)
+    - [Conditions](#conditions)
+      - [Volume Conditions](#volume-conditions)
+      - [Claim Conditions](#claim-conditions)
     - [Phase](#phase)
   - [PersistentVolumeClaims](#persistentvolumeclaims)
     - [Access Modes](#access-modes)
@@ -73,7 +76,7 @@ Please see the [detailed walkthrough with working examples](persistent-volumes/)
 
 ## Lifecycle of a volume and claim
 
-PVs are resources in the cluster.  PVCs are requests for those resources and also act as claim checks to the resource.  The interaction between PVs and PVCs follows this lifecycle:
+PVs are resources in the cluster.  PVCs are requests for those resources and also act as claim checks to the resource.    The interaction between PVs and PVCs follows this lifecycle:
 
 ### Provisioning
 
@@ -166,6 +169,54 @@ Current recycling policies are:
 * Recycle -- basic scrub ("rm -rf /thevolume/*")
 
 Currently, NFS and HostPath support recycling.
+
+### Conditions
+
+Volumes and claims have Conditions, which is a need to be satisfied and a status report on the state of that need.  Claims, for example, naturally want to be bound to a volume and so will have a Bound condition in `claim.Status.Conditions` by default.
+
+Every sync period, each Condition is run with a handler that tries to satisfy the condition.  The sync marks the object's `lastProbeTime` on each sync, but only sets `lastTransitionTime` when a new value is saved on the condition.
+
+#### Volume Conditions
+
+A PersistentVolume can have multiple Conditions that encapsulate various runtime states of the volume, all of which want to be true.
+
+* **PersistentVolumeBoundCondition**
+	* Bound condition is the status of the binding to a claim. An unsatisfied bound condition means the volume is available for matching to a claim.
+	* Bound Reason codes are:
+		* New - the default value for a new condition
+		* Bound - when the volume is successfully bound to a claim
+		* Released - when the volume's claim has been deleted
+	 	* Error - when the claim's bind is in an erroneous state.
+	* a Message field contains descriptive text
+* **PersistentVolumeProvisionedCondition**
+	* Provisioned condition is the status of the storage backing this volume.
+	* Provisioned Reason codes are:
+		* New - the default value for a new condition
+		* Provisioned - when the storage is provisioned and ready to use in the PV
+		* Error - when something went wrong
+	* a Message field contains descriptive text
+	* The addition of this condition to a volume causes the volume plugin's provisioner to create or pair a resource to this volume.
+* **PersistentVolumeRecycleCondition**
+	* Recycled condition is the state of the volume's reclaim policy
+	* Recycled Reason codes are:
+		* New - the default value for a new condition
+		* Recycled - the volume.Spec.PersistentVolumeReclaimPolicy was applied successfully
+		* Error - something went wrong with the reclamation process
+	* a Message field contains descriptive text
+	* The addition of this condition to a volume causes the volume to be recycled.
+
+#### Claim Conditions
+
+A PersistentVolumeClaim currently has a single condition: Bound.
+
+* **PersistentVolumeClaimBoundCondition**
+	* Bound condition is the status of the binding to a volume. An unsatisfied bound condition means the claim is available for matching to a volume.
+	* Bound Reason codes are:
+		* New - the default value for a new condition
+		* NoMatch - when the claim has not yet found a matching volume
+		* Bound - when the volume is successfully bound to a claim
+	 	* Error - when the claim's bind is in an erroneous state.
+	* a Message field contains descriptive text
 
 ### Phase
 

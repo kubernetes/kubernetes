@@ -348,6 +348,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			types := []api.PersistentVolumePhase{api.VolumeAvailable, api.VolumePending, api.VolumeBound, api.VolumeReleased, api.VolumeFailed}
 			pv.Status.Phase = types[c.Rand.Intn(len(types))]
 			pv.Status.Message = c.RandString()
+			pv.Status.Conditions = []api.PersistentVolumeCondition{{Type: api.PersistentVolumeBound, Status: api.ConditionFalse, Reason: "New"}}
 			reclamationPolicies := []api.PersistentVolumeReclaimPolicy{api.PersistentVolumeReclaimRecycle, api.PersistentVolumeReclaimRetain}
 			pv.Spec.PersistentVolumeReclaimPolicy = reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
 		},
@@ -355,6 +356,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			c.FuzzNoCustom(pvc) // fuzz self without calling this function again
 			types := []api.PersistentVolumeClaimPhase{api.ClaimBound, api.ClaimPending}
 			pvc.Status.Phase = types[c.Rand.Intn(len(types))]
+			pvc.Status.Conditions = []api.PersistentVolumeClaimCondition{{Type: api.PersistentVolumeClaimBound, Status: api.ConditionFalse, Reason: "New"}}
 		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}

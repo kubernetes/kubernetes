@@ -313,6 +313,8 @@ const (
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
+	// Current service state of volume
+	Conditions []PersistentVolumeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// A human-readable message indicating details about why the volume is in this state.
 	Message string `json:"message,omitempty"`
 	// Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI
@@ -359,6 +361,8 @@ type PersistentVolumeClaimSpec struct {
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
+	// Current service state of claim.
+	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume
@@ -402,6 +406,46 @@ const (
 	// used for PersistentVolumeClaims that are bound
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
+
+// PersistentVolumeConditionType is a valid value for PersistentVolumeCondition.Type
+type PersistentVolumeConditionType string
+
+// These are valid conditions of PersistentVolume.
+const (
+	// PersistentVolumeBound means the volume is bound to a claim for storage and can be
+	// consumed as a storage resource by the claimant
+	PersistentVolumeBound PersistentVolumeConditionType = "Bound"
+	// PersistentVolumeRecycled is the recycled state of a PersistentVolume per the volume's reclaim policy
+	PersistentVolumeRecycled PersistentVolumeConditionType = "Recycled"
+	// PersistentVolumeRecycled is the provisioned state of a PersistentVolume
+	PersistentVolumeProvisioned PersistentVolumeConditionType = "Provisioned"
+)
+
+type PersistentVolumeCondition struct {
+	Type               PersistentVolumeConditionType `json:"type"`
+	Status             ConditionStatus               `json:"status"`
+	LastProbeTime      unversioned.Time              `json:"lastProbeTime,omitempty"`
+	LastTransitionTime unversioned.Time              `json:"lastTransitionTime,omitempty"`
+	Reason             string                        `json:"reason,omitempty"`
+	Message            string                        `json:"message,omitempty"`
+}
+
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of PersistentVolumeClaim.
+const (
+	// PersistentVolumeClaimBound means the claim is bound to persistent storage and can be consumed as a resource
+	PersistentVolumeClaimBound PersistentVolumeClaimConditionType = "Bound"
+)
+
+type PersistentVolumeClaimCondition struct {
+	Type               PersistentVolumeClaimConditionType `json:"type"`
+	Status             ConditionStatus                    `json:"status"`
+	LastProbeTime      unversioned.Time                   `json:"lastProbeTime,omitempty"`
+	LastTransitionTime unversioned.Time                   `json:"lastTransitionTime,omitempty"`
+	Reason             string                             `json:"reason,omitempty"`
+	Message            string                             `json:"message,omitempty"`
+}
 
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.

@@ -15727,6 +15727,13 @@
       "type": "string",
       "description": "Phase represents the current phase of PersistentVolumeClaim."
      },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeClaimCondition"
+      },
+      "description": "Current service state of claim."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -15737,6 +15744,40 @@
      "capacity": {
       "type": "any",
       "description": "Represents the actual resources of the underlying volume."
+     }
+    }
+   },
+   "v1.PersistentVolumeClaimCondition": {
+    "id": "v1.PersistentVolumeClaimCondition",
+    "description": "PersistentVolumeClaim contains the details for the current condition of this claim",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type is the type of the condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status is the status of the condition. Can be True, False, Unknown."
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time we probed the condition."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human-readable message indicating details about last transition."
      }
     }
    },
@@ -16234,6 +16275,13 @@
       "type": "string",
       "description": "Phase indicates if a volume is available, bound to a claim, or released by a claim. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase"
      },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeCondition"
+      },
+      "description": "Current service state of volume"
+     },
      "message": {
       "type": "string",
       "description": "A human-readable message indicating details about why the volume is in this state."
@@ -16241,6 +16289,40 @@
      "reason": {
       "type": "string",
       "description": "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI."
+     }
+    }
+   },
+   "v1.PersistentVolumeCondition": {
+    "id": "v1.PersistentVolumeCondition",
+    "description": "PersistentVolumeCondition contains the details for the current condition of this volume",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "The type can be one of Bound, Recycled, or Provisioned."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status is the status of the condition. Can be True, False, Unknown."
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time we probed the condition."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human-readable message indicating details about last transition."
      }
     }
    },

@@ -164,6 +164,12 @@ func TestUpdateStatus(t *testing.T) {
 		},
 		Status: api.PersistentVolumeStatus{
 			Phase: api.VolumeBound,
+			Conditions: []api.PersistentVolumeCondition{
+				{
+					Type:   api.PersistentVolumeBound,
+					Status: api.ConditionFalse,
+				},
+			},
 		},
 	}
 

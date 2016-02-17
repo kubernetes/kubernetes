@@ -962,6 +962,20 @@ func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeClaim
 }
 
+var map_PersistentVolumeClaimCondition = map[string]string{
+	"":                   "PersistentVolumeClaim contains the details for the current condition of this claim",
+	"type":               "Type is the type of the condition.",
+	"status":             "Status is the status of the condition. Can be True, False, Unknown.",
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, one-word, CamelCase reason for the condition's last transition.",
+	"message":            "Human-readable message indicating details about last transition.",
+}
+
+func (PersistentVolumeClaimCondition) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeClaimCondition
+}
+
 var map_PersistentVolumeClaimList = map[string]string{
 	"":         "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -986,6 +1000,7 @@ func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
 var map_PersistentVolumeClaimStatus = map[string]string{
 	"":            "PersistentVolumeClaimStatus is the current status of a persistent volume claim.",
 	"phase":       "Phase represents the current phase of PersistentVolumeClaim.",
+	"conditions":  "Current service state of claim.",
 	"accessModes": "AccessModes contains the actual access modes the volume backing the PVC has. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1",
 	"capacity":    "Represents the actual resources of the underlying volume.",
 }
@@ -1002,6 +1017,20 @@ var map_PersistentVolumeClaimVolumeSource = map[string]string{
 
 func (PersistentVolumeClaimVolumeSource) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeClaimVolumeSource
+}
+
+var map_PersistentVolumeCondition = map[string]string{
+	"":                   "PersistentVolumeCondition contains the details for the current condition of this volume",
+	"type":               "The type can be one of Bound, Recycled, or Provisioned.",
+	"status":             "Status is the status of the condition. Can be True, False, Unknown.",
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, one-word, CamelCase reason for the condition's last transition.",
+	"message":            "Human-readable message indicating details about last transition.",
+}
+
+func (PersistentVolumeCondition) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeCondition
 }
 
 var map_PersistentVolumeList = map[string]string{
@@ -1048,10 +1077,11 @@ func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeStatus = map[string]string{
-	"":        "PersistentVolumeStatus is the current status of a persistent volume.",
-	"phase":   "Phase indicates if a volume is available, bound to a claim, or released by a claim. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase",
-	"message": "A human-readable message indicating details about why the volume is in this state.",
-	"reason":  "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
+	"":           "PersistentVolumeStatus is the current status of a persistent volume.",
+	"phase":      "Phase indicates if a volume is available, bound to a claim, or released by a claim. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase",
+	"conditions": "Current service state of volume",
+	"message":    "A human-readable message indicating details about why the volume is in this state.",
+	"reason":     "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
 }
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
