@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -47,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "openstack"
@@ -641,8 +639,9 @@ func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*f
 	return &floatingIPList[0], nil
 }
 
-func (lb *LoadBalancer) GetLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
-	vip, err := getVipByName(lb.network, name)
+func (lb *LoadBalancer) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err == ErrNotFound {
 		return nil, false, nil
 	}
@@ -661,9 +660,10 @@ func (lb *LoadBalancer) GetLoadBalancer(name, region string) (*api.LoadBalancerS
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, serviceName, annotations)
+func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
 
+	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
 	} else if len(ports) == 0 {
@@ -676,6 +676,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
 	}
 
+	affinity := apiService.Spec.SessionAffinity
 	var persistence *vips.SessionPersistence
 	switch affinity {
 	case api.ServiceAffinityNone:
@@ -695,8 +696,8 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
 	}
 
-	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", name)
-	_, exists, err := lb.GetLoadBalancer(name, region)
+	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
+	_, exists, err := lb.GetLoadBalancer(apiService)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
 	}
@@ -704,7 +705,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
 	// In particular, if we implement hosts update, we can get rid of UpdateHosts
 	if exists {
-		err := lb.EnsureLoadBalancerDeleted(name, region)
+		err := lb.EnsureLoadBalancerDeleted(apiService)
 		if err != nil {
 			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
 		}
@@ -714,6 +715,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 	if lbmethod == "" {
 		lbmethod = pools.LBMethodRoundRobin
 	}
+	name := cloudprovider.GetLoadBalancerName(apiService)
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
@@ -771,8 +773,10 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		SubnetID:     lb.opts.SubnetId,
 		Persistence:  persistence,
 	}
-	if loadBalancerIP != nil {
-		createOpts.Address = loadBalancerIP.String()
+
+	loadBalancerIP := apiService.Spec.LoadBalancerIP
+	if loadBalancerIP != "" {
+		createOpts.Address = loadBalancerIP
 	}
 
 	vip, err := vips.Create(lb.network, createOpts).Extract()
@@ -805,10 +809,11 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 
 }
 
-func (lb *LoadBalancer) UpdateLoadBalancer(name, region string, hosts []string) error {
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", name, region, hosts)
+func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	glog.V(4).Infof("UpdateLoadBalancer(%v, %v)", loadBalancerName, hosts)
 
-	vip, err := getVipByName(lb.network, name)
+	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err != nil {
 		return err
 	}
@@ -866,10 +871,11 @@ func (lb *LoadBalancer) UpdateLoadBalancer(name, region string, hosts []string) 
 	return nil
 }
 
-func (lb *LoadBalancer) EnsureLoadBalancerDeleted(name, region string) error {
-	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", name, region)
+func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v)", loadBalancerName)
 
-	vip, err := getVipByName(lb.network, name)
+	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err != nil && err != ErrNotFound {
 		return err
 	}
@@ -907,7 +913,7 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(name, region string) error {
 		// still exists that we failed to delete on some
 		// previous occasion.  Make a best effort attempt to
 		// cleanup any pools with the same name as the VIP.
-		pool, err = getPoolByName(lb.network, name)
+		pool, err = getPoolByName(lb.network, service.Name)
 		if err != nil && err != ErrNotFound {
 			return err
 		}
