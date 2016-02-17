@@ -87,10 +87,12 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 				now := time.Now()
 				data, err := g.getKubeSystemContainersResourceUsage(c)
 				if err != nil {
-					return err
+					Logf("Error while getting resource usage: %v", err)
+					continue
 				}
 				g.usageTimeseries[now] = data
 			case <-g.stopCh:
+				Logf("Stop channel is closed. Stopping gatherer.")
 				g.wg.Done()
 				return nil
 			}
@@ -100,8 +102,9 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 
 func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constraints map[string]resourceConstraint) *ResourceUsageSummary {
 	close(g.stopCh)
-	g.timer.Stop()
+	Logf("Closed stop channel.")
 	g.wg.Wait()
+	Logf("Waitgroup finished.")
 	if len(percentiles) == 0 {
 		Logf("Warning! Empty percentile list for stopAndPrintData.")
 		return &ResourceUsageSummary{}
