@@ -94,6 +94,11 @@
         - 'gce-examples':
             description: 'Run e2e examples test on GCE using the latest successful Kubernetes build.'
             timeout: 90
+        - 'gce-ubernetes-lite':
+            description: 'Run E2E tests on GCE across multiple zones using the latest successful build.'
+            timeout: 150
+            emails: '$DEFAULT_RECIPIENTS, quinton@google.com, justin@fathomdb.com'
+            test-owner: 'quinton'
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
