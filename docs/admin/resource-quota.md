@@ -126,7 +126,7 @@ $ cat <<EOF > quota.json
   "apiVersion": "v1",
   "kind": "ResourceQuota",
   "metadata": {
-    "name": "quota",
+    "name": "quota"
   },
   "spec": {
     "hard": {
@@ -135,8 +135,8 @@ $ cat <<EOF > quota.json
       "pods": "10",
       "services": "5",
       "replicationcontrollers":"20",
-      "resourcequotas":"1",
-    },
+      "resourcequotas":"1"
+    }
   }
 }
 EOF
