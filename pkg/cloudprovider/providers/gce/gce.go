@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"path"
 	"regexp"
@@ -439,8 +438,9 @@ func (gce *GCECloud) waitForZoneOp(op *compute.Operation, zone string) error {
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (gce *GCECloud) GetLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
-	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+func (gce *GCECloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err == nil {
 		status := &api.LoadBalancerStatus{}
 		status.Ingress = []api.LoadBalancerIngress{{IP: fwd.IPAddress}}
@@ -465,14 +465,7 @@ func isHTTPErrorCode(err error, code int) bool {
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP, ports []*api.ServicePort, hostNames []string, svc types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
-	portStr := []string{}
-	for _, p := range ports {
-		portStr = append(portStr, fmt.Sprintf("%s/%d", p.Protocol, p.Port))
-	}
-	serviceName := svc.String()
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", name, region, requestedIP, portStr, hostNames, serviceName, annotations)
-
+func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	if len(hostNames) == 0 {
 		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
@@ -482,8 +475,21 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 		return nil, err
 	}
 
+	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerIP := apiService.Spec.LoadBalancerIP
+	ports := apiService.Spec.Ports
+	portStr := []string{}
+	for _, p := range apiService.Spec.Ports {
+		portStr = append(portStr, fmt.Sprintf("%s/%d", p.Protocol, p.Port))
+	}
+
+	affinityType := apiService.Spec.SessionAffinity
+
+	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", loadBalancerName, gce.region, loadBalancerIP, portStr, hosts, serviceName, annotations)
+
 	// Check if the forwarding rule exists, and if so, what its IP is.
-	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(name, region, requestedIP, ports)
+	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(loadBalancerName, gce.region, loadBalancerIP, ports)
 	if err != nil {
 		return nil, err
 	}
@@ -517,45 +523,45 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 			return
 		}
 		if isSafeToReleaseIP {
-			if err := gce.deleteStaticIP(name, region); err != nil {
-				glog.Errorf("failed to release static IP %s for load balancer (%v(%v), %v): %v", ipAddress, name, serviceName, region, err)
+			if err := gce.deleteStaticIP(loadBalancerName, gce.region); err != nil {
+				glog.Errorf("failed to release static IP %s for load balancer (%v(%v), %v): %v", ipAddress, loadBalancerName, serviceName, gce.region, err)
 			}
-			glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): released static IP %s", name, serviceName, ipAddress)
+			glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): released static IP %s", loadBalancerName, serviceName, ipAddress)
 		} else {
-			glog.Warningf("orphaning static IP %s during update of load balancer (%v(%v), %v): %v", ipAddress, name, serviceName, region, err)
+			glog.Warningf("orphaning static IP %s during update of load balancer (%v(%v), %v): %v", ipAddress, loadBalancerName, serviceName, gce.region, err)
 		}
 	}()
 
-	if requestedIP != nil {
+	if loadBalancerIP != "" {
 		// If a specific IP address has been requested, we have to respect the
 		// user's request and use that IP. If the forwarding rule was already using
 		// a different IP, it will be harmlessly abandoned because it was only an
 		// ephemeral IP (or it was a different static IP owned by the user, in which
 		// case we shouldn't delete it anyway).
-		if isStatic, err := gce.projectOwnsStaticIP(name, region, requestedIP.String()); err != nil {
-			return nil, fmt.Errorf("failed to test if this GCE project owns the static IP %s: %v", requestedIP.String(), err)
+		if isStatic, err := gce.projectOwnsStaticIP(loadBalancerName, gce.region, loadBalancerIP); err != nil {
+			return nil, fmt.Errorf("failed to test if this GCE project owns the static IP %s: %v", loadBalancerIP, err)
 		} else if isStatic {
 			// The requested IP is a static IP, owned and managed by the user.
 			isUserOwnedIP = true
 			isSafeToReleaseIP = false
-			ipAddress = requestedIP.String()
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided static IP %s", name, serviceName, ipAddress)
-		} else if requestedIP.String() == fwdRuleIP {
+			ipAddress = loadBalancerIP
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided static IP %s", loadBalancerName, serviceName, ipAddress)
+		} else if loadBalancerIP == fwdRuleIP {
 			// The requested IP is not a static IP, but is currently assigned
 			// to this forwarding rule, so we can keep it.
 			isUserOwnedIP = false
 			isSafeToReleaseIP = true
-			ipAddress, _, err = gce.ensureStaticIP(name, serviceName, region, fwdRuleIP)
+			ipAddress, _, err = gce.ensureStaticIP(loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
 			if err != nil {
 				return nil, fmt.Errorf("failed to ensure static IP %s: %v", fwdRuleIP, err)
 			}
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided non-static IP %s", name, serviceName, ipAddress)
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided non-static IP %s", loadBalancerName, serviceName, ipAddress)
 		} else {
 			// The requested IP is not static and it is not assigned to the
 			// current forwarding rule.  It might be attached to a different
 			// rule or it might not be part of this project at all.  Either
 			// way, we can't use it.
-			return nil, fmt.Errorf("requested ip %s is neither static nor assigned to LB %s(%v): %v", requestedIP.String(), name, serviceName, err)
+			return nil, fmt.Errorf("requested ip %s is neither static nor assigned to LB %s(%v): %v", loadBalancerIP, loadBalancerName, serviceName, err)
 		}
 	} else {
 		// The user did not request a specific IP.
@@ -566,7 +572,7 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 		// IP from ephemeral to static, or it will just get the IP if it is
 		// already static.
 		existed := false
-		ipAddress, existed, err = gce.ensureStaticIP(name, serviceName, region, fwdRuleIP)
+		ipAddress, existed, err = gce.ensureStaticIP(loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
 		if err != nil {
 			return nil, fmt.Errorf("failed to ensure static IP %s: %v", fwdRuleIP, err)
 		}
@@ -576,13 +582,13 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 			// use this IP and try to run through the process again, but we
 			// should not release the IP unless it is explicitly flagged as OK.
 			isSafeToReleaseIP = false
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): adopting static IP %s", name, serviceName, ipAddress)
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): adopting static IP %s", loadBalancerName, serviceName, ipAddress)
 		} else {
 			// For total clarity.  The IP did not pre-exist and the user did
 			// not ask for a particular one, so we can release the IP in case
 			// of failure or success.
 			isSafeToReleaseIP = true
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): allocated static IP %s", name, serviceName, ipAddress)
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): allocated static IP %s", loadBalancerName, serviceName, ipAddress)
 		}
 	}
 
@@ -595,29 +601,29 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 		return nil, err
 	}
 
-	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(name, serviceName, region, ipAddress, ports, sourceRanges)
+	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports, sourceRanges)
 	if err != nil {
 		return nil, err
 	}
 
 	if firewallNeedsUpdate {
-		desc := makeFirewallDescription(serviceName, ipAddress)
+		desc := makeFirewallDescription(serviceName.String(), ipAddress)
 		// Unlike forwarding rules and target pools, firewalls can be updated
 		// without needing to be deleted and recreated.
 		if firewallExists {
-			if err := gce.updateFirewall(name, region, desc, sourceRanges, ports, hosts); err != nil {
+			if err := gce.updateFirewall(loadBalancerName, gce.region, desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): updated firewall", name, serviceName)
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): updated firewall", loadBalancerName, serviceName)
 		} else {
-			if err := gce.createFirewall(name, region, desc, sourceRanges, ports, hosts); err != nil {
+			if err := gce.createFirewall(loadBalancerName, gce.region, desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created firewall", name, serviceName)
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created firewall", loadBalancerName, serviceName)
 		}
 	}
 
-	tpExists, tpNeedsUpdate, err := gce.targetPoolNeedsUpdate(name, region, affinityType)
+	tpExists, tpNeedsUpdate, err := gce.targetPoolNeedsUpdate(loadBalancerName, gce.region, affinityType)
 	if err != nil {
 		return nil, err
 	}
@@ -634,36 +640,36 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 		// and something should fail before we recreate it, don't release the
 		// IP.  That way we can come back to it later.
 		isSafeToReleaseIP = false
-		if err := gce.deleteForwardingRule(name, region); err != nil {
-			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", name, err)
+		if err := gce.deleteForwardingRule(loadBalancerName, gce.region); err != nil {
+			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", loadBalancerName, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): deleted forwarding rule", name, serviceName)
+		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): deleted forwarding rule", loadBalancerName, serviceName)
 	}
 	if tpExists && tpNeedsUpdate {
-		if err := gce.deleteTargetPool(name, region); err != nil {
-			return nil, fmt.Errorf("failed to delete existing target pool %s for load balancer update: %v", name, err)
+		if err := gce.deleteTargetPool(loadBalancerName, gce.region); err != nil {
+			return nil, fmt.Errorf("failed to delete existing target pool %s for load balancer update: %v", loadBalancerName, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): deleted target pool", name, serviceName)
+		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): deleted target pool", loadBalancerName, serviceName)
 	}
 
 	// Once we've deleted the resources (if necessary), build them back up (or for
 	// the first time if they're new).
 	if tpNeedsUpdate {
-		if err := gce.createTargetPool(name, serviceName, region, hosts, affinityType); err != nil {
-			return nil, fmt.Errorf("failed to create target pool %s: %v", name, err)
+		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), gce.region, hosts, affinityType); err != nil {
+			return nil, fmt.Errorf("failed to create target pool %s: %v", loadBalancerName, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", name, serviceName)
+		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", loadBalancerName, serviceName)
 	}
 	if tpNeedsUpdate || fwdRuleNeedsUpdate {
-		if err := gce.createForwardingRule(name, serviceName, region, ipAddress, ports); err != nil {
-			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", name, err)
+		if err := gce.createForwardingRule(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports); err != nil {
+			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", loadBalancerName, err)
 		}
 		// End critical section.  It is safe to release the static IP (which
 		// just demotes it to ephemeral) now that it is attached.  In the case
 		// of a user-requested IP, the "is user-owned" flag will be set,
 		// preventing it from actually being released.
 		isSafeToReleaseIP = true
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created forwarding rule, IP %s", name, serviceName, ipAddress)
+		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created forwarding rule, IP %s", loadBalancerName, serviceName, ipAddress)
 	}
 
 	status := &api.LoadBalancerStatus{}
@@ -675,7 +681,7 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 // IP is being requested.
 // Returns whether the forwarding rule exists, whether it needs to be updated,
 // what its IP address is (if it exists), and any error we encountered.
-func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, requestedIP net.IP, ports []*api.ServicePort) (exists bool, needsUpdate bool, ipAddress string, err error) {
+func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, loadBalancerIP string, ports []api.ServicePort) (exists bool, needsUpdate bool, ipAddress string, err error) {
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -683,7 +689,7 @@ func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, requestedIP 
 		}
 		return false, false, "", fmt.Errorf("error getting load balancer's forwarding rule: %v", err)
 	}
-	if requestedIP != nil && requestedIP.String() != fwd.IPAddress {
+	if loadBalancerIP != fwd.IPAddress {
 		return true, true, fwd.IPAddress, nil
 	}
 	portRange, err := loadBalancerPortRange(ports)
@@ -701,7 +707,7 @@ func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, requestedIP 
 	return true, false, fwd.IPAddress, nil
 }
 
-func loadBalancerPortRange(ports []*api.ServicePort) (string, error) {
+func loadBalancerPortRange(ports []api.ServicePort) (string, error) {
 	if len(ports) == 0 {
 		return "", fmt.Errorf("no ports specified for GCE load balancer")
 	}
@@ -753,7 +759,7 @@ func translateAffinityType(affinityType api.ServiceAffinity) string {
 	}
 }
 
-func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []*api.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
+func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []api.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
 	fw, err := gce.service.Firewalls.Get(gce.projectID, makeFirewallName(name)).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -814,7 +820,7 @@ func slicesEqual(x, y []string) bool {
 	return true
 }
 
-func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress string, ports []*api.ServicePort) error {
+func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress string, ports []api.ServicePort) error {
 	portRange, err := loadBalancerPortRange(ports)
 	if err != nil {
 		return err
@@ -865,7 +871,7 @@ func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []
 	return nil
 }
 
-func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) error {
+func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []api.ServicePort, hosts []*gceInstance) error {
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -883,7 +889,7 @@ func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges nets
 	return nil
 }
 
-func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) error {
+func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []api.ServicePort, hosts []*gceInstance) error {
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -901,7 +907,7 @@ func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges nets
 	return nil
 }
 
-func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges netsets.IPNet, ports []api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
@@ -1053,13 +1059,14 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
-func (gce *GCECloud) UpdateLoadBalancer(name, region string, hostNames []string) error {
+func (gce *GCECloud) UpdateLoadBalancer(service *api.Service, hostNames []string) error {
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
 		return err
 	}
 
-	pool, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	pool, err := gce.service.TargetPools.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err != nil {
 		return err
 	}
@@ -1083,22 +1090,22 @@ func (gce *GCECloud) UpdateLoadBalancer(name, region string, hostNames []string)
 
 	if len(toAdd) > 0 {
 		add := &compute.TargetPoolsAddInstanceRequest{Instances: toAdd}
-		op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, add).Do()
+		op, err := gce.service.TargetPools.AddInstance(gce.projectID, gce.region, loadBalancerName, add).Do()
 		if err != nil {
 			return err
 		}
-		if err := gce.waitForRegionOp(op, region); err != nil {
+		if err := gce.waitForRegionOp(op, gce.region); err != nil {
 			return err
 		}
 	}
 
 	if len(toRemove) > 0 {
 		rm := &compute.TargetPoolsRemoveInstanceRequest{Instances: toRemove}
-		op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, region, name, rm).Do()
+		op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, gce.region, loadBalancerName, rm).Do()
 		if err != nil {
 			return err
 		}
-		if err := gce.waitForRegionOp(op, region); err != nil {
+		if err := gce.waitForRegionOp(op, gce.region); err != nil {
 			return err
 		}
 	}
@@ -1106,41 +1113,44 @@ func (gce *GCECloud) UpdateLoadBalancer(name, region string, hostNames []string)
 	// Try to verify that the correct number of nodes are now in the target pool.
 	// We've been bitten by a bug here before (#11327) where all nodes were
 	// accidentally removed and want to make similar problems easier to notice.
-	updatedPool, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	updatedPool, err := gce.service.TargetPools.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err != nil {
 		return err
 	}
 	if len(updatedPool.Instances) != len(hosts) {
 		glog.Errorf("Unexpected number of instances (%d) in target pool %s after updating (expected %d). Instances in updated pool: %s",
-			len(updatedPool.Instances), name, len(hosts), strings.Join(updatedPool.Instances, ","))
-		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), name, len(hosts))
+			len(updatedPool.Instances), loadBalancerName, len(hosts), strings.Join(updatedPool.Instances, ","))
+		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, len(hosts))
 	}
 	return nil
 }
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
-func (gce *GCECloud) EnsureLoadBalancerDeleted(name, region string) error {
-	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v", name, region)
-	err := utilerrors.AggregateGoroutines(
-		func() error { return gce.deleteFirewall(name, region) },
+func (gce *GCECloud) EnsureLoadBalancerDeleted(service *api.Service) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v)", service.Namespace, service.Name, loadBalancerName,
+		gce.region)
+
+	errs := utilerrors.AggregateGoroutines(
+		func() error { return gce.deleteFirewall(loadBalancerName, gce.region) },
 		// Even though we don't hold on to static IPs for load balancers, it's
 		// possible that EnsureLoadBalancer left one around in a failed
 		// creation/update attempt, so make sure we clean it up here just in case.
-		func() error { return gce.deleteStaticIP(name, region) },
+		func() error { return gce.deleteStaticIP(loadBalancerName, gce.region) },
 		func() error {
 			// The forwarding rule must be deleted before either the target pool can,
 			// unfortunately, so we have to do these two serially.
-			if err := gce.deleteForwardingRule(name, region); err != nil {
+			if err := gce.deleteForwardingRule(loadBalancerName, gce.region); err != nil {
 				return err
 			}
-			if err := gce.deleteTargetPool(name, region); err != nil {
+			if err := gce.deleteTargetPool(loadBalancerName, gce.region); err != nil {
 				return err
 			}
 			return nil
 		},
 	)
-	if err != nil {
-		return utilerrors.Flatten(err)
+	if errs != nil {
+		return utilerrors.Flatten(errs)
 	}
 	return nil
 }
@@ -1226,9 +1236,9 @@ func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNe
 	}
 	// TODO: This completely breaks modularity in the cloudprovider but the methods
 	// shared with the TCPLoadBalancer take api.ServicePorts.
-	svcPorts := []*api.ServicePort{}
+	svcPorts := []api.ServicePort{}
 	for _, p := range ports {
-		svcPorts = append(svcPorts, &api.ServicePort{Port: int(p)})
+		svcPorts = append(svcPorts, api.ServicePort{Port: int(p)})
 	}
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
@@ -1255,9 +1265,9 @@ func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNe
 	}
 	// TODO: This completely breaks modularity in the cloudprovider but the methods
 	// shared with the TCPLoadBalancer take api.ServicePorts.
-	svcPorts := []*api.ServicePort{}
+	svcPorts := []api.ServicePort{}
 	for _, p := range ports {
-		svcPorts = append(svcPorts, &api.ServicePort{Port: int(p)})
+		svcPorts = append(svcPorts, api.ServicePort{Port: int(p)})
 	}
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {

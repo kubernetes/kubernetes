@@ -19,11 +19,9 @@ package cloudprovider
 import (
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
@@ -82,18 +80,22 @@ type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
-	GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	GetLoadBalancer(service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error)
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	EnsureLoadBalancer(service *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
-	UpdateLoadBalancer(name, region string, hosts []string) error
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	UpdateLoadBalancer(service *api.Service, hosts []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
 	// This construction is useful because many cloud providers' load balancers
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
-	EnsureLoadBalancerDeleted(name, region string) error
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	EnsureLoadBalancerDeleted(service *api.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
