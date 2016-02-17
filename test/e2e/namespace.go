@@ -34,8 +34,8 @@ func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds in
 
 	By("Creating testing namespaces")
 	wg := &sync.WaitGroup{}
+	wg.Add(totalNS)
 	for n := 0; n < totalNS; n += 1 {
-		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
 			defer GinkgoRecover()
