@@ -112,8 +112,8 @@ kubelet
       --manifest-url-header="": HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'
       --master-service-namespace="default": The namespace from which the kubernetes master services should be injected into pods
       --max-open-files=1000000: Number of files that can be opened by Kubelet process. [default=1000000]
-      --max-pods=40: Number of Pods that can run on this Kubelet.
-      --maximum-dead-containers=100: Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 100.
+      --max-pods=110: Number of Pods that can run on this Kubelet.
+      --maximum-dead-containers=250: Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 250.
       --maximum-dead-containers-per-container=2: Maximum number of old instances to retain per container.  Each container takes up some disk space.  Default: 2.
       --minimum-container-ttl-duration=1m0s: Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
       --network-plugin="": <Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle
