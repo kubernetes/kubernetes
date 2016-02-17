@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM redis:2.8
-RUN apt-get update
-RUN apt-get install -yy -q python
+FROM gcr.io/google_containers/ubuntu-slim:0.1
+
+RUN apt-get update && apt-get install -y \
+  --no-install-recommends \
+  redis-server redis-sentinel sed bash && \
+  apt-get clean -y && \
+  rm -rf /var/lib/apt/lists/*
 
 COPY redis-master.conf /redis-master/redis.conf
 COPY redis-slave.conf /redis-slave/redis.conf
 COPY run.sh /run.sh
 
 CMD [ "/run.sh" ]
+
 ENTRYPOINT [ "sh", "-c" ]

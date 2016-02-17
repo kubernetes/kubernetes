@@ -66,8 +66,8 @@ function launchslave() {
     echo "Connecting to master failed.  Waiting..."
     sleep 10
   done
-  perl -pi -e "s/%master-ip%/${master}/" /redis-slave/redis.conf
-  perl -pi -e "s/%master-port%/6379/" /redis-slave/redis.conf
+  sed -i "s/%master-ip%/${master}/" /redis-slave/redis.conf
+  sed -i "s/%master-port%/6379/" /redis-slave/redis.conf
   redis-server /redis-slave/redis.conf
 }
 

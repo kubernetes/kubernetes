@@ -8,7 +8,7 @@ metadata:
 spec:
   containers:
   - name: proxy
-    image: kubernetes/redis-proxy:v1
+    image: kubernetes/redis-proxy:v2
     ports:
     - containerPort: 6379
       name: api
