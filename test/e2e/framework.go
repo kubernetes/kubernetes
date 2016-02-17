@@ -146,7 +146,11 @@ func (f *Framework) afterEach() {
 					timeout = f.NamespaceDeletionTimeout
 				}
 				if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
-					Failf("Couldn't delete ns %q: %s", ns.Name, err)
+					if !strings.Contains(err.Error(), "not found") {
+						Failf("Couldn't delete ns %q: %s", ns.Name, err)
+					} else {
+						Logf("Namespace %v was already deleted", ns.Name)
+					}
 				}
 			}
 			f.namespacesToDelete = nil
