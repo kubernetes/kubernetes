@@ -71,6 +71,10 @@ var (
 	// Name of the loadbalancer controller within the cluster addon
 	lbContainerName = "l7-lb-controller"
 
+	// Labels used to identify existing loadbalancer controllers.
+	// TODO: Pull this out of the RC manifest.
+	clusterAddonLBLabels = map[string]string{"k8s-app": "glbc"}
+
 	// If set, the test tries to perform an HTTP GET on each url endpoint of
 	// the Ingress. Only set to false to short-circuit test runs in debugging.
 	verifyHTTPGET = true
@@ -269,13 +273,19 @@ func (cont *ingressController) create() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 	rc := rcFromManifest(cont.rcPath)
-	existingRc, err := cont.c.ReplicationControllers(api.NamespaceSystem).Get(lbContainerName)
+
+	listOpts := api.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(clusterAddonLBLabels))}
+	existingRCs, err := cont.c.ReplicationControllers(api.NamespaceSystem).List(listOpts)
 	Expect(err).NotTo(HaveOccurred())
+	if len(existingRCs.Items) != 1 {
+		Failf("Unexpected number of lb cluster addons %v with label %v in kube-system namespace", len(existingRCs.Items), clusterAddonLBLabels)
+	}
+
 	// Merge the existing spec and new spec. The modifications should not
 	// manifest as functional changes to the controller. Most importantly, the
 	// podTemplate shouldn't change (but for the additional test cmd line flags)
 	// to ensure we test actual cluster functionality across upgrades.
-	rc.Spec = existingRc.Spec
+	rc.Spec = existingRCs.Items[0].Spec
 	rc.Name = "glbc"
 	rc.Namespace = cont.ns
 	rc.Labels = controllerLabels
@@ -402,7 +412,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 		client = framework.Client
 		ns = framework.Namespace.Name
 		// Scaled down the existing Ingress controller so it doesn't interfere with the test.
-		Expect(scaleRCByName(client, api.NamespaceSystem, lbContainerName, 0)).NotTo(HaveOccurred())
+		Expect(scaleRCByLabels(client, api.NamespaceSystem, clusterAddonLBLabels, 0)).NotTo(HaveOccurred())
 		addonDir = filepath.Join(
 			testContext.RepoRoot, "cluster", "addons", "cluster-loadbalancing", "glbc")
 
@@ -453,7 +463,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			return true, nil
 		})
 		// TODO: Remove this once issue #17802 is fixed
-		Expect(scaleRCByName(client, ingController.rc.Namespace, ingController.rc.Name, 0)).NotTo(HaveOccurred())
+		Expect(scaleRCByLabels(client, ingController.rc.Namespace, ingController.rc.Labels, 0)).NotTo(HaveOccurred())
 
 		// If the controller failed to cleanup the test will fail, but we want to cleanup
 		// resources before that.
@@ -464,7 +474,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			Failf("Failed to cleanup GCE L7 resources.")
 		}
 		// Restore the cluster Addon.
-		Expect(scaleRCByName(client, api.NamespaceSystem, lbContainerName, 1)).NotTo(HaveOccurred())
+		Expect(scaleRCByLabels(client, api.NamespaceSystem, clusterAddonLBLabels, 1)).NotTo(HaveOccurred())
 		framework.afterEach()
 		Logf("Successfully verified GCE L7 loadbalancer via Ingress.")
 	})
