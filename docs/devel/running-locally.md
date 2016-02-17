@@ -36,6 +36,7 @@ Getting started locally
     - [Docker](#docker)
     - [etcd](#etcd)
     - [go](#go)
+    - [OpenSSL](#openssl)
 - [Clone the repository](#clone-the-repository)
 - [Starting the cluster](#starting-the-cluster)
 - [Running a container](#running-a-container)
@@ -67,6 +68,14 @@ You need an [etcd](https://github.com/coreos/etcd/releases) in your path, please
 #### go
 
 You need [go](https://golang.org/doc/install) in your path (see [here](development.md#go-versions) for supported versions), please make sure it is installed and in your ``$PATH``.
+
+#### OpenSSL
+
+You need [OpenSSL](https://www.openssl.org/) installed.  If you do not have the `openssl` command available, you may see the following error in `/tmp/kube-apiserver.log`:
+
+```
+server.go:333] Invalid Authentication Config: open /tmp/kube-serviceaccount.key: no such file or directory
+```
 
 ### Clone the repository
 
