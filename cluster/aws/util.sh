@@ -1003,7 +1003,16 @@ function start-master() {
     echo ""
     echo "wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}"
     echo "chmod +x bootstrap"
-    echo "./bootstrap"
+    echo "mkdir -p /etc/kubernetes"
+    echo "mv kube_env.yaml /etc/kubernetes"
+    echo "mv bootstrap /etc/kubernetes/"
+    echo "cat > /etc/rc.local << EOF_RC_LOCAL"
+    echo "#!/bin/sh -e"
+    # We want to be sure that we don't pass an argument to bootstrap
+    echo "/etc/kubernetes/bootstrap"
+    echo "exit 0"
+    echo "EOF_RC_LOCAL"
+    echo "/etc/kubernetes/bootstrap"
   ) > "${KUBE_TEMP}/master-user-data"
 
   # Compress the data to fit under the 16KB limit (cloud-init accepts compressed data)
@@ -1088,7 +1097,16 @@ function start-minions() {
     echo ""
     echo "wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}"
     echo "chmod +x bootstrap"
-    echo "./bootstrap"
+    echo "mkdir -p /etc/kubernetes"
+    echo "mv kube_env.yaml /etc/kubernetes"
+    echo "mv bootstrap /etc/kubernetes/"
+    echo "cat > /etc/rc.local << EOF_RC_LOCAL"
+    echo "#!/bin/sh -e"
+    # We want to be sure that we don't pass an argument to bootstrap
+    echo "/etc/kubernetes/bootstrap"
+    echo "exit 0"
+    echo "EOF_RC_LOCAL"
+    echo "/etc/kubernetes/bootstrap"
   ) > "${KUBE_TEMP}/node-user-data"
 
   # Compress the data to fit under the 16KB limit (cloud-init accepts compressed data)
