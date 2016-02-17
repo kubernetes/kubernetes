@@ -153,14 +153,35 @@ func getContainerInfo(c *client.Client, nodeName string, req *stats.StatsRequest
 	if err != nil {
 		return nil, err
 	}
-	data, err := c.Post().
-		Prefix("proxy").
-		Resource("nodes").
-		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-		Suffix("stats/container").
-		SetHeader("Content-Type", "application/json").
-		Body(reqBody).
-		Do().Raw()
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	if err != nil {
+		return nil, err
+	}
+
+	var data []byte
+	if subResourceProxyAvailable {
+		data, err = c.Post().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+			Suffix("stats/container").
+			SetHeader("Content-Type", "application/json").
+			Body(reqBody).
+			Do().Raw()
+
+	} else {
+		data, err = c.Post().
+			Prefix("proxy").
+			Resource("nodes").
+			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+			Suffix("stats/container").
+			SetHeader("Content-Type", "application/json").
+			Body(reqBody).
+			Do().Raw()
+	}
+	if err != nil {
+		return nil, err
+	}
 
 	var containers map[string]cadvisorapi.ContainerInfo
 	err = json.Unmarshal(data, &containers)
@@ -316,19 +337,39 @@ type usageDataPerContainer struct {
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
-func nodeProxyRequest(c *client.Client, node, endpoint string) client.Result {
-	return c.Get().
-		Prefix("proxy").
-		Resource("nodes").
-		Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-		Suffix(endpoint).
-		Do()
+func nodeProxyRequest(c *client.Client, node, endpoint string) (client.Result, error) {
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	if err != nil {
+		return client.Result{}, err
+	}
+	var result client.Result
+	if subResourceProxyAvailable {
+		result = c.Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Suffix(endpoint).
+			Do()
+
+	} else {
+		result = c.Get().
+			Prefix("proxy").
+			Resource("nodes").
+			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Suffix(endpoint).
+			Do()
+	}
+	return result, nil
 }
 
 // Retrieve metrics from the kubelet server of the given node.
 func getKubeletMetricsThroughProxy(c *client.Client, node string) (string, error) {
-	metric, err := nodeProxyRequest(c, node, "metrics").Raw()
+	client, err := nodeProxyRequest(c, node, "metrics")
 	if err != nil {
+		return "", err
+	}
+	metric, errRaw := client.Raw()
+	if errRaw != nil {
 		return "", err
 	}
 	return string(metric), nil
@@ -354,7 +395,11 @@ func getKubeletMetricsThroughNode(nodeName string) (string, error) {
 // pods/containers), but do not contain the full spec.
 func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
 	result := &api.PodList{}
-	if err := nodeProxyRequest(c, node, "runningpods").Into(result); err != nil {
+	client, err := nodeProxyRequest(c, node, "runningpods")
+	if err != nil {
+		return &api.PodList{}, err
+	}
+	if err = client.Into(result); err != nil {
 		return &api.PodList{}, err
 	}
 	return result, nil
