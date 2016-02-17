@@ -86,10 +86,6 @@ MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 # Runtime config
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
-# Enable various v1beta1 features
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
-
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
 #   influxdb - Heapster, InfluxDB, and Grafana
