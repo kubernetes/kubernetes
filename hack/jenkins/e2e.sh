@@ -443,14 +443,20 @@ case ${JOB_NAME} in
 
   kubernetes-upgrade-gke-1.0-master-step1-deploy)
     configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
     ;;
 
   kubernetes-upgrade-gke-1.0-master-step4-e2e-old)
     configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
     ;;
 
   kubernetes-upgrade-gke-1.0-master-step6-e2e-old)
     configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
     ;;
 esac
 
