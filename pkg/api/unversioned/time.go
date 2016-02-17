@@ -88,6 +88,11 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	var str string
 	json.Unmarshal(b, &str)
 
+	// we were probably called with *only* the time part (no tag) from query deserialization
+	if len(b) > 0 && len(str) == 0 {
+		str = string(b)
+	}
+
 	pt, err := time.Parse(time.RFC3339, str)
 	if err != nil {
 		return err

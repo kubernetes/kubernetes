@@ -670,6 +670,32 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 		switch st.Kind() {
 		case reflect.Ptr, reflect.Interface:
 			return c.convert(sv.Elem(), dv.Elem(), scope)
+
+		case reflect.Slice:
+			// url values enter here as string slices.
+			// if the destinationvalue can unmarshal json and the source value is a string slice with exactly one value, unmarshal the string
+			// if this doesn't work for some reason, call the default convert instead of failing
+			if sv.Len() != 1 {
+				return c.convert(sv, dv.Elem(), scope)
+			}
+			sliceElement := sv.Index(0)
+			if sliceElement.Kind() != reflect.String {
+				return c.convert(sv, dv.Elem(), scope)
+			}
+
+			unmarshalFunction := dv.MethodByName("UnmarshalJSON")
+			if unmarshalFunction.Kind() == reflect.Invalid {
+				return c.convert(sv, dv.Elem(), scope)
+			}
+			unmarshalValue := unmarshalFunction.Call([]reflect.Value{reflect.ValueOf([]byte(sliceElement.String()))})
+			if unmarshalValue[0].IsNil() {
+				return nil
+			}
+
+			// reset the destination value and call normal conversion
+			dv.Set(reflect.New(dt.Elem()))
+			return c.convert(sv, dv.Elem(), scope)
+
 		default:
 			return c.convert(sv, dv.Elem(), scope)
 		}

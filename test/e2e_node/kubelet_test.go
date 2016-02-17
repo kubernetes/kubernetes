@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 
@@ -43,7 +44,7 @@ var _ = Describe("Kubelet", func() {
 
 	Describe("pod scheduling", func() {
 		Context("when scheduling a busybox command in a pod", func() {
-			It("it should return succes", func() {
+			It("it should return success", func() {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "busybox",
@@ -69,7 +70,7 @@ var _ = Describe("Kubelet", func() {
 
 			It("it should print the output to logs", func() {
 				Eventually(func() string {
-					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
+					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{SinceTime: unversioned.NewTime(time.Now().Sub(time.Duration(1 * time.Hour)))}).Stream()
 					if err != nil {
 						return ""
 					}

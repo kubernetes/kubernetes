@@ -56,6 +56,15 @@ func isStructKind(kind reflect.Kind) bool {
 	return kind == reflect.Struct
 }
 
+func marshalFunction(value reflect.Value) *reflect.Value {
+	marshalFunction := value.MethodByName("MarshalJSON")
+	if marshalFunction.Kind() == reflect.Invalid {
+		return nil
+	}
+
+	return &marshalFunction
+}
+
 func isValueKind(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16,
@@ -128,7 +137,8 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 
 		kind := ft.Kind()
 		if isPointerKind(kind) {
-			kind = ft.Elem().Kind()
+			ft = ft.Elem()
+			kind = ft.Kind()
 			if !field.IsNil() {
 				field = reflect.Indirect(field)
 			}
@@ -142,7 +152,18 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 				addListOfParams(result, tag, omitempty, field)
 			}
 		case isStructKind(kind) && !(zeroValue(field) && omitempty):
-			convertStruct(result, ft, field)
+			if marshalFunction := marshalFunction(field); marshalFunction != nil {
+				marshalReturn := marshalFunction.Call([]reflect.Value{})
+				errorValue := marshalReturn[1]
+				if errorValue.IsNil() {
+					bytes := marshalReturn[0].Interface().([]byte)
+					asString := string(bytes)
+					addParam(result, tag, omitempty, reflect.ValueOf(asString))
+				}
+
+			} else {
+				convertStruct(result, ft, field)
+			}
 		}
 	}
 }
