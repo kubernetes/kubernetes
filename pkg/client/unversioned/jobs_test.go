@@ -26,19 +26,32 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func getJobResourceName() string {
+func getJobsResourceName() string {
 	return "jobs"
 }
 
-func TestListJobsViaExtensions(t *testing.T) {
+func getJobClient(t *testing.T, c *simple.Client, ns, resourceGroup string) JobInterface {
+	switch resourceGroup {
+	case batch.GroupName:
+		return c.Setup(t).Batch().Jobs(ns)
+	case extensions.GroupName:
+		return c.Setup(t).Extensions().Jobs(ns)
+	default:
+		t.Fatalf("Unknown group %v", resourceGroup)
+	}
+	return nil
+}
+
+func testListJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceAll
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   group.ResourcePath(getJobsResourceName(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.JobList{
@@ -58,18 +71,24 @@ func TestListJobsViaExtensions(t *testing.T) {
 				},
 			},
 		},
+		ResourceGroup: resourceGroup,
 	}
-	receivedJobList, err := c.Setup(t).Extensions().Jobs(ns).List(api.ListOptions{})
+	receivedJobList, err := getJobClient(t, c, ns, resourceGroup).List(api.ListOptions{})
 	defer c.Close()
 	c.Validate(t, receivedJobList, err)
 }
 
-func TestGetJobViaExtensions(t *testing.T) {
+func TestListJob(t *testing.T) {
+	testListJob(t, testapi.Extensions, extensions.GroupName)
+	testListJob(t, testapi.Batch, batch.GroupName)
+}
+
+func testGetJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -87,25 +106,19 @@ func TestGetJobViaExtensions(t *testing.T) {
 				},
 			},
 		},
+		ResourceGroup: resourceGroup,
 	}
-	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Get("foo")
+	receivedJob, err := getJobClient(t, c, ns, resourceGroup).Get("foo")
 	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
-func TestGetJobWithNoNameViaExtensions(t *testing.T) {
-	ns := api.NamespaceDefault
-	c := &simple.Client{Error: true}
-	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Get("")
-	defer c.Close()
-	if (err != nil) && (err.Error() != simple.NameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
-	}
-
-	c.Validate(t, receivedJob, err)
+func TestGetJob(t *testing.T) {
+	testGetJob(t, testapi.Extensions, extensions.GroupName)
+	testGetJob(t, testapi.Batch, batch.GroupName)
 }
 
-func TestUpdateJobViaExtensions(t *testing.T) {
+func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
 	requestJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
@@ -117,7 +130,7 @@ func TestUpdateJobViaExtensions(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -135,13 +148,19 @@ func TestUpdateJobViaExtensions(t *testing.T) {
 				},
 			},
 		},
+		ResourceGroup: resourceGroup,
 	}
-	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Update(requestJob)
+	receivedJob, err := getJobClient(t, c, ns, resourceGroup).Update(requestJob)
 	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
-func TestUpdateJobStatusViaExtensions(t *testing.T) {
+func TestUpdateJob(t *testing.T) {
+	testUpdateJob(t, testapi.Extensions, extensions.GroupName)
+	testUpdateJob(t, testapi.Batch, batch.GroupName)
+}
+
+func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
 	requestJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
@@ -153,7 +172,7 @@ func TestUpdateJobStatusViaExtensions(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
+			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo") + "/status",
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -174,28 +193,40 @@ func TestUpdateJobStatusViaExtensions(t *testing.T) {
 				},
 			},
 		},
+		ResourceGroup: resourceGroup,
 	}
-	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).UpdateStatus(requestJob)
+	receivedJob, err := getJobClient(t, c, ns, resourceGroup).UpdateStatus(requestJob)
 	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
-func TestDeleteJobViaExtensions(t *testing.T) {
+func TestUpdateJobStatus(t *testing.T) {
+	testUpdateJobStatus(t, testapi.Extensions, extensions.GroupName)
+	testUpdateJobStatus(t, testapi.Batch, batch.GroupName)
+}
+
+func testDeleteJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response:      simple.Response{StatusCode: 200},
+		ResourceGroup: resourceGroup,
 	}
-	err := c.Setup(t).Extensions().Jobs(ns).Delete("foo", nil)
+	err := getJobClient(t, c, ns, resourceGroup).Delete("foo", nil)
 	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
-func TestCreateJobViaExtensions(t *testing.T) {
+func TestDeleteJob(t *testing.T) {
+	testDeleteJob(t, testapi.Extensions, extensions.GroupName)
+	testDeleteJob(t, testapi.Batch, batch.GroupName)
+}
+
+func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
 	requestJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
@@ -206,7 +237,7 @@ func TestCreateJobViaExtensions(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   group.ResourcePath(getJobsResourceName(), ns, ""),
 			Body:   requestJob,
 			Query:  simple.BuildQueryValues(nil),
 		},
@@ -225,208 +256,17 @@ func TestCreateJobViaExtensions(t *testing.T) {
 				},
 			},
 		},
+		ResourceGroup: resourceGroup,
 	}
-	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Create(requestJob)
+	receivedJob, err := getJobClient(t, c, ns, resourceGroup).Create(requestJob)
 	defer c.Close()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	c.Validate(t, receivedJob, err)
 }
 
-// Tests below are a copy of the above tests.  Once job is removed from extensions, above test cases can be deleted.
-
-func TestListJobsViaBatch(t *testing.T) {
-	ns := api.NamespaceAll
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "GET",
-			Path:   testapi.Batch.ResourcePath(getJobResourceName(), ns, ""),
-		},
-		Response: simple.Response{StatusCode: 200,
-			Body: &extensions.JobList{
-				Items: []extensions.Job{
-					{
-						ObjectMeta: api.ObjectMeta{
-							Name: "foo",
-							Labels: map[string]string{
-								"foo":  "bar",
-								"name": "baz",
-							},
-						},
-						Spec: extensions.JobSpec{
-							Template: api.PodTemplateSpec{},
-						},
-					},
-				},
-			},
-		},
-	}
-	receivedJobList, err := c.Setup(t).Batch().Jobs(ns).List(api.ListOptions{})
-	defer c.Close()
-	c.Validate(t, receivedJobList, err)
-}
-
-func TestGetJobViaBatch(t *testing.T) {
-	ns := api.NamespaceDefault
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "GET",
-			Path:   testapi.Batch.ResourcePath(getJobResourceName(), ns, "foo"),
-			Query:  simple.BuildQueryValues(nil),
-		},
-		Response: simple.Response{
-			StatusCode: 200,
-			Body: &extensions.Job{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"foo":  "bar",
-						"name": "baz",
-					},
-				},
-				Spec: extensions.JobSpec{
-					Template: api.PodTemplateSpec{},
-				},
-			},
-		},
-	}
-	receivedJob, err := c.Setup(t).Batch().Jobs(ns).Get("foo")
-	defer c.Close()
-	c.Validate(t, receivedJob, err)
-}
-
-func TestGetJobWithNoNameViaBatch(t *testing.T) {
-	ns := api.NamespaceDefault
-	c := &simple.Client{Error: true}
-	receivedJob, err := c.Setup(t).Batch().Jobs(ns).Get("")
-	defer c.Close()
-	if (err != nil) && (err.Error() != simple.NameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
-	}
-
-	c.Validate(t, receivedJob, err)
-}
-
-func TestUpdateJobViaBatch(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestJob := &extensions.Job{
-		ObjectMeta: api.ObjectMeta{
-			Name:            "foo",
-			Namespace:       ns,
-			ResourceVersion: "1",
-		},
-	}
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "PUT",
-			Path:   testapi.Batch.ResourcePath(getJobResourceName(), ns, "foo"),
-			Query:  simple.BuildQueryValues(nil),
-		},
-		Response: simple.Response{
-			StatusCode: 200,
-			Body: &extensions.Job{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"foo":  "bar",
-						"name": "baz",
-					},
-				},
-				Spec: extensions.JobSpec{
-					Template: api.PodTemplateSpec{},
-				},
-			},
-		},
-	}
-	receivedJob, err := c.Setup(t).Batch().Jobs(ns).Update(requestJob)
-	defer c.Close()
-	c.Validate(t, receivedJob, err)
-}
-
-func TestUpdateJobStatusViaBatch(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestJob := &extensions.Job{
-		ObjectMeta: api.ObjectMeta{
-			Name:            "foo",
-			Namespace:       ns,
-			ResourceVersion: "1",
-		},
-	}
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "PUT",
-			Path:   testapi.Batch.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
-			Query:  simple.BuildQueryValues(nil),
-		},
-		Response: simple.Response{
-			StatusCode: 200,
-			Body: &extensions.Job{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"foo":  "bar",
-						"name": "baz",
-					},
-				},
-				Spec: extensions.JobSpec{
-					Template: api.PodTemplateSpec{},
-				},
-				Status: extensions.JobStatus{
-					Active: 1,
-				},
-			},
-		},
-	}
-	receivedJob, err := c.Setup(t).Batch().Jobs(ns).UpdateStatus(requestJob)
-	defer c.Close()
-	c.Validate(t, receivedJob, err)
-}
-
-func TestDeleteJobViaBatch(t *testing.T) {
-	ns := api.NamespaceDefault
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "DELETE",
-			Path:   testapi.Batch.ResourcePath(getJobResourceName(), ns, "foo"),
-			Query:  simple.BuildQueryValues(nil),
-		},
-		Response: simple.Response{StatusCode: 200},
-	}
-	err := c.Setup(t).Batch().Jobs(ns).Delete("foo", nil)
-	defer c.Close()
-	c.Validate(t, nil, err)
-}
-
-func TestCreateJobViaBatch(t *testing.T) {
-	ns := api.NamespaceDefault
-	requestJob := &extensions.Job{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: ns,
-		},
-	}
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "POST",
-			Path:   testapi.Batch.ResourcePath(getJobResourceName(), ns, ""),
-			Body:   requestJob,
-			Query:  simple.BuildQueryValues(nil),
-		},
-		Response: simple.Response{
-			StatusCode: 200,
-			Body: &extensions.Job{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-					Labels: map[string]string{
-						"foo":  "bar",
-						"name": "baz",
-					},
-				},
-				Spec: extensions.JobSpec{
-					Template: api.PodTemplateSpec{},
-				},
-			},
-		},
-	}
-	receivedJob, err := c.Setup(t).Batch().Jobs(ns).Create(requestJob)
-	defer c.Close()
-	c.Validate(t, receivedJob, err)
+func TestCreateJob(t *testing.T) {
+	testCreateJob(t, testapi.Extensions, extensions.GroupName)
+	testCreateJob(t, testapi.Batch, batch.GroupName)
 }
