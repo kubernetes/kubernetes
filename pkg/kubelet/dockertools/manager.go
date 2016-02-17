@@ -803,6 +803,7 @@ func (dm *DockerManager) runContainer(
 
 		// keep gpu device usage status
 		container.GPUIndexs = gpuIdxs
+		glog.Errorf("Hans: runContainer(): afterAllocGPU: container:%+v", container)
 	}
 
 	if dm.cpuCFSQuota {
@@ -1720,6 +1721,7 @@ type podContainerChangesSpec struct {
 }
 
 func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kubecontainer.PodStatus) (podContainerChangesSpec, error) {
+	glog.Infof("Hans: computePodContainerChanges(): pod: %+v,\n podStatus:%+v", pod, podStatus)
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))

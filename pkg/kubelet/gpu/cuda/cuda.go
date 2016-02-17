@@ -53,7 +53,7 @@ func (cuda *Cuda) ReleasePlugin() error {
 }
 
 func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
-	glog.Infof("Hans: cuda.AllocGPU(): gpuReqs: %d", gpuReqs)
+	glog.Infof("Hans: cuda.AllocGPU(): gpuReqs: %d, GPUDevices: %+v", gpuReqs, cuda.gpuInfo.GPUDevices.Devices)
 	totalGPUNum := uint(len(cuda.gpuInfo.GPUDevices.Devices))
 	if gpuReqs > totalGPUNum {
 		return []uint{}, fmt.Errorf("Cannot alloc %d cuda gpu, because there are %d", gpuReqs, totalGPUNum)
@@ -65,7 +65,6 @@ func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
 	// check whether there are enough free gpus
 	freeGPUIdx := []uint{}
 	freedGPUNum := uint(0)
-	glog.Infof("Hans: cuda.AllocGPU(): cuda.gpuInfo: %+v", cuda.gpuInfo)
 	for idx, gpuDevice := range cuda.gpuInfo.GPUDevices.Devices {
 		if !gpuDevice.GPUDeviceState.IsOccupied {
 			freedGPUNum++
@@ -73,14 +72,16 @@ func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
 		}
 	}
 
-	glog.Infof("Hans: cuda.AllocGPU(): freedGPUNum: %d, gpuReqs", freedGPUNum, cgpuReqs)
+	glog.Infof("Hans: cuda.AllocGPU(): freedGPUNum: %d, gpuReqs: %d, freeGPUIdx: %+v", freedGPUNum, gpuReqs, freeGPUIdx)
 	if freedGPUNum >= gpuReqs {
+		glog.Infof("Hans: cuda.AllocGPU(): before alloc: GPUDevices: %+v", cuda.gpuInfo.GPUDevices.Devices)
 		var result = make([]uint, gpuReqs)
 		cc := copy(result, freeGPUIdx[:gpuReqs])
 		if uint(cc) == gpuReqs {
 			for _, idx := range result {
 				cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied = true
 			}
+			glog.Infof("Hans: cuda.AllocGPU(): after alloc: GPUDevices: %+v", cuda.gpuInfo.GPUDevices.Devices)
 			return result, nil
 		} else {
 			return []uint{}, fmt.Errorf("Failed to generate gpu index slice")
@@ -98,7 +99,7 @@ func (cuda *Cuda) FreeGPU(gpuIdxs []uint) error {
 		}
 	}()
 
-	glog.Infof("Hans: cuda.FreeGPU()")
+	glog.Infof("Hans: cuda.FreeGPU(): gpuIdxs: %+v, GPUDevices: %+v", gpuIdxs, cuda.gpuInfo.GPUDevices.Devices)
 	if len(gpuIdxs) == 0 {
 		return nil
 	}
@@ -113,11 +114,12 @@ func (cuda *Cuda) FreeGPU(gpuIdxs []uint) error {
 		}
 	}
 
-	// remove the occupy flag
+	// remove the occupied flag
 	for _, idx := range gpuIdxs {
 		cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied = false
 	}
 
+	glog.Infof("Hans: cuda.FreeGPU(): after free: GPUDevices: %+v", cuda.gpuInfo.GPUDevices.Devices)
 	return nil
 }
 

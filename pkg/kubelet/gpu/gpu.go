@@ -34,8 +34,8 @@ func IsGPUAvailable(pods []*api.Pod, gpuCapacity int) bool {
 		totalGPURequest += getGPUResourceRequest(pod)
 	}
 
-	glog.Infof("Hans: IsGPUAvailable: totalGPU: %d, totalGPURequest: %d", totalGPU, totalGPU)
-	return totalGPURequest == 0 || (totalGPU-totalGPU) >= 0
+	glog.Infof("Hans: IsGPUAvailable: totalGPU: %d, totalGPURequest: %d", totalGPU, totalGPURequest)
+	return totalGPURequest == 0 || (totalGPU-totalGPURequest) >= 0
 }
 
 func getGPUResourceRequest(pod *api.Pod) int {
