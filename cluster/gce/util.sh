@@ -1252,7 +1252,17 @@ function test-teardown {
     --project "${PROJECT}" \
     --quiet \
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" || true
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  if [[ ${MULTIZONE:-} == "true" ]]; then
+      local zones=( ${E2E_ZONES} )
+      # tear them down in reverse order, finally tearing down the master too.
+      for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--))
+      do
+	  KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
+      done
+      KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/cluster/kube-down.sh"
+  else
+      "${KUBE_ROOT}/cluster/kube-down.sh"
+  fi
 }
 
 # SSH to a node by name ($1) and run a command ($2).
