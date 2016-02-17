@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
@@ -281,6 +282,38 @@ func (m *Master) InstallAPIs(c *Config) {
 			Name:             autoscalingGroupMeta.GroupVersion.Group,
 			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
 			PreferredVersion: autoscalingGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+
+	// Install batch unless disabled.
+	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
+		batchResources := m.getBatchResources(c)
+		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
+
+		// Hard code preferred group version to batch/v1
+		batchGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "batch", Version: "v1"}
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *batchGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": batchResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		batchGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: batchGroupMeta.GroupVersion.String(),
+			Version:      batchGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             batchGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{batchGVForDiscovery},
+			PreferredVersion: batchGVForDiscovery,
 		}
 		allGroups = append(allGroups, group)
 	}
@@ -666,9 +699,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
 	if isEnabled("jobs") {
-		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
-		storage["jobs"] = jobStorage
-		storage["jobs/status"] = jobStatusStorage
+		m.constructJobResources(c, storage)
 	}
 	if isEnabled("ingresses") {
 		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
@@ -718,6 +749,40 @@ func (m *Master) getAutoscalingResources(c *Config) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	if isEnabled("horizontalpodautoscalers") {
 		m.constructHPAResources(c, storage)
+	}
+	return storage
+}
+
+// constructJobResources makes Job resources and adds them to the storage map.
+// They're installed in both batch and extensions. It's assumed that you've
+// already done the check that they should be on.
+func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.Storage) {
+	// Note that job's storage settings are changed by changing the batch
+	// group. Clearly we want all jobs to be stored in the same place no
+	// matter where they're accessed from.
+	storageDecorator := m.StorageDecorator()
+	dbClient := func(resource string) storage.Interface {
+		return c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource)
+	}
+	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
+	restStorage["jobs"] = jobStorage
+	restStorage["jobs/status"] = jobStatusStorage
+}
+
+// getBatchResources returns the resources for batch api
+func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
+	resourceOverrides := m.ApiGroupVersionOverrides["batch/v1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		if enabled, ok := resourceOverrides[resource]; ok {
+			return enabled
+		}
+		return !m.ApiGroupVersionOverrides["batch/v1"].Disable
+	}
+
+	storage := map[string]rest.Storage{}
+	if isEnabled("jobs") {
+		m.constructJobResources(c, storage)
 	}
 	return storage
 }
