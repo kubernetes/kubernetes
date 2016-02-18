@@ -70,7 +70,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return namespace.MatchNamespace(label, field)
 		},
-		QualifiedResource: api.Resource("namespaces"),
+		QualifiedResource:       api.Resource("namespaces"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,

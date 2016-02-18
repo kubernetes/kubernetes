@@ -64,7 +64,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return ingress.MatchIngress(label, field)
 		},
-		QualifiedResource: extensions.Resource("ingresses"),
+		QualifiedResource:       extensions.Resource("ingresses"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation
 		CreateStrategy: ingress.Strategy,

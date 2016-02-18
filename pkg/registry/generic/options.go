@@ -22,6 +22,7 @@ import (
 
 // RESTOptions is set of configuration options to generic registries.
 type RESTOptions struct {
-	Storage   pkgstorage.Interface
-	Decorator StorageDecorator
+	Storage                 pkgstorage.Interface
+	Decorator               StorageDecorator
+	DeleteCollectionWorkers int
 }

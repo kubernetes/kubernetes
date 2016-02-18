@@ -142,6 +142,8 @@
                 export KUBELET_TEST_LOG_LEVEL="--v=4"
                 # Increase resync period to simulate production
                 export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+                # Increase delete collection parallelism
+                export TEST_CLUSTER_DELETE_COLLECTION_WORKERS="--delete-collection-workers=16"
         - 'gce-examples':
             description: 'Run E2E examples test on GCE.'
             timeout: 90

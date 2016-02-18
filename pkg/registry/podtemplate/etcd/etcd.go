@@ -54,7 +54,8 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return podtemplate.MatchPodTemplate(label, field)
 		},
-		QualifiedResource: api.Resource("podtemplates"),
+		QualifiedResource:       api.Resource("podtemplates"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: podtemplate.Strategy,
 		UpdateStrategy: podtemplate.Strategy,

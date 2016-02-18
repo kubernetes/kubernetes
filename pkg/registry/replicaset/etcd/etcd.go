@@ -80,7 +80,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return replicaset.MatchReplicaSet(label, field)
 		},
-		QualifiedResource: api.Resource("replicasets"),
+		QualifiedResource:       api.Resource("replicasets"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate ReplicaSet creation
 		CreateStrategy: replicaset.Strategy,

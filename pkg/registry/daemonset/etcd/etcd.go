@@ -64,7 +64,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return daemonset.MatchDaemonSet(label, field)
 		},
-		QualifiedResource: extensions.Resource("daemonsets"),
+		QualifiedResource:       extensions.Resource("daemonsets"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate daemon set creation
 		CreateStrategy: daemonset.Strategy,
