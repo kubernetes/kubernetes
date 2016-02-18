@@ -173,7 +173,9 @@ fi
 if [[ "${E2E_TEST,,}" == "true" ]]; then
     # Check to make sure the cluster is up before running tests, and fail if it's not.
     go run ./hack/e2e.go ${E2E_OPT:-} -v --isup
-    go run ./hack/e2e.go ${E2E_OPT:-} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
+    go run ./hack/e2e.go ${E2E_OPT:-} -v --test \
+      ${GINKGO_TEST_ARGS:+--test_args="${GINKGO_TEST_ARGS}"} \
+      && exitcode=0 || exitcode=$?
     if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${build_version:-} ]]; then
         echo "publish build_version to ci/latest-green.txt: ${build_version}"
         echo "${build_version}" > ${WORKSPACE}/build_version.txt
