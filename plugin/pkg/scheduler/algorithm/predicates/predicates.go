@@ -89,10 +89,10 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 	}
 
 	for _, existingVolume := range pod.Spec.Volumes {
-		// Same GCE disk mounted by multiple pods conflicts unless all pods mount it read-only.
+		// Allow only one pod to mount the disk as read-write all other mounts should be read-only
 		if volume.GCEPersistentDisk != nil && existingVolume.GCEPersistentDisk != nil {
 			disk, existingDisk := volume.GCEPersistentDisk, existingVolume.GCEPersistentDisk
-			if disk.PDName == existingDisk.PDName && !(disk.ReadOnly && existingDisk.ReadOnly) {
+			if disk.PDName == existingDisk.PDName && (!disk.ReadOnly && !existingDisk.ReadOnly) {
 				return true
 			}
 		}
