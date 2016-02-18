@@ -40,6 +40,7 @@ const (
 )
 
 var (
+	// TODO(jdef) eliminate this global var
 	CloudProvider *MesosCloud
 
 	noHostNameSpecified = errors.New("No hostname specified")

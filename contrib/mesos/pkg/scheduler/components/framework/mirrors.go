@@ -84,7 +84,7 @@ func (gc *podGC) schedule(host, slaveID string, done <-chan struct{}) (chan<- bo
 
 func (gc *podGC) run(done <-chan struct{}) {
 	var (
-		t        = time.NewTimer(podGCCoalescePeriod)
+		t        = time.NewTimer(0)
 		requests = map[jobKey][]podGCRequest{}
 		timeChan <-chan time.Time
 	)
@@ -96,6 +96,8 @@ func (gc *podGC) run(done <-chan struct{}) {
 			delete(gc.ongoing, k)
 		}
 	}()
+
+	<-t.C // sanity: start w/ a clear timer chan
 	for {
 		select {
 		case <-done:
@@ -105,8 +107,8 @@ func (gc *podGC) run(done <-chan struct{}) {
 			// are we coalescing?
 			if timeChan == nil {
 				log.V(1).Infof("will GC pods for host %q slave %q momentarily", r.host, r.slaveID)
-				timeChan = t.C
 				t.Reset(podGCCoalescePeriod)
+				timeChan = t.C
 			}
 			key := jobKey{host: r.host, slaveID: r.slaveID}
 			existing := requests[key]

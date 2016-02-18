@@ -97,6 +97,7 @@ func (u *StatusUpdater) Run(terminate <-chan struct{}) error {
 }
 
 func (u *StatusUpdater) updateStatus(n *api.Node) error {
+	// TODO(jdef) set an annotation on the Node w/ the current slaveID
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := u.tryUpdateStatus(n); err != nil && !errors.IsConflict(err) {
 			log.Errorf("Error updating node status, will retry: %v", err)

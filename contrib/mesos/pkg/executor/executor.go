@@ -93,8 +93,7 @@ type Executor struct {
 	dockerClient         dockertools.DockerInterface
 	suicideWatch         suicideWatcher
 	suicideTimeout       time.Duration
-	shutdownAlert        func()          // invoked just prior to executor shutdown
-	kubeletFinished      <-chan struct{} // signals that kubelet Run() died
+	shutdownAlert        func() // invoked just prior to executor shutdown
 	exitFunc             func(int)
 	staticPodsConfigPath string
 	staticPodsFilters    podutil.Filters
@@ -142,7 +141,6 @@ func New(config Config) *Executor {
 		outgoing:          make(chan func() (mesos.Status, error), 1024),
 		dockerClient:      config.Docker,
 		suicideTimeout:    config.SuicideTimeout,
-		kubeletFinished:   config.KubeletFinished,
 		suicideWatch:      &suicideTimer{},
 		shutdownAlert:     config.ShutdownAlert,
 		exitFunc:          config.ExitFunc,
@@ -203,8 +201,6 @@ func (k *Executor) Init(driver bindings.ExecutorDriver) {
 		}
 		return true
 	})
-
-	//TODO(jdef) monitor kubeletFinished and shutdown if it happens
 }
 
 func (k *Executor) isDone() bool {
@@ -633,19 +629,16 @@ func (k *Executor) doShutdown(driver bindings.ExecutorDriver) {
 	// if needed, so don't take extra time to do that here.
 	k.registry.shutdown()
 
-	select {
 	// the main Run() func may still be running... wait for it to finish: it will
 	// clear the pod configuration cleanly, telling k8s "there are no pods" and
 	// clean up resources (pods, volumes, etc).
-	case <-k.kubeletFinished:
 
 	//TODO(jdef) attempt to wait for events to propagate to API server?
 
 	// TODO(jdef) extract constant, should be smaller than whatever the
 	// slave graceful shutdown timeout period is.
-	case <-time.After(15 * time.Second):
-		log.Errorf("timed out waiting for kubelet Run() to die")
-	}
+	time.Sleep(15 * time.Second)
+
 	log.Infoln("exiting")
 	if k.exitFunc != nil {
 		k.exitFunc(0)

@@ -55,6 +55,7 @@ type (
 	Source struct {
 		stop    <-chan struct{}
 		filters []Filter // additional filters to apply to pod objects
+		name    string
 
 		guard sync.Locker        // guard out because it's mutable, shared across multiple go-routines
 		out   chan<- interface{} // never close this because pkg/util/config.mux doesn't handle that very well
@@ -79,7 +80,7 @@ func (f FilterFunc) Accept(pod *api.Pod) (*api.Pod, bool) { return f(pod) }
 func (nl *noopLock) Lock()   {}
 func (nl *noopLock) Unlock() {}
 
-// Generic creates a generic podsource that supports the following options: ClearPodsOnShutdown.
+// Generic creates a generic podsource that supports the following options: ClearPodsOnShutdown, Name.
 func Generic(stop <-chan struct{}, out chan<- interface{}, in <-chan interface{}, options ...Option) {
 	source := &Source{
 		stop:  stop,
@@ -106,6 +107,7 @@ func Mesos(
 		stop:  stop,
 		out:   out,
 		guard: new(noopLock),
+		name:  MesosSource,
 		filters: []Filter{
 			FilterFunc(filterMirrorPod),
 			&registeredPodFilter{registry: registry},
@@ -228,12 +230,18 @@ func filterContainerEnvOverlay(env []api.EnvVar) FilterFunc {
 	}
 }
 
-// ClearPodsOnShutdown sends an empty pod snapshot upon termination (close of Source.stop)
+// ClearPodsOnShutdown sends an empty pod snapshot upon termination (close of Source.stop).
+// This option will not be applied if the source is unnamed (see Name).
 func ClearPodsOnShutdown() Option {
 	return func(s *Source) {
+		if s.name == "" {
+			return
+		}
 		s.guard = &sync.Mutex{}
 		go func() {
 			<-s.stop
+
+			log.Infof("sending final, blank pod snapshot for source %q", s.name)
 
 			var out chan<- interface{}
 			s.guard.Lock()
@@ -241,8 +249,16 @@ func ClearPodsOnShutdown() Option {
 			s.out = nil
 			s.guard.Unlock()
 
-			out <- kubetypes.PodUpdate{Op: kubetypes.SET, Source: MesosSource}
+			out <- kubetypes.PodUpdate{Op: kubetypes.SET, Pods: []*api.Pod{}, Source: s.name}
 		}()
+	}
+}
+
+// Name overrides the default name of the source. Intended be used with Generic sources since
+// they will have no name set by default.
+func Name(name string) Option {
+	return func(s *Source) {
+		s.name = name
 	}
 }
 

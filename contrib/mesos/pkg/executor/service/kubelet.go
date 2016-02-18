@@ -17,10 +17,10 @@ limitations under the License.
 package service
 
 import (
-	log "github.com/golang/glog"
+	// log "github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/runtime"
+	// "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -35,50 +35,53 @@ type executorKubelet struct {
 // Run runs the main kubelet loop, closing the kubeletFinished chan when the
 // loop exits. Like the upstream Run, it will never return.
 func (kl *executorKubelet) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
-	defer func() {
-		// When this Run function is called, we close it here.
-		// Otherwise, KubeletExecutorServer.runKubelet will.
-		close(kl.kubeletDone)
-		runtime.HandleCrash()
-		log.Infoln("kubelet run terminated") //TODO(jdef) turn down verbosity
-		// important: never return! this is in our contract
-		select {}
-	}()
+	wait.Until(func() { kl.Kubelet.Run(mergedUpdates) }, 0, kl.executorDone)
+	/*
+		defer func() {
+			// When this Run function is called, we close it here.
+			// Otherwise, KubeletExecutorServer.runKubelet will.
+			close(kl.kubeletDone)
+			runtime.HandleCrash()
+			log.Infoln("kubelet run terminated") //TODO(jdef) turn down verbosity
+			// important: never return! this is in our contract
+			select {}
+		}()
 
-	// push merged updates into another, closable update channel which is closed
-	// when the executor shuts down.
-	closableUpdates := make(chan kubetypes.PodUpdate)
-	go func() {
-		// closing closableUpdates will cause our patched kubelet's syncLoop() to exit
-		defer close(closableUpdates)
-	pipeLoop:
-		for {
-			select {
-			case <-kl.executorDone:
-				break pipeLoop
-			default:
+		// push merged updates into another, closable update channel which is closed
+		// when the executor shuts down.
+		closableUpdates := make(chan kubetypes.PodUpdate)
+		go func() {
+			// closing closableUpdates will cause our patched kubelet's syncLoop() to exit
+			defer close(closableUpdates)
+		pipeLoop:
+			for {
 				select {
-				case u := <-mergedUpdates:
+				case <-kl.executorDone:
+					break pipeLoop
+				default:
 					select {
-					case closableUpdates <- u: // noop
+					case u := <-mergedUpdates:
+						select {
+						case closableUpdates <- u: // noop
+						case <-kl.executorDone:
+							break pipeLoop
+						}
 					case <-kl.executorDone:
 						break pipeLoop
 					}
-				case <-kl.executorDone:
-					break pipeLoop
 				}
 			}
-		}
-	}()
+		}()
 
-	// we expect that Run() will complete after closableUpdates is closed and the
-	// kubelet's syncLoop() has finished processing its backlog, which hopefully
-	// will not take very long. Peeking into the future (current k8s master) it
-	// seems that the backlog has grown from 1 to 50 -- this may negatively impact
-	// us going forward, time will tell.
-	wait.Until(func() { kl.Kubelet.Run(closableUpdates) }, 0, kl.executorDone)
+		// we expect that Run() will complete after closableUpdates is closed and the
+		// kubelet's syncLoop() has finished processing its backlog, which hopefully
+		// will not take very long. Peeking into the future (current k8s master) it
+		// seems that the backlog has grown from 1 to 50 -- this may negatively impact
+		// us going forward, time will tell.
+		wait.Until(func() { kl.Kubelet.Run(closableUpdates) }, 0, kl.executorDone)
 
-	//TODO(jdef) revisit this if/when executor failover lands
-	// Force kubelet to delete all pods.
-	kl.HandlePodDeletions(kl.GetPods())
+		//TODO(jdef) revisit this if/when executor failover lands
+		// Force kubelet to delete all pods.
+		kl.HandlePodDeletions(kl.GetPods())
+	*/
 }

@@ -105,7 +105,6 @@ func (k *executorWrapper) Registered(
 
 func (s *KubeletExecutorServer) runExecutor(
 	nodeInfos chan<- executor.NodeInfo,
-	kubeletFinished <-chan struct{},
 	staticPodsConfigPath string,
 	apiclient *clientset.Clientset,
 	registry executor.Registry,
@@ -133,13 +132,12 @@ func (s *KubeletExecutorServer) runExecutor(
 		}))
 	}
 	executorWrapper.Executor = executor.New(executor.Config{
-		Registry:        registry,
-		APIClient:       apiclient,
-		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		SuicideTimeout:  s.SuicideTimeout,
-		KubeletFinished: kubeletFinished,
-		ExitFunc:        os.Exit,
-		NodeInfos:       nodeInfos,
+		Registry:       registry,
+		APIClient:      apiclient,
+		Docker:         dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		SuicideTimeout: s.SuicideTimeout,
+		ExitFunc:       os.Exit,
+		NodeInfos:      nodeInfos,
 		Options: []executor.Option{
 			executor.StaticPods(staticPodsConfigPath, staticPodFilters),
 		},
@@ -171,21 +169,12 @@ func (s *KubeletExecutorServer) runExecutor(
 
 func (s *KubeletExecutorServer) runKubelet(
 	nodeInfos <-chan executor.NodeInfo,
-	kubeletDone chan<- struct{},
 	staticPodsConfigPath string,
 	apiclient *clientset.Clientset,
 	podLW *cache.ListWatch,
 	registry executor.Registry,
 	executorDone <-chan struct{},
 ) (err error) {
-	defer func() {
-		if err != nil {
-			// close the channel here. When Run returns without error, the executorKubelet is
-			// responsible to do this. If it returns with an error, we are responsible here.
-			close(kubeletDone)
-		}
-	}()
-
 	kcfg, err := kubeletapp.UnsecuredKubeletConfig(s.KubeletServer)
 	if err != nil {
 		return err
@@ -201,7 +190,6 @@ func (s *KubeletExecutorServer) runKubelet(
 		// decorate kubelet such that it shuts down when the executor is
 		decorated := &executorKubelet{
 			Kubelet:      k.(*kubelet.Kubelet),
-			kubeletDone:  kubeletDone,
 			executorDone: executorDone,
 		}
 
@@ -281,7 +269,12 @@ func (s *KubeletExecutorServer) runKubelet(
 	filteredUpdates := make(chan interface{})
 	kconfig.NewSourceFile(staticPodsConfigPath, kcfg.HostnameOverride, kcfg.FileCheckFrequency, filteredUpdates)
 	fileSourceUpdates := kcfg.PodConfig.Channel(kubetypes.FileSource)
-	podsource.Generic(executorDone, fileSourceUpdates, filteredUpdates, podsource.ClearPodsOnShutdown())
+	podsource.Generic(
+		executorDone,
+		fileSourceUpdates,
+		filteredUpdates,
+		podsource.Name(kubetypes.FileSource),
+		podsource.ClearPodsOnShutdown())
 
 	// run the kubelet
 	// NOTE: because kcfg != nil holds, the upstream Run function will not
@@ -296,7 +289,6 @@ func (s *KubeletExecutorServer) runKubelet(
 // Run runs the specified KubeletExecutorServer.
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	// create shared channels
-	kubeletFinished := make(chan struct{})
 	nodeInfos := make(chan executor.NodeInfo, 1)
 
 	// create static pods directory
@@ -332,13 +324,13 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	// start executor
 	var executorDone <-chan struct{}
-	executorDone, err = s.runExecutor(nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient, reg)
+	executorDone, err = s.runExecutor(nodeInfos, staticPodsConfigPath, apiclient, reg)
 	if err != nil {
 		return err
 	}
 
 	// start kubelet, blocking
-	return s.runKubelet(nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient, pw, reg, executorDone)
+	return s.runKubelet(nodeInfos, staticPodsConfigPath, apiclient, pw, reg, executorDone)
 }
 
 func defaultBindingAddress() string {
