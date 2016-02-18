@@ -66,6 +66,10 @@ func CoreDump(dir string) {
 		}...)
 	}
 
+	if provider == "gce" {
+		cmds = append(cmds, command{"cat /var/log/startupscript.log", "startupscript"})
+	}
+
 	logCore(cmds, []string{master}, dir, provider)
 
 	// requires ssh
