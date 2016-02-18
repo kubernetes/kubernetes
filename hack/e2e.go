@@ -122,6 +122,7 @@ func main() {
 	}
 
 	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
+	os.Setenv("KUBE_TEST_DEBUG", "y")
 
 	if *pushup {
 		if IsUp() {
@@ -175,7 +176,6 @@ func Up() bool {
 			return false
 		}
 	}
-
 	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 

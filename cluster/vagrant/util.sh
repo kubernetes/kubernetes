@@ -317,6 +317,7 @@ function test-build-release {
 
 # Execute prior to running tests to initialize required structure
 function test-setup {
+  "${KUBE_ROOT}/cluster/kube-up.sh"
   echo "Vagrant test setup complete" 1>&2
 }
 
