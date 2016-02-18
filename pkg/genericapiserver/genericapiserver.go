@@ -650,9 +650,10 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 	}
 
 	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
+	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
 	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
 		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
+		if longRunningRequestCheck(req) {
 			return nil, ""
 		}
 		return time.After(time.Minute), ""
@@ -662,7 +663,7 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 		handler := apiserver.TimeoutHandler(s.Handler, longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, apiserver.RecoverPanics(handler)),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
