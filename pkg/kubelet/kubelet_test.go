@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	"k8s.io/kubernetes/pkg/util/mount"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -93,6 +94,7 @@ type TestKubelet struct {
 	fakeKubeClient   *fake.Clientset
 	fakeMirrorClient *kubepod.FakeMirrorClient
 	fakeClock        *util.FakeClock
+	mounter          mount.Interface
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
@@ -192,7 +194,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil)
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
+	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil}
 }
 
 func newTestPods(count int) []*api.Pod {
@@ -564,6 +566,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 func TestCleanupOrphanedVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	kubelet.mounter = &mount.FakeMounter{}
 	kubeClient := testKubelet.fakeKubeClient
 	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
