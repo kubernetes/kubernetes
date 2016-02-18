@@ -14,13 +14,17 @@ coreos:
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-apiserver \
-        --service-account-key-file=/opt/kubernetes/certs/kube-serviceaccount.key \
+        --tls-cert-file=./opt/kubernetes/certs/apiserver.pem \
+        --tls-private-key-file=/opt/kubernetes/certs/apiserver-key.pem \
+        --client-ca-file=/opt/kubernetes/certs/ca.pem \
+        --service-account-key-file=/opt/kubernetes/certs/apiserver-key.pem \
         --service-account-lookup=${SERVICE_ACCOUNT_LOOKUP} \
         --admission-control=${ADMISSION_CONTROL} \
         --insecure-bind-address=0.0.0.0 \
         --insecure-port=8080 \
         --etcd-servers=http://127.0.0.1:2379 \
         --kubelet-port=10250 \
+        --v=4 \
         --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}
         Restart=always
         RestartSec=2
@@ -40,7 +44,9 @@ coreos:
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-controller-manager \
         --master=127.0.0.1:8080 \
-        --service-account-private-key-file=/opt/kubernetes/certs/kube-serviceaccount.key \
+        --service-account-private-key-file=/opt/kubernetes/certs/apiserver-key.pem \
+        --root-ca-file=/opt/kubernetes/certs/ca.pem \
+        --v=4
         Restart=always
         RestartSec=2
 
