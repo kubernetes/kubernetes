@@ -40,6 +40,12 @@ There are multiple guides on running Kubernetes with [CoreOS](https://coreos.com
 
 These guides are maintained by CoreOS and deploy Kubernetes the "CoreOS Way" with full TLS, the DNS add-on, and more. These guides pass Kubernetes conformance testing and we encourage you to [test this yourself](https://coreos.com/kubernetes/docs/latest/conformance-tests.html).
 
+[**AWS Multi-Node**](https://coreos.com/kubernetes/docs/latest/kubernetes-on-aws.html)
+
+Guide and CLI tool for setting up a multi-node cluster on AWS. CloudFormation is used to set up a master and multiple workers in auto-scaling groups.
+
+<hr/>
+
 [**Vagrant Multi-Node**](https://coreos.com/kubernetes/docs/latest/kubernetes-on-vagrant.html)
 
 Guide to setting up a multi-node cluster on Vagrant. The deployer can independently configure the number of etcd nodes, master nodes, and worker nodes to bring up a fully HA control plane.
