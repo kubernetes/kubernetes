@@ -56,16 +56,38 @@ function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
 
-function set_service_accounts {
-    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/tmp/kube-serviceaccount.key"}
-    # Generate ServiceAccount key if needed
-    if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
-      mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
-      openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
-    fi
+function generate_certs {
+    node_names=("${@}")
+    #Root-CA
+    tempdir=$(mktemp -d)
+    CA_KEY=${CA_KEY:-"$tempdir/ca-key.pem"}
+    CA_CERT=${CA_CERT:-"$tempdir/ca.pem"}
+    openssl genrsa -out "${CA_KEY}" 2048 2>/dev/null
+    openssl req -x509 -new -nodes -key "${CA_KEY}" -days 10000 -out "${CA_CERT}" -subj "/CN=kube-ca"  2>/dev/null
 
+    #API server key pair
+    KUBE_KEY=${KUBE_KEY:-"$tempdir/apiserver-key.pem"}
+    API_SERVER_CERT_REQ=${API_SERVER_CERT_REQ:-"$tempdir/apiserver.csr"}
+    openssl genrsa -out "${KUBE_KEY}" 2048 2>/dev/null
+    KUBERNETES_SVC=${SERVICE_CLUSTER_IP_RANGE%.*}.1 openssl req -new -key "${KUBE_KEY}" -out "${API_SERVER_CERT_REQ}" -subj "/CN=kube-apiserver" -config cluster/libvirt-coreos/openssl.cnf 2>/dev/null
+    KUBE_CERT=${KUBE_CERT:-"$tempdir/apiserver.pem"}
+    KUBERNETES_SVC=${SERVICE_CLUSTER_IP_RANGE%.*}.1 openssl x509 -req -in "${API_SERVER_CERT_REQ}" -CA "${CA_CERT}" -CAkey "${CA_KEY}" -CAcreateserial -out "${KUBE_CERT}" -days 365 -extensions v3_req -extfile  cluster/libvirt-coreos/openssl.cnf 2>/dev/null
+
+    #Copy apiserver and controller tsl assets
     mkdir -p  "$POOL_PATH/kubernetes/certs"
-    cp "${SERVICE_ACCOUNT_KEY}" "$POOL_PATH/kubernetes/certs"
+    cp "${KUBE_CERT}" "$POOL_PATH/kubernetes/certs"
+    cp "${KUBE_KEY}"  "$POOL_PATH/kubernetes/certs"
+    cp "${CA_CERT}" "$POOL_PATH/kubernetes/certs"
+
+    #Generate nodes certificate
+    for (( i = 0 ; i < $NUM_NODES ; i++ )); do
+        openssl genrsa -out $tempdir/${node_names[$i]}-node-key.pem 2048 2>/dev/null
+        cp "$tempdir/${node_names[$i]}-node-key.pem" "$POOL_PATH/kubernetes/certs"
+        WORKER_IP=${NODE_IPS[$i]} openssl req -new -key $tempdir/${node_names[$i]}-node-key.pem -out $tempdir/${node_names[$i]}-node.csr -subj "/CN=${node_names[$i]}" -config  cluster/libvirt-coreos/node-openssl.cnf 2>/dev/null
+        WORKER_IP=${NODE_IPS[$i]} openssl x509 -req -in $tempdir/${node_names[$i]}-node.csr -CA "${CA_CERT}" -CAkey "${CA_KEY}" -CAcreateserial -out $tempdir/${node_names[$i]}-node.pem -days 365 -extensions v3_req -extfile  cluster/libvirt-coreos/node-openssl.cnf 2>/dev/null
+        cp "$tempdir/${node_names[$i]}-node.pem" "$POOL_PATH/kubernetes/certs"
+    done
+    echo "TLS assets generated..."
 }
 
 
@@ -154,6 +176,7 @@ function initialize-pool {
 
   mkdir -p "$POOL_PATH/kubernetes/addons"
   if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
+      render-template "$ROOT/namespace.yaml" > "$POOL_PATH/kubernetes/addons/namespace.yaml"
       render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
       render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
   fi
@@ -200,10 +223,10 @@ function wait-cluster-readiness {
 function kube-up {
   detect-master
   detect-nodes
-  load-or-gen-kube-bearertoken
   initialize-pool keep_base_image
-  set_service_accounts
+  generate_certs "${NODE_NAMES[@]}"
   initialize-network
+
 
   readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
