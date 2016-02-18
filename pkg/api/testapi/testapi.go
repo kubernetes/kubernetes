@@ -75,7 +75,7 @@ func init() {
 	if _, ok := Groups[autoscaling.GroupName]; !ok {
 		Groups[autoscaling.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: autoscaling.GroupName, Version: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version},
-			internalGroupVersion: autoscaling.SchemeGroupVersion,
+			internalGroupVersion: extensions.SchemeGroupVersion,
 		}
 	}
 	if _, ok := Groups[extensions.GroupName]; !ok {
