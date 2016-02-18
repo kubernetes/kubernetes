@@ -580,6 +580,11 @@ function kube::build::run_build_command() {
     docker_run_opts+=(-e "KUBERNETES_CONTRIB=${KUBERNETES_CONTRIB}")
   fi
 
+  docker_run_opts+=(
+    --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
+    --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
+  )
+
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up
   # running in a daemon-ish mode.  So if we don't have a stdin, we explicitly
