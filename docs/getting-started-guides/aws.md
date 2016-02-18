@@ -107,8 +107,7 @@ NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS
 
 ### Alternatives
 
-A contributed [example](coreos/coreos_multinode_cluster.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), using
-EC2 with user data (cloud-config).
+CoreOS maintains [a CLI tool](https://coreos.com/kubernetes/docs/latest/kubernetes-on-aws.html), `kube-aws` that will create and manage a Kubernetes cluster based on [CoreOS](http://www.coreos.com), using AWS tools: EC2, CloudFormation and Autoscaling.
 
 ## Getting started with your cluster
 
