@@ -271,7 +271,7 @@ func (s *offerStorage) Delete(offerId string, reason metrics.OfferDeclinedReason
 				s.declineOffer(offerId, offer.Host(), reason)
 			} else {
 				// some pod has acquired this and may attempt to launch a task with it
-				// failed schedule/launch attempts are requried to Release() any claims on the offer
+				// failed schedule/launch attempts are required to Release() any claims on the offer
 
 				// TODO(jdef): not sure what a good value is here. the goal is to provide a
 				// launchTasks (driver) operation enough time to complete so that we don't end

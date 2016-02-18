@@ -189,7 +189,7 @@ func (c *cache) subscribe(id types.UID, timestamp time.Time) chan *data {
 	defer c.lock.Unlock()
 	d := c.getIfNewerThan(id, timestamp)
 	if d != nil {
-		// If the cache entry is ready, send the data and return immediatly.
+		// If the cache entry is ready, send the data and return immediately.
 		ch <- d
 		return ch
 	}

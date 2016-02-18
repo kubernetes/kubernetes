@@ -704,7 +704,7 @@ func TestFindContainersByPod(t *testing.T) {
 	}
 	fakeClient := &FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	// image back-off is set to nil, this test shouldnt pull images
+	// image back-off is set to nil, this test should not pull images
 	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, kubetypes.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList

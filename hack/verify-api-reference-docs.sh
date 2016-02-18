@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Verifies that api reference docs are upto date.
+# Verifies that api reference docs are up to date.
 
 set -o errexit
 set -o nounset

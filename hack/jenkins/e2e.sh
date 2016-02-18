@@ -289,7 +289,7 @@ case ${JOB_NAME} in
     export NUM_NODES="100"
     # Reduce logs verbosity
     export TEST_CLUSTER_LOG_LEVEL="--v=2"
-    # TODO: Remove when we figure out the reason for ocassional failures #19048
+    # TODO: Remove when we figure out the reason for occasional failures #19048
     export KUBELET_TEST_LOG_LEVEL="--v=4"
     # Increase resync period to simulate production
     export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
@@ -366,7 +366,7 @@ case ${JOB_NAME} in
     export E2E_TEST="false"
     export USE_KUBEMARK="true"
     export KUBEMARK_TESTS="\[Feature:Performance\]"
-    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    # Override defaults to be independent from GCE defaults and set kubemark parameters
     export NUM_NODES="10"
     export MASTER_SIZE="n1-standard-2"
     export NODE_SIZE="n1-standard-1"
@@ -385,7 +385,7 @@ case ${JOB_NAME} in
     export USE_KUBEMARK="true"
     export KUBEMARK_TESTS="\[Feature:Performance\]"
     export FAIL_ON_GCP_RESOURCE_LEAK="false"
-    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    # Override defaults to be independent from GCE defaults and set kubemark parameters
     export NUM_NODES="6"
     export MASTER_SIZE="n1-standard-4"
     export NODE_SIZE="n1-standard-8"
@@ -403,7 +403,7 @@ case ${JOB_NAME} in
     export USE_KUBEMARK="true"
     export KUBEMARK_TESTS="\[Feature:Performance\]"
     export FAIL_ON_GCP_RESOURCE_LEAK="false"
-    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    # Override defaults to be independent from GCE defaults and set kubemark parameters
     # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
     export NUM_NODES="11"
     export MASTER_SIZE="n1-standard-4"

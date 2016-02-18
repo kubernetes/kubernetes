@@ -68,7 +68,7 @@ Documentation for other releases can be found at
 ## What is a _replication controller_?
 
 A _replication controller_ ensures that a specified number of pod "replicas" are running at any one
-time. In other words, a replication controller makes sure that a pod or homogenous set of pods are
+time. In other words, a replication controller makes sure that a pod or homogeneous set of pods are
 always up and available.
 If there are too many pods, it will kill some. If there are too few, the
 replication controller will start more. Unlike manually created pods, the pods maintained by a

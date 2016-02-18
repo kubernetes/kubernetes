@@ -129,7 +129,7 @@ The first is accomplished in this PR, while a timeline for 2. and 3. are TDB. To
 	- Get: Handle a watch on leases
 * `/network/leases/subnet`:
 	- Put: This is a request for a lease. If the nodecontroller is allocating CIDRs we can probably just no-op.
-* `/network/reservations`: TDB, we can probably use this to accomodate node controller allocating CIDR instead of flannel requesting it
+* `/network/reservations`: TDB, we can probably use this to accommodate node controller allocating CIDR instead of flannel requesting it
 
 The ick-iest part of this implementation is going to the the `GET /network/leases`, i.e the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
 * Watch all nodes, ignore heartbeats
@@ -152,7 +152,7 @@ This proposal is really just a call for community help in writing a Kubernetes x
 * Flannel daemon in privileged pod
 * Flannel server talks to apiserver, described in proposal above
 * HTTPs between flannel daemon/server
-* Investigate flannel server runing on every node (as done in the reference implementation mentioned above)
+* Investigate flannel server running on every node (as done in the reference implementation mentioned above)
 * Use flannel reservation mode to support node controller podcidr alloction
 
 

@@ -72,6 +72,6 @@ elif [[ $1 == "ai" ]]; then
 elif [[ $1 == "a" ]]; then
   config_etcd
 else
-  echo "Another arguement is required."
+  echo "Another argument is required."
   exit 1
 fi 

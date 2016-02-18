@@ -53,7 +53,7 @@ if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   KUBE_OS_DISTRIBUTION=vivid
 fi
 
-# For GCE script compatability
+# For GCE script compatibility
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION}
 
 case "${KUBE_OS_DISTRIBUTION}" in

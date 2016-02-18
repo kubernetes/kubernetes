@@ -43,7 +43,7 @@ For example to add a 'cifs' driver, by vendor 'foo' install the driver at: /usr/
 
 ## Plugin details
 
-Driver will be invoked with 'Init' to initalize the driver. It will be invoked with 'attach' to attach the volume and with 'detach' to detach the volume from the kubelet node. It also supports custom mounts using 'mount' and 'unmount' callouts to the driver.
+Driver will be invoked with 'Init' to initialize the driver. It will be invoked with 'attach' to attach the volume and with 'detach' to detach the volume from the kubelet node. It also supports custom mounts using 'mount' and 'unmount' callouts to the driver.
 
 ### Driver invocation model:
 

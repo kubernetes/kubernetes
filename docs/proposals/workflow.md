@@ -258,7 +258,7 @@ The events associated to `Workflow`s will be:
 
 ## Kubectl
 
-Kubectl will be modified to display workflows. More particulary the `describe` command
+Kubectl will be modified to display workflows. More particularly the `describe` command
 will display all the steps with their status. Steps will be topologically sorted and
 each dependency will be decorated with its status (wether or not step is waitin for
 dependency).

@@ -350,7 +350,7 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	return data, nil
 }
 
-// ReadConfigData reads the bytes from the specified filesytem or network
+// ReadConfigData reads the bytes from the specified filesystem or network
 // location or from stdin if location == "-".
 // TODO: replace with resource.Builder
 func ReadConfigData(location string) ([]byte, error) {

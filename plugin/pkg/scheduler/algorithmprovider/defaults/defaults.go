@@ -31,7 +31,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Amazon reccomends having no more that 40 volumes attached to an instance,
+// Amazon recommends having no more that 40 volumes attached to an instance,
 // and at least one of those is for the system root volume.
 const DefaultMaxEBSVolumes = 39
 

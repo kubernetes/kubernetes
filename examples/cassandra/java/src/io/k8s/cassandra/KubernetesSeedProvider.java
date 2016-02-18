@@ -117,7 +117,7 @@ public class KubernetesSeedProvider implements SeedProvider {
             logger.info("Getting endpoints from " + url);
             HttpsURLConnection conn = (HttpsURLConnection)url.openConnection();
 
-            // TODO: Remove this once the CA cert is propogated everywhere, and replace
+            // TODO: Remove this once the CA cert is propagated everywhere, and replace
             // with loading the CA cert.
             conn.setSSLSocketFactory(ctx.getSocketFactory());
             conn.setHostnameVerifier(trustAllHosts);

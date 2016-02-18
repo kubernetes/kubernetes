@@ -1562,7 +1562,7 @@ function kube::release::docker::release() {
       kube::log::status "Pushing ${binary} to ${docker_target}"
       "${docker_push_cmd[@]}" push "${docker_target}"
 
-      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compability with earlier versions
+      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
       if [[ ${arch} == "amd64" ]]; then
         local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
 

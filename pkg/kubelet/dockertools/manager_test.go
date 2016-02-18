@@ -913,7 +913,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra contianer.
+		// Check the pod infra container.
 		"inspect_container",
 	})
 }
