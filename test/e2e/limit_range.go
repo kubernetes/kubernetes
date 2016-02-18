@@ -61,7 +61,11 @@ var _ = Describe("LimitRange", func() {
 		Expect(err).NotTo(HaveOccurred())
 		for i := range pod.Spec.Containers {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
-			Expect(err).NotTo(HaveOccurred())
+			if err != nil {
+				// Print the pod to help in debugging.
+				Logf("Pod %+v does not have the expected requirements", pod)
+				Expect(err).NotTo(HaveOccurred())
+			}
 		}
 
 		By("Creating a Pod with partial resource requirements")
@@ -78,7 +82,11 @@ var _ = Describe("LimitRange", func() {
 		expected = api.ResourceRequirements{Requests: getResourceList("300m", "150Mi"), Limits: getResourceList("300m", "500Mi")}
 		for i := range pod.Spec.Containers {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
-			Expect(err).NotTo(HaveOccurred())
+			if err != nil {
+				// Print the pod to help in debugging.
+				Logf("Pod %+v does not have the expected requirements", pod)
+				Expect(err).NotTo(HaveOccurred())
+			}
 		}
 
 		By("Failing to create a Pod with less than min resources")
