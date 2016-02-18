@@ -316,7 +316,7 @@ function test-build-release {
 
 # Execute prior to running tests to initialize required structure
 function test-setup {
-  echo "TODO"
+  "${KUBE_ROOT}/cluster/kube-up.sh"
 }
 
 # Execute after running tests to perform any required clean-up
