@@ -63,7 +63,7 @@ var _ = Describe("Pod Disks", func() {
 		mathrand.Seed(time.Now().UTC().UnixNano())
 	})
 
-	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
+	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host [Slow]", func() {
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -116,7 +116,7 @@ var _ = Describe("Pod Disks", func() {
 		return
 	})
 
-	It("should schedule a pod w/ a readonly PD on two hosts, then remove both.", func() {
+	It("should schedule a pod w/ a readonly PD on two hosts, then remove both. [Slow]", func() {
 		SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
