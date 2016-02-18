@@ -311,10 +311,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"mongo-service":     &api.Service{},
 		},
 		"../examples/mysql-wordpress-pd": {
-			"mysql-service":     &api.Service{},
-			"mysql":             &api.Pod{},
-			"wordpress-service": &api.Service{},
-			"wordpress":         &api.Pod{},
+			"gce-volumes":          &api.PersistentVolume{},
+			"local-volumes":        &api.PersistentVolume{},
+			"mysql-deployment":     &api.Service{},
+			"wordpress-deployment": &api.Service{},
 		},
 		"../examples/nfs": {
 			"nfs-busybox-rc":     &api.ReplicationController{},
