@@ -180,6 +180,50 @@ apt-get-update() {
   done
 }
 
+# Restart any services that need restarting due to a library upgrade
+# Uses needrestart
+restart-updated-services() {
+  if [[ "${AUTO_RESTART_SERVICES:-auto}" == "no" ]]; then
+    echo "Auto restart of services prevented by AUTO_RESTART_SERVICES=${AUTO_RESTART_SERVICES}"
+    return
+  fi
+  echo "Restarting services with updated libraries (needrestart -r a)"
+  # The pipes make sure that needrestart doesn't think it is running with a TTY
+  # Debian bug #803249; fixed but not necessarily in package repos yet
+  echo "" | needrestart -r a 2>&1 | tee /dev/null
+}
+
+# Reboot the machine if /var/run/reboot-required exists
+reboot-if-required() {
+  if [[ ! -e "/var/run/reboot-required" ]]; then
+    return
+  fi
+
+  echo "Reboot is required (/var/run/reboot-required detected)"
+  if [[ -e "/var/run/reboot-required.pkgs" ]]; then
+    echo "Packages that triggered reboot:"
+    cat /var/run/reboot-required.pkgs
+  fi
+
+  if [[ "${AUTO_REBOOT:-auto}" == "no" ]]; then
+    echo "Reboot prevented by AUTO_REBOOT=${AUTO_REBOOT}"
+    return
+  fi
+
+  rm -f /var/run/reboot-required
+  rm -f /var/run/reboot-required.pkgs
+  echo "Triggering reboot"
+  init 6
+}
+
+# Install upgrades using unattended-upgrades, then reboot or restart services
+auto-upgrade() {
+  apt-get-install unattended-upgrades needrestart
+  unattended-upgrade --debug
+  reboot-if-required # We may reboot the machine right here
+  restart-updated-services
+}
+
 #
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
@@ -794,6 +838,9 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   ensure-packages
   set-kube-env
+  if [[ "${AUTO_UPGRADE:-auto}" != "no" ]]; then
+    auto-upgrade
+  fi
   ensure-local-disks
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
