@@ -49,10 +49,12 @@ The following implementations are available, and are selected by flag:
   - `--authorization-mode=AlwaysDeny`
   - `--authorization-mode=AlwaysAllow`
   - `--authorization-mode=ABAC`
+  - `--authorization-mode=Webhook`
 
 `AlwaysDeny` blocks all requests (used in tests).
 `AlwaysAllow` allows all requests; use if you don't need authorization.
 `ABAC` allows for user-configured authorization policy.  ABAC stands for Attribute-Based Access Control.
+`Webhook` allows for authorization to be driven by a remote service using REST.
 
 ## ABAC Mode
 
@@ -166,6 +168,111 @@ For example, if you wanted to grant the default service account in the kube-syst
 ```
 
 The apiserver will need to be restarted to pickup the new policy lines.
+
+## Webhook Mode
+
+When specified, mode `Webhook` causes Kubernetes to query an outside REST service when determining user privileges.
+
+### Configuration File Format
+
+Mode `Webhook` requires a file for HTTP configuration, specify by the `--authorization-webhook-config-file=SOME_FILENAME` flag.
+
+The configuration file uses the [kubeconfig](../user-guide/kubeconfig-file.md) file format. Within the file "users" refers to the API Server webhook and "clusters" refers to the remote service.
+
+A configuration example which uses HTTPS client auth:
+
+```yaml
+# clusters refers to the remote service.
+clusters:
+  - name: name-of-remote-authz-service
+    cluster:
+      certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
+      server: https://authz.example.com/authorize # URL of remote service to query. Must use 'https'.
+
+# users refers to the API Server's webhook configuration.
+users:
+  - name: name-of-api-server
+    user:
+      client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
+      client-key: /path/to/key.pem          # key matching the cert
+```
+
+### Request Payloads
+
+When faced with an authorization decision, the API Server POSTs a JSON serialized api.authorization.v1beta1.SubjectAccessReview object describing the action. This object contains fields describing the user attempting to make the request, and either details about the resource being accessed or requests attributes.
+
+Note that webhook API objects are subject to the same [versioning compatibility rules](../api.md) as other Kubernetes API objects. Implementers should be aware of loser compatibility promises for beta objects and check the "apiVersion" field of the request to ensure correct deserialization. Additionally, the API Server must enable the `authorization.k8s.io/v1beta1` API extensions group (`--runtime-config=authorization.k8s.io/v1beta1=true`).
+
+An example request body:
+
+```json
+{
+  "apiVersion": "authorization.k8s.io/v1beta1",
+  "kind": "SubjectAccessReview",
+  "spec": {
+    "resourceAttributes": {
+      "namespace": "kittensandponies",
+      "verb": "GET",
+      "group": "*",
+      "resource": "pods"
+    },
+    "user": "jane",
+    "group": [
+      "group1",
+      "group2"
+    ]
+  }
+}
+```
+
+The remote service is expected to fill the SubjectAccessReviewStatus field of the request and respond to either allow or disallow access. The response body's "spec" field is ignored and may be omitted. A permissive response would return:
+
+```json
+{
+  "apiVersion": "authorization.k8s.io/v1beta1",
+  "kind": "SubjectAccessReview",
+  "status": {
+    "allowed": true
+  }
+}
+```
+
+To disallow access, the remote service would return:
+
+```json
+{
+  "apiVersion": "authorization.k8s.io/v1beta1",
+  "kind": "SubjectAccessReview",
+  "status": {
+    "allowed": false,
+    "reason": "user does not have read access to the namespace"
+  }
+}
+```
+
+Access to non-resource paths are sent as:
+
+```json
+{
+  "apiVersion": "authorization.k8s.io/v1beta1",
+  "kind": "SubjectAccessReview",
+  "spec": {
+    "nonResourceAttributes": {
+      "path": "/debug",
+      "verb": "GET"
+    },
+    "user": "jane",
+    "group": [
+      "group1",
+      "group2"
+    ]
+  }
+}
+```
+
+Non-resource paths include: `/api`, `/apis`, `/metrics`, `/resetMetrics`, `/logs`, `/debug`, `/healthz`, `/swagger-ui/`, `/swaggerapi/`, `/ui`, and `/version.` Clients require access to `/api`, `/api/*/`, `/apis/`, `/apis/*`, `/apis/*/*`, and `/version` to discover what resources and versions are present on the server. Access to other non-resource paths can be disallowed without restricting access to the REST api.
+
+For further documentation refer to the authorization.v1beta1 API objects and plugin/pkg/auth/authorizer/webhook/webhook.go.
 
 ## Plugin Development
 
