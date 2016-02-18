@@ -66,6 +66,7 @@ func CoreDump(dir string) {
 			{"cat /var/log/supervisor/kubelet-stdout.log", "supervisord-kubelet-stdout"},
 			{"cat /var/log/supervisor/kubelet-stderr.log", "supervisord-kubelet-stderr"},
 			{"cat /var/log/kern.log", "kern.log"},
+			{"cat /var/log/docker.log", "docker.log"},
 		}...)
 	}
 
@@ -94,6 +95,7 @@ func CoreDump(dir string) {
 			{"cat /var/log/supervisor/kubelet-stdout.log", "supervisord-kubelet-stdout"},
 			{"cat /var/log/supervisor/kubelet-stderr.log", "supervisord-kubelet-stderr"},
 			{"cat /var/log/kern.log", "kern.log"},
+			{"cat /var/log/docker.log", "docker.log"},
 		}...)
 	}
 
