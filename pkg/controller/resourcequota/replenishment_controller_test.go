@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // testReplenishment lets us test replenishment functions are invoked
@@ -79,6 +80,42 @@ func TestObjectReplenishmentDeleteFunc(t *testing.T) {
 		t.Errorf("Unexpected group kind %v", mockReplenish.groupKind)
 	}
 	if mockReplenish.namespace != oldPod.Namespace {
+		t.Errorf("Unexpected namespace %v", mockReplenish.namespace)
+	}
+}
+
+func TestServiceReplenishmentUpdateFunc(t *testing.T) {
+	mockReplenish := &testReplenishment{}
+	options := ReplenishmentControllerOptions{
+		GroupKind:         api.Kind("Service"),
+		ReplenishmentFunc: mockReplenish.Replenish,
+		ResyncPeriod:      controller.NoResyncPeriodFunc,
+	}
+	oldService := &api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "mysvc"},
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{
+				Port:       80,
+				TargetPort: intstr.FromInt(80),
+			}},
+		},
+	}
+	newService := &api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "mysvc"},
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+			Ports: []api.ServicePort{{
+				Port:       80,
+				TargetPort: intstr.FromInt(80),
+			}}},
+	}
+	updateFunc := ServiceReplenishmentUpdateFunc(&options)
+	updateFunc(oldService, newService)
+	if mockReplenish.groupKind != api.Kind("Service") {
+		t.Errorf("Unexpected group kind %v", mockReplenish.groupKind)
+	}
+	if mockReplenish.namespace != oldService.Namespace {
 		t.Errorf("Unexpected namespace %v", mockReplenish.namespace)
 	}
 }

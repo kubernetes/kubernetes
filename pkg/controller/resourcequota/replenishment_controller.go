@@ -136,6 +136,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			&api.Service{},
 			options.ResyncPeriod(),
 			framework.ResourceEventHandlerFuncs{
+				UpdateFunc: ServiceReplenishmentUpdateFunc(options),
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
 		)
@@ -207,4 +208,15 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		return nil, fmt.Errorf("no replenishment controller available for %s", options.GroupKind)
 	}
 	return result, nil
+}
+
+// ServiceReplenishmentUpdateFunc will replenish if the old service was quota tracked but the new is not
+func ServiceReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) func(oldObj, newObj interface{}) {
+	return func(oldObj, newObj interface{}) {
+		oldService := oldObj.(*api.Service)
+		newService := newObj.(*api.Service)
+		if core.QuotaServiceType(oldService) && !core.QuotaServiceType(newService) {
+			options.ReplenishmentFunc(options.GroupKind, newService.Namespace, newService)
+		}
+	}
 }
