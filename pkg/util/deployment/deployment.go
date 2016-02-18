@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/integer"
+	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 )
@@ -232,4 +234,39 @@ func Revision(rs *extensions.ReplicaSet) (int64, error) {
 		return 0, nil
 	}
 	return strconv.ParseInt(v, 10, 64)
+}
+
+func IsRollingUpdate(deployment *extensions.Deployment) bool {
+	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
+}
+
+// NewRSNewReplicas calculates the number of replicas a deployment's new RS should have.
+// When one of the followings is true, we're rolling out the deployment; otherwise, we're scaling it.
+// 1) The new RS is saturated: newRS's replicas == deployment's replicas
+// 2) Max number of pods allowed is reached: deployment's replicas + maxSurge == all RSs' replicas
+func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) (int, error) {
+	switch deployment.Spec.Strategy.Type {
+	case extensions.RollingUpdateDeploymentStrategyType:
+		// Check if we can scale up.
+		maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Replicas)
+		if err != nil {
+			return 0, err
+		}
+		// Find the total number of pods
+		currentPodCount := GetReplicaCountForReplicaSets(allRSs)
+		maxTotalPods := deployment.Spec.Replicas + maxSurge
+		if currentPodCount >= maxTotalPods {
+			// Cannot scale up.
+			return newRS.Spec.Replicas, nil
+		}
+		// Scale up.
+		scaleUpCount := maxTotalPods - currentPodCount
+		// Do not exceed the number of desired replicas.
+		scaleUpCount = integer.IntMin(scaleUpCount, deployment.Spec.Replicas-newRS.Spec.Replicas)
+		return newRS.Spec.Replicas + scaleUpCount, nil
+	case extensions.RecreateDeploymentStrategyType:
+		return deployment.Spec.Replicas, nil
+	default:
+		return 0, fmt.Errorf("deployment type %v isn't supported", deployment.Spec.Strategy.Type)
+	}
 }
