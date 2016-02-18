@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -207,7 +208,7 @@ func NewNodeController(
 				return nc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Node{},
+		&extensions.DaemonSet{},
 		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{},
 	)
