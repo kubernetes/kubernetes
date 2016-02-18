@@ -19,6 +19,7 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -27,7 +28,10 @@ import (
 
 // NewServiceEvaluator returns an evaluator that can evaluate service quotas
 func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceServices}
+	allResources := []api.ResourceName{
+		api.ResourceServices,
+		api.ResourceServicesNodePorts,
+	}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Service",
 		InternalGroupKind: api.Kind("Service"),
@@ -37,9 +41,31 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceServices),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceServices),
+		UsageFunc:            ServiceUsageFunc,
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
 			return kubeClient.Core().Services(namespace).List(options)
 		},
 	}
+}
+
+// ServiceUsageFunc knows how to measure usage associated with services
+func ServiceUsageFunc(object runtime.Object) api.ResourceList {
+	result := api.ResourceList{}
+	if service, ok := object.(*api.Service); ok {
+		result[api.ResourceServices] = resource.MustParse("1")
+		switch service.Spec.Type {
+		case api.ServiceTypeNodePort:
+			result[api.ResourceServicesNodePorts] = resource.MustParse("1")
+		}
+	}
+	return result
+}
+
+// QuotaServiceType returns true if the service type is eligible to track against a quota
+func QuotaServiceType(service *api.Service) bool {
+	switch service.Spec.Type {
+	case api.ServiceTypeNodePort:
+		return true
+	}
+	return false
 }

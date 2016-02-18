@@ -175,7 +175,7 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 			return admission.NewForbidden(a, fmt.Errorf("Failed quota: %s: %v", resourceQuota.Name, err))
 		}
 		if !hasUsageStats(resourceQuota) {
-			return admission.NewForbidden(a, fmt.Errorf("Status unknown for quota: %s", resourceQuota.Name))
+			return admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s", resourceQuota.Name))
 		}
 		resourceQuotas = append(resourceQuotas, resourceQuota)
 	}
@@ -235,7 +235,7 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 				failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
 				failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
 				return admission.NewForbidden(a,
-					fmt.Errorf("Exceeded quota: %s, requested: %s, used: %s, limited: %s",
+					fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
 						resourceQuota.Name,
 						prettyPrint(failedRequestedUsage),
 						prettyPrint(failedUsed),
