@@ -166,20 +166,7 @@ func (f *Framework) afterEach() {
 
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
-		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
-		for _, e := range events.Items {
-			Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
-		}
-		// Note that we don't wait for any cleanup to propagate, which means
-		// that if you delete a bunch of pods right before ending your test,
-		// you may or may not see the killing/deletion/cleanup events.
-
-		dumpAllPodInfo(f.Client)
-
-		dumpAllNodeInfo(f.Client)
+		dumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 	}
 
 	summaries := make([]TestDataSummary, 0)
