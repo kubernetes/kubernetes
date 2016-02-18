@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
+	utilerrs "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -2073,9 +2074,56 @@ func restartKubeProxy(host string) error {
 	if !providerIs("gce", "gke", "aws") {
 		return fmt.Errorf("unsupported provider: %s", testContext.Provider)
 	}
+	err1 := restartKubeProxyByInitD(host)
+	if err1 == nil {
+		return nil
+	}
+	err2 := restartKubeProxyByKill(host)
+	if err2 == nil {
+		return nil
+	}
+	return utilerrs.NewAggregate([]error{
+		fmt.Errorf("tried by init.d: %v", err1),
+		fmt.Errorf("tried by kill: %v", err2),
+	})
+}
+
+func restartKubeProxyByInitD(host string) error {
+	// TODO: Make it work for all providers.
+	if !providerIs("gce", "gke", "aws") {
+		return fmt.Errorf("unsupported provider: %s", testContext.Provider)
+	}
 	_, _, code, err := SSH("sudo /etc/init.d/kube-proxy restart", host, testContext.Provider)
 	if err != nil || code != 0 {
 		return fmt.Errorf("couldn't restart kube-proxy: %v (code %v)", err, code)
+	}
+	return nil
+}
+
+// This is derived from the 1.2 release to test cross-version compat.
+func restartKubeProxyByKill(host string) error {
+	// kubelet will restart the kube-proxy since it's running in a static pod
+	_, _, code, err := SSH("sudo pkill kube-proxy", host, testContext.Provider)
+	if err != nil || code != 0 {
+		return fmt.Errorf("couldn't restart kube-proxy: %v (code %v)", err, code)
+	}
+	// wait for kube-proxy to come back up
+	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		o, _, code, err := SSH("sudo /bin/sh -c 'pgrep kube-proxy | wc -l'", host, testContext.Provider)
+		if err != nil {
+			return false, err
+		}
+		if code != 0 {
+			return false, fmt.Errorf("failed to run command, exited %d", code)
+		}
+		if o == "0\n" {
+			return false, nil
+		}
+		Logf("kube-proxy is back up.")
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("kube-proxy didn't recover: %v", err)
 	}
 	return nil
 }
