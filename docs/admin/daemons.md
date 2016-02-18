@@ -216,6 +216,13 @@ DaemonSet is not enabled by default. Enable it by setting
 achieved by exporting KUBE_ENABLE_DAEMONSETS=true before running kube-up.sh script
 on GCE.
 
+If you intend to restart the api server in an existing cluster to enable this
+feature, you will also need to restart the controller manager
+(`kube-controller-manager`). The controller manager detects what API versions
+are supported in the api server and launches corresponding controllers *during
+startup*. Restarting the controller manager *after* the api server ensures that
+the DaemonSet controller will be created.
+
 DaemonSet objects effectively have [API version `v1alpha1`](../api.md#api-versioning).
  Alpha objects may change or even be discontinued in future software releases.
 However, due to to a known issue, they will appear as API version `v1beta1` if enabled.
