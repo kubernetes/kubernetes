@@ -282,7 +282,7 @@ var _ = Describe("Kubectl client", func() {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
 
-			subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+			subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, c)
 			if err != nil {
 				Failf("Unable to determine server version.  Error: %s", err)
 			}
@@ -1284,7 +1284,7 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
-		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, c)
 		if err != nil {
 			return err
 		}

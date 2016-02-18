@@ -1158,6 +1158,14 @@ func deepCopy_v1_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) erro
 	return nil
 }
 
+func deepCopy_v1_NodeProxyOptions(in NodeProxyOptions, out *NodeProxyOptions, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
+	return nil
+}
+
 func deepCopy_v1_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) error {
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
@@ -2679,6 +2687,7 @@ func init() {
 		deepCopy_v1_NodeCondition,
 		deepCopy_v1_NodeDaemonEndpoints,
 		deepCopy_v1_NodeList,
+		deepCopy_v1_NodeProxyOptions,
 		deepCopy_v1_NodeSpec,
 		deepCopy_v1_NodeStatus,
 		deepCopy_v1_NodeSystemInfo,

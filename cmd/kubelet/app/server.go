@@ -154,6 +154,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	}
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
+		MinAge:               s.ImageMinimumGCAge.Duration,
 		HighThresholdPercent: s.ImageGCHighThresholdPercent,
 		LowThresholdPercent:  s.ImageGCLowThresholdPercent,
 	}
