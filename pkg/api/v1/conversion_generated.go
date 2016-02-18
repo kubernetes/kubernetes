@@ -1375,6 +1375,7 @@ func autoConvert_api_LocalObjectReference_To_v1_LocalObjectReference(in *api.Loc
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LocalObjectReference))(in)
 	}
+	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil
 }
@@ -4627,6 +4628,7 @@ func autoConvert_v1_LocalObjectReference_To_api_LocalObjectReference(in *LocalOb
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LocalObjectReference))(in)
 	}
+	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil
 }

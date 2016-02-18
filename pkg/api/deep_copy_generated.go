@@ -1244,6 +1244,7 @@ func DeepCopy_api_LoadBalancerStatus(in LoadBalancerStatus, out *LoadBalancerSta
 }
 
 func DeepCopy_api_LocalObjectReference(in LocalObjectReference, out *LocalObjectReference, c *conversion.Cloner) error {
+	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil
 }

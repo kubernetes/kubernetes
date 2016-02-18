@@ -59,6 +59,21 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				}
 			}
 		},
+		func(obj *RBDVolumeSource) {
+			if obj.SecretRef != nil && obj.SecretRef.Kind == "" {
+				obj.SecretRef.Kind = "Secret"
+			}
+		},
+		func(obj *CephFSVolumeSource) {
+			if obj.SecretRef != nil && obj.SecretRef.Kind == "" {
+				obj.SecretRef.Kind = "Secret"
+			}
+		},
+		func(obj *FlexVolumeSource) {
+			if obj.SecretRef != nil && obj.SecretRef.Kind == "" {
+				obj.SecretRef.Kind = "Secret"
+			}
+		},
 		func(obj *ContainerPort) {
 			if obj.Protocol == "" {
 				obj.Protocol = ProtocolTCP
@@ -77,6 +92,18 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			}
 			if obj.TerminationMessagePath == "" {
 				obj.TerminationMessagePath = TerminationMessagePathDefault
+			}
+		},
+		func(obj *ServiceAccount) {
+			for i := range obj.Secrets {
+				if obj.Secrets[i].Kind == "" {
+					obj.Secrets[i].Kind = "Secret"
+				}
+			}
+			for i := range obj.ImagePullSecrets {
+				if obj.ImagePullSecrets[i].Kind == "" {
+					obj.ImagePullSecrets[i].Kind = "Secret"
+				}
 			}
 		},
 		func(obj *ServiceSpec) {
@@ -131,6 +158,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				period := int64(DefaultTerminationGracePeriodSeconds)
 				obj.TerminationGracePeriodSeconds = &period
 			}
+			for i := range obj.ImagePullSecrets {
+				if obj.ImagePullSecrets[i].Kind == "" {
+					obj.ImagePullSecrets[i].Kind = "Secret"
+				}
+			}
 		},
 		func(obj *Probe) {
 			if obj.TimeoutSeconds == 0 {
@@ -149,6 +181,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		func(obj *Secret) {
 			if obj.Type == "" {
 				obj.Type = SecretTypeOpaque
+			}
+		},
+		func(obj *SecretKeySelector) {
+			if obj.LocalObjectReference.Kind == "" {
+				obj.LocalObjectReference.Kind = "Secret"
 			}
 		},
 		func(obj *PersistentVolume) {
@@ -246,6 +283,16 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		func(obj *ConfigMap) {
 			if obj.Data == nil {
 				obj.Data = make(map[string]string)
+			}
+		},
+		func(obj *ConfigMapVolumeSource) {
+			if obj.LocalObjectReference.Kind == "" {
+				obj.LocalObjectReference.Kind = "ConfigMap"
+			}
+		},
+		func(obj *ConfigMapKeySelector) {
+			if obj.LocalObjectReference.Kind == "" {
+				obj.LocalObjectReference.Kind = "ConfigMap"
 			}
 		},
 	)

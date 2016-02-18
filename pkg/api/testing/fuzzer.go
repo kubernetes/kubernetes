@@ -83,6 +83,13 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			c.Fuzz(&nsec)
 			j.CreationTimestamp = unversioned.Unix(sec, nsec).Rfc3339Copy()
 		},
+		func(j *api.LocalObjectReference, c fuzz.Continue) {
+			// Ensure references have a kind set
+			for len(j.Kind) == 0 {
+				j.Kind = c.RandString()
+			}
+			j.Name = c.RandString()
+		},
 		func(j *api.ObjectReference, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
@@ -284,6 +291,15 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		func(p *api.ServiceType, c fuzz.Continue) {
 			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
+		},
+		func(s *api.ServiceAccount, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			for i := range s.Secrets {
+				// Ensure all secret references have a kind set
+				for len(s.Secrets[i].Kind) == 0 {
+					s.Secrets[i].Kind = c.RandString()
+				}
+			}
 		},
 		func(ct *api.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again

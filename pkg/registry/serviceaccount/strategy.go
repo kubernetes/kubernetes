@@ -64,7 +64,7 @@ func (strategy) PrepareForUpdate(obj, old runtime.Object) {
 
 func cleanSecretReferences(serviceAccount *api.ServiceAccount) {
 	for i, secret := range serviceAccount.Secrets {
-		serviceAccount.Secrets[i] = api.ObjectReference{Name: secret.Name}
+		serviceAccount.Secrets[i] = api.ObjectReference{Kind: secret.Kind, Name: secret.Name}
 	}
 }
 
