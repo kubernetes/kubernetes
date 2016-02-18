@@ -205,8 +205,9 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 	if finalStatus.StartTime.IsZero() {
 		t.Errorf("StartTime should not be zero")
 	}
-	if !finalStatus.StartTime.Time.Equal(now.Time) {
-		t.Errorf("Expected %v, but got %v", now.Time, finalStatus.StartTime.Time)
+	expected := now.Rfc3339Copy()
+	if !finalStatus.StartTime.Equal(expected) {
+		t.Errorf("Expected %v, but got %v", expected, finalStatus.StartTime)
 	}
 }
 
@@ -464,8 +465,10 @@ func TestStatusEquality(t *testing.T) {
 		oldPodStatus := api.PodStatus{
 			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
 		}
+		normalizeStatus(&oldPodStatus)
+		normalizeStatus(&podStatus)
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
-			t.Fatalf("Order of container statuses should not affect equality.")
+			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
 	}
 }
@@ -494,6 +497,7 @@ func TestStaticPodStatus(t *testing.T) {
 
 	m.SetPodStatus(staticPod, status)
 	retrievedStatus := expectPodStatus(t, m, staticPod)
+	normalizeStatus(&status)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
