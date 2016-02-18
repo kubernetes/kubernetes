@@ -110,13 +110,21 @@ func TestList(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	result := &api.PodList{}
-	// TODO: We need to pass ResourceVersion of barPod deletion operation.
-	// However, there is no easy way to get it, so it is hardcoded to 8.
-	if err := cacher.List(context.TODO(), "pods/ns", "8", storage.Everything, result); err != nil {
+	// We first List directly from etcd by passing empty resourceVersion,
+	// to get the current etcd resourceVersion.
+	rvResult := &api.PodList{}
+	if err := cacher.List(context.TODO(), "pods/ns", "", storage.Everything, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if result.ListMeta.ResourceVersion != "8" {
+	deletedPodRV := rvResult.ListMeta.ResourceVersion
+
+	result := &api.PodList{}
+	// We pass the current etcd ResourceVersion received from the above List() operation,
+	// since there is not easy way to get ResourceVersion of barPod deletion operation.
+	if err := cacher.List(context.TODO(), "pods/ns", deletedPodRV, storage.Everything, result); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if result.ListMeta.ResourceVersion != deletedPodRV {
 		t.Errorf("Incorrect resource version: %v", result.ListMeta.ResourceVersion)
 	}
 	if len(result.Items) != 2 {
