@@ -75,6 +75,12 @@ func init() {
 			internalGroupVersion: api.SchemeGroupVersion,
 		}
 	}
+	if _, ok := Groups[extensions.GroupName]; !ok {
+		Groups[extensions.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: registered.GroupOrDie(extensions.GroupName).GroupVersion.Version},
+			internalGroupVersion: extensions.SchemeGroupVersion,
+		}
+	}
 	if _, ok := Groups[autoscaling.GroupName]; !ok {
 		Groups[autoscaling.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: autoscaling.GroupName, Version: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version},
@@ -84,12 +90,6 @@ func init() {
 	if _, ok := Groups[batch.GroupName]; !ok {
 		Groups[batch.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: batch.GroupName, Version: registered.GroupOrDie(batch.GroupName).GroupVersion.Version},
-			internalGroupVersion: extensions.SchemeGroupVersion,
-		}
-	}
-	if _, ok := Groups[extensions.GroupName]; !ok {
-		Groups[extensions.GroupName] = TestGroup{
-			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: registered.GroupOrDie(extensions.GroupName).GroupVersion.Version},
 			internalGroupVersion: extensions.SchemeGroupVersion,
 		}
 	}
