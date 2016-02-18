@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -235,7 +234,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	// than the old rc. This selector is the hash of the rc, which will differ because the new rc has a
 	// different image.
 	if len(image) != 0 {
-		codec := registered.GroupOrDie(client.APIVersion().Group).Codec
+		codec := api.Codecs.LegacyCodec(client.APIVersion())
 		keepOldName = len(args) == 1
 		newName := findNewName(args, oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(client, cmdNamespace, newName); err != nil {
