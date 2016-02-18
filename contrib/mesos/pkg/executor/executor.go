@@ -269,8 +269,12 @@ func (k *Executor) Reregistered(driver bindings.ExecutorDriver, slaveInfo *mesos
 		return
 	}
 	log.Infof("Reregistered with slave %v\n", slaveInfo)
+
 	if !(&k.state).transition(disconnectedState, connectedState) {
-		log.Errorf("failed to reregister/transition to a connected state")
+		// in reality, we may have been temporarily disconnected from the slave during a slave
+		// failover event. but because we never tried to send a message to the slave, we never
+		// found out that we were disconnected.
+		log.V(2).Info("not disconnected, but we received a re-registration callback from slave?")
 	}
 
 	if slaveInfo != nil {
