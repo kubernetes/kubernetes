@@ -2233,6 +2233,10 @@ type Secret struct {
 }
 
 const MaxSecretSize = 1 * 1024 * 1024
+const MaxSecretKeys = 1024
+
+// reserve 1k from the MaxSecretSize for serialization
+const MaxUnserializedSecretSize = MaxSecretSize - 1024
 
 type SecretType string
 

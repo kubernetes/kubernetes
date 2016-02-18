@@ -2109,15 +2109,18 @@ func ValidateSecret(secret *api.Secret) field.ErrorList {
 	allErrs := ValidateObjectMeta(&secret.ObjectMeta, true, ValidateSecretName, field.NewPath("metadata"))
 
 	dataPath := field.NewPath("data")
+	if len(secret.Data) > api.MaxSecretKeys {
+		allErrs = append(allErrs, field.Invalid(dataPath, "", fmt.Sprintf("must have at most %d keys", api.MaxSecretKeys)))
+	}
 	totalSize := 0
 	for key, value := range secret.Data {
 		if !IsSecretKey(key) {
 			allErrs = append(allErrs, field.Invalid(dataPath.Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
 		}
-		totalSize += len(value)
+		totalSize += len(key) + len(value)
 	}
-	if totalSize > api.MaxSecretSize {
-		allErrs = append(allErrs, field.TooLong(dataPath, "", api.MaxSecretSize))
+	if totalSize > api.MaxUnserializedSecretSize {
+		allErrs = append(allErrs, field.TooLong(dataPath, "", api.MaxUnserializedSecretSize))
 	}
 
 	switch secret.Type {
@@ -2208,16 +2211,20 @@ func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&cfg.ObjectMeta, true, ValidateConfigMapName, field.NewPath("metadata"))...)
 
+	if len(cfg.Data) > api.MaxSecretKeys {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("data"), "", fmt.Sprintf("must have at most %d keys", api.MaxSecretKeys)))
+	}
+
 	totalSize := 0
 
 	for key, value := range cfg.Data {
 		if !IsSecretKey(key) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
 		}
-		totalSize += len(value)
+		totalSize += len(key) + len(value)
 	}
-	if totalSize > api.MaxSecretSize {
-		allErrs = append(allErrs, field.TooLong(field.NewPath("data"), "", api.MaxSecretSize))
+	if totalSize > api.MaxUnserializedSecretSize {
+		allErrs = append(allErrs, field.TooLong(field.NewPath("data"), "", api.MaxUnserializedSecretSize))
 	}
 
 	return allErrs
