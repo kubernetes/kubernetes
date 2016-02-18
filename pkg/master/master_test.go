@@ -35,6 +35,7 @@ import (
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -67,10 +68,13 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageDestinations.AddAPIGroup(
 		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false))
 	storageDestinations.AddAPIGroup(
+		autoscaling.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false))
+	storageDestinations.AddAPIGroup(
 		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false))
 
 	config.StorageDestinations = storageDestinations
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
+	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
 	config.StorageVersions = storageVersions
 	config.PublicAddress = net.ParseIP("192.168.10.4")
@@ -274,20 +278,40 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	extensionsGroupName := extensions.GroupName
-	extensionsVersions := []unversioned.GroupVersionForDiscovery{
+	expectGroupNames := []string{autoscaling.GroupName, extensions.GroupName}
+	expectVersions := [][]unversioned.GroupVersionForDiscovery{
 		{
-			GroupVersion: testapi.Extensions.GroupVersion().String(),
-			Version:      testapi.Extensions.GroupVersion().Version,
+			{
+				GroupVersion: testapi.Autoscaling.GroupVersion().String(),
+				Version:      testapi.Autoscaling.GroupVersion().Version,
+			},
+		},
+		{
+			{
+				GroupVersion: testapi.Extensions.GroupVersion().String(),
+				Version:      testapi.Extensions.GroupVersion().Version,
+			},
 		},
 	}
-	extensionsPreferredVersion := unversioned.GroupVersionForDiscovery{
-		GroupVersion: config.StorageVersions[extensions.GroupName],
-		Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
+	expectPreferredVersion := []unversioned.GroupVersionForDiscovery{
+		{
+			GroupVersion: config.StorageVersions[autoscaling.GroupName],
+			Version:      apiutil.GetVersion(config.StorageVersions[autoscaling.GroupName]),
+		},
+		{
+			GroupVersion: config.StorageVersions[extensions.GroupName],
+			Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
+		},
 	}
-	assert.Equal(extensionsGroupName, groupList.Groups[0].Name)
-	assert.Equal(extensionsVersions, groupList.Groups[0].Versions)
-	assert.Equal(extensionsPreferredVersion, groupList.Groups[0].PreferredVersion)
+
+	assert.Equal(expectGroupNames[0], groupList.Groups[0].Name)
+	assert.Equal(expectGroupNames[1], groupList.Groups[1].Name)
+
+	assert.Equal(expectVersions[0], groupList.Groups[0].Versions)
+	assert.Equal(expectVersions[1], groupList.Groups[1].Versions)
+
+	assert.Equal(expectPreferredVersion[0], groupList.Groups[0].PreferredVersion)
+	assert.Equal(expectPreferredVersion[1], groupList.Groups[1].PreferredVersion)
 
 	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
 	master.addThirdPartyResourceStorage("/apis/company.com/v1", nil,
@@ -312,13 +336,19 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	thirdPartyGroupName := "company.com"
 	thirdPartyExpectVersions := []unversioned.GroupVersionForDiscovery{thirdPartyGV}
 
-	assert.Equal(2, len(groupList.Groups))
-	assert.Equal(thirdPartyGroupName, groupList.Groups[0].Name)
-	assert.Equal(thirdPartyExpectVersions, groupList.Groups[0].Versions)
-	assert.Equal(thirdPartyGV, groupList.Groups[0].PreferredVersion)
-	assert.Equal(extensionsGroupName, groupList.Groups[1].Name)
-	assert.Equal(extensionsVersions, groupList.Groups[1].Versions)
-	assert.Equal(extensionsPreferredVersion, groupList.Groups[1].PreferredVersion)
+	assert.Equal(3, len(groupList.Groups))
+	// autoscaling group
+	assert.Equal(expectGroupNames[0], groupList.Groups[0].Name)
+	assert.Equal(expectVersions[0], groupList.Groups[0].Versions)
+	assert.Equal(expectPreferredVersion[0], groupList.Groups[0].PreferredVersion)
+	// third party
+	assert.Equal(thirdPartyGroupName, groupList.Groups[1].Name)
+	assert.Equal(thirdPartyExpectVersions, groupList.Groups[1].Versions)
+	assert.Equal(thirdPartyGV, groupList.Groups[1].PreferredVersion)
+	// extensions group
+	assert.Equal(expectGroupNames[1], groupList.Groups[2].Name)
+	assert.Equal(expectVersions[1], groupList.Groups[2].Versions)
+	assert.Equal(expectPreferredVersion[1], groupList.Groups[2].PreferredVersion)
 }
 
 var versionsToTest = []string{"v1", "v3"}
