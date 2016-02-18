@@ -71,44 +71,11 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	}
 }
 
-func TestGenerateStorageVersionMap(t *testing.T) {
-	testCases := []struct {
-		legacyVersion   string
-		storageVersions string
-		expectedMap     map[string]string
-	}{
-		{
-			legacyVersion:   "v1",
-			storageVersions: "v1,extensions/v1beta1",
-			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				extensions.GroupName: "extensions/v1beta1",
-			},
-		},
-		{
-			legacyVersion:   "",
-			storageVersions: "extensions/v1beta1,v1",
-			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				extensions.GroupName: "extensions/v1beta1",
-			},
-		},
-		{
-			legacyVersion:   "",
-			storageVersions: "",
-			expectedMap:     map[string]string{},
-		},
-	}
-	for _, test := range testCases {
-		output := generateStorageVersionMap(test.legacyVersion, test.storageVersions)
-		if !reflect.DeepEqual(test.expectedMap, output) {
-			t.Errorf("unexpected error. expect: %v, got: %v", test.expectedMap, output)
-		}
-	}
-}
-
 func TestUpdateEtcdOverrides(t *testing.T) {
-	storageVersions := generateStorageVersionMap("", "v1,extensions/v1beta1")
+	storageVersions := map[string]string{
+		"":           "v1",
+		"extensions": "extensions/v1beta1",
+	}
 
 	testCases := []struct {
 		apigroup string
@@ -133,7 +100,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newEtcd := func(serverList []string, _ runtime.NegotiatedSerializer, _, _ string, _ bool) (storage.Interface, error) {
+		newEtcd := func(serverList []string, _ runtime.NegotiatedSerializer, _, _, _ string, _ bool) (storage.Interface, error) {
 			if !reflect.DeepEqual(test.servers, serverList) {
 				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, serverList)
 			}

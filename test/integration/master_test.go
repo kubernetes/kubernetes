@@ -19,28 +19,40 @@ limitations under the License.
 package integration
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func TestExperimentalPrefix(t *testing.T) {
+func testPrefix(t *testing.T, prefix string) {
 	_, s := framework.RunAMaster(t)
 	// TODO: Uncomment when fix #19254
 	// defer s.Close()
 
-	resp, err := http.Get(s.URL + "/apis/extensions/")
+	resp, err := http.Get(s.URL + prefix)
 	if err != nil {
-		t.Fatalf("unexpected error getting experimental prefix: %v", err)
+		t.Fatalf("unexpected error getting %s prefix: %v", prefix, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
+}
+
+func TestAutoscalingPrefix(t *testing.T) {
+	testPrefix(t, "/apis/autoscaling/")
+}
+
+func TestExtensionsPrefix(t *testing.T) {
+	testPrefix(t, "/apis/extensions/")
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
@@ -56,6 +68,81 @@ func TestWatchSucceedsWithoutArgs(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 	resp.Body.Close()
+}
+
+var hpaV1 string = `
+{
+  "apiVersion": "autoscaling/v1",
+  "kind": "HorizontalPodAutoscaler",
+  "metadata": {
+    "name": "test-hpa",
+    "namespace": "default"
+  },
+  "spec": {
+    "scaleTargetRef": {
+      "kind": "ReplicationController",
+      "name": "test-hpa",
+      "namespace": "default"
+    },
+    "minReplicas": 1,
+    "maxReplicas": 10,
+    "targetCPUUtilizationPercentage": 50
+  }
+}
+`
+
+func autoscalingPath(resource, namespace, name string) string {
+	return testapi.Autoscaling.ResourcePath(resource, namespace, name)
+}
+
+func extensionsPath(resource, namespace, name string) string {
+	return testapi.Extensions.ResourcePath(resource, namespace, name)
+}
+
+func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb                string
+		URL                 string
+		body                string
+		expectedStatusCodes map[int]bool
+		expectedVersion     string
+	}{
+		{"POST", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), hpaV1, code201, ""},
+		{"GET", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", code200, testapi.Autoscaling.GroupVersion().String()},
+		{"GET", extensionsPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", code200, testapi.Extensions.GroupVersion().String()},
+	}
+
+	for _, r := range requests {
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Logf("case %v", r)
+			t.Fatalf("unexpected error: %v", err)
+		}
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			b, _ := ioutil.ReadAll(resp.Body)
+			body := string(b)
+			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
+				t.Errorf("Expected status one of %v, but got %v", r.expectedStatusCodes, resp.StatusCode)
+				t.Errorf("Body: %v", body)
+			}
+			if !strings.Contains(body, "\"apiVersion\":\""+r.expectedVersion) {
+				t.Logf("case %v", r)
+				t.Errorf("Expected version %v, got body %v", r.expectedVersion, body)
+			}
+		}()
+	}
 }
 
 func TestAccept(t *testing.T) {
