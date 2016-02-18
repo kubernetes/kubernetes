@@ -170,6 +170,7 @@ metadata:
   labels:
     k8s-app: fluentd-logging
 spec:
+  dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
     image: gcr.io/google_containers/fluentd-gcp:1.16
