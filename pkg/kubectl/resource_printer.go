@@ -410,8 +410,8 @@ var resourceQuotaColumns = []string{"NAME", "AGE"}
 var namespaceColumns = []string{"NAME", "STATUS", "AGE"}
 var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
-var persistentVolumeColumns = []string{"NAME", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
-var persistentVolumeClaimColumns = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
+var persistentVolumeColumns = []string{"NAME", "CAPACITY", "ACCESSMODES", "STATUS", "CONDITION", "MESSAGE", "CLAIM", "REASON", "AGE"}
+var persistentVolumeClaimColumns = []string{"NAME", "STATUS", "CONDITION", "MESSAGE", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
@@ -1279,10 +1279,27 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options PrintO
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.String()
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s",
+	// deprecating phase in favor of Condition
+	phase := api.ClaimPending
+	status := "Unbound"
+	message := ""
+	for _, condition := range pv.Status.Conditions {
+		if condition.Type == api.PersistentVolumeBound {
+			if condition.Status == api.ConditionTrue {
+				status = "Bound"
+				phase = api.ClaimBound
+			}
+			message = condition.Message
+			break
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 		name,
 		aSize, modesStr,
-		pv.Status.Phase,
+		phase,
+		status,
+		message,
 		claimRefUID,
 		pv.Status.Reason,
 		translateTimestamp(pv.CreationTimestamp),
@@ -1315,7 +1332,21 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, opt
 		}
 	}
 
+	// deprecating Phase in favor of Condition
 	phase := pvc.Status.Phase
+	status := "Unbound"
+	message := ""
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == api.PersistentVolumeClaimBound {
+			if condition.Status == api.ConditionTrue {
+				status = "Bound"
+				phase = api.ClaimBound
+			}
+			message = condition.Message
+			break
+		}
+	}
+
 	storage := pvc.Spec.Resources.Requests[api.ResourceStorage]
 	capacity := ""
 	accessModes := ""
@@ -1325,7 +1356,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, opt
 		capacity = storage.String()
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", name, phase, pvc.Spec.VolumeName, capacity, accessModes, translateTimestamp(pvc.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s", name, phase, status, message, pvc.Spec.VolumeName, capacity, accessModes, translateTimestamp(pvc.CreationTimestamp)); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, appendLabels(pvc.Labels, options.ColumnLabels)); err != nil {
