@@ -42,7 +42,7 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slo
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"
 
 	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
-	// Describe("Deployment [Feature:Deployment]", func() {
+	// Describe("Deployment", func() {
 	// 	// CPU tests via deployments
 	// 	It(titleUp, func() {
 	// 		scaleUp("deployment", kindDeployment, rc, f)

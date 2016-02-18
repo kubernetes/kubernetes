@@ -82,9 +82,6 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
-# Enable various v1beta1 features
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-true}"
-
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
 #   influxdb - Heapster, InfluxDB, and Grafana

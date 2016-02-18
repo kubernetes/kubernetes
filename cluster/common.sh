@@ -420,17 +420,11 @@ function yaml-quote {
   echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
 }
 
-# Builds the RUNTIME_CONFIG var from other feature enable options
+# Builds the RUNTIME_CONFIG var from other feature enable options (such as
+# features in alpha)
 function build-runtime-config() {
-  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/daemonsets=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
-          fi
-      fi
-  fi
+  # There is nothing to do here for now. Just using this function as a placeholder.
+  :
 }
 
 function write-master-env {
