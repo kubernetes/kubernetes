@@ -61,6 +61,7 @@ cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_serve
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
+cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
 cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/supervisor/kubelet-checker.sh:	{% set kubelet_port = pillar['kubelet_port'] -%}
@@ -82,8 +83,6 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var 
 docs/getting-started-guides/docker-multinode/skydns-rc.yaml.in:        - -kube_master_url=http://{kube_server_url}:8080
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/vitess/env.sh:    node_ip=$(get_node_ip)
-hack/jenkins/e2e.sh:  local -r cluster_name="$3"
-hack/jenkins/e2e.sh:#   $3 cluster_name: determines E2E_CLUSTER_NAME and E2E_NETWORK
 hack/jenkins/job-builder-image/Dockerfile:# JJB configuration lives in /etc/jenkins_jobs/jenkins_jobs.ini
 hack/jenkins/update-jobs.sh:    docker cp jenkins_jobs.ini job-builder:/etc/jenkins_jobs
 hack/jenkins/update-jobs.sh:    echo "jenkins_jobs.ini not found in workspace" >&2
