@@ -508,7 +508,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 	availableCIDRs := generateCIDRs(nc.clusterCIDR, len(nodes.Items))
 	for _, node := range nodes.Items {
 		if node.Spec.PodCIDR != "" {
-			glog.V(4).Infof("CIDR %s is already being used by node %s", node.Spec.PodCIDR, node.Name)
+			glog.V(1).Infof("CIDR %s is already being used by node %s", node.Spec.PodCIDR, node.Name)
 			availableCIDRs.Delete(node.Spec.PodCIDR)
 		}
 	}
@@ -525,7 +525,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 				nc.recordNodeStatusChange(n, "CIDRNotAvailable")
 				continue
 			}
-			glog.V(4).Infof("Assigning node %s CIDR %s", n.Name, podCIDR)
+			glog.V(1).Infof("Assigning node %s CIDR %s", n.Name, podCIDR)
 			n.Spec.PodCIDR = podCIDR
 			if _, err := nc.kubeClient.Core().Nodes().Update(n); err != nil {
 				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
