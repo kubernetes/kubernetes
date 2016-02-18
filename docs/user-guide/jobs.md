@@ -239,7 +239,7 @@ parallelism, for a variety or reasons:
 
 - For Fixed Completion Count jobs, the actual number of pods running in parallel will not exceed the number of
   remaining completions.   Higher values of `.spec.parallelism` are effectively ignored.
-- For work queue jobs, no new pods are started after any pod has succeded -- remaining pods are allowed to complete, however.
+- For work queue jobs, no new pods are started after any pod has succeeded -- remaining pods are allowed to complete, however.
 - If the controller has not had time to react.
 - If the controller failed to create pods for any reason (lack of ResourceQuota, lack of permission, etc),
   then there may be fewer pods than requested.

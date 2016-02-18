@@ -101,7 +101,7 @@ func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	}
 }
 
-// Returns a channel from which the subscriber can recieve PodLifecycleEvent
+// Returns a channel from which the subscriber can receive PodLifecycleEvent
 // events.
 // TODO: support multiple subscribers.
 func (g *GenericPLEG) Watch() chan *PodLifecycleEvent {

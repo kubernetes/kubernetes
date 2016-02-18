@@ -342,7 +342,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	}
 
 	// delete terminating pods that have been scheduled on
-	// nonexistant nodes
+	// nonexistent nodes
 	if !found {
 		nc.forcefullyDeletePod(pod)
 		return

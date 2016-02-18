@@ -614,7 +614,7 @@ func TestGetPodStatus(t *testing.T) {
 				Name:      "guestbook",
 				Namespace: "default",
 				IP:        "10.10.10.42",
-				// Result should contain all contianers.
+				// Result should contain all containers.
 				ContainerStatuses: []*kubecontainer.ContainerStatus{
 					{
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),

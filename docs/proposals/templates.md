@@ -177,7 +177,7 @@ can be instantiated multiple times within the same namespace, as long as a diffe
 instantiation.  The resulting objects will be independent from a replica/load-balancing perspective.
 
 Generation of parameter values for fields such as Secrets will be delegated to an [admission controller/initializer/finalizer](https://github.com/kubernetes/kubernetes/issues/3585) rather than being solved by the template processor.  Some discussion about a generation
-service is occuring [here](https://github.com/kubernetes/kubernetes/issues/12732)
+service is occurring [here](https://github.com/kubernetes/kubernetes/issues/12732)
 
 Labels to be assigned to all objects could also be generated in addition to, or instead of, allowing labels to be supplied in the
 Template definition.

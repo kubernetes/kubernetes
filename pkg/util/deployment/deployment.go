@@ -110,7 +110,7 @@ func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.In
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
-// Returns nil if the new replica set doesnt exist yet.
+// Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
 	return GetNewReplicaSetFromList(deployment, c,
 		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
@@ -120,7 +120,7 @@ func GetNewReplicaSet(deployment extensions.Deployment, c clientset.Interface) (
 }
 
 // GetNewReplicaSetFromList returns a replica set that matches the intent of the given deployment; get ReplicaSetList with the input function.
-// Returns nil if the new replica set doesnt exist yet.
+// Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Interface, getRSList func(string, api.ListOptions) ([]extensions.ReplicaSet, error)) (*extensions.ReplicaSet, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)

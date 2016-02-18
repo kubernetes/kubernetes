@@ -189,7 +189,7 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	err := f.popError("list")
 	containerList := append([]docker.APIContainers{}, f.ContainerList...)
 	if options.All {
-		// Althought the container is not sorted, but the container with the same name should be in order,
+		// Although the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
 		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)

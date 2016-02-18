@@ -305,7 +305,7 @@ Use the following set of examples to help you familiarize yourself with running 
 		// Return a snapshot of the logs from pod <pod-name>.
 		$ kubectl logs <pod-name>
 
-		// Start streaming the logs from pod <pod-name>. This is similiar to the 'tail -f' Linux command.
+		// Start streaming the logs from pod <pod-name>. This is similar to the 'tail -f' Linux command.
 		$ kubectl logs -f <pod-name>
 
 

@@ -128,7 +128,7 @@ function kube-down() {
 }
 
 function prepare-e2e() {
-  echo "prepare-e2e() The Juju provider does not need any preperations for e2e." 1>&2
+  echo "prepare-e2e() The Juju provider does not need any preparations for e2e." 1>&2
 }
 
 function sleep-status() {

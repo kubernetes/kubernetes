@@ -2079,7 +2079,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			return false, err
 		}
 		if newRS == nil {
-			// New RC hasnt been created yet.
+			// New RC hasn't been created yet.
 			return false, nil
 		}
 		allRSs := append(oldRSs, newRS)

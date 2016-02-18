@@ -52,7 +52,7 @@ type Framework struct {
 	NamespaceDeletionTimeout time.Duration
 
 	gatherer containerResourceGatherer
-	// Constraints that passed to a check which is exectued after data is gathered to
+	// Constraints that passed to a check which is executed after data is gathered to
 	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
 	// as expectations vary greatly. Constraints are groupped by the container names.
 	addonResourceConstraints map[string]resourceConstraint

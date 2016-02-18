@@ -315,7 +315,7 @@ func (k *framework) Registered(drv bindings.SchedulerDriver, fid *mesos.Framewor
 }
 
 // Reregistered is called when the scheduler re-registered with the master successfully.
-// This happends when the master fails over.
+// This happens when the master fails over.
 func (k *framework) Reregistered(drv bindings.SchedulerDriver, mi *mesos.MasterInfo) {
 	log.Infof("Scheduler reregistered with the master: %v\n", mi)
 
