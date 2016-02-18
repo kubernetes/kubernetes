@@ -168,7 +168,6 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		targetGV.Group = group
 		targetGV.Version = runtime.APIVersionInternal
 	} else {
-		fmt.Printf("looking for %v in %#v\n", group, c.decodeVersion)
 		gv, ok := c.decodeVersion[group]
 		if !ok {
 			// unknown objects are left in their original version
