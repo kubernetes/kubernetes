@@ -425,8 +425,13 @@ terminated_pod_gc_threshold: '$(echo "${TERMINATED_POD_GC_THRESHOLD}" | sed -e "
 EOF
     fi
     if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls       
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 enable_custom_metrics: '$(echo "${ENABLE_CUSTOM_METRICS}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${NODE_LABELS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
 }
