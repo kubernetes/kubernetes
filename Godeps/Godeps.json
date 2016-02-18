@@ -683,6 +683,10 @@
 			"Rev": "fa3f63826f7c23912c15263591e65d54d080b458"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/golang-lru",
+			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/raft",
 			"Rev": "057b893fd996696719e98b6c44649ea14968c811"
 		},
