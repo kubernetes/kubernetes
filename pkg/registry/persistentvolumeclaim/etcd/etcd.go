@@ -54,7 +54,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return persistentvolumeclaim.MatchPersistentVolumeClaim(label, field)
 		},
-		QualifiedResource: api.Resource("persistentvolumeclaims"),
+		QualifiedResource:       api.Resource("persistentvolumeclaims"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,
 		UpdateStrategy:      persistentvolumeclaim.Strategy,

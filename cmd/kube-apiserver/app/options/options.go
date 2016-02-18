@@ -52,6 +52,7 @@ type APIServer struct {
 	CloudConfigFile            string
 	CloudProvider              string
 	CorsAllowedOriginList      []string
+	DeleteCollectionWorkers    int
 	DeprecatedStorageVersion   string
 	EnableLogsSupport          bool
 	EnableProfiling            bool
@@ -92,19 +93,20 @@ type APIServer struct {
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
-		ServerRunOptions:       genericapiserver.NewServerRunOptions(),
-		APIGroupPrefix:         "/apis",
-		APIPrefix:              "/api",
-		AdmissionControl:       "AlwaysAdmit",
-		AuthorizationMode:      "AlwaysAllow",
-		EnableLogsSupport:      true,
-		EtcdPathPrefix:         genericapiserver.DefaultEtcdPathPrefix,
-		EventTTL:               1 * time.Hour,
-		MasterCount:            1,
-		MasterServiceNamespace: api.NamespaceDefault,
-		RuntimeConfig:          make(util.ConfigurationMap),
-		StorageVersions:        registered.AllPreferredGroupVersions(),
-		DefaultStorageVersions: registered.AllPreferredGroupVersions(),
+		ServerRunOptions:        genericapiserver.NewServerRunOptions(),
+		APIGroupPrefix:          "/apis",
+		APIPrefix:               "/api",
+		AdmissionControl:        "AlwaysAdmit",
+		AuthorizationMode:       "AlwaysAllow",
+		DeleteCollectionWorkers: 1,
+		EnableLogsSupport:       true,
+		EtcdPathPrefix:          genericapiserver.DefaultEtcdPathPrefix,
+		EventTTL:                1 * time.Hour,
+		MasterCount:             1,
+		MasterServiceNamespace:  api.NamespaceDefault,
+		RuntimeConfig:           make(util.ConfigurationMap),
+		StorageVersions:         registered.AllPreferredGroupVersions(),
+		DefaultStorageVersions:  registered.AllPreferredGroupVersions(),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
@@ -231,6 +233,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount, "The number of apiservers running in the cluster")
+	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers, "Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	// TODO: enable cache in integration tests.

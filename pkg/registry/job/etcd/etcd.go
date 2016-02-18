@@ -64,7 +64,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return job.MatchJob(label, field)
 		},
-		QualifiedResource: extensions.Resource("jobs"),
+		QualifiedResource:       extensions.Resource("jobs"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate job creation
 		CreateStrategy: job.Strategy,

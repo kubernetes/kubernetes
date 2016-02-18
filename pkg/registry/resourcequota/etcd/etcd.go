@@ -54,7 +54,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return resourcequota.MatchResourceQuota(label, field)
 		},
-		QualifiedResource: api.Resource("resourcequotas"),
+		QualifiedResource:       api.Resource("resourcequotas"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      resourcequota.Strategy,
 		UpdateStrategy:      resourcequota.Strategy,

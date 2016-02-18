@@ -54,7 +54,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return service.MatchServices(label, field)
 		},
-		QualifiedResource: api.Resource("services"),
+		QualifiedResource:       api.Resource("services"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: service.Strategy,
 		UpdateStrategy: service.Strategy,
