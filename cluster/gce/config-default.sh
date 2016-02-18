@@ -80,10 +80,6 @@ fi
 # Optional: customize runtime config
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
-# Optional: enable v1beta1 related features
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
-
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"

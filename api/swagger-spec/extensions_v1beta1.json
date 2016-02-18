@@ -5,6 +5,831 @@
   "resourcePath": "/apis/extensions/v1beta1",
   "apis": [
    {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.DaemonSetList",
+      "method": "GET",
+      "summary": "list or watch objects of kind DaemonSet",
+      "nickname": "listNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSetList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.DaemonSet",
+      "method": "POST",
+      "summary": "create a DaemonSet",
+      "nickname": "createNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.DaemonSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete collection of DaemonSet",
+      "nickname": "deletecollectionNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/daemonsets",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of DaemonSet",
+      "nickname": "watchNamespacedDaemonSetList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets/{name}",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.DaemonSet",
+      "method": "GET",
+      "summary": "read the specified DaemonSet",
+      "nickname": "readNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.DaemonSet",
+      "method": "PUT",
+      "summary": "replace the specified DaemonSet",
+      "nickname": "replaceNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.DaemonSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.DaemonSet",
+      "method": "PATCH",
+      "summary": "partially update the specified DaemonSet",
+      "nickname": "patchNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete a DaemonSet",
+      "nickname": "deleteNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/daemonsets/{name}",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind DaemonSet",
+      "nickname": "watchNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/daemonsets",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.DaemonSetList",
+      "method": "GET",
+      "summary": "list or watch objects of kind DaemonSet",
+      "nickname": "listDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSetList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/daemonsets",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of DaemonSet",
+      "nickname": "watchDaemonSetList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets/{name}/status",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.DaemonSet",
+      "method": "PUT",
+      "summary": "replace status of the specified DaemonSet",
+      "nickname": "replaceNamespacedDaemonSetStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.DaemonSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSet",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/deployments",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
@@ -4374,9 +5199,9 @@
    }
   ],
   "models": {
-   "v1beta1.DeploymentList": {
-    "id": "v1beta1.DeploymentList",
-    "description": "DeploymentList is a list of Deployments.",
+   "v1beta1.DaemonSetList": {
+    "id": "v1beta1.DaemonSetList",
+    "description": "DaemonSetList is a collection of daemon sets.",
     "required": [
      "items"
     ],
@@ -4391,14 +5216,14 @@
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata."
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.Deployment"
+       "$ref": "v1beta1.DaemonSet"
       },
-      "description": "Items is the list of Deployments."
+      "description": "Items is a list of daemon sets."
      }
     }
    },
@@ -4416,9 +5241,9 @@
      }
     }
    },
-   "v1beta1.Deployment": {
-    "id": "v1beta1.Deployment",
-    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+   "v1beta1.DaemonSet": {
+    "id": "v1beta1.DaemonSet",
+    "description": "DaemonSet represents the configuration of a daemon set.",
     "properties": {
      "kind": {
       "type": "string",
@@ -4430,15 +5255,15 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object metadata."
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
-      "$ref": "v1beta1.DeploymentSpec",
-      "description": "Specification of the desired behavior of the Deployment."
+      "$ref": "v1beta1.DaemonSetSpec",
+      "description": "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
-      "$ref": "v1beta1.DeploymentStatus",
-      "description": "Most recently observed status of the Deployment."
+      "$ref": "v1beta1.DaemonSetStatus",
+      "description": "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -4498,47 +5323,20 @@
      }
     }
    },
-   "v1beta1.DeploymentSpec": {
-    "id": "v1beta1.DeploymentSpec",
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+   "v1beta1.DaemonSetSpec": {
+    "id": "v1beta1.DaemonSetSpec",
+    "description": "DaemonSetSpec is the specification of a daemon set.",
     "required": [
      "template"
     ],
     "properties": {
-     "replicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
-     },
      "selector": {
       "$ref": "v1beta1.LabelSelector",
-      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
+      "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template describes the pods that will be created."
-     },
-     "strategy": {
-      "$ref": "v1beta1.DeploymentStrategy",
-      "description": "The deployment strategy to use to replace existing pods with new ones."
-     },
-     "minReadySeconds": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
-     },
-     "revisionHistoryLimit": {
-      "type": "integer",
-      "format": "int32",
-      "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified."
-     },
-     "paused": {
-      "type": "boolean",
-      "description": "Indicates that the deployment is paused and will not be processed by the deployment controller."
-     },
-     "rollbackTo": {
-      "$ref": "v1beta1.RollbackConfig",
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+      "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template"
      }
     }
    },
@@ -5762,67 +6560,29 @@
     "id": "integer",
     "properties": {}
    },
-   "v1beta1.DeploymentStrategy": {
-    "id": "v1beta1.DeploymentStrategy",
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+   "v1beta1.DaemonSetStatus": {
+    "id": "v1beta1.DaemonSetStatus",
+    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "required": [
+     "currentNumberScheduled",
+     "numberMisscheduled",
+     "desiredNumberScheduled"
+    ],
     "properties": {
-     "type": {
-      "type": "string",
-      "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate."
-     },
-     "rollingUpdate": {
-      "$ref": "v1beta1.RollingUpdateDeployment",
-      "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate."
-     }
-    }
-   },
-   "v1beta1.RollingUpdateDeployment": {
-    "id": "v1beta1.RollingUpdateDeployment",
-    "description": "Spec to control the desired behavior of rolling update.",
-    "properties": {
-     "maxUnavailable": {
-      "type": "string",
-      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods."
-     },
-     "maxSurge": {
-      "type": "string",
-      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods."
-     }
-    }
-   },
-   "v1beta1.RollbackConfig": {
-    "id": "v1beta1.RollbackConfig",
-    "properties": {
-     "revision": {
-      "type": "integer",
-      "format": "int64",
-      "description": "The revision to rollback to. If set to 0, rollbck to the last revision."
-     }
-    }
-   },
-   "v1beta1.DeploymentStatus": {
-    "id": "v1beta1.DeploymentStatus",
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
-    "properties": {
-     "replicas": {
+     "currentNumberScheduled": {
       "type": "integer",
       "format": "int32",
-      "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector)."
+      "description": "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md"
      },
-     "updatedReplicas": {
+     "numberMisscheduled": {
       "type": "integer",
       "format": "int32",
-      "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec."
+      "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md"
      },
-     "availableReplicas": {
+     "desiredNumberScheduled": {
       "type": "integer",
       "format": "int32",
-      "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment."
-     },
-     "unavailableReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Total number of unavailable pods targeted by this deployment."
+      "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md"
      }
     }
    },
@@ -5950,6 +6710,168 @@
       "type": "integer",
       "format": "int64",
       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately."
+     }
+    }
+   },
+   "v1beta1.DeploymentList": {
+    "id": "v1beta1.DeploymentList",
+    "description": "DeploymentList is a list of Deployments.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.Deployment"
+      },
+      "description": "Items is the list of Deployments."
+     }
+    }
+   },
+   "v1beta1.Deployment": {
+    "id": "v1beta1.Deployment",
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata."
+     },
+     "spec": {
+      "$ref": "v1beta1.DeploymentSpec",
+      "description": "Specification of the desired behavior of the Deployment."
+     },
+     "status": {
+      "$ref": "v1beta1.DeploymentStatus",
+      "description": "Most recently observed status of the Deployment."
+     }
+    }
+   },
+   "v1beta1.DeploymentSpec": {
+    "id": "v1beta1.DeploymentSpec",
+    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
+     },
+     "selector": {
+      "$ref": "v1beta1.LabelSelector",
+      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
+     },
+     "template": {
+      "$ref": "v1.PodTemplateSpec",
+      "description": "Template describes the pods that will be created."
+     },
+     "strategy": {
+      "$ref": "v1beta1.DeploymentStrategy",
+      "description": "The deployment strategy to use to replace existing pods with new ones."
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
+     },
+     "revisionHistoryLimit": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified."
+     },
+     "paused": {
+      "type": "boolean",
+      "description": "Indicates that the deployment is paused and will not be processed by the deployment controller."
+     },
+     "rollbackTo": {
+      "$ref": "v1beta1.RollbackConfig",
+      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+     }
+    }
+   },
+   "v1beta1.DeploymentStrategy": {
+    "id": "v1beta1.DeploymentStrategy",
+    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate."
+     },
+     "rollingUpdate": {
+      "$ref": "v1beta1.RollingUpdateDeployment",
+      "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate."
+     }
+    }
+   },
+   "v1beta1.RollingUpdateDeployment": {
+    "id": "v1beta1.RollingUpdateDeployment",
+    "description": "Spec to control the desired behavior of rolling update.",
+    "properties": {
+     "maxUnavailable": {
+      "type": "string",
+      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods."
+     },
+     "maxSurge": {
+      "type": "string",
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods."
+     }
+    }
+   },
+   "v1beta1.RollbackConfig": {
+    "id": "v1beta1.RollbackConfig",
+    "properties": {
+     "revision": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The revision to rollback to. If set to 0, rollbck to the last revision."
+     }
+    }
+   },
+   "v1beta1.DeploymentStatus": {
+    "id": "v1beta1.DeploymentStatus",
+    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector)."
+     },
+     "updatedReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec."
+     },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment."
+     },
+     "unavailableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of unavailable pods targeted by this deployment."
      }
     }
    },

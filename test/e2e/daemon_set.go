@@ -48,7 +48,7 @@ const (
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
 
-var _ = Describe("Daemon set [Feature:DaemonSet]", func() {
+var _ = Describe("Daemon set", func() {
 	var f *Framework
 
 	AfterEach(func() {
