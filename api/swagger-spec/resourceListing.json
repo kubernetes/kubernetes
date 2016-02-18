@@ -32,6 +32,14 @@
    {
     "path": "/apis/autoscaling",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/batch/v1",
+    "description": "API at /apis/batch/v1"
+   },
+   {
+    "path": "/apis/batch",
+    "description": "get information of a group"
    }
   ],
   "apiVersion": "",
