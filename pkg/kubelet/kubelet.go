@@ -1926,14 +1926,19 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
 			// TODO(yifan): Refactor this hacky string manipulation.
 			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
+			// Get path reference count
+			refs, err := mount.GetMountRefs(kl.mounter, cleanerTuple.Cleaner.GetPath())
+			if err != nil {
+				return fmt.Errorf("Could not get mount path references %v", err)
+			}
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
-			err := cleanerTuple.Cleaner.TearDown()
+			err = cleanerTuple.Cleaner.TearDown()
 			if err != nil {
 				glog.Errorf("Could not tear down volume %q: %v", name, err)
 			}
 
 			// volume is unmounted.  some volumes also require detachment from the node.
-			if cleanerTuple.Detacher != nil {
+			if cleanerTuple.Detacher != nil && len(refs) == 1 {
 				detacher := *cleanerTuple.Detacher
 				err = detacher.Detach()
 				if err != nil {
