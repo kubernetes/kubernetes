@@ -85,6 +85,33 @@
                     <healthScaleFactor>100.0</healthScaleFactor>
                 </hudson.tasks.junit.JUnitResultArchiver>
 
+- builder:
+    name: docker-build-publish
+    builders:
+        - raw:
+            xml: |
+               <com.cloudbees.dockerpublish.DockerBuilder plugin="docker-build-publish@1.1">
+                   <server plugin="docker-commons@1.2"/>
+                   <registry plugin="docker-commons@1.2">
+                       <credentialsId>1f361efb-5b85-4f61-91a7-4ec7fb2a5c23</credentialsId>
+                   </registry>
+                   <repoName>{repoName}</repoName>
+                   <noCache>true</noCache>
+                   <forcePull>true</forcePull>
+                   <dockerfilePath>{dockerfilePath}</dockerfilePath>
+                   <skipBuild>false</skipBuild>
+                   <skipDecorate>false</skipDecorate>
+                   <repoTag>{tag}</repoTag>
+                   <skipPush>false</skipPush>
+                   <createFingerprint>true</createFingerprint>
+                   <skipTagLatest>true</skipTagLatest>
+               </com.cloudbees.dockerpublish.DockerBuilder>
+        - shell: |
+           #!/bin/bash
+           set -e
+           set -x
+           docker rmi -f {repoName}:{tag}
+
 # Default email recipients are set in Jenkins global config
 - defaults:
     name: global

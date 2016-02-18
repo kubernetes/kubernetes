@@ -1,0 +1,151 @@
+- job-template:
+    name: '{gitproject}-dockercanarybuild-ci'
+    description: 'Build and push {gitproject} docker image.<br>Test Owner: {owner}.'
+    node: 'node'
+    logrotate:
+        numToKeep: 200
+    node: node
+    builders:
+         - docker-build-publish:
+             repoName: '{repoName}'
+             dockerfilePath: 'go/src/{gitbasedir}/{dockerfilePath}'
+             tag: 'canary'
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: '{owner}'
+    scm:
+        - git:
+            url: 'https://github.com/{repoName}'
+            browser: githubweb
+            browser-url: 'https://github.com/{repoName}'
+            branches:
+                - 'master'
+            skip-tag: true
+            basedir: 'go/src/{gitbasedir}'
+    triggers:
+        - pollscm:
+            cron: 'H/5 * * * *'
+        - timed: '@daily'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 30
+            fail: true
+        - timestamps
+
+- job-template:
+    name: '{gitproject}-gce-e2e-ci'
+    description: '{gitproject} continuous e2e tests.<br>Test Owner: {owner}.'
+    node: 'node'
+    logrotate:
+        numToKeep: 200
+    node: node
+    builders:
+         - shell: '{shell}'
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: '{owner}'
+    scm:
+        - git:
+            url: 'https://github.com/{repoName}'
+            browser: githubweb
+            browser-url: 'https://github.com/{repoName}'
+            branches:
+                - 'master'
+            skip-tag: true
+            basedir: 'go/src/{gitbasedir}'
+    triggers:
+        - pollscm:
+            cron: 'H/5 * * * *'
+        - timed: '@daily'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 30
+            fail: true
+        - timestamps
+        - inject:
+            properties-content: |
+                GOROOT=/usr/local/go
+                GOPATH=$WORKSPACE/go
+                PATH=$PATH:$GOROOT/bin:$WORKSPACE/go/bin
+
+- project:
+    name: node-docker-canary-build
+    repoName: 'google/cadvisor'
+    gitproject:
+        - 'cadvisor':
+            repoName: 'google/cadvisor'
+            gitbasedir: 'github.com/google/cadvisor'
+            dockerfilePath: 'deploy/canary/Dockerfile'
+            owner: 'vishnuk@google.com'
+        - 'heapster':
+            repoName: 'kubernetes/heapster'
+            gitbasedir: 'k8s.io/heapster'
+            dockerfilePath: 'deploy/docker/canary/Dockerfile'
+            owner: 'pszczesniak@google.com'
+    jobs:
+        - '{gitproject}-dockercanarybuild-ci'
+
+- project:
+    name: node-gce-e2e
+    repoName: 'google/cadvisor'
+    gitproject:
+        - 'cadvisor':
+            repoName: 'google/cadvisor'
+            gitbasedir: 'github.com/google/cadvisor'
+            owner: 'vishnuk@google.com'
+            shell: |
+                #!/bin/bash
+                set -e
+                set -x
+                cd go/src/github.com/google/cadvisor
+
+                go get -u github.com/tools/godep
+
+                ./build/presubmit.sh
+                godep go build -tags test github.com/google/cadvisor/integration/runner
+                ./runner --logtostderr --test-retry-count=8 --test-retry-whitelist=integration/runner/retrywhitelist.txt \
+                --ssh-options "-i /home/jenkins/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no" \
+                e2e-cadvisor-ubuntu-trusty \
+                e2e-cadvisor-coreos-beta \
+                e2e-cadvisor-container-vm-v20151215 \
+                e2e-cadvisor-container-vm-v20160127 \
+                e2e-cadvisor-rhel-7
+        - 'heapster':
+            repoName: 'kubernetes/heapster'
+            gitbasedir: 'k8s.io/heapster'
+            owner: 'pszczesniak@google.com'
+            shell: |
+                #!/bin/bash
+                set -e
+                set -x
+                cd go/src/k8s.io/heapster
+
+                make test-unit test-integration
+        - 'kubelet':
+            repoName: 'kubernetes/kubernetes'
+            gitbasedir: 'k8s.io/kubernetes'
+            owner: 'pwittroc@google.com'
+            shell: |
+                #!/bin/bash
+                set -e
+                set -x
+                cd go/src/k8s.io/kubernetes
+
+                go get -u github.com/tools/godep
+                go get -u github.com/onsi/ginkgo/ginkgo
+                go get -u github.com/onsi/gomega
+
+                godep go build test/e2e_node/environment/conformance.go
+                godep go run test/e2e_node/runner/run_e2e.go --zone us-central1-f --hosts e2e-node-container-vm-v20151215,e2e-node-coreos-beta.c.kubernetes-jenkins.internal,e2e-node-ubuntu-trusty,e2e-node-ubuntu-trusty-docker1-10 --logtostderr -v 2
+    jobs:
+        - '{gitproject}-gce-e2e-ci'
