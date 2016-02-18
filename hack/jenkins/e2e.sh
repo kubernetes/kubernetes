@@ -273,14 +273,13 @@ case ${JOB_NAME} in
 
   # Runs the performance/scalability tests on GCE. A larger cluster is used.
   kubernetes-e2e-gce-scalability)
-    # XXX Not a unique project
     export E2E_NAME="e2e-scalability"
     export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\] \
                              --gather-resource-usage=true \
                              --gather-metrics-at-teardown=true \
                              --gather-logs-sizes=true \
                              --output-print-type=json"
-    export PROJECT="kubernetes-jenkins"
+    export PROJECT="google.com:k8s-jenkins-scalability"
     export FAIL_ON_GCP_RESOURCE_LEAK="false"
     # Override GCE defaults.
     export MASTER_SIZE="n1-standard-4"
