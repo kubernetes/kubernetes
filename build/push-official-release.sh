@@ -45,6 +45,11 @@ if "${KUBE_ROOT}/cluster/kubectl.sh" 'version' | grep 'Client' | grep 'dirty'; t
   exit 1
 fi
 
+if ! kube::release::has_gcloud_account k8s.production.user@gmail.com; then
+  kube::log::error "Pushing images to gcr.io/google_containers requires credentials for account k8s.production.user@gmail.com"
+  return 1
+fi
+
 kube::release::parse_and_validate_release_version "${KUBE_RELEASE_VERSION}"
 kube::release::gcs::release
 kube::release::docker::release
