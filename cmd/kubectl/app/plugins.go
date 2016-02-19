@@ -18,18 +18,33 @@ package app
 
 import (
 	"os"
+	"strings"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdplugin "k8s.io/kubernetes/pkg/kubectl/cmd/plugin"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/plugin/mesosphere"
 )
 
-func Run() error {
-	err := RegisterPlugins()
-	if err != nil {
-		return err
+var pluginRegistrationFuncs = []func() error{
+	// add all plugin registation funcs here
+	mesosphere.RegisterPlugins,
+}
+
+func RegisterPlugins() error {
+	for _, f := range pluginRegistrationFuncs {
+		if err := f(); err != nil {
+			return err
+		}
 	}
-	configOptions := cmdplugin.ConfigOptions()
-	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil, configOptions...), os.Stdin, os.Stdout, os.Stderr)
-	return cmd.Execute()
+	pluginEnv := os.Getenv("KUBECTL_PLUGINS")
+	rawNames := strings.Split(pluginEnv, ",")
+	for i := range rawNames {
+		if rawNames[i] == "" {
+			continue
+		}
+		err := cmdplugin.Activate(rawNames[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

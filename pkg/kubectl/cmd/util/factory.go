@@ -173,10 +173,23 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	return generators[cmdName]
 }
 
+// ConfigOption allows plugins to inject behavior that modifies the default client configuration
+type ConfigOption interface {
+	Flags(*pflag.FlagSet, clientcmd.ConfigOverrideFlags, *clientcmd.ClientConfigLoadingRules, *clientcmd.ConfigOverrides)
+	ClientConfig(clientcmd.ClientConfig) clientcmd.ClientConfig
+}
+
+// EmptyConfigOption provides a noop implementation of ConfigOption that plugins can embed
+type EmptyConfigOption int
+
+func (o *EmptyConfigOption) ClientConfig(c clientcmd.ClientConfig) clientcmd.ClientConfig { return c }
+func (o *EmptyConfigOption) Flags(*pflag.FlagSet, clientcmd.ConfigOverrideFlags, *clientcmd.ClientConfigLoadingRules, *clientcmd.ConfigOverrides) {
+}
+
 // NewFactory creates a factory with the default Kubernetes resources defined
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
-func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
+func NewFactory(optionalClientConfig clientcmd.ClientConfig, configOptions ...ConfigOption) *Factory {
 	mapper := kubectl.ShortcutExpander{RESTMapper: api.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
@@ -184,7 +197,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
-		clientConfig = DefaultClientConfig(flags)
+		clientConfig = DefaultClientConfig(flags, configOptions...)
 	}
 
 	clients := NewClientCache(clientConfig)
@@ -758,7 +771,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 //     The env vars KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT are
 //     set, and the file /var/run/secrets/kubernetes.io/serviceaccount/token
 //     exists and is not a directory.
-func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
+func DefaultClientConfig(flags *pflag.FlagSet, options ...ConfigOption) clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
@@ -768,7 +781,18 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
 
 	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
+
+	// allow plugins to customize flags, overrides, and loading rules
+	for _, opt := range options {
+		opt.Flags(flags, flagNames, loadingRules, overrides)
+	}
+
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
+
+	// allow plugins to customize resulting config
+	for _, opt := range options {
+		clientConfig = opt.ClientConfig(clientConfig)
+	}
 
 	return clientConfig
 }
