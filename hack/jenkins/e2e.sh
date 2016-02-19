@@ -90,7 +90,7 @@ if [[ ${JOB_NAME} =~ ^kubernetes-upgrade ]]; then
     export E2E_OPT="--check_version_skew=false"
     export E2E_UP="false"
     export E2E_DOWN="false"
-    export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master --upgrade-target=${new_version}"
+    export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master"
   elif [[ "${JOB_NAME}" =~ step4 ]]; then
     export E2E_OPT="--check_version_skew=false"
     export E2E_UP="false"
@@ -99,7 +99,7 @@ if [[ ${JOB_NAME} =~ ^kubernetes-upgrade ]]; then
     export E2E_OPT="--check_version_skew=false"
     export E2E_UP="false"
     export E2E_DOWN="false"
-    export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster --upgrade-target=${new_version}"
+    export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster"
   elif [[ "${JOB_NAME}" =~ step6 ]]; then
     export E2E_OPT="--check_version_skew=false"
     export E2E_UP="false"
