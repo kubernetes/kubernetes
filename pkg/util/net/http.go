@@ -120,3 +120,36 @@ func GetHTTPClient(req *http.Request) string {
 	}
 	return "unknown"
 }
+
+// Extracts and returns the clients IP from the given request.
+// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
+// Returns nil if none of them are set or is set to an invalid value.
+func GetClientIP(req *http.Request) net.IP {
+	hdr := req.Header
+	// First check the X-Forwarded-For header for requests via proxy.
+	hdrForwardedFor := hdr.Get("X-Forwarded-For")
+	if hdrForwardedFor != "" {
+		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
+		// Use the first valid one.
+		parts := strings.Split(hdrForwardedFor, ",")
+		for _, part := range parts {
+			ip := net.ParseIP(strings.TrimSpace(part))
+			if ip != nil {
+				return ip
+			}
+		}
+	}
+
+	// Try the X-Real-Ip header.
+	hdrRealIp := hdr.Get("X-Real-Ip")
+	if hdrRealIp != "" {
+		ip := net.ParseIP(hdrRealIp)
+		if ip != nil {
+			return ip
+		}
+	}
+
+	// Fallback to Remote Address in request, which will give the correct client IP when there is no proxy.
+	ip := net.ParseIP(req.RemoteAddr)
+	return ip
+}
