@@ -2124,6 +2124,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		}
 		if totalCreated > maxCreated {
 			logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
@@ -2137,10 +2138,12 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			// Verify replica sets.
 			if deploymentutil.GetReplicaCountForReplicaSets(oldRSs) != 0 {
 				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+				logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 				return false, fmt.Errorf("old replica sets are not fully scaled down")
 			}
 			if deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) != desiredUpdatedReplicas {
 				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+				logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 				return false, fmt.Errorf("new replica sets is not fully scaled up")
 			}
 			return true, nil
