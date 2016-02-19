@@ -123,7 +123,7 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 			summary[strconv.Itoa(perc)] = append(summary[strconv.Itoa(perc)], SingleContainerSummary{
 				Name: name,
 				Cpu:  usage.CPUUsageInCores,
-				Mem:  usage.MemoryWorkingSetInBytes,
+				Mem:  usage.MemoryRSSInBytes,
 			})
 			// Verifying 99th percentile of resource usage
 			if perc == 99 {
@@ -140,12 +140,12 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 							),
 						)
 					}
-					if usage.MemoryWorkingSetInBytes > constraint.memoryConstraint {
+					if usage.MemoryRSSInBytes > constraint.memoryConstraint {
 						violatedConstraints = append(
 							violatedConstraints,
 							fmt.Sprintf("Container %v is using %v/%v MB of memory",
 								name,
-								float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
+								float64(usage.MemoryRSSInBytes)/(1024*1024),
 								float64(constraint.memoryConstraint)/(1024*1024),
 							),
 						)
@@ -170,17 +170,20 @@ func (g *containerResourceGatherer) computePercentiles(timeSeries map[time.Time]
 					cpuData:        make([]float64, len(timeSeries)),
 					memUseData:     make([]uint64, len(timeSeries)),
 					memWorkSetData: make([]uint64, len(timeSeries)),
+					memRSSData:     make([]uint64, len(timeSeries)),
 				}
 			}
 			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)
 			dataMap[name].memUseData = append(dataMap[name].memUseData, data.MemoryUsageInBytes)
 			dataMap[name].memWorkSetData = append(dataMap[name].memWorkSetData, data.MemoryWorkingSetInBytes)
+			dataMap[name].memRSSData = append(dataMap[name].memRSSData, data.MemoryRSSInBytes)
 		}
 	}
 	for _, v := range dataMap {
 		sort.Float64s(v.cpuData)
 		sort.Sort(uint64arr(v.memUseData))
 		sort.Sort(uint64arr(v.memWorkSetData))
+		sort.Sort(uint64arr(v.memRSSData))
 	}
 
 	result := make(map[int]resourceUsagePerContainer)
@@ -193,6 +196,7 @@ func (g *containerResourceGatherer) computePercentiles(timeSeries map[time.Time]
 				CPUUsageInCores:         v.cpuData[percentileIndex],
 				MemoryUsageInBytes:      v.memUseData[percentileIndex],
 				MemoryWorkingSetInBytes: v.memWorkSetData[percentileIndex],
+				MemoryRSSInBytes:        v.memRSSData[percentileIndex],
 			}
 		}
 		result[perc] = data
