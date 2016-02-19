@@ -1746,12 +1746,14 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		tags = append(tags, tag)
 	}
 
-	tagRequest := &ec2.CreateTagsInput{}
-	tagRequest.Resources = []*string{&groupID}
-	tagRequest.Tags = tags
-	if _, err := s.createTags(tagRequest); err != nil {
-		// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
-		return "", fmt.Errorf("error tagging security group: %v", err)
+	if len(tags) > 0 {
+		tagRequest := &ec2.CreateTagsInput{}
+		tagRequest.Resources = []*string{&groupID}
+		tagRequest.Tags = tags
+		if _, err := s.createTags(tagRequest); err != nil {
+			// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
+			return "", fmt.Errorf("error tagging security group: %v", err)
+		}
 	}
 	return groupID, nil
 }
