@@ -11,15 +11,6 @@
 - publisher:
     name: gcs-uploader
     publishers:
-        # Use the plugin for the build log, since it isn't available on Jenkins slaves.
-        - google-cloud-storage:
-            credentials-id: kubernetes-jenkins
-            uploads:
-                - build-log:
-                    log-name: build-log.txt
-                    storage-location: gs://kubernetes-jenkins/logs/$JOB_NAME/$BUILD_NUMBER
-                    share-publicly: true
-                    upload-for-failed-jobs: true
         # Use our script for build artifacts, since it's more flexible.
         - postbuildscript:
             builders:
@@ -58,6 +49,15 @@
                         - shell: './upload-finished.sh ABORTED'
             script-only-if-succeeded: False
             script-only-if-failed: False
+        # Use the plugin for the build log, since it isn't available on Jenkins slaves.
+        - google-cloud-storage:
+            credentials-id: kubernetes-jenkins
+            uploads:
+                - build-log:
+                    log-name: build-log.txt
+                    storage-location: gs://kubernetes-jenkins/logs/$JOB_NAME/$BUILD_NUMBER
+                    share-publicly: true
+                    upload-for-failed-jobs: true
 
 # Default log parser rules.
 - publisher:
