@@ -34,7 +34,7 @@ func newInitializedVolumePlugMgr(t *testing.T) (volume.VolumePluginMgr, string) 
 	plugMgr := volume.VolumePluginMgr{}
 	dir, err := utiltesting.MkTmpdir("flocker")
 	assert.NoError(t, err)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(dir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(dir, nil, nil))
 	return plugMgr, dir
 }
 

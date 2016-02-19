@@ -30,19 +30,24 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-// ProbeVolumePlugin is the entry point for plugin detection in a package.
-func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&configMapPlugin{}}
+// This is the primary entrypoint for volume plugins.
+func init() {
+	volume.RegisterFactory(configMapPluginName, ProbeVolumePlugins)
 }
 
-const (
-	configMapPluginName = "kubernetes.io/configmap"
-)
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&configMapPlugin{}}
+}
 
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
 	host volume.VolumeHost
 }
+
+const (
+	configMapPluginName = "kubernetes.io/configmap"
+)
 
 var _ volume.VolumePlugin = &configMapPlugin{}
 

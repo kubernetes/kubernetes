@@ -58,6 +58,7 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -219,7 +220,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10250, /* KubeletPort */
 		0,     /* ReadOnlyPort */
 		api.NamespaceDefault,
-		empty_dir.ProbeVolumePlugins(),
+		empty_dir.ProbeVolumePlugins(volume.VolumeConfig{}),
 		nil,
 		cadvisorInterface,
 		configFilePath,
@@ -251,7 +252,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10251, /* KubeletPort */
 		0,     /* ReadOnlyPort */
 		api.NamespaceDefault,
-		empty_dir.ProbeVolumePlugins(),
+		empty_dir.ProbeVolumePlugins(volume.VolumeConfig{}),
 		nil,
 		cadvisorInterface,
 		"",

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/test/integration"
 
@@ -59,7 +60,7 @@ func NewHollowKubelet(
 			uint(kubeletPort),
 			uint(kubeletReadOnlyPort),
 			api.NamespaceDefault,
-			empty_dir.ProbeVolumePlugins(),
+			empty_dir.ProbeVolumePlugins(volume.VolumeConfig{}),
 			nil, /* tls-options */
 			cadvisorInterface,
 			manifestFilePath,

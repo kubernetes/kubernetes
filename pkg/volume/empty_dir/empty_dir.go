@@ -30,19 +30,22 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+// This is the primary entrypoint for volume plugins.
+func init() {
+	volume.RegisterFactory(emptyDirPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&emptyDirPlugin{nil}}
+}
+
 // TODO: in the near future, this will be changed to be more restrictive
 // and the group will be set to allow containers to use emptyDir volumes
 // from the group attribute.
 //
 // http://issue.k8s.io/2630
 const perm os.FileMode = 0777
-
-// This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{
-		&emptyDirPlugin{nil},
-	}
-}
 
 type emptyDirPlugin struct {
 	host volume.VolumeHost

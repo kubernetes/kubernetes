@@ -33,8 +33,19 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
+func init() {
+	volume.RegisterFactory(FlexPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	plugins := []volume.VolumePlugin{}
+
+	pluginDir := config.VolumePluginDir
+	if pluginDir == "" {
+		glog.V(3).Infof("Flex plugin not configured")
+		return plugins
+	}
 
 	files, _ := ioutil.ReadDir(pluginDir)
 	for _, f := range files {
@@ -50,6 +61,10 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	}
 	return plugins
 }
+
+const (
+	FlexPluginName = "kubernetes.io/flex"
+)
 
 // FlexVolumePlugin object.
 type flexVolumePlugin struct {

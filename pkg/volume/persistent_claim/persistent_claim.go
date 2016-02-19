@@ -25,7 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-func ProbeVolumePlugins() []volume.VolumePlugin {
+// This is the primary entrypoint for volume plugins.
+func init() {
+	volume.RegisterFactory(persistentClaimPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{&persistentClaimPlugin{host: nil}}
 }
 

@@ -30,7 +30,12 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.VolumePlugin {
+func init() {
+	volume.RegisterFactory(iscsiPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{&iscsiPlugin{nil, exec.New()}}
 }
 

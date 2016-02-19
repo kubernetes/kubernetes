@@ -45,14 +45,14 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins(volume.VolumeConfig{}))
 }
 
 func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, nil)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -105,7 +105,7 @@ func TestLabels(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	rootDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -192,7 +192,7 @@ func TestAnnotations(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -254,7 +254,7 @@ func TestName(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -317,7 +317,7 @@ func TestNamespace(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -373,7 +373,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -459,7 +459,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -565,7 +565,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -641,7 +641,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")

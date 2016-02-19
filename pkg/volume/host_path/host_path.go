@@ -28,17 +28,19 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-// The volumeConfig arg provides the ability to configure volume behavior.  It is implemented as a pointer to allow nils.
-// The hostPathPlugin is used to store the volumeConfig and give it, when needed, to the func that creates HostPath Recyclers.
-// Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
-func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
+func init() {
+	volume.RegisterFactory(HostPathPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&hostPathPlugin{
 			host:               nil,
 			newRecyclerFunc:    newRecycler,
 			newDeleterFunc:     newDeleter,
 			newProvisionerFunc: newProvisioner,
-			config:             volumeConfig,
+			config:             config,
 		},
 	}
 }
@@ -70,7 +72,7 @@ var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
 var _ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
 
 const (
-	hostPathPluginName = "kubernetes.io/host-path"
+	HostPathPluginName = "kubernetes.io/host-path"
 )
 
 func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
@@ -79,7 +81,7 @@ func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (plugin *hostPathPlugin) Name() string {
-	return hostPathPluginName
+	return HostPathPluginName
 }
 
 func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
