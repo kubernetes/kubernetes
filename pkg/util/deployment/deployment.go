@@ -179,7 +179,7 @@ func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 
 // Returns the number of available pods corresponding to the given replica sets.
 func GetAvailablePodsForReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) (int, error) {
-	allPods, err := getPodsForReplicaSets(c, rss)
+	allPods, err := GetPodsForReplicaSets(c, rss)
 	if err != nil {
 		return 0, err
 	}
@@ -189,28 +189,35 @@ func GetAvailablePodsForReplicaSets(c clientset.Interface, rss []*extensions.Rep
 func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 	readyPodCount := 0
 	for _, pod := range pods {
-		if api.IsPodReady(&pod) {
-			// Check if we've passed minReadySeconds since LastTransitionTime
-			// If so, this pod is ready
-			for _, c := range pod.Status.Conditions {
-				// we only care about pod ready conditions
-				if c.Type == api.PodReady {
-					// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is ready):
-					// 1. minReadySeconds <= 0
-					// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
-					minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-					if minReadySeconds <= 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
-						readyPodCount++
-						break
-					}
-				}
-			}
+		if IsPodAvailable(&pod, minReadySeconds) {
+			readyPodCount++
 		}
 	}
 	return readyPodCount
 }
 
-func getPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.ReplicaSet) ([]api.Pod, error) {
+func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
+	if !api.IsPodReady(pod) {
+		return false
+	}
+	// Check if we've passed minReadySeconds since LastTransitionTime
+	// If so, this pod is ready
+	for _, c := range pod.Status.Conditions {
+		// we only care about pod ready conditions
+		if c.Type == api.PodReady {
+			// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is ready):
+			// 1. minReadySeconds <= 0
+			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
+			minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+			if minReadySeconds <= 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func GetPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.ReplicaSet) ([]api.Pod, error) {
 	allPods := []api.Pod{}
 	for _, rs := range replicaSets {
 		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)

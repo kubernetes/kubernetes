@@ -2128,6 +2128,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		}
 		if totalAvailable < minAvailable {
 			logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
@@ -2168,6 +2169,19 @@ func logReplicaSetsOfDeployment(deploymentName string, oldRSs []*extensions.Repl
 		Logf("Old ReplicaSets (%d/%d) of deployment %s: %+v", i+1, len(oldRSs), deploymentName, oldRSs[i])
 	}
 	Logf("New ReplicaSet of deployment %s: %+v", deploymentName, newRS)
+}
+
+func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) {
+	allPods, err := deploymentutil.GetPodsForReplicaSets(c, rss)
+	if err == nil {
+		for _, pod := range allPods {
+			availability := "not available"
+			if deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
+				availability = "available"
+			}
+			Logf("Pod %s is %s: %+v", pod.Name, availability, pod)
+		}
+	}
 }
 
 // Waits for the number of events on the given object to reach a desired count.
