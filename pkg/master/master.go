@@ -350,6 +350,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"), storageDecorator)
 
+	serviceRest := service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport)
+
+	// TODO: Factor out the core API registration
 	m.v1ResourcesStorage = map[string]rest.Storage{
 		"pods":             podStorage.Pod,
 		"pods/attach":      podStorage.Attach,
@@ -365,13 +368,18 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 		"replicationControllers":        controllerStorage,
 		"replicationControllers/status": controllerStatusStorage,
-		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
-		"services/status":               serviceStatusStorage,
-		"endpoints":                     endpointsStorage,
-		"nodes":                         nodeStorage.Node,
-		"nodes/status":                  nodeStorage.Status,
-		"nodes/proxy":                   nodeStorage.Proxy,
-		"events":                        eventStorage,
+
+		"services":        serviceRest.Service,
+		"services/proxy":  serviceRest.Proxy,
+		"services/status": serviceStatusStorage,
+
+		"endpoints": endpointsStorage,
+
+		"nodes":        nodeStorage.Node,
+		"nodes/status": nodeStorage.Status,
+		"nodes/proxy":  nodeStorage.Proxy,
+
+		"events": eventStorage,
 
 		"limitRanges":                   limitRangeStorage,
 		"resourceQuotas":                resourceQuotaStorage,

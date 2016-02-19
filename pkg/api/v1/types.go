@@ -2439,6 +2439,18 @@ type NodeProxyOptions struct {
 	Path string `json:"path,omitempty"`
 }
 
+// ServiceProxyOptions is the query options to a Service's proxy call.
+type ServiceProxyOptions struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// Path is the part of URLs that include service endpoints, suffixes,
+	// and parameters to use for the current proxy request to service.
+	// For example, the whole request URL is
+	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
+	// Path is _search?q=user:kimchy.
+	Path string `json:"path,omitempty"`
+}
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	// Kind of the referent.

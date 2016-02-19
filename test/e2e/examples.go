@@ -432,10 +432,11 @@ func makeHttpRequestToService(c *client.Client, ns, service, path string, timeou
 	var result []byte
 	var err error
 	for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
-		result, err = c.Get().
-			Prefix("proxy").
-			Namespace(ns).
-			Resource("services").
+		proxyRequest, errProxy := getServicesProxyRequest(c, c.Get())
+		if errProxy != nil {
+			break
+		}
+		result, err = proxyRequest.Namespace(ns).
 			Name(service).
 			Suffix(path).
 			Do().

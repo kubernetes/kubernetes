@@ -108,9 +108,9 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 // ProxyGet returns a response of the service by calling it through the proxy.
 func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) ResponseWrapper {
 	request := c.r.Get().
-		Prefix("proxy").
 		Namespace(c.ns).
 		Resource("services").
+		SubResource("proxy").
 		Name(net.JoinSchemeNamePort(scheme, name, port)).
 		Suffix(path)
 	for k, v := range params {

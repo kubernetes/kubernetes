@@ -3023,6 +3023,18 @@ func Convert_api_ServicePort_To_v1_ServicePort(in *api.ServicePort, out *Service
 	return autoConvert_api_ServicePort_To_v1_ServicePort(in, out, s)
 }
 
+func autoConvert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *api.ServiceProxyOptions, out *ServiceProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ServiceProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *api.ServiceProxyOptions, out *ServiceProxyOptions, s conversion.Scope) error {
+	return autoConvert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in, out, s)
+}
+
 func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceSpec))(in)
@@ -6196,6 +6208,18 @@ func Convert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Service
 	return autoConvert_v1_ServicePort_To_api_ServicePort(in, out, s)
 }
 
+func autoConvert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions(in *ServiceProxyOptions, out *api.ServiceProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions(in *ServiceProxyOptions, out *api.ServiceProxyOptions, s conversion.Scope) error {
+	return autoConvert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions(in, out, s)
+}
+
 func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceSpec))(in)
@@ -6597,6 +6621,7 @@ func init() {
 		autoConvert_api_ServiceAccount_To_v1_ServiceAccount,
 		autoConvert_api_ServiceList_To_v1_ServiceList,
 		autoConvert_api_ServicePort_To_v1_ServicePort,
+		autoConvert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions,
 		autoConvert_api_ServiceSpec_To_v1_ServiceSpec,
 		autoConvert_api_ServiceStatus_To_v1_ServiceStatus,
 		autoConvert_api_Service_To_v1_Service,
@@ -6728,6 +6753,7 @@ func init() {
 		autoConvert_v1_ServiceAccount_To_api_ServiceAccount,
 		autoConvert_v1_ServiceList_To_api_ServiceList,
 		autoConvert_v1_ServicePort_To_api_ServicePort,
+		autoConvert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions,
 		autoConvert_v1_ServiceSpec_To_api_ServiceSpec,
 		autoConvert_v1_ServiceStatus_To_api_ServiceStatus,
 		autoConvert_v1_Service_To_api_Service,

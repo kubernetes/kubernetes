@@ -2358,6 +2358,14 @@ func deepCopy_v1_ServicePort(in ServicePort, out *ServicePort, c *conversion.Clo
 	return nil
 }
 
+func deepCopy_v1_ServiceProxyOptions(in ServiceProxyOptions, out *ServiceProxyOptions, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
+	return nil
+}
+
 func deepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cloner) error {
 	if in.Ports != nil {
 		out.Ports = make([]ServicePort, len(in.Ports))
@@ -2742,6 +2750,7 @@ func init() {
 		deepCopy_v1_ServiceAccountList,
 		deepCopy_v1_ServiceList,
 		deepCopy_v1_ServicePort,
+		deepCopy_v1_ServiceProxyOptions,
 		deepCopy_v1_ServiceSpec,
 		deepCopy_v1_ServiceStatus,
 		deepCopy_v1_TCPSocketAction,

@@ -218,7 +218,7 @@ func TestServiceProxyGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("proxy", "services", ns, "service-1") + "/foo",
+			Path:   testapi.Default.ResourcePath("services", ns, "service-1") + "/proxy/foo",
 			Query:  simple.BuildQueryValues(url.Values{"param-name": []string{"param-value"}}),
 		},
 		Response: simple.Response{StatusCode: 200, RawBody: &body},
@@ -231,7 +231,7 @@ func TestServiceProxyGet(t *testing.T) {
 	c = &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("proxy", "services", ns, "https:service-1:my-port") + "/foo",
+			Path:   testapi.Default.ResourcePath("services", ns, "https:service-1:my-port") + "/proxy/foo",
 			Query:  simple.BuildQueryValues(url.Values{"param-name": []string{"param-value"}}),
 		},
 		Response: simple.Response{StatusCode: 200, RawBody: &body},
