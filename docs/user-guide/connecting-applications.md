@@ -425,6 +425,18 @@ $ curl https://162.22.184.144 -k
 The IP address in the `EXTERNAL_IP` column is the one that is available on the public internet.  The `CLUSTER_IP` is only available inside your
 cluster/private cloud network.
 
+Note that on AWS, type `LoadBalancer` creates an ELB, which uses a (long)
+hostname, not an IP.  It's too long to fit in the standard `kubectl get svc`
+output, in fact, so you'll need to do `kubectl describe service nginxsvc` to
+see it.  You'll see something like this:
+
+```
+> kubectl describe service nginxsvc
+...
+LoadBalancer Ingress:   a320587ffd19711e5a37606cf4a74574-1142138393.us-east-1.elb.amazonaws.com
+...
+```
+
 ## What's next?
 
 [Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.md)

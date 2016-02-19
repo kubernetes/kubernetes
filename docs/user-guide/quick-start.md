@@ -92,6 +92,11 @@ You may need to wait for a minute or two for the external ip address to be provi
 
 In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a [firewall to allow traffic on port 80](services-firewalls.md).
 
+If you're running on AWS, Kubernetes creates an ELB for you.  ELBs use host
+names, not IPs, so you will have to do `kubectl describe svc my-nginx` and look
+for the `LoadBalancer Ingress` host name.  Traffic from external IPs is allowed
+automatically.
+
 ## Killing the application
 
 To kill the application and delete its containers and public IP address, do:
