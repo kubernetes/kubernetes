@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,31 +28,31 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// SecretGeneratorV1 supports stable generation of an opaque secret
-type SecretGeneratorV1 struct {
-	// Name of secret (required)
+// ConfigMapGeneratorV1 supports stable generation of a configMap.
+type ConfigMapGeneratorV1 struct {
+	// Name of configMap (required)
 	Name string
-	// Type of secret (optional)
+	// Type of configMap (optional)
 	Type string
-	// FileSources to derive the secret from (optional)
+	// FileSources to derive the configMap from (optional)
 	FileSources []string
-	// LiteralSources to derive the secret from (optional)
+	// LiteralSources to derive the configMap from (optional)
 	LiteralSources []string
 }
 
-// Ensure it supports the generator pattern that uses parameter injection
-var _ Generator = &SecretGeneratorV1{}
+// Ensure it supports the generator pattern that uses parameter injection.
+var _ Generator = &ConfigMapGeneratorV1{}
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
-var _ StructuredGenerator = &SecretGeneratorV1{}
+// Ensure it supports the generator pattern that uses parameters specified during construction.
+var _ StructuredGenerator = &ConfigMapGeneratorV1{}
 
-// Generate returns a secret using the specified parameters
-func (s SecretGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+// Generate returns a configMap using the specified parameters.
+func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), genericParams)
 	if err != nil {
 		return nil, err
 	}
-	delegate := &SecretGeneratorV1{}
+	delegate := &ConfigMapGeneratorV1{}
 	fromFileStrings, found := genericParams["from-file"]
 	if found {
 		fromFileArray, isArray := fromFileStrings.([]string)
@@ -84,8 +84,8 @@ func (s SecretGeneratorV1) Generate(genericParams map[string]interface{}) (runti
 	return delegate.StructuredGenerate()
 }
 
-// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
-func (s SecretGeneratorV1) ParamNames() []GeneratorParam {
+// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
+func (s ConfigMapGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"type", false},
@@ -95,46 +95,44 @@ func (s SecretGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-// StructuredGenerate outputs a secret object using the configured fields
-func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
+// StructuredGenerate outputs a configMap object using the configured fields.
+func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	secret := &api.Secret{}
-	secret.Name = s.Name
-	secret.Data = map[string][]byte{}
-	if len(s.Type) > 0 {
-		secret.Type = api.SecretType(s.Type)
-	}
+	configMap := &api.ConfigMap{}
+	configMap.Name = s.Name
+	configMap.Data = map[string]string{}
 	if len(s.FileSources) > 0 {
-		if err := handleFromFileSources(secret, s.FileSources); err != nil {
+		if err := handleConfigMapFromFileSources(configMap, s.FileSources); err != nil {
 			return nil, err
 		}
 	}
 	if len(s.LiteralSources) > 0 {
-		if err := handleFromLiteralSources(secret, s.LiteralSources); err != nil {
+		if err := handleConfigMapFromLiteralSources(configMap, s.LiteralSources); err != nil {
 			return nil, err
 		}
 	}
-	return secret, nil
+	return configMap, nil
 }
 
-// validate validates required fields are set to support structured generation
-func (s SecretGeneratorV1) validate() error {
+// validate validates required fields are set to support structured generation.
+func (s ConfigMapGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
 	return nil
 }
 
-// handleFromLiteralSources adds the specified literal source information into the provided secret
-func handleFromLiteralSources(secret *api.Secret, literalSources []string) error {
+// handleConfigMapFromLiteralSources adds the specified literal source
+// information into the provided configMap.
+func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources []string) error {
 	for _, literalSource := range literalSources {
 		keyName, value, err := parseLiteralSource(literalSource)
 		if err != nil {
 			return err
 		}
-		err = addKeyFromLiteralToSecret(secret, keyName, []byte(value))
+		err = addKeyFromLiteralToConfigMap(configMap, keyName, value)
 		if err != nil {
 			return err
 		}
@@ -142,8 +140,9 @@ func handleFromLiteralSources(secret *api.Secret, literalSources []string) error
 	return nil
 }
 
-// handleFromFileSources adds the specified file source information into the provided secret
-func handleFromFileSources(secret *api.Secret, fileSources []string) error {
+// handleConfigMapFromFileSources adds the specified file source information
+// into the provided configMap
+func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []string) error {
 	for _, fileSource := range fileSources {
 		keyName, filePath, err := parseFileSource(fileSource)
 		if err != nil {
@@ -170,14 +169,14 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 				itemPath := path.Join(filePath, item.Name())
 				if item.Mode().IsRegular() {
 					keyName = item.Name()
-					err = addKeyFromFileToSecret(secret, keyName, itemPath)
+					err = addKeyFromFileToConfigMap(configMap, keyName, itemPath)
 					if err != nil {
 						return err
 					}
 				}
 			}
 		} else {
-			err = addKeyFromFileToSecret(secret, keyName, filePath)
+			err = addKeyFromFileToConfigMap(configMap, keyName, filePath)
 			if err != nil {
 				return err
 			}
@@ -187,21 +186,27 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 	return nil
 }
 
-func addKeyFromFileToSecret(secret *api.Secret, keyName, filePath string) error {
+// addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
+// the value with the content of the given file path, or returns an error.
+func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath string) error {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
-	return addKeyFromLiteralToSecret(secret, keyName, data)
+	return addKeyFromLiteralToConfigMap(configMap, keyName, string(data))
 }
 
-func addKeyFromLiteralToSecret(secret *api.Secret, keyName string, data []byte) error {
+// addKeyFromLiteralToConfigMap adds the given key and data to the given config map,
+// returning an error if the key is not valid or if the key already exists.
+func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string) error {
+	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys
+	// to be consistent; validation.IsSecretKey is used here intentionally.
 	if !validation.IsSecretKey(keyName) {
-		return fmt.Errorf("%v is not a valid key name for a secret", keyName)
+		return fmt.Errorf("%v is not a valid key name for a configMap", keyName)
 	}
-	if _, entryExists := secret.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, secret.Data)
+	if _, entryExists := configMap.Data[keyName]; entryExists {
+		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)
 	}
-	secret.Data[keyName] = data
+	configMap.Data[keyName] = data
 	return nil
 }
