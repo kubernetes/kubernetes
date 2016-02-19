@@ -2956,3 +2956,57 @@ func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
 		return true, nil
 	})
 }
+
+// The following helper functions can block/unblock network from source
+// host to destination host by manipulating iptable rules.
+// This function assumes it can ssh to the source host.
+//
+// Caution:
+// Recommend to input IP instead of hostnames. Using hostnames will cause iptables to
+// do a DNS lookup to resolve the name to an IP address, which will
+// slow down the test and cause it to fail if DNS is absent or broken.
+//
+// Suggested usage pattern:
+// func foo() {
+//	...
+//	defer unblockNetwork(from, to)
+//	blockNetwork(from, to)
+//	...
+// }
+//
+func blockNetwork(from string, to string) {
+	Logf("block network traffic from %s to %s", from, to)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
+	if result, err := SSH(dropCmd, from, testContext.Provider); result.Code != 0 || err != nil {
+		LogSSHResult(result)
+		Failf("Unexpected error: %v", err)
+	}
+}
+
+func unblockNetwork(from string, to string) {
+	Logf("Unblock network traffic from %s to %s", from, to)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
+	// Undrop command may fail if the rule has never been created.
+	// In such case we just lose 30 seconds, but the cluster is healthy.
+	// But if the rule had been created and removing it failed, the node is broken and
+	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
+	// may fail). Manual intervention is required in such case (recreating the
+	// cluster solves the problem too).
+	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
+		result, err := SSH(undropCmd, from, testContext.Provider)
+		if result.Code == 0 && err == nil {
+			return true, nil
+		}
+		LogSSHResult(result)
+		if err != nil {
+			Logf("Unexpected error: %v", err)
+		}
+		return false, nil
+	})
+	if err != nil {
+		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
+			"required on host %s: remove rule %s, if exists", from, iptablesRule)
+	}
+}
