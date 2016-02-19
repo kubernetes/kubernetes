@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -46,8 +47,8 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 		return &ReplicationControllerScaler{c}, nil
 	case extensions.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
-	case extensions.Kind("Job"):
-		return &JobScaler{c.Extensions()}, nil
+	case extensions.Kind("Job"), batch.Kind("Job"):
+		return &JobScaler{c.Extensions()}, nil // Either kind of job can be scaled with Extensions interface.
 	case extensions.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}

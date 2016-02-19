@@ -242,6 +242,7 @@ runTests() {
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.cpuUtilization.targetPercentage"
+  job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
   secret_type=".type"
@@ -723,6 +724,8 @@ __EOF__
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
+  # Post-condition: no pods exist.
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1047,7 +1050,10 @@ __EOF__
 
   ### Scale a job
   kubectl create -f docs/user-guide/job.yaml "${kube_flags[@]}"
-  # Job scale support removed.
+  # Command
+  kubectl scale --replicas=2 job/pi
+  # Post-condition: 2 replicas for pi
+  kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
   # Clean-up
   kubectl delete job/pi "${kube_flags[@]}"
 
