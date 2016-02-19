@@ -102,21 +102,6 @@ fi
 # Kubernetes.
 case ${JOB_NAME} in
 
-  # PR builder
-
-  # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
-  kubernetes-pull-build-test-e2e-gce)
-    # XXX Not a unique project
-    export E2E_NAME="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"
-    export GINKGO_PARALLEL="y"
-    # This list should match the list in kubernetes-e2e-gce.
-    export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
-    export FAIL_ON_GCP_RESOURCE_LEAK="false"
-    export PROJECT="kubernetes-jenkins-pull"
-    # Override GCE defaults
-    export NUM_NODES="6"
-    ;;
-
   # Upgrade jobs
 
   # kubernetes-upgrade-gke-1.0-master
