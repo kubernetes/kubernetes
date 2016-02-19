@@ -823,6 +823,34 @@ __EOF__
   # Clean up
   kubectl delete namespace test-secrets
 
+  ######################
+  # ConfigMap          #
+  ######################
+
+  kubectl create -f docs/user-guide/configmap/config-map.yaml
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
+  kubectl delete configmap test-configmap "${kube_flags[@]}"
+
+  ### Create a new namespace
+  # Pre-condition: the test-configmaps namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-configmaps\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-configmaps
+  # Post-condition: namespace 'test-configmaps' is created.
+  kube::test::get_object_assert 'namespaces/test-configmaps' "{{$id_field}}" 'test-configmaps'
+
+  ### Create a generic configmap in a specific namespace
+  # Pre-condition: no configmaps namespace exists
+  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
+  # Post-condition: configmap exists and has expected values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value1')" ]]
+  # Clean-up
+  kubectl delete configmap test-configmap --namespace=test-configmaps
+  kubectl delete namespace test-configmaps
+  
   #################
   # Pod templates #
   #################
@@ -1270,14 +1298,6 @@ __EOF__
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
 
-
-  ######################
-  # ConfigMap          #
-  ######################
-
-  kubectl create -f docs/user-guide/configmap/config-map.yaml
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
-  kubectl delete configmap test-configmap "${kube_flags[@]}"
 
   ######################
   # Multiple Resources #

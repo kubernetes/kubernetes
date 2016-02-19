@@ -18,6 +18,9 @@ limitations under the License.
 package kubectl
 
 import (
+	"errors"
+	"fmt"
+	"path"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -119,4 +122,37 @@ func expandResourceShortcut(resource unversioned.GroupVersionResource) unversion
 		return expanded
 	}
 	return resource
+}
+
+// parseFileSource parses the source given. Acceptable formats include:
+//
+// 1.  source-path: the basename will become the key name
+// 2.  source-name=source-path: the source-name will become the key name and source-path is the path to the key file
+//
+// Key names cannot include '='.
+func parseFileSource(source string) (keyName, filePath string, err error) {
+	numSeparators := strings.Count(source, "=")
+	switch {
+	case numSeparators == 0:
+		return path.Base(source), source, nil
+	case numSeparators == 1 && strings.HasPrefix(source, "="):
+		return "", "", fmt.Errorf("key name for file path %v missing.", strings.TrimPrefix(source, "="))
+	case numSeparators == 1 && strings.HasSuffix(source, "="):
+		return "", "", fmt.Errorf("file path for key name %v missing.", strings.TrimSuffix(source, "="))
+	case numSeparators > 1:
+		return "", "", errors.New("Key names or file paths cannot contain '='.")
+	default:
+		components := strings.Split(source, "=")
+		return components[0], components[1], nil
+	}
+}
+
+// parseLiteralSource parses the source key=val pair
+func parseLiteralSource(source string) (keyName, value string, err error) {
+	items := strings.Split(source, "=")
+	if len(items) != 2 {
+		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
+	}
+
+	return items[0], items[1], nil
 }
