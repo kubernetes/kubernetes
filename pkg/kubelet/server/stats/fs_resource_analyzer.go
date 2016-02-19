@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
@@ -36,7 +37,7 @@ type Cache map[types.UID]*PodVolumeStats
 
 // PodVolumeStats encapsulates all VolumeStats for a pod
 type PodVolumeStats struct {
-	Volumes []VolumeStats
+	Volumes []stats.VolumeStats
 }
 
 // fsResourceAnalyzerInterface is for embedding fs functions into ResourceAnalyzer
@@ -107,7 +108,7 @@ func (s *fsResourceAnalyzer) getPodVolumeStats(pod *api.Pod) (PodVolumeStats, bo
 	}
 
 	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
-	stats := make([]VolumeStats, 0, len(volumes))
+	stats := make([]stats.VolumeStats, 0, len(volumes))
 	for name, v := range volumes {
 		metric, err := v.GetMetrics()
 		if err != nil {
@@ -123,13 +124,13 @@ func (s *fsResourceAnalyzer) getPodVolumeStats(pod *api.Pod) (PodVolumeStats, bo
 	return PodVolumeStats{Volumes: stats}, true
 }
 
-func (s *fsResourceAnalyzer) parsePodVolumeStats(podName string, metric *volume.Metrics) VolumeStats {
+func (s *fsResourceAnalyzer) parsePodVolumeStats(podName string, metric *volume.Metrics) stats.VolumeStats {
 	available := uint64(metric.Available.Value())
 	capacity := uint64(metric.Capacity.Value())
 	used := uint64((metric.Used.Value()))
-	return VolumeStats{
+	return stats.VolumeStats{
 		Name: podName,
-		FsStats: FsStats{
+		FsStats: stats.FsStats{
 			AvailableBytes: &available,
 			CapacityBytes:  &capacity,
 			UsedBytes:      &used}}

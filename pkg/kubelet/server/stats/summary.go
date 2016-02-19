@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
@@ -35,7 +36,7 @@ import (
 
 type SummaryProvider interface {
 	// Get provides a new Summary using the latest results from cadvisor
-	Get() (*Summary, error)
+	Get() (*stats.Summary, error)
 }
 
 type summaryProviderImpl struct {
@@ -54,7 +55,7 @@ func NewSummaryProvider(statsProvider StatsProvider, resourceAnalyzer ResourceAn
 
 // Get implements the SummaryProvider interface
 // Query cadvisor for the latest resource metrics and build into a summary
-func (sp *summaryProviderImpl) Get() (*Summary, error) {
+func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 	options := cadvisorapiv2.RequestOptions{
 		IdType:    cadvisorapiv2.TypeName,
 		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
@@ -95,19 +96,19 @@ type summaryBuilder struct {
 }
 
 // build returns a Summary from aggregating the input data
-func (sb *summaryBuilder) build() (*Summary, error) {
+func (sb *summaryBuilder) build() (*stats.Summary, error) {
 	rootInfo, found := sb.infos["/"]
 	if !found {
 		return nil, fmt.Errorf("Missing stats for root container")
 	}
 
 	rootStats := sb.containerInfoV2ToStats("", &rootInfo)
-	nodeStats := NodeStats{
+	nodeStats := stats.NodeStats{
 		NodeName: sb.node.Name,
 		CPU:      rootStats.CPU,
 		Memory:   rootStats.Memory,
 		Network:  sb.containerInfoV2ToNetworkStats(&rootInfo),
-		Fs: &FsStats{
+		Fs: &stats.FsStats{
 			AvailableBytes: &sb.rootFsInfo.Available,
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
 			UsedBytes:      &sb.rootFsInfo.Usage},
@@ -115,9 +116,9 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 	}
 
 	systemContainers := map[string]string{
-		SystemContainerKubelet: sb.nodeConfig.KubeletCgroupsName,
-		SystemContainerRuntime: sb.nodeConfig.RuntimeCgroupsName,
-		SystemContainerMisc:    sb.nodeConfig.SystemCgroupsName,
+		stats.SystemContainerKubelet: sb.nodeConfig.KubeletCgroupsName,
+		stats.SystemContainerRuntime: sb.nodeConfig.RuntimeCgroupsName,
+		stats.SystemContainerMisc:    sb.nodeConfig.SystemCgroupsName,
 	}
 	for sys, name := range systemContainers {
 		if info, ok := sb.infos[name]; ok {
@@ -125,7 +126,7 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 		}
 	}
 
-	summary := Summary{
+	summary := stats.Summary{
 		Node: nodeStats,
 		Pods: sb.buildSummaryPods(),
 	}
@@ -135,16 +136,16 @@ func (sb *summaryBuilder) build() (*Summary, error) {
 // containerInfoV2FsStats populates the container fs stats
 func (sb *summaryBuilder) containerInfoV2FsStats(
 	info *cadvisorapiv2.ContainerInfo,
-	cs *ContainerStats) {
+	cs *stats.ContainerStats) {
 
 	// The container logs live on the node rootfs device
-	cs.Logs = &FsStats{
+	cs.Logs = &stats.FsStats{
 		AvailableBytes: &sb.rootFsInfo.Available,
 		CapacityBytes:  &sb.rootFsInfo.Capacity,
 	}
 
 	// The container rootFs lives on the imageFs devices (which may not be the node root fs)
-	cs.Rootfs = &FsStats{
+	cs.Rootfs = &stats.FsStats{
 		AvailableBytes: &sb.imageFsInfo.Available,
 		CapacityBytes:  &sb.imageFsInfo.Capacity,
 	}
@@ -179,9 +180,9 @@ func (sb *summaryBuilder) latestContainerStats(info *cadvisorapiv2.ContainerInfo
 
 // buildSummaryPods aggregates and returns the container stats in cinfos by the Pod managing the container.
 // Containers not managed by a Pod are omitted.
-func (sb *summaryBuilder) buildSummaryPods() []PodStats {
+func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 	// Map each container to a pod and update the PodStats with container data
-	podToStats := map[PodReference]*PodStats{}
+	podToStats := map[stats.PodReference]*stats.PodStats{}
 	for _, cinfo := range sb.infos {
 		// Build the Pod key if this container is managed by a Pod
 		if !sb.isPodManagedContainer(&cinfo) {
@@ -190,42 +191,42 @@ func (sb *summaryBuilder) buildSummaryPods() []PodStats {
 		ref := sb.buildPodRef(&cinfo)
 
 		// Lookup the PodStats for the pod using the PodRef.  If none exists, initialize a new entry.
-		stats, found := podToStats[ref]
+		podStats, found := podToStats[ref]
 		if !found {
-			stats = &PodStats{PodRef: ref}
-			podToStats[ref] = stats
+			podStats = &stats.PodStats{PodRef: ref}
+			podToStats[ref] = podStats
 		}
 
 		// Update the PodStats entry with the stats from the container by adding it to stats.Containers
 		containerName := dockertools.GetContainerName(cinfo.Spec.Labels)
 		if containerName == leaky.PodInfraContainerName {
 			// Special case for infrastructure container which is hidden from the user and has network stats
-			stats.Network = sb.containerInfoV2ToNetworkStats(&cinfo)
-			stats.StartTime = unversioned.NewTime(cinfo.Spec.CreationTime)
+			podStats.Network = sb.containerInfoV2ToNetworkStats(&cinfo)
+			podStats.StartTime = unversioned.NewTime(cinfo.Spec.CreationTime)
 		} else {
-			stats.Containers = append(stats.Containers, sb.containerInfoV2ToStats(containerName, &cinfo))
+			podStats.Containers = append(podStats.Containers, sb.containerInfoV2ToStats(containerName, &cinfo))
 		}
 	}
 
 	// Add each PodStats to the result
-	result := make([]PodStats, 0, len(podToStats))
-	for _, stats := range podToStats {
+	result := make([]stats.PodStats, 0, len(podToStats))
+	for _, podStats := range podToStats {
 		// Lookup the volume stats for each pod
-		podUID := types.UID(stats.PodRef.UID)
+		podUID := types.UID(podStats.PodRef.UID)
 		if vstats, found := sb.resourceAnalyzer.GetPodVolumeStats(podUID); found {
-			stats.VolumeStats = vstats.Volumes
+			podStats.VolumeStats = vstats.Volumes
 		}
-		result = append(result, *stats)
+		result = append(result, *podStats)
 	}
 	return result
 }
 
 // buildPodRef returns a PodReference that identifies the Pod managing cinfo
-func (sb *summaryBuilder) buildPodRef(cinfo *cadvisorapiv2.ContainerInfo) PodReference {
+func (sb *summaryBuilder) buildPodRef(cinfo *cadvisorapiv2.ContainerInfo) stats.PodReference {
 	podName := dockertools.GetPodName(cinfo.Spec.Labels)
 	podNamespace := dockertools.GetPodNamespace(cinfo.Spec.Labels)
 	podUID := dockertools.GetPodUID(cinfo.Spec.Labels)
-	return PodReference{Name: podName, Namespace: podNamespace, UID: podUID}
+	return stats.PodReference{Name: podName, Namespace: podNamespace, UID: podUID}
 }
 
 // isPodManagedContainer returns true if the cinfo container is managed by a Pod
@@ -243,17 +244,17 @@ func (sb *summaryBuilder) isPodManagedContainer(cinfo *cadvisorapiv2.ContainerIn
 
 func (sb *summaryBuilder) containerInfoV2ToStats(
 	name string,
-	info *cadvisorapiv2.ContainerInfo) ContainerStats {
-	stats := ContainerStats{
+	info *cadvisorapiv2.ContainerInfo) stats.ContainerStats {
+	cStats := stats.ContainerStats{
 		StartTime: unversioned.NewTime(info.Spec.CreationTime),
 		Name:      name,
 	}
 	cstat, found := sb.latestContainerStats(info)
 	if !found {
-		return stats
+		return cStats
 	}
 	if info.Spec.HasCpu {
-		cpuStats := CPUStats{
+		cpuStats := stats.CPUStats{
 			Time: unversioned.NewTime(cstat.Timestamp),
 		}
 		if cstat.CpuInst != nil {
@@ -262,12 +263,12 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 		if cstat.Cpu != nil {
 			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
 		}
-		stats.CPU = &cpuStats
+		cStats.CPU = &cpuStats
 	}
 	if info.Spec.HasMemory {
 		pageFaults := cstat.Memory.ContainerData.Pgfault
 		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
-		stats.Memory = &MemoryStats{
+		cStats.Memory = &stats.MemoryStats{
 			Time:            unversioned.NewTime(cstat.Timestamp),
 			UsageBytes:      &cstat.Memory.Usage,
 			WorkingSetBytes: &cstat.Memory.WorkingSet,
@@ -275,12 +276,12 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 			MajorPageFaults: &majorPageFaults,
 		}
 	}
-	sb.containerInfoV2FsStats(info, &stats)
-	stats.UserDefinedMetrics = sb.containerInfoV2ToUserDefinedMetrics(info)
-	return stats
+	sb.containerInfoV2FsStats(info, &cStats)
+	cStats.UserDefinedMetrics = sb.containerInfoV2ToUserDefinedMetrics(info)
+	return cStats
 }
 
-func (sb *summaryBuilder) containerInfoV2ToNetworkStats(info *cadvisorapiv2.ContainerInfo) *NetworkStats {
+func (sb *summaryBuilder) containerInfoV2ToNetworkStats(info *cadvisorapiv2.ContainerInfo) *stats.NetworkStats {
 	if !info.Spec.HasNetwork {
 		return nil
 	}
@@ -301,7 +302,7 @@ func (sb *summaryBuilder) containerInfoV2ToNetworkStats(info *cadvisorapiv2.Cont
 		txBytes += inter.TxBytes
 		txErrors += inter.TxErrors
 	}
-	return &NetworkStats{
+	return &stats.NetworkStats{
 		Time:     unversioned.NewTime(cstat.Timestamp),
 		RxBytes:  &rxBytes,
 		RxErrors: &rxErrors,
@@ -310,9 +311,9 @@ func (sb *summaryBuilder) containerInfoV2ToNetworkStats(info *cadvisorapiv2.Cont
 	}
 }
 
-func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []UserDefinedMetric {
+func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []stats.UserDefinedMetric {
 	type specVal struct {
-		ref     UserDefinedMetricDescriptor
+		ref     stats.UserDefinedMetricDescriptor
 		valType cadvisorapiv1.DataType
 		time    time.Time
 		value   float64
@@ -320,9 +321,9 @@ func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv
 	udmMap := map[string]*specVal{}
 	for _, spec := range info.Spec.CustomMetrics {
 		udmMap[spec.Name] = &specVal{
-			ref: UserDefinedMetricDescriptor{
+			ref: stats.UserDefinedMetricDescriptor{
 				Name:  spec.Name,
-				Type:  UserDefinedMetricType(spec.Type),
+				Type:  stats.UserDefinedMetricType(spec.Type),
 				Units: spec.Units,
 			},
 			valType: spec.Format,
@@ -348,9 +349,9 @@ func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv
 			}
 		}
 	}
-	var udm []UserDefinedMetric
+	var udm []stats.UserDefinedMetric
 	for _, specVal := range udmMap {
-		udm = append(udm, UserDefinedMetric{
+		udm = append(udm, stats.UserDefinedMetric{
 			UserDefinedMetricDescriptor: specVal.ref,
 			Time:  unversioned.NewTime(specVal.time),
 			Value: specVal.value,
