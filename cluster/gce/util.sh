@@ -752,7 +752,7 @@ function check-cluster() {
             echo "Preserving master logs in ${savedir}"
             local logdir=/var/log
             local basename
-            for basename in startupscript kube-apiserver; do
+            for basename in startupscript docker kubelet kube-apiserver; do
               # TODO(mml): Perhaps revisit how we name logs for preservation and
               # centralize an implementation.  Options include putting basename
               # before hostname and including a timestamp.
