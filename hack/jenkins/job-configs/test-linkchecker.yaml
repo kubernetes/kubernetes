@@ -6,7 +6,9 @@
     logrotate:
         numToKeep: 200
     builders:
-        - shell: './hack/verify-linkcheck.sh'
+        - shell: |
+            export PATH=${PATH}:/usr/local/go/bin
+            ./hack/verify-linkcheck.sh
     publishers:
         - claim-build
         - gcs-uploader
