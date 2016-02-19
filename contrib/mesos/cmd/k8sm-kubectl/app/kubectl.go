@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"errors"
 	"net/http"
 	"os"
 
@@ -54,13 +53,9 @@ func (w *wrappedClientConfig) RawConfig() (clientcmdapi.Config, error) {
 
 // ClientConfig returns a complete client config
 func (w *wrappedClientConfig) ClientConfig() (*client.Config, error) {
-	if w.dcosToken == "" {
-		return nil, errors.New("missing DCOS_TOKEN in environment")
-	}
-
 	config, err := w.delegate.ClientConfig()
-	if err != nil {
-		return nil, err
+	if w.dcosToken == "" || err != nil {
+		return config, err
 	}
 
 	config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
