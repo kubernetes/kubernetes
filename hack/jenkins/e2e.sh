@@ -153,14 +153,14 @@ case ${JOB_NAME} in
     export GINKGO_PARALLEL="y"
     export PROJECT="k8s-jkns-e2e-gce-slow"
     ;;
-  
+
   # Runs all non-flaky, non-slow tests on GCE, sequentially,
   # and in a multi-zone ("Ubernetes Lite") cluster.
   kubernetes-e2e-gce-ubernetes-lite)
     export PROJECT="k8s-jkns-e2e-gce-ubelite"
-    export E2E_MULTIZONE="true"
+    export MULTIZONE="true"
     export KUBE_GCE_ZONE=""
-    export E2E_ZONES="us-central1-a us-central1-b us-central1-f"}
+    export E2E_ZONES="us-central1-a us-central1-b us-central1-f"
     ;;
 
   # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GCE.
