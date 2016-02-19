@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -75,12 +76,12 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 	}
 }
 
-func PackageForClientset(typedClientBasePath string, groupVersions []unversioned.GroupVersion, boilerplate []byte) generator.Package {
+func PackageForClientset(customArgs clientgenargs.Args, typedClientBasePath string, boilerplate []byte) generator.Package {
 	return &generator.DefaultPackage{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
 		PackageName: "fake",
-		PackagePath: "k8s.io/kubernetes/pkg/client/testing/fake",
+		PackagePath: filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName, "fake"),
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
 			`// This package has the automatically generated fake clientset.
@@ -93,10 +94,11 @@ func PackageForClientset(typedClientBasePath string, groupVersions []unversioned
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "clientset_generated",
 					},
-					groupVersions:   groupVersions,
+					groupVersions:   customArgs.GroupVersions,
 					typedClientPath: typedClientBasePath,
 					outputPackage:   "fake",
 					imports:         generator.NewImportTracker(),
+					clientsetPath:   filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName),
 				},
 			}
 			return generators
