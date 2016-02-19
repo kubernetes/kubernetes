@@ -282,14 +282,6 @@ func deepCopy_v1_Container(in Container, out *Container, c *conversion.Cloner) e
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
-	if in.GPUIndexs != nil {
-		out.GPUIndexs = make([]uint, len(in.GPUIndexs))
-		for i := range in.GPUIndexs {
-			out.GPUIndexs[i] = in.GPUIndexs[i]
-		}
-	} else {
-		out.GPUIndexs = nil
-	}
 	return nil
 }
 

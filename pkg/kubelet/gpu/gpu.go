@@ -39,7 +39,7 @@ func IsGPUAvailable(pods []*api.Pod, gpuCapacity int) bool {
 }
 
 func getGPUResourceRequest(pod *api.Pod) int {
-
+	glog.Infof("Hans: getGPUResourceRequest()")
 	gpuReqNum := 0
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests

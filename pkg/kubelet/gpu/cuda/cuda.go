@@ -7,10 +7,14 @@ import (
 	"github.com/haniceboy/nvidia-docker/tools/src/docker"
 	"github.com/haniceboy/nvidia-docker/tools/src/nvidia"
 	"github.com/haniceboy/nvidia-docker/tools/src/nvml"
+	"k8s.io/kubernetes/pkg/api"
 	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu/types"
+	gpuUtil "k8s.io/kubernetes/pkg/kubelet/gpu/util"
+	"k8s.io/kubernetes/pkg/types"
 	"strings"
 
 	dockerClient "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -52,74 +56,73 @@ func (cuda *Cuda) ReleasePlugin() error {
 	return nvidia.Shutdown()
 }
 
-func (cuda *Cuda) AllocGPU(gpuReqs uint) ([]uint, error) {
-	glog.Infof("Hans: cuda.AllocGPU(): gpuReqs: %d, GPUDevices: %+v", gpuReqs, cuda.gpuInfo.GPUDevices.Devices)
-	totalGPUNum := uint(len(cuda.gpuInfo.GPUDevices.Devices))
-	if gpuReqs > totalGPUNum {
-		return []uint{}, fmt.Errorf("Cannot alloc %d cuda gpu, because there are %d", gpuReqs, totalGPUNum)
-	}
+func (cuda *Cuda) AllocGPU(gpuReqs int, podUID types.UID, container *api.Container) ([]int, error) {
+	glog.Infof("Hans: cuda.AllocGPU(): gpuReqs: %d, container(%s), pod(%s)", gpuReqs, container.Name, string(podUID))
 
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
 
-	// check whether there are enough free gpus
-	freeGPUIdx := []uint{}
-	freedGPUNum := uint(0)
-	for idx, gpuDevice := range cuda.gpuInfo.GPUDevices.Devices {
-		if !gpuDevice.GPUDeviceState.IsOccupied {
-			freedGPUNum++
-			freeGPUIdx = append(freeGPUIdx, uint(idx))
-		}
+	// Check whether it already alloced GPU for the container.
+	// It avoid to re-alloc gpu for a restart container.
+	containerHash := gpuUtil.HashContainerFromData(podUID, container)
+	gpuStatus, found := cuda.gpuInfo.GPUStatus[containerHash]
+	if found {
+		glog.Errorf("Hans: cuda.AllocGPU(): it already alloced gpu for(container(%s), pod(%s))", container.Name, string(podUID))
+		return gpuStatus.GPUIndexes, nil
 	}
 
-	glog.Infof("Hans: cuda.AllocGPU(): freedGPUNum: %d, gpuReqs: %d, freeGPUIdx: %+v", freedGPUNum, gpuReqs, freeGPUIdx)
-	if freedGPUNum >= gpuReqs {
-		glog.Infof("Hans: cuda.AllocGPU(): before alloc: GPUDevices: %+v", cuda.gpuInfo.GPUDevices.Devices)
-		var result = make([]uint, gpuReqs)
-		cc := copy(result, freeGPUIdx[:gpuReqs])
-		if uint(cc) == gpuReqs {
-			for _, idx := range result {
-				cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied = true
-			}
-			glog.Infof("Hans: cuda.AllocGPU(): after alloc: GPUDevices: %+v", cuda.gpuInfo.GPUDevices.Devices)
+	totalGPUNum := len(cuda.gpuInfo.GPUDevices.Devices)
+	if gpuReqs > totalGPUNum {
+		return []int{}, fmt.Errorf("Cannot alloc %d cuda gpu, because there are only %d", gpuReqs, totalGPUNum)
+	}
+
+	availableGPUIdx, err := cuda.getAvailableGPUs()
+	if err != nil {
+		return []int{}, fmt.Errorf("Cannot alloc cuda gpu (%s)", err)
+	}
+
+	availableGPUNum := len(availableGPUIdx)
+	glog.Infof("Hans: cuda.AllocGPU(): availableGPUNum: %d, gpuReqs: %d, availableGPUIdx: %+v", availableGPUNum, gpuReqs, availableGPUIdx)
+	if availableGPUNum >= gpuReqs {
+		glog.Infof("Hans: cuda.AllocGPU(): before alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
+		var result = make([]int, gpuReqs)
+		cc := copy(result, availableGPUIdx[:gpuReqs])
+		if cc == gpuReqs {
+			// gpuUsageStatus := gpuTypes.GPUUsageStatus{PodID: podUID, ContainerName: container.Name, GPUIndexes: result}
+			gpuUsageStatus := gpuTypes.GPUUsageStatus{GPUIndexes: result}
+			cuda.gpuInfo.GPUStatus[containerHash] = gpuUsageStatus
+			glog.Infof("Hans: cuda.AllocGPU(): after alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
 			return result, nil
 		} else {
-			return []uint{}, fmt.Errorf("Failed to generate gpu index slice")
+			return []int{}, fmt.Errorf("Failed to generate gpu index slice")
 		}
 	} else {
-		return []uint{}, fmt.Errorf("Cannot meet the required gpu number %d and only have %d freed gpus", gpuReqs, freedGPUNum)
+		return []int{}, fmt.Errorf("Cannot meet the required gpu number %d and only have %d available gpus", gpuReqs, availableGPUNum)
 	}
 
 }
 
-func (cuda *Cuda) FreeGPU(gpuIdxs []uint) error {
+func (cuda *Cuda) FreeGPU(PodUID types.UID, container *api.Container) error {
 	defer func() {
 		if err := recover(); err != nil {
-			glog.Errorf("Failed to free GPU(%s). Reason: %s", gpuIdxs, err)
+			glog.Errorf("Failed to free GPU for the container(%s) of pod(%s). Reason: %s", container.Name, string(PodUID), err)
 		}
 	}()
 
-	glog.Infof("Hans: cuda.FreeGPU(): gpuIdxs: %+v, GPUDevices: %+v", gpuIdxs, cuda.gpuInfo.GPUDevices.Devices)
-	if len(gpuIdxs) == 0 {
-		return nil
-	}
+	glog.Infof("Hans: cuda.FreeGPU(): podId: %s, container: %s", string(PodUID), container.Name)
+
+	containerHash := gpuUtil.HashContainerFromData(PodUID, container)
 
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
+	delete(cuda.gpuInfo.GPUStatus, containerHash)
 
-	// check whether the passed gpuIdxs is valid or not
-	for _, idx := range gpuIdxs {
-		if !cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied {
-			return fmt.Errorf("Failed to free gpu %d, because it is not occupied", idx)
-		}
+	// double check whether free it or not
+	_, found := cuda.gpuInfo.GPUStatus[containerHash]
+	if found {
+		glog.Errorf("Failed to free GPU for the container(%s) of pod(%s). Reason: internal error", container.Name, string(PodUID))
 	}
 
-	// remove the occupied flag
-	for _, idx := range gpuIdxs {
-		cuda.gpuInfo.GPUDevices.Devices[idx].GPUDeviceState.IsOccupied = false
-	}
-
-	glog.Infof("Hans: cuda.FreeGPU(): after free: GPUDevices: %+v", cuda.gpuInfo.GPUDevices.Devices)
 	return nil
 }
 
@@ -147,9 +150,6 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 		dev.Cores = cudaDevice.CUDADev.Cores
 		dev.Memory = cudaDevice.CUDADev.Memory.Global
 		dev.Family = cudaDevice.CUDADev.Family
-
-		// init gpu device state
-		dev.GPUDeviceState = gpuTypes.GPUDeviceState{IsOccupied: false}
 
 		gpuDevs = append(gpuDevs, dev)
 	}
@@ -243,17 +243,17 @@ func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
 	return isSupported, nil
 }
 
-func (cuda *Cuda) GenerateDeviceOpts(gpuIdxs []uint) ([]dockerClient.Device, error) {
+func (cuda *Cuda) GenerateDeviceOpts(gpuIdxes []int) ([]dockerClient.Device, error) {
 	glog.Infof("Hans: cuda.GenerateDeviceOpts()")
 	devicesOpts := []dockerClient.Device{}
 
 	cuda.gpuInfo.Lock.RLock()
 	defer cuda.gpuInfo.Lock.RUnlock()
 
-	for _, idx := range gpuIdxs {
+	for _, idx := range gpuIdxes {
 		var device dockerClient.Device
 		device.CgroupPermissions = "rwm"
-		if idx < uint(len(cuda.gpuInfo.GPUDevices.Devices)) {
+		if idx < len(cuda.gpuInfo.GPUDevices.Devices) {
 			device.PathOnHost = cuda.gpuInfo.GPUDevices.Devices[idx].Path
 			device.PathInContainer = cuda.gpuInfo.GPUDevices.Devices[idx].Path
 			devicesOpts = append(devicesOpts, device)
@@ -353,4 +353,34 @@ func (cuda *Cuda) cudaSupported(image string, version string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// caculate the current available gpus.
+// Note: it is used internally, so before invoke it,
+//       it must hold lock
+func (cuda *Cuda) getAvailableGPUs() ([]int, error) {
+	glog.Infof("Hans: cuda.getAvailableGPUs()")
+	occupiedGpuSet := sets.Int{}
+
+	// collect gpu usage information
+	for _, gpuStatus := range cuda.gpuInfo.GPUStatus {
+		occupiedGpuSet.Insert(gpuStatus.GPUIndexes...)
+	}
+
+	totalGpuSet := sets.Int{}
+	for i := 0; i < len(cuda.gpuInfo.GPUDevices.Devices); i++ {
+		totalGpuSet.Insert(int(i))
+	}
+
+	availableGpuSet := totalGpuSet.Difference(occupiedGpuSet)
+	return availableGpuSet.List(), nil
+}
+
+func (cuda *Cuda) UpdateGPUUsageStatus(newGPUStatus *map[gpuTypes.PodCotainerHashID]gpuTypes.GPUUsageStatus) {
+	glog.Infof("Hans: cuda.UpdateGPUUsageStatus()")
+
+	cuda.gpuInfo.Lock.Lock()
+	defer cuda.gpuInfo.Lock.Unlock()
+
+	cuda.gpuInfo.GPUStatus = *newGPUStatus
 }

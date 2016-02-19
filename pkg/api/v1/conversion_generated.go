@@ -307,14 +307,6 @@ func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
-	if in.GPUIndexs != nil {
-		out.GPUIndexs = make([]uint, len(in.GPUIndexs))
-		for i := range in.GPUIndexs {
-			out.GPUIndexs[i] = in.GPUIndexs[i]
-		}
-	} else {
-		out.GPUIndexs = nil
-	}
 	return nil
 }
 
@@ -3433,14 +3425,6 @@ func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
-	if in.GPUIndexs != nil {
-		out.GPUIndexs = make([]uint, len(in.GPUIndexs))
-		for i := range in.GPUIndexs {
-			out.GPUIndexs[i] = in.GPUIndexs[i]
-		}
-	} else {
-		out.GPUIndexs = nil
-	}
 	return nil
 }
 
