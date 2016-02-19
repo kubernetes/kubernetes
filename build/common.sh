@@ -1523,6 +1523,10 @@ function kube::release::docker::release() {
     docker_push_cmd=("gcloud" "docker")
   fi
 
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/google_containers" ]]; then
+    # Activate credentials for the k8s.production.user@gmail.com
+    gcloud config set account k8s.production.user@gmail.com
+  fi
   for arch in "${archs[@]}"; do
     for binary in "${binaries[@]}"; do
       local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
@@ -1540,4 +1544,17 @@ function kube::release::docker::release() {
       fi
     done
   done
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/google_containers" ]]; then
+    # Activate default account
+    gcloud config set account ${USER}@google.com
+  fi
+}
+
+function kube::release::has_gcloud_account() {
+  local -r account="${1-}"
+  if [[ -n $(gcloud auth list --filter-account $account 2>/dev/null) ]]; then
+    return 0
+  else
+    return 1
+  fi
 }
