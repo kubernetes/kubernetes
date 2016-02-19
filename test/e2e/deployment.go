@@ -484,10 +484,10 @@ func testRolloverDeployment(f *Framework) {
 	// If the deployment already finished here, the test would fail. When this happens, increase its minReadySeconds or replicas to prevent it.
 	Expect(newRS.Spec.Replicas).Should(BeNumerically("<", deploymentReplicas))
 	updatedDeploymentImage := "redis"
-	newDeployment.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImage
-	newDeployment.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
-	Logf("updating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Update(newDeployment)
+	_, err = updateDeploymentWithRetries(c, ns, newDeployment.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImage
+		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, deploymentMinReadySeconds)
@@ -524,8 +524,9 @@ func testPausedDeployment(f *Framework) {
 	}
 
 	// Update the deployment to run
-	deployment.Spec.Paused = false
-	deployment, err = c.Extensions().Deployments(ns).Update(deployment)
+	deployment, err = updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
+		update.Spec.Paused = false
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
@@ -546,9 +547,9 @@ func testPausedDeployment(f *Framework) {
 
 	// Pause the deployment and delete the replica set.
 	// The paused deployment shouldn't recreate a new one.
-	deployment.Spec.Paused = true
-	deployment.ResourceVersion = ""
-	deployment, err = c.Extensions().Deployments(ns).Update(deployment)
+	deployment, err = updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
+		update.Spec.Paused = true
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
@@ -613,10 +614,10 @@ func testRollbackDeployment(f *Framework) {
 	// Update the deployment to create redis pods.
 	updatedDeploymentImage := "redis"
 	updatedDeploymentImageName := "redis"
-	d.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
-	d.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
-	Logf("updating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Update(d)
+	_, err = updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
+		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)
@@ -731,10 +732,10 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 	// Update the deployment to create redis pods.
 	updatedDeploymentImage := "redis"
 	updatedDeploymentImageName := "redis"
-	d.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
-	d.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
-	Logf("updating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Update(d)
+	_, err = updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
+		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)

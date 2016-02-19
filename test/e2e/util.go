@@ -2204,6 +2204,25 @@ func waitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, 
 	})
 }
 
+type updateDeploymentFunc func(d *extensions.Deployment)
+
+func updateDeploymentWithRetries(c *clientset.Clientset, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
+	deployments := c.Extensions().Deployments(namespace)
+	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if deployment, err = deployments.Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(deployment)
+		if deployment, err = deployments.Update(deployment); err == nil {
+			Logf("updating deployment %s", name)
+			return true, nil
+		}
+		return false, nil
+	})
+	return deployment, err
+}
+
 // FailedContainers inspects all containers in a pod and returns failure
 // information for containers that have failed or been restarted.
 // A map is returned where the key is the containerID and the value is a
