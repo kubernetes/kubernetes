@@ -4,7 +4,12 @@
     logrotate:
         daysToKeep: 14
     builders:
-        - shell: curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+        - shell: |
+            {provider-env}
+            {soak-deploy}
+            {job-env}
+            {post-env}
+            {runner}
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -30,7 +35,12 @@
     logrotate:
         daysToKeep: 7
     builders:
-        - shell: curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+        - shell: |
+            {provider-env}
+            {soak-continuous}
+            {job-env}
+            {post-env}
+            {runner}
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -56,6 +66,20 @@
 - project:
     name: soak
     test-owner: 'Build Cop'
+    soak-deploy: |
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
+        export E2E_TEST="false"
+        export E2E_DOWN="false"
+    soak-continuous: |
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
+        export E2E_UP="false"
+        export E2E_DOWN="false"
+        # Clear out any orphaned namespaces in case previous run was interrupted.
+        export E2E_CLEAN_START="true"
+        # We should be testing the reliability of a long-running cluster. The
+        # [Disruptive] tests kill/restart components or nodes in the cluster,
+        # defeating the purpose of a soak cluster. (#15722)
+        export GINKGO_TEST_ARGS="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
     suffix:
         - 'gce':
             deploy-description: |
@@ -70,10 +94,17 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'master'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                export HAIRPIN_MODE="false"
+                export PROJECT="k8s-jkns-gce-soak"
         - 'gce-2':
             deploy-description: Clone of kubernetes-soak-weekly-deploy-gce.
             e2e-description: Clone of kubernetes-soak-continuous-e2e-gce.
             branch: 'master'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                export PROJECT="k8s-jkns-gce-soak-2"
         - 'gce-1.1':
             deploy-description: |
                 Deploy Kubernetes to soak cluster using the latest successful
@@ -88,6 +119,10 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'release-1.1'
+            runner: '{old-runner-1-1}'
+            post-env: ''
+            soak-deploy: ''
+            soak-continuous: ''
         - 'gke':
             deploy-description: |
                 Deploy Kubernetes to a GKE soak cluster using the staging GKE
@@ -108,6 +143,12 @@
                 builds will be blocked and remain in the queue until the
                 deployment is complete.<br>
             branch: 'master'
+            provider-env: '{gke-provider-env}'
+            job-env: |
+                export PROJECT="k8s-jkns-gke-soak"
+                # Need at least n1-standard-2 nodes to run kubelet_perf tests
+                export MACHINE_TYPE="n1-standard-2"
+                export E2E_OPT="--check_version_skew=false"
     jobs:
         - 'kubernetes-soak-weekly-deploy-{suffix}'
         - 'kubernetes-soak-continuous-e2e-{suffix}'
