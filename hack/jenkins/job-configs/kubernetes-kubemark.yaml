@@ -42,7 +42,8 @@
             cron-string: '@hourly'
         - 'gce-scale':
             description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 6 hours so as not to waste too many resources.'
-            timeout: 480
+            # 12h - load tests take really, really, really long time.
+            timeout: 720
             cron-string: 'H H/8 * * *'
     jobs:
         - 'kubernetes-kubemark-{suffix}'
