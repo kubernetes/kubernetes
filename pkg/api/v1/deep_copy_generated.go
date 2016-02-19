@@ -349,15 +349,15 @@ func deepCopy_v1_Container(in Container, out *Container, c *conversion.Cloner) e
 }
 
 func deepCopy_v1_ContainerImage(in ContainerImage, out *ContainerImage, c *conversion.Cloner) error {
-	if in.RepoTags != nil {
-		out.RepoTags = make([]string, len(in.RepoTags))
-		for i := range in.RepoTags {
-			out.RepoTags[i] = in.RepoTags[i]
+	if in.Names != nil {
+		out.Names = make([]string, len(in.Names))
+		for i := range in.Names {
+			out.Names[i] = in.Names[i]
 		}
 	} else {
-		out.RepoTags = nil
+		out.Names = nil
 	}
-	out.Size = in.Size
+	out.SizeBytes = in.SizeBytes
 	return nil
 }
 

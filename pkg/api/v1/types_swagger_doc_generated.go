@@ -201,9 +201,9 @@ func (Container) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerImage = map[string]string{
-	"":         "Describe a container image",
-	"repoTags": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
-	"size":     "The size of the image in bytes.",
+	"":          "Describe a container image",
+	"names":     "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+	"sizeBytes": "The size of the image in bytes.",
 }
 
 func (ContainerImage) SwaggerDoc() map[string]string {

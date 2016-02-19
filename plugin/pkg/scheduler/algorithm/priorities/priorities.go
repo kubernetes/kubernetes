@@ -183,10 +183,10 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 // checkContainerImageOnNode checks if a container image is present on a node and returns its size.
 func checkContainerImageOnNode(node api.Node, container api.Container) int64 {
 	for _, image := range node.Status.Images {
-		for _, repoTag := range image.RepoTags {
-			if container.Image == repoTag {
+		for _, name := range image.Names {
+			if container.Image == name {
 				// Should return immediately.
-				return image.Size
+				return image.SizeBytes
 			}
 		}
 	}

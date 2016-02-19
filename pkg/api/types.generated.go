@@ -33754,7 +33754,7 @@ func (x *ContainerImage) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [2]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[1] = x.Size != 0
+			yyq2[1] = x.SizeBytes != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(2)
@@ -33770,28 +33770,28 @@ func (x *ContainerImage) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.RepoTags == nil {
+				if x.Names == nil {
 					r.EncodeNil()
 				} else {
 					yym4 := z.EncBinary()
 					_ = yym4
 					if false {
 					} else {
-						z.F.EncSliceStringV(x.RepoTags, false, e)
+						z.F.EncSliceStringV(x.Names, false, e)
 					}
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("repoTags"))
+				r.EncodeString(codecSelferC_UTF81234, string("names"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.RepoTags == nil {
+				if x.Names == nil {
 					r.EncodeNil()
 				} else {
 					yym5 := z.EncBinary()
 					_ = yym5
 					if false {
 					} else {
-						z.F.EncSliceStringV(x.RepoTags, false, e)
+						z.F.EncSliceStringV(x.Names, false, e)
 					}
 				}
 			}
@@ -33802,7 +33802,7 @@ func (x *ContainerImage) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym7
 					if false {
 					} else {
-						r.EncodeInt(int64(x.Size))
+						r.EncodeInt(int64(x.SizeBytes))
 					}
 				} else {
 					r.EncodeInt(0)
@@ -33810,13 +33810,13 @@ func (x *ContainerImage) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("size"))
+					r.EncodeString(codecSelferC_UTF81234, string("sizeBytes"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym8 := z.EncBinary()
 					_ = yym8
 					if false {
 					} else {
-						r.EncodeInt(int64(x.Size))
+						r.EncodeInt(int64(x.SizeBytes))
 					}
 				}
 			}
@@ -33881,11 +33881,11 @@ func (x *ContainerImage) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "repoTags":
+		case "names":
 			if r.TryDecodeAsNil() {
-				x.RepoTags = nil
+				x.Names = nil
 			} else {
-				yyv4 := &x.RepoTags
+				yyv4 := &x.Names
 				yym5 := z.DecBinary()
 				_ = yym5
 				if false {
@@ -33893,11 +33893,11 @@ func (x *ContainerImage) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					z.F.DecSliceStringX(yyv4, false, d)
 				}
 			}
-		case "size":
+		case "sizeBytes":
 			if r.TryDecodeAsNil() {
-				x.Size = 0
+				x.SizeBytes = 0
 			} else {
-				x.Size = int64(r.DecodeInt(64))
+				x.SizeBytes = int64(r.DecodeInt(64))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -33925,9 +33925,9 @@ func (x *ContainerImage) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.RepoTags = nil
+		x.Names = nil
 	} else {
-		yyv8 := &x.RepoTags
+		yyv8 := &x.Names
 		yym9 := z.DecBinary()
 		_ = yym9
 		if false {
@@ -33947,9 +33947,9 @@ func (x *ContainerImage) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Size = 0
+		x.SizeBytes = 0
 	} else {
-		x.Size = int64(r.DecodeInt(64))
+		x.SizeBytes = int64(r.DecodeInt(64))
 	}
 	for {
 		yyj7++
