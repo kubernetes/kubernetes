@@ -75,6 +75,9 @@ const (
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
 
+	// How long to wait for the pod to no longer be running
+	podNoLongerRunningTimeout = 30 * time.Second
+
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
 	// failures caused by leaked resources from a previous test run.
@@ -793,6 +796,22 @@ func waitTimeoutForPodRunningInNamespace(c *client.Client, podName string, names
 		}
 		if pod.Status.Phase == api.PodFailed {
 			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
+		}
+		return false, nil
+	})
+}
+
+// Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
+// Returns an error if timeout occurs first.
+func waitForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string) error {
+	return waitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, podNoLongerRunningTimeout)
+}
+
+func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
+	return waitForPodCondition(c, namespace, podName, "no longer running", timeout, func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+			Logf("Found pod '%s' with status '%s' on node '%s'", podName, pod.Status.Phase, pod.Spec.NodeName)
+			return true, nil
 		}
 		return false, nil
 	})
