@@ -197,14 +197,11 @@ func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 }
 
 func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
-	if !api.IsPodReady(pod) {
-		return false
-	}
 	// Check if we've passed minReadySeconds since LastTransitionTime
 	// If so, this pod is ready
 	for _, c := range pod.Status.Conditions {
 		// we only care about pod ready conditions
-		if c.Type == api.PodReady {
+		if c.Type == api.PodReady && c.Status == api.ConditionTrue {
 			// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is ready):
 			// 1. minReadySeconds <= 0
 			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
