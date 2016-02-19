@@ -350,7 +350,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-enormous-startup)
     # XXX Not a unique project
     # TODO: increase a quota for networks in kubernetes-scale and move this test to its own network
-    export E2E_NAME="e2e-enormous-cluster"
+    export E2E_NAME="e2e-enormous-startup"
     export E2E_TEST="false"
     export PROJECT="kubernetes-scale"
     export FAIL_ON_GCP_RESOURCE_LEAK="false"
