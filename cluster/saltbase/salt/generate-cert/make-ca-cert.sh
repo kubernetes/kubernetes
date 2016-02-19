@@ -18,6 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+DEBUG="${DEBUG:-false}"
+
 if [ "${DEBUG}" == "true" ]; then
 	set -x
 fi
