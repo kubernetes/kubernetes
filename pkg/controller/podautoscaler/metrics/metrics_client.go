@@ -123,6 +123,11 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	requestSum := int64(0)
 	missing := false
 	for _, pod := range podList.Items {
+		if pod.Status.Phase == api.PodPending {
+			// Skip pending pods.
+			continue
+		}
+
 		podNames = append(podNames, pod.Name)
 		for _, container := range pod.Spec.Containers {
 			containerRequest := container.Resources.Requests[api.ResourceCPU]
@@ -132,6 +137,9 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 				missing = true
 			}
 		}
+	}
+	if len(podNames) == 0 && len(podList.Items) > 0 {
+		return 0, 0, time.Time{}, fmt.Errorf("no running pods")
 	}
 	if missing || requestSum == 0 {
 		return 0, 0, time.Time{}, fmt.Errorf("some pods do not have request for cpu")
@@ -159,7 +167,14 @@ func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespa
 	}
 	podNames := []string{}
 	for _, pod := range podList.Items {
+		if pod.Status.Phase == api.PodPending {
+			// Skip pending pods.
+			continue
+		}
 		podNames = append(podNames, pod.Name)
+	}
+	if len(podNames) == 0 && len(podList.Items) > 0 {
+		return nil, time.Time{}, fmt.Errorf("no running pods")
 	}
 
 	value, timestamp, err := h.getForPods(metricSpec, namespace, podNames)
