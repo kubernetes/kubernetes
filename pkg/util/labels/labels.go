@@ -120,16 +120,7 @@ func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, la
 	return selector
 }
 
-// SelectorHasLabel checks if the given selector contains the given label key in its MatchLabels or MatchExpressions
+// SelectorHasLabel checks if the given selector contains the given label key in its MatchLabels
 func SelectorHasLabel(selector *unversioned.LabelSelector, labelKey string) bool {
-	_, found := selector.MatchLabels[labelKey]
-	if found {
-		return true
-	}
-	for _, exp := range selector.MatchExpressions {
-		if exp.Key == labelKey && exp.Operator != unversioned.LabelSelectorOpDoesNotExist {
-			return true
-		}
-	}
-	return false
+	return len(selector.MatchLabels[labelKey]) > 0
 }
