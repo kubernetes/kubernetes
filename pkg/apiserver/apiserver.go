@@ -218,10 +218,10 @@ func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *Reques
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
-func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, versions []string) {
+func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) {
 	// TODO: InstallREST should register each version automatically
 
-	versionHandler := APIVersionHandler(s, versions[:]...)
+	versionHandler := APIVersionHandler(s, getAPIVersionsFunc)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
 	ws.Doc("get available API versions")
@@ -234,7 +234,7 @@ func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Contain
 }
 
 // Adds a service to return the supported api versions at /apis.
-func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, f func() []unversioned.APIGroup) {
+func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, f func(req *restful.Request) []unversioned.APIGroup) {
 	rootAPIHandler := RootAPIHandler(s, f)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
@@ -279,16 +279,16 @@ func handleVersion(req *restful.Request, resp *restful.Response) {
 }
 
 // APIVersionHandler returns a handler which will list the provided versions as available.
-func APIVersionHandler(s runtime.NegotiatedSerializer, versions ...string) restful.RouteFunction {
+func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIVersions{Versions: versions})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, getAPIVersionsFunc(req))
 	}
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
-func RootAPIHandler(s runtime.NegotiatedSerializer, f func() []unversioned.APIGroup) restful.RouteFunction {
+func RootAPIHandler(s runtime.NegotiatedSerializer, f func(req *restful.Request) []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: f()})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: f(req)})
 	}
 }
 
