@@ -826,18 +826,24 @@ case ${JOB_NAME} in
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MACHINE_TYPE='n1-standard-2'
     ;;
 
   kubernetes-upgrade-gke-1.1-master-step4-e2e-old)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MACHINE_TYPE='n1-standard-2'
     ;;
 
   kubernetes-upgrade-gke-1.1-master-step6-e2e-old)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MACHINE_TYPE='n1-standard-2'
     ;;
 
   # kubernetes-upgrade-gce-1.1-master
