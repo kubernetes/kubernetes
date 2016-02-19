@@ -17,6 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -36,9 +38,13 @@ func TestRunOnce(t *testing.T) {
 	podManager, _ := newFakePodManager()
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &kubecontainer.FakeRuntime{}
-
+	basePath, err := ioutil.TempDir(os.TempDir(), "kubelet")
+	if err != nil {
+		t.Fatalf("can't make a temp rootdir %v", err)
+	}
+	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
-		rootDirectory:       "/tmp/kubelet",
+		rootDirectory:       basePath,
 		recorder:            &record.FakeRecorder{},
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},

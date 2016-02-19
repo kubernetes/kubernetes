@@ -17,7 +17,9 @@ limitations under the License.
 package cephfs
 
 import (
+	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -27,8 +29,13 @@ import (
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "cephTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -45,8 +52,13 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "cephTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -71,8 +83,9 @@ func TestPlugin(t *testing.T) {
 	if builder == nil {
 		t.Errorf("Got a nil Builder: %v")
 	}
+	volpath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cephfs/vol1")
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~cephfs/vol1" {
+	if path != volpath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 	if err := builder.SetUp(); err != nil {
