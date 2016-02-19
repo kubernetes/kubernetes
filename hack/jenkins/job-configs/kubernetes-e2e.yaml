@@ -88,7 +88,7 @@
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
             timeout: 120
-       - 'gce-examples':
+        - 'gce-examples':
             description: 'Run e2e examples test on GCE using the latest successful Kubernetes build.'
             timeout: 90
         - 'gce-ubernetes-lite':
