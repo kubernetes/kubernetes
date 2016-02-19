@@ -401,12 +401,9 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	// paused, move pausing to above update operation. Without it, we need to
 	// pause deployment before stopping RSs, to prevent creating new RSs.
 	// See https://github.com/kubernetes/kubernetes/issues/20966
-	deployment, err = deployments.Get(name)
-	if err != nil {
-		return err
-	}
-	deployment.Spec.Paused = true
-	deployment, err = deployments.Update(deployment)
+	deployment, err = reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
+		d.Spec.Paused = true
+	})
 	if err != nil {
 		return err
 	}
