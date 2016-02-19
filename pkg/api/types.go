@@ -1719,9 +1719,9 @@ type NodeStatus struct {
 // Describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
-	RepoTags []string `json:"repoTags"`
+	Names []string `json:"names"`
 	// The size of the image in bytes.
-	Size int64 `json:"size,omitempty"`
+	SizeBytes int64 `json:"sizeBytes,omitempty"`
 }
 
 type NodePhase string

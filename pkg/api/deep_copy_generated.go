@@ -496,14 +496,14 @@ func DeepCopy_api_Container(in Container, out *Container, c *conversion.Cloner) 
 }
 
 func DeepCopy_api_ContainerImage(in ContainerImage, out *ContainerImage, c *conversion.Cloner) error {
-	if in.RepoTags != nil {
-		in, out := in.RepoTags, &out.RepoTags
+	if in.Names != nil {
+		in, out := in.Names, &out.Names
 		*out = make([]string, len(in))
 		copy(*out, in)
 	} else {
-		out.RepoTags = nil
+		out.Names = nil
 	}
-	out.Size = in.Size
+	out.SizeBytes = in.SizeBytes
 	return nil
 }
 

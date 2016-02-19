@@ -767,25 +767,25 @@ func TestImageLocalityPriority(t *testing.T) {
 	node_40_140_2000 := api.NodeStatus{
 		Images: []api.ContainerImage{
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/40",
 					"gcr.io/40:v1",
 					"gcr.io/40:v1",
 				},
-				Size: int64(40 * mb),
+				SizeBytes: int64(40 * mb),
 			},
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/140",
 					"gcr.io/140:v1",
 				},
-				Size: int64(140 * mb),
+				SizeBytes: int64(140 * mb),
 			},
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/2000",
 				},
-				Size: int64(2000 * mb),
+				SizeBytes: int64(2000 * mb),
 			},
 		},
 	}
@@ -793,17 +793,17 @@ func TestImageLocalityPriority(t *testing.T) {
 	node_250_10 := api.NodeStatus{
 		Images: []api.ContainerImage{
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/250",
 				},
-				Size: int64(250 * mb),
+				SizeBytes: int64(250 * mb),
 			},
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/10",
 					"gcr.io/10:v1",
 				},
-				Size: int64(10 * mb),
+				SizeBytes: int64(10 * mb),
 			},
 		},
 	}
