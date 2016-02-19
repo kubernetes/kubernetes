@@ -36,6 +36,8 @@ type genClientset struct {
 	outputPackage      string
 	imports            *generator.ImportTracker
 	clientsetGenerated bool
+	// the import path of the generated real clientset.
+	clientsetPath string
 }
 
 var _ generator.Generator = &genClientset{}
@@ -63,6 +65,17 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
 		imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", version, group, fakeTypedClientPath))
 	}
+	// the package that has the clientset Interface
+	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.clientsetPath))
+	// imports for the code in commonTemplate
+	imports = append(imports,
+		"k8s.io/kubernetes/pkg/api",
+		"k8s.io/kubernetes/pkg/client/testing/core",
+		"k8s.io/kubernetes/pkg/client/unversioned",
+		"k8s.io/kubernetes/pkg/runtime",
+		"k8s.io/kubernetes/pkg/watch",
+	)
+
 	return
 }
 
@@ -70,6 +83,10 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// TODO: We actually don't need any type information to generate the clientset,
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
+
+	sw.Do(common, nil)
+
+	sw.Do(checkImpl, nil)
 
 	type arg struct {
 		Group       string
@@ -88,6 +105,41 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	return sw.Error()
 }
+
+// This part of code is version-independent, unchanging.
+var common = `
+// Clientset returns a clientset that will respond with the provided objects
+func NewSimpleClientset(objects ...runtime.Object) *Clientset {
+	o := core.NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
+	for _, obj := range objects {
+		if err := o.Add(obj); err != nil {
+			panic(err)
+		}
+	}
+
+	fakePtr := core.Fake{}
+	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
+
+	fakePtr.AddWatchReactor("*", core.DefaultWatchReactor(watch.NewFake(), nil))
+
+	return &Clientset{fakePtr}
+}
+
+// Clientset implements clientset.Interface. Meant to be embedded into a
+// struct to get a default implementation. This makes faking out just the method
+// you want to test easier.
+type Clientset struct {
+	core.Fake
+}
+
+func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+	return &FakeDiscovery{&c.Fake}
+}
+`
+
+var checkImpl = `
+var _ clientset.Interface = &Clientset{}
+`
 
 var clientsetInterfaceImplTemplate = `
 // $.Group$ retrieves the $.Group$Client
