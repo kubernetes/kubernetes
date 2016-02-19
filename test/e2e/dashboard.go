@@ -52,11 +52,12 @@ var _ = Describe("Kubernetes Dashboard", func() {
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(poll, serverStartTimeout, func() (bool, error) {
 			var status int
+			proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+			if errProxy != nil {
+				Logf("Get services proxy request failed: %v", errProxy)
+			}
 			// Query against the proxy URL for the kube-ui service.
-			err := f.Client.Get().
-				Namespace(uiNamespace).
-				Prefix("proxy").
-				Resource("services").
+			err := proxyRequest.Namespace(uiNamespace).
 				Name(uiServiceName).
 				Timeout(singleCallTimeout).
 				Do().

@@ -187,10 +187,9 @@ func (rc *ResourceConsumer) sendConsumeMemRequests(requests, megabytes, duration
 // sendOneConsumeCPURequest sends POST request for cpu consumption
 func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec int) {
 	defer GinkgoRecover()
-	_, err := rc.framework.Client.Post().
-		Prefix("proxy").
-		Namespace(rc.framework.Namespace.Name).
-		Resource("services").
+	proxyRequest, err := getServicesProxyRequest(rc.framework.Client, rc.framework.Client.Post())
+	expectNoError(err)
+	_, err = proxyRequest.Namespace(rc.framework.Namespace.Name).
 		Name(rc.name).
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
@@ -202,10 +201,9 @@ func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec
 // sendOneConsumeMemRequest sends POST request for memory consumption
 func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec int) {
 	defer GinkgoRecover()
-	_, err := rc.framework.Client.Post().
-		Prefix("proxy").
-		Namespace(rc.framework.Namespace.Name).
-		Resource("services").
+	proxyRequest, err := getServicesProxyRequest(rc.framework.Client, rc.framework.Client.Post())
+	expectNoError(err)
+	_, err = proxyRequest.Namespace(rc.framework.Namespace.Name).
 		Name(rc.name).
 		Suffix("ConsumeMem").
 		Param("megabytes", strconv.Itoa(megabytes)).

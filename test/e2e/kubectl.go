@@ -1185,10 +1185,11 @@ func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse strin
 }
 
 func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (string, error) {
-	result, err := c.Get().
-		Prefix("proxy").
-		Namespace(ns).
-		Resource("services").
+	proxyRequest, errProxy := getServicesProxyRequest(c, c.Get())
+	if errProxy != nil {
+		return "", errProxy
+	}
+	result, err := proxyRequest.Namespace(ns).
 		Name("frontend").
 		Suffix("/guestbook.php").
 		Param("cmd", cmd).
