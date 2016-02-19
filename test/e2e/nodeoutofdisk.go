@@ -70,7 +70,6 @@ var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 	framework := NewFramework("node-outofdisk")
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		c = framework.Client
 
 		nodelist := ListSchedulableNodesOrDie(c)
@@ -83,7 +82,6 @@ var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 	})
 
 	AfterEach(func() {
-		defer framework.afterEach()
 
 		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).ToNot(BeZero())
