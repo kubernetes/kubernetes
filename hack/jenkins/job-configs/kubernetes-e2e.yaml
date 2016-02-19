@@ -274,6 +274,11 @@
             timeout: 90
             emails: '$DEFAULT_RECIPIENTS, beeps@google.com'
             test-owner: 'beeps'
+        - 'gce-es-logging':
+            description: 'Run [Feature:Elasticsearch] tests on GCE using the latest successful build.'
+            timeout: 90
+            emails: '$DEFAULT_RECIPIENTS, mixia@google.com'
+            test-owner: 'mixia'
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
