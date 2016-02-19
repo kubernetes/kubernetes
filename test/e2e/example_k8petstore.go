@@ -33,15 +33,16 @@ import (
 )
 
 const (
-	k8bpsContainerVersion = "r.2.8.19"       // Container version, see the examples/k8petstore dockerfiles for details.
-	k8bpsThroughputDummy  = "0"              // Polling time = 0, since we poll in ginkgo rather than using the shell script tests.
-	k8bpsRedisSlaves      = "1"              // Number of redis slaves.
-	k8bpsDontRunTest      = "0"              // Don't bother embedded test.
-	k8bpsStartupTimeout   = 30 * time.Second // Amount of elapsed time before petstore transactions are being stored.
+	k8bpsContainerVersion         = "r.2.8.19"       // Container version, see the examples/k8petstore dockerfiles for details.
+	k8bpsThroughputDummy          = "0"              // Polling time = 0, since we poll in ginkgo rather than using the shell script tests.
+	k8bpsRedisSlaves              = "1"              // Number of redis slaves.
+	k8bpsDontRunTest              = "0"              // Don't bother embedded test.
+	k8bpsStartupTimeout           = 30 * time.Second // Amount of elapsed time before petstore transactions are being stored.
+	k8bpsMinTransactionsOnStartup = 3                // Amount of transactions we expect we should have before data generator starts.
 
 	// Constants for the first test. We can make this a hashmap once we add scale tests to it.
-	k8bpsSmokeTestTransactions = 50
-	k8bpsSmokeTestTimeout      = 60 * time.Second
+	k8bpsSmokeTestFinalTransactions = 50
+	k8bpsSmokeTestTimeout           = 60 * time.Second
 )
 
 // readTransactions reads # of transactions from the k8petstore web server endpoint.
@@ -64,8 +65,8 @@ func readTransactions(c *client.Client, ns string) (error, int) {
 }
 
 // runK8petstore runs the k8petstore application, bound to external nodeport, and
-// polls until minExpected transactions are acquired, in a maximum of maxSeconds.
-func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns string, minExpected int, maxTime time.Duration) {
+// polls until finalTransactionsExpected transactions are acquired, in a maximum of maxSeconds.
+func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns string, finalTransactionsExpected int, maxTime time.Duration) {
 
 	var err error = nil
 	k8bpsScriptLocation := filepath.Join(testContext.RepoRoot, "examples/k8petstore/k8petstore-nodeport.sh")
@@ -118,37 +119,38 @@ T:
 	for {
 		select {
 		case <-transactionsCompleteTimeout:
-			Logf("Timeout %v reached, transactions not complete.  Breaking!", tick)
+			Logf("Completion timeout %v reached, %v transactions not complete.  Breaking!", time.Duration(maxTime), finalTransactionsExpected)
 			break T
-		case <-startupTimeout:
-			err, totalTransactions = readTransactions(c, ns)
-			Logf("Timeout %v reached.  Checking if transactions have occured.", startupTimeout)
-			// If we don't have 3 transactions, fail the test.
-			if err != nil {
-				Logf("Failed : Error %v", err)
-				break T
-			}
-			if totalTransactions < 3 {
-				break T
-			}
-			ready = true
 		case <-tick:
-			// Pass if we've collected enough transactions
+			// Don't fail if there's an error.  We expect a few failures might happen in the cloud.
 			err, totalTransactions = readTransactions(c, ns)
-			if ready {
-				Expect(err).NotTo(HaveOccurred())
+			if err == nil {
+				Logf("PetStore : Time: %v, %v = total petstore transactions stored into redis.", time.Now(), totalTransactions)
+				if totalTransactions >= k8bpsMinTransactionsOnStartup {
+					ready = true
+				}
+				if totalTransactions >= finalTransactionsExpected {
+					break T
+				}
+			} else {
+				if ready {
+					Logf("Blip: during polling: %v", err)
+				} else {
+					Logf("Not ready yet: %v", err)
+				}
 			}
-			if totalTransactions > minExpected {
+		case <-startupTimeout:
+			if !ready {
+				Logf("Startup Timeout %v reached: Its been too long and we still haven't started accumulating %v transactions!", startupTimeout, k8bpsMinTransactionsOnStartup)
 				break T
 			}
-			Logf("Time: %v, %v = total petstore transactions stored into redis.", time.Now(), totalTransactions)
 		}
 	}
 
-	// We should have exceeded the minExpected num of transactions.
+	// We should have exceeded the finalTransactionsExpected num of transactions.
 	// If this fails, but there are transactions being created, we may need to recalibrate
-	// the minExpected value - or else - your cluster is broken/slow !
-	Ω(totalTransactions).Should(BeNumerically(">", minExpected))
+	// the finalTransactionsExpected value - or else - your cluster is broken/slow !
+	Ω(totalTransactions).Should(BeNumerically(">", finalTransactionsExpected))
 }
 
 var _ = Describe("Pet Store [Feature:Example]", func() {
@@ -157,14 +159,14 @@ var _ = Describe("Pet Store [Feature:Example]", func() {
 	var nodeCount int
 	f := NewFramework("petstore")
 
-	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout), func() {
+	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestFinalTransactions, k8bpsSmokeTestTimeout), func() {
 		nodes := ListSchedulableNodesOrDie(f.Client)
 		nodeCount = len(nodes.Items)
 
 		loadGenerators := nodeCount
 		restServers := nodeCount
 		fmt.Printf("load generators / rest servers [ %v  /  %v ] ", loadGenerators, restServers)
-		runK8petstore(restServers, loadGenerators, f.Client, f.Namespace.Name, k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout)
+		runK8petstore(restServers, loadGenerators, f.Client, f.Namespace.Name, k8bpsSmokeTestFinalTransactions, k8bpsSmokeTestTimeout)
 	})
 
 })
