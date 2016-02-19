@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	kubestats "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
@@ -87,9 +88,9 @@ func TestBuildSummary(t *testing.T) {
 		cName20 = "c1" // ensure cName20 conflicts with cName01, but is in a different pod + namespace
 	)
 
-	prf0 := PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
-	prf1 := PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
-	prf2 := PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
+	prf0 := kubestats.PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
+	prf1 := kubestats.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
+	prf2 := kubestats.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
 	infos := map[string]v2.ContainerInfo{
 		"/":              summaryTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": summaryTestContainerInfo(seedRuntime, "", "", ""),
@@ -123,9 +124,9 @@ func TestBuildSummary(t *testing.T) {
 	checkNetworkStats(t, "Node", seedRoot, nodeStats.Network)
 
 	systemSeeds := map[string]int{
-		SystemContainerRuntime: seedRuntime,
-		SystemContainerKubelet: seedKubelet,
-		SystemContainerMisc:    seedMisc,
+		kubestats.SystemContainerRuntime: seedRuntime,
+		kubestats.SystemContainerKubelet: seedKubelet,
+		kubestats.SystemContainerMisc:    seedMisc,
 	}
 	for _, sys := range nodeStats.SystemContainers {
 		name := sys.Name
@@ -139,7 +140,7 @@ func TestBuildSummary(t *testing.T) {
 	}
 
 	assert.Equal(t, 3, len(summary.Pods))
-	indexPods := make(map[PodReference]PodStats, len(summary.Pods))
+	indexPods := make(map[kubestats.PodReference]kubestats.PodStats, len(summary.Pods))
 	for _, pod := range summary.Pods {
 		indexPods[pod.PodRef] = pod
 	}
@@ -148,7 +149,7 @@ func TestBuildSummary(t *testing.T) {
 	ps, found := indexPods[prf0]
 	assert.True(t, found)
 	assert.Len(t, ps.Containers, 2)
-	indexCon := make(map[string]ContainerStats, len(ps.Containers))
+	indexCon := make(map[string]kubestats.ContainerStats, len(ps.Containers))
 	for _, con := range ps.Containers {
 		indexCon[con.Name] = con
 	}
@@ -284,7 +285,7 @@ func testTime(base time.Time, seed int) time.Time {
 	return base.Add(time.Duration(seed) * time.Second)
 }
 
-func checkNetworkStats(t *testing.T, label string, seed int, stats *NetworkStats) {
+func checkNetworkStats(t *testing.T, label string, seed int, stats *kubestats.NetworkStats) {
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
@@ -292,13 +293,13 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *NetworkStats
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
 }
 
-func checkCPUStats(t *testing.T, label string, seed int, stats *CPUStats) {
+func checkCPUStats(t *testing.T, label string, seed int, stats *kubestats.CPUStats) {
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
 	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
 	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
 }
 
-func checkMemoryStats(t *testing.T, label string, seed int, stats *MemoryStats) {
+func checkMemoryStats(t *testing.T, label string, seed int, stats *kubestats.MemoryStats) {
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
 	assert.EqualValues(t, seed+offsetMemUsageBytes, *stats.UsageBytes, label+".Mem.UsageBytes")
 	assert.EqualValues(t, seed+offsetMemWorkingSetBytes, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
@@ -357,19 +358,19 @@ func TestCustomMetrics(t *testing.T) {
 	}
 	sb := &summaryBuilder{}
 	assert.Contains(t, sb.containerInfoV2ToUserDefinedMetrics(&cInfo),
-		UserDefinedMetric{
-			UserDefinedMetricDescriptor: UserDefinedMetricDescriptor{
+		kubestats.UserDefinedMetric{
+			UserDefinedMetricDescriptor: kubestats.UserDefinedMetricDescriptor{
 				Name:  "qos",
-				Type:  MetricGauge,
+				Type:  kubestats.MetricGauge,
 				Units: "per second",
 			},
 			Time:  unversioned.NewTime(timestamp2),
 			Value: 100,
 		},
-		UserDefinedMetric{
-			UserDefinedMetricDescriptor: UserDefinedMetricDescriptor{
+		kubestats.UserDefinedMetric{
+			UserDefinedMetricDescriptor: kubestats.UserDefinedMetricDescriptor{
 				Name:  "cpuLoad",
-				Type:  MetricCumulative,
+				Type:  kubestats.MetricCumulative,
 				Units: "count",
 			},
 			Time:  unversioned.NewTime(timestamp2),

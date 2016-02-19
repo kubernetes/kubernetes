@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 
@@ -32,34 +33,34 @@ import (
 // TestGetPodVolumeStats tests that GetPodVolumeStats reads from the cache and returns the value
 func TestGetPodVolumeStats(t *testing.T) {
 	instance := newFsResourceAnalyzer(&MockStatsProvider{}, time.Minute*5)
-	stats, found := instance.GetPodVolumeStats("testpod1")
+	vStats, found := instance.GetPodVolumeStats("testpod1")
 	assert.False(t, found)
-	assert.Equal(t, PodVolumeStats{}, stats)
+	assert.Equal(t, PodVolumeStats{}, vStats)
 
 	instance.cachedVolumeStats.Store(make(Cache))
-	stats, found = instance.GetPodVolumeStats("testpod1")
+	vStats, found = instance.GetPodVolumeStats("testpod1")
 	assert.False(t, found)
-	assert.Equal(t, PodVolumeStats{}, stats)
+	assert.Equal(t, PodVolumeStats{}, vStats)
 
 	available := uint64(100)
 	used := uint64(200)
 	capacity := uint64(400)
-	vs1 := VolumeStats{
+	vs1 := stats.VolumeStats{
 		Name: "vol1",
-		FsStats: FsStats{
+		FsStats: stats.FsStats{
 			AvailableBytes: &available,
 			UsedBytes:      &used,
 			CapacityBytes:  &capacity,
 		},
 	}
 	pvs := &PodVolumeStats{
-		Volumes: []VolumeStats{vs1},
+		Volumes: []stats.VolumeStats{vs1},
 	}
 
 	instance.cachedVolumeStats.Load().(Cache)["testpod1"] = pvs
-	stats, found = instance.GetPodVolumeStats("testpod1")
+	vStats, found = instance.GetPodVolumeStats("testpod1")
 	assert.True(t, found)
-	assert.Equal(t, *pvs, stats)
+	assert.Equal(t, *pvs, vStats)
 }
 
 // TestUpdateCachedPodVolumeStats tests that the cache is updated from the stats provider
@@ -120,9 +121,9 @@ func TestUpdateCachedPodVolumeStats(t *testing.T) {
 	v1available := uint64(100)
 	v1used := uint64(200)
 	v1capacity := uint64(400)
-	assert.Contains(t, actual1.Volumes, VolumeStats{
+	assert.Contains(t, actual1.Volumes, stats.VolumeStats{
 		Name: "v1",
-		FsStats: FsStats{
+		FsStats: stats.FsStats{
 			AvailableBytes: &v1available,
 			UsedBytes:      &v1used,
 			CapacityBytes:  &v1capacity,
@@ -132,9 +133,9 @@ func TestUpdateCachedPodVolumeStats(t *testing.T) {
 	v2available := uint64(600)
 	v2used := uint64(700)
 	v2capacity := uint64(1400)
-	assert.Contains(t, actual1.Volumes, VolumeStats{
+	assert.Contains(t, actual1.Volumes, stats.VolumeStats{
 		Name: "v2",
-		FsStats: FsStats{
+		FsStats: stats.FsStats{
 			AvailableBytes: &v2available,
 			UsedBytes:      &v2used,
 			CapacityBytes:  &v2capacity,
@@ -147,9 +148,9 @@ func TestUpdateCachedPodVolumeStats(t *testing.T) {
 	actual2, found := instance.GetPodVolumeStats("testpod2")
 	assert.True(t, found)
 	assert.Len(t, actual2.Volumes, 1)
-	assert.Contains(t, actual2.Volumes, VolumeStats{
+	assert.Contains(t, actual2.Volumes, stats.VolumeStats{
 		Name: "v3",
-		FsStats: FsStats{
+		FsStats: stats.FsStats{
 			AvailableBytes: &v3available,
 			UsedBytes:      &v3used,
 			CapacityBytes:  &v3capacity,
