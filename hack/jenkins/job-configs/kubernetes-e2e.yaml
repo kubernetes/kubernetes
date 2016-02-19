@@ -334,3 +334,17 @@
             timeout: 270
     jobs:
         - 'kubernetes-e2e-gce-trusty-{suffix}'
+
+- project:
+    name: kubernetes-e2e-gce-enormous-cluster
+    test-owner: 'gmarek'
+    emails: 'gmarek@google.com'
+    cron-string: 'H 8 * * *'
+    trigger-job: ''
+    description: 'Starts and deletes empty 1000 node cluster and runs Density 30 test on it. Does allow few Nodes to fail during startup.'
+    timeout: 480
+    branch: 'master'
+    suffix: 'gce-enormous-cluster'
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
