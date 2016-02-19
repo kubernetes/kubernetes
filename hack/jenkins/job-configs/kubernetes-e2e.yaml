@@ -18,7 +18,10 @@
     disabled: false
     builders:
         - shell: |
-            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+            {provider-env}
+            {job-env}
+            {post-env}
+            {runner}
     properties:
         - mail-watcher
     wrappers:
@@ -65,37 +68,96 @@
     name: kubernetes-e2e-gce-master
     trigger-job: 'kubernetes-build'
     test-owner: 'Build Cop'
-    branch: 'master'
+    provider-env: '{gce-provider-env}'
     suffix:
         - 'gce':
-            description: 'Run E2E tests on GCE using the latest successful build.'
+            description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.'
             timeout: 30
+            job-env: |
+                # This is the *only* job that should publish the last green version.
+                export E2E_PUBLISH_GREEN_VERSION="true"
+                # This list should match the list in kubernetes-pull-build-test-e2e-gce.
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export PROJECT="k8s-jkns-e2e-gce"
         - 'gce-slow':
-            description: 'Run slow E2E tests on GCE using the latest successful build.'
+            description: 'Runs slow tests on GCE, sequentially.'
             timeout: 60
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
+                                         --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export PROJECT="k8s-jkns-e2e-gce-slow"
         - 'gce-serial':
-            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GCE using the latest successful build.'
+            description: 'Run [Serial], [Disruptive], tests on GCE.'
             timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="kubernetes-jkns-e2e-gce-serial"
         - 'gce-reboot':
-            description: 'Run [Feature:Reboot] tests on GCE using the latest successful build.'
+            description: 'Run [Feature:Reboot] tests on GCE.'
             timeout: 180
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Reboot\]"
+                export PROJECT="k8s-jkns-e2e-gce-ci-reboot"
         - 'gce-autoscaling':
-            description: 'Run autoscaling E2E tests on GCE using the latest successful build.'
+            description: 'Run autoscaling E2E tests on GCE.'
             timeout: 210
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterSizeAutoscaling\]|\[Feature:InitialResources\] \
+                                         --ginkgo.skip=\[Flaky\]"
+                export PROJECT="k8s-jnks-e2e-gce-autoscaling"
+                # Override GCE default for cluster size autoscaling purposes.
+                export KUBE_ENABLE_CLUSTER_MONITORING="googleinfluxdb"
+                export KUBE_ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
         - 'gce-flaky':
-            description: 'Run E2E tests on GCE using the latest successful build. Limit to known-flaky tests.'
+            description: 'Run the flaky tests on GCE, sequentially.'
             timeout: 180
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Flaky\] \
+                                         --ginkgo.skip=\[Feature:.+\]"
+                export PROJECT="k8s-jkns-e2e-gce-flaky"
         - 'gce-scalability':
-            description: 'Run scalability E2E tests on GCE using the latest successful build.'
+            description: 'Run the performance/scalability tests on GCE. A larger cluster is used.'
             timeout: 120
+            job-env: |
+                # XXX Not a unique project
+                export E2E_NAME="e2e-scalability"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\] \
+                                         --gather-resource-usage=true \
+                                         --gather-metrics-at-teardown=true \
+                                         --gather-logs-sizes=true \
+                                         --output-print-type=json"
+                export PROJECT="kubernetes-jenkins"
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
+                # Override GCE defaults.
+                export MASTER_SIZE="n1-standard-4"
+                export NODE_SIZE="n1-standard-2"
+                export NODE_DISK_SIZE="50GB"
+                export NUM_NODES="100"
+                # Reduce logs verbosity
+                export TEST_CLUSTER_LOG_LEVEL="--v=2"
+                # TODO: Remove when we figure out the reason for occasional failures #19048
+                export KUBELET_TEST_LOG_LEVEL="--v=4"
+                # Increase resync period to simulate production
+                export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
         - 'gce-examples':
-            description: 'Run e2e examples test on GCE using the latest successful Kubernetes build.'
+            description: 'Run E2E examples test on GCE.'
             timeout: 90
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Example\]"
+                export PROJECT="k8s-jkns-e2e-examples"
         - 'gce-ubernetes-lite':
-            description: 'Run E2E tests on GCE across multiple zones using the latest successful build.'
+            description: 'Run all non-flaky, non-slow tests on GCE, sequentially, and in a multi-zone (Ubernetes-lite) cluster.'
             timeout: 150
             emails: '$DEFAULT_RECIPIENTS, quinton@google.com, justin@fathomdb.com'
             test-owner: 'quinton'
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gce-ubelite"
+                export MULTIZONE="true"
+                export KUBE_GCE_ZONE=""
+                export E2E_ZONES="us-central1-a us-central1-b us-central1-f"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -103,21 +165,37 @@
     name: kubernetes-e2e-gke-master
     trigger-job: 'kubernetes-build'
     test-owner: 'GKE on-call'
-    branch: 'master'
     emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
+    provider-env: '{gke-provider-env}'
     suffix:
         - 'gke':
-            description: Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)
+            description: 'Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)'
             timeout: 30
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-ci"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
         - 'gke-slow':
             description: 'Run slow E2E tests on GKE using the latest successful build.'
             timeout: 60
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-slow"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
+                                         --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
         - 'gke-serial':
-            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GKE using the latest successful build.'
+            description: 'Run [Serial], [Disruptive] tests on GKE.'
             timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="jenkins-gke-e2e-serial"
         - 'gke-reboot':
             description: 'Run [Feature:Reboot] tests on GKE using the latest successful build.'
             timeout: 180
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-ci-reboot"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Reboot\]"
         - 'gke-flaky':
             description: |
                 Run flaky e2e tests using the following config:<br>
@@ -128,6 +206,10 @@
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
             timeout: 300
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-ci-flaky"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Flaky\] \
+                                         --ginkgo.skip=\[Feature:.+\]"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -136,6 +218,8 @@
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'GKE on-call'
     branch: 'release-1.1'
+    runner: '{old-runner-1-1}'
+    post-env: ''
     emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
     suffix:
         - 'gke-1.1':
@@ -191,6 +275,8 @@
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'wonderfly@google.com'
     branch: 'release-1.1'
+    runner: '{old-runner-1-1}'
+    post-env: ''
     emails: 'wonderfly@google.com,qzheng@google.com'
     suffix:
         - 'gke-trusty-prod':
@@ -231,6 +317,8 @@
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'Build Cop'
     branch: 'release-1.1'
+    runner: '{old-runner-1-1}'
+    post-env: ''
     suffix:
         - 'gce-release-1.1':
             timeout: 175
@@ -249,6 +337,8 @@
     trigger-job: 'kubernetes-build-1.0'
     test-owner: 'Build Cop'
     branch: 'release-1.0'
+    runner: '{old-runner-1-0}'
+    post-env: ''
     suffix:
         - 'gce-release-1.0':
             timeout: 150
@@ -259,28 +349,58 @@
 - project:
     name: kubernetes-e2e-features
     trigger-job: 'kubernetes-build'
-    branch: 'master'
     suffix:
         - 'gke-ingress':
             description: 'Run [Feature:Ingress] tests on GKE using the latest successful build.'
             timeout: 90
             emails: 'beeps@google.com'
             test-owner: 'beeps'
+            provider-env: '{gke-provider-env}'
+            job-env: |
+                # XXX Not a unique project
+                export E2E_NAME="e2e-gke-ingress"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
+                # TODO: Move this into a different project. Currently, since this test
+                # shares resources with various other networking tests, it's easier to
+                # zero in on the source of a leak if it's run in isolation.
+                export PROJECT="kubernetes-flannel"
         - 'gce-ingress':
-            description: 'Run [Feature:Ingress] tests on GCE using the latest successful build.'
+            description: 'Run [Feature:Ingress] tests on GCE.'
             timeout: 90
             emails: 'beeps@google.com'
             test-owner: 'beeps'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                # XXX Not a unique project
+                export E2E_NAME="e2e-ingress"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
+                # TODO: Move this into a different project. Currently, since this test
+                # shares resources with various other networking tests, so it's easier
+                # to zero in on the source of a leak if it's run in isolation.
+                export PROJECT="kubernetes-flannel"
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
             timeout: 90
             emails: 'beeps@google.com'
             test-owner: 'beeps'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                # XXX Not a unique project
+                export E2E_NAME="e2e-flannel"
+                export PROJECT="kubernetes-flannel"
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
+                # Override GCE defaults.
+                export NETWORK_PROVIDER="flannel"
         - 'gce-es-logging':
             description: 'Run [Feature:Elasticsearch] tests on GCE using the latest successful build.'
             timeout: 90
             emails: '$DEFAULT_RECIPIENTS, mixia@google.com'
             test-owner: 'mixia'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                export PROJECT="kubernetes-es-logging"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Elasticsearch\]"
+                export KUBE_LOGGING_DESTINATION="elasticsearch"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -294,11 +414,22 @@
         - 'aws':
             description: 'Run e2e tests on AWS using the latest successful Kubernetes build.'
             timeout: 240
-            branch: 'master'
+            provider-env: '{aws-provider-env}'
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export PROJECT="k8s-jkns-e2e-aws"
+                export AWS_CONFIG_FILE='/var/lib/jenkins/.aws/credentials'
+                export AWS_SSH_KEY='/var/lib/jenkins/.ssh/kube_aws_rsa'
+                export KUBE_SSH_USER='ubuntu'
+                # This is needed to be able to create PD from the e2e test
+                export AWS_SHARED_CREDENTIALS_FILE='/var/lib/jenkins/.aws/credentials'
         - 'aws-release-1.1':
             description: 'Run e2e tests on AWS using the latest successful 1.1 Kubernetes build.'
             timeout: 240
             branch: 'release-1.1'
+            runner: '{old-runner-1-1}'
+            post-env: ''
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -345,6 +476,30 @@
     timeout: 480
     branch: 'master'
     suffix: 'gce-enormous-cluster'
+    job-env: |
+        # XXX Not a unique project
+        export E2E_NAME="e2e-enormous-cluster"
+        # TODO: Currently run only density test.
+        # Once this is stable, run the whole [Performance] suite.
+        export GINKGO_TEST_ARGS="--ginkgo.focus=starting\s30\spods\sper\snode"
+        export PROJECT="kubernetes-scale"
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
+        # Override GCE defaults.
+        export NETWORK_PROVIDER="flannel"
+        # Temporarily switch of Heapster, as this will not schedule anywhere.
+        # TODO: Think of a solution to enable it.
+        export KUBE_ENABLE_CLUSTER_MONITORING="none"
+        export KUBE_GCE_ZONE="asia-east1-a"
+        export MASTER_SIZE="n1-standard-32"
+        export NODE_SIZE="n1-standard-1"
+        export NODE_DISK_SIZE="50GB"
+        export NUM_NODES="1000"
+        export ALLOWED_NOTREADY_NODES="2"
+        export EXIT_ON_WEAK_ERROR="false"
+        # Reduce logs verbosity
+        export TEST_CLUSTER_LOG_LEVEL="--v=1"
+        # Increase resync period to simulate production
+        export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
