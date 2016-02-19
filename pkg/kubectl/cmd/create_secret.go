@@ -43,7 +43,7 @@ func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 const (
 	secretLong = `
-Create a secret based on a file, directory, or specified literal value
+Create a secret based on a file, directory, or specified literal value.
 
 A single secret may package one or more key/value pairs.
 
@@ -87,7 +87,7 @@ func NewCmdCreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 	return cmd
 }
 
-// CreateSecretGeneric is the implementation the create secret generic command
+// CreateSecretGeneric is the implementation of the create secret generic command
 func CreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
