@@ -558,9 +558,6 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 	if detacher.DetachCallCount != 1 {
 		t.Errorf("Expected Detach to be called")
 	}
-	if detacher.WaitForDetachCallCount != 1 {
-		t.Errorf("Expected WaitForDetach to be called")
-	}
 	if detacher.UnmountDeviceCallCount != 1 {
 		t.Errorf("Expected UnmountDevice to be called")
 	}

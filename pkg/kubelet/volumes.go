@@ -143,7 +143,8 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 			return nil, err
 		}
 		if attacher != nil {
-			err = attacher.Attach(volSpec, kl.hostname)
+			host := &volumeHost{kl}
+			err = attacher.Attach(host, volSpec, kl.hostname)
 			if err != nil {
 				return nil, err
 			}
@@ -153,8 +154,8 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 				return nil, err
 			}
 
-			deviceMountPath := attacher.GetDeviceMountPath(volSpec)
-			if err = attacher.MountDevice(devicePath, deviceMountPath, kl.mounter); err != nil {
+			deviceMountPath := attacher.GetDeviceMountPath(host, volSpec)
+			if err = attacher.MountDevice(volSpec, devicePath, deviceMountPath, kl.mounter); err != nil {
 				return nil, err
 			}
 		}
@@ -303,7 +304,7 @@ func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod,
 		return nil, nil
 	}
 
-	attacher, err := plugin.NewAttacher(spec)
+	attacher, err := plugin.NewAttacher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume attacher for %s: %v", spec.Name(), err)
 	}
@@ -348,10 +349,9 @@ func (kl *Kubelet) newVolumeDetacherFromPlugins(kind string, name string, podUID
 		return nil, nil
 	}
 
-	detacher, err := plugin.NewDetacher(name, podUID)
+	detacher, err := plugin.NewDetacher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s/%s: %v", podUID, kind, err)
 	}
-	glog.V(3).Infof("Used volume plugin %q to detach %s/%s", plugin.Name(), podUID, kind)
 	return detacher, nil
 }

@@ -2021,16 +2021,16 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 					glog.Errorf("Could not unmount the global mount for %q: %v", name, err)
 				}
 
-				err = detacher.Detach(refs[0], kl.hostname)
+				err = detacher.Detach(&volumeHost{kl}, refs[0], kl.hostname)
 				if err != nil {
 					glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
 				}
 
-				// TODO(swagiaal): This will block until the sync loop until device is attached
-				// so all of this should be moved to a mount/unmount manager which does it asynchronously
-				if err = detacher.WaitForDetach(devicePath, maxWaitForVolumeOps); err != nil {
-					glog.Errorf("Error while waiting for detach: %v", err)
-				}
+				go func() {
+					if err = detacher.WaitForDetach(devicePath, maxWaitForVolumeOps); err != nil {
+						glog.Errorf("Error while waiting for detach: %v", err)
+					}
+				}()
 			}
 		}
 	}

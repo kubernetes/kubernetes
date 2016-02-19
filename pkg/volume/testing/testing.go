@@ -189,12 +189,12 @@ func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return volume, nil
 }
 
-func (plugin *FakeVolumePlugin) NewAttacher(spec *Spec) (Attacher, error) {
+func (plugin *FakeVolumePlugin) NewAttacher() (Attacher, error) {
 	plugin.NewAttacherCallCount = plugin.NewAttacherCallCount + 1
 	return plugin.getFakeVolume(&plugin.Attachers), nil
 }
 
-func (plugin *FakeVolumePlugin) NewDetacher(name string, podUID types.UID) (Detacher, error) {
+func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
 	return plugin.getFakeVolume(&plugin.Detachers), nil
 }
@@ -263,7 +263,7 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func (fv *FakeVolume) Attach(spec *Spec, hostName string) error {
+func (fv *FakeVolume) Attach(host VolumeHost, spec *Spec, hostName string) error {
 	fv.AttachCallCount++
 	return nil
 }
@@ -273,17 +273,17 @@ func (fv *FakeVolume) WaitForAttach(spec *Spec, spectimeout time.Duration) (stri
 	return "", nil
 }
 
-func (fv *FakeVolume) GetDeviceMountPath(spec *Spec) string {
+func (fv *FakeVolume) GetDeviceMountPath(host VolumeHost, spec *Spec) string {
 	fv.GetDeviceMountPathCallCount++
 	return ""
 }
 
-func (fv *FakeVolume) MountDevice(devicePath string, deviceMountPath string, mounter mount.Interface) error {
+func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
 	fv.MountDeviceCallCount++
 	return nil
 }
 
-func (fv *FakeVolume) Detach(deviceMountPath string, hostName string) error {
+func (fv *FakeVolume) Detach(host VolumeHost, deviceMountPath string, hostName string) error {
 	fv.DetachCallCount++
 	return nil
 }
