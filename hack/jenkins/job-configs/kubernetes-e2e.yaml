@@ -476,6 +476,7 @@
     timeout: 480
     branch: 'master'
     suffix: 'gce-enormous-cluster'
+    provider-env: '{gce-provider-env}'
     job-env: |
         # XXX Not a unique project
         export E2E_NAME="e2e-enormous-cluster"
