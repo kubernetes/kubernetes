@@ -32,7 +32,7 @@ import (
 
 var (
 	test          = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
-	inputVersions = flag.StringSlice("input", []string{"api/", "extensions/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions\"")
+	inputVersions = flag.StringSlice("input", []string{"api/", "extensions/", "autoscaling/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions/,autoscaling/\"")
 	clientsetName = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
 	clientsetPath = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>. Default to \"k8s.io/kubernetes/pkg/client/clientset_generated/\"")
 	clientsetOnly = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
