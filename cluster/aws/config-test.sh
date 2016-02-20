@@ -34,12 +34,10 @@ fi
 # Dynamically set the master size by the number of nodes, these are guesses
 # TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_NODES} < 50 )); then
-    MASTER_SIZE="t2.micro"
-  elif (( ${NUM_NODES} < 150 )); then
-    MASTER_SIZE="t2.small"
+  if (( ${NUM_NODES} < 150 )); then
+    MASTER_SIZE="m3.medium"
   else
-    MASTER_SIZE="t2.medium"
+    MASTER_SIZE="m3.large"
   fi
 fi
 

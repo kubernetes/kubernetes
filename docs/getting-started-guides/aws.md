@@ -85,6 +85,7 @@ You can override the variables defined in [config-default.sh](http://releases.k8
 ```bash
 export KUBE_AWS_ZONE=eu-west-1c
 export NUM_NODES=2
+export MASTER_SIZE=m3.medium
 export NODE_SIZE=m3.medium
 export AWS_S3_REGION=eu-west-1
 export AWS_S3_BUCKET=mycompany-kubernetes-artifacts
@@ -92,13 +93,43 @@ export INSTANCE_PREFIX=k8s
 ...
 ```
 
-If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_NODES}`. In
-particular, for clusters less than 50 nodes it will use a `t2.micro`, for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with
-greater than 150 nodes it will use a `t2.medium`.
+If you don't specify master and minion sizes, the scripts will attempt to guess
+the correct size of the master and worker nodes based on `${NUM_NODES}`. In
+version 1.2 these default are:
+
+* For the master, for clusters of less than 150 nodes it will use an
+  `m3.medium`, for clusters of greater than 150 nodes it will use an
+  `m3.large`.
+
+* For worker nodes, for clusters less than 50 nodes it will use a `t2.micro`,
+  for clusters between 50 and 150 nodes it will use a `t2.small` and for
+  clusters with greater than 150 nodes it will use a `t2.medium`.
 
 WARNING: beware that `t2` instances receive a limited number of CPU credits per hour and might not be suitable for clusters where the CPU is used
 consistently. As a rough estimation, consider 15 pods/node the absolute limit a `t2.large` instance can handle before it starts exhausting its CPU credits
 steadily, although this number depends heavily on the usage.
+
+In prior versions of kubernetes, we defaulted the master node to a t2-class
+instance, but found that this sometimes gave hard-to-diagnose problems when the
+master ran out of memory or CPU credits.  If you are running a test cluster
+and want to save money, you can specify `export MASTER_SIZE=t2.micro` but if
+your master pauses do check the CPU credits in the AWS console.
+
+For production usage, we recommend at least `export MASTER_SIZE=m3.medium` and
+`export NODE_SIZE=m3.medium`.  And once you get above a handful of nodes, be
+aware that one m3.large instance has more storage than two m3.medium instances,
+for the same price.
+
+We generally recommend the m3 instances over the m4 instances, because the m3
+instances include local instance storage.  Historically local instance storage
+has been more reliable than AWS EBS, and performance should be more consistent.
+The ephemeral nature of this storage is a match for ephemeral container
+workloads also!
+
+If you use an m4 instance, or another instance type which does not have local
+instance storage, you may want to increase the `NODE_ROOT_DISK_SIZE` value,
+although the default value of 32 is probably sufficient for the smaller
+instance types in the m4 family.
 
 The script will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
 If these already exist, make sure you want them to be used here.
