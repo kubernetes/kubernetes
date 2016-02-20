@@ -117,23 +117,41 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 	} else {
 		kubeConfigFiles = append(kubeConfigFiles, rules.Precedence...)
+	}
 
+	kubeconfigs := []*clientcmdapi.Config{}
+	// read and cache the config files so that we only look at them once
+	for _, filename := range kubeConfigFiles {
+		if len(filename) == 0 {
+			// no work to do
+			continue
+		}
+
+		config, err := LoadFromFile(filename)
+		if os.IsNotExist(err) {
+			// skip missing files
+			continue
+		}
+		if err != nil {
+			errlist = append(errlist, fmt.Errorf("Error loading config file \"%s\": %v", filename, err))
+			continue
+		}
+
+		kubeconfigs = append(kubeconfigs, config)
 	}
 
 	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
-	for _, file := range kubeConfigFiles {
-		if err := mergeConfigWithFile(mapConfig, file); err != nil {
-			errlist = append(errlist, err)
-		}
+	for _, kubeconfig := range kubeconfigs {
+		mergo.Merge(mapConfig, kubeconfig)
 	}
 
 	// merge all of the struct values in the reverse order so that priority is given correctly
 	// errors are not added to the list the second time
 	nonMapConfig := clientcmdapi.NewConfig()
-	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
-		file := kubeConfigFiles[i]
-		mergeConfigWithFile(nonMapConfig, file)
+	for i := len(kubeconfigs) - 1; i >= 0; i-- {
+		kubeconfig := kubeconfigs[i]
+		mergo.Merge(nonMapConfig, kubeconfig)
 	}
 
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
@@ -194,25 +212,6 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return err
 		}
 	}
-
-	return nil
-}
-
-func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) error {
-	if len(filename) == 0 {
-		// no work to do
-		return nil
-	}
-
-	config, err := LoadFromFile(filename)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("Error loading config file \"%s\": %v", filename, err)
-	}
-
-	mergo.Merge(startingConfig, config)
 
 	return nil
 }
