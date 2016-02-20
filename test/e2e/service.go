@@ -48,7 +48,11 @@ import (
 const kubeProxyLagTimeout = 5 * time.Minute
 
 // Maximum time a load balancer is allowed to not respond after creation.
-const loadBalancerLagTimeout = 2 * time.Minute
+const loadBalancerLagTimeoutDefault = 2 * time.Minute
+
+// On AWS there is a delay between ELB creation and serving traffic;
+// a few minutes is typical, so use 10m.
+const loadBalancerLagTimeoutAWS = 10 * time.Minute
 
 // How long to wait for a load balancer to be created/modified.
 //TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
@@ -403,6 +407,13 @@ var _ = Describe("Services", func() {
 		// requires cloud load-balancer support
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
+		loadBalancerSupportsUDP := !providerIs("aws")
+
+		loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
+		if providerIs("aws") {
+			loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
+		}
+
 		// This test is more monolithic than we'd like because LB turnup can be
 		// very slow, so we lumped all the tests into one LB lifecycle.
 
@@ -493,10 +504,12 @@ var _ = Describe("Services", func() {
 			s.Spec.Type = api.ServiceTypeLoadBalancer
 		})
 
-		By("changing the UDP service to type=LoadBalancer")
-		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
-			s.Spec.Type = api.ServiceTypeLoadBalancer
-		})
+		if loadBalancerSupportsUDP {
+			By("changing the UDP service to type=LoadBalancer")
+			udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+			})
+		}
 
 		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
@@ -511,7 +524,6 @@ var _ = Describe("Services", func() {
 		tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 		Logf("TCP load balancer: %s", tcpIngressIP)
 
-		By("waiting for the UDP service " + serviceName + " to have a load balancer")
 		if providerIs("gce", "gke") {
 			// Do this as early as possible, which overrides the `defer` above.
 			// This is mostly out of fear of leaking the IP in a timeout case
@@ -528,19 +540,22 @@ var _ = Describe("Services", func() {
 			}
 		}
 
-		By("waiting for the UDP service to have a load balancer")
-		// 2nd one should be faster since they ran in parallel.
-		udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
-		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
-		if udpService.Spec.Ports[0].NodePort != udpNodePort {
-			Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
-		}
-		udpIngressIP := getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
-		Logf("UDP load balancer: %s", udpIngressIP)
+		var udpIngressIP string
+		if loadBalancerSupportsUDP {
+			By("waiting for the UDP service to have a load balancer")
+			// 2nd one should be faster since they ran in parallel.
+			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
+			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+			if udpService.Spec.Ports[0].NodePort != udpNodePort {
+				Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
+			}
+			udpIngressIP = getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
+			Logf("UDP load balancer: %s", udpIngressIP)
 
-		By("verifying that TCP and UDP use different load balancers")
-		if tcpIngressIP == udpIngressIP {
-			Failf("Load balancers are not different: %s", getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
+			By("verifying that TCP and UDP use different load balancers")
+			if tcpIngressIP == udpIngressIP {
+				Failf("Load balancers are not different: %s", getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
+			}
 		}
 
 		By("hitting the TCP service's NodePort")
@@ -552,8 +567,10 @@ var _ = Describe("Services", func() {
 		By("hitting the TCP service's LoadBalancer")
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		By("hitting the UDP service's LoadBalancer")
-		jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
 
 		// Change the services' node ports.
 
@@ -572,13 +589,17 @@ var _ = Describe("Services", func() {
 
 		By("changing the UDP service's NodePort")
 		udpService = jig.ChangeServiceNodePortOrFail(ns2, udpService.Name, udpNodePort)
-		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		if loadBalancerSupportsUDP {
+			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		} else {
+			jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
+		}
 		udpNodePortOld := udpNodePort
 		udpNodePort = udpService.Spec.Ports[0].NodePort
 		if udpNodePort == udpNodePortOld {
 			Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
 		}
-		if getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
+		if loadBalancerSupportsUDP && getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
 			Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
 		Logf("UDP node port: %d", udpNodePort)
@@ -598,8 +619,10 @@ var _ = Describe("Services", func() {
 		By("hitting the TCP service's LoadBalancer")
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		By("hitting the UDP service's LoadBalancer")
-		jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
 
 		// Change the services' main ports.
 
@@ -624,14 +647,18 @@ var _ = Describe("Services", func() {
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 			s.Spec.Ports[0].Port++
 		})
-		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		if loadBalancerSupportsUDP {
+			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		} else {
+			jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
+		}
 		if udpService.Spec.Ports[0].Port != svcPort {
 			Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
 		}
 		if udpService.Spec.Ports[0].NodePort != udpNodePort {
 			Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
 		}
-		if getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
+		if loadBalancerSupportsUDP && getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
 			Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
 
@@ -646,8 +673,10 @@ var _ = Describe("Services", func() {
 		By("hitting the TCP service's LoadBalancer")
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB
 
-		By("hitting the UDP service's LoadBalancer")
-		jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB)
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB)
+		}
 
 		// Change the services back to ClusterIP.
 
@@ -665,9 +694,11 @@ var _ = Describe("Services", func() {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
 		})
-		// Wait for the load balancer to be destroyed asynchronously
-		udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
-		jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
+		if loadBalancerSupportsUDP {
+			// Wait for the load balancer to be destroyed asynchronously
+			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
+			jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
+		}
 
 		By("checking the TCP NodePort is closed")
 		jig.TestNotReachableHTTP(nodeIP, tcpNodePort, kubeProxyLagTimeout)
@@ -678,8 +709,10 @@ var _ = Describe("Services", func() {
 		By("checking the TCP LoadBalancer is closed")
 		jig.TestNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		By("checking the UDP LoadBalancer is closed")
-		jig.TestNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		if loadBalancerSupportsUDP {
+			By("checking the UDP LoadBalancer is closed")
+			jig.TestNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
 	})
 
 	It("should prevent NodePort collisions", func() {
