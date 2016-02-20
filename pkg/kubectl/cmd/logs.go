@@ -61,6 +61,7 @@ type LogsOptions struct {
 	ClientMapper resource.ClientMapper
 	Decoder      runtime.Decoder
 
+	Object        runtime.Object
 	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
 
 	Out io.Writer
@@ -150,13 +151,26 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		logOptions.SinceSeconds = &sec
 	}
 	o.Options = logOptions
-
-	o.Mapper, o.Typer = f.Object()
-	o.Decoder = f.Decoder(true)
-	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.LogsForObject = f.LogsForObject
-
+	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
+
+	mapper, typer := f.Object()
+	decoder := f.Decoder(true)
+	if o.Object == nil {
+		infos, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
+			NamespaceParam(o.Namespace).DefaultNamespace().
+			ResourceNames("pods", o.ResourceArg).
+			SingleResourceType().
+			Do().Infos()
+		if err != nil {
+			return err
+		}
+		if len(infos) != 1 {
+			return errors.New("expected a resource")
+		}
+		o.Object = infos[0].Object
+	}
 
 	return nil
 }
@@ -178,20 +192,7 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() (int64, error) {
-	infos, err := resource.NewBuilder(o.Mapper, o.Typer, o.ClientMapper, o.Decoder).
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		ResourceNames("pods", o.ResourceArg).
-		SingleResourceType().
-		Do().Infos()
-	if err != nil {
-		return 0, err
-	}
-	if len(infos) != 1 {
-		return 0, errors.New("expected a resource")
-	}
-	info := infos[0]
-
-	req, err := o.LogsForObject(info.Object, o.Options)
+	req, err := o.LogsForObject(o.Object, o.Options)
 	if err != nil {
 		return 0, err
 	}
