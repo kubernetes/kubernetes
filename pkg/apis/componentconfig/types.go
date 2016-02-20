@@ -78,24 +78,6 @@ const (
 	ProxyModeIPTables  ProxyMode = "iptables"
 )
 
-// HairpinMode denotes how the kubelet should configure networking to handle
-// hairpin packets.
-type HairpinMode string
-
-// Enum settings for different ways to handle hairpin packets.
-const (
-	// Set the hairpin flag on the veth of containers in the respective
-	// container runtime.
-	HairpinVeth = "hairpin-veth"
-	// Make the container bridge promiscuous. This will force it to accept
-	// hairpin packets, even if the flag isn't set on ports of the bridge.
-	PromiscuousBridge = "promiscuous-bridge"
-	// Neither of the above. If the kubelet is started in this hairpin mode
-	// and kube-proxy is running in iptables mode, hairpin packets will be
-	// dropped by the container bridge.
-	HairpinNone = "none"
-)
-
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
 	// config is the path to the config file or directory of files
@@ -270,16 +252,11 @@ type KubeletConfiguration struct {
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`
-	// How should the kubelet configure the container bridge for hairpin packets.
-	// Setting this flag allows endpoints in a Service to loadbalance back to
-	// themselves if they should try to access their own Service. Values:
-	//   "promiscuous-bridge": make the container bridge promiscuous.
-	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
-	//   "none":               do nothing.
-	// Setting --configure-cbr0 to false implies that to achieve hairpin NAT
-	// one must set --hairpin-mode=veth-flag, because bridge assumes the
-	// existence of a container bridge named cbr0.
-	HairpinMode string `json:"hairpinMode"`
+	// Should the kubelet set the hairpin flag on veth interfaces for containers
+	// it creates? Setting this flag allows endpoints in a Service to
+	// loadbalance back to themselves if they should try to access their own
+	// Service.
+	HairpinMode bool `json:"configureHairpinMode"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int `json:"maxPods"`
 	// dockerExecHandlerName is the handler to use when executing a command
