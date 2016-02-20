@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   name: spark-worker-controller
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     component: spark-worker
   template:
@@ -20,3 +20,4 @@ spec:
           resources:
             requests:
               cpu: 100m
+
