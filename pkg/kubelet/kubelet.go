@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -205,7 +204,7 @@ func NewMainKubelet(
 	enableCustomMetrics bool,
 	volumeStatsAggPeriod time.Duration,
 	containerRuntimeOptions []kubecontainer.Option,
-	hairpinMode string,
+	hairpinMode bool,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -327,7 +326,6 @@ func NewMainKubelet(
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
-		hairpinMode:                  componentconfig.HairpinMode(hairpinMode),
 	}
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod)
@@ -385,7 +383,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			hairpinMode == componentconfig.HairpinVeth,
+			hairpinMode,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
@@ -685,11 +683,6 @@ type Kubelet struct {
 
 	// support gathering custom metrics.
 	enableCustomMetrics bool
-
-	// How the Kubelet should setup hairpin NAT. Can take the values: "promiscuous-bridge"
-	// (make cbr0 promiscuous), "hairpin-veth" (set the hairpin flag on veth interfaces)
-	// or "none" (do nothing).
-	hairpinMode componentconfig.HairpinMode
 }
 
 // Validate given node IP belongs to the current host
@@ -2640,7 +2633,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge); err != nil {
+	if err := ensureCbr0(cidr); err != nil {
 		return err
 	}
 	if kl.shaper == nil {
