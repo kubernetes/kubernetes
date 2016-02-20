@@ -645,7 +645,11 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 		} else {
 			transitionTime = savedNodeStatus.readyTransitionTimestamp
 		}
-		glog.V(3).Infof("Nodes ReadyCondition updated. Updating timestamp: %+v\n vs %+v.", savedNodeStatus.status, node.Status)
+		if glog.V(5) {
+			glog.Infof("Node %s ReadyCondition updated. Updating timestamp: %+v vs %+v.", node.Name, savedNodeStatus.status, node.Status)
+		} else {
+			glog.V(3).Infof("Node %s ReadyCondition updated. Updating timestamp.", node.Name)
+		}
 		savedNodeStatus = nodeStatusData{
 			status:                   node.Status,
 			probeTimestamp:           nc.now(),
