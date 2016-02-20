@@ -2124,10 +2124,12 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		}
 		if totalCreated > maxCreated {
 			logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
 			logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
@@ -2136,10 +2138,12 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			// Verify replica sets.
 			if deploymentutil.GetReplicaCountForReplicaSets(oldRSs) != 0 {
 				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+				logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 				return false, fmt.Errorf("old replica sets are not fully scaled down")
 			}
 			if deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) != desiredUpdatedReplicas {
 				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
+				logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 				return false, fmt.Errorf("new replica sets is not fully scaled up")
 			}
 			return true, nil
@@ -2168,6 +2172,19 @@ func logReplicaSetsOfDeployment(deploymentName string, oldRSs []*extensions.Repl
 		Logf("Old ReplicaSets (%d/%d) of deployment %s: %+v", i+1, len(oldRSs), deploymentName, oldRSs[i])
 	}
 	Logf("New ReplicaSet of deployment %s: %+v", deploymentName, newRS)
+}
+
+func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) {
+	allPods, err := deploymentutil.GetPodsForReplicaSets(c, rss)
+	if err == nil {
+		for _, pod := range allPods {
+			availability := "not available"
+			if deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
+				availability = "available"
+			}
+			Logf("Pod %s is %s: %+v", pod.Name, availability, pod)
+		}
+	}
 }
 
 // Waits for the number of events on the given object to reach a desired count.
