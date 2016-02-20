@@ -14,7 +14,7 @@
 
 FROM golang:latest
 
-ADD . /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src
+ADD . /go/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src
 
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/
 RUN cd _src/ && go get && go build -o ../bin/guestbook
