@@ -20,19 +20,18 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/docker/docker/pkg/term"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/interrupt"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 const (
@@ -52,6 +51,8 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 		In:  cmdIn,
 		Out: cmdOut,
 		Err: cmdErr,
+
+		CommandName: "kubectl attach",
 
 		Attach: &DefaultRemoteAttach{},
 	}
@@ -96,10 +97,16 @@ type AttachOptions struct {
 	ContainerName string
 	Stdin         bool
 	TTY           bool
+	CommandName   string
+
+	// InterruptParent, if set, is used to handle interrupts while attached
+	InterruptParent *interrupt.Handler
 
 	In  io.Reader
 	Out io.Writer
 	Err io.Writer
+
+	Pod *api.Pod
 
 	Attach RemoteAttach
 	Client *client.Client
@@ -154,80 +161,65 @@ func (p *AttachOptions) Validate() error {
 
 // Run executes a validated remote execution against a pod.
 func (p *AttachOptions) Run() error {
-	pod, err := p.Client.Pods(p.Namespace).Get(p.PodName)
-	if err != nil {
-		return err
+	if p.Pod == nil {
+		pod, err := p.Client.Pods(p.Namespace).Get(p.PodName)
+		if err != nil {
+			return err
+		}
+		if pod.Status.Phase != api.PodRunning {
+			return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
+		}
+		p.Pod = pod
+		// TODO: convert this to a clean "wait" behavior
 	}
+	pod := p.Pod
 
-	if pod.Status.Phase != api.PodRunning {
-		return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
-	}
+	// ensure we can recover the terminal while attached
+	t := term.TTY{Parent: p.InterruptParent}
 
-	var stdin io.Reader
+	// check for TTY
 	tty := p.TTY
-
 	containerToAttach := p.GetContainer(pod)
 	if tty && !containerToAttach.TTY {
 		tty = false
-		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s doesn't allocate one\n", containerToAttach.Name)
+		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 	}
-
-	// TODO: refactor with terminal helpers from the edit utility once that is merged
 	if p.Stdin {
-		stdin = p.In
-		if tty {
-			if file, ok := stdin.(*os.File); ok {
-				inFd := file.Fd()
-				if term.IsTerminal(inFd) {
-					oldState, err := term.SetRawTerminal(inFd)
-					if err != nil {
-						glog.Fatal(err)
-					}
-					fmt.Fprintln(p.Out, "\nHit enter for command prompt")
-					// this handles a clean exit, where the command finished
-					defer term.RestoreTerminal(inFd, oldState)
-
-					// SIGINT is handled by term.SetRawTerminal (it runs a goroutine that listens
-					// for SIGINT and restores the terminal before exiting)
-
-					// this handles SIGTERM
-					sigChan := make(chan os.Signal, 1)
-					signal.Notify(sigChan, syscall.SIGTERM)
-					go func() {
-						<-sigChan
-						term.RestoreTerminal(inFd, oldState)
-						os.Exit(0)
-					}()
-				} else {
-					fmt.Fprintln(p.Err, "STDIN is not a terminal")
-				}
-			} else {
-				tty = false
-				fmt.Fprintln(p.Err, "Unable to use a TTY - input is not the right kind of file")
-			}
+		t.In = p.In
+		if tty && !t.IsTerminal() {
+			tty = false
+			fmt.Fprintln(p.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
 		}
 	}
+	t.Raw = tty
 
-	// TODO: consider abstracting into a client invocation or client helper
-	req := p.Client.RESTClient.Post().
-		Resource("pods").
-		Name(pod.Name).
-		Namespace(pod.Namespace).
-		SubResource("attach")
-	req.VersionedParams(&api.PodAttachOptions{
-		Container: containerToAttach.Name,
-		Stdin:     stdin != nil,
-		Stdout:    p.Out != nil,
-		Stderr:    p.Err != nil,
-		TTY:       tty,
-	}, api.ParameterCodec)
+	fn := func() error {
+		if tty {
+			fmt.Fprintln(p.Out, "\nHit enter for command prompt")
+		}
+		// TODO: consider abstracting into a client invocation or client helper
+		req := p.Client.RESTClient.Post().
+			Resource("pods").
+			Name(pod.Name).
+			Namespace(pod.Namespace).
+			SubResource("attach")
+		req.VersionedParams(&api.PodAttachOptions{
+			Container: containerToAttach.Name,
+			Stdin:     p.In != nil,
+			Stdout:    p.Out != nil,
+			Stderr:    p.Err != nil,
+			TTY:       tty,
+		}, api.ParameterCodec)
 
-	err = p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
-	if err != nil {
+		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, tty)
+	}
+
+	if err := t.Safe(fn); err != nil {
 		return err
 	}
+
 	if p.Stdin && tty && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
-		fmt.Fprintf(p.Out, "Session ended, resume using 'kubectl attach %s -c %s -i -t' command when the pod is running\n", pod.Name, containerToAttach.Name)
+		fmt.Fprintf(p.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", p.CommandName, pod.Name, containerToAttach.Name)
 	}
 	return nil
 }
