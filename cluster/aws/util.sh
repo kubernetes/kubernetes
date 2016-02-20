@@ -57,7 +57,7 @@ fi
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION}
 
 case "${KUBE_OS_DISTRIBUTION}" in
-  trusty|wheezy|jessie|vivid|coreos)
+  trusty|wheezy|jessie|vivid|wily|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -271,6 +271,9 @@ case "${KUBE_OS_DISTRIBUTION}" in
     ;;
   vivid)
     detect-vivid-image
+    ;;
+  wily)
+    detect-wily-image
     ;;
   wheezy)
     detect-wheezy-image

@@ -117,7 +117,7 @@
     {% set kubelet_container= "--kubelet-cgroups=/kubelet" -%}
   {% endif %}
 {% endif -%}
-{% if grains['oscodename'] == 'vivid' -%}
+{% if grains['oscodename'] in ['vivid','wily'] -%}
   {% set cgroup_root = "--cgroup-root=docker" -%}
 {% endif -%}
 
