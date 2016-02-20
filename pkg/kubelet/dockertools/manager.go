@@ -1607,7 +1607,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))
 	}()
-	glog.V(4).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
+	glog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
 
 	containersToStart := make(map[int]string)
 	containersToKeep := make(map[kubecontainer.DockerID]int)
