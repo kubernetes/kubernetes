@@ -161,7 +161,6 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa extensions.Ho
 	}
 
 	return replicas, string(byteStatusList), timestamp, nil
-
 }
 
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
@@ -182,45 +181,55 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	cmStatus := ""
 	cmTimestamp := time.Time{}
 
-	if hpa.Spec.CPUUtilization != nil {
-		cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
-		if err != nil {
-			a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
-			return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
-		}
-	}
-
-	if cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]; cmAnnotationFound {
-		cmDesiredReplicas, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
-		if err != nil {
-			a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
-			return fmt.Errorf("failed to compute desired number of replicas based on Custom Metrics for %s: %v", reference, err)
-		}
-	}
-
 	desiredReplicas := 0
-	timestamp := time.Time{}
+	timestamp := time.Now()
 
-	if cpuDesiredReplicas > desiredReplicas {
-		desiredReplicas = cpuDesiredReplicas
-		timestamp = cpuTimestamp
-	}
-	if cmDesiredReplicas > desiredReplicas {
-		desiredReplicas = cmDesiredReplicas
-		timestamp = cmTimestamp
-	}
-
-	if hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas {
-		desiredReplicas = *hpa.Spec.MinReplicas
-	}
-
-	// TODO: remove when pod idling is done.
-	if desiredReplicas == 0 {
-		desiredReplicas = 1
-	}
-
-	if desiredReplicas > hpa.Spec.MaxReplicas {
+	if currentReplicas > hpa.Spec.MaxReplicas {
 		desiredReplicas = hpa.Spec.MaxReplicas
+	} else if hpa.Spec.MinReplicas != nil && currentReplicas < *hpa.Spec.MinReplicas {
+		desiredReplicas = *hpa.Spec.MinReplicas
+	} else if currentReplicas == 0 {
+		desiredReplicas = 1
+	} else {
+		// All basic scenarios covered, the state should be sane, lets use metrics.
+
+		if hpa.Spec.CPUUtilization != nil {
+			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
+			if err != nil {
+				a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
+				return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
+			}
+		}
+
+		if cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]; cmAnnotationFound {
+			cmDesiredReplicas, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
+			if err != nil {
+				a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
+				return fmt.Errorf("failed to compute desired number of replicas based on Custom Metrics for %s: %v", reference, err)
+			}
+		}
+
+		if cpuDesiredReplicas > desiredReplicas {
+			desiredReplicas = cpuDesiredReplicas
+			timestamp = cpuTimestamp
+		}
+		if cmDesiredReplicas > desiredReplicas {
+			desiredReplicas = cmDesiredReplicas
+			timestamp = cmTimestamp
+		}
+
+		if hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas {
+			desiredReplicas = *hpa.Spec.MinReplicas
+		}
+
+		// TODO: remove when pod idling is done.
+		if desiredReplicas == 0 {
+			desiredReplicas = 1
+		}
+
+		if desiredReplicas > hpa.Spec.MaxReplicas {
+			desiredReplicas = hpa.Spec.MaxReplicas
+		}
 	}
 	rescale := false
 
