@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM google/golang:latest
+FROM golang:latest
 
-ADD . /go/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src
+ADD . /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src
 
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/
 RUN cd _src/ && go get && go build -o ../bin/guestbook
