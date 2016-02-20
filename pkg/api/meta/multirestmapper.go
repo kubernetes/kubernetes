@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
@@ -50,72 +51,148 @@ func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string,
 }
 
 func (m MultiRESTMapper) ResourcesFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
+	allGVRs := []unversioned.GroupVersionResource{}
 	for _, t := range m {
 		gvrs, err := t.ResourcesFor(resource)
 		// ignore "no match" errors, but any other error percolates back up
-		if !IsNoResourceMatchError(err) {
-			return gvrs, err
+		if err != nil && !IsNoResourceMatchError(err) {
+			return nil, err
+		}
+
+		// walk the existing values to de-dup
+		for _, curr := range gvrs {
+			found := false
+			for _, existing := range allGVRs {
+				if curr == existing {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				allGVRs = append(allGVRs, curr)
+			}
 		}
 	}
-	return nil, &NoResourceMatchError{PartialResource: resource}
+
+	if len(allGVRs) == 0 {
+		return nil, &NoResourceMatchError{PartialResource: resource}
+	}
+
+	return allGVRs, nil
 }
 
-// KindsFor provides the Kind mappings for the REST resources. This implementation supports multiple REST schemas and returns
-// the first match.
 func (m MultiRESTMapper) KindsFor(resource unversioned.GroupVersionResource) (gvk []unversioned.GroupVersionKind, err error) {
+	allGVKs := []unversioned.GroupVersionKind{}
 	for _, t := range m {
 		gvks, err := t.KindsFor(resource)
 		// ignore "no match" errors, but any other error percolates back up
-		if !IsNoResourceMatchError(err) {
-			return gvks, err
+		if err != nil && !IsNoResourceMatchError(err) {
+			return nil, err
+		}
+
+		// walk the existing values to de-dup
+		for _, curr := range gvks {
+			found := false
+			for _, existing := range allGVKs {
+				if curr == existing {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				allGVKs = append(allGVKs, curr)
+			}
 		}
 	}
-	return nil, &NoResourceMatchError{PartialResource: resource}
+
+	if len(allGVKs) == 0 {
+		return nil, &NoResourceMatchError{PartialResource: resource}
+	}
+
+	return allGVKs, nil
 }
 
 func (m MultiRESTMapper) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
-	for _, t := range m {
-		gvr, err := t.ResourceFor(resource)
-		// ignore "no match" errors, but any other error percolates back up
-		if !IsNoResourceMatchError(err) {
-			return gvr, err
-		}
+	resources, err := m.ResourcesFor(resource)
+	if err != nil {
+		return unversioned.GroupVersionResource{}, err
 	}
-	return unversioned.GroupVersionResource{}, &NoResourceMatchError{PartialResource: resource}
+	if len(resources) == 1 {
+		return resources[0], nil
+	}
+
+	preferredResources := getMostPreferredVersionForResource(resources)
+	if len(preferredResources) == 1 {
+		return preferredResources[0], nil
+	}
+
+	return unversioned.GroupVersionResource{}, &AmbiguousResourceError{PartialResource: resource, MatchingResources: resources}
 }
 
-// KindsFor provides the Kind mapping for the REST resources. This implementation supports multiple REST schemas and returns
-// the first match.
 func (m MultiRESTMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
-	for _, t := range m {
-		gvk, err := t.KindFor(resource)
-		// ignore "no match" errors, but any other error percolates back up
-		if !IsNoResourceMatchError(err) {
-			return gvk, err
-		}
+	kinds, err := m.KindsFor(resource)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
 	}
-	return unversioned.GroupVersionKind{}, &NoResourceMatchError{PartialResource: resource}
+	if len(kinds) == 1 {
+		return kinds[0], nil
+	}
+
+	// TODO for each group, choose the most preferred (first) version.  This keeps us consistent with code today.
+	// eventually, we'll need a RESTMapper that is aware of what's available server-side and deconflicts that with
+	// user preferences
+	preferredKinds := getMostPreferredVersionForKind(kinds)
+	if len(preferredKinds) == 1 {
+		return preferredKinds[0], nil
+	}
+
+	return unversioned.GroupVersionKind{}, &AmbiguousResourceError{PartialResource: resource, MatchingKinds: kinds}
 }
 
 // RESTMapping provides the REST mapping for the resource based on the
 // kind and version. This implementation supports multiple REST schemas and
 // return the first match.
-func (m MultiRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
+func (m MultiRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error) {
+	allMappings := []*RESTMapping{}
+	errors := []error{}
+
 	for _, t := range m {
-		mapping, err = t.RESTMapping(gk, versions...)
-		if err == nil {
-			return
+		currMapping, err := t.RESTMapping(gk, versions...)
+		// ignore "no match" errors, but any other error percolates back up
+		if err != nil {
+			errors = append(errors, err)
+			continue
 		}
+
+		allMappings = append(allMappings, currMapping)
 	}
-	return
+
+	// if we got exactly one mapping, then use it even if other requested failed
+	if len(allMappings) == 1 {
+		return allMappings[0], nil
+	}
+	if len(errors) > 0 {
+		return nil, utilerrors.NewAggregate(errors)
+	}
+	if len(allMappings) == 0 {
+		return nil, fmt.Errorf("no match found for %v in %v", gk, versions)
+	}
+
+	return nil, fmt.Errorf("multiple matches found for %v in %v", gk, versions)
 }
 
 // AliasesForResource finds the first alias response for the provided mappers.
-func (m MultiRESTMapper) AliasesForResource(alias string) (aliases []string, ok bool) {
+func (m MultiRESTMapper) AliasesForResource(alias string) ([]string, bool) {
+	allAliases := []string{}
+	handled := false
+
 	for _, t := range m {
-		if aliases, ok = t.AliasesForResource(alias); ok {
-			return
+		if currAliases, currOk := t.AliasesForResource(alias); currOk {
+			allAliases = append(allAliases, currAliases...)
+			handled = true
 		}
 	}
-	return nil, false
+	return allAliases, handled
 }

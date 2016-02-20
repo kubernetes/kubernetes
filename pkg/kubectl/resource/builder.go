@@ -440,15 +440,27 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r})
+		gvks, err := b.mapper.KindsFor(unversioned.GroupVersionResource{Resource: r})
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return nil, err
+		// the list is in most-preferred to least preferred, so iterate until we find a hit
+		var firstErr error
+		for _, gvk := range gvks {
+			mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+			if err == nil {
+				firstErr = nil
+				mappings = append(mappings, mapping)
+				break
+			}
+
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
-		mappings = append(mappings, mapping)
+		if firstErr != nil {
+			return nil, firstErr
+		}
 	}
 	return mappings, nil
 }
@@ -460,14 +472,28 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if _, ok := mappings[r.Resource]; ok {
 			continue
 		}
-		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r.Resource})
+		gvks, err := b.mapper.KindsFor(unversioned.GroupVersionResource{Resource: r.Resource})
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return nil, err
+		// the list is in most-preferred to least preferred, so iterate until we find a hit
+		var firstErr error
+		var mapping *meta.RESTMapping
+		for _, gvk := range gvks {
+			mapping, err = b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+			if err == nil {
+				firstErr = nil
+				break
+			}
+
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
+		if firstErr != nil {
+			return nil, firstErr
+		}
+
 		mappings[mapping.Resource] = mapping
 		mappings[r.Resource] = mapping
 		canonical[mapping.Resource] = struct{}{}
