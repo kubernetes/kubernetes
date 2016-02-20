@@ -134,7 +134,7 @@ var _ = Describe("EmptyDir wrapper volumes", func() {
 				Containers: []api.Container{
 					{
 						Name:  "secret-test",
-						Image: "gcr.io/google_containers/test-webserver",
+						Image: "gcr.io/google_containers/test-webserver:e2e",
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      volumeName,
