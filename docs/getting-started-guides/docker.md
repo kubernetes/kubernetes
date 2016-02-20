@@ -84,7 +84,14 @@ parameters as follows:
     ```
 
 4. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
-   a value such as "1.0.7".
+   a value such as "1.0.7". If you'd like to use the latest released version of
+   Kubernetes, run the following:
+
+```
+sh
+export K8S_VERSION=`curl -sS
+https://storage.googleapis.com/kubernetes-release/release/stable.txt`
+```
 
 ### Step One: Run etcd
 
