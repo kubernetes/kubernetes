@@ -1094,6 +1094,32 @@ func (x *ProxyMode) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
+func (x HairpinMode) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	yym1 := z.EncBinary()
+	_ = yym1
+	if false {
+	} else if z.HasExtensions() && z.EncExt(x) {
+	} else {
+		r.EncodeString(codecSelferC_UTF81234, string(x))
+	}
+}
+
+func (x *HairpinMode) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym1 := z.DecBinary()
+	_ = yym1
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		*((*string)(x)) = r.DecodeString()
+	}
+}
+
 func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
@@ -2354,17 +2380,17 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 				_ = yym194
 				if false {
 				} else {
-					r.EncodeBool(bool(x.HairpinMode))
+					r.EncodeString(codecSelferC_UTF81234, string(x.HairpinMode))
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("configureHairpinMode"))
+				r.EncodeString(codecSelferC_UTF81234, string("hairpinMode"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				yym195 := z.EncBinary()
 				_ = yym195
 				if false {
 				} else {
-					r.EncodeBool(bool(x.HairpinMode))
+					r.EncodeString(codecSelferC_UTF81234, string(x.HairpinMode))
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -3218,11 +3244,11 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			} else {
 				x.ConfigureCBR0 = bool(r.DecodeBool())
 			}
-		case "configureHairpinMode":
+		case "hairpinMode":
 			if r.TryDecodeAsNil() {
-				x.HairpinMode = false
+				x.HairpinMode = ""
 			} else {
-				x.HairpinMode = bool(r.DecodeBool())
+				x.HairpinMode = string(r.DecodeString())
 			}
 		case "maxPods":
 			if r.TryDecodeAsNil() {
@@ -4373,9 +4399,9 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.HairpinMode = false
+		x.HairpinMode = ""
 	} else {
-		x.HairpinMode = bool(r.DecodeBool())
+		x.HairpinMode = string(r.DecodeString())
 	}
 	yyj91++
 	if yyhl91 {
