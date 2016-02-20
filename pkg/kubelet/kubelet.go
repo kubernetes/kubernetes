@@ -970,7 +970,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:   kl.nodeName,
-			Labels: map[string]string{"kubernetes.io/hostname": kl.hostname},
+			Labels: map[string]string{unversioned.LabelHostname: kl.hostname},
 		},
 		Spec: api.NodeSpec{
 			Unschedulable: !kl.registerSchedulable,
