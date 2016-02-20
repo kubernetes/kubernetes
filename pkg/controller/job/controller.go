@@ -288,6 +288,14 @@ func (jm *JobController) syncJob(key string) error {
 		glog.V(4).Infof("Finished syncing job %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
+	if !jm.podStoreSynced() {
+		// Sleep so we give the pod reflector goroutine a chance to run.
+		time.Sleep(replicationcontroller.PodStoreSyncedPollPeriod)
+		glog.V(4).Infof("Waiting for pods controller to sync, requeuing job %v", key)
+		jm.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := jm.jobStore.Store.GetByKey(key)
 	if !exists {
 		glog.V(4).Infof("Job has been deleted: %v", key)
@@ -300,13 +308,6 @@ func (jm *JobController) syncJob(key string) error {
 		return err
 	}
 	job := *obj.(*extensions.Job)
-	if !jm.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(replicationcontroller.PodStoreSyncedPollPeriod)
-		glog.V(4).Infof("Waiting for pods controller to sync, requeuing job %v", job.Name)
-		jm.enqueueController(&job)
-		return nil
-	}
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters

@@ -397,6 +397,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
+	if !dc.rsStoreSynced() || !dc.podStoreSynced() {
+		// Sleep so we give the replica set / pod reflector goroutine a chance to run.
+		time.Sleep(StoreSyncedPollPeriod)
+		glog.Infof("Waiting for replica set / pod controller to sync, requeuing deployment %s", key)
+		dc.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := dc.dStore.Store.GetByKey(key)
 	if err != nil {
 		glog.Infof("Unable to retrieve deployment %v from store: %v", key, err)
@@ -410,13 +418,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	d := *obj.(*extensions.Deployment)
-	if !dc.rsStoreSynced() || !dc.podStoreSynced() {
-		// Sleep so we give the replica set / pod reflector goroutine a chance to run.
-		time.Sleep(StoreSyncedPollPeriod)
-		glog.Infof("Waiting for replica set / pod controller to sync, requeuing deployment %s", d.Name)
-		dc.enqueueDeployment(&d)
-		return nil
-	}
 
 	if d.Spec.Paused {
 		// Ignore paused deployments
