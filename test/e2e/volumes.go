@@ -376,7 +376,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs",
+				serverImage: "gcr.io/google_containers/volume-nfs:0.4",
 				serverPorts: []int{2049},
 			}
 
@@ -410,7 +410,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster",
+				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
 				serverPorts: []int{24007, 24008, 49152},
 			}
 
@@ -489,7 +489,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
-				serverImage: "gcr.io/google_containers/volume-iscsi",
+				serverImage: "gcr.io/google_containers/volume-iscsi:0.1",
 				serverPorts: []int{3260},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -531,7 +531,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
-				serverImage: "gcr.io/google_containers/volume-rbd",
+				serverImage: "gcr.io/google_containers/volume-rbd:0.1",
 				serverPorts: []int{6789},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -604,7 +604,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
-				serverImage: "gcr.io/google_containers/volume-ceph",
+				serverImage: "gcr.io/google_containers/volume-ceph:0.1",
 				serverPorts: []int{6789},
 			}
 
