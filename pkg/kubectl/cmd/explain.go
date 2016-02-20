@@ -79,7 +79,7 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	// TODO: We should deduce the group for a resource by discovering the supported resources at server.
-	gvk, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: inModel})
+	gvk, err := mapper.KindFor(unversioned.ParseGroupResource(inModel).WithVersion(""))
 	if err != nil {
 		return err
 	}
