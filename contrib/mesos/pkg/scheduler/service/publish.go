@@ -32,7 +32,7 @@ const (
 	SCHEDULER_SERVICE_NAME = "k8sm-scheduler"
 )
 
-func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
+func (m *SchedulerServer) newServiceWriter(publishedAddress net.IP, stop <-chan struct{}) func() {
 	return func() {
 		for {
 			// Update service & endpoint records.
@@ -42,7 +42,10 @@ func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
 				glog.Errorf("Can't create scheduler service: %v", err)
 			}
 
-			if err := m.setEndpoints(SCHEDULER_SERVICE_NAME, net.IP(m.address), m.port); err != nil {
+			if publishedAddress == nil {
+				publishedAddress = net.IP(m.address)
+			}
+			if err := m.setEndpoints(SCHEDULER_SERVICE_NAME, publishedAddress, m.port); err != nil {
 				glog.Errorf("Can't create scheduler endpoints: %v", err)
 			}
 
