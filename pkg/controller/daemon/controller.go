@@ -535,6 +535,15 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	defer func() {
 		glog.V(4).Infof("Finished syncing daemon set %q (%v)", key, time.Now().Sub(startTime))
 	}()
+
+	if !dsc.podStoreSynced() {
+		// Sleep so we give the pod reflector goroutine a chance to run.
+		time.Sleep(PodStoreSyncedPollPeriod)
+		glog.Infof("Waiting for pods controller to sync, requeuing ds %v", key)
+		dsc.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := dsc.dsStore.Store.GetByKey(key)
 	if err != nil {
 		glog.Infof("Unable to retrieve ds %v from store: %v", key, err)
@@ -547,13 +556,6 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return nil
 	}
 	ds := obj.(*extensions.DaemonSet)
-	if !dsc.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing ds %v", ds.Name)
-		dsc.enqueueDaemonSet(ds)
-		return nil
-	}
 
 	// Don't process a daemon set until all its creations and deletions have been processed.
 	// For example if daemon set foo asked for 3 new daemon pods in the previous call to manage,
