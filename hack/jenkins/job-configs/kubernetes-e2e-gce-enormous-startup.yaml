@@ -28,6 +28,7 @@
             # Increase resync period to simulate production
             export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
             {post-env}
+            export E2E_NETWORK="e2e-enormous-cluster"
             {runner}
     properties:
         - mail-watcher
