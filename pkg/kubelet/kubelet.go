@@ -359,10 +359,41 @@ func NewMainKubelet(
 
 	klet.podCache = kubecontainer.NewCache()
 
+	// The hairpin mode setting doesn't matter if:
+	// - We're not using a bridge network. This is hard to check because we might
+	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
+	//   don't pipe it down to any plugins.
+	// - It's set to hairpin-veth for a container runtime that doesn't know how
+	//   to set the hairpin flag on the veth's of containers. Currently the
+	//   docker runtime is the only one that understands this.
+	// - It's set to "none" or an unrecognized string.
+	switch hairpinMode {
+	case componentconfig.PromiscuousBridge:
+		if !configureCBR0 {
+			glog.Warningf("Hairpin mode set to %v but configureCBR0 is false", hairpinMode)
+			break
+		}
+		fallthrough
+	case componentconfig.HairpinVeth:
+		if containerRuntime != "docker" {
+			glog.Warningf("Hairpin mode set to %v but container runtime is %v", hairpinMode, containerRuntime)
+			break
+		}
+		fallthrough
+	case componentconfig.HairpinNone:
+		if configureCBR0 {
+			glog.Warningf("Hairpin mode set to %q and configureCBR0 is true, this might result in loss of hairpin packets.", hairpinMode)
+			break
+		}
+		glog.Infof("Hairpin mode set to %q", hairpinMode)
+	default:
+		glog.Infof("Unrecognized hairpin mode setting %q, setting it to %v", hairpinMode, componentconfig.HairpinNone)
+		hairpinMode = componentconfig.HairpinNone
+	}
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
-		glog.Infof("Hairpin mode set to %v", hairpinMode)
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
