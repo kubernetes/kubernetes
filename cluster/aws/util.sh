@@ -1446,11 +1446,13 @@ function test-build-release {
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up (it is run after kube-up).
+# called from hack/e2e.go only when running -up.
 #
 # Assumed vars:
 #   Variables from config.sh
 function test-setup {
+  "${KUBE_ROOT}/cluster/kube-up.sh"
+
   VPC_ID=$(get_vpc_id)
   detect-security-groups
 
