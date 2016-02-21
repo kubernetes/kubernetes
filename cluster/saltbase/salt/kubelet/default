@@ -107,12 +107,12 @@
 {% set system_container = "" -%}
 {% set kubelet_container = "" -%}
 {% set runtime_container = "" -%}
-{% if grains['os_family'] == 'Debian' -%}  
+{% if grains['os_family'] == 'Debian' -%}
   {% if pillar.get('is_systemd') %}
     {% set cgroup_root = "--cgroup-root=docker" -%}
   {% else %}
     {% set cgroup_root = "--cgroup-root=/" -%}
-    {% set system_container = "--system-cgroups=/system" -%}    
+    {% set system_container = "--system-cgroups=/system" -%}
     {% set runtime_container = "--runtime-cgroups=/docker-daemon" -%}
     {% set kubelet_container= "--kubelet-cgroups=/kubelet" -%}
   {% endif %}
@@ -151,9 +151,17 @@
   {% endif -%}
 {% endif -%}
 
-{% set configure_hairpin_mode = "--configure-hairpin-mode=true" -%}
-{% if pillar.get('hairpin_mode', '').lower() == 'false' %}
-  {% set configure_hairpin_mode = "--configure-hairpin-mode=false" %}
+# Don't pipe the --hairpin-mode flag by default. This allows the kubelet to pick
+# an appropriate value.
+{% set hairpin_mode = "" -%}
+# The master cannot see Services because it doesn't run kube-proxy, so we don't
+# need to make its container bridge promiscuous. We also don't want to set
+# the hairpin-veth flag on the master because it increases the chances of
+# running into the kernel bug described in #20096.
+{% if grains['roles'][0] == 'kubernetes-master' -%}
+  {% set hairpin_mode = "--hairpin-mode=none" -%}
+{% elif pillar['hairpin_mode'] is defined and pillar['hairpin_mode'] in ['promiscuous-bridge', 'hairpin-veth', 'none'] -%}
+  {% set hairpin_mode = "--hairpin-mode=" + pillar['hairpin_mode'] -%}
 {% endif -%}
 
 {% set kubelet_port = "" -%}
