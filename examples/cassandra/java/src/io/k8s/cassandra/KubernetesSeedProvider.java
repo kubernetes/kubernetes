@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2015 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+
 package io.k8s.cassandra;
 
 import java.io.IOException;
@@ -32,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KubernetesSeedProvider implements SeedProvider {
-    
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Address {
         public String ip;
@@ -40,14 +56,14 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Subset {
-        public List<Address> addresses; 
+        public List<Address> addresses;
     }
-    
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Endpoints {
         public List<Subset> subsets;
     }
-    
+
     private static String getEnvOrDefault(String var, String def) {
         String val = System.getenv(var);
         if (val == null) {
@@ -141,7 +157,7 @@ public class KubernetesSeedProvider implements SeedProvider {
 		logger.warn("Endpoints are not available");
 	    }
         } catch (IOException | NoSuchAlgorithmException | KeyManagementException ex) {
-	    logger.warn("Request to kubernetes apiserver failed", ex); 
+	    logger.warn("Request to kubernetes apiserver failed", ex);
         }
         if (list.size() == 0) {
 	    // If we got nothing, we might be the first instance, in that case

@@ -34,23 +34,45 @@ Documentation for other releases can be found at
 
 ## Cloud Native Deployments of Cassandra using Kubernetes
 
-The following document describes the development of a _cloud native_ [Cassandra](http://cassandra.apache.org/) deployment on Kubernetes.  When we say _cloud native_ we mean an application which understands that it is running within a cluster manager, and uses this cluster management infrastructure to help implement the application.  In particular, in this instance, a custom Cassandra ```SeedProvider``` is used to enable Cassandra to dynamically discover new Cassandra nodes as they join the cluster.
+The following document describes the development of a _cloud native_
+[Cassandra](http://cassandra.apache.org/) deployment on Kubernetes.  When we say
+_cloud native_, we mean an application which understands that it is running
+within a cluster manager, and uses this cluster management infrastructure to
+help implement the application.  In particular, in this instance, a custom
+Cassandra `SeedProvider` is used to enable Cassandra to dynamically discover
+new Cassandra nodes as they join the cluster.
 
-This document also attempts to describe the core components of Kubernetes: _Pods_, _Services_, and _Replication Controllers_.
+This example also uses some of the core components of Kubernetes:
+
+- [_Pods_](../../docs/user-guide/pods.md)
+- [ _Services_](../../docs/user-guide/services.md)
+- [_Replication Controllers_](../../docs/user-guide/replication-controller.md).
 
 ### Prerequisites
 
-This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](../../docs/getting-started-guides/) for installation instructions for your platform.
+This example assumes that you have a Kubernetes cluster installed and running,
+and that you have installed the [`kubectl`](../../docs/user-guide/kubectl/kubectl.md)
+command line tool somewhere in your path.  Please see the
+[getting started guides](../../docs/getting-started-guides/)
+for installation instructions for your platform.
 
-This example also has a few code and configuration files needed.  To avoid typing these out, you can ```git clone``` the Kubernetes repository to you local computer.
+This example also has a few code and configuration files needed.  To avoid
+typing these out, you can `git clone` the Kubernetes repository to you local
+computer.
 
 ### A note for the impatient
 
-This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
+This is a somewhat long tutorial.  If you want to jump straight to the "do it
+now" commands, please see the [tl; dr](#tl-dr) at the end.
 
 ### Simple Single Pod Cassandra Node
 
-In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
+In Kubernetes, the atomic unit of an application is a
+[_Pod_](../../docs/user-guide/pods.md).
+A Pod is one or more containers that _must_ be scheduled onto
+the same host.  All containers in a pod share a network namespace, and may
+optionally share mounted volumes.
+
 In this simple case, we define a single container running Cassandra for our pod:
 
 <!-- BEGIN MUNGE: EXAMPLE cassandra.yaml -->
@@ -69,7 +91,7 @@ spec:
     resources:
       limits:
         cpu: "0.1"
-    image: gcr.io/google_containers/cassandra:v6
+    image: gcr.io/google-samples/cassandra:v8
     name: cassandra
     ports:
     - name: cql
@@ -96,15 +118,42 @@ spec:
 [Download example](cassandra.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra.yaml -->
 
-There are a few things to note in this description.  First is that we are running the [```gcr.io/google_containers/cassandra:v6```](image/Dockerfile) image from Google's [container registry](https://cloud.google.com/container-registry/docs/).  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The [```KubernetesSeedProvider```](#seed-provider-source) discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
+There are a few things to note in this description.  First is that we are
+running the [```gcr.io/google-samples/cassandra:v8```](image/Dockerfile)
+image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
 
-You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```) and adding information about the [namespace](../../docs/user-guide/namespaces.md).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.1 cpu (0.1 core).
+This is a standard Cassandra installation on top of Debian.  However it also
+adds a custom
+[`SeedProvider`](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In
+Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra
+uses to find other nodes.
+The [`KubernetesSeedProvider`](java/src/io/k8s/cassandra/KubernetesSeedProvider.java)
+discovers the Kubernetes API Server using the built in Kubernetes
+discovery service, and then uses the Kubernetes API to find new nodes (more on
+this later). See the [image](image/) directory of this example for specifics on
+how the container image was built and what it contains.
 
-In theory could create a single Cassandra pod right now but since `KubernetesSeedProvider` needs to learn what nodes are in the Cassandra deployment we need to create a service first.
+You may also note that we are setting some Cassandra parameters (`MAX_HEAP_SIZE`
+and `HEAP_NEWSIZE`) and adding information about the
+[namespace](../../docs/user-guide/namespaces.md).
+We also tell Kubernetes that the container exposes
+both the `CQL` and `Thrift` API ports.  Finally, we tell the cluster
+manager that we need 0.1 cpu (0.1 core).
+
+In theory, we could create a single Cassandra pod right now, but since
+`KubernetesSeedProvider` needs to learn what nodes are in the Cassandra
+deployment we need to create a service first.
 
 ### Cassandra Service
 
-In Kubernetes a _[Service](../../docs/user-guide/services.md)_ describes a set of Pods that perform the same task.  For example, the set of Pods in a Cassandra cluster can be a Kubernetes Service, or even just the single Pod we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set of Pods.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
+In Kubernetes, a _[Service](../../docs/user-guide/services.md)_ describes a set
+of Pods that perform the same task.  For example, the set of Pods in a Cassandra
+cluster can be a Kubernetes Service, or even just the single Pod we created
+above.  An important use for a Service is to create a load balancer which
+distributes traffic across members of the set of Pods.  But a _Service_ can also
+be used as a standing query which makes a dynamically changing set of Pods (or
+the single Pod we've already created) available via the Kubernetes API.  This is
+the way that we use initially use Services with Cassandra.
 
 Here is the service description:
 
@@ -127,7 +176,11 @@ spec:
 [Download example](cassandra-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-service.yaml -->
 
-The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
+The important thing to note here is the `selector`. It is a query over
+labels, that identifies the set of _Pods_ contained by the _Service_.  In this
+case the selector is `app=cassandra`.  If you look back at the Pod
+specification above, you'll see that the pod has the corresponding label, so it
+will be selected for membership in this Service.
 
 Create this service as follows:
 
@@ -180,11 +233,21 @@ subsets:
 
 ### Adding replicated nodes
 
-Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, scalable Cassandra cluster.
+Of course, a single node cluster isn't particularly interesting.  The real power
+of Kubernetes and Cassandra lies in easily building a replicated, scalable
+Cassandra cluster.
 
-In Kubernetes a _[Replication Controller](../../docs/user-guide/replication-controller.md)_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
+In Kubernetes a
+_[Replication Controller](../../docs/user-guide/replication-controller.md)_
+is responsible for replicating sets of identical pods.  Like a
+_Service_, it has a selector query which identifies the members of its set.
+Unlike a _Service_, it also has a desired number of replicas, and it will create
+or delete _Pods_ to ensure that the number of _Pods_ matches up with its
+desired state.
 
-Replication controllers will "adopt" existing pods that match their selector query, so let's create a replication controller with a single replica to adopt our existing Cassandra pod.
+Replication controllers will "adopt" existing pods that match their selector
+query, so let's create a replication controller with a single replica to adopt
+our existing Cassandra pod.
 
 <!-- BEGIN MUNGE: EXAMPLE cassandra-controller.yaml -->
 
@@ -219,7 +282,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v6
+          image: gcr.io/google-samples/cassandra:v8
           name: cassandra
           ports:
             - containerPort: 9042
@@ -237,7 +300,12 @@ spec:
 [Download example](cassandra-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-controller.yaml -->
 
-Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the replication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
+Most of this replication controller definition is identical to the Cassandra pod
+definition above; it simply gives the replication controller a recipe to use
+when it creates new Cassandra pods.  The other differentiating parts are the
+`selector` attribute which contains the controller's selector query, and the
+`replicas` attribute which specifies the desired number of replicas, in this
+case 1.
 
 Create this controller:
 
@@ -245,7 +313,8 @@ Create this controller:
 $ kubectl create -f examples/cassandra/cassandra-controller.yaml
 ```
 
-Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
+Now this is actually not that interesting, since we haven't actually done
+anything new.  Now it will get interesting.
 
 Let's scale our cluster to 2:
 
@@ -253,18 +322,22 @@ Let's scale our cluster to 2:
 $ kubectl scale rc cassandra --replicas=2
 ```
 
-Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see two cassandra pods:
+Now if you list the pods in your cluster, and filter to the label `app=cassandra`, you should see two cassandra pods:
 
-```console 
-$ kubectl get pods -l="name=cassandra"
+```console
+$ kubectl get pods -l="app=cassandra"
 NAME              READY     STATUS    RESTARTS   AGE
 cassandra         1/1       Running   0          3m
 cassandra-af6h5   1/1       Running   0          28s
 ```
 
-Notice that one of the pods has the human readable name ```cassandra``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
+Notice that one of the pods has the human-readable name `cassandra` that you
+specified in your config before, and one has a random string, since it was named
+by the replication controller.
 
-To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
+To prove that this all works, you can use the `nodetool` command to examine the
+status of the cluster.  To do this, use the `kubectl exec` command to run
+`nodetool` in one of your Cassandra pods.
 
 ```console
 $ kubectl exec -ti cassandra -- nodetool status
@@ -300,11 +373,28 @@ UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e
 
 ### Using a DaemonSet
 
-In Kubernetes a _[Daemon Set](../../docs/admin/daemons.md)_ can distribute pods onto Kubernetes nodes, one-to-one.  Like a _ReplicationController_ it has a selector query which identifies the members of it's set.  Unlike a _ReplicationController_ it has a node selector to limit which nodes are scheduled with the templated pods, and replicates not based on a set target number of pods, but rather assigns a single pod to each targeted node.
+Before you start this section, __delete the replication controller__ you created above:
 
-An example use case: when deploying to the cloud, the expectation is that instances are ephemeral and might die at any time. Cassandra is built to replicate data across the cluster to facilitate data redundancy, so that in the case that an instance dies, the data stored on the instance does not, and the cluster can react by re-replicating the data to other running nodes.
+```sh
+$ kubectl delete rc cassandra
+```
 
-DaemonSet is designed to place a single pod on each node in the Kubernetes cluster. If you're looking for data redundancy with Cassandra, let's create a daemonset to start our storage cluster:
+In Kubernetes a _[Daemon Set](../../docs/admin/daemons.md)_ can distribute pods
+onto Kubernetes nodes, one-to-one.  Like a _ReplicationController_, it has a
+selector query which identifies the members of its set.  Unlike a
+_ReplicationController_, it has a node selector to limit which nodes are
+scheduled with the templated pods, and replicates not based on a set target
+number of pods, but rather assigns a single pod to each targeted node.
+
+An example use case: when deploying to the cloud, the expectation is that
+instances are ephemeral and might die at any time. Cassandra is built to
+replicate data across the cluster to facilitate data redundancy, so that in the
+case that an instance dies, the data stored on the instance does not, and the
+cluster can react by re-replicating the data to other running nodes.
+
+`DaemonSet` is designed to place a single pod on each node in the Kubernetes
+cluster. If you're looking for data redundancy with Cassandra, let's create a
+daemonset to start our storage cluster:
 
 <!-- BEGIN MUNGE: EXAMPLE cassandra-daemonset.yaml -->
 
@@ -319,7 +409,7 @@ spec:
   template:
     metadata:
       labels:
-        name: cassandra
+        app: cassandra
     spec:
       # Filter to specific nodes:
       # nodeSelector:
@@ -336,7 +426,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: "gcr.io/google_containers/cassandra:v6"
+          image: gcr.io/google-samples/cassandra:v8
           name: cassandra
           ports:
             - containerPort: 9042
@@ -351,14 +441,19 @@ spec:
               name: data
       volumes:
         - name: data
-          hostPath:
-            path: /var/lib/cassandra
+          emptyDir: {}
 ```
 
 [Download example](cassandra-daemonset.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-daemonset.yaml -->
 
-Most of this daemon set definition is identical to the Cassandra pod and ReplicationController definitions above, it simply gives the daemon set a recipe to use when it creates new Cassandra pods, and targets all Cassandra nodes in the cluster.  The other differentiating part from a Replication Controller is the ```nodeSelector``` attribute which allows the daemonset to target a specific subset of nodes, and the lack of a ```replicas``` attribute due to the 1 to 1 node-pod relationship.
+Most of this daemon set definition is identical to the Cassandra pod and
+ReplicationController definitions above; it simply gives the daemon set a recipe
+to use when it creates new Cassandra pods, and targets all Cassandra nodes in
+the cluster.  The other differentiating part from a Replication Controller is
+the `nodeSelector` attribute which allows the daemonset to target a specific
+subset of nodes, and the lack of a `replicas` attribute due to the 1 to 1 node-
+pod relationship.
 
 Create this daemonset:
 
@@ -366,17 +461,27 @@ Create this daemonset:
 $ kubectl create -f examples/cassandra/cassandra-daemonset.yaml
 ```
 
-Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see one cassandra pod for each node in your network:
+You may need to disable config file validation, like so:
 
-```console 
-$ kubectl get pods -l="name=cassandra"
+```console
+$ kubectl create -f examples/cassandra/cassandra-daemonset.yaml --validate=false
+```
+
+Now, if you list the pods in your cluster, and filter to the label
+`app=cassandra`, you should see one new cassandra pod for each node in your
+network.
+
+```console
+$ kubectl get pods -l="app=cassandra"
 NAME              READY     STATUS    RESTARTS   AGE
 cassandra-af6h5   1/1       Running   0          28s
 cassandra-2jq1b   1/1       Running   0          32s
 cassandra-34j2a   1/1       Running   0          29s
 ```
 
-To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
+To prove that this all works, you can use the `nodetool` command to examine the
+status of the cluster.  To do this, use the `kubectl exec` command to run
+`nodetool` in one of your Cassandra pods.
 
 ```console
 $ kubectl exec -ti cassandra-af6h5 -- nodetool status
@@ -413,7 +518,10 @@ kubectl exec -ti cassandra -- nodetool status
 # scale up to 4 nodes
 kubectl scale rc cassandra --replicas=4
 
-# create a daemonset to place a cassandra node on each kubernetes node
+# delete the replication controller
+kubectl delete rc cassandra
+
+# then create a daemonset to place a cassandra node on each kubernetes node
 kubectl create -f examples/cassandra/cassandra-daemonset.yaml
 ```
 
