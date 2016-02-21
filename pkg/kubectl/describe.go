@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -470,7 +472,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
 		fmt.Fprintf(out, "Containers:\n")
-		describeContainers(pod, out)
+		DescribeContainers(pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out)
 		if len(pod.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -707,13 +709,14 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 	})
 }
 
-func describeContainers(pod *api.Pod, out io.Writer) {
+// DescribeContainers is exported for consumers in other API groups that have container templates
+func DescribeContainers(containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer) {
 	statuses := map[string]api.ContainerStatus{}
-	for _, status := range pod.Status.ContainerStatuses {
+	for _, status := range containerStatuses {
 		statuses[status.Name] = status
 	}
 
-	for _, container := range pod.Spec.Containers {
+	for _, container := range containers {
 		status := statuses[container.Name]
 		state := status.State
 
@@ -759,14 +762,26 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 
 		describeStatus("State", state, out)
 		if status.LastTerminationState.Terminated != nil {
-			describeStatus("Last Termination State", status.LastTerminationState, out)
+			describeStatus("Last State", status.LastTerminationState, out)
 		}
 		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
 		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
+
+		if container.LivenessProbe != nil {
+			probe := DescribeProbe(container.LivenessProbe)
+			fmt.Fprintf(out, "    Liveness:\t%s\n", probe)
+		}
+		if container.ReadinessProbe != nil {
+			probe := DescribeProbe(container.ReadinessProbe)
+			fmt.Fprintf(out, "    Readiness:\t%s\n", probe)
+		}
 		fmt.Fprintf(out, "    Environment Variables:\n")
 		for _, e := range container.Env {
 			if e.ValueFrom != nil && e.ValueFrom.FieldRef != nil {
-				valueFrom := envValueFrom(pod, e)
+				var valueFrom string
+				if resolverFn != nil {
+					valueFrom = resolverFn(e)
+				}
 				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 			} else {
 				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)
@@ -775,18 +790,45 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 	}
 }
 
-func envValueFrom(pod *api.Pod, e api.EnvVar) string {
-	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(e.ValueFrom.FieldRef.APIVersion, "Pod", e.ValueFrom.FieldRef.FieldPath, "")
-	if err != nil {
-		return "" // pod validation should catch this on create
+// DescribeProbe is exported for consumers in other API groups that have probes
+func DescribeProbe(probe *api.Probe) string {
+	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds #success=%d #failure=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
+	switch {
+	case probe.Exec != nil:
+		return fmt.Sprintf("exec %v %s", probe.Exec.Command, attrs)
+	case probe.HTTPGet != nil:
+		url := &url.URL{}
+		url.Scheme = strings.ToLower(string(probe.HTTPGet.Scheme))
+		if len(probe.HTTPGet.Port.String()) > 0 {
+			url.Host = net.JoinHostPort(probe.HTTPGet.Host, probe.HTTPGet.Port.String())
+		} else {
+			url.Host = probe.HTTPGet.Host
+		}
+		url.Path = probe.HTTPGet.Path
+		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
+	case probe.TCPSocket != nil:
+		return fmt.Sprintf("tcp-socket :%s %s", probe.TCPSocket.Port.String(), attrs)
 	}
+	return fmt.Sprintf("unknown %s", attrs)
+}
 
-	valueFrom, err := fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
-	if err != nil {
-		return "" // pod validation should catch this on create
+type EnvVarResolverFunc func(e api.EnvVar) string
+
+// EnvValueFrom is exported for use by describers in other packages
+func EnvValueRetriever(pod *api.Pod) EnvVarResolverFunc {
+	return func(e api.EnvVar) string {
+		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(e.ValueFrom.FieldRef.APIVersion, "Pod", e.ValueFrom.FieldRef.FieldPath, "")
+		if err != nil {
+			return "" // pod validation should catch this on create
+		}
+
+		valueFrom, err := fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
+		if err != nil {
+			return "" // pod validation should catch this on create
+		}
+
+		return valueFrom
 	}
-
-	return valueFrom
 }
 
 func describeStatus(stateName string, state api.ContainerState, out io.Writer) {
