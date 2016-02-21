@@ -46,9 +46,15 @@ import (
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
 
-// specialParams lists parameters that are handled specially and which users of Request
-// are therefore not allowed to set manually.
-var specialParams = sets.NewString("timeout")
+var (
+	// specialParams lists parameters that are handled specially and which users of Request
+	// are therefore not allowed to set manually.
+	specialParams = sets.NewString("timeout")
+
+	// longThrottleLatency defines threshold for logging requests. All requests being
+	// throttle for more than longThrottleLatency will be logged.
+	longThrottleLatency = 50 * time.Millisecond
+)
 
 func init() {
 	metrics.Register()
@@ -612,6 +618,16 @@ func (r Request) finalURLTemplate() string {
 	return r.URL().String()
 }
 
+func (r *Request) tryThrottle() {
+	now := time.Now()
+	if r.throttle != nil {
+		r.throttle.Accept()
+	}
+	if latency := time.Since(now); latency > longThrottleLatency {
+		glog.Warningf("Throttling request took %v, request: %s", latency, r.URL().String())
+	}
+}
+
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch() (watch.Interface, error) {
@@ -683,9 +699,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		return nil, r.err
 	}
 
-	if r.throttle != nil {
-		r.throttle.Accept()
-	}
+	r.tryThrottle()
 
 	url := r.URL().String()
 	req, err := http.NewRequest(r.verb, url, nil)
@@ -819,9 +833,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 //  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
-	if r.throttle != nil {
-		r.throttle.Accept()
-	}
+	r.tryThrottle()
 
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
@@ -835,9 +847,7 @@ func (r *Request) Do() Result {
 
 // DoRaw executes the request but does not process the response body.
 func (r *Request) DoRaw() ([]byte, error) {
-	if r.throttle != nil {
-		r.throttle.Accept()
-	}
+	r.tryThrottle()
 
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
