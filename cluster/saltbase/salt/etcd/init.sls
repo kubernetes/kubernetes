@@ -67,8 +67,6 @@ touch /var/log/etcd-events.log:
         server_port: 2380
         cpulimit: '"200m"'
 
-# Switch on second etcd instance if there are more than 50 nodes.
-{% if pillar['num_nodes'] is defined and pillar['num_nodes'] > 50 -%}
 /etc/kubernetes/manifests/etcd-events.manifest:
   file.managed:
     - source: salt://etcd/etcd.manifest
@@ -83,4 +81,3 @@ touch /var/log/etcd-events.log:
         port: 4002
         server_port: 2381
         cpulimit: '"100m"'
-{% endif -%}
