@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,26 +17,7 @@
 # Source common.sh
 source $(dirname "${BASH_SOURCE}")/common.sh
 
-# Make sure MASTER_IP is properly set
-if [[ -z ${MASTER_IP} ]]; then
-    echo "Please export MASTER_IP in your env"
-    exit 1
-fi
-
-kube::multinode::check_params
-
-kube::multinode::detect_lsb
-
+# Turndown kubernetes in docker
 kube::multinode::turndown
 
-kube::multinode::bootstrap_daemon
-
-kube::multinode::start_flannel
-
-kube::multinode::restart_docker
-
-kube::multinode::start_k8s_worker
-
-kube::multinode::start_k8s_worker_proxy
-
-kube::log::status "Done. After about a minute the node should be ready."
+kube::log::status "Done. It will take some minutes before apiserver is up though"

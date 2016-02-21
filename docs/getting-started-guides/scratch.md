@@ -224,7 +224,7 @@ we recommend that you run these as containers, so you need an image to be built.
 
 You have several choices for Kubernetes images:
 - Use images hosted on Google Container Registry (GCR):
-  - e.g `gcr.io/google_containers/hyperkube:$TAG`, where `TAG` is the latest
+  - e.g `gcr.io/google_containers/hyperkube-amd64:$TAG`, where `TAG` is the latest
     release tag, which can be found on the [latest releases page](https://github.com/kubernetes/kubernetes/releases/latest).
   - Ensure $TAG is the same tag as the release tag you are using for kubelet and kube-proxy.
   - The [hyperkube](../../cmd/hyperkube/) binary is an all in one binary
@@ -238,19 +238,18 @@ You have several choices for Kubernetes images:
     command like `docker images`
 
 For etcd, you can:
-- Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.2.1`
+- Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd-amd64:2.2.1`
 - Use images hosted on [Docker Hub](https://hub.docker.com/search/?q=etcd) or [Quay.io](https://quay.io/repository/coreos/etcd), such as `quay.io/coreos/etcd:v2.2.1`
 - Use etcd binary included in your OS distro.
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
 
-We recommend that you use the etcd version which is provided in the Kubernetes binary distribution.   The Kubernetes binaries in the release
-were tested extensively with this version of etcd and not with any other version.
+We recommend that you use the etcd version which is provided in the Kubernetes binary distribution. The Kubernetes binaries in the release were tested extensively with this version of etcd and not with any other version.
 The recommended version number can also be found as the value of `ETCD_VERSION` in `kubernetes/cluster/images/etcd/Makefile`.
 
 The remainder of the document assumes that the image identifiers have been chosen and stored in corresponding env vars.  Examples (replace with latest tags and appropriate registry):
-  - `HYPERKUBE_IMAGE==gcr.io/google_containers/hyperkube:$TAG`
-  - `ETCD_IMAGE=gcr.io/google_containers/etcd:$ETCD_VERSION`
+  - `HYPERKUBE_IMAGE==gcr.io/google_containers/hyperkube-amd64:$TAG`
+  - `ETCD_IMAGE=gcr.io/google_containers/etcd-amd64:$ETCD_VERSION`
 
 ### Security Models
 
