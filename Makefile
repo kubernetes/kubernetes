@@ -98,7 +98,7 @@ test_integration:
 # Example:
 #   make test_e2e
 test_e2e:
-	hack/e2e-test.sh
+	go run hack/e2e.go -v --build --up --test --down
 .PHONY: test_e2e
 
 # Remove all build artifacts.
