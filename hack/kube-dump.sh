@@ -45,8 +45,8 @@ echo
 echo "kube-dump.sh: Getting boundpods from etcd..."
 ssh-to-node "${MASTER_NAME}" '
   ETCD_SERVER=$(hostname -i):4001 
-  for DIR in $(etcdctl -C $ETCD_SERVER ls /registry/nodes); do 
+  for DIR in $(etcdctl -C $ETCD_SERVER ls --quorum /registry/nodes); do 
     echo "kube-dump.sh: Dir $DIR:"
-    etcdctl -C $ETCD_SERVER get $DIR/boundpods
+    etcdctl -C $ETCD_SERVER get --quorum $DIR/boundpods
   done 
 '
