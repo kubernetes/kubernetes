@@ -41,11 +41,7 @@
 {% endif -%}
 
 {% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
-{% set etcd_servers_overrides = "" -%}
-# If there are more than 50 nodes, there is a dedicated etcd instance for events.
-{% if pillar['num_nodes'] is defined and pillar['num_nodes'] > 50 -%}
-	{% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
-{% endif -%}
+{% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
 
 {% set service_cluster_ip_range = "" -%}
 {% if pillar['service_cluster_ip_range'] is defined -%}
