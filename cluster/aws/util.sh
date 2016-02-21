@@ -937,15 +937,15 @@ function kube-up {
     # Create the master
     start-master
 
+    # Build ~/.kube/config
+    build-config
+
     # Start minions
     start-minions
     wait-minions
 
     # Wait for the master to be ready
     wait-master
-
-    # Build ~/.kube/config
-    build-config
   fi
 
   # Check the cluster is OK
