@@ -11,7 +11,7 @@ spec:
     resources:
       limits:
         cpu: "0.1"
-    image: gcr.io/google_containers/cassandra:v6
+    image: gcr.io/google-samples/cassandra:v8
     name: cassandra
     ports:
     - name: cql
