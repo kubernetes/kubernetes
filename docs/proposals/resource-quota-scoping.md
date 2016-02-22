@@ -112,11 +112,11 @@ Support the following resources that can be tracked by quota.
 | Resource Name | Description |
 | ------------- | ----------- |
 | cpu | total cpu requests (backwards compatibility) |
-| cpu.request | total cpu requests |
-| cpu.limit | total cpu limits |
 | memory | total memory requests (backwards compatibility) |
-| memory.request | total memory requests |
-| memory.limit | total memory limits |
+| requests.cpu | total cpu requests |
+| requests.memory | total memory requests |
+| limits.cpu | total cpu limits |
+| limits.memory | total memory limits |
 
 ### Resource Quota Scopes
 
@@ -145,22 +145,22 @@ A `Terminating`, `NotTerminating`, `NotBestEffort` scope restricts a quota to
 tracking the following resources:
 
 * pod
-* memory, memory.request, memory.limit
-* cpu, cpu.request, cpu.limit
+* memory, requests.memory, limits.memory
+* cpu, requests.cpu, limits.cpu
 
 ## Data Model Impact
 
 ```
 // The following identify resource constants for Kubernetes object types
 const (
-  // CPU Request, in cores
-  ResourceCPURequest ResourceName = "cpu.request"
-  // CPU Limit, in bytes
-  ResourceCPULimit ResourceName = "cpu.limit"
-  // Memory Request, in bytes
-  ResourceMemoryRequest ResourceName = "memory.request"
-  // Memory Limit, in bytes
-  ResourceMemoryLimit ResourceName = "memory.limit"
+	// CPU request, in cores. (500m = .5 cores)
+	ResourceRequestsCPU ResourceName = "requests.cpu"
+	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceRequestsMemory ResourceName = "requests.memory"
+	// CPU limit, in cores. (500m = .5 cores)
+	ResourceLimitsCPU ResourceName = "limits.cpu"
+	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceLimitsMemory ResourceName = "limits.memory"
 )
 
 // A scope is a filter that matches an object
@@ -178,8 +178,8 @@ const (
 type ResourceQuotaSpec struct {
   // Hard is the set of desired hard limits for each named resource
   Hard ResourceList `json:"hard,omitempty"`
-  // Scopes is the set of filters that must match an object for it to be
-  // tracked by the quota
+  // A collection of filters that must match each object tracked by a quota.
+  // If not specified, the quota matches all objects.
   Scopes []ResourceQuotaScope `json:"scopes,omitempty"`
 }
 ```
