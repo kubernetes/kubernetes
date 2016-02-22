@@ -87,7 +87,7 @@ func (cuda *Cuda) AllocGPU(gpuReqs int, podUID types.UID, container *api.Contain
 		glog.Infof("Hans: cuda.AllocGPU(): before alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
 		var result = make([]int, gpuReqs)
 		cc := copy(result, availableGPUIdx[:gpuReqs])
-		glog.Infof("Hans: cuda.AllocGPU(): cc: %d, result: %+v", cc,  result)
+		glog.Infof("Hans: cuda.AllocGPU(): cc: %d, result: %+v", cc, result)
 		if cc == gpuReqs {
 			// gpuUsageStatus := gpuTypes.GPUUsageStatus{PodID: podUID, ContainerName: container.Name, GPUIndexes: result}
 			gpuUsageStatus := gpuTypes.GPUUsageStatus{GPUIndexes: result}
@@ -388,4 +388,13 @@ func (cuda *Cuda) UpdateGPUUsageStatus(newGPUStatus *map[gpuTypes.PodCotainerHas
 	defer cuda.gpuInfo.Lock.Unlock()
 
 	cuda.gpuInfo.GPUStatus = *newGPUStatus
+}
+
+func (cuda *Cuda) ShowCurrentGPUUsageStatus() {
+	glog.Infof("Hans: cuda.UpdateGPUUsageStatus()")
+
+	cuda.gpuInfo.Lock.RLock()
+	defer cuda.gpuInfo.Lock.RUnlock()
+
+	glog.Infof("GPU usage status(%s): %+v", cuda.Name(), cuda.gpuInfo.GPUStatus)
 }

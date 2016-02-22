@@ -70,6 +70,9 @@ type GPUPlugin interface {
 	// Name returns the plugin's name. This will be used when searching
 	// for a plugin by name, e.g.
 	Name() string
+
+	// the following functions only for test
+	ShowCurrentGPUUsageStatus()
 }
 
 type GPUCommonInfo struct {
