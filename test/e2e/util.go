@@ -1070,6 +1070,22 @@ func (r podProxyResponseChecker) checkAllResponses() (done bool, err error) {
 	return true, nil
 }
 
+// TODO This could  be integrated in to version.Parse at some point.
+// Converts a dirty git string like v0.7.0.20841+8fa34ff2fd0c07
+// Into a semver compatible one, i.e. v0.7.0-20841+8fa34ff2fd0c07
+func FixVersion(gitversion string) string {
+	versElements := strings.Split(gitversion, ".")
+	cleanedGitVersion := versElements[0]
+	for i := 1; i < len(versElements); i++ {
+		if i > 2 {
+			cleanedGitVersion = cleanedGitVersion + "-" + versElements[i]
+		} else {
+			cleanedGitVersion = cleanedGitVersion + "." + versElements[i]
+		}
+	}
+	return cleanedGitVersion
+}
+
 // serverVersionGTE returns true if v is greater than or equal to the server
 // version.
 //
@@ -1079,9 +1095,12 @@ func serverVersionGTE(v semver.Version, c client.ServerVersionInterface) (bool, 
 	if err != nil {
 		return false, fmt.Errorf("Unable to get server version: %v", err)
 	}
-	sv, err := version.Parse(serverVersion.GitVersion)
+
+	// Removes extra periods in case of dirty versions.
+	gitversion := FixVersion(serverVersion.GitVersion)
+	sv, err := version.Parse(gitversion)
 	if err != nil {
-		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+		return false, fmt.Errorf("Unable to parse server version %q: %v", gitversion, err)
 	}
 	return sv.GTE(v), nil
 }
