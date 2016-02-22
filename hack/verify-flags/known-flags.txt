@@ -28,6 +28,7 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
+build-services
 cadvisor-port
 cert-dir
 certificate-authority
@@ -161,6 +162,7 @@ ir-user
 jenkins-host
 jenkins-jobs
 k8s-build-output
+k8s-bin-dir
 keep-gogoproto
 km-path
 kube-api-burst
@@ -322,6 +324,7 @@ scheduler-name
 schema-cache-dir
 secure-port
 serialize-image-pulls
+server-start-timeout
 service-account-key-file
 service-account-lookup
 service-account-private-key-file
@@ -343,10 +346,14 @@ skip-generated-rewrite
 skip-munges
 sort-by
 source-file
+ssh-env
 ssh-keyfile
+ssh-options
 ssh-user
+start-services
 static-pods-config
 stats-port
+stop-services
 storage-version
 storage-versions
 streaming-connection-idle-timeout
