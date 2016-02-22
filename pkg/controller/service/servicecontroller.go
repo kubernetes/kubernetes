@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"reflect"
 )
 
 const (
@@ -247,6 +248,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 			}
 			message += err.Error()
 			s.eventRecorder.Event(service, api.EventTypeWarning, "CreatingLoadBalancerFailed", message)
+
 			return err, retry
 		}
 		// Always update the cache upon success.
@@ -321,6 +323,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 
 		// The load balancer doesn't exist yet, so create it.
 		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
+
 		err := s.createLoadBalancer(service, namespacedName)
 		if err != nil {
 			return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
@@ -385,7 +388,7 @@ func (s *ServiceController) createLoadBalancer(service *api.Service, serviceName
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
 	status, err := s.balancer.EnsureLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
-		ports, hostsFromNodeList(&nodes), serviceName, service.Spec.SessionAffinity)
+		ports, hostsFromNodeList(&nodes), serviceName, service.Spec.SessionAffinity, service.ObjectMeta.Annotations)
 	if err != nil {
 		return err
 	} else {
@@ -488,6 +491,10 @@ func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api
 			return true
 		}
 	}
+	if !reflect.DeepEqual(oldService.Annotations, newService.Annotations) {
+		return true
+	}
+
 	return false
 }
 
