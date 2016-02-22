@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"hash/adler32"
 	"sync"
 	"time"
 
@@ -56,6 +57,22 @@ type Config struct {
 	//       the object completely if desired. Pass the object in
 	//       question to this interface as a parameter.
 	RetryOnError bool
+
+	// If ParallelWorkers is set, then watch events coming from underlying
+	// reflector will be processed by such number of workers in parallel.
+	// However, it is guaranteed that all changes of a given object will
+	// always be processed by the same worker, which means that they will be
+	// processed in the order in which they are coming.
+	//
+	// Note that if a controller requires that all changes (for different
+	// objects) need to be processed in serial (or it cannot tolerate
+	// processing different watch events in parallel) you need to leave this
+	// field unset or explicitly set it to 1.
+	ParallelWorkers int
+
+	// If ParallelWorkers is set to non-zero value, KeyFunc is a function
+	// to spread coming events to workers.
+	KeyFunc func(interface{}) (int, error)
 }
 
 // ProcessFunc processes a single object.
@@ -66,6 +83,10 @@ type Controller struct {
 	config         Config
 	reflector      *cache.Reflector
 	reflectorMutex sync.RWMutex
+
+	// If there are multiple parallel workers, those channels are used to
+	// send them pieces of work.
+	workQueue []chan interface{}
 }
 
 // New makes a new Controller from the given Config.
@@ -94,7 +115,31 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	r.RunUntil(stopCh)
 
+	// Spawn a number of works that will be processing coming watch events.
+	wg := sync.WaitGroup{}
+	wg.Add(c.config.ParallelWorkers)
+	c.workQueue = make([]chan interface{}, c.config.ParallelWorkers)
+	for i := 0; i < c.config.ParallelWorkers; i++ {
+		c.workQueue[i] = make(chan interface{}, 10)
+		go func(queue chan interface{}) {
+			defer utilruntime.HandleCrash()
+			defer wg.Done()
+			for {
+				obj, ok := <-queue
+				if !ok {
+					return
+				}
+				if c.config.Process(obj) != nil {
+					c.reenqueue(obj)
+				}
+			}
+		}(c.workQueue[i])
+	}
 	wait.Until(c.processLoop, time.Second, stopCh)
+	for i := 0; i < c.config.ParallelWorkers; i++ {
+		close(c.workQueue[i])
+	}
+	wg.Wait()
 }
 
 // Returns true once this controller has completed an initial resource listing
@@ -112,20 +157,33 @@ func (c *Controller) Requeue(obj interface{}) error {
 	})
 }
 
+// reenqueue add a given obj back to queue if RetryOnError is set.
+// It additionally rate-limits those operations to avoid very fast retries of
+// conditions that don't immediately clear up.
+func (c *Controller) reenqueue(obj interface{}) {
+	if c.config.RetryOnError {
+		// This is the safe way to re-enqueue.
+		// TODO: Add rate-limitting.
+		c.config.Queue.AddIfNotPresent(obj)
+	}
+}
+
 // processLoop drains the work queue.
-// TODO: Consider doing the processing in parallel. This will require a little thought
-// to make sure that we don't end up processing the same object multiple times
-// concurrently.
 func (c *Controller) processLoop() {
 	for {
 		obj := c.config.Queue.Pop()
-		err := c.config.Process(obj)
-		if err != nil {
-			if c.config.RetryOnError {
-				// This is the safe way to re-enqueue.
-				c.config.Queue.AddIfNotPresent(obj)
+		if c.config.ParallelWorkers == 0 {
+			if c.config.Process(obj) != nil {
+				c.reenqueue(obj)
 			}
+			continue
 		}
+		key, err := c.config.KeyFunc(obj)
+		if err != nil {
+			c.reenqueue(obj)
+			continue
+		}
+		c.workQueue[key%c.config.ParallelWorkers] <- obj
 	}
 }
 
@@ -189,34 +247,33 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	return cache.MetaNamespaceKeyFunc(obj)
 }
 
-// NewInformer returns a cache.Store and a controller for populating the store
-// while also providing event notifications. You should only used the returned
-// cache.Store for Get/List operations; Add/Modify/Deletes will cause the event
-// notifications to be faulty.
-//
-// Parameters:
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//
-func NewInformer(
+// newInformer extracts the common part of New*() methods.
+func newInformer(
 	lw cache.ListerWatcher,
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
-) (cache.Store, *Controller) {
-	// This will hold the client state, as we know it.
-	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-
+	workersNumber int,
+	clientState cache.Store,
+) *Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
+
+	keyFunc := func(obj interface{}) (int, error) {
+		deltas := obj.(cache.Deltas)
+		if len(deltas) == 0 {
+			return 0, nil
+		}
+		name, err := cache.MetaNamespaceKeyFunc(deltas[0].Object)
+		if err != nil {
+			return 0, err
+		}
+		hash := adler32.New()
+		hash.Write([]byte(name))
+		return int(hash.Sum32()), nil
+	}
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -224,6 +281,8 @@ func NewInformer(
 		ObjectType:       objType,
 		FullResyncPeriod: resyncPeriod,
 		RetryOnError:     false,
+		ParallelWorkers:  workersNumber,
+		KeyFunc:          keyFunc,
 
 		Process: func(obj interface{}) error {
 			// from oldest to newest
@@ -251,7 +310,60 @@ func NewInformer(
 			return nil
 		},
 	}
-	return clientState, New(cfg)
+	return New(cfg)
+}
+
+// NewInformer returns a cache.Store and a controller for populating the store
+// while also providing event notifications. You should only used the returned
+// cache.Store for Get/List operations; Add/Modify/Deletes will cause the event
+// notifications to be faulty.
+//
+// Parameters:
+//  * lw is list and watch functions for the source of the resource you want to
+//    be informed of.
+//  * objType is an object of the type that you expect to receive.
+//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//    calls, even if nothing changed). Otherwise, re-list will be delayed as
+//    long as possible (until the upstream source closes the watch or times out,
+//    or you stop the controller).
+//  * h is the object you want notifications sent to.
+//
+func NewInformer(
+	lw cache.ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+) (cache.Store, *Controller) {
+	// This will hold the client state, as we know it.
+	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, 0, clientState)
+}
+
+// NewParalelInformer returns a cache.Store and a controller for populating the store
+// while also providing event notifications. You should only used the returned
+// cache.Store for Get/List operations; Add/Modify/Deletes will cause the event
+// notifications to be faulty.
+//
+// Parameters:
+//  * lw is list and watch functions for the source of the resource you want to
+//    be informed of.
+//  * objType is an object of the type that you expect to receive.
+//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//    calls, even if nothing changed). Otherwise, re-list will be delayed as
+//    long as possible (until the upstream source closes the watch or times out,
+//    or you stop the controller).
+//  * h is the object you want notifications sent to.
+//
+func NewParallelInformer(
+	lw cache.ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+	workersNumber int,
+) (cache.Store, *Controller) {
+	// This will hold the client state, as we know it.
+	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, workersNumber, clientState)
 }
 
 // NewIndexerInformer returns a cache.Indexer and a controller for populating the index
@@ -278,44 +390,5 @@ func NewIndexerInformer(
 ) (cache.Indexer, *Controller) {
 	// This will hold the client state, as we know it.
 	clientState := cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
-
-	// This will hold incoming changes. Note how we pass clientState in as a
-	// KeyLister, that way resync operations will result in the correct set
-	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(cache.Deltas) {
-				switch d.Type {
-				case cache.Sync, cache.Added, cache.Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
-						if err := clientState.Update(d.Object); err != nil {
-							return err
-						}
-						h.OnUpdate(old, d.Object)
-					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
-						}
-						h.OnAdd(d.Object)
-					}
-				case cache.Deleted:
-					if err := clientState.Delete(d.Object); err != nil {
-						return err
-					}
-					h.OnDelete(d.Object)
-				}
-			}
-			return nil
-		},
-	}
-	return clientState, New(cfg)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, 0, clientState)
 }
