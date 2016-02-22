@@ -273,9 +273,7 @@ func (cont *ingressController) create() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 	rc := rcFromManifest(cont.rcPath)
-
-	listOpts := api.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(clusterAddonLBLabels))}
-	existingRCs, err := cont.c.ReplicationControllers(api.NamespaceSystem).List(listOpts)
+	existingRCs, err := cont.c.ReplicationControllers(api.NamespaceSystem).List(labels.SelectorFromSet(labels.Set(clusterAddonLBLabels)))
 	Expect(err).NotTo(HaveOccurred())
 	if len(existingRCs.Items) != 1 {
 		Failf("Unexpected number of lb cluster addons %v with label %v in kube-system namespace", len(existingRCs.Items), clusterAddonLBLabels)

@@ -2337,8 +2337,7 @@ func getNodePortURL(client *client.Client, ns, name string, svcPort int) (string
 // scaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
 func scaleRCByLabels(client *client.Client, ns string, l map[string]string, replicas uint) error {
-	listOpts := api.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l))}
-	rcs, err := client.ReplicationControllers(ns).List(listOpts)
+	rcs, err := client.ReplicationControllers(ns).List(labels.SelectorFromSet(labels.Set(l)))
 	if err != nil {
 		return err
 	}
