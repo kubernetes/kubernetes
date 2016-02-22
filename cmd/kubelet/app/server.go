@@ -759,7 +759,7 @@ type KubeletConfig struct {
 	ExperimentalFlannelOverlay bool
 	NodeIP                     net.IP
 	ContainerRuntimeOptions    []kubecontainer.Option
-	HairpinMode                bool
+	HairpinMode                string
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
