@@ -18,16 +18,20 @@ package resourcequota
 
 import (
 	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/hashicorp/golang-lru"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -63,386 +67,502 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 	return pod
 }
 
+// TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
 func TestAdmissionIgnoresDelete(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	handler, err := NewResourceQuota(kubeClient, install.NewRegistry(kubeClient))
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
 	namespace := "default"
-	handler := createResourceQuota(&fake.Clientset{}, nil)
-	err := handler.Admit(admission.NewAttributesRecord(nil, api.Kind("Pod"), namespace, "name", api.Resource("pods"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, api.Kind("Pod"), namespace, "name", api.Resource("pods"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes: %v", err)
 	}
 }
 
+// TestAdmissionIgnoresSubresources verifies that the admission controller ignores subresources
+// It verifies that creation of a pod that would have exceeded quota is properly failed
+// It verifies that create operations to a subresource that would have exceeded quota would succeed
 func TestAdmissionIgnoresSubresources(t *testing.T) {
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	handler := createResourceQuota(&fake.Clientset{}, indexer)
-
-	quota := &api.ResourceQuota{}
-	quota.Name = "quota"
-	quota.Namespace = "test"
-	quota.Status = api.ResourceQuotaStatus{
+	resourceQuota := &api.ResourceQuota{}
+	resourceQuota.Name = "quota"
+	resourceQuota.Namespace = "test"
+	resourceQuota.Status = api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
 	}
-	quota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
-	quota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
-
-	indexer.Add(quota)
-
+	resourceQuota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
+	resourceQuota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
+	}
+	handler.indexer.Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
-
 	err = handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "subresource", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the action went to a subresource: %v", err)
 	}
-
 }
 
-func TestIncrementUsagePodResources(t *testing.T) {
-	type testCase struct {
-		testName      string
-		existing      *api.Pod
-		input         *api.Pod
-		resourceName  api.ResourceName
-		hard          resource.Quantity
-		expectedUsage resource.Quantity
-		expectedError bool
-	}
-	testCases := []testCase{
-		{
-			testName:      "memory-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedUsage: resource.MustParse("200Mi"),
-			expectedError: false,
-		},
-		{
-			testName:      "memory-not-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedError: true,
-		},
-		{
-			testName:      "memory-not-allowed-with-different-format",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100M"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedError: true,
-		},
-		{
-			testName:      "memory-no-request",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedError: true,
-		},
-		{
-			testName:      "cpu-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceCPU,
-			hard:          resource.MustParse("2"),
-			expectedUsage: resource.MustParse("2"),
-			expectedError: false,
-		},
-		{
-			testName:      "cpu-not-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("600m", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceCPU,
-			hard:          resource.MustParse("1500m"),
-			expectedError: true,
-		},
-		{
-			testName:      "cpu-no-request",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceCPU,
-			hard:          resource.MustParse("1500m"),
-			expectedError: true,
+// TestAdmitBelowQuotaLimit verifies that a pod when created has its usage reflected on the quota
+func TestAdmitBelowQuotaLimit(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1"),
+				api.ResourceMemory: resource.MustParse("50Gi"),
+				api.ResourcePods:   resource.MustParse("3"),
+			},
 		},
 	}
-	for _, item := range testCases {
-		podList := &api.PodList{Items: []api.Pod{*item.existing}}
-		client := fake.NewSimpleClientset(podList)
-		status := &api.ResourceQuotaStatus{
-			Hard: api.ResourceList{},
-			Used: api.ResourceList{},
-		}
-		used, err := resourcequotacontroller.PodRequests(item.existing, item.resourceName)
-		if err != nil {
-			t.Errorf("Test %s, unexpected error %v", item.testName, err)
-		}
-		status.Hard[item.resourceName] = item.hard
-		status.Used[item.resourceName] = *used
-
-		dirty, err := IncrementUsage(admission.NewAttributesRecord(item.input, api.Kind("Pod"), item.input.Namespace, item.input.Name, api.Resource("pods"), "", admission.Create, nil), status, client)
-		if err == nil && item.expectedError {
-			t.Errorf("Test %s, expected error", item.testName)
-		}
-		if err != nil && !item.expectedError {
-			t.Errorf("Test %s, unexpected error", err)
-		}
-		if !item.expectedError {
-			if !dirty {
-				t.Errorf("Test %s, expected the quota to be dirty", item.testName)
-			}
-			quantity := status.Used[item.resourceName]
-			if quantity.String() != item.expectedUsage.String() {
-				t.Errorf("Test %s, expected usage %s, actual usage %s", item.testName, item.expectedUsage.String(), quantity.String())
-			}
-		}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
 	}
-}
-
-func TestIncrementUsagePods(t *testing.T) {
-	pod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
-	podList := &api.PodList{Items: []api.Pod{*pod}}
-	client := fake.NewSimpleClientset(podList)
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourcePods
-	status.Hard[r] = resource.MustParse("2")
-	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, api.Kind("Pod"), pod.Namespace, "new-pod", api.Resource("pods"), "", admission.Create, nil), status, client)
+	handler.indexer.Add(resourceQuota)
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if !dirty {
-		t.Errorf("Expected the status to get incremented, therefore should have been dirty")
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
 	}
-	quantity := status.Used[r]
-	if quantity.Value() != int64(2) {
-		t.Errorf("Expected new item count to be 2, but was %s", quantity.String())
-	}
-}
 
-func TestExceedUsagePods(t *testing.T) {
-	pod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
-	podList := &api.PodList{Items: []api.Pod{*pod}}
-	client := fake.NewSimpleClientset(podList)
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
 	}
-	r := api.ResourcePods
-	status.Hard[r] = resource.MustParse("1")
-	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, api.Kind("Pod"), pod.Namespace, "name", api.Resource("pods"), "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected error because this would exceed your quota")
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
-}
 
-func TestIncrementUsageServices(t *testing.T) {
-	namespace := "default"
-	client := fake.NewSimpleClientset(&api.ServiceList{
-		Items: []api.Service{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+	lastActionIndex := len(kubeClient.Actions()) - 1
+	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1100m"),
+				api.ResourceMemory: resource.MustParse("52Gi"),
+				api.ResourcePods:   resource.MustParse("4"),
 			},
 		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
 	}
-	r := api.ResourceServices
-	status.Hard[r] = resource.MustParse("2")
-	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, api.Kind("Service"), namespace, "name", api.Resource("services"), "", admission.Create, nil), status, client)
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+}
+
+// TestAdmitExceedQuotaLimit verifies that if a pod exceeded allowed usage that its rejected during admission.
+func TestAdmitExceedQuotaLimit(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1"),
+				api.ResourceMemory: resource.MustParse("50Gi"),
+				api.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
+	}
+	handler.indexer.Add(resourceQuota)
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error exceeding quota")
+	}
+}
+
+// TestAdmitEnforceQuotaConstraints verifies that if a quota tracks a particular resource that that resource is
+// specified on the pod.  In this case, we create a quota that tracks cpu request, memory request, and memory limit.
+// We ensure that a pod that does not specify a memory limit that it fails in admission.
+func TestAdmitEnforceQuotaConstraints(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:          resource.MustParse("3"),
+				api.ResourceMemory:       resource.MustParse("100Gi"),
+				api.ResourceLimitsMemory: resource.MustParse("200Gi"),
+				api.ResourcePods:         resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:          resource.MustParse("1"),
+				api.ResourceMemory:       resource.MustParse("50Gi"),
+				api.ResourceLimitsMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:         resource.MustParse("3"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
+	}
+	handler.indexer.Add(resourceQuota)
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error because the pod does not specify a memory limit")
+	}
+}
+
+// TestAdmitPodInNamespaceWithoutQuota ensures that if a namespace has no quota, that a pod can get in
+func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "other", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:          resource.MustParse("3"),
+				api.ResourceMemory:       resource.MustParse("100Gi"),
+				api.ResourceLimitsMemory: resource.MustParse("200Gi"),
+				api.ResourcePods:         resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:          resource.MustParse("1"),
+				api.ResourceMemory:       resource.MustParse("50Gi"),
+				api.ResourceLimitsMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:         resource.MustParse("3"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	liveLookupCache, err := lru.New(100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := &quotaAdmission{
+		Handler:         admission.NewHandler(admission.Create, admission.Update),
+		client:          kubeClient,
+		indexer:         indexer,
+		registry:        install.NewRegistry(kubeClient),
+		liveLookupCache: liveLookupCache,
+	}
+	// Add to the index
+	handler.indexer.Add(resourceQuota)
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
+	// Add to the lru cache so we do not do a live client lookup
+	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*api.ResourceQuota{}})
+	err = handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Did not expect an error because the pod is in a different namespace than the quota")
+	}
+}
+
+// TestAdmitBelowTerminatingQuotaLimit ensures that terminating pods are charged to the right quota.
+// It creates a terminating and non-terminating quota, and creates a terminating pod.
+// It ensures that the terminating quota is incremented, and the non-terminating quota is not.
+func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
+	resourceQuotaNonTerminating := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota-non-terminating", Namespace: "test", ResourceVersion: "124"},
+		Spec: api.ResourceQuotaSpec{
+			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1"),
+				api.ResourceMemory: resource.MustParse("50Gi"),
+				api.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+	}
+	resourceQuotaTerminating := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota-terminating", Namespace: "test", ResourceVersion: "124"},
+		Spec: api.ResourceQuotaSpec{
+			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1"),
+				api.ResourceMemory: resource.MustParse("50Gi"),
+				api.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
+	}
+	handler.indexer.Add(resourceQuotaNonTerminating)
+	handler.indexer.Add(resourceQuotaTerminating)
+
+	// create a pod that has an active deadline
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
+	activeDeadlineSeconds := int64(30)
+	newPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if !dirty {
-		t.Errorf("Expected the status to get incremented, therefore should have been dirty")
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
 	}
-	quantity := status.Used[r]
-	if quantity.Value() != int64(2) {
-		t.Errorf("Expected new item count to be 2, but was %s", quantity.String())
+
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	lastActionIndex := len(kubeClient.Actions()) - 1
+	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+
+	// ensure only the quota-terminating was updated
+	if usage.Name != resourceQuotaTerminating.Name {
+		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaTerminating.Name, usage.Name)
+	}
+
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("100Gi"),
+				api.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1100m"),
+				api.ResourceMemory: resource.MustParse("52Gi"),
+				api.ResourcePods:   resource.MustParse("4"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
 	}
 }
 
-func TestExceedUsageServices(t *testing.T) {
-	namespace := "default"
-	client := fake.NewSimpleClientset(&api.ServiceList{
-		Items: []api.Service{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+// TestAdmitBelowBestEffortQuotaLimit creates a best effort and non-best effort quota.
+// It verifies that best effort pods are properly scoped to the best effort quota document.
+func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
+	resourceQuotaBestEffort := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+		Spec: api.ResourceQuotaSpec{
+			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePods: resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePods: resource.MustParse("3"),
 			},
 		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
 	}
-	r := api.ResourceServices
-	status.Hard[r] = resource.MustParse("1")
-	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, api.Kind("Service"), namespace, "name", api.Resource("services"), "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected error because this would exceed usage")
+	resourceQuotaNotBestEffort := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota-not-besteffort", Namespace: "test", ResourceVersion: "124"},
+		Spec: api.ResourceQuotaSpec{
+			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePods: resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePods: resource.MustParse("3"),
+			},
+		},
 	}
-}
+	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
+	}
+	handler.indexer.Add(resourceQuotaBestEffort)
+	handler.indexer.Add(resourceQuotaNotBestEffort)
 
-func TestIncrementUsageReplicationControllers(t *testing.T) {
-	namespace := "default"
-	client := fake.NewSimpleClientset(&api.ReplicationControllerList{
-		Items: []api.ReplicationController{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
-	}
-	r := api.ResourceReplicationControllers
-	status.Hard[r] = resource.MustParse("2")
-	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, api.Kind("ReplicationController"), namespace, "name", api.Resource("replicationcontrollers"), "", admission.Create, nil), status, client)
+	// create a pod that is best effort because it does not make a request for anything
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if !dirty {
-		t.Errorf("Expected the status to get incremented, therefore should have been dirty")
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
 	}
-	quantity := status.Used[r]
-	if quantity.Value() != int64(2) {
-		t.Errorf("Expected new item count to be 2, but was %s", quantity.String())
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
-}
+	lastActionIndex := len(kubeClient.Actions()) - 1
+	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
 
-func TestExceedUsageReplicationControllers(t *testing.T) {
-	namespace := "default"
-	client := fake.NewSimpleClientset(&api.ReplicationControllerList{
-		Items: []api.ReplicationController{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+	if usage.Name != resourceQuotaBestEffort.Name {
+		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaBestEffort.Name, usage.Name)
+	}
+
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePods: resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePods: resource.MustParse("4"),
 			},
 		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
 	}
-	r := api.ResourceReplicationControllers
-	status.Hard[r] = resource.MustParse("1")
-	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, api.Kind("ReplicationController"), namespace, "name", api.Resource("replicationcontrollers"), "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected error for exceeding hard limits")
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
 	}
 }
 
-func TestExceedUsageSecrets(t *testing.T) {
-	namespace := "default"
-	client := fake.NewSimpleClientset(&api.SecretList{
-		Items: []api.Secret{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+// TestAdmitBestEffortQuotaLimitIgnoresBurstable validates that a besteffort quota does not match a resource
+// guaranteed pod.
+func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+		Spec: api.ResourceQuotaSpec{
+			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePods: resource.MustParse("5"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePods: resource.MustParse("3"),
 			},
 		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
 	}
-	r := api.ResourceSecrets
-	status.Hard[r] = resource.MustParse("1")
-	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Secret{}, api.Kind("Secret"), namespace, "name", api.Resource("secrets"), "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected error for exceeding hard limits")
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: install.NewRegistry(kubeClient),
 	}
-}
-
-func TestExceedUsagePersistentVolumeClaims(t *testing.T) {
-	namespace := "default"
-	client := fake.NewSimpleClientset(&api.PersistentVolumeClaimList{
-		Items: []api.PersistentVolumeClaim{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-			},
-		},
-	})
-	status := &api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
+	handler.indexer.Add(resourceQuota)
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), newPod.Namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
-	r := api.ResourcePersistentVolumeClaims
-	status.Hard[r] = resource.MustParse("1")
-	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, api.Kind("PersistentVolumeClaim"), namespace, "name", api.Resource("persistentvolumeclaims"), "", admission.Create, nil), status, client)
-	if err == nil {
-		t.Errorf("Expected error for exceeding hard limits")
+	if len(kubeClient.Actions()) != 0 {
+		t.Errorf("Expected no client actions because the incoming pod did not match best effort quota")
 	}
 }
 
-func TestIncrementUsageOnUpdateIgnoresNonPodResources(t *testing.T) {
-	testCase := []struct {
-		kind        unversioned.GroupKind
-		resource    unversioned.GroupResource
-		subresource string
-		object      runtime.Object
+func TestHasUsageStats(t *testing.T) {
+	testCases := map[string]struct {
+		a        api.ResourceQuota
+		expected bool
 	}{
-		{
-			kind:     api.Kind("Service"),
-			resource: api.Resource("services"),
-			object:   &api.Service{},
+		"empty": {
+			a:        api.ResourceQuota{Status: api.ResourceQuotaStatus{Hard: api.ResourceList{}}},
+			expected: true,
 		},
-		{
-			kind:     api.Kind("ReplicationController"),
-			resource: api.Resource("replicationcontrollers"),
-			object:   &api.ReplicationController{},
+		"hard-only": {
+			a: api.ResourceQuota{
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Used: api.ResourceList{},
+				},
+			},
+			expected: false,
 		},
-		{
-			kind:     api.Kind("ResourceQuota"),
-			resource: api.Resource("resourcequotas"),
-			object:   &api.ResourceQuota{},
-		},
-		{
-			kind:     api.Kind("Secret"),
-			resource: api.Resource("secrets"),
-			object:   &api.Secret{},
-		},
-		{
-			kind:     api.Kind("PersistentVolumeClaim"),
-			resource: api.Resource("persistentvolumeclaims"),
-			object:   &api.PersistentVolumeClaim{},
+		"hard-used": {
+			a: api.ResourceQuota{
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Used: api.ResourceList{
+						api.ResourceMemory: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expected: true,
 		},
 	}
-
-	for _, testCase := range testCase {
-		client := fake.NewSimpleClientset()
-		status := &api.ResourceQuotaStatus{
-			Hard: api.ResourceList{},
-			Used: api.ResourceList{},
-		}
-		r := resourceToResourceName[testCase.resource]
-		status.Hard[r] = resource.MustParse("2")
-		status.Used[r] = resource.MustParse("1")
-
-		attributesRecord := admission.NewAttributesRecord(testCase.object, testCase.kind, "my-ns", "new-thing",
-			testCase.resource, testCase.subresource, admission.Update, nil)
-		dirty, err := IncrementUsage(attributesRecord, status, client)
-		if err != nil {
-			t.Errorf("Increment usage of resource %v had unexpected error: %v", testCase.resource, err)
-		}
-		if dirty {
-			t.Errorf("Increment usage of resource %v should not result in a dirty quota on update", testCase.resource)
+	for testName, testCase := range testCases {
+		if result := hasUsageStats(&testCase.a); result != testCase.expected {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
 		}
 	}
 }
