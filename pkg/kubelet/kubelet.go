@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -204,7 +205,7 @@ func NewMainKubelet(
 	enableCustomMetrics bool,
 	volumeStatsAggPeriod time.Duration,
 	containerRuntimeOptions []kubecontainer.Option,
-	hairpinMode bool,
+	hairpinMode string,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -326,6 +327,7 @@ func NewMainKubelet(
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
+		hairpinMode:                  componentconfig.HairpinMode(hairpinMode),
 	}
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod)
@@ -357,10 +359,41 @@ func NewMainKubelet(
 
 	klet.podCache = kubecontainer.NewCache()
 
+	// The hairpin mode setting doesn't matter if:
+	// - We're not using a bridge network. This is hard to check because we might
+	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
+	//   don't pipe it down to any plugins.
+	// - It's set to hairpin-veth for a container runtime that doesn't know how
+	//   to set the hairpin flag on the veth's of containers. Currently the
+	//   docker runtime is the only one that understands this.
+	// - It's set to "none" or an unrecognized string.
+	switch hairpinMode {
+	case componentconfig.PromiscuousBridge:
+		if !configureCBR0 {
+			glog.Warningf("Hairpin mode set to %v but configureCBR0 is false", hairpinMode)
+			break
+		}
+		fallthrough
+	case componentconfig.HairpinVeth:
+		if containerRuntime != "docker" {
+			glog.Warningf("Hairpin mode set to %v but container runtime is %v", hairpinMode, containerRuntime)
+			break
+		}
+		fallthrough
+	case componentconfig.HairpinNone:
+		if configureCBR0 {
+			glog.Warningf("Hairpin mode set to %q and configureCBR0 is true, this might result in loss of hairpin packets.", hairpinMode)
+			break
+		}
+		glog.Infof("Hairpin mode set to %q", hairpinMode)
+	default:
+		glog.Infof("Unrecognized hairpin mode setting %q, setting it to %v", hairpinMode, componentconfig.HairpinNone)
+		hairpinMode = componentconfig.HairpinNone
+	}
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
-		glog.Infof("Hairpin mode set to %v", hairpinMode)
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
@@ -383,7 +416,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			hairpinMode,
+			hairpinMode == componentconfig.HairpinVeth,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
@@ -683,6 +716,11 @@ type Kubelet struct {
 
 	// support gathering custom metrics.
 	enableCustomMetrics bool
+
+	// How the Kubelet should setup hairpin NAT. Can take the values: "promiscuous-bridge"
+	// (make cbr0 promiscuous), "hairpin-veth" (set the hairpin flag on veth interfaces)
+	// or "none" (do nothing).
+	hairpinMode componentconfig.HairpinMode
 }
 
 // Validate given node IP belongs to the current host
@@ -2633,7 +2671,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr); err != nil {
+	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge); err != nil {
 		return err
 	}
 	if kl.shaper == nil {
