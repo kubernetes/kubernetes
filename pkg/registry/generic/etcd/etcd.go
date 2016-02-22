@@ -464,7 +464,7 @@ func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, lis
 		if err != nil {
 			return nil, err
 		}
-		if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil {
+		if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
 			return nil, err
 		}
 	}
