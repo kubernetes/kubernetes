@@ -1,3 +1,10 @@
+# These configs rely on the fact that previous branches will overwrite any
+# environment variables that they need. Currently, 1.0 and 1.1 jobs use the
+# old e2e.sh script on their branches. To turn up new upgrade jobs from these
+# releases, you will need to fiddle with e2e.sh on their branches. For all
+# branches after those, you will simply need to add a new entry in one of the
+# projects below.
+
 - job-template:
     name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}'
     disabled: false
@@ -56,8 +63,11 @@
         daysToKeep: 7
     builders:
         - shell: |
+            # per-provider variables
             {provider-env}
+            # per-upgrade-flow variables, such as project name
             {project-env}
+            # per-step variables, such as whether to run tests
             {job-env}
             {post-env}
             {runner}
@@ -88,8 +98,11 @@
         daysToKeep: 7
     builders:
         - shell: |
+            # per-provider variables
             {provider-env}
+            # per-upgrade-flow variables, such as project name
             {project-env}
+            # per-step variables, such as whether to run tests
             {job-env}
             {post-env}
             {runner}
@@ -177,7 +190,6 @@
         {gke-provider-env}
         export JENKINS_FORCE_GET_TARS="y"
         export FAIL_ON_GCP_RESOURCE_LEAK="false"
-    project-env: ''
     jobs:
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gke'
@@ -203,12 +215,14 @@
             version-new: 'current-release'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: ''
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gke'
             version-old: 'stable'
             version-new: 'current-release'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: ''
 
 - project:
     name: 'upgrade-gce'
@@ -217,7 +231,6 @@
         export NUM_NODES=5
         export JENKINS_FORCE_GET_TARS="y"
         export FAIL_ON_GCP_RESOURCE_LEAK="false"
-    project-env: ''
     jobs:
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gce'
@@ -234,3 +247,4 @@
             version-new: 'current-release'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: ''
