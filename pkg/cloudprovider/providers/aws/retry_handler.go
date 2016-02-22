@@ -42,7 +42,7 @@ type CrossRequestRetryDelay struct {
 // Create a new CrossRequestRetryDelay
 func NewCrossRequestRetryDelay() *CrossRequestRetryDelay {
 	c := &CrossRequestRetryDelay{}
-	c.backoff.init()
+	c.backoff.init(decayIntervalSeconds, decayFraction, maxDelay)
 	return c
 }
 
@@ -90,6 +90,10 @@ func (c *CrossRequestRetryDelay) AfterRetry(r *request.Request) {
 
 // Backoff manages a backoff that varies based on the recently observed failures
 type Backoff struct {
+	decayIntervalSeconds int64
+	decayFraction        float64
+	maxDelay             time.Duration
+
 	mutex sync.Mutex
 
 	// We count all requests & the number of requests which hit a
@@ -100,10 +104,13 @@ type Backoff struct {
 	lastDecay               int64
 }
 
-func (b *Backoff) init() {
+func (b *Backoff) init(decayIntervalSeconds int, decayFraction float64, maxDelay time.Duration) {
 	b.lastDecay = time.Now().Unix()
 	// Bias so that if the first request hits the limit we don't immediately apply the full delay
 	b.countRequests = 4
+	b.decayIntervalSeconds = int64(decayIntervalSeconds)
+	b.decayFraction = decayFraction
+	b.maxDelay = maxDelay
 }
 
 // Computes the delay required for a request, also updating internal state to count this request
@@ -113,9 +120,9 @@ func (b *Backoff) ComputeDelayForRequest(now time.Time) time.Duration {
 
 	// Apply exponential decay to the counters
 	timeDeltaSeconds := now.Unix() - b.lastDecay
-	if timeDeltaSeconds > decayIntervalSeconds {
-		intervals := float64(timeDeltaSeconds) / float64(decayIntervalSeconds)
-		decay := float32(math.Pow(decayFraction, intervals))
+	if timeDeltaSeconds > b.decayIntervalSeconds {
+		intervals := float64(timeDeltaSeconds) / float64(b.decayIntervalSeconds)
+		decay := float32(math.Pow(b.decayFraction, intervals))
 		b.countErrorsRequestLimit *= decay
 		b.countRequests *= decay
 		b.lastDecay = now.Unix()
@@ -140,7 +147,7 @@ func (b *Backoff) ComputeDelayForRequest(now time.Time) time.Duration {
 	// Delay by the max delay multiplied by the recent error rate
 	// (i.e. we apply a linear delay function)
 	// TODO: This is pretty arbitrary
-	delay := time.Nanosecond * time.Duration(float32(maxDelay.Nanoseconds())*errorFraction)
+	delay := time.Nanosecond * time.Duration(float32(b.maxDelay.Nanoseconds())*errorFraction)
 	// Round down to the nearest second for sanity
 	return time.Second * time.Duration(int(delay.Seconds()))
 }

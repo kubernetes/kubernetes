@@ -30,7 +30,7 @@ import (
 // Test that we don't apply any delays when there are no errors
 func TestBackoffNoErrors(t *testing.T) {
 	b := &Backoff{}
-	b.init()
+	b.init(decayIntervalSeconds, decayFraction, maxDelay)
 
 	now := time.Now()
 	for i := 0; i < 100; i++ {
@@ -47,7 +47,7 @@ func TestBackoffNoErrors(t *testing.T) {
 // delay and no-delay.
 func TestBackoffAllErrors(t *testing.T) {
 	b := &Backoff{}
-	b.init()
+	b.init(decayIntervalSeconds, decayFraction, maxDelay)
 
 	now := time.Now()
 	// Warm up
@@ -73,7 +73,7 @@ func TestBackoffAllErrors(t *testing.T) {
 // don't wait for delay in between requests)
 func TestBackoffHitsMax(t *testing.T) {
 	b := &Backoff{}
-	b.init()
+	b.init(decayIntervalSeconds, decayFraction, maxDelay)
 
 	now := time.Now()
 	for i := 0; i < 100; i++ {
@@ -97,7 +97,7 @@ func TestBackoffHitsMax(t *testing.T) {
 // no more errors.
 func TestBackoffRecovers(t *testing.T) {
 	b := &Backoff{}
-	b.init()
+	b.init(decayIntervalSeconds, decayFraction, maxDelay)
 
 	now := time.Now()
 
