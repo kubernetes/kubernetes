@@ -2212,6 +2212,11 @@ func (dm *DockerManager) ProbeGPUStatus() error {
 		}
 	}
 
+	// Test for show the current gpu usage status
+	for _, gpuPlugin := range dm.gpuPlugins {
+		gpuPlugin.ShowCurrentGPUUsageStatus()
+	}
+
 	return nil
 }
 
