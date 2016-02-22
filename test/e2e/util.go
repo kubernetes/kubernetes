@@ -2911,22 +2911,39 @@ func getNodePortURL(client *client.Client, ns, name string, svcPort int) (string
 	return "", fmt.Errorf("Failed to find external address for service %v", name)
 }
 
-// scaleRCByName scales an RC via ns/name lookup. If replicas == 0 it waits till
+// scaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
-func scaleRCByName(client *client.Client, ns, name string, replicas uint) error {
-	if err := ScaleRC(client, ns, name, replicas, false); err != nil {
-		return err
-	}
-	rc, err := client.ReplicationControllers(ns).Get(name)
+func scaleRCByLabels(client *client.Client, ns string, l map[string]string, replicas uint) error {
+	listOpts := api.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l))}
+	rcs, err := client.ReplicationControllers(ns).List(listOpts)
 	if err != nil {
 		return err
 	}
-	if replicas == 0 {
-		return waitForRCPodsGone(client, rc)
-	} else {
-		return waitForPodsWithLabelRunning(
-			client, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector)))
+	if len(rcs.Items) == 0 {
+		return fmt.Errorf("RC with labels %v not found in ns %v", l, ns)
 	}
+	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
+	for _, labelRC := range rcs.Items {
+		name := labelRC.Name
+		if err := ScaleRC(client, ns, name, replicas, false); err != nil {
+			return err
+		}
+		rc, err := client.ReplicationControllers(ns).Get(name)
+		if err != nil {
+			return err
+		}
+		if replicas == 0 {
+			if err := waitForRCPodsGone(client, rc); err != nil {
+				return err
+			}
+		} else {
+			if err := waitForPodsWithLabelRunning(
+				client, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector))); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func getPodLogs(c *client.Client, namespace, podName, containerName string) (string, error) {
