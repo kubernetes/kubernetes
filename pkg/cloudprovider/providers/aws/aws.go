@@ -2344,7 +2344,9 @@ func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance,
 	for _, instance := range allInstances {
 		nodeName := aws.StringValue(instance.PrivateDnsName)
 		if nodeName == "" {
-			glog.V(2).Infof("ignoring ec2 instance with no PrivateDnsName: %q", aws.StringValue(instance.InstanceId))
+			if isAlive(instance) {
+				glog.V(2).Infof("ignoring ec2 instance with no PrivateDnsName: %q", aws.StringValue(instance.InstanceId))
+			}
 			continue
 		}
 		i, found := nodeNamesMap[nodeName]
