@@ -25,7 +25,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-EXIT_ON_WEAK_ERROR="${EXIT_ON_WEAK_ERROR:-true}"
+EXIT_ON_WEAK_ERROR="${EXIT_ON_WEAK_ERROR:-false}"
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
