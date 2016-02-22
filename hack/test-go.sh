@@ -303,6 +303,17 @@ reportCoverageToCoveralls() {
   fi
 }
 
+checkFDs() {
+  # several unittests panic when httptest cannot open more sockets
+  # due to the low default files limit on OS X.  Warn about low limit.
+  local fileslimit="$(ulimit -n)"
+  if [[ $fileslimit -lt 1000 ]]; then
+    echo "WARNING: ulimit -n (files) should be at least 1000, is $fileslimit, may cause test failure";
+  fi
+}
+
+checkFDs
+
 # Convert the CSVs to arrays.
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
