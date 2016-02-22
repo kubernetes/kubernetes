@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"os/exec"
 	"reflect"
 	"sort"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/util/codeinspector"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -882,5 +884,32 @@ func makeImageNode(node string, status api.NodeStatus) api.Node {
 	return api.Node{
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Status:     status,
+	}
+}
+
+func TestPriorityRegistered(t *testing.T) {
+	var functionNames []string
+
+	files := []string{"priorities.go", "node_affinity.go", "selector_spreading.go"}
+
+	for _, filePath := range files {
+		functions, err := codeinspector.GetPulicFunctions(filePath)
+		if err == nil {
+			functionNames = append(functionNames, functions...)
+		} else {
+			t.Errorf("unexpected error when parsing %s", filePath)
+		}
+	}
+
+	for _, funcionName := range functionNames {
+		err := exec.Command("grep", "-rl", funcionName, "./../../algorithmprovider/defaults/defaults.go", "./../../factory/plugins.go").Run()
+		if err != nil {
+			switch err.Error() {
+			case "exit status 2":
+				t.Errorf("unexpected error when checking %s", funcionName)
+			case "exit status 1":
+				t.Errorf("priority %s is implemented but seems not registered in any place", funcionName)
+			}
+		}
 	}
 }
