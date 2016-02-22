@@ -1042,8 +1042,8 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 }
 
 func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) (totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
-	totalReplicas = deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-	updatedReplicas = deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS})
+	totalReplicas = deploymentutil.GetActualReplicaCountForReplicaSets(allRSs)
+	updatedReplicas = deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS})
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	availableReplicas, err = deploymentutil.GetAvailablePodsForReplicaSets(dc.client, allRSs, minReadySeconds)
 	if err != nil {
