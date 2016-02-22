@@ -391,7 +391,7 @@ func (cuda *Cuda) UpdateGPUUsageStatus(newGPUStatus *map[gpuTypes.PodCotainerHas
 }
 
 func (cuda *Cuda) ShowCurrentGPUUsageStatus() {
-	glog.Infof("Hans: cuda.UpdateGPUUsageStatus()")
+	glog.Infof("Hans: cuda.ShowCurrentGPUUsageStatus()")
 
 	cuda.gpuInfo.Lock.RLock()
 	defer cuda.gpuInfo.Lock.RUnlock()
