@@ -25,7 +25,6 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/persistentvolumeclaim"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
@@ -33,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/persistentvolumeclaims"
 
 	newListFunc := func() runtime.Object { return &api.PersistentVolumeClaimList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.PersistentVolumeClaims), &api.PersistentVolumeClaim{}, prefix, persistentvolumeclaim.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.PersistentVolumeClaims), &api.PersistentVolumeClaim{}, prefix, persistentvolumeclaim.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },

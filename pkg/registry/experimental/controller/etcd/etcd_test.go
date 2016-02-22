@@ -30,7 +30,8 @@ import (
 
 func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.Interface) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	return NewStorage(etcdStorage, generic.UndecoratedStorage).Scale, server, etcdStorage
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage}
+	return NewStorage(restOptions).Scale, server, etcdStorage
 }
 
 var validPodTemplate = api.PodTemplate{
