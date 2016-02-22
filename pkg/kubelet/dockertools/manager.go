@@ -2198,6 +2198,10 @@ func (dm *DockerManager) ProbeGPUStatus() error {
 		podID, containerHashID := dm.getGPUProbeInfo(iResult.Config.Labels)
 		podContainerHash := gpuUtil.HashContainerFromLabel(podID, containerHashID)
 
+		if gpuUsageStatus[gpuNameLabel] == nil {
+			gpuUsageStatus[gpuNameLabel] = map[gpuTypes.PodCotainerHashID]gpuTypes.GPUUsageStatus{}
+		}
+
 		gpuUsageStatus[gpuNameLabel][podContainerHash] = gpuTypes.GPUUsageStatus{GPUIndexes: gpuUtil.GetGPUIndexFromLabel(gpuIndexesLabel)}
 	}
 
