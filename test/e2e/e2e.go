@@ -206,7 +206,7 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // If a "report directory" is specified, one or more JUnit test reports will be
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
-func RunE2ETests(t *testing.T) {
+func RunE2ETests(t *testing.T, suite string) {
 	runtime.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -236,5 +236,5 @@ func RunE2ETests(t *testing.T) {
 		}
 	}
 	glog.Infof("Starting e2e run %q on Ginkgo node %d", runId, config.GinkgoConfig.ParallelNode)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, suite, r)
 }

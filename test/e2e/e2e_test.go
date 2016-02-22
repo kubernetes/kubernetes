@@ -25,5 +25,5 @@ func init() {
 }
 
 func TestE2E(t *testing.T) {
-	RunE2ETests(t)
+	RunE2ETests(t, "Kubernetes e2e suite")
 }
