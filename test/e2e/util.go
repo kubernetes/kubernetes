@@ -2133,19 +2133,11 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
+		// When the deployment status and its underlying resources reach the desired state, we're done
 		if deployment.Status.Replicas == desiredUpdatedReplicas &&
-			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
-			// Verify replica sets.
-			if deploymentutil.GetReplicaCountForReplicaSets(oldRSs) != 0 {
-				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
-				logPodsOfReplicaSets(c, allRSs, minReadySeconds)
-				return false, fmt.Errorf("old replica sets are not fully scaled down")
-			}
-			if deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) != desiredUpdatedReplicas {
-				logReplicaSetsOfDeployment(deploymentName, oldRSs, newRS)
-				logPodsOfReplicaSets(c, allRSs, minReadySeconds)
-				return false, fmt.Errorf("new replica sets is not fully scaled up")
-			}
+			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas &&
+			deploymentutil.GetReplicaCountForReplicaSets(oldRSs) == 0 &&
+			deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) == desiredUpdatedReplicas {
 			return true, nil
 		}
 		return false, nil
