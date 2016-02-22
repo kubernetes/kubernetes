@@ -25,7 +25,7 @@ kube::golang::setup_env
 
 gendeepcopy=$(kube::util::find-binary "gendeepcopy")
 
-APIROOTS=${APIROOTS:-pkg/api pkg/apis/authorization pkg/apis/autoscaling pkg/apis/extensions pkg/apis/metrics}
+APIROOTS=${APIROOTS:-pkg/api pkg/apis/authorization pkg/apis/autoscaling pkg/apis/batch pkg/apis/extensions pkg/apis/metrics}
 _tmp="${KUBE_ROOT}/_tmp"
 
 cleanup() {

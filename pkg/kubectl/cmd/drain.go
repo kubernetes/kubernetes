@@ -242,7 +242,7 @@ func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
 					daemonset_pod = true
 				}
 			} else if sr.Reference.Kind == "Job" {
-				job, err := o.client.Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
+				job, err := o.client.ExtensionsClient.Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
 
 				// Assume the only reason for an error is because the Job is
 				// gone/missing, not for any other cause.  TODO(mml): something more

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -94,6 +95,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
 		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                     &JobDescriber{c},
+		batch.Kind("Job"):                          &JobDescriber{c},
 		extensions.Kind("Ingress"):                 &IngressDescriber{c},
 	}
 

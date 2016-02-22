@@ -278,6 +278,10 @@ func (c *Fake) Autoscaling() client.AutoscalingInterface {
 	return &FakeAutoscaling{c}
 }
 
+func (c *Fake) Batch() client.BatchInterface {
+	return &FakeBatch{c}
+}
+
 func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
@@ -319,6 +323,19 @@ type FakeAutoscaling struct {
 
 func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
 	return &FakeHorizontalPodAutoscalersV1{Fake: c, Namespace: namespace}
+}
+
+// NewSimpleFakeBatch returns a client that will respond with the provided objects
+func NewSimpleFakeBatch(objects ...runtime.Object) *FakeBatch {
+	return &FakeBatch{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeBatch struct {
+	*Fake
+}
+
+func (c *FakeBatch) Jobs(namespace string) client.JobInterface {
+	return &FakeJobsV1{Fake: c, Namespace: namespace}
 }
 
 // NewSimpleFakeExp returns a client that will respond with the provided objects

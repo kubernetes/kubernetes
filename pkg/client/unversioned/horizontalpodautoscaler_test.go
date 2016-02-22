@@ -35,7 +35,7 @@ func getHorizontalPodAutoscalersResoureName() string {
 	return "horizontalpodautoscalers"
 }
 
-func getClient(t *testing.T, c *simple.Client, ns, resourceGroup string) HorizontalPodAutoscalerInterface {
+func getHPAClient(t *testing.T, c *simple.Client, ns, resourceGroup string) HorizontalPodAutoscalerInterface {
 	switch resourceGroup {
 	case autoscaling.GroupName:
 		return c.Setup(t).Autoscaling().HorizontalPodAutoscalers(ns)
@@ -66,7 +66,7 @@ func testHorizontalPodAutoscalerCreate(t *testing.T, group testapi.TestGroup, re
 		ResourceGroup: resourceGroup,
 	}
 
-	response, err := getClient(t, c, ns, resourceGroup).Create(&horizontalPodAutoscaler)
+	response, err := getHPAClient(t, c, ns, resourceGroup).Create(&horizontalPodAutoscaler)
 	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -98,7 +98,7 @@ func testHorizontalPodAutoscalerGet(t *testing.T, group testapi.TestGroup, resou
 		ResourceGroup: resourceGroup,
 	}
 
-	response, err := getClient(t, c, ns, resourceGroup).Get("abc")
+	response, err := getHPAClient(t, c, ns, resourceGroup).Get("abc")
 	defer c.Close()
 	c.Validate(t, response, err)
 }
@@ -130,7 +130,7 @@ func testHorizontalPodAutoscalerList(t *testing.T, group testapi.TestGroup, reso
 		Response:      simple.Response{StatusCode: 200, Body: horizontalPodAutoscalerList},
 		ResourceGroup: resourceGroup,
 	}
-	response, err := getClient(t, c, ns, resourceGroup).List(api.ListOptions{})
+	response, err := getHPAClient(t, c, ns, resourceGroup).List(api.ListOptions{})
 	defer c.Close()
 	c.Validate(t, response, err)
 }
@@ -154,7 +154,7 @@ func testHorizontalPodAutoscalerUpdate(t *testing.T, group testapi.TestGroup, re
 		Response:      simple.Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 		ResourceGroup: resourceGroup,
 	}
-	response, err := getClient(t, c, ns, resourceGroup).Update(horizontalPodAutoscaler)
+	response, err := getHPAClient(t, c, ns, resourceGroup).Update(horizontalPodAutoscaler)
 	defer c.Close()
 	c.Validate(t, response, err)
 }
@@ -178,7 +178,7 @@ func testHorizontalPodAutoscalerUpdateStatus(t *testing.T, group testapi.TestGro
 		Response:      simple.Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 		ResourceGroup: resourceGroup,
 	}
-	response, err := getClient(t, c, ns, resourceGroup).UpdateStatus(horizontalPodAutoscaler)
+	response, err := getHPAClient(t, c, ns, resourceGroup).UpdateStatus(horizontalPodAutoscaler)
 	defer c.Close()
 	c.Validate(t, response, err)
 }
@@ -195,7 +195,7 @@ func testHorizontalPodAutoscalerDelete(t *testing.T, group testapi.TestGroup, re
 		Response:      simple.Response{StatusCode: 200},
 		ResourceGroup: resourceGroup,
 	}
-	err := getClient(t, c, ns, resourceGroup).Delete("foo", nil)
+	err := getHPAClient(t, c, ns, resourceGroup).Delete("foo", nil)
 	defer c.Close()
 	c.Validate(t, nil, err)
 }
@@ -214,7 +214,7 @@ func testHorizontalPodAutoscalerWatch(t *testing.T, group testapi.TestGroup, res
 		Response:      simple.Response{StatusCode: 200},
 		ResourceGroup: resourceGroup,
 	}
-	_, err := getClient(t, c, api.NamespaceAll, resourceGroup).Watch(api.ListOptions{})
+	_, err := getHPAClient(t, c, api.NamespaceAll, resourceGroup).Watch(api.ListOptions{})
 	defer c.Close()
 	c.Validate(t, nil, err)
 }
