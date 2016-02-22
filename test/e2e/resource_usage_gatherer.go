@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -44,7 +45,6 @@ type resourceConstraint struct {
 type containerResourceGatherer struct {
 	usageTimeseries map[time.Time]resourceUsagePerContainer
 	stopCh          chan struct{}
-	timer           *time.Ticker
 	wg              sync.WaitGroup
 }
 
@@ -79,11 +79,12 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 	g.usageTimeseries = make(map[time.Time]resourceUsagePerContainer)
 	g.wg.Add(1)
 	g.stopCh = make(chan struct{})
-	g.timer = time.NewTicker(period)
 	go func() error {
+		defer utilruntime.HandleCrash()
+		defer g.wg.Done()
 		for {
 			select {
-			case <-g.timer.C:
+			case <-time.After(period):
 				now := time.Now()
 				data, err := g.getKubeSystemContainersResourceUsage(c)
 				if err != nil {
@@ -93,7 +94,6 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 				g.usageTimeseries[now] = data
 			case <-g.stopCh:
 				Logf("Stop channel is closed. Stopping gatherer.")
-				g.wg.Done()
 				return nil
 			}
 		}
@@ -226,6 +226,7 @@ func (g *containerResourceGatherer) getKubeSystemContainersResourceUsage(c *clie
 	nameToUsageMap := make(resourceUsagePerContainer, len(containerIDToNameMap))
 	for _, node := range nodes.Items {
 		go func(nodeName string) {
+			defer utilruntime.HandleCrash()
 			defer wg.Done()
 			nodeUsage, err := getOneTimeResourceUsageOnNode(c, nodeName, 15*time.Second, func() []string { return containerIDs }, true)
 			mutex.Lock()
