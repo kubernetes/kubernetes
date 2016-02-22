@@ -193,9 +193,9 @@ function kube::build::prepare_docker_machine() {
   docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
     docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
-      --engine-env HTTP_PROXY="${KUBE_BUILD_HTTP_PROXY:-}" \
-      --engine-env HTTPS_PROXY="${KUBE_BUILD_HTTPS_PROXY:-}" \
-      --engine-env NO_PROXY="${KUBE_BUILD_NO_PROXY:-127.0.0.1}" \
+      --engine-env HTTP_PROXY="${KUBERNETES_HTTP_PROXY:-}" \
+      --engine-env HTTPS_PROXY="${KUBERNETES_HTTPS_PROXY:-}" \
+      --engine-env NO_PROXY="${KUBERNETES_NO_PROXY:-127.0.0.1}" \
       "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
@@ -247,9 +247,9 @@ function kube::build::update_dockerfile() {
     sed_opts=(-i)
   fi
   sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTP_PROXY#${KUBE_BUILD_HTTP_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTPS_PROXY#${KUBE_BUILD_HTTPS_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  sed ${sed_opts[@]} "s#KUBE_BUILD_NO_PROXY#${KUBE_BUILD_NO_PROXY:-127.0.0.1}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s#KUBERNETES_HTTP_PROXY#${KUBERNETES_HTTP_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s#KUBERNETES_HTTPS_PROXY#${KUBERNETES_HTTPS_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed ${sed_opts[@]} "s#KUBERNETES_NO_PROXY#${KUBERNETES_NO_PROXY:-127.0.0.1}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
 
 function kube::build::ensure_docker_in_path() {
