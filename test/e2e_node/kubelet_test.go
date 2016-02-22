@@ -249,7 +249,7 @@ var _ = Describe("Kubelet", func() {
 					Expect(*container.Logs.UsedBytes).NotTo(BeZero(), spew.Sdump(container))
 
 				}
-				Expect(podsList).To(ConsistOf(podNames))
+				Expect(podsList).To(ConsistOf(podNames), spew.Sdump(summary))
 			})
 		})
 

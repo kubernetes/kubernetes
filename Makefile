@@ -101,6 +101,15 @@ test_e2e:
 	hack/e2e-test.sh
 .PHONY: test_e2e
 
+# Build and run node end-to-end tests.
+#
+# Example:
+#   make test_e2e_node
+test_e2e_node:
+	hack/e2e-node-test.sh
+.PHONY: test_e2e_node
+
+
 # Remove all build artifacts.
 #
 # Example:
