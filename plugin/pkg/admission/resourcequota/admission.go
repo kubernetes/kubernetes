@@ -208,7 +208,7 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 
 		// check that we pass all remaining quotas so we do not prematurely charge
 		// for each quota, mask the usage to the set of resources tracked by the quota
-		// if request + used < hard, return an error describing the failure
+		// if request + used > hard, return an error describing the failure
 		updatedUsage := map[string]api.ResourceList{}
 		for _, resourceQuota := range resourceQuotasToProcess {
 			hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
@@ -230,7 +230,7 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 
 		// update the status for each quota with its new usage
 		// if we get a conflict, get updated quota, and enqueue
-		for _, resourceQuota := range resourceQuotasToProcess {
+		for i, resourceQuota := range resourceQuotasToProcess {
 			newUsage := updatedUsage[resourceQuota.Name]
 			quotaToUpdate := &api.ResourceQuota{
 				ObjectMeta: api.ObjectMeta{
@@ -248,11 +248,15 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 				if !errors.IsConflict(err) {
 					return admission.NewForbidden(a, fmt.Errorf("Unable to update quota status: %s %v", resourceQuota.Name, err))
 				}
-				latestQuota, err := q.client.Core().ResourceQuotas(namespace).Get(resourceQuota.Name)
-				if err != nil {
-					return admission.NewForbidden(a, fmt.Errorf("Unable to get quota: %s %v", resourceQuota.Name, err))
+				// if we get a conflict, we get the latest copy of the quota documents that were not yet modified so we retry all with latest state.
+				for fetchIndex := i; fetchIndex < len(resourceQuotasToProcess); fetchIndex++ {
+					latestQuota, err := q.client.Core().ResourceQuotas(namespace).Get(resourceQuotasToProcess[fetchIndex].Name)
+					if err != nil {
+						return admission.NewForbidden(a, fmt.Errorf("Unable to get quota: %s %v", resourceQuotasToProcess[fetchIndex].Name, err))
+					}
+					tryAgain = append(tryAgain, latestQuota)
 				}
-				tryAgain = append(tryAgain, latestQuota)
+				break
 			}
 		}
 
