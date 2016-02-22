@@ -26,7 +26,6 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	ingress "k8s.io/kubernetes/pkg/registry/ingress"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for replication controllers against etcd
@@ -35,12 +34,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/ingress"
 
 	newListFunc := func() runtime.Object { return &extensions.IngressList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Ingress), &extensions.Ingress{}, prefix, ingress.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Ingress), &extensions.Ingress{}, prefix, ingress.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Ingress{} },

@@ -21,7 +21,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/configmap"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 )
@@ -32,12 +31,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work with ConfigMap objects.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
+func NewREST(opts generic.RESTOptions) *REST {
 	prefix := "/configmaps"
 
 	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
-	storageInterface := storageDecorator(
-		s, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object {

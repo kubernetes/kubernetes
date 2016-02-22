@@ -25,7 +25,6 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for PodSecurityPolicies against etcd.
@@ -36,10 +35,10 @@ type REST struct {
 const Prefix = "/podsecuritypolicies"
 
 // NewREST returns a RESTStorage object that will work against PodSecurityPolicy objects.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
+func NewREST(opts generic.RESTOptions) *REST {
 	newListFunc := func() runtime.Object { return &extensions.PodSecurityPolicyList{} }
-	storageInterface := storageDecorator(
-		s, 100, &extensions.PodSecurityPolicy{}, Prefix, podsecuritypolicy.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, 100, &extensions.PodSecurityPolicy{}, Prefix, podsecuritypolicy.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &extensions.PodSecurityPolicy{} },

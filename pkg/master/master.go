@@ -324,38 +324,42 @@ func (m *Master) InstallAPIs(c *Config) {
 }
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
-	storageDecorator := m.StorageDecorator()
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.Get("", resource) }
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   dbClient(resource),
+			Decorator: m.StorageDecorator(),
+		}
+	}
 
-	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"), storageDecorator)
+	podTemplateStorage := podtemplateetcd.NewREST(restOptions("podTemplates"))
 
-	eventStorage := eventetcd.NewREST(dbClient("events"), storageDecorator, uint64(c.EventTTL.Seconds()))
-	limitRangeStorage := limitrangeetcd.NewREST(dbClient("limitRanges"), storageDecorator)
+	eventStorage := eventetcd.NewREST(restOptions("events"), uint64(c.EventTTL.Seconds()))
+	limitRangeStorage := limitrangeetcd.NewREST(restOptions("limitRanges"))
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(dbClient("resourceQuotas"), storageDecorator)
-	secretStorage := secretetcd.NewREST(dbClient("secrets"), storageDecorator)
-	serviceAccountStorage := serviceaccountetcd.NewREST(dbClient("serviceAccounts"), storageDecorator)
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(dbClient("persistentVolumes"), storageDecorator)
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(dbClient("persistentVolumeClaims"), storageDecorator)
-	configMapStorage := configmapetcd.NewREST(dbClient("configMaps"), storageDecorator)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(restOptions("resourceQuotas"))
+	secretStorage := secretetcd.NewREST(restOptions("secrets"))
+	serviceAccountStorage := serviceaccountetcd.NewREST(restOptions("serviceAccounts"))
+	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(restOptions("persistentVolumes"))
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(restOptions("persistentVolumeClaims"))
+	configMapStorage := configmapetcd.NewREST(restOptions("configMaps"))
 
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(dbClient("namespaces"), storageDecorator)
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptions("namespaces"))
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), storageDecorator)
+	endpointsStorage := endpointsetcd.NewREST(restOptions("endpoints"))
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage := nodeetcd.NewStorage(dbClient("nodes"), storageDecorator, c.KubeletClient, m.ProxyTransport)
+	nodeStorage := nodeetcd.NewStorage(restOptions("nodes"), c.KubeletClient, m.ProxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
-		dbClient("pods"),
-		storageDecorator,
+		restOptions("pods"),
 		kubeletclient.ConnectionInfoGetter(nodeStorage.Node),
 		m.ProxyTransport,
 	)
 
-	serviceStorage, serviceStatusStorage := serviceetcd.NewREST(dbClient("services"), storageDecorator)
+	serviceStorage, serviceStatusStorage := serviceetcd.NewREST(restOptions("services"))
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
 
 	var serviceClusterIPRegistry service.RangeRegistry
@@ -381,7 +385,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"), storageDecorator)
+	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(restOptions("replicationControllers"))
 
 	serviceRest := service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport)
 
@@ -608,7 +612,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 }
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
-	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, generic.UndecoratedStorage, group, kind)
+	resourceStorage := thirdpartyresourcedataetcd.NewREST(generic.RESTOptions{m.thirdPartyStorage, generic.UndecoratedStorage}, group, kind)
 
 	apiRoot := makeThirdPartyPath("")
 
@@ -656,20 +660,23 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		}
 		return enabled
 	}
-	storageDecorator := m.StorageDecorator()
-	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.Get(extensions.GroupName, resource)
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   c.StorageDestinations.Get(extensions.GroupName, resource),
+			Decorator: m.StorageDecorator(),
+		}
 	}
 
 	storage := map[string]rest.Storage{}
 	if isEnabled("horizontalpodautoscalers") {
 		m.constructHPAResources(c, storage)
-		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)
+		controllerStorage := expcontrolleretcd.NewStorage(
+			generic.RESTOptions{c.StorageDestinations.Get("", "replicationControllers"), m.StorageDecorator()})
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
 	if isEnabled("thirdpartyresources") {
-		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"), storageDecorator)
+		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptions("thirdpartyresources"))
 		thirdPartyControl := ThirdPartyController{
 			master: m,
 			thirdPartyResourceRegistry: thirdPartyResourceStorage,
@@ -686,12 +693,12 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	}
 
 	if isEnabled("daemonsets") {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"), storageDecorator)
+		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptions("daemonsets"))
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	if isEnabled("deployments") {
-		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"), storageDecorator)
+		deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		// TODO(madhusudancs): Install scale when Scale group issues are fixed (see issue #18528).
@@ -702,16 +709,16 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		m.constructJobResources(c, storage)
 	}
 	if isEnabled("ingresses") {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptions("ingresses"))
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 	if isEnabled("podsecuritypolicy") {
-		podSecurityPolicyStorage := pspetcd.NewREST(dbClient("podsecuritypolicy"), storageDecorator)
+		podSecurityPolicyStorage := pspetcd.NewREST(restOptions("podsecuritypolicy"))
 		storage["podSecurityPolicies"] = podSecurityPolicyStorage
 	}
 	if isEnabled("replicasets") {
-		replicaSetStorage := replicasetetcd.NewStorage(dbClient("replicasets"), storageDecorator)
+		replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
 	}
@@ -726,11 +733,13 @@ func (m *Master) constructHPAResources(c *Config, restStorage map[string]rest.St
 	// Note that hpa's storage settings are changed by changing the autoscaling
 	// group. Clearly we want all hpas to be stored in the same place no
 	// matter where they're accessed from.
-	storageDecorator := m.StorageDecorator()
-	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.Search([]string{autoscaling.GroupName, extensions.GroupName}, resource)
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   c.StorageDestinations.Search([]string{autoscaling.GroupName, extensions.GroupName}, resource),
+			Decorator: m.StorageDecorator(),
+		}
 	}
-	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
+	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptions("horizontalpodautoscalers"))
 	restStorage["horizontalpodautoscalers"] = autoscalerStorage
 	restStorage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
 }
@@ -760,11 +769,13 @@ func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.St
 	// Note that job's storage settings are changed by changing the batch
 	// group. Clearly we want all jobs to be stored in the same place no
 	// matter where they're accessed from.
-	storageDecorator := m.StorageDecorator()
-	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource)
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource),
+			Decorator: m.StorageDecorator(),
+		}
 	}
-	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
+	jobStorage, jobStatusStorage := jobetcd.NewREST(restOptions("jobs"))
 	restStorage["jobs"] = jobStorage
 	restStorage["jobs/status"] = jobStatusStorage
 }
