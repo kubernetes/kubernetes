@@ -246,9 +246,6 @@ func (h *etcdHelper) Set(ctx context.Context, key string, obj, out runtime.Objec
 		metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	}
 
-	if err != nil {
-		return err
-	}
 	if out != nil {
 		if _, err := conversion.EnforcePtr(out); err != nil {
 			panic("unable to convert output object to pointer")
