@@ -311,7 +311,8 @@ resource-quota-sync-period
 resource-version
 retry_time
 rkt-path
-rkt-stage1-image
+rkt-stage1-path
+rkt-stage1-url
 root-ca-file
 root-dir
 run-proxy

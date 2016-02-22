@@ -1038,7 +1038,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		rktBinAbsPath: "/bin/rkt/rkt",
 		config: &Config{
 			Path:            "/bin/rkt/rkt",
-			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
+			Stage1Path:      "/bin/rkt/stage1-coreos.aci",
 			Dir:             "/var/data",
 			InsecureOptions: "image,ondisk",
 			LocalConfigDir:  "/var/rkt/local/data",
