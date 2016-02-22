@@ -527,6 +527,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer) {
 			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, out)
 		case volume.VolumeSource.Secret != nil:
 			printSecretVolumeSource(volume.VolumeSource.Secret, out)
+		case volume.VolumeSource.ConfigMap != nil:
+			printConfigMapVolumeSource(volume.VolumeSource.ConfigMap, out)
 		case volume.VolumeSource.NFS != nil:
 			printNFSVolumeSource(volume.VolumeSource.NFS, out)
 		case volume.VolumeSource.ISCSI != nil:
@@ -579,8 +581,13 @@ func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, out io.Writer) {
 }
 
 func printSecretVolumeSource(secret *api.SecretVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tSecret (a secret that should populate this volume)\n"+
+	fmt.Fprintf(out, "    Type:\tSecret (a volume populated by a Secret)\n"+
 		"    SecretName:\t%v\n", secret.SecretName)
+}
+
+func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
+		"    Name:\t%v\n", configMap.Name)
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, out io.Writer) {
