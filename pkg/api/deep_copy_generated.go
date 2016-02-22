@@ -2455,6 +2455,15 @@ func DeepCopy_api_ResourceQuotaSpec(in ResourceQuotaSpec, out *ResourceQuotaSpec
 	} else {
 		out.Hard = nil
 	}
+	if in.Scopes != nil {
+		in, out := in.Scopes, &out.Scopes
+		*out = make([]ResourceQuotaScope, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.Scopes = nil
+	}
 	return nil
 }
 
