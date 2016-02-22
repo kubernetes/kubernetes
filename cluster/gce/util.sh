@@ -824,7 +824,7 @@ function kube-down {
   # Get the name of the managed instance group template before we delete the
   # managed instance group. (The name of the managed instance group template may
   # change during a cluster upgrade.)
-  local template=$(get-template "${PROJECT}" "${ZONE}" "${NODE_INSTANCE_PREFIX}-group")
+  local template=$(get-template "${PROJECT}")
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
@@ -956,18 +956,18 @@ function kube-down {
   set -e
 }
 
-# Gets the instance template for the managed instance group with the provided
-# project, zone, and group name. It echos the template name so that the function
+# Gets the instance template for given NODE_INSTANCE_PREFIX. It echos the template name so that the function
 # output can be used.
+# Assumed vars:
+#   NODE_INSTANCE_PREFIX
 #
 # $1: project
 # $2: zone
-# $3: managed instance group name
 function get-template {
-  # url is set to https://www.googleapis.com/compute/v1/projects/$1/global/instanceTemplates/<template>
-  local url=$(gcloud compute instance-groups managed describe --project="${1}" --zone="${2}" "${3}" | grep instanceTemplate)
-  # template is set to <template> (the pattern strips off all but last slash)
-  local template="${url##*/}"
+  local template=""
+  if [[ -n $(gcloud compute instance-templates list "${NODE_INSTANCE_PREFIX}"-template --project="${1}" | grep template) ]]; then
+    template="${NODE_INSTANCE_PREFIX}"-template
+  fi
   echo "${template}"
 }
 
