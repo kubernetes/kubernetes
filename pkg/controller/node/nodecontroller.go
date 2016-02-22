@@ -240,7 +240,7 @@ func (nc *NodeController) Run(period time.Duration) {
 	//    b. If there are no pods left terminating, exit
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
-	go wait.Until(func() {
+	go wait.Forever(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		nc.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
@@ -255,11 +255,11 @@ func (nc *NodeController) Run(period time.Duration) {
 			}
 			return true, 0
 		})
-	}, nodeEvictionPeriod, wait.NeverStop)
+	}, nodeEvictionPeriod)
 
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
-	go wait.Until(func() {
+	go wait.Forever(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		nc.terminationEvictor.Try(func(value TimedValue) (bool, time.Duration) {
@@ -282,7 +282,7 @@ func (nc *NodeController) Run(period time.Duration) {
 			}
 			return false, remaining
 		})
-	}, nodeEvictionPeriod, wait.NeverStop)
+	}, nodeEvictionPeriod)
 }
 
 // Generates num pod CIDRs that could be assigned to nodes.
