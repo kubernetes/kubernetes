@@ -1565,6 +1565,12 @@ func deepCopy_v1beta1_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) er
 	} else {
 		out.Selector = nil
 	}
+	if in.AutoSelector != nil {
+		out.AutoSelector = new(bool)
+		*out.AutoSelector = *in.AutoSelector
+	} else {
+		out.AutoSelector = nil
+	}
 	if err := deepCopy_v1_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
 		return err
 	}

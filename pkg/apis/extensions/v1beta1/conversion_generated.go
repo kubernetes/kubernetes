@@ -3460,14 +3460,11 @@ func autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, o
 	} else {
 		out.Selector = nil
 	}
+	// in.ManualSelector has no peer in out
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-func Convert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *JobSpec, s conversion.Scope) error {
-	return autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in, out, s)
 }
 
 func autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
@@ -4730,14 +4727,11 @@ func autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensi
 	} else {
 		out.Selector = nil
 	}
+	// in.AutoSelector has no peer in out
 	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-func Convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.JobSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *extensions.JobStatus, s conversion.Scope) error {
