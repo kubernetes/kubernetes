@@ -42,6 +42,7 @@ type Interface interface {
 	ComponentStatusesInterface
 	ConfigMapsNamespacer
 	Autoscaling() AutoscalingInterface
+	Batch() BatchInterface
 	Extensions() ExtensionsInterface
 	Discovery() DiscoveryInterface
 }
@@ -113,6 +114,7 @@ func (c *Client) ConfigMaps(namespace string) ConfigMapsInterface {
 type Client struct {
 	*RESTClient
 	*AutoscalingClient
+	*BatchClient
 	*ExtensionsClient
 	*DiscoveryClient
 }
@@ -150,6 +152,10 @@ func IsTimeout(err error) bool {
 
 func (c *Client) Autoscaling() AutoscalingInterface {
 	return c.AutoscalingClient
+}
+
+func (c *Client) Batch() BatchInterface {
+	return c.BatchClient
 }
 
 func (c *Client) Extensions() ExtensionsInterface {

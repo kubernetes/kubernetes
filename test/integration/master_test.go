@@ -51,6 +51,10 @@ func TestAutoscalingPrefix(t *testing.T) {
 	testPrefix(t, "/apis/autoscaling/")
 }
 
+func TestBatchPrefix(t *testing.T) {
+	testPrefix(t, "/apis/batch/")
+}
+
 func TestExtensionsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/extensions/")
 }
@@ -95,6 +99,10 @@ func autoscalingPath(resource, namespace, name string) string {
 	return testapi.Autoscaling.ResourcePath(resource, namespace, name)
 }
 
+func batchPath(resource, namespace, name string) string {
+	return testapi.Batch.ResourcePath(resource, namespace, name)
+}
+
 func extensionsPath(resource, namespace, name string) string {
 	return testapi.Extensions.ResourcePath(resource, namespace, name)
 }
@@ -114,6 +122,164 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		{"POST", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), hpaV1, code201, ""},
 		{"GET", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", code200, testapi.Autoscaling.GroupVersion().String()},
 		{"GET", extensionsPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", code200, testapi.Extensions.GroupVersion().String()},
+	}
+
+	for _, r := range requests {
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Logf("case %v", r)
+			t.Fatalf("unexpected error: %v", err)
+		}
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			b, _ := ioutil.ReadAll(resp.Body)
+			body := string(b)
+			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
+				t.Errorf("Expected status one of %v, but got %v", r.expectedStatusCodes, resp.StatusCode)
+				t.Errorf("Body: %v", body)
+			}
+			if !strings.Contains(body, "\"apiVersion\":\""+r.expectedVersion) {
+				t.Logf("case %v", r)
+				t.Errorf("Expected version %v, got body %v", r.expectedVersion, body)
+			}
+		}()
+	}
+}
+
+var jobV1beta1 string = `
+{
+    "kind": "Job",
+    "apiVersion": "extensions/v1beta1",
+    "metadata": {
+        "name": "pi",
+        "labels": {
+            "app": "pi"
+        }
+    },
+    "spec": {
+        "parallelism": 1,
+        "completions": 1,
+        "selector": {
+            "matchLabels": {
+                "app": "pi"
+            }
+        },
+        "template": {
+            "metadata": {
+                "name": "pi",
+                "creationTimestamp": null,
+                "labels": {
+                    "app": "pi"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "pi",
+                        "image": "perl",
+                        "command": [
+                            "perl",
+                            "-Mbignum=bpi",
+                            "-wle",
+                            "print bpi(2000)"
+                        ]
+                    }
+                ],
+                "restartPolicy": "Never"
+            }
+        }
+    }
+}
+`
+
+var jobV1 string = `
+{
+    "kind": "Job",
+    "apiVersion": "batch/v1",
+    "metadata": {
+        "name": "pi",
+        "labels": {
+            "app": "pi"
+        }
+    },
+    "spec": {
+        "parallelism": 1,
+        "completions": 1,
+        "selector": {
+            "matchLabels": {
+                "app": "pi"
+            }
+        },
+        "template": {
+            "metadata": {
+                "name": "pi",
+                "creationTimestamp": null,
+                "labels": {
+                    "app": "pi"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "pi",
+                        "image": "perl",
+                        "command": [
+                            "perl",
+                            "-Mbignum=bpi",
+                            "-wle",
+                            "print bpi(2000)"
+                        ]
+                    }
+                ],
+                "restartPolicy": "Never"
+            }
+        }
+    }
+}
+`
+
+var deleteResp string = `
+{
+    "kind": "Status",
+    "apiVersion": "v1",
+    "metadata":{},
+    "status":"Success",
+    "code":200
+}
+`
+
+// TestBatchGroupBackwardCompatibility is testing that batch/v1 and ext/v1beta1
+// Job share storage.  This test can be deleted when Jobs is removed from ext/v1beta1,
+// (expected to happen in 1.4).
+func TestBatchGroupBackwardCompatibility(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb                string
+		URL                 string
+		body                string
+		expectedStatusCodes map[int]bool
+		expectedVersion     string
+	}{
+		// Post a v1 and get back both as v1beta1 and as v1.
+		{"POST", batchPath("jobs", api.NamespaceDefault, ""), jobV1, code201, ""},
+		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Batch.GroupVersion().String()},
+		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Extensions.GroupVersion().String()},
+		{"DELETE", batchPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Default.GroupVersion().String()}, // status response
+		// Post a v1beta1 and get back both as v1beta1 and as v1.
+		{"POST", extensionsPath("jobs", api.NamespaceDefault, ""), jobV1beta1, code201, ""},
+		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Batch.GroupVersion().String()},
+		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Extensions.GroupVersion().String()},
+		{"DELETE", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Default.GroupVersion().String()}, //status response
 	}
 
 	for _, r := range requests {

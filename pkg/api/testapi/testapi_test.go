@@ -128,6 +128,10 @@ func TestAutoscalingEncodeDecodeStatus(t *testing.T) {
 	testEncodeDecodeStatus(t, Autoscaling.Codec())
 }
 
+func TestBatchEncodeDecodeStatus(t *testing.T) {
+	testEncodeDecodeStatus(t, Batch.Codec())
+}
+
 func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	testEncodeDecodeStatus(t, Extensions.Codec())
 }

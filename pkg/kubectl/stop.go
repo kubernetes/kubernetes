@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -75,7 +76,7 @@ func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	case api.Kind("Service"):
 		return &ServiceReaper{c}, nil
 
-	case extensions.Kind("Job"):
+	case extensions.Kind("Job"), batch.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
 
 	case extensions.Kind("Deployment"):
