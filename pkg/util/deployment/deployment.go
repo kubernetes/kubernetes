@@ -191,7 +191,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 		}
 	}
 	// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
-	if updatedRS.Generation != updatedRS.Status.ObservedGeneration {
+	if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
 		if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, rs.Name); err != nil {
 			return nil, err
 		}

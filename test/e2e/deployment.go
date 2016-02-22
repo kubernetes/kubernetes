@@ -849,6 +849,7 @@ func testDeploymentLabelAdopted(f *Framework) {
 		Expect(c.Extensions().ReplicaSets(ns).Delete(newRS.Name, nil)).NotTo(HaveOccurred())
 	}()
 
+	// The RS and pods should be relabeled before the status is updated by syncRollingUpdateDeployment
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
 
