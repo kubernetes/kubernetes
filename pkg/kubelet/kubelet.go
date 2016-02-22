@@ -2766,8 +2766,8 @@ func (kl *Kubelet) setNodeStatusGPUInfo(node *api.Node) {
 	}
 
 	if node.Status.Capacity != nil {
-		node.Status.Capacity[api.ResourceGPU] = *resource.NewMilliQuantity(int64(gpuNum*1000), resource.DecimalSI)
-		node.Status.Allocatable[api.ResourceGPU] = *resource.NewMilliQuantity(int64(gpuNum*1000), resource.DecimalSI)
+		node.Status.Capacity[api.ResourceDevices] = *resource.NewMilliQuantity(int64(gpuNum*1000), resource.DecimalSI)
+		node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(gpuNum*1000), resource.DecimalSI)
 	}
 
 }
