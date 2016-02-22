@@ -228,13 +228,57 @@ type awsSdkEC2 struct {
 
 type awsSDKProvider struct {
 	creds *credentials.Credentials
+
+	mutex          sync.Mutex
+	regionDelayers map[string]*CrossRequestRetryDelay
 }
 
-func addHandlers(h *request.Handlers) {
+func newAWSSDKProvider(creds *credentials.Credentials) *awsSDKProvider {
+	return &awsSDKProvider{
+		creds:          creds,
+		regionDelayers: make(map[string]*CrossRequestRetryDelay),
+	}
+}
+
+func (p *awsSDKProvider) addHandlers(regionName string, h *request.Handlers) {
 	h.Sign.PushFrontNamed(request.NamedHandler{
 		Name: "k8s/logger",
 		Fn:   awsHandlerLogger,
 	})
+
+	delayer := p.getCrossRequestRetryDelay(regionName)
+	if delayer != nil {
+		h.Sign.PushFrontNamed(request.NamedHandler{
+			Name: "k8s/delay-presign",
+			Fn:   delayer.BeforeSign,
+		})
+
+		h.AfterRetry.PushFrontNamed(request.NamedHandler{
+			Name: "k8s/delay-afterretry",
+			Fn:   delayer.AfterRetry,
+		})
+	}
+}
+
+// Get a CrossRequestRetryDelay, scoped to the region, not to the request.
+// This means that when we hit a limit on a call, we will delay _all_ calls to the API.
+// We do this to protect the AWS account from becoming overloaded and effectively locked.
+// We also log when we hit request limits.
+// Note that this delays the current goroutine; this is bad behaviour and will
+// likely cause k8s to become slow or unresponsive for cloud operations.
+// However, this throttle is intended only as a last resort.  When we observe
+// this throttling, we need to address the root cause (e.g. add a delay to a
+// controller retry loop)
+func (p *awsSDKProvider) getCrossRequestRetryDelay(regionName string) *CrossRequestRetryDelay {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	delayer, found := p.regionDelayers[regionName]
+	if !found {
+		delayer = NewCrossRequestRetryDelay()
+		p.regionDelayers[regionName] = delayer
+	}
+	return delayer
 }
 
 func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
@@ -243,7 +287,7 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 		Credentials: p.creds,
 	}))
 
-	addHandlers(&service.Handlers)
+	p.addHandlers(regionName, &service.Handlers)
 
 	ec2 := &awsSdkEC2{
 		ec2: service,
@@ -257,7 +301,7 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Credentials: p.creds,
 	}))
 
-	addHandlers(&elbClient.Handlers)
+	p.addHandlers(regionName, &elbClient.Handlers)
 
 	return elbClient, nil
 }
@@ -268,7 +312,7 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 		Credentials: p.creds,
 	}))
 
-	addHandlers(&client.Handlers)
+	p.addHandlers(regionName, &client.Handlers)
 
 	return client, nil
 }
@@ -458,7 +502,7 @@ func init() {
 				},
 				&credentials.SharedCredentialsProvider{},
 			})
-		aws := &awsSDKProvider{creds: creds}
+		aws := newAWSSDKProvider(creds)
 		return newAWSCloud(config, aws)
 	})
 }
