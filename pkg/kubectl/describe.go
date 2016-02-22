@@ -720,13 +720,16 @@ func DescribeContainers(containers []api.Container, containerStatuses []api.Cont
 	}
 
 	for _, container := range containers {
-		status := statuses[container.Name]
-		state := status.State
+		status, ok := statuses[container.Name]
 
 		fmt.Fprintf(out, "  %v:\n", container.Name)
-		fmt.Fprintf(out, "    Container ID:\t%s\n", status.ContainerID)
+		if ok {
+			fmt.Fprintf(out, "    Container ID:\t%s\n", status.ContainerID)
+		}
 		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
-		fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
+		if ok {
+			fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
+		}
 
 		if len(container.Command) > 0 {
 			fmt.Fprintf(out, "    Command:\n")
@@ -763,12 +766,14 @@ func DescribeContainers(containers []api.Container, containerStatuses []api.Cont
 			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
 		}
 
-		describeStatus("State", state, out)
-		if status.LastTerminationState.Terminated != nil {
-			describeStatus("Last State", status.LastTerminationState, out)
+		if ok {
+			describeStatus("State", status.State, out)
+			if status.LastTerminationState.Terminated != nil {
+				describeStatus("Last State", status.LastTerminationState, out)
+			}
+			fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
+			fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
 		}
-		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
-		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
 
 		if container.LivenessProbe != nil {
 			probe := DescribeProbe(container.LivenessProbe)
