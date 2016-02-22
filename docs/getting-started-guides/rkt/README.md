@@ -206,6 +206,9 @@ See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try ou
 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
+### Different UX with rkt container runtime
+
+rkt and Docker have very different designs, as well as ACI and Docker image format. Users might experience some different experience when switching from one to the other. More information can be found [here](notes.md).
 
 ### Debugging
 
