@@ -94,6 +94,12 @@ var (
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
 	jobsVersion = version.MustParse("v1.1.0")
+
+	// Deployments were introduced by default in v1.2, so we don't expect tests that rely on
+	// deployments to work on clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
+	deploymentsVersion = version.MustParse("v1.2.0-alpha.7.726")
 )
 
 var _ = Describe("Kubectl client", func() {
@@ -911,6 +917,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create a deployment from an image [Conformance]", func() {
+			SkipUnlessServerVersionGTE(deploymentsVersion, c)
+
 			image := "nginx"
 
 			By("running the image " + image)
