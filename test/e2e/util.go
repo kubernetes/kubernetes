@@ -2221,6 +2221,22 @@ func waitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, 
 	})
 }
 
+// waitForRollbackDone waits for the given deployment finishes rollback.
+func waitForRollbackDone(c *clientset.Clientset, deployment *extensions.Deployment) (err error) {
+	deployments := c.Extensions().Deployments(deployment.Namespace)
+	name := deployment.Name
+	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if deployment, err = deployments.Get(name); err != nil {
+			return false, err
+		}
+		// When deployment's RollbackTo is empty, the rollback is done.
+		if deployment.Spec.RollbackTo == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
 type updateDeploymentFunc func(d *extensions.Deployment)
 
 func updateDeploymentWithRetries(c *clientset.Clientset, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {

@@ -655,10 +655,11 @@ func testRollbackDeployment(f *Framework) {
 
 // testRollbackDeploymentRSNoRevision tests that deployment supports rollback even when there's old replica set without revision.
 // An old replica set without revision is created, and then a deployment is created (v1). The deployment shouldn't add revision
-// annotation to the old replica set. Then rollback the deployment to last revision, and it should fail and emit related event.
-// Then update the deployment to v2 and rollback it to v1 should succeed and emit related event, now the deployment
-// becomes v3. Then rollback the deployment to v10 (doesn't exist in history) should fail and emit related event.
-// Finally, rollback the deployment (v3) to v3 should be no-op and emit related event.
+// annotation to the old replica set. Then rollback the deployment to last revision, and it should fail.
+// Then update the deployment to v2 and rollback it to v1 should succeed, now the deployment
+// becomes v3. Then rollback the deployment to v10 (doesn't exist in history) should fail.
+// Finally, rollback the deployment (v3) to v3 should be no-op.
+// TODO: When we finished reporting rollback status in deployment status, check the rollback status here in each case.
 func testRollbackDeploymentRSNoRevision(f *Framework) {
 	ns := f.Namespace.Name
 	unversionedClient := f.Client
@@ -720,13 +721,12 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 	err = c.Extensions().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
-	// There should be revision not found event since there's no last revision
-	waitForEvents(unversionedClient, ns, deployment, 2)
-	events, err := c.Events(ns).Search(deployment)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[1].Reason).Should(Equal(deploymentutil.RollbackRevisionNotFound))
+	// Wait until the rollback is done
+	waitForRollbackDone(c, deployment)
+	// TODO: report RollbackRevisionNotFound in deployment status and check it here
 
-	// Check if it's still revision 1
+	// The pod template shouldn't change since there's no last revision
+	// Check if the deployment is still revision 1 and still has the old pod template
 	checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
 
 	// Update the deployment to create redis pods.
@@ -754,46 +754,43 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
 
-	// There should be rollback event after we rollback to revision 1
-	waitForEvents(unversionedClient, ns, deployment, 5)
-	events, err = c.Events(ns).Search(deployment)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[4].Reason).Should(Equal(deploymentutil.RollbackDone))
+	// Wait until the rollback is done
+	waitForRollbackDone(c, deployment)
+	// TODO: report RollbackDone in deployment status and check it here
 
+	// The pod template should be updated to the one in revision 1
 	// Check if it's updated to revision 3 correctly
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
 
 	// Update the deploymentRollback to rollback to revision 10
-	// Since there's no revision 10 in history, it should stay as revision 3, and emit an event
+	// Since there's no revision 10 in history, it should stay as revision 3
 	revision = 10
 	Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
 	err = c.Extensions().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
-	// There should be revision not found event since there's no revision 10
-	waitForEvents(unversionedClient, ns, deployment, 7)
-	events, err = c.Events(ns).Search(deployment)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[6].Reason).Should(Equal(deploymentutil.RollbackRevisionNotFound))
+	// Wait until the rollback is done
+	waitForRollbackDone(c, deployment)
+	// TODO: report RollbackRevisionNotFound in deployment status and check it here
 
-	// Check if it's still revision 3
+	// The pod template shouldn't change since there's no revision 10
+	// Check if it's still revision 3 and still has the old pod template
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
 
 	// Update the deploymentRollback to rollback to revision 3
-	// Since it's already revision 3, it should be no-op and emit an event
+	// Since it's already revision 3, it should be no-op
 	revision = 3
 	Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
 	err = c.Extensions().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
-	// There should be revision template unchanged event since it's already revision 3
-	waitForEvents(unversionedClient, ns, deployment, 8)
-	events, err = c.Events(ns).Search(deployment)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[7].Reason).Should(Equal(deploymentutil.RollbackTemplateUnchanged))
+	// Wait until the rollback is done
+	waitForRollbackDone(c, deployment)
+	// TODO: report RollbackTemplateUnchanged in deployment status and check it here
 
-	// Check if it's still revision 3
+	// The pod template shouldn't change since it's already revision 3
+	// Check if it's still revision 3 and still has the old pod template
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
 }
