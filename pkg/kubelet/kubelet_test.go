@@ -2344,7 +2344,7 @@ func TestGetHostPortConflicts(t *testing.T) {
 	// The new pod should cause conflict and be reported.
 	pods = append(pods, expected)
 	if !hasHostPortConflicts(pods) {
-		t.Errorf("expected no conflict, Got no conflicts")
+		t.Errorf("expected conflict, Got no conflicts")
 	}
 }
 
