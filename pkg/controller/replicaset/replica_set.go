@@ -19,6 +19,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -86,6 +88,8 @@ type ReplicaSetController struct {
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
 
+	lookupCache *controller.MatchingCache
+
 	// Controllers that need to be synced
 	queue *workqueue.Type
 }
@@ -122,6 +126,24 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rsc.enqueueReplicaSet,
 			UpdateFunc: func(old, cur interface{}) {
+				oldRS := old.(*extensions.ReplicaSet)
+				curRS := cur.(*extensions.ReplicaSet)
+
+				// We should invalidate the whole lookup cache if a RS's selector has been updated.
+				//
+				// Imagine that you have two RSs:
+				// * old RS1
+				// * new RS2
+				// You also have a pod that is attached to RS2 (because it doesn't match RS1 selector).
+				// Now imagine that you are changing RS1 selector so that it is now matching that pod,
+				// in such case we must invalidate the whole cache so that pod could be adopted by RS1
+				//
+				// This makes the lookup cache less helpful, but selector update does not happen often,
+				// so it's not a big problem
+				if !reflect.DeepEqual(oldRS.Spec.Selector, curRS.Spec.Selector) {
+					rsc.lookupCache.InvalidateAll()
+				}
+
 				// You might imagine that we only really need to enqueue the
 				// replica set when Spec changes, but it is safer to sync any
 				// time this function is triggered. That way a full informer
@@ -134,8 +156,6 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 				// this function), but in general extra resyncs shouldn't be
 				// that bad as ReplicaSets that haven't met expectations yet won't
 				// sync, and all the listing is done using local stores.
-				oldRS := old.(*extensions.ReplicaSet)
-				curRS := cur.(*extensions.ReplicaSet)
 				if oldRS.Status.Replicas != curRS.Status.Replicas {
 					glog.V(4).Infof("Observed updated replica count for ReplicaSet: %v, %d->%d", curRS.Name, oldRS.Status.Replicas, curRS.Status.Replicas)
 				}
@@ -171,6 +191,7 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 
 	rsc.syncHandler = rsc.syncReplicaSet
 	rsc.podStoreSynced = rsc.podController.HasSynced
+	rsc.lookupCache = controller.NewMatchingCache(controller.DefaultCacheEntries)
 	return rsc
 }
 
@@ -198,6 +219,20 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 // getPodReplicaSet returns the replica set managing the given pod.
 // TODO: Surface that we are ignoring multiple replica sets for a single pod.
 func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.ReplicaSet {
+	// look up in the cache, if cached and the cache is valid, just return cached value
+	if obj, cached := rsc.lookupCache.GetMatchingObject(pod); cached {
+		rs, ok := obj.(*extensions.ReplicaSet)
+		if !ok {
+			// This should not happen
+			glog.Errorf("lookup cache does not retuen a ReplicaSet object")
+			return nil
+		}
+		if cached && rsc.isCacheValid(pod, rs) {
+			return rs
+		}
+	}
+
+	// if not cached or cached value is invalid, search all the rs to find the matching one, and update cache
 	rss, err := rsc.rsStore.GetPodReplicaSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No ReplicaSets found for pod %v, ReplicaSet controller will avoid syncing", pod.Name)
@@ -215,7 +250,40 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.Repl
 		glog.Errorf("user error! more than one ReplicaSet is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(overlappingReplicaSets(rss))
 	}
+
+	// update lookup cache
+	rsc.lookupCache.Update(pod, &rss[0])
+
 	return &rss[0]
+}
+
+// isCacheValid check if the cache is valid
+func (rsc *ReplicaSetController) isCacheValid(pod *api.Pod, cachedRS *extensions.ReplicaSet) bool {
+	_, exists, err := rsc.rsStore.Get(cachedRS)
+	// rs has been deleted or updated, cache is invalid
+	if err != nil || !exists || !isReplicaSetMatch(pod, cachedRS) {
+		return false
+	}
+	return true
+}
+
+// isReplicaSetMatch take a Pod and ReplicaSet, return whether the Pod and ReplicaSet are matching
+// TODO(mqliang): This logic is a copy from GetPodReplicaSets(), remove the duplication
+func isReplicaSetMatch(pod *api.Pod, rs *extensions.ReplicaSet) bool {
+	if rs.Namespace != pod.Namespace {
+		return false
+	}
+	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		err = fmt.Errorf("invalid selector: %v", err)
+		return false
+	}
+
+	// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		return false
+	}
+	return true
 }
 
 // When a pod is created, enqueue the replica set that manages it and update it's expectations.
