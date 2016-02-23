@@ -71,9 +71,9 @@ function setClusterInfo() {
 function check-CNI-config() {
   if [ -z "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
     echo "Warning: CNI_PLUGIN_CONF is emtpy but CNI_PLUGIN_EXES is not (it is $CNI_PLUGIN_EXES); Flannel will be used" >& 2
-  else if [ -n "$CNI_PLUGIN_CONF" ] && [ -z "$CNI_PLUGIN_EXES" ]; then
+  elif [ -n "$CNI_PLUGIN_CONF" ] && [ -z "$CNI_PLUGIN_EXES" ]; then
     echo "Warning: CNI_PLUGIN_EXES is empty but CNI_PLUGIN_CONF is not (it is $CNI_PLUGIN_CONF); Flannel will be used" & 2
-  else if [ -n "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
+  elif [ -n "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
     local problems=0
     if ! [ -r "$CNI_PLUGIN_CONF" ]; then
       echo "ERROR: CNI_PLUGIN_CONF is set to $CNI_PLUGIN_CONF but that is not a readable existing file!" >& 2
