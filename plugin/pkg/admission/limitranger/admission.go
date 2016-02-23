@@ -74,6 +74,11 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
+	// ignore all calls that do not deal with pod resources since that is all this supports now.
+	if a.GetKind() != api.Kind("Pod") {
+		return nil
+	}
+
 	obj := a.GetObject()
 	name := "Unknown"
 	if obj != nil {
