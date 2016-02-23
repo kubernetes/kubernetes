@@ -14,7 +14,7 @@ github.com/beorn7/perks/quantile | MIT?
 github.com/blang/semver | MITname
 github.com/boltdb/bolt | MITname
 github.com/camlistore/go4 | Apache-2
-github.com/ClusterHQ/flocker-go | UNKNOWN
+github.com/ClusterHQ/flocker-go | Apache-2
 github.com/codegangsta/negroni | MITname
 github.com/coreos/etcd | Apache-2
 github.com/coreos/go-etcd | Apache-2
