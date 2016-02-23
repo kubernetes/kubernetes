@@ -85,6 +85,43 @@
                     <healthScaleFactor>100.0</healthScaleFactor>
                 </hudson.tasks.junit.JUnitResultArchiver>
 
+# Implements Docker Build and Publish Plugin
+# https://wiki.jenkins-ci.org/display/JENKINS/CloudBees+Docker+Build+and+Publish+plugin
+# From the docs: 'This plugin provides the ability to build projects with a Dockerfile, and publish the resultant
+# tagged image (repo) to the docker registry.'
+#
+# repoName: docker registry repo name to publish the image
+# dockerfilePath: workspace relative path to the 'Dockerfile' to build
+# tag: Tag to apply to the built image
+# credentialsId: Jenkins 'Username with password' credentials ID (hex string) to authenticate to docker registry.
+#                Found under http:<jenkinsurl>/credentials -> "Advanced"
+- builder:
+    name: docker-build-publish
+    builders:
+        - raw:
+            xml: |
+               <com.cloudbees.dockerpublish.DockerBuilder plugin="docker-build-publish@1.1">
+                   <server plugin="docker-commons@1.2"/>
+                   <registry plugin="docker-commons@1.2">
+                       <credentialsId>{credentialsId}</credentialsId>
+                   </registry>
+                   <repoName>{repoName}</repoName>
+                   <noCache>true</noCache>
+                   <forcePull>true</forcePull>
+                   <dockerfilePath>{dockerfilePath}</dockerfilePath>
+                   <skipBuild>false</skipBuild>
+                   <skipDecorate>false</skipDecorate>
+                   <repoTag>{tag}</repoTag>
+                   <skipPush>false</skipPush>
+                   <createFingerprint>true</createFingerprint>
+                   <skipTagLatest>true</skipTagLatest>
+               </com.cloudbees.dockerpublish.DockerBuilder>
+        - shell: |
+           #!/bin/bash
+           set -e
+           set -x
+           docker rmi -f {repoName}:{tag}
+
 # Default email recipients are set in Jenkins global config
 - defaults:
     name: global
