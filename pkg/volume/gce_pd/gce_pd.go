@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -45,11 +44,15 @@ var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.MountableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 )
+
+var accessModes []api.PersistentVolumeAccessMode = []api.PersistentVolumeAccessMode{
+	api.ReadWriteOnce,
+	api.ReadOnlyMany,
+}
 
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -66,10 +69,7 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-		api.ReadOnlyMany,
-	}
+	return accessModes
 }
 
 func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
@@ -143,23 +143,6 @@ func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, man
 			manager: manager,
 			plugin:  plugin,
 		}}, nil
-}
-
-func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
-	return plugin.newProvisionerInternal(options, &GCEDiskUtil{})
-}
-
-func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.VolumeOptions, manager pdManager) (volume.Provisioner, error) {
-	return &gcePersistentDiskProvisioner{
-		gcePersistentDisk: &gcePersistentDisk{
-			manager: manager,
-			plugin:  plugin,
-		},
-		options: options,
-	}, nil
 }
 
 // Abstract interface to PD operations.
@@ -362,52 +345,4 @@ func (d *gcePersistentDiskDeleter) GetPath() string {
 
 func (d *gcePersistentDiskDeleter) Delete() error {
 	return d.manager.DeleteVolume(d)
-}
-
-type gcePersistentDiskProvisioner struct {
-	*gcePersistentDisk
-	options volume.VolumeOptions
-}
-
-var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
-
-func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error {
-	volumeID, sizeGB, err := c.manager.CreateVolume(c)
-	if err != nil {
-		return err
-	}
-	pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName = volumeID
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
-	}
-	return nil
-}
-
-func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	// Provide dummy api.PersistentVolume.Spec, it will be filled in
-	// gcePersistentDiskProvisioner.Provision()
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-gce-",
-			Labels:       map[string]string{},
-			Annotations: map[string]string{
-				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
-			},
-		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): c.options.Capacity,
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:    "dummy",
-					FSType:    "ext4",
-					Partition: 0,
-					ReadOnly:  false,
-				},
-			},
-		},
-	}, nil
 }

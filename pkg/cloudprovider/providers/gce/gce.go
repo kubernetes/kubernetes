@@ -64,6 +64,8 @@ const (
 
 	defaultLBSourceRange = "0.0.0.0/0"
 
+	diskTypeTemplate = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/diskTypes/%s"
+
 	//Expected annotations for GCE
 	gceLBAllowSourceRange = "net.beta.kubernetes.io/gce-source-ranges"
 )
@@ -1965,7 +1967,7 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 // CreateDisk creates a new Persistent Disk, with the specified name & size, in
 // the specified zone. It stores specified tags endoced in JSON in Description
 // field.
-func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error {
+func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, diskType string, tags map[string]string) error {
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
 		return err
@@ -1975,6 +1977,7 @@ func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map
 		Name:        name,
 		SizeGb:      sizeGb,
 		Description: tagsStr,
+		Type:        fmt.Sprintf(diskTypeTemplate, gce.projectID, zone, diskType),
 	}
 
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()

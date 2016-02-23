@@ -94,7 +94,7 @@ func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
 	case cloud != nil && gce.ProviderName == cloud.ProviderName():
-		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
+		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeProvisionableVolumePlugins())
 	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
 	}
