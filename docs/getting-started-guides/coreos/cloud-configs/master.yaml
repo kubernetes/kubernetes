@@ -31,6 +31,8 @@ coreos:
   fleet:
     metadata: "role=master"
   units:
+    - name: etcd2.service
+      command: start
     - name: generate-serviceaccount-key.service
       command: start
       content: |
