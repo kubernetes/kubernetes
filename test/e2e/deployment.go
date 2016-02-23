@@ -366,11 +366,7 @@ func testRecreateDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, 0, replicas, 0)
-	if err != nil {
-		deployment, _ := c.Extensions().Deployments(ns).Get(deploymentName)
-		Logf("deployment = %+v", deployment)
-	}
+	waitForDeploymentStatus(c, ns, deploymentName, replicas, 0, replicas, 0)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
