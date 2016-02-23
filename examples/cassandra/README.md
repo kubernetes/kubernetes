@@ -196,7 +196,9 @@ metadata:
     app: cassandra
   name: cassandra
 spec:
-  replicas: 1
+  replicas: 2
+  selector:
+      app: cassandra
   template:
     metadata:
       labels:
