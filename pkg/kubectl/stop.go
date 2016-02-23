@@ -42,7 +42,8 @@ const (
 
 // A Reaper handles terminating an object as gracefully as possible.
 // timeout is how long we'll wait for the termination to be successful
-// gracePeriod is time given to an API object for it to delete itself cleanly (e.g. pod shutdown)
+// gracePeriod is time given to an API object for it to delete itself cleanly,
+// e.g., pod shutdown. It may or may not be supported by the API object.
 type Reaper interface {
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error
 }
@@ -272,7 +273,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		}
 	}
 
-	if err := rsc.Delete(name, gracePeriod); err != nil {
+	if err := rsc.Delete(name, nil); err != nil {
 		return err
 	}
 	return nil
@@ -355,7 +356,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return utilerrors.NewAggregate(errList)
 	}
 	// once we have all the pods removed we can safely remove the job itself
-	return jobs.Delete(name, gracePeriod)
+	return jobs.Delete(name, nil)
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -406,7 +407,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 
 	// Delete deployment at the end.
 	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
-	return deployments.Delete(name, gracePeriod)
+	return deployments.Delete(name, nil)
 }
 
 type updateDeploymentFunc func(d *extensions.Deployment)
