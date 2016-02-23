@@ -1,1 +1,0 @@
-min_by(people, &age_str)
