@@ -1587,6 +1587,11 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 				fmt.Fprintf(out, "failed to check Replication Controller\n")
 			}
 		}
+
+		events, _ := d.client.Events(namespace).Search(hpa)
+		if events != nil {
+			DescribeEvents(events, out)
+		}
 		return nil
 	})
 }
