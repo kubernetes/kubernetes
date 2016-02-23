@@ -175,9 +175,16 @@ One or more of the Kubernetes daemons might've crashed. Tail the logs of each in
 
 #### The pods fail to connect to the services by host names
 
-The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](http://issue.k8s.io/6667). You can start a manually. Related documents can be found [here](../../cluster/addons/dns/#how-do-i-configure-it)
+To start the DNS service, you need to set the following variables:
 
+```sh
+KUBE_ENABLE_CLUSTER_DNS=true
+KUBE_DNS_SERVER_IP="10.0.0.10"
+KUBE_DNS_DOMAIN="cluster.local"
+KUBE_DNS_REPLICAS=1
+```
 
+To know more on DNS service you can look [here](http://issue.k8s.io/6667). Related documents can be found [here](../../cluster/addons/dns/#how-do-i-configure-it)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
