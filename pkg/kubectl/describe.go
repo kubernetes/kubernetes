@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -90,13 +91,14 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
-		extensions.Kind("ReplicaSet"):              &ReplicaSetDescriber{c},
-		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
-		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
-		extensions.Kind("Job"):                     &JobDescriber{c},
-		batch.Kind("Job"):                          &JobDescriber{c},
-		extensions.Kind("Ingress"):                 &IngressDescriber{c},
+		extensions.Kind("ReplicaSet"):               &ReplicaSetDescriber{c},
+		extensions.Kind("HorizontalPodAutoscaler"):  &HorizontalPodAutoscalerDescriber{c},
+		autoscaling.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("DaemonSet"):                &DaemonSetDescriber{c},
+		extensions.Kind("Deployment"):               &DeploymentDescriber{clientset.FromUnversionedClient(c)},
+		extensions.Kind("Job"):                      &JobDescriber{c},
+		batch.Kind("Job"):                           &JobDescriber{c},
+		extensions.Kind("Ingress"):                  &IngressDescriber{c},
 	}
 
 	return m
