@@ -67,6 +67,8 @@ type GPUPlugin interface {
 
 	UpdateGPUUsageStatus(newGPUStatus *map[PodCotainerHashID]GPUUsageStatus)
 
+	GetAvailableGPUs() ([]int, error)
+
 	// Name returns the plugin's name. This will be used when searching
 	// for a plugin by name, e.g.
 	Name() string

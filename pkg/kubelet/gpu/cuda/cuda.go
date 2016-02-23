@@ -381,6 +381,16 @@ func (cuda *Cuda) getAvailableGPUs() ([]int, error) {
 	return availableGpuSet.List(), nil
 }
 
+func (cuda *Cuda) GetAvailableGPUs() ([]int, error) {
+	glog.Infof("Hans: cuda.GetAvailableGPUs()")
+
+	cuda.gpuInfo.Lock.RLock()
+	defer cuda.gpuInfo.Lock.RUnlock()
+
+	return cuda.getAvailableGPUs()
+
+}
+
 func (cuda *Cuda) UpdateGPUUsageStatus(newGPUStatus *map[gpuTypes.PodCotainerHashID]gpuTypes.GPUUsageStatus) {
 	glog.Infof("Hans: cuda.UpdateGPUUsageStatus()")
 
