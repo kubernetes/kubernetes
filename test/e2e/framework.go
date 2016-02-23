@@ -51,7 +51,7 @@ type Framework struct {
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
-	gatherer containerResourceGatherer
+	gatherer *containerResourceGatherer
 	// Constraints that passed to a check which is executed after data is gathered to
 	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
 	// as expectations vary greatly. Constraints are groupped by the container names.
@@ -116,7 +116,12 @@ func (f *Framework) beforeEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.startGatheringData(c, resourceDataGatheringPeriodSeconds*time.Second)
+		f.gatherer, err = NewResourceUsageGatherer(c)
+		if err != nil {
+			Logf("Error while creating NewResourceUsageGatherer: %v", err)
+		} else {
+			go f.gatherer.startGatheringData()
+		}
 	}
 
 	if testContext.GatherLogsSizes {
@@ -170,7 +175,7 @@ func (f *Framework) afterEach() {
 	}
 
 	summaries := make([]TestDataSummary, 0)
-	if testContext.GatherKubeSystemResourceUsageData {
+	if testContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
 	}
