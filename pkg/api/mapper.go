@@ -43,10 +43,10 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, inter
 	for _, gv := range defaultGroupVersions {
 		for kind, oType := range Scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
-			// TODO: Remove import path prefix check.
-			// We check the import path prefix because we currently stuff both "api" and "extensions" objects
+			// TODO: Remove import path check.
+			// We check the import path because we currently stuff both "api" and "extensions" objects
 			// into the same group within Scheme since Scheme has no notion of groups yet.
-			if !strings.HasPrefix(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
+			if !strings.Contains(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
 				continue
 			}
 			scope := meta.RESTScopeNamespace
