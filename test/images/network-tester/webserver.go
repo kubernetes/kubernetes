@@ -36,7 +36,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -215,6 +214,7 @@ func main() {
 
 // Find all sibling pods in the service and post to their /write handler.
 func contactOthers(state *State) {
+	const waitTimeout = 2 * time.Minute
 	defer state.doneContactingPeers()
 	client, err := client.NewInCluster()
 	if err != nil {
@@ -227,30 +227,42 @@ func contactOthers(state *State) {
 		log.Printf("Server version: %#v\n", v)
 	}
 
+	for start := time.Now(); time.Since(start) < waitTimeout; time.Sleep(5 * time.Second) {
+		eps := getWebserverEndpoints(client)
+		if eps.Len() >= *peerCount {
+			break
+		}
+		state.Logf("%v/%v has %v endpoints, which is less than %v as expected. Waiting for all endpoints to come up.", *namespace, *service, len(eps), *peerCount)
+	}
+
 	// Do this repeatedly, in case there's some propagation delay with getting
 	// newly started pods into the endpoints list.
 	for i := 0; i < 15; i++ {
-		endpoints, err := client.Endpoints(*namespace).Get(*service)
-		if err != nil {
-			state.Logf("Unable to read the endpoints for %v/%v: %v; will try again.", *namespace, *service, err)
-			time.Sleep(time.Duration(1+rand.Intn(10)) * time.Second)
-		}
-
-		eps := sets.String{}
-		for _, ss := range endpoints.Subsets {
-			for _, a := range ss.Addresses {
-				for _, p := range ss.Ports {
-					eps.Insert(fmt.Sprintf("http://%s:%d", a.IP, p.Port))
-				}
-			}
-		}
+		eps := getWebserverEndpoints(client)
 		for ep := range eps {
 			state.Logf("Attempting to contact %s", ep)
 			contactSingle(ep, state)
 		}
-
 		time.Sleep(5 * time.Second)
 	}
+}
+
+//getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
+func getWebserverEndpoints(client *client.Client) sets.String {
+	endpoints, err := client.Endpoints(*namespace).Get(*service)
+	eps := sets.String{}
+	if err != nil {
+		state.Logf("Unable to read the endpoints for %v/%v: %v.", *namespace, *service, err)
+		return eps
+	}
+	for _, ss := range endpoints.Subsets {
+		for _, a := range ss.Addresses {
+			for _, p := range ss.Ports {
+				eps.Insert(fmt.Sprintf("http://%s:%d", a.IP, p.Port))
+			}
+		}
+	}
+	return eps
 }
 
 // contactSingle dials the address 'e' and tries to POST to its /write address.
