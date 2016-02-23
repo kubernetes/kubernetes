@@ -1233,6 +1233,7 @@ func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *
 }
 
 func deepCopy_v1beta1_DeploymentStatus(in DeploymentStatus, out *DeploymentStatus, c *conversion.Cloner) error {
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.AvailableReplicas = in.AvailableReplicas
