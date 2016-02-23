@@ -152,9 +152,9 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	c, ok := api.GetContainerStatus(status.ContainerStatuses, w.container.Name)
-	if !ok {
+	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
-		glog.V(3).Infof("Non-existant container probed: %v - %v",
+		glog.V(3).Infof("Probe target container not found: %v - %v",
 			format.Pod(w.pod), w.container.Name)
 		return true // Wait for more information.
 	}
