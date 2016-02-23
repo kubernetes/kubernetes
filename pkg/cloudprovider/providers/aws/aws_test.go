@@ -275,6 +275,20 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 		}
 		return contains(filter.Values, *instance.PrivateDnsName)
 	}
+
+	if name == "instance-state-name" {
+		return contains(filter.Values, *instance.State.Name)
+	}
+
+	if name == "tag:"+TagNameKubernetesCluster {
+		for _, tag := range instance.Tags {
+			if *tag.Key == TagNameKubernetesCluster {
+				return contains(filter.Values, *tag.Value)
+			}
+		}
+		return false
+	}
+
 	panic("Unknown filter name: " + name)
 }
 
@@ -935,5 +949,104 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, true)
 	if equals {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+}
+
+func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+
+	nodeName := "my-dns.internal"
+
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
+	var runningInstance ec2.Instance
+	runningInstance.InstanceId = aws.String("i-running")
+	runningInstance.PrivateDnsName = aws.String(nodeName)
+	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
+	runningInstance.Tags = tags
+
+	var terminatedInstance ec2.Instance
+	terminatedInstance.InstanceId = aws.String("i-terminated")
+	terminatedInstance.PrivateDnsName = aws.String(nodeName)
+	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
+	terminatedInstance.Tags = tags
+
+	instances := []*ec2.Instance{&terminatedInstance, &runningInstance}
+	awsServices.instances = append(awsServices.instances, instances...)
+
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	instance, err := c.findInstanceByNodeName(nodeName)
+
+	if err != nil {
+		t.Errorf("Failed to find instance: %v", err)
+		return
+	}
+
+	if *instance.InstanceId != "i-running" {
+		t.Errorf("Expected running instance but got %v", *instance.InstanceId)
+	}
+}
+
+func TestFindInstancesByNodeName(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+
+	nodeNameOne := "my-dns.internal"
+	nodeNameTwo := "my-dns-two.internal"
+
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
+	var runningInstance ec2.Instance
+	runningInstance.InstanceId = aws.String("i-running")
+	runningInstance.PrivateDnsName = aws.String(nodeNameOne)
+	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
+	runningInstance.Tags = tags
+
+	var secondInstance ec2.Instance
+
+	secondInstance.InstanceId = aws.String("i-running")
+	secondInstance.PrivateDnsName = aws.String(nodeNameTwo)
+	secondInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("running")}
+	secondInstance.Tags = tags
+
+	var terminatedInstance ec2.Instance
+	terminatedInstance.InstanceId = aws.String("i-terminated")
+	terminatedInstance.PrivateDnsName = aws.String(nodeNameOne)
+	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
+	terminatedInstance.Tags = tags
+
+	instances := []*ec2.Instance{&secondInstance, &runningInstance, &terminatedInstance}
+	awsServices.instances = append(awsServices.instances, instances...)
+
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	nodeNames := []string{nodeNameOne}
+	returnedInstances, errr := c.getInstancesByNodeNames(nodeNames)
+
+	if errr != nil {
+		t.Errorf("Failed to find instance: %v", err)
+		return
+	}
+
+	if len(returnedInstances) != 1 {
+		t.Errorf("Expected a single isntance but found: %v", returnedInstances)
+	}
+
+	if *returnedInstances[0].PrivateDnsName != nodeNameOne {
+		t.Errorf("Expected node name %v but got %v", nodeNameOne, returnedInstances[0].PrivateDnsName)
 	}
 }
