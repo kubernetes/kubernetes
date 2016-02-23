@@ -396,9 +396,9 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-var replicationControllerColumns = []string{"CONTROLLER", "REPLICAS", "AGE"}
-var replicaSetColumns = []string{"CONTROLLER", "REPLICAS", "AGE"}
-var jobColumns = []string{"JOB", "SUCCESSFUL"}
+var replicationControllerColumns = []string{"NAME", "REPLICAS", "AGE"}
+var replicaSetColumns = []string{"NAME", "REPLICAS", "AGE"}
+var jobColumns = []string{"NAME", "SUCCESSFUL"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
