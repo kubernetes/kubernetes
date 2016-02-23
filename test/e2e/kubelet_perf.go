@@ -96,7 +96,6 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 
 	By("Reporting overall resource usage")
 	logPodsOnNodes(framework.Client, nodeNames.List())
-	rm.LogLatest()
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("%s", rm.FormatResourceUsage(usageSummary))

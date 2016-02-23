@@ -585,7 +585,7 @@ func (r *resourceMonitor) LogLatest() {
 	if err != nil {
 		Logf("%v", err)
 	}
-	r.FormatResourceUsage(summary)
+	Logf(r.FormatResourceUsage(summary))
 }
 
 func (r *resourceMonitor) FormatResourceUsage(s resourceUsagePerNode) string {
