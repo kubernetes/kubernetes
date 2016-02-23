@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
@@ -33,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against endpoints.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
+func NewREST(opts generic.RESTOptions) *REST {
 	prefix := "/services/endpoints"
 
 	newListFunc := func() runtime.Object { return &api.EndpointsList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Endpoints), &api.Endpoints{}, prefix, endpoint.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Endpoints), &api.Endpoints{}, prefix, endpoint.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Endpoints{} },
