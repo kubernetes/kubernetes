@@ -126,7 +126,7 @@ var _ = Describe("Networking", func() {
 				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.7")
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.8")
 
 		// Clean up the pods
 		defer func() {
@@ -171,7 +171,9 @@ var _ = Describe("Networking", func() {
 				DoRaw()
 		}
 
-		timeout := time.Now().Add(2 * time.Minute)
+		// nettest containers will wait for all service endpoints to come up for 2 minutes
+		// apply a 3 minutes observation period here to avoid this test to time out before the nettest starts to contact peers
+		timeout := time.Now().Add(3 * time.Minute)
 		for i := 0; !passed && timeout.After(time.Now()); i++ {
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
