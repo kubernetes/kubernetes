@@ -221,7 +221,8 @@ func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	srv.StartTLS()
-	defer srv.Close()
+	// TODO: Uncomment when fix #19254
+	// defer srv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
 		Issuer: srv.URL,
@@ -277,7 +278,8 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	tlsSrv.StartTLS()
-	defer tlsSrv.Close()
+	// TODO: Uncomment when fix #19254
+	// defer tlsSrv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
 		Issuer:       tlsSrv.URL,
