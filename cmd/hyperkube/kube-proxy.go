@@ -21,7 +21,12 @@ package main
 import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
+	"k8s.io/kubernetes/pkg/healthz"
 )
+
+func init() {
+	healthz.DefaultHealthz()
+}
 
 // NewKubeProxy creates a new hyperkube Server object that includes the
 // description and flags.
