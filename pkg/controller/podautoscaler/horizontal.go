@@ -196,6 +196,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		if hpa.Spec.CPUUtilization != nil {
 			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
 			if err != nil {
+				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
 				a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
 				return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
 			}
@@ -204,6 +205,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		if cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]; cmAnnotationFound {
 			cmDesiredReplicas, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
 			if err != nil {
+				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
 				a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
 				return fmt.Errorf("failed to compute desired number of replicas based on Custom Metrics for %s: %v", reference, err)
 			}
@@ -269,6 +271,13 @@ func shouldScale(hpa extensions.HorizontalPodAutoscaler, currentReplicas, desire
 		}
 	}
 	return false
+}
+
+func (a *HorizontalController) updateCurrentReplicasInStatus(hpa extensions.HorizontalPodAutoscaler, currentReplicas int) {
+	err := a.updateStatus(hpa, currentReplicas, hpa.Status.DesiredReplicas, hpa.Status.CurrentCPUUtilizationPercentage, hpa.Annotations[HpaCustomMetricsStatusAnnotationName], false)
+	if err != nil {
+		glog.Errorf("%v", err)
+	}
 }
 
 func (a *HorizontalController) updateStatus(hpa extensions.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int, cpuCurrentUtilization *int, cmStatus string, rescale bool) error {
