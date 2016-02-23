@@ -62,6 +62,8 @@ type testCase struct {
 	desiredReplicas int
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget           int
+	CPUCurrent          int
+	verifyCPUCurrent    bool
 	reportedLevels      []uint64
 	reportedCPURequests []resource.Quantity
 	cmTarget            *extensions.CustomMetricTargetList
@@ -69,6 +71,21 @@ type testCase struct {
 	statusUpdated       bool
 	eventCreated        bool
 	verifyEvents        bool
+}
+
+func (tc *testCase) computeCPUCurrent() {
+	if len(tc.reportedLevels) != len(tc.reportedCPURequests) || len(tc.reportedLevels) == 0 {
+		return
+	}
+	reported := 0
+	for _, r := range tc.reportedLevels {
+		reported += int(r)
+	}
+	requested := 0
+	for _, req := range tc.reportedCPURequests {
+		requested += int(req.MilliValue())
+	}
+	tc.CPUCurrent = 100 * reported / requested
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
@@ -80,6 +97,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	tc.scaleUpdated = false
 	tc.statusUpdated = false
 	tc.eventCreated = false
+	tc.computeCPUCurrent()
 
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -198,6 +216,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
 		tc.statusUpdated = true
+		if tc.verifyCPUCurrent {
+			assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage)
+			assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage)
+		}
 		return true, obj, nil
 	})
 
@@ -242,6 +264,7 @@ func TestScaleUp(t *testing.T) {
 		initialReplicas:     3,
 		desiredReplicas:     5,
 		CPUTarget:           30,
+		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
@@ -274,6 +297,7 @@ func TestScaleDown(t *testing.T) {
 		initialReplicas:     5,
 		desiredReplicas:     3,
 		CPUTarget:           50,
+		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
@@ -354,7 +378,7 @@ func TestZeroReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestToFewReplicas(t *testing.T) {
+func TestTooFewReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:         3,
 		maxReplicas:         5,
