@@ -21,11 +21,13 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/ioutil"
+	"strings"
 	"unicode"
 )
 
-// Get all public functions (not methods) from a golang source file.
-func GetPulicFunctions(filePath string) ([]string, error) {
+// GetPublicFunctions lists all public functions (not methods) from a golang source file.
+func GetPublicFunctions(filePath string) ([]string, error) {
 	var functionNames []string
 
 	// Create the AST by parsing src.
@@ -52,9 +54,27 @@ func GetPulicFunctions(filePath string) ([]string, error) {
 	return functionNames, nil
 }
 
-// Check if a given string is a public function name.
+// isPublic checks if a given string is a public function name.
 func isPublic(myString string) bool {
 	a := []rune(myString)
 	a[0] = unicode.ToUpper(a[0])
 	return myString == string(a)
+}
+
+// GetSourceCodeFiles lists golang source code files from directory, excluding sub-directory and tests files.
+func GetSourceCodeFiles(dir string) ([]string, error) {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var filenames []string
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".go") && !strings.HasSuffix(file.Name(), "_test.go") {
+			filenames = append(filenames, file.Name())
+		}
+	}
+
+	return filenames, nil
 }

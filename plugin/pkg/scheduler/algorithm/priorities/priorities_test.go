@@ -887,13 +887,25 @@ func makeImageNode(node string, status api.NodeStatus) api.Node {
 	}
 }
 
-func TestPriorityRegistered(t *testing.T) {
+func TestPrioritiesRegistered(t *testing.T) {
 	var functionNames []string
 
-	files := []string{"priorities.go", "node_affinity.go", "selector_spreading.go"}
+	// Files and directories which priorities may be referenced
+	targetFiles := []string{
+		"./../../algorithmprovider/defaults/defaults.go", // Default algorithm
+		"./../../factory/plugins.go",                     // Registered in init()
+	}
 
+	// List all golang source files under ./priorities/, excluding test files and sub-directories.
+	files, err := codeinspector.GetSourceCodeFiles(".")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v when listing files in current directory", err)
+	}
+
+	// Get all public priorities in files.
 	for _, filePath := range files {
-		functions, err := codeinspector.GetPulicFunctions(filePath)
+		functions, err := codeinspector.GetPublicFunctions(filePath)
 		if err == nil {
 			functionNames = append(functionNames, functions...)
 		} else {
@@ -901,14 +913,19 @@ func TestPriorityRegistered(t *testing.T) {
 		}
 	}
 
-	for _, funcionName := range functionNames {
-		err := exec.Command("grep", "-rl", funcionName, "./../../algorithmprovider/defaults/defaults.go", "./../../factory/plugins.go").Run()
+	// Check if all public priorities are referenced in target files.
+	for _, functionName := range functionNames {
+		args := []string{"-rl", functionName}
+		args = append(args, targetFiles...)
+
+		err := exec.Command("grep", args...).Run()
 		if err != nil {
 			switch err.Error() {
 			case "exit status 2":
-				t.Errorf("unexpected error when checking %s", funcionName)
+				t.Errorf("unexpected error when checking %s", functionName)
 			case "exit status 1":
-				t.Errorf("priority %s is implemented but seems not registered in any place", funcionName)
+				t.Errorf("priority %s is implemented as public but seems not registered or used in any other place",
+					functionName)
 			}
 		}
 	}
