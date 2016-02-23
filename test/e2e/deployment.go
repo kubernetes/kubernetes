@@ -454,12 +454,14 @@ func testRolloverDeployment(f *Framework) {
 		Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
+	deploymentMinReadySeconds := 5
+	err = waitForPodsReady(c, ns, podName, deploymentMinReadySeconds)
+	Expect(err).NotTo(HaveOccurred())
 
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	deploymentName, deploymentImageName := "redis-deployment", "redis-slave"
 	deploymentReplicas := 4
 	deploymentImage := "gcr.io/google_samples/gb-redisslave:v1"
-	deploymentMinReadySeconds := 5
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	Logf("Creating deployment %s", deploymentName)
 	newDeployment := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)

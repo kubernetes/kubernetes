@@ -2144,6 +2144,23 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 	})
 }
 
+func waitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds int) error {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	options := api.ListOptions{LabelSelector: label}
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+		pods, err := c.Pods(ns).List(options)
+		if err != nil {
+			return false, nil
+		}
+		for _, pod := range pods.Items {
+			if !deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
 // Waits for the deployment to clean up old rcs.
 func waitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName string, desiredRSNum int) error {
 	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
