@@ -2192,7 +2192,7 @@ func waitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string
 		if err != nil {
 			return false, err
 		}
-		return int(deployment.Generation) == deployment.Status.ObservedGeneration, nil
+		return deployment.Generation == deployment.Status.ObservedGeneration, nil
 	})
 }
 

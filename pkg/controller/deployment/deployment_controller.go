@@ -582,7 +582,7 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 	if err != nil {
 		return err
 	}
-	if d.Status.Replicas != totalReplicas || d.Status.UpdatedReplicas != updatedReplicas || d.Status.AvailableReplicas != availableReplicas || int(d.Generation) > d.Status.ObservedGeneration {
+	if d.Generation > d.Status.ObservedGeneration || d.Status.Replicas != totalReplicas || d.Status.UpdatedReplicas != updatedReplicas || d.Status.AvailableReplicas != availableReplicas {
 		return dc.updateDeploymentStatus(allRSs, newRS, d)
 	}
 	return nil
@@ -1037,7 +1037,7 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	// TODO: Reconcile this with API definition. API definition talks about ready pods, while this just computes created pods.
 	newDeployment.Status = extensions.DeploymentStatus{
 		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
-		ObservedGeneration:  int(deployment.Generation),
+		ObservedGeneration:  deployment.Generation,
 		Replicas:            totalReplicas,
 		UpdatedReplicas:     updatedReplicas,
 		AvailableReplicas:   availableReplicas,
