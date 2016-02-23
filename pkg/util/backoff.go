@@ -120,6 +120,12 @@ func (p *Backoff) GC() {
 	}
 }
 
+func (p *Backoff) DeleteEntry(id string) {
+	p.Lock()
+	defer p.Unlock()
+	delete(p.perItemBackoff, id)
+}
+
 // Take a lock on *Backoff, before calling initEntryUnsafe
 func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
 	entry := &backoffEntry{backoff: p.defaultDuration}
