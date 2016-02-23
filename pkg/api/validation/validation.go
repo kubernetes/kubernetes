@@ -1770,11 +1770,14 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPort"), sp.TargetPort, PortNameErrorMsg))
 	}
 
-	if isHeadlessService {
-		if sp.TargetPort.Type == intstr.String || (sp.TargetPort.Type == intstr.Int && sp.Port != sp.TargetPort.IntValue()) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, "must be equal to targetPort when clusterIP = None"))
-		}
-	}
+	// in the v1 API, targetPorts on headless services were tolerated.
+	// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
+	//
+	// if isHeadlessService {
+	// 	if sp.TargetPort.Type == intstr.String || (sp.TargetPort.Type == intstr.Int && sp.Port != sp.TargetPort.IntValue()) {
+	// 		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPort"), sp.TargetPort, "must be equal to the value of 'port' when clusterIP = None"))
+	// 	}
+	// }
 
 	return allErrs
 }
