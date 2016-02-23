@@ -10,6 +10,7 @@
              repoName: '{repoName}'
              dockerfilePath: 'go/src/{gitbasedir}/{dockerfilePath}'
              tag: 'canary'
+             credentialsId: '1f361efb-5b85-4f61-91a7-4ec7fb2a5c23'
     publishers:
         - claim-build
         - gcs-uploader

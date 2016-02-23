@@ -93,7 +93,7 @@
                <com.cloudbees.dockerpublish.DockerBuilder plugin="docker-build-publish@1.1">
                    <server plugin="docker-commons@1.2"/>
                    <registry plugin="docker-commons@1.2">
-                       <credentialsId>1f361efb-5b85-4f61-91a7-4ec7fb2a5c23</credentialsId>
+                       <credentialsId>{credentialsId}</credentialsId>
                    </registry>
                    <repoName>{repoName}</repoName>
                    <noCache>true</noCache>
