@@ -156,8 +156,8 @@
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gce-ubelite"
                 export MULTIZONE="true"
-                export KUBE_GCE_ZONE=""
-                export E2E_ZONES="us-central1-a us-central1-b us-central1-f"
+                export E2E_ZONES="us-central1-a us-central1-b us-central1-f" # Where the nodes reside.  Master is in the first one.
+                export KUBE_GCE_ZONE="us-central1-a" # Where the master resides - hangover due to legacy scripts.
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
