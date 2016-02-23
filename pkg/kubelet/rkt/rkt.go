@@ -1045,7 +1045,8 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 
 	res := <-reschan
 	if res != "done" {
-		glog.Errorf("rkt: Failed to stop unit %q: %s", serviceName, res)
+		err := fmt.Errorf("invalid result: %s", res)
+		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
 	}
 
