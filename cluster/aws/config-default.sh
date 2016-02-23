@@ -50,6 +50,12 @@ AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
 # Which docker storage mechanism to use.
 DOCKER_STORAGE=${DOCKER_STORAGE:-aufs}
 
+#Proper fix for complete compliance with http://kubernetes.io/v1.0/docs/getting-started-guides/aws.html#cluster-turnup
+IRND=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(8))')
+echo $IRND
+KUBE_AWS_INSTANCE_PREFIX="${INSTANCE_PREFIX:-Oleg}-$IRND"
+echo $KUBE_AWS_INSTANCE_PREFIX
+
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_ID=${INSTANCE_PREFIX}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
