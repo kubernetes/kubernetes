@@ -665,6 +665,10 @@ func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deploymen
 	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
 
 	existingNewRS, err := deploymentutil.GetNewReplicaSetFromList(deployment, dc.client,
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
+			podList, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
+			return &podList, err
+		},
 		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
 			return dc.rsStore.ReplicaSets(namespace).List(options.LabelSelector)
 		})
