@@ -92,7 +92,7 @@ func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.
 	case cloud == nil && config.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
-		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
+		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeProvisionableVolumePlugins())
 	case cloud != nil && gce.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeProvisionableVolumePlugins())
 	case cloud != nil && openstack.ProviderName == cloud.ProviderName():

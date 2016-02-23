@@ -26,7 +26,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -47,11 +46,14 @@ var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.MountableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
 )
+
+var accessModes []api.PersistentVolumeAccessMode = []api.PersistentVolumeAccessMode{
+	api.ReadWriteOnce,
+}
 
 func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -68,9 +70,7 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-	}
+	return accessModes
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
@@ -143,23 +143,6 @@ func (plugin *awsElasticBlockStorePlugin) newDeleterInternal(spec *volume.Spec, 
 			manager:  manager,
 			plugin:   plugin,
 		}}, nil
-}
-
-func (plugin *awsElasticBlockStorePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
-	return plugin.newProvisionerInternal(options, &AWSDiskUtil{})
-}
-
-func (plugin *awsElasticBlockStorePlugin) newProvisionerInternal(options volume.VolumeOptions, manager ebsManager) (volume.Provisioner, error) {
-	return &awsElasticBlockStoreProvisioner{
-		awsElasticBlockStore: &awsElasticBlockStore{
-			manager: manager,
-			plugin:  plugin,
-		},
-		options: options,
-	}, nil
 }
 
 // Abstract interface to PD operations.
@@ -399,53 +382,4 @@ func (d *awsElasticBlockStoreDeleter) GetPath() string {
 
 func (d *awsElasticBlockStoreDeleter) Delete() error {
 	return d.manager.DeleteVolume(d)
-}
-
-type awsElasticBlockStoreProvisioner struct {
-	*awsElasticBlockStore
-	options   volume.VolumeOptions
-	namespace string
-}
-
-var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
-
-func (c *awsElasticBlockStoreProvisioner) Provision(pv *api.PersistentVolume) error {
-	volumeID, sizeGB, err := c.manager.CreateVolume(c)
-	if err != nil {
-		return err
-	}
-	pv.Spec.PersistentVolumeSource.AWSElasticBlockStore.VolumeID = volumeID
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
-	}
-	return nil
-}
-
-func (c *awsElasticBlockStoreProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	// Provide dummy api.PersistentVolume.Spec, it will be filled in
-	// awsElasticBlockStoreProvisioner.Provision()
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-aws-",
-			Labels:       map[string]string{},
-			Annotations: map[string]string{
-				"kubernetes.io/createdby": "aws-ebs-dynamic-provisioner",
-			},
-		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): c.options.Capacity,
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-					VolumeID:  "dummy",
-					FSType:    "ext4",
-					Partition: 0,
-					ReadOnly:  false,
-				},
-			},
-		},
-	}, nil
 }
