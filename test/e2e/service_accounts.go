@@ -28,12 +28,128 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var serviceAccountTokenNamespaceVersion = version.MustParse("v1.2.0")
 
 var _ = Describe("ServiceAccounts", func() {
 	f := NewFramework("svcaccounts")
+
+	It("should ensure a single API token exists", func() {
+		// wait for the service account to reference a single secret
+		var secrets []api.ObjectReference
+		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+			By("waiting for a single token reference")
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			if apierrors.IsNotFound(err) {
+				Logf("default service account was not found")
+				return false, nil
+			}
+			if err != nil {
+				Logf("error getting default service account: %v", err)
+				return false, err
+			}
+			switch len(sa.Secrets) {
+			case 0:
+				Logf("default service account has no secret references")
+				return false, nil
+			case 1:
+				Logf("default service account has a single secret reference")
+				secrets = sa.Secrets
+				return true, nil
+			default:
+				return false, fmt.Errorf("default service account has too many secret references: %#v", sa.Secrets)
+			}
+		}))
+
+		// make sure the reference doesn't flutter
+		{
+			By("ensuring the single token reference persists")
+			time.Sleep(2 * time.Second)
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			expectNoError(err)
+			Expect(sa.Secrets).To(Equal(secrets))
+		}
+
+		// delete the referenced secret
+		By("deleting the service account token")
+		expectNoError(f.Client.Secrets(f.Namespace.Name).Delete(secrets[0].Name))
+
+		// wait for the referenced secret to be removed, and another one autocreated
+		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+			By("waiting for a new token reference")
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			if err != nil {
+				Logf("error getting default service account: %v", err)
+				return false, err
+			}
+			switch len(sa.Secrets) {
+			case 0:
+				Logf("default service account has no secret references")
+				return false, nil
+			case 1:
+				if sa.Secrets[0] == secrets[0] {
+					Logf("default service account still has the deleted secret reference")
+					return false, nil
+				}
+				Logf("default service account has a new single secret reference")
+				secrets = sa.Secrets
+				return true, nil
+			default:
+				return false, fmt.Errorf("default service account has too many secret references: %#v", sa.Secrets)
+			}
+		}))
+
+		// make sure the reference doesn't flutter
+		{
+			By("ensuring the single token reference persists")
+			time.Sleep(2 * time.Second)
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			expectNoError(err)
+			Expect(sa.Secrets).To(Equal(secrets))
+		}
+
+		// delete the reference from the service account
+		By("deleting the reference to the service account token")
+		{
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			expectNoError(err)
+			sa.Secrets = nil
+			_, updateErr := f.Client.ServiceAccounts(f.Namespace.Name).Update(sa)
+			expectNoError(updateErr)
+		}
+
+		// wait for another one to be autocreated
+		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+			By("waiting for a new token to be created and added")
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			if err != nil {
+				Logf("error getting default service account: %v", err)
+				return false, err
+			}
+			switch len(sa.Secrets) {
+			case 0:
+				Logf("default service account has no secret references")
+				return false, nil
+			case 1:
+				Logf("default service account has a new single secret reference")
+				secrets = sa.Secrets
+				return true, nil
+			default:
+				return false, fmt.Errorf("default service account has too many secret references: %#v", sa.Secrets)
+			}
+		}))
+
+		// make sure the reference doesn't flutter
+		{
+			By("ensuring the single token reference persists")
+			time.Sleep(2 * time.Second)
+			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
+			expectNoError(err)
+			Expect(sa.Secrets).To(Equal(secrets))
+		}
+	})
 
 	It("should mount an API token into pods [Conformance]", func() {
 		var tokenContent string
