@@ -197,31 +197,36 @@ var _ = Describe("[Feature:Example]", func() {
 			controllerYaml := mkpath("cassandra-controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			By("starting service and pod")
+			By("Starting the cassandra service and pod")
 			runKubectlOrDie("create", "-f", serviceYaml, nsFlag)
 			runKubectlOrDie("create", "-f", podYaml, nsFlag)
+
+			Logf("waiting for first cassandra pod")
 			err := waitForPodRunningInNamespace(c, "cassandra", ns)
 			Expect(err).NotTo(HaveOccurred())
 
+			Logf("waiting for thrift listener online")
 			_, err = lookForStringInLog(ns, "cassandra", "cassandra", "Listening for thrift clients", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
 
+			Logf("wait for service")
 			err = waitForEndpoint(c, ns, "cassandra")
 			Expect(err).NotTo(HaveOccurred())
 
-			By("create and scale rc")
+			// Create an RC with n nodes in it.  Each node will then be verified.
+			By("Creating a Cassandra RC")
 			runKubectlOrDie("create", "-f", controllerYaml, nsFlag)
-			err = ScaleRC(c, ns, "cassandra", 2, true)
-			Expect(err).NotTo(HaveOccurred())
-			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
+			forEachPod(c, ns, "app", "cassandra", func(pod api.Pod) {
+				Logf("Verifying pod %v ", pod.Name)
 				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Handshaking version", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
+			By("Finding each node in the nodetool status lines")
 			output := runKubectlOrDie("exec", "cassandra", nsFlag, "--", "nodetool", "status")
-			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
+			forEachPod(c, ns, "app", "cassandra", func(pod api.Pod) {
 				if !strings.Contains(output, pod.Status.PodIP) {
 					Failf("Pod ip %s not found in nodetool status", pod.Status.PodIP)
 				}
