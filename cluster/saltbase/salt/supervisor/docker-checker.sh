@@ -25,6 +25,10 @@ while pidof docker > /dev/null; do
     sleep 10
 done
 
+# cleanup docker network checkpoint to avoid running into known issue
+# of docker (https://github.com/docker/docker/issues/18283)
+rm -rf /var/lib/docker/network
+
 /etc/init.d/docker start
 
 echo "waiting 30s for startup"
