@@ -1695,8 +1695,6 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 // There are still quite a few failure cases not covered.
 // TODO(random-liu): Better way to test the SyncPod failures.
 func TestSyncPodWithFailure(t *testing.T) {
-	dm, fakeDocker := newTestDockerManager()
-	puller := dm.dockerPuller.(*FakeDockerPuller)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
@@ -1704,13 +1702,6 @@ func TestSyncPodWithFailure(t *testing.T) {
 			Namespace: "new",
 		},
 	}
-	// Pretend that the pod infra container has already been created, so that
-	// we can run the user containers.
-	fakeDocker.SetFakeRunningContainers([]*docker.Container{{
-		ID:   "9876",
-		Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0",
-	}})
-
 	tests := map[string]struct {
 		container   api.Container
 		dockerError map[string]error
@@ -1724,13 +1715,13 @@ func TestSyncPodWithFailure(t *testing.T) {
 			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrImagePull, "can't pull image"}},
 		},
 		"CreateContainerFailure": {
-			api.Container{Name: "bar"},
+			api.Container{Name: "bar", Image: "alreadyPresent"},
 			map[string]error{"create": fmt.Errorf("can't create container")},
 			[]error{},
 			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrRunContainer, "can't create container"}},
 		},
 		"StartContainerFailure": {
-			api.Container{Name: "bar"},
+			api.Container{Name: "bar", Image: "alreadyPresent"},
 			map[string]error{"start": fmt.Errorf("can't start container")},
 			[]error{},
 			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrRunContainer, "can't start container"}},
@@ -1738,9 +1729,18 @@ func TestSyncPodWithFailure(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		pod.Spec.Containers = []api.Container{test.container}
+		dm, fakeDocker := newTestDockerManager()
+		puller := dm.dockerPuller.(*FakeDockerPuller)
+		puller.HasImages = []string{test.container.Image}
+		// Pretend that the pod infra container has already been created, so that
+		// we can run the user containers.
+		fakeDocker.SetFakeRunningContainers([]*docker.Container{{
+			ID:   "9876",
+			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0",
+		}})
 		fakeDocker.Errors = test.dockerError
 		puller.ErrorsToInject = test.pullerError
+		pod.Spec.Containers = []api.Container{test.container}
 		result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
 		verifySyncResults(t, test.expected, result)
 	}
