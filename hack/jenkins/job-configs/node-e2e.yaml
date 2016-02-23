@@ -1,3 +1,13 @@
+# Job template to checkout source from github to $WORKSPACE/go/src/{gitbasedir} and build + publish a docker image.
+# - Tags the docker image with 'canary'.
+# - Job is executed daily and when changes are found polling github (every 5m).
+# - Console output is published to google cloud storage.
+#
+# gitproject: name of the project - for display purposes only
+# owner: owner to be notified for job failures.  test results are published to owner email
+# repoName: github repo to checkout e.g. kubernetes/kubernetes or google/cadvisor.  Must match the docker image repo name where the image will be published.
+# gitbasedir: directory under $WORKSPACE/go/src to checkout source repo to - e.g. k8s.io/kubernetes or github.com/google/cadvisor
+# dockerfilePath: workspace relative path to the 'Dockerfile' to build
 - job-template:
     name: '{gitproject}-dockercanarybuild-ci'
     description: 'Build and push {gitproject} docker image.<br>Test Owner: {owner}.'
@@ -38,6 +48,16 @@
             fail: true
         - timestamps
 
+# Job template to checkout source from github to $WORKSPACE/go/src/{gitbasedir}, setup go environment variables, and execute a
+# shell script.
+# - Job is executed daily and when changes are found polling github (every 5m).
+# - Console output is published to google cloud storage.
+#
+# gitproject: name of the project - for display purposes only
+# owner: owner to be notified for job failures.  test results are published to owner email
+# repoName: github repo to checkout e.g. kubernetes/kubernetes or google/cadvisor
+# gitbasedir: directory under $WORKSPACE/go/src to checkout source repo to - e.g. k8s.io/kubernetes or github.com/google/cadvisor
+# shell: shell to execute from workspace
 - job-template:
     name: '{gitproject}-gce-e2e-ci'
     description: '{gitproject} continuous e2e tests.<br>Test Owner: {owner}.'
