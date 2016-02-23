@@ -2186,6 +2186,16 @@ func waitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName strin
 	})
 }
 
+func waitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string) error {
+	return wait.Poll(poll, 1*time.Minute, func() (bool, error) {
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		return int(deployment.Generation) == deployment.Status.ObservedGeneration, nil
+	})
+}
+
 func logReplicaSetsOfDeployment(deployment *extensions.Deployment, oldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
 	Logf("Deployment = %+v", deployment)
 	for i := range oldRSs {
