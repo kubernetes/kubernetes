@@ -98,7 +98,7 @@ type ObjectMeta struct {
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
 	// A sequence number representing a specific generation of the desired state.
-	// Currently only implemented by replication controllers.
+	// Populated by the system. Read-only.
 	Generation int64 `json:"generation,omitempty"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
