@@ -36,6 +36,9 @@ github.com/elazarl/goproxy | BSDWarr
 github.com/emicklei/go-restful | MITname
 github.com/evanphx/json-patch | BSDWarr
 github.com/fsouza/go-dockerclient | spdxBSD2
+github.com/fsouza/go-dockerclient/external/github.com/docker/go-units | Apache-2
+github.com/fsouza/go-dockerclient/external/github.com/hashicorp/go-cleanhttp | IntelPart08
+github.com/fsouza/go-dockerclient/external/github.com/Sirupsen/logrus | MITname
 github.com/garyburd/redigo/internal | ApachesPermLim
 github.com/garyburd/redigo/redis | ApachesPermLim
 github.com/ghodss/yaml | MITname
@@ -104,6 +107,7 @@ golang.org/x/oauth2 | spdxBSD3
 golang.org/x/sys | spdxBSD3
 golang.org/x/tools | spdxBSD3
 google.golang.org/api | spdxBSD3
+google.golang.org/api/googleapi/internal/uritemplates | spdxMIT
 google.golang.org/cloud | Apache-2
 google.golang.org/grpc | spdxBSD3
 gopkg.in/natefinch/lumberjack.v2 | MITname
