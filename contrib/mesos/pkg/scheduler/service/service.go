@@ -43,6 +43,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
@@ -594,8 +595,14 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 		validation := ha.ValidationFunc(validateLeadershipTransition)
 		srv := ha.NewCandidate(schedulerProcess, driverFactory, validation)
 		path := meta.ElectionPath(s.frameworkName)
-		log.Infof("registering for election at %v with id %v", path, eid.GetValue())
-		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, eid.GetValue(), srv, nil)
+		uuid := eid.GetValue() + ":" + uuid.New() // unique for each scheduler instance
+		log.Infof("registering for election at %v with id %v", path, uuid)
+		go election.Notify(
+			election.NewEtcdMasterElector(etcdClient),
+			path,
+			uuid,
+			srv,
+			nil)
 	} else {
 		log.Infoln("self-electing in non-HA mode")
 		schedulerProcess.Elect(driverFactory)
@@ -650,8 +657,28 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 
 func validateLeadershipTransition(desired, current string) {
 	log.Infof("validating leadership transition")
+	// desired, current are of the format <executor-id>:<scheduler-uuid> (see Run()).
+	// parse them and ensure that executor ID's match, otherwise the cluster can get into
+	// a bad state after scheduler failover: executor ID is a config hash that must remain
+	// consistent across failover events.
+	var (
+		i = strings.LastIndex(desired, ":")
+		j = strings.LastIndex(current, ":")
+	)
+
+	if i > -1 {
+		desired = desired[0:i]
+	} else {
+		log.Fatalf("desired id %q is invalid", desired)
+	}
+	if j > -1 {
+		current = current[0:j]
+	} else if current != "" {
+		log.Fatalf("current id %q is invalid", current)
+	}
+
 	if desired != current && current != "" {
-		log.Fatalf("desired executor id != current executor id", desired, current)
+		log.Fatalf("desired executor id %q != current executor id %q", desired, current)
 	}
 }
 
