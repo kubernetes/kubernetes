@@ -37,7 +37,8 @@ import (
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	storage := NewStorage(etcdStorage, generic.UndecoratedStorage, nil, nil)
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage}
+	storage := NewStorage(restOptions, nil, nil)
 	return storage.Pod, storage.Binding, storage.Status, server
 }
 

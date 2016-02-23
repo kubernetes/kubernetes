@@ -43,8 +43,8 @@ type DeploymentStorage struct {
 	Rollback   *RollbackREST
 }
 
-func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator) DeploymentStorage {
-	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(s, storageDecorator)
+func NewStorage(opts generic.RESTOptions) DeploymentStorage {
+	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(opts)
 	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
@@ -60,12 +60,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST, *RollbackREST) {
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 	prefix := "/deployments"
 
 	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Deployments), &extensions.Deployment{}, prefix, deployment.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Deployments), &extensions.Deployment{}, prefix, deployment.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Deployment{} },
