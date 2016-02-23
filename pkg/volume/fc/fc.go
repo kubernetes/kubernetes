@@ -59,15 +59,8 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	if (spec.Volume != nil && spec.Volume.FC == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC == nil) {
 		return false
 	}
-	// TODO:  turn this into a func so CanSupport can be unit tested without
-	// having to make system calls
-	// see if /sys/class/fc_transport is there, which indicates fc is connected
-	_, err := plugin.execCommand("ls", []string{"/sys/class/fc_transport"})
-	if err == nil {
-		return true
-	}
 
-	return false
+	return true
 }
 
 func (plugin *fcPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
