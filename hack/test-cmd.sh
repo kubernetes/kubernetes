@@ -832,7 +832,7 @@ __EOF__
   # ConfigMap          #
   ######################
 
-  kubectl create -f docs/user-guide/configmap/config-map.yaml
+  kubectl create -f docs/user-guide/configmap/configmap.yaml
   kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
   kubectl delete configmap test-configmap "${kube_flags[@]}"
 
@@ -1302,7 +1302,6 @@ __EOF__
   kubectl delete rs frontend redis-slave "${kube_flags[@]}" # delete multiple replica sets at once
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
-
 
   ######################
   # Multiple Resources #
