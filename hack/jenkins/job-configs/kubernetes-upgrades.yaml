@@ -1,3 +1,10 @@
+# These configs rely on the fact that previous branches will overwrite any
+# environment variables that they need. Currently, 1.0 and 1.1 jobs use the
+# old e2e.sh script on their branches. To turn up new upgrade jobs from these
+# releases, you will need to fiddle with e2e.sh on their branches. For all
+# branches after those, you will simply need to add a new entry in one of the
+# projects below.
+
 - job-template:
     name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}'
     disabled: false
@@ -56,7 +63,14 @@
         daysToKeep: 7
     builders:
         - shell: |
-            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+            # per-provider variables
+            {provider-env}
+            # per-upgrade-flow variables, such as project name
+            {project-env}
+            # per-step variables, such as whether to run tests
+            {job-env}
+            {post-env}
+            {runner}
     properties:
         - mail-watcher
     publishers:
@@ -84,7 +98,14 @@
         daysToKeep: 7
     builders:
         - shell: |
-            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+            # per-provider variables
+            {provider-env}
+            # per-upgrade-flow variables, such as project name
+            {project-env}
+            # per-step variables, such as whether to run tests
+            {job-env}
+            {post-env}
+            {runner}
     properties:
         - mail-watcher
     publishers:
@@ -109,72 +130,121 @@
     jobs:
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}'
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step1-deploy':
-            branch: '{branch-old}'
+            runner: '{runner-old}'
+            job-env: |
+                export E2E_TEST="false"
+                export E2E_DOWN="false"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step2-kubectl-e2e-new'
-            branch: '{branch-new}'
             description: 'Run {version-new} kubectl tests against the cluster running {version-old}.'
+            job-env: |
+                export E2E_OPT="--check_version_skew=false"
+                export E2E_UP="false"
+                export E2E_DOWN="false"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step3-upgrade-master'
-            branch: '{branch-new}'
             description: 'Upgrade the master from {version-old} to {version-new}.'
+            job-env: |
+                export E2E_OPT="--check_version_skew=false"
+                export E2E_UP="false"
+                export E2E_DOWN="false"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step4-e2e-old'
-            branch: '{branch-old}'
+            runner: '{runner-old}'
             description: 'Run {version-old} e2e tests against the cluster with master at {version-new} and nodes still at {version-old}.'
+            job-env: |
+                export E2E_OPT="--check_version_skew=false"
+                export E2E_UP="false"
+                export E2E_DOWN="false"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step5-upgrade-cluster'
-            branch: '{branch-new}'
             description: 'Upgrade the nodes from {version-old} to {version-new}.'
+            job-env: |
+                export E2E_OPT="--check_version_skew=false"
+                export E2E_UP="false"
+                export E2E_DOWN="false"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step6-e2e-old'
-            branch: '{branch-old}'
+            runner: '{runner-old}'
             description: 'Run {version-old} e2e tests against the cluster with master and nodes at {version-new}.'
+            job-env: |
+                export E2E_OPT="--check_version_skew=false"
+                export E2E_UP="false"
+                export E2E_DOWN="false"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step7-e2e-new'
-            branch: '{branch-new}'
             description: 'Run {version-new} e2e tests against the cluster with master and nodes at {version-new}.'
+            job-env: |
+                # TODO(15011): these really shouldn't be (very) version skewed, but
+                # because we have to get ci/latest again, it could get slightly out of
+                # whack.
+                export E2E_OPT="--check_version_skew=false"
+                export E2E_UP="false"
 
 - project:
     name: 'upgrade-gke'
+    provider-env: |
+        {gke-provider-env}
+        export JENKINS_FORCE_GET_TARS="y"
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
     jobs:
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gke'
             version-old: '1.1'
             version-new: 'master'
-            branch-old: 'release-1.1'
-            branch-new: 'master'
+            runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
+            runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: |
+                export E2E_NAME="upgrade-gke-1-1-master"
+                export PROJECT="kubernetes-jenkins-gke-upgrade"
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gke'
             version-old: '1.0'
             version-new: 'master'
-            branch-old: 'release-1.0'
-            branch-new: 'master'
+            runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh" | bash -
+            runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: |
+                export E2E_NAME="upgrade-gke-1-0-master"
+                export PROJECT="kubernetes-jenkins-gke-upgrade"
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gke'
             version-old: '1.0'
             version-new: 'current-release'
-            branch-old: 'release-1.0'
-            branch-new: 'release-1.1'
+            runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh" | bash -
+            runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: ''
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gke'
             version-old: 'stable'
             version-new: 'current-release'
-            branch-old: 'release-1.1'
-            branch-new: 'release-1.1'
+            runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
+            runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: ''
 
 - project:
     name: 'upgrade-gce'
+    provider-env: |
+        {gce-provider-env}
+        export NUM_NODES=5
+        export JENKINS_FORCE_GET_TARS="y"
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
     jobs:
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gce'
             version-old: '1.1'
             version-new: 'master'
-            branch-old: 'release-1.1'
-            branch-new: 'master'
+            runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
+            runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: |
+                export E2E_NAME="upgrade-gce-1-1-master"
+                export PROJECT="kubernetes-jenkins-gce-upgrade"
         - '{provider}-{version-old}-{version-new}-upgrades':
             provider: 'gce'
             version-old: 'stable'
             version-new: 'current-release'
-            branch-old: 'release-1.1'
-            branch-new: 'release-1.1'
+            runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
+            runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e-runner.sh" | bash -
+            project-env: ''
