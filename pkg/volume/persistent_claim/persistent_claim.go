@@ -35,6 +35,7 @@ type persistentClaimPlugin struct {
 }
 
 var _ volume.VolumePlugin = &persistentClaimPlugin{}
+var _ volume.MountableVolumePlugin = &persistentClaimPlugin{}
 
 const (
 	persistentClaimPluginName = "kubernetes.io/persistent-claim"

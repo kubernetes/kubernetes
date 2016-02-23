@@ -140,7 +140,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/cinder")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -254,7 +254,7 @@ func TestAttachDetachRace(t *testing.T) {
 	host := volume.NewFakeVolumeHost(tmpDir, nil, nil)
 	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/cinder")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

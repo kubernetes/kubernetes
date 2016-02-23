@@ -40,6 +40,7 @@ type fcPlugin struct {
 }
 
 var _ volume.VolumePlugin = &fcPlugin{}
+var _ volume.MountableVolumePlugin = &fcPlugin{}
 var _ volume.PersistentVolumePlugin = &fcPlugin{}
 
 const (

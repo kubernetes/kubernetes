@@ -111,6 +111,32 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	return pm.plugins[matches[0]], nil
 }
 
+// FindMountablePluginBySpec looks for a persistent volume plugin that can support a given volume
+// specification.  If no plugin is found, return an error
+func (pm *VolumePluginMgr) FindMountablePluginBySpec(spec *Spec) (MountableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, fmt.Errorf("Could not find volume plugin for spec: %+v", spec)
+	}
+	if mountableVolumePlugin, ok := volumePlugin.(MountableVolumePlugin); ok {
+		return mountableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no mountable volume plugin matched")
+}
+
+// FindMountablePluginByName fetches a persistent volume plugin by name.  If no plugin
+// is found, returns error.
+func (pm *VolumePluginMgr) FindMountablePluginByName(name string) (MountableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if mountableVolumePlugin, ok := volumePlugin.(MountableVolumePlugin); ok {
+		return mountableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no mountable volume plugin matched")
+}
+
 // FindPersistentPluginBySpec looks for a persistent volume plugin that can support a given volume
 // specification.  If no plugin is found, return an error
 func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {

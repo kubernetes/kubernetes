@@ -67,7 +67,12 @@ type VolumePlugin interface {
 	// specification from the API.  The spec pointer should be considered
 	// const.
 	CanSupport(spec *Spec) bool
+}
 
+// PersistentVolumePlugin is an extended interface of VolumePlugin and is used
+// by volumes that can be mounted to a node.
+type MountableVolumePlugin interface {
+	VolumePlugin
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec

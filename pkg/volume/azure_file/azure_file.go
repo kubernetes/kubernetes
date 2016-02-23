@@ -39,6 +39,7 @@ type azureFilePlugin struct {
 }
 
 var _ volume.VolumePlugin = &azureFilePlugin{}
+var _ volume.MountableVolumePlugin = &azureFilePlugin{}
 var _ volume.PersistentVolumePlugin = &azureFilePlugin{}
 
 const (

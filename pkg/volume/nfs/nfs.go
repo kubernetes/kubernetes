@@ -51,6 +51,7 @@ type nfsPlugin struct {
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
+var _ volume.MountableVolumePlugin = &nfsPlugin{}
 var _ volume.PersistentVolumePlugin = &nfsPlugin{}
 var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
 

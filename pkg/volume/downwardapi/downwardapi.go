@@ -50,6 +50,7 @@ type downwardAPIPlugin struct {
 }
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
+var _ volume.MountableVolumePlugin = &downwardAPIPlugin{}
 
 var wrappedVolumeSpec = volume.Spec{
 	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},

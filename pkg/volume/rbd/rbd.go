@@ -39,6 +39,7 @@ type rbdPlugin struct {
 }
 
 var _ volume.VolumePlugin = &rbdPlugin{}
+var _ volume.MountableVolumePlugin = &rbdPlugin{}
 var _ volume.PersistentVolumePlugin = &rbdPlugin{}
 
 const (

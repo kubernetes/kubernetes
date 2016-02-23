@@ -244,7 +244,7 @@ func TestNewBuilder(t *testing.T) {
 		defer os.RemoveAll(tempDir)
 		plugMgr.InitPlugins(testProbeVolumePlugins(), vh)
 
-		plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
+		plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/persistent-claim")
 		if err != nil {
 			t.Errorf("Can't find the plugin by name")
 		}
@@ -297,7 +297,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	plugMgr.InitPlugins(testProbeVolumePlugins(), vh)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/persistent-claim")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

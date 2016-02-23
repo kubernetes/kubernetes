@@ -46,6 +46,7 @@ type secretPlugin struct {
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
+var _ volume.MountableVolumePlugin = &secretPlugin{}
 
 var wrappedVolumeSpec = volume.Spec{
 	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},

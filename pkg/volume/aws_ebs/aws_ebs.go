@@ -44,6 +44,7 @@ type awsElasticBlockStorePlugin struct {
 }
 
 var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.MountableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}

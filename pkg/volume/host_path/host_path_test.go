@@ -189,7 +189,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -260,7 +260,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
-	plug, _ := plugMgr.FindPluginByName(hostPathPluginName)
+	plug, _ := plugMgr.FindMountablePluginByName(hostPathPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
@@ -284,7 +284,7 @@ func TestMetrics(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

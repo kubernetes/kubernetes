@@ -222,7 +222,7 @@ func TestPlugin(t *testing.T) {
 
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(configMapPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -277,7 +277,7 @@ func TestPluginReboot(t *testing.T) {
 
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(configMapPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -360,7 +360,7 @@ func doTestConfigMapDataInVolume(volumePath string, configMap api.ConfigMap, t *
 	}
 }
 
-func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
+func doTestCleanAndTeardown(plugin volume.MountableVolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
 	cleaner, err := plugin.NewCleaner(testVolumeName, podUID)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)

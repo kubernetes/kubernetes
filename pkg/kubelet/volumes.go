@@ -79,7 +79,7 @@ func (vh *volumeHost) NewWrapperCleaner(volName string, spec volume.Spec, podUID
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(&spec)
+	plugin, err := vh.kubelet.volumePluginMgr.FindMountablePluginBySpec(&spec)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 }
 
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
+	plugin, err := kl.volumePluginMgr.FindMountablePluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
 	}
@@ -300,7 +300,7 @@ func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod,
 
 func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
 	plugName := strings.UnescapeQualifiedNameForDisk(kind)
-	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
+	plugin, err := kl.volumePluginMgr.FindMountablePluginByName(plugName)
 	if err != nil {
 		// TODO: Maybe we should launch a cleanup of this dir?
 		return nil, fmt.Errorf("can't use volume plugins for %s/%s: %v", podUID, kind, err)

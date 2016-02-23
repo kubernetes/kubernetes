@@ -118,7 +118,7 @@ func TestNewBuilder(t *testing.T) {
 	assert := assert.New(t)
 
 	plugMgr, _ := newInitializedVolumePlugMgr(t)
-	plug, err := plugMgr.FindPluginByName(pluginName)
+	plug, err := plugMgr.FindMountablePluginByName(pluginName)
 	assert.NoError(err)
 
 	spec := &volume.Spec{
@@ -204,7 +204,7 @@ func TestSetUpAtInternal(t *testing.T) {
 	if rootDir != "" {
 		defer os.RemoveAll(rootDir)
 	}
-	plug, err := plugMgr.FindPluginByName(flockerPluginName)
+	plug, err := plugMgr.FindMountablePluginByName(flockerPluginName)
 	assert.NoError(err)
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}

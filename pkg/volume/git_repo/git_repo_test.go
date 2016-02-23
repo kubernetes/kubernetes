@@ -222,7 +222,7 @@ func doTestPlugin(scenario struct {
 	rootDir, host := newTestHost(t)
 	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/git-repo")
 	if err != nil {
 		allErrs = append(allErrs,
 			fmt.Errorf("Can't find the plugin by name"))

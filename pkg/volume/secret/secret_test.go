@@ -82,7 +82,7 @@ func TestPlugin(t *testing.T) {
 
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(secretPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -154,7 +154,7 @@ func TestPluginIdempotent(t *testing.T) {
 
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(secretPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -215,7 +215,7 @@ func TestPluginReboot(t *testing.T) {
 
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(secretPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -296,7 +296,7 @@ func doTestSecretDataInVolume(volumePath string, secret api.Secret, t *testing.T
 	}
 }
 
-func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
+func doTestCleanAndTeardown(plugin volume.MountableVolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
 	cleaner, err := plugin.NewCleaner(testVolumeName, podUID)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)

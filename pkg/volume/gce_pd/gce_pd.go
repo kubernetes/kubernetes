@@ -42,6 +42,7 @@ type gcePersistentDiskPlugin struct {
 }
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.MountableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}

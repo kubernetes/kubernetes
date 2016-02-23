@@ -46,6 +46,7 @@ type cinderPlugin struct {
 }
 
 var _ volume.VolumePlugin = &cinderPlugin{}
+var _ volume.MountableVolumePlugin = &cinderPlugin{}
 var _ volume.PersistentVolumePlugin = &cinderPlugin{}
 var _ volume.DeletableVolumePlugin = &cinderPlugin{}
 var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}

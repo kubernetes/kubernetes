@@ -64,6 +64,7 @@ type hostPathPlugin struct {
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
+var _ volume.MountableVolumePlugin = &hostPathPlugin{}
 var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
 var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
 var _ volume.DeletableVolumePlugin = &hostPathPlugin{}

@@ -41,6 +41,7 @@ type glusterfsPlugin struct {
 }
 
 var _ volume.VolumePlugin = &glusterfsPlugin{}
+var _ volume.MountableVolumePlugin = &glusterfsPlugin{}
 var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
 
 const (
