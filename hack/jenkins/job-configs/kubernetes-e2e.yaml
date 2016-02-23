@@ -438,6 +438,8 @@
     test-owner: 'wonderfly@google.com'
     branch: 'release-1.1'
     emails: 'wonderfly@google.com,qzheng@google.com'
+    runner: '{old-runner-1-1}'
+    post-env: ''
     suffix:
         - 'head-release':
             description: 'Continuously test Trusty build against latest k8s release.'
