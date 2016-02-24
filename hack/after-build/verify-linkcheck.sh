@@ -52,8 +52,7 @@ done
 if [ ${found_invalid} = true ]; then
   echo "Summary of invalid links:"
   cat ${OUTPUT}/error
+  exit 1
 fi
-
-trap "cleanup" EXIT SIGINT
 
 # ex: ts=2 sw=2 et filetype=sh
