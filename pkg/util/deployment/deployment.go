@@ -187,13 +187,13 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 			updated.Spec.Template.Labels = labelsutil.AddLabel(updated.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error updating rs %s pod template label with template hash: %v", updatedRS.Name, err)
 		}
 	}
 	// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
 	if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
 		if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, rs.Name); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error waiting for rs %s generation %d observed by controller: %v", updatedRS.Name, updatedRS.Generation, err)
 		}
 	}
 
@@ -217,7 +217,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 		updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error updating rs %s label and selector with template hash: %v", updatedRS.Name, err)
 	}
 
 	// TODO: look for orphaned pods and label them in the background somewhere else periodically
