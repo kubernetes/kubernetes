@@ -334,6 +334,7 @@ type usageDataPerContainer struct {
 	cpuData        []float64
 	memUseData     []uint64
 	memWorkSetData []uint64
+	memRSSData     []uint64
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
