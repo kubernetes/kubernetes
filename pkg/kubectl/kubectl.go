@@ -100,6 +100,8 @@ func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) 
 func expandResourceShortcut(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
 	shortForms := map[string]unversioned.GroupVersionResource{
 		// Please keep this alphabetized
+		// If you add an entry here, please also take a look at pkg/kubectl/cmd/cmd.go
+		// and add an entry to valid_resources when appropriate.
 		"cs":     api.SchemeGroupVersion.WithResource("componentstatuses"),
 		"ds":     extensions.SchemeGroupVersion.WithResource("daemonsets"),
 		"ep":     api.SchemeGroupVersion.WithResource("endpoints"),
