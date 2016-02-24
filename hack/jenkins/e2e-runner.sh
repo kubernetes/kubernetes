@@ -140,11 +140,11 @@ fi
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 if [[ ! -z "${CLOUDSDK_BUCKET:-}" ]]; then
-    gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
+    gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~
     rm -rf ~/repo ~/cloudsdk
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
-    tar zvxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
+    tar zxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
     export CLOUDSDK_CORE_DISABLE_PROMPTS=1
     export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
     ~/cloudsdk/google-cloud-sdk/install.sh --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
