@@ -232,7 +232,7 @@ func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec, tmpDir string) {
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
 	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
-	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
+	plugin, err := plugMgr.FindMountablePluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -311,7 +311,7 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeMounter", tmpDir, execScriptTempl2, nil)
 	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volume.NewFakeVolumeHost(tmpDir, nil, nil))
-	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeMounter")
+	plugin, err := plugMgr.FindMountablePluginByName("kubernetes.io/fakeMounter")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

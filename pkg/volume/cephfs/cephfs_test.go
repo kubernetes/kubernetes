@@ -59,7 +59,7 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/cephfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

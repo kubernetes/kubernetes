@@ -45,6 +45,7 @@ type configMapPlugin struct {
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
+var _ volume.MountableVolumePlugin = &configMapPlugin{}
 
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host

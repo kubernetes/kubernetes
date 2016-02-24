@@ -32,11 +32,11 @@ import (
 )
 
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
+func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.MountableVolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(basePath, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName(plugName)
+	plug, err := plugMgr.FindMountablePluginByName(plugName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

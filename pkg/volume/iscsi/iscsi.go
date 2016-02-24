@@ -40,6 +40,7 @@ type iscsiPlugin struct {
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
+var _ volume.MountableVolumePlugin = &iscsiPlugin{}
 var _ volume.PersistentVolumePlugin = &iscsiPlugin{}
 
 const (

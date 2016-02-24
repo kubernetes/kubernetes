@@ -17,20 +17,13 @@ limitations under the License.
 package volume
 
 import (
-	"fmt"
-	"strings"
-	"sync"
-
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // VolumeOptions contains option information about a volume.
@@ -74,7 +67,12 @@ type VolumePlugin interface {
 	// specification from the API.  The spec pointer should be considered
 	// const.
 	CanSupport(spec *Spec) bool
+}
 
+// PersistentVolumePlugin is an extended interface of VolumePlugin and is used
+// by volumes that can be mounted to a node.
+type MountableVolumePlugin interface {
+	VolumePlugin
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
@@ -176,12 +174,6 @@ type VolumeHost interface {
 	GetHostName() string
 }
 
-// VolumePluginMgr tracks registered plugins.
-type VolumePluginMgr struct {
-	mutex   sync.Mutex
-	plugins map[string]VolumePlugin
-}
-
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
 type Spec struct {
 	Volume           *api.Volume
@@ -250,178 +242,6 @@ func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec 
 		PersistentVolume: pv,
 		ReadOnly:         readOnly,
 	}
-}
-
-// InitPlugins initializes each plugin.  All plugins must have unique names.
-// This must be called exactly once before any New* methods are called on any
-// plugins.
-func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) error {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
-
-	if pm.plugins == nil {
-		pm.plugins = map[string]VolumePlugin{}
-	}
-
-	allErrs := []error{}
-	for _, plugin := range plugins {
-		name := plugin.Name()
-		if !validation.IsQualifiedName(name) {
-			allErrs = append(allErrs, fmt.Errorf("volume plugin has invalid name: %#v", plugin))
-			continue
-		}
-
-		if _, found := pm.plugins[name]; found {
-			allErrs = append(allErrs, fmt.Errorf("volume plugin %q was registered more than once", name))
-			continue
-		}
-		err := plugin.Init(host)
-		if err != nil {
-			glog.Errorf("Failed to load volume plugin %s, error: %s", plugin, err.Error())
-			allErrs = append(allErrs, err)
-			continue
-		}
-		pm.plugins[name] = plugin
-		glog.V(1).Infof("Loaded volume plugin %q", name)
-	}
-	return utilerrors.NewAggregate(allErrs)
-}
-
-// FindPluginBySpec looks for a plugin that can support a given volume
-// specification.  If no plugins can support or more than one plugin can
-// support it, return error.
-func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
-
-	matches := []string{}
-	for k, v := range pm.plugins {
-		if v.CanSupport(spec) {
-			matches = append(matches, k)
-		}
-	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
-	}
-	if len(matches) > 1 {
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matches, ","))
-	}
-	return pm.plugins[matches[0]], nil
-}
-
-// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
-// is found, returns error.
-func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
-
-	// Once we can get rid of legacy names we can reduce this to a map lookup.
-	matches := []string{}
-	for k, v := range pm.plugins {
-		if v.Name() == name {
-			matches = append(matches, k)
-		}
-	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
-	}
-	if len(matches) > 1 {
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matches, ","))
-	}
-	return pm.plugins[matches[0]], nil
-}
-
-// FindPersistentPluginBySpec looks for a persistent volume plugin that can support a given volume
-// specification.  If no plugin is found, return an error
-func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, fmt.Errorf("Could not find volume plugin for spec: %+v", spec)
-	}
-	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
-		return persistentVolumePlugin, nil
-	}
-	return nil, fmt.Errorf("no persistent volume plugin matched")
-}
-
-// FindPersistentPluginByName fetches a persistent volume plugin by name.  If no plugin
-// is found, returns error.
-func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginByName(name)
-	if err != nil {
-		return nil, err
-	}
-	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
-		return persistentVolumePlugin, nil
-	}
-	return nil, fmt.Errorf("no persistent volume plugin matched")
-}
-
-// FindRecyclablePluginByName fetches a persistent volume plugin by name.  If no plugin
-// is found, returns error.
-func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	if recyclableVolumePlugin, ok := volumePlugin.(RecyclableVolumePlugin); ok {
-		return recyclableVolumePlugin, nil
-	}
-	return nil, fmt.Errorf("no recyclable volume plugin matched")
-}
-
-// FindDeletablePluginByName fetches a persistent volume plugin by name.  If no plugin
-// is found, returns error.
-func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	if deletableVolumePlugin, ok := volumePlugin.(DeletableVolumePlugin); ok {
-		return deletableVolumePlugin, nil
-	}
-	return nil, fmt.Errorf("no deletable volume plugin matched")
-}
-
-// FindCreatablePluginBySpec fetches a persistent volume plugin by name.  If no plugin
-// is found, returns error.
-func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	if provisionableVolumePlugin, ok := volumePlugin.(ProvisionableVolumePlugin); ok {
-		return provisionableVolumePlugin, nil
-	}
-	return nil, fmt.Errorf("no creatable volume plugin matched")
-}
-
-// FindAttachablePluginBySpec fetches a persistent volume plugin by name.  Unlike the other "FindPlugin" methods, this
-// does not return error if no plugin is found.  All volumes require a builder and cleaner, but not every volume will
-// have an attacher/detacher.
-func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	if attachableVolumePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
-		return attachableVolumePlugin, nil
-	}
-	return nil, nil
-}
-
-// FindAttachablePluginByName fetches an attachable volume plugin by name. Unlike the other "FindPlugin" methods, this
-// does not return error if no plugin is found.  All volumes require a builder and cleaner, but not every volume will
-// have an attacher/detacher.
-func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginByName(name)
-	if err != nil {
-		return nil, err
-	}
-	if attachablePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
-		return attachablePlugin, nil
-	}
-	return nil, nil
 }
 
 // NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler pod.  By default, a recycler pod simply runs

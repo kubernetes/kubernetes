@@ -63,7 +63,7 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-func CleanEverything(plugin volume.VolumePlugin, testVolumeName, volumePath string, testPodUID types.UID, t *testing.T) {
+func CleanEverything(plugin volume.MountableVolumePlugin, testVolumeName, volumePath string, testPodUID types.UID, t *testing.T) {
 	cleaner, err := plugin.NewCleaner(testVolumeName, testPodUID)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
@@ -106,7 +106,7 @@ func TestLabels(t *testing.T) {
 	rootDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(rootDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
@@ -193,7 +193,7 @@ func TestAnnotations(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -255,7 +255,7 @@ func TestName(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -318,7 +318,7 @@ func TestNamespace(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -374,7 +374,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
@@ -460,7 +460,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
@@ -566,7 +566,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
@@ -642,7 +642,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	tmpDir, host := newTestHost(t, clientset)
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
-	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	plugin, err := pluginMgr.FindMountablePluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

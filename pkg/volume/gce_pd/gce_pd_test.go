@@ -131,8 +131,9 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeProvisionableVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/gce-pd")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -204,6 +205,8 @@ func TestPlugin(t *testing.T) {
 	}
 
 	// Test Provisioner
+	provisionerPlug, err := plugMgr.FindCreatablePluginByName("kubernetes.io/gce-pd-ssd")
+
 	cap := resource.MustParse("100Mi")
 	options := volume.VolumeOptions{
 		Capacity: cap,
@@ -212,14 +215,14 @@ func TestPlugin(t *testing.T) {
 		},
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
-	provisioner, err := plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
+	provisioner, err := provisionerPlug.(*provisionableGcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
 	persistentSpec, err := provisioner.NewPersistentVolumeTemplate()
 	if err != nil {
 		t.Errorf("NewPersistentVolumeTemplate() failed: %v", err)
 	}
 
 	// get 2nd Provisioner - persistent volume controller will do the same
-	provisioner, err = plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
+	provisioner, err = provisionerPlug.(*provisionableGcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
 	err = provisioner.Provision(persistentSpec)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -282,7 +285,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
-	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
+	plug, _ := plugMgr.FindMountablePluginByName(gcePersistentDiskPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)

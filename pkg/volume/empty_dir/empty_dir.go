@@ -49,6 +49,7 @@ type emptyDirPlugin struct {
 }
 
 var _ volume.VolumePlugin = &emptyDirPlugin{}
+var _ volume.MountableVolumePlugin = &emptyDirPlugin{}
 
 const (
 	emptyDirPluginName = "kubernetes.io/empty-dir"

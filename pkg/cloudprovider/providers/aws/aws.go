@@ -151,6 +151,7 @@ type EC2Metadata interface {
 type VolumeOptions struct {
 	CapacityGB int
 	Tags       *map[string]string
+	VolumeType string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1383,7 +1384,11 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	request.AvailabilityZone = &s.availabilityZone
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
-	request.VolumeType = aws.String(DefaultVolumeType)
+	if volumeOptions.VolumeType != "" {
+		request.VolumeType = aws.String(volumeOptions.VolumeType)
+	} else {
+		request.VolumeType = aws.String(DefaultVolumeType)
+	}
 	response, err := s.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err

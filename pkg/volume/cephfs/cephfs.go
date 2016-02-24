@@ -39,6 +39,7 @@ type cephfsPlugin struct {
 }
 
 var _ volume.VolumePlugin = &cephfsPlugin{}
+var _ volume.MountableVolumePlugin = &cephfsPlugin{}
 
 const (
 	cephfsPluginName = "kubernetes.io/cephfs"

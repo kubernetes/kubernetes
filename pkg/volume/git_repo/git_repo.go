@@ -40,6 +40,7 @@ type gitRepoPlugin struct {
 }
 
 var _ volume.VolumePlugin = &gitRepoPlugin{}
+var _ volume.MountableVolumePlugin = &gitRepoPlugin{}
 
 var wrappedVolumeSpec = volume.Spec{
 	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},

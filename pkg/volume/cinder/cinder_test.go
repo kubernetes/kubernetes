@@ -139,8 +139,9 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeProvisionableVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/cinder")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -202,6 +203,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	// Test Provisioner
+	provisionerPlug, err := plugMgr.FindCreatablePluginByName("kubernetes.io/cinder-provisioning-default")
 	cap := resource.MustParse("100Mi")
 	options := volume.VolumeOptions{
 		Capacity: cap,
@@ -210,14 +212,14 @@ func TestPlugin(t *testing.T) {
 		},
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
-	provisioner, err := plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{0})
+	provisioner, err := provisionerPlug.(*provisionableCinderPlugin).newProvisionerInternal(options, &fakePDManager{})
 	persistentSpec, err := provisioner.NewPersistentVolumeTemplate()
 	if err != nil {
 		t.Errorf("NewPersistentVolumeTemplate() failed: %v", err)
 	}
 
 	// get 2nd Provisioner - persistent volume controller will do the same
-	provisioner, err = plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{0})
+	provisioner, err = provisionerPlug.(*provisionableCinderPlugin).newProvisionerInternal(options, &fakePDManager{})
 	err = provisioner.Provision(persistentSpec)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -254,7 +256,7 @@ func TestAttachDetachRace(t *testing.T) {
 	host := volume.NewFakeVolumeHost(tmpDir, nil, nil)
 	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	plug, err := plugMgr.FindMountablePluginByName("kubernetes.io/cinder")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -46,13 +45,17 @@ type cinderPlugin struct {
 }
 
 var _ volume.VolumePlugin = &cinderPlugin{}
+var _ volume.MountableVolumePlugin = &cinderPlugin{}
 var _ volume.PersistentVolumePlugin = &cinderPlugin{}
 var _ volume.DeletableVolumePlugin = &cinderPlugin{}
-var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}
 
 const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
 )
+
+var accessModes []api.PersistentVolumeAccessMode = []api.PersistentVolumeAccessMode{
+	api.ReadWriteOnce,
+}
 
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -69,9 +72,7 @@ func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *cinderPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-	}
+	return accessModes
 }
 
 func (plugin *cinderPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
@@ -134,23 +135,6 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 			manager: manager,
 			plugin:  plugin,
 		}}, nil
-}
-
-func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
-	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
-}
-
-func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions, manager cdManager) (volume.Provisioner, error) {
-	return &cinderVolumeProvisioner{
-		cinderVolume: &cinderVolume{
-			manager: manager,
-			plugin:  plugin,
-		},
-		options: options,
-	}, nil
 }
 
 func (plugin *cinderPlugin) getCloudProvider() (*openstack.OpenStack, error) {
@@ -405,52 +389,4 @@ func (r *cinderVolumeDeleter) GetPath() string {
 
 func (r *cinderVolumeDeleter) Delete() error {
 	return r.manager.DeleteVolume(r)
-}
-
-type cinderVolumeProvisioner struct {
-	*cinderVolume
-	options volume.VolumeOptions
-}
-
-var _ volume.Provisioner = &cinderVolumeProvisioner{}
-
-func (c *cinderVolumeProvisioner) Provision(pv *api.PersistentVolume) error {
-	volumeID, sizeGB, err := c.manager.CreateVolume(c)
-	if err != nil {
-		return err
-	}
-	pv.Spec.PersistentVolumeSource.Cinder.VolumeID = volumeID
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
-	}
-	return nil
-}
-
-func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	// Provide dummy api.PersistentVolume.Spec, it will be filled in
-	// cinderVolumeProvisioner.Provision()
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-cinder-",
-			Labels:       map[string]string{},
-			Annotations: map[string]string{
-				"kubernetes.io/createdby": "cinder-dynamic-provisioner",
-			},
-		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): c.options.Capacity,
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				Cinder: &api.CinderVolumeSource{
-					VolumeID: "dummy",
-					FSType:   "ext4",
-					ReadOnly: false,
-				},
-			},
-		},
-	}, nil
-
 }

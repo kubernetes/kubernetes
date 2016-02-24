@@ -87,7 +87,7 @@ func (f *fakeVolumeHost) NewWrapperBuilder(volName string, spec Spec, pod *api.P
 	if spec.Volume != nil {
 		spec.Volume.Name = wrapperVolumeName
 	}
-	plug, err := f.pluginMgr.FindPluginBySpec(&spec)
+	plug, err := f.pluginMgr.FindMountablePluginBySpec(&spec)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (f *fakeVolumeHost) NewWrapperCleaner(volName string, spec Spec, podUID typ
 	if spec.Volume != nil {
 		spec.Volume.Name = wrapperVolumeName
 	}
-	plug, err := f.pluginMgr.FindPluginBySpec(&spec)
+	plug, err := f.pluginMgr.FindMountablePluginBySpec(&spec)
 	if err != nil {
 		return nil, err
 	}
