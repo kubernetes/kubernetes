@@ -94,7 +94,7 @@ type ReplicationManager struct {
 }
 
 // NewReplicationManager creates a new ReplicationManager.
-func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
+func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
@@ -190,7 +190,7 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 
 	rm.syncHandler = rm.syncReplicationController
 	rm.podStoreSynced = rm.podController.HasSynced
-	rm.lookupCache = controller.NewMatchingCache(controller.DefaultCacheEntries)
+	rm.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return rm
 }
 
