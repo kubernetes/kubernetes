@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -217,6 +218,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*awsElasticBlockStorePlugin).newProvisionerInternal(options, &fakePDManager{})
+	if err != nil {
+		t.Errorf("Got error instead of provisioner: %v", err)
+	}
 	persistentSpec, err := provisioner.NewPersistentVolumeTemplate()
 	if err != nil {
 		t.Errorf("NewPersistentVolumeTemplate() failed: %v", err)
@@ -224,6 +228,9 @@ func TestPlugin(t *testing.T) {
 
 	// get 2nd Provisioner - persistent volume controller will do the same
 	provisioner, err = plug.(*awsElasticBlockStorePlugin).newProvisionerInternal(options, &fakePDManager{})
+	if err != nil {
+		t.Errorf("Got error instead of provisioner: %v", err)
+	}
 	err = provisioner.Provision(persistentSpec)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -329,5 +336,133 @@ func TestBuilderAndCleanerTypeAssert(t *testing.T) {
 	cleaner, err := plug.(*awsElasticBlockStorePlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if _, ok := cleaner.(volume.Builder); ok {
 		t.Errorf("Volume Cleaner can be type-assert to Builder")
+	}
+}
+
+func TestOptionParser(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
+
+	cap := resource.MustParse("100Gi")
+	options := volume.VolumeOptions{
+		Capacity: cap,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+		},
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+
+	// test defaults
+	options.ProvisioningOptions = ""
+	o, err := plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.IOPS != 0 {
+		t.Errorf("Expected 0 IOPS, got %d", o.IOPS)
+	}
+	if o.VolumeType != aws.DefaultVolumeType {
+		t.Errorf("Expected default volume type, got %s", o.VolumeType)
+	}
+
+	// gp2 (+ everything lowercase)
+	options.ProvisioningOptions = "{ \"volumetype\": \"gp2\"}"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.IOPS != 0 {
+		t.Errorf("Expected 0 IOPS, got %d", o.IOPS)
+	}
+	if o.VolumeType != aws.EBSVolumeTypeGP2 {
+		t.Errorf("Expected default volume type, got %s", o.VolumeType)
+	}
+
+	// standard (+ everything uppercase + unknown (=ignored) attribute)
+	options.ProvisioningOptions = "{ \"VOLUMETYPE\": \"STANDARD\", \"UNKNOWN\": \"VALUE\" }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.IOPS != 0 {
+		t.Errorf("Expected 0 IOPS, got %d", o.IOPS)
+	}
+	if o.VolumeType != aws.EBSVolumeTypeStandard {
+		t.Errorf("Expected standard volume type, got %s", o.VolumeType)
+	}
+
+	// IOPS (+ everything mixed-case)
+	options.ProvisioningOptions = "{ \"VolumeType\": \"Io1\", \"IoPs\": 300}"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.IOPS != 300 {
+		t.Errorf("Expected 10000 IOPS, got %d", o.IOPS)
+	}
+	if o.VolumeType != aws.EBSVolumeTypeIO1 {
+		t.Errorf("Expected io1 volume type, got %s", o.VolumeType)
+	}
+
+	// Error cases
+	// unexpected IOPS (with implicit gp2)
+	options.ProvisioningOptions = "{ \"IoPs\": 3000}"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Unknown VolumeType
+	options.ProvisioningOptions = "{ \"VolumeType\": \"unknown\" }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Invalid JSON
+	options.ProvisioningOptions = "{ "
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Unspecified IOPS
+	options.ProvisioningOptions = "{ \"VolumeType\": \"io1\"  }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Invalid IOPS (should  0 < x <= 20000)
+	options.ProvisioningOptions = "{ \"VolumeType\": \"io1\", \"IOPS\": 0 }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+	options.ProvisioningOptions = "{ \"VolumeType\": \"io1\", \"IOPS\": 20001 }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Invalid IOPS/GiB ratio (must be under 30, try 31)
+	options.ProvisioningOptions = "{ \"VolumeType\": \"io1\", \"IOPS\": 3100 }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Invalid type of IOPS (should be int)
+	options.ProvisioningOptions = "{ \"VolumeType\": \"io1\", \"IOPS\": \"300\" }"
+	o, err = plug.(*awsElasticBlockStorePlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
 	}
 }

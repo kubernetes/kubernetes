@@ -17,6 +17,7 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -27,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -151,13 +153,63 @@ func (plugin *awsElasticBlockStorePlugin) NewProvisioner(options volume.VolumeOp
 	return plugin.newProvisionerInternal(options, &AWSDiskUtil{})
 }
 
+func (plugin *awsElasticBlockStorePlugin) parseProvisioningOptions(options volume.VolumeOptions) (awsProvisioningOptions, error) {
+	var opts awsProvisioningOptions
+
+	optStr := strings.TrimSpace(options.ProvisioningOptions)
+	if optStr != "" {
+		bytes := []byte(optStr)
+
+		err := json.Unmarshal(bytes, &opts)
+		if err != nil {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: %v", plugin.Name(), err)
+		}
+
+		// convert VolumeType to lower case
+		opts.VolumeType = strings.ToLower(opts.VolumeType)
+	}
+
+	// Apply defaults
+	if opts.VolumeType == "" {
+		opts.VolumeType = aws.DefaultVolumeType
+	}
+	switch string(opts.VolumeType) {
+	case aws.EBSVolumeTypeGP2, aws.EBSVolumeTypeStandard:
+		if opts.IOPS != 0 {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: VolumeType %s does not allow IOPS configuration", plugin.Name(), opts.VolumeType)
+		}
+	case aws.EBSVolumeTypeIO1:
+		// AWS limitats are described here: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html#EBSVolumeTypes_piopshttp://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html#EBSVolumeTypes_piops
+		if opts.IOPS <= 0 {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: invalid IOPS value %d, must be positive integer", plugin.Name(), opts.IOPS)
+		}
+		if opts.IOPS > 20000 {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: invalid IOPS value %d, must be less than 20000", plugin.Name(), opts.IOPS)
+		}
+		requestBytes := options.Capacity.Value()
+		requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
+		if opts.IOPS/requestGB > 30 {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: too high IOPS value %d, AWS can handle only up to 30 IOPS/GiB", plugin.Name(), opts.IOPS)
+		}
+	default:
+		return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: unknown VolumeType %q", plugin.Name(), opts.VolumeType)
+	}
+	return opts, nil
+}
+
 func (plugin *awsElasticBlockStorePlugin) newProvisionerInternal(options volume.VolumeOptions, manager ebsManager) (volume.Provisioner, error) {
+	provOpts, err := plugin.parseProvisioningOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
 	return &awsElasticBlockStoreProvisioner{
 		awsElasticBlockStore: &awsElasticBlockStore{
 			manager: manager,
 			plugin:  plugin,
 		},
-		options: options,
+		options:             options,
+		provisioningOptions: provOpts,
 	}, nil
 }
 
@@ -402,11 +454,17 @@ func (d *awsElasticBlockStoreDeleter) Delete() error {
 
 type awsElasticBlockStoreProvisioner struct {
 	*awsElasticBlockStore
-	options   volume.VolumeOptions
-	namespace string
+	options             volume.VolumeOptions
+	namespace           string
+	provisioningOptions awsProvisioningOptions
 }
 
 var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
+
+type awsProvisioningOptions struct {
+	VolumeType string
+	IOPS       int64
+}
 
 func (c *awsElasticBlockStoreProvisioner) Provision(pv *api.PersistentVolume) error {
 	volumeID, sizeGB, err := c.manager.CreateVolume(c)

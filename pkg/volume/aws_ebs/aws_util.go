@@ -149,6 +149,14 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volum
 		Tags:       &tags,
 	}
 
+	// Apply c.provisioningOptions
+	if c.provisioningOptions.VolumeType != "" {
+		volumeOptions.VolumeType = c.provisioningOptions.VolumeType
+		if c.provisioningOptions.VolumeType == aws.EBSVolumeTypeIO1 {
+			volumeOptions.IOPS = c.provisioningOptions.IOPS
+		}
+	}
+
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating EBS Disk volume: %v", err)

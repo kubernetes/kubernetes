@@ -55,6 +55,10 @@ type VolumeOptions struct {
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
+	// ProvisioningOptions are additional options for the provisioner, e.g.
+	// to create a volume of certain QoS characteristics. These options are
+	// opaque to anything but appropriate provisioner plugin.
+	ProvisioningOptions string
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
