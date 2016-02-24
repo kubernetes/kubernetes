@@ -56,7 +56,7 @@ var upscaleForbiddenWindow = 3 * time.Minute
 
 func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(evtNamespacer.Events(""))
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	return &HorizontalController{
