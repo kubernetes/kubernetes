@@ -892,3 +892,89 @@ func TestOverlappingRCs(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkGetPodControllerMultiNS(b *testing.B) {
+	client := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)
+
+	const nsNum = 1000
+
+	pods := []api.Pod{}
+	for i := 0; i < nsNum; i++ {
+		ns := fmt.Sprintf("ns-%d", i)
+		for j := 0; j < 10; j++ {
+			rcName := fmt.Sprintf("rc-%d", j)
+			for k := 0; k < 10; k++ {
+				podName := fmt.Sprintf("pod-%d-%d", j, k)
+				pods = append(pods, api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      podName,
+						Namespace: ns,
+						Labels:    map[string]string{"rcName": rcName},
+					},
+				})
+			}
+		}
+	}
+
+	for i := 0; i < nsNum; i++ {
+		ns := fmt.Sprintf("ns-%d", i)
+		for j := 0; j < 10; j++ {
+			rcName := fmt.Sprintf("rc-%d", j)
+			manager.rcStore.Add(&api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: rcName, Namespace: ns},
+				Spec: api.ReplicationControllerSpec{
+					Selector: map[string]string{"rcName": rcName},
+				},
+			})
+		}
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for _, pod := range pods {
+			manager.getPodController(&pod)
+		}
+	}
+}
+
+func BenchmarkGetPodControllerSingleNS(b *testing.B) {
+	client := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)
+
+	const rcNum = 1000
+	const replicaNum = 3
+
+	pods := []api.Pod{}
+	for i := 0; i < rcNum; i++ {
+		rcName := fmt.Sprintf("rc-%d", i)
+		for j := 0; j < replicaNum; j++ {
+			podName := fmt.Sprintf("pod-%d-%d", i, j)
+			pods = append(pods, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      podName,
+					Namespace: "foo",
+					Labels:    map[string]string{"rcName": rcName},
+				},
+			})
+		}
+	}
+
+	for i := 0; i < rcNum; i++ {
+		rcName := fmt.Sprintf("rc-%d", i)
+		manager.rcStore.Add(&api.ReplicationController{
+			ObjectMeta: api.ObjectMeta{Name: rcName, Namespace: "foo"},
+			Spec: api.ReplicationControllerSpec{
+				Selector: map[string]string{"rcName": rcName},
+			},
+		})
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for _, pod := range pods {
+			manager.getPodController(&pod)
+		}
+	}
+}
