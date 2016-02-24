@@ -71,13 +71,10 @@ With Docker 1.10 its possible to share a slave mount namespace with the root nam
 # Configuration
 As of Kubernetes 1.2, the volume plugins expect that the VCS is installed on the host.  *Each plugin will have to opt-in to container usage* this may leave a undeseriable "out of the box" experience until the default is changed to opt-out. This design prsents a pattern which will be added to plugins independently.
 
-For greater flexibility each plugin will accept a CLI option to specify the container or host to mount.  If container not specified host is assumed.  If the default chnages to always user a container then the CLI arg will take 'host' as an additional option  Example:
+For greater flexibility each plugin will specify whether to support containerized or host based mount, or both.  If containerized mount is not specified, then host based mount is assumed.  If containerized mount is supported, the container images can either retrieved from ConfigMap like the following:
 
 --nfs_mount_container="k8/nfs_container:latest"
 
-or
-
---nfs_mount_container="host"
 
 # Container State #
 The volume plugin will manage the containers state if necesarry.  If a container must remain running while the mount is available, the container should ensure as such.  Once the volume is cleaned the container may be released.
@@ -86,6 +83,10 @@ The volume plugin will manage the containers state if necesarry.  If a container
 In many cases its as simple as creating a container with the entire VCS and executing the same mount command that would have been executed on host.  This allows a single mount command to work both on a host VCS or containerized VCS.
 
 With other scenarios it may be desirable to override the mount command, or continue running.  Each in-tree plugin should handle this on a case-by-case basis.
+
+# Limitation
+
+FUSE mount is not supported in the first pass. 
 
 # Design Alternatives
 
