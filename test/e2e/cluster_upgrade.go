@@ -160,7 +160,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		Logf("Version for %q is %q", testContext.UpgradeTarget, v)
 	})
 
-	f := NewFramework("cluster-upgrade")
+	f := NewDefaultFramework("cluster-upgrade")
 	var w *ServiceTestFixture
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")

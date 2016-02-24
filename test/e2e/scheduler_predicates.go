@@ -150,7 +150,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		}
 	})
 
-	framework := NewFramework("sched-pred")
+	framework := NewDefaultFramework("sched-pred")
 
 	BeforeEach(func() {
 		c = framework.Client

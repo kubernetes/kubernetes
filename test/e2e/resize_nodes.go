@@ -402,7 +402,7 @@ func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
 }
 
 var _ = Describe("Nodes [Disruptive]", func() {
-	framework := NewFramework("resize-nodes")
+	framework := NewDefaultFramework("resize-nodes")
 	var systemPodsNo int
 	var c *client.Client
 	var ns string

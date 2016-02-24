@@ -157,7 +157,7 @@ var _ = Describe("Pet Store [Feature:Example]", func() {
 
 	// The number of nodes dictates total number of generators/transaction expectations.
 	var nodeCount int
-	f := NewFramework("petstore")
+	f := NewDefaultFramework("petstore")
 
 	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestFinalTransactions, k8bpsSmokeTestTimeout), func() {
 		nodes := ListSchedulableNodesOrDie(f.Client)

@@ -37,7 +37,7 @@ import (
 )
 
 var _ = Describe("Deployment", func() {
-	f := NewFramework("deployment")
+	f := NewDefaultFramework("deployment")
 
 	It("deployment should create new pods", func() {
 		testNewDeployment(f)

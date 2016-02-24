@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("Networking", func() {
-	f := NewFramework("nettest")
+	f := NewDefaultFramework("nettest")
 
 	var svcname = "nettest"
 

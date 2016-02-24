@@ -29,7 +29,7 @@ import (
 
 var _ = Describe("Etcd failure [Disruptive]", func() {
 
-	framework := NewFramework("etcd-failure")
+	framework := NewDefaultFramework("etcd-failure")
 
 	BeforeEach(func() {
 		// This test requires:

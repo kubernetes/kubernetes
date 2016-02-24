@@ -37,7 +37,7 @@ var _ = Describe("Kubernetes Dashboard", func() {
 		serverStartTimeout = 1 * time.Minute
 	)
 
-	f := NewFramework(uiServiceName)
+	f := NewDefaultFramework(uiServiceName)
 
 	It("should check that the kubernetes-dashboard instance is alive", func() {
 		By("Checking whether the kubernetes-dashboard service exists.")

@@ -105,7 +105,7 @@ var (
 
 var _ = Describe("Kubectl client", func() {
 	defer GinkgoRecover()
-	framework := NewFramework("kubectl")
+	framework := NewDefaultFramework("kubectl")
 	var c *client.Client
 	var ns string
 	BeforeEach(func() {

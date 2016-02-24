@@ -35,7 +35,7 @@ const (
 )
 
 var _ = Describe("ResourceQuota", func() {
-	f := NewFramework("resourcequota")
+	f := NewDefaultFramework("resourcequota")
 
 	It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
 		By("Creating a ResourceQuota")
