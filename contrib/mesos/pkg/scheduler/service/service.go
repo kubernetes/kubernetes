@@ -495,6 +495,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	// running executors in a cluster.
 	execInfo.ExecutorId = executorinfo.NewID(execInfo)
 	execInfo.Data = data
+	log.V(1).Infof("started with executor id %v", execInfo.ExecutorId.GetValue())
 
 	return execInfo, nil
 }
