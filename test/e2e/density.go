@@ -135,9 +135,16 @@ var _ = Describe("Density", func() {
 	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		c = framework.Client
+		// Explicitly create a client with higher QPS limits.
+		// However, make those at most comparable to components.
+		config, err := loadConfig()
+		Expect(err).NotTo(HaveOccurred())
+		config.QPS = 20
+		config.Burst = 30
+		c, err = loadClientFromConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+
 		ns = framework.Namespace.Name
-		var err error
 
 		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
