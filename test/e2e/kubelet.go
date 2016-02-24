@@ -89,7 +89,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames sets.String, podNam
 var _ = Describe("kubelet", func() {
 	var numNodes int
 	var nodeNames sets.String
-	framework := NewFramework("kubelet")
+	framework := NewDefaultFramework("kubelet")
 	var resourceMonitor *resourceMonitor
 
 	BeforeEach(func() {

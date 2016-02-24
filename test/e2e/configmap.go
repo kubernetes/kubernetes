@@ -29,7 +29,7 @@ import (
 
 var _ = Describe("ConfigMap", func() {
 
-	f := NewFramework("configmap")
+	f := NewDefaultFramework("configmap")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
 		name := "configmap-test-volume-" + string(util.NewUUID())

@@ -64,17 +64,15 @@ var _ = Describe("Load capacity", func() {
 
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	framework := NewFramework("load")
+	options := FrameworkOptions{
+		clientQPS:   50,
+		clientBurst: 100,
+	}
+	framework := NewFramework("load", options)
 	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		// Explicitly create a client with higher QPS limits.
-		config, err := loadConfig()
-		Expect(err).NotTo(HaveOccurred())
-		config.QPS = 50
-		config.Burst = 100
-		c, err = loadClientFromConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		c = framework.Client
 
 		ns = framework.Namespace.Name
 		nodes := ListSchedulableNodesOrDie(c)
@@ -84,7 +82,7 @@ var _ = Describe("Load capacity", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = checkTestingNSDeletedExcept(c, ns)
+		err := checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))

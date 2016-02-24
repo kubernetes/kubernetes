@@ -111,7 +111,7 @@ func runPortForward(ns, podName string, port int) (*exec.Cmd, int) {
 }
 
 var _ = Describe("Port forwarding", func() {
-	framework := NewFramework("port-forwarding")
+	framework := NewDefaultFramework("port-forwarding")
 
 	Describe("With a server that expects a client request", func() {
 		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {

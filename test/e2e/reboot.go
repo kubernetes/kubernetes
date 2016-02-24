@@ -82,7 +82,7 @@ var _ = Describe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		}
 	})
 
-	f = NewFramework("reboot")
+	f = NewDefaultFramework("reboot")
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart

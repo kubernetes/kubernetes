@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("Monitoring", func() {
-	f := NewFramework("monitoring")
+	f := NewDefaultFramework("monitoring")
 
 	BeforeEach(func() {
 		SkipUnlessProviderIs("gce")

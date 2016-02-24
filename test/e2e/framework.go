@@ -65,6 +65,9 @@ type Framework struct {
 	// we install a cleanup action before each test and clear it after.  If we
 	// should abort, the AfterSuite hook should run all cleanup actions.
 	cleanupHandle CleanupActionHandle
+
+	// configuration for framework's client
+	options FrameworkOptions
 }
 
 type TestDataSummary interface {
@@ -72,12 +75,26 @@ type TestDataSummary interface {
 	PrintJSON() string
 }
 
+type FrameworkOptions struct {
+	clientQPS   float32
+	clientBurst int
+}
+
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
-func NewFramework(baseName string) *Framework {
+func NewDefaultFramework(baseName string) *Framework {
+	options := FrameworkOptions{
+		clientQPS:   5,
+		clientBurst: 10,
+	}
+	return NewFramework(baseName, options)
+}
+
+func NewFramework(baseName string, options FrameworkOptions) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
 		addonResourceConstraints: make(map[string]resourceConstraint),
+		options:                  options,
 	}
 
 	BeforeEach(f.beforeEach)
@@ -93,7 +110,11 @@ func (f *Framework) beforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.afterEach)
 
 	By("Creating a kubernetes client")
-	c, err := loadClient()
+	config, err := loadConfig()
+	Expect(err).NotTo(HaveOccurred())
+	config.QPS = f.options.clientQPS
+	config.Burst = f.options.clientBurst
+	c, err := loadClientFromConfig(config)
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Client = c

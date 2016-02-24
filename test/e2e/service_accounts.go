@@ -34,7 +34,7 @@ import (
 var serviceAccountTokenNamespaceVersion = version.MustParse("v1.2.0")
 
 var _ = Describe("ServiceAccounts", func() {
-	f := NewFramework("svcaccounts")
+	f := NewDefaultFramework("svcaccounts")
 
 	It("should ensure a single API token exists", func() {
 		// wait for the service account to reference a single secret

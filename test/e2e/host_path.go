@@ -32,7 +32,7 @@ import (
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
 var _ = Describe("hostPath", func() {
-	framework := NewFramework("hostpath")
+	framework := NewDefaultFramework("hostpath")
 	var c *client.Client
 	var namespace *api.Namespace
 

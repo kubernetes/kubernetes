@@ -40,7 +40,7 @@ const (
 )
 
 var _ = Describe("Job", func() {
-	f := NewFramework("job")
+	f := NewDefaultFramework("job")
 	parallelism := 2
 	completions := 4
 	lotsOfFailures := 5 // more than completions

@@ -27,7 +27,7 @@ import (
 )
 
 var _ = Describe("Kibana Logging Instances Is Alive", func() {
-	f := NewFramework("kibana-logging")
+	f := NewDefaultFramework("kibana-logging")
 
 	BeforeEach(func() {
 		// TODO: For now assume we are only testing cluster logging with Elasticsearch

@@ -353,7 +353,7 @@ func deleteCinderVolume(name string) error {
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
 var _ = Describe("Volumes [Feature:Volumes]", func() {
-	framework := NewFramework("volume")
+	framework := NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag

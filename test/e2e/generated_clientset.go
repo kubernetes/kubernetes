@@ -33,7 +33,7 @@ import (
 )
 
 var _ = Describe("Generated release_1_2 clientset", func() {
-	framework := NewFramework("clientset")
+	framework := NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
 		podClient := framework.Clientset_1_2.Core().Pods(framework.Namespace.Name)
 		By("creating the pod")

@@ -179,7 +179,7 @@ func verifyCPULimits(expected containersCPUSummary, actual nodesCPUSummary) {
 // Slow by design (1 hour)
 var _ = Describe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
-	framework := NewFramework("kubelet-perf")
+	framework := NewDefaultFramework("kubelet-perf")
 	var rm *resourceMonitor
 
 	BeforeEach(func() {

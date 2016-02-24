@@ -31,7 +31,7 @@ import (
 )
 
 var _ = Describe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
-	f := NewFramework("es-logging")
+	f := NewDefaultFramework("es-logging")
 
 	BeforeEach(func() {
 		// TODO: For now assume we are only testing cluster logging with Elasticsearch
