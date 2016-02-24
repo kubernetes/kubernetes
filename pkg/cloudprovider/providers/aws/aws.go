@@ -1655,7 +1655,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 	_, err = s.ec2.AuthorizeSecurityGroupIngress(request)
 	if err != nil {
 		glog.Warning("Error authorizing security group ingress", err)
-		return false, err
+		return false, fmt.Errorf("error authorizing security group ingress: %v", err)
 	}
 
 	return true, nil
