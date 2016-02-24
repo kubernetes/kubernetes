@@ -441,10 +441,10 @@ const (
 
 // Represents a Persistent Disk resource in Google Compute Engine.
 //
-// A GCE PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same GCE project and zone as the kubelet.
-// A GCE PD can only be mounted as read/write once.
-// GCE PDs support ownership management and SELinux relabeling.
+// A GCE PD must exist before mounting to a container. The disk must
+// also be in the same GCE project and zone as the kubelet. A GCE PD
+// can only be mounted as read/write once or read-only many times. GCE
+// PDs support ownership management and SELinux relabeling.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName"`
@@ -523,10 +523,10 @@ type FlexVolumeSource struct {
 
 // Represents a Persistent Disk resource in AWS.
 //
-// An AWS EBS disk must exist and be formatted before mounting to a container.
-// The disk must also be in the same AWS zone as the kubelet.
-// A AWS EBS disk can only be mounted as read/write once.
-// AWS EBS volumes support ownership management and SELinux relabeling.
+// An AWS EBS disk must exist before mounting to a container. The disk
+// must also be in the same AWS zone as the kubelet. A AWS EBS disk
+// can only be mounted as read/write once. AWS EBS volumes support
+// ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the persistent disk resource. Used to identify the disk in AWS
 	VolumeID string `json:"volumeID"`
@@ -623,10 +623,10 @@ type RBDVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// Represents a cinder volume resource in Openstack.
-// A Cinder volume must exist and be formatted before mounting to a container.
-// The volume must also be in the same region as the kubelet.
-// Cinder volumes support ownership management and SELinux relabeling.
+// Represents a cinder volume resource in Openstack. A Cinder volume
+// must exist before mounting to a container. The volume must also be
+// in the same region as the kubelet. Cinder volumes support ownership
+// management and SELinux relabeling.
 type CinderVolumeSource struct {
 	// Unique id of the volume used to identify the cinder volume
 	VolumeID string `json:"volumeID"`
