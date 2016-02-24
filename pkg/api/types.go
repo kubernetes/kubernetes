@@ -1526,8 +1526,10 @@ type ServicePort struct {
 
 	// Optional: The target port on pods selected by this service.  If this
 	// is a string, it will be looked up as a named port in the target
-	// Pod's container ports.  If this is not specified, the default value
-	// is the sames as the Port field (an identity map).
+	// Pod's container ports.  If this is not specified, the value
+	// of the 'port' field is used (an identity map).
+	// This field is ignored for services with clusterIP=None, and should be
+	// omitted or set equal to the 'port' field.
 	TargetPort intstr.IntOrString `json:"targetPort"`
 
 	// The port on each node on which this service is exposed.

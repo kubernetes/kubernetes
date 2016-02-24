@@ -5513,7 +5513,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">targetPort</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod&#8217;s container ports. If this is not specified, the value of Port is used (an identity map). Defaults to the service port. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service">http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod&#8217;s container ports. If this is not specified, the value of the <em>port</em> field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the <em>port</em> field. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service">http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>

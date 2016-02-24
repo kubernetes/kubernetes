@@ -2620,22 +2620,28 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid port headless",
+			name: "invalid port headless 1",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromInt(11721)
 				s.Spec.ClusterIP = api.ClusterIPNone
 			},
-			numErrs: 1,
+			// in the v1 API, targetPorts on headless services were tolerated.
+			// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
+			// numErrs: 1,
+			numErrs: 0,
 		},
 		{
-			name: "invalid port headless",
+			name: "invalid port headless 2",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromString("target")
 				s.Spec.ClusterIP = api.ClusterIPNone
 			},
-			numErrs: 1,
+			// in the v1 API, targetPorts on headless services were tolerated.
+			// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
+			// numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "invalid publicIPs localhost",
