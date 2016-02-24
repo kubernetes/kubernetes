@@ -18,10 +18,7 @@ package cinder
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -42,7 +39,11 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath stri
 	if err != nil {
 		return err
 	}
-	diskid, err := cloud.AttachDisk(b.pdName)
+	instanceid, err := cloud.InstanceID()
+	if err != nil {
+		return err
+	}
+	diskid, err := cloud.AttachDisk(instanceid, b.pdName)
 	if err != nil {
 		return err
 	}
@@ -50,8 +51,7 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath stri
 	var devicePath string
 	numTries := 0
 	for {
-		devicePath = makeDevicePath(diskid)
-		// probe the attached vol so that symlink in /dev/disk/by-id is created
+		devicePath = cloud.GetDevicePath(diskid)
 		probeAttachedVolume()
 
 		_, err := os.Stat(devicePath)
@@ -89,21 +89,6 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath stri
 	return nil
 }
 
-func makeDevicePath(diskid string) string {
-	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
-	for _, f := range files {
-		if strings.Contains(f.Name(), "virtio-") {
-			devid_prefix := f.Name()[len("virtio-"):len(f.Name())]
-			if strings.Contains(diskid, devid_prefix) {
-				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
-				return path.Join("/dev/disk/by-id/", f.Name())
-			}
-		}
-	}
-	glog.Warningf("Failed to find device for the diskid: %q\n", diskid)
-	return ""
-}
-
 // Unmounts the device and detaches the disk from the kubelet's host machine.
 func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	globalPDPath := makeGlobalPDName(cd.plugin.host, cd.pdName)
@@ -119,8 +104,11 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	if err != nil {
 		return err
 	}
-
-	if err = cloud.DetachDisk(cd.pdName); err != nil {
+	instanceid, err := cloud.InstanceID()
+	if err != nil {
+		return err
+	}
+	if err = cloud.DetachDisk(instanceid, cd.pdName); err != nil {
 		return err
 	}
 	glog.V(2).Infof("Successfully detached cinder volume %s", cd.pdName)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
@@ -37,6 +38,15 @@ import (
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cinderPlugin{}}
+}
+
+type CinderProvider interface {
+	AttachDisk(instanceID string, diskName string) (string, error)
+	DetachDisk(instanceID string, partialDiskId string) error
+	DeleteVolume(volumeName string) error
+	CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error)
+	GetDevicePath(diskId string) string
+	InstanceID() (string, error)
 }
 
 type cinderPlugin struct {
@@ -153,18 +163,21 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
-func (plugin *cinderPlugin) getCloudProvider() (*openstack.OpenStack, error) {
+func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 	cloud := plugin.host.GetCloudProvider()
 	if cloud == nil {
 		glog.Errorf("Cloud provider not initialized properly")
 		return nil, errors.New("Cloud provider not initialized properly")
 	}
 
-	os := cloud.(*openstack.OpenStack)
-	if os == nil {
-		return nil, errors.New("Invalid cloud provider: expected OpenStack")
+	switch cloud := cloud.(type) {
+	case *rackspace.Rackspace:
+		return cloud, nil
+	case *openstack.OpenStack:
+		return cloud, nil
+	default:
+		return nil, errors.New("Invalid cloud provider: expected OpenStack or Rackspace.")
 	}
-	return os, nil
 }
 
 // Abstract interface to PD operations.
