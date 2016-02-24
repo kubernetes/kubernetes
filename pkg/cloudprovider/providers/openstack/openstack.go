@@ -685,6 +685,15 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
+	sourceRanges, err := cloudprovider.GetSourceRangeAnnotations(annotations)
+	if err != nil {
+		return nil, err
+	}
+
+	if !cloudprovider.IsAllowAll(sourceRanges) {
+		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
+	}
+
 	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", name)
 	_, exists, err := lb.GetLoadBalancer(name, region)
 	if err != nil {
