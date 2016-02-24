@@ -96,6 +96,12 @@ type APIGroupVersion struct {
 	Context api.RequestContextMapper
 
 	MinRequestTimeout time.Duration
+
+	// SubresourceGroupVersionKind contains the GroupVersionKind overrides for each subresource that is
+	// accessible from this API group version. The GroupVersionKind is that of the external version of
+	// the subresource. The key of this map should be the path of the subresource. The keys here should
+	// match the keys in the Storage map above for subresources.
+	SubresourceGroupVersionKind map[string]unversioned.GroupVersionKind
 }
 
 type ProxyDialerFunc func(network, addr string) (net.Conn, error)
