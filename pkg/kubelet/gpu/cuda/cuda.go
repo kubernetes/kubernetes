@@ -120,12 +120,9 @@ func (cuda *Cuda) FreeGPU(PodUID types.UID, container *api.Container) error {
 
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
-	delete(cuda.gpuInfo.GPUStatus, containerHash)
 
-	// double check whether free it or not
-	_, found := cuda.gpuInfo.GPUStatus[containerHash]
-	if found {
-		glog.Errorf("Failed to free GPU for the container(%s) of pod(%s). Reason: internal error", container.Name, string(PodUID))
+	if cuda.gpuInfo.GPUStatus != nil {
+		delete(cuda.gpuInfo.GPUStatus, containerHash)
 	}
 
 	return nil

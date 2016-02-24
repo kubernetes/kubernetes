@@ -703,7 +703,7 @@ func (dm *DockerManager) runContainer(
 
 		// add device options when launch container
 		devOpts, err := dm.gpuPlugins[0].GenerateDeviceOpts(gpuIdxes)
-		if err != nil {
+		if err != nil && container != nil {
 			dm.gpuPlugins[0].FreeGPU(pod.UID, container)
 			dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 			return kubecontainer.ContainerID{}, err
@@ -1470,11 +1470,13 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		return nil
 	}
 
-	glog.V(2).Infof("Hans: killContainer(): invoke FreeGPU()")
-	// free gpu resource for the container
-	if gpuRequest := int(container.Resources.Requests.Gpu().MilliValue()); gpuRequest > 0 {
-		if err := dm.gpuPlugins[0].FreeGPU(pod.UID, container); err != nil {
-			glog.Warningf("Failed to free the gpu resource(%s)", err)
+	if container != nil {
+		glog.V(2).Infof("Hans: killContainer(): invoke FreeGPU()")
+		// free gpu resource for the container
+		if gpuRequest := int(container.Resources.Requests.Gpu().MilliValue()); gpuRequest > 0 {
+			if err := dm.gpuPlugins[0].FreeGPU(pod.UID, container); err != nil {
+				glog.Warningf("Failed to free the gpu resource(%s)", err)
+			}
 		}
 	}
 
