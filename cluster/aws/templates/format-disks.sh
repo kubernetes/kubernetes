@@ -190,6 +190,9 @@ else
 fi
 
 if [[ -n "${move_docker}" ]]; then
+  # Stop docker if it is running, so we can move its files
+  systemctl stop docker || true
+
   # Move docker to e.g. /mnt
   # but only if it is a directory, not a symlink left over from a previous run
   if [[ -d /var/lib/docker ]]; then
