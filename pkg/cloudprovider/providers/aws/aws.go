@@ -1948,7 +1948,7 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
-func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations cloudprovider.ServiceAnnotation) (*api.LoadBalancerStatus, error) {
+func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts, serviceName, annotations)
 
 	if region != s.region {
@@ -1979,6 +1979,11 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
+	sourceRanges, err := cloudprovider.GetSourceRangeAnnotations(annotations)
+	if err != nil {
+		return nil, err
+	}
+
 	vpcId, err := s.findVPCID()
 	if err != nil {
 		glog.Error("Error finding VPC", err)
@@ -2003,16 +2008,20 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 			return nil, err
 		}
 
+		ec2SourceRanges := []*ec2.IpRange{}
+		for _, sourceRange := range sourceRanges.StringSlice() {
+			ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
+		}
+
 		permissions := []*ec2.IpPermission{}
 		for _, port := range ports {
 			portInt64 := int64(port.Port)
 			protocol := strings.ToLower(string(port.Protocol))
-			sourceIp := "0.0.0.0/0"
 
 			permission := &ec2.IpPermission{}
 			permission.FromPort = &portInt64
 			permission.ToPort = &portInt64
-			permission.IpRanges = []*ec2.IpRange{{CidrIp: &sourceIp}}
+			permission.IpRanges = ec2SourceRanges
 			permission.IpProtocol = &protocol
 
 			permissions = append(permissions, permission)
