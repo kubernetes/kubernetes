@@ -66,6 +66,7 @@ type testCase struct {
 	reportedCPURequests []resource.Quantity
 	cmTarget            *extensions.CustomMetricTargetList
 	scaleUpdated        bool
+	statusUpdated       bool
 	eventCreated        bool
 	verifyEvents        bool
 }
@@ -77,6 +78,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	podNamePrefix := "test-pod"
 
 	tc.scaleUpdated = false
+	tc.statusUpdated = false
 	tc.eventCreated = false
 
 	fakeClient := &fake.Clientset{}
@@ -97,6 +99,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 						MinReplicas: &tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
+					},
+					Status: extensions.HorizontalPodAutoscalerStatus{
+						CurrentReplicas: tc.initialReplicas,
+						DesiredReplicas: tc.initialReplicas,
 					},
 				},
 			},
@@ -191,6 +197,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
+		tc.statusUpdated = true
 		return true, obj, nil
 	})
 
@@ -209,6 +216,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 func (tc *testCase) verifyResults(t *testing.T) {
 	assert.Equal(t, tc.initialReplicas != tc.desiredReplicas, tc.scaleUpdated)
+	assert.True(t, tc.statusUpdated)
 	if tc.verifyEvents {
 		assert.Equal(t, tc.initialReplicas != tc.desiredReplicas, tc.eventCreated)
 	}
