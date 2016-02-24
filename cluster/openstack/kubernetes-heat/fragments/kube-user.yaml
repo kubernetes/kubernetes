@@ -1,0 +1,10 @@
+#cloud-config
+system_info:
+  default_user:
+    name: minion
+    lock_passwd: true
+    gecos: Kubernetes Interactive User
+    groups: [wheel, adm, systemd-journal]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+

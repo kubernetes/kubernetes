@@ -1,0 +1,11 @@
+#cloud-config
+merge_how: dict(recurse_array)+list(append)
+write_files:
+  - path: /etc/sysconfig/heat-params
+    owner: "root:root"
+    permissions: "0644"
+    content: |
+      KUBERNETES_SERVER_URL="$KUBERNETES_SERVER_URL"
+      KUBERNETES_SALT_URL="$KUBERNETES_SALT_URL"
+      MASTER_IP=$MASTER_IP
+      CONTAINER_SUBNET=10.246.0.0/16
