@@ -67,6 +67,11 @@ func (l IPNetSet) Equal(r IPNetSet) bool {
 	return true
 }
 
+// Len returns the size of the set.
+func (s IPNetSet) Len() int {
+	return len(s)
+}
+
 // GetSourceRangeAnnotations verifies and parses the LBAnnotationAllowSourceRange annotation from a service,
 // extracting the source ranges to allow, and if not present returns a default (allow-all) value.
 func GetSourceRangeAnnotations(annotation map[string]string) (IPNetSet, error) {
@@ -81,4 +86,14 @@ func GetSourceRangeAnnotations(annotation map[string]string) (IPNetSet, error) {
 		return nil, fmt.Errorf("Service annotation %s:%s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", LBAnnotationAllowSourceRange, val)
 	}
 	return ipnets, nil
+}
+
+// IsAllowAll checks whether the IPNetSet contains the default allow-all policy
+func IsAllowAll(ipnets IPNetSet) bool {
+	for _, s := range ipnets.StringSlice() {
+		if s == "0.0.0.0/0" {
+			return true
+		}
+	}
+	return false
 }
