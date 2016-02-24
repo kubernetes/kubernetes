@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1828,8 +1829,13 @@ func dumpAllNamespaceInfo(c *client.Client, namespace string) {
 	events, err := c.Events(namespace).List(api.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	for _, e := range events.Items {
-		Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+	// Sort events by their first timestamp
+	sortedEvents := events.Items
+	if len(sortedEvents) > 1 {
+		sort.Sort(byFirstTimestamp(sortedEvents))
+	}
+	for _, e := range sortedEvents {
+		Logf("At %v - event for %v: %v %v: %v", e.FirstTimestamp, e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 	}
 	// Note that we don't wait for any cleanup to propagate, which means
 	// that if you delete a bunch of pods right before ending your test,
@@ -1838,6 +1844,19 @@ func dumpAllNamespaceInfo(c *client.Client, namespace string) {
 	dumpAllPodInfo(c)
 
 	dumpAllNodeInfo(c)
+}
+
+// byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
+type byFirstTimestamp []api.Event
+
+func (o byFirstTimestamp) Len() int      { return len(o) }
+func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o byFirstTimestamp) Less(i, j int) bool {
+	if o[i].FirstTimestamp.Equal(o[j].FirstTimestamp) {
+		return o[i].InvolvedObject.Name < o[j].InvolvedObject.Name
+	}
+	return o[i].FirstTimestamp.Before(o[j].FirstTimestamp)
 }
 
 func dumpAllPodInfo(c *client.Client) {
