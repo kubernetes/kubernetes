@@ -1305,6 +1305,41 @@ func TestPrintDeployment(t *testing.T) {
 	}
 }
 
+func TestPrintDaemonSet(t *testing.T) {
+	tests := []struct {
+		ds         extensions.DaemonSet
+		startsWith string
+	}{
+		{
+			extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.DaemonSetSpec{
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 2,
+					DesiredNumberScheduled: 3,
+				},
+			},
+			"test1\t3\t2\t<none>\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printDaemonSet(&test.ds, buf, PrintOptions{false, false, false, false, false, false, []string{}})
+		if !strings.HasPrefix(buf.String(), test.startsWith) {
+			t.Fatalf("Expected to start with %s but got %s", test.startsWith, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
 func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
 		pod        api.Pod

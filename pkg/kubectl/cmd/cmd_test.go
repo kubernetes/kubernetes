@@ -357,14 +357,17 @@ func ExamplePrintReplicationControllerWithNamespace() {
 				},
 			},
 		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   NAME      REPLICAS   AGE
-	// beep        foo       1          10y
+	// NAMESPACE   NAME      DESIRED   CURRENT   AGE
+	// beep        foo       1         1         10y
 }
 
 func ExamplePrintReplicationControllerWithWide() {
@@ -398,14 +401,17 @@ func ExamplePrintReplicationControllerWithWide() {
 				},
 			},
 		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      REPLICAS   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
-	// foo       1          10y       foo            someimage   foo=bar
+	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
+	// foo       1         1         10y       foo            someimage   foo=bar
 }
 
 func ExamplePrintPodWithWideFormat() {
