@@ -328,6 +328,9 @@ type RollingUpdateDeployment struct {
 
 // DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
+	// The generation observed by the deployment controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
 	Replicas int32 `json:"replicas,omitempty"`
 

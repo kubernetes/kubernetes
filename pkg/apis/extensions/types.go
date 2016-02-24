@@ -332,6 +332,9 @@ type RollingUpdateDeployment struct {
 }
 
 type DeploymentStatus struct {
+	// The generation observed by the deployment controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
 	Replicas int `json:"replicas,omitempty"`
 
