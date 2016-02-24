@@ -87,6 +87,7 @@ kube::golang::test_targets() {
     examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
+    test/e2e_node/e2e_node.test
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
