@@ -194,6 +194,8 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false"
   ./test/kubemark/stop-kubemark.sh
+  # Run empty test of tests that would trigger storing logs from base cluster.
+  go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
   unset RUN_FROM_DISTRO
