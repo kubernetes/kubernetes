@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
@@ -41,7 +42,7 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 	}
 
 	fakeClient := &Fake{}
-	fakeClient.AddReactor("*", "*", ObjectReaction(o, api.RESTMapper))
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, registered.RESTMapper()))
 
 	fakeClient.AddWatchReactor("*", DefaultWatchReactor(watch.NewFake(), nil))
 
