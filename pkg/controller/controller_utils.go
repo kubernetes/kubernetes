@@ -35,21 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-const (
-	CreatedByAnnotation = "kubernetes.io/created-by"
-
-	// If a watch drops a delete event for a pod, it'll take this long
-	// before a dormant controller waiting for those packets is woken up anyway. It is
-	// specifically targeted at the case where some problem prevents an update
-	// of expectations, without it the controller could stay asleep forever. This should
-	// be set based on the expected latency of watch events.
-	//
-	// Currently a controller can service (create *and* observe the watch events for said
-	// creation) about 10-20 pods a second, so it takes about 1 min to service
-	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
-	// latency/pod at the scale of 3000 pods over 100 nodes.
-	ExpectationsTimeout = 3 * time.Minute
-)
+const CreatedByAnnotation = "kubernetes.io/created-by"
 
 var (
 	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
@@ -221,7 +207,7 @@ func (e *ControlleeExpectations) GetExpectations() (int64, int64) {
 
 // NewControllerExpectations returns a store for ControlleeExpectations.
 func NewControllerExpectations() *ControllerExpectations {
-	return &ControllerExpectations{cache.NewTTLStore(ExpKeyFunc, ExpectationsTimeout)}
+	return &ControllerExpectations{cache.NewStore(ExpKeyFunc)}
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods
