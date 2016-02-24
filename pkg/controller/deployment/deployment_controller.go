@@ -577,13 +577,13 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 }
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
-func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) error {
-	totalReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRSs, newRS, deployment)
+func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d extensions.Deployment) error {
+	totalReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRSs, newRS, d)
 	if err != nil {
 		return err
 	}
-	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas || deployment.Status.AvailableReplicas != availableReplicas {
-		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+	if d.Generation > d.Status.ObservedGeneration || d.Status.Replicas != totalReplicas || d.Status.UpdatedReplicas != updatedReplicas || d.Status.AvailableReplicas != availableReplicas {
+		return dc.updateDeploymentStatus(allRSs, newRS, d)
 	}
 	return nil
 }
@@ -1036,6 +1036,8 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	newDeployment := deployment
 	// TODO: Reconcile this with API definition. API definition talks about ready pods, while this just computes created pods.
 	newDeployment.Status = extensions.DeploymentStatus{
+		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
+		ObservedGeneration:  deployment.Generation,
 		Replicas:            totalReplicas,
 		UpdatedReplicas:     updatedReplicas,
 		AvailableReplicas:   availableReplicas,

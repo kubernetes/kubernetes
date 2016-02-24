@@ -951,7 +951,7 @@
      "generation": {
       "type": "integer",
       "format": "int64",
-      "description": "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only."
+      "description": "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only."
      },
      "creationTimestamp": {
       "type": "string",

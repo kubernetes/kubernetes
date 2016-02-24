@@ -5298,7 +5298,7 @@
      "generation": {
       "type": "integer",
       "format": "int64",
-      "description": "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only."
+      "description": "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only."
      },
      "creationTimestamp": {
       "type": "string",
@@ -6853,6 +6853,11 @@
     "id": "v1beta1.DeploymentStatus",
     "description": "DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The generation observed by the deployment controller."
+     },
      "replicas": {
       "type": "integer",
       "format": "int32",
