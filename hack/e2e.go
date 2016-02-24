@@ -19,10 +19,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -35,7 +32,6 @@ import (
 var (
 	isup             = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
 	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
-	version          = flag.String("version", "", "The version to be tested (including the leading 'v'). An empty string defaults to the local build, but it can be set to any release (e.g. v0.4.4, v0.6.0).")
 	up               = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
@@ -53,18 +49,7 @@ var (
 )
 
 const (
-	serverTarName   = "kubernetes-server-linux-amd64.tar.gz"
-	saltTarName     = "kubernetes-salt.tar.gz"
-	downloadDirName = "_output/downloads"
-	tarDirName      = "server"
-	tempDirName     = "upgrade-e2e-temp-dir"
-	minNodeCount    = 2
-)
-
-var (
-	// Root directory of the specified cluster version, rather than of where
-	// this script is being run from.
-	versionRoot = *root
+	minNodeCount = 2
 )
 
 func absOrDie(path string) string {
@@ -107,21 +92,7 @@ func main() {
 		}
 	}
 
-	if *version != "" {
-		// If the desired version isn't available already, do whatever's needed
-		// to make it available. Once done, update the root directory for client
-		// tools to be the root of the release directory so that the given
-		// release's tools will be used. We can't use this new root for
-		// everything because it likely doesn't have the hack/ directory in it.
-		if newVersionRoot, err := PrepareVersion(*version); err != nil {
-			log.Fatalf("Error preparing a binary of version %s: %s. Aborting.", *version, err)
-		} else {
-			versionRoot = newVersionRoot
-			os.Setenv("KUBE_VERSION_ROOT", newVersionRoot)
-		}
-	}
-
-	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
+	os.Setenv("KUBECTL", *root+`/cluster/kubectl.sh`+kubectlArgs())
 	os.Setenv("KUBE_TEST_DEBUG", "y")
 
 	if *pushup {
@@ -150,7 +121,7 @@ func main() {
 	case *ctlCmd != "":
 		ctlArgs := strings.Fields(*ctlCmd)
 		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
+		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(*root, "cluster/kubectl.sh"), ctlArgs...))
 	case *test:
 		success = Test()
 	}
@@ -204,54 +175,6 @@ func ValidateClusterSize() {
 // Is the e2e cluster up?
 func IsUp() bool {
 	return finishRunning("get status", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-status.sh")))
-}
-
-// PrepareVersion makes sure that the specified release version is locally
-// available and ready to be used by kube-up or kube-push. Returns the director
-// path of the release.
-func PrepareVersion(version string) (string, error) {
-	if version == "" {
-		// Assume that the build flag already handled building a local binary.
-		return *root, nil
-	}
-
-	// If the version isn't a local build, try fetching the release from Google
-	// Cloud Storage.
-	downloadDir := filepath.Join(*root, downloadDirName)
-	if err := os.MkdirAll(downloadDir, 0755); err != nil {
-		return "", err
-	}
-	localReleaseDir := filepath.Join(downloadDir, version)
-	if err := os.MkdirAll(localReleaseDir, 0755); err != nil {
-		return "", err
-	}
-
-	remoteReleaseTar := fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/release/%s/kubernetes.tar.gz", version)
-	localReleaseTar := filepath.Join(downloadDir, fmt.Sprintf("kubernetes-%s.tar.gz", version))
-	if _, err := os.Stat(localReleaseTar); os.IsNotExist(err) {
-		out, err := os.Create(localReleaseTar)
-		if err != nil {
-			return "", err
-		}
-		resp, err := http.Get(remoteReleaseTar)
-		if err != nil {
-			out.Close()
-			return "", err
-		}
-		defer resp.Body.Close()
-		io.Copy(out, resp.Body)
-		if err != nil {
-			out.Close()
-			return "", err
-		}
-		out.Close()
-	}
-	if !finishRunning("untarRelease", exec.Command("tar", "-C", localReleaseDir, "-zxf", localReleaseTar, "--strip-components=1")) {
-		log.Fatal("Failed to untar release. Aborting.")
-	}
-	// Now that we have the binaries saved locally, use the path to the untarred
-	// directory as the "root" path for future operations.
-	return localReleaseDir, nil
 }
 
 func Test() bool {
