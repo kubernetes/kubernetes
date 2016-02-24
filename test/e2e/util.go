@@ -264,6 +264,8 @@ type RCConfig struct {
 	// Maximum allowable container failures. If exceeded, RunRC returns an error.
 	// Defaults to replicas*0.1 if unspecified.
 	MaxContainerFailures *int
+	ReadinessProbe       *api.Probe
+	LivenessProbe        *api.Probe
 }
 
 type DeploymentConfig struct {
@@ -1633,10 +1635,12 @@ func (config *RCConfig) create() error {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
-							Ports:   []api.ContainerPort{{ContainerPort: 80}},
+							Name:           config.Name,
+							Image:          config.Image,
+							Command:        config.Command,
+							Ports:          []api.ContainerPort{{ContainerPort: 80}},
+							ReadinessProbe: config.ReadinessProbe,
+							LivenessProbe:  config.LivenessProbe,
 						},
 					},
 					DNSPolicy: api.DNSDefault,

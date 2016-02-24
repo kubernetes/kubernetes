@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	. "github.com/onsi/ginkgo"
@@ -40,8 +41,9 @@ const (
 )
 
 type resourceTest struct {
-	podsPerNode int
-	limits      containersCPUSummary
+	podsPerNode          int
+	limits               containersCPUSummary
+	probePeriodInSeconds int
 }
 
 func logPodsOnNodes(c *client.Client, nodeNames []string) {
@@ -55,20 +57,10 @@ func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	}
 }
 
-func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, rm *resourceMonitor, expected map[string]map[float64]float64) {
-	numNodes := nodeNames.Len()
-	totalPods := podsPerNode * numNodes
-	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID()))
-
-	// TODO: Use a more realistic workload
-	Expect(RunRC(RCConfig{
-		Client:    framework.Client,
-		Name:      rcName,
-		Namespace: framework.Namespace.Name,
-		Image:     "gcr.io/google_containers/pause:2.0",
-		Replicas:  totalPods,
-	})).NotTo(HaveOccurred())
+func runResourceTrackingTest(framework *Framework, rcConfig *RCConfig, nodeNames sets.String, rm *resourceMonitor, expected map[string]map[float64]float64) {
+	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", rcConfig.Replicas))
+	rcName := rcConfig.Name
+	Expect(RunRC(*rcConfig)).NotTo(HaveOccurred())
 
 	// Log once and flush the stats.
 	rm.LogLatest()
@@ -226,7 +218,55 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			name := fmt.Sprintf(
 				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, itArg.limits)
+				numNodes := nodeNames.Len()
+				totalPods := podsPerNode * numNodes
+				rcConfig := &RCConfig{
+					Client:    framework.Client,
+					Name:      fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID())),
+					Namespace: framework.Namespace.Name,
+					Image:     "gcr.io/google_containers/pause:2.0",
+					Replicas:  totalPods,
+				}
+				runResourceTrackingTest(framework, rcConfig, nodeNames, rm, itArg.limits)
+			})
+		}
+	})
+	Describe("stressed resource usage tracking", func() {
+		rTests := []resourceTest{
+			{
+				podsPerNode:          35,
+				probePeriodInSeconds: 1,
+				limits:               nil,
+			},
+		}
+		for _, testArg := range rTests {
+			itArg := testArg
+			podsPerNode := itArg.podsPerNode
+			name := fmt.Sprintf(
+				"for %d pods per node over %v", podsPerNode, monitoringTime)
+			It(name, func() {
+				numNodes := nodeNames.Len()
+				totalPods := podsPerNode * numNodes
+				probe := &api.Probe{
+					Handler: api.Handler{
+						HTTPGet: &api.HTTPGetAction{
+							Port: intstr.FromInt(80),
+							Path: "/",
+						},
+					},
+					PeriodSeconds: itArg.probePeriodInSeconds,
+				}
+
+				rcConfig := &RCConfig{
+					Client:         framework.Client,
+					Name:           fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID())),
+					Namespace:      framework.Namespace.Name,
+					Image:          "gcr.io/google_containers/test-webserver",
+					Replicas:       totalPods,
+					ReadinessProbe: probe,
+					LivenessProbe:  probe,
+				}
+				runResourceTrackingTest(framework, rcConfig, nodeNames, rm, itArg.limits)
 			})
 		}
 	})
@@ -237,7 +277,16 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			name := fmt.Sprintf(
 				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, nil)
+				numNodes := nodeNames.Len()
+				totalPods := podsPerNode * numNodes
+				rcConfig := &RCConfig{
+					Client:    framework.Client,
+					Name:      fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID())),
+					Namespace: framework.Namespace.Name,
+					Image:     "gcr.io/google_containers/pause:2.0",
+					Replicas:  totalPods,
+				}
+				runResourceTrackingTest(framework, rcConfig, nodeNames, rm, nil)
 			})
 		}
 	})
