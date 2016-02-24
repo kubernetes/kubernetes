@@ -578,11 +578,11 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
 func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d extensions.Deployment) error {
-	totalReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRSs, newRS, d)
+	totalActualReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRSs, newRS, d)
 	if err != nil {
 		return err
 	}
-	if d.Generation > d.Status.ObservedGeneration || d.Status.Replicas != totalReplicas || d.Status.UpdatedReplicas != updatedReplicas || d.Status.AvailableReplicas != availableReplicas {
+	if d.Generation > d.Status.ObservedGeneration || d.Status.Replicas != totalActualReplicas || d.Status.UpdatedReplicas != updatedReplicas || d.Status.AvailableReplicas != availableReplicas {
 		return dc.updateDeploymentStatus(allRSs, newRS, d)
 	}
 	return nil
@@ -1029,7 +1029,7 @@ func (dc *DeploymentController) cleanupOldReplicaSets(oldRSs []*extensions.Repli
 }
 
 func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) error {
-	totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas, err := dc.calculateStatus(allRSs, newRS, deployment)
+	totalActualReplicas, updatedReplicas, availableReplicas, unavailableReplicas, err := dc.calculateStatus(allRSs, newRS, deployment)
 	if err != nil {
 		return err
 	}
@@ -1038,7 +1038,7 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	newDeployment.Status = extensions.DeploymentStatus{
 		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
 		ObservedGeneration:  deployment.Generation,
-		Replicas:            totalReplicas,
+		Replicas:            totalActualReplicas,
 		UpdatedReplicas:     updatedReplicas,
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
@@ -1047,8 +1047,8 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	return err
 }
 
-func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) (totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
-	totalReplicas = deploymentutil.GetActualReplicaCountForReplicaSets(allRSs)
+func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) (totalActualReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
+	totalActualReplicas = deploymentutil.GetActualReplicaCountForReplicaSets(allRSs)
 	updatedReplicas = deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS})
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	availableReplicas, err = deploymentutil.GetAvailablePodsForReplicaSets(dc.client, allRSs, minReadySeconds)
@@ -1056,6 +1056,7 @@ func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet,
 		err = fmt.Errorf("failed to count available pods: %v", err)
 		return
 	}
+	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	unavailableReplicas = totalReplicas - availableReplicas
 	return
 }

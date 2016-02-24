@@ -377,7 +377,7 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
 }
 
 func GetPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.ReplicaSet) ([]api.Pod, error) {
-	allPods := []api.Pod{}
+	allPods := map[string]api.Pod{}
 	for _, rs := range replicaSets {
 		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
@@ -386,11 +386,17 @@ func GetPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.Repl
 		options := api.ListOptions{LabelSelector: selector}
 		podList, err := c.Core().Pods(rs.ObjectMeta.Namespace).List(options)
 		if err != nil {
-			return allPods, fmt.Errorf("error listing pods: %v", err)
+			return nil, fmt.Errorf("error listing pods: %v", err)
 		}
-		allPods = append(allPods, podList.Items...)
+		for _, pod := range podList.Items {
+			allPods[pod.Name] = pod
+		}
 	}
-	return allPods, nil
+	requiredPods := []api.Pod{}
+	for _, pod := range allPods {
+		requiredPods = append(requiredPods, pod)
+	}
+	return requiredPods, nil
 }
 
 // Revision returns the revision number of the input replica set
