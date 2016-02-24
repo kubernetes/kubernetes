@@ -234,19 +234,20 @@ func (s *podStore) Stop() {
 }
 
 type RCConfig struct {
-	Client        *client.Client
-	Image         string
-	Command       []string
-	Name          string
-	Namespace     string
-	PollInterval  time.Duration
-	Timeout       time.Duration
-	PodStatusFile *os.File
-	Replicas      int
-	CpuRequest    int64 // millicores
-	CpuLimit      int64 // millicores
-	MemRequest    int64 // bytes
-	MemLimit      int64 // bytes
+	Client         *client.Client
+	Image          string
+	Command        []string
+	Name           string
+	Namespace      string
+	PollInterval   time.Duration
+	Timeout        time.Duration
+	PodStatusFile  *os.File
+	Replicas       int
+	CpuRequest     int64 // millicores
+	CpuLimit       int64 // millicores
+	MemRequest     int64 // bytes
+	MemLimit       int64 // bytes
+	ReadinessProbe *api.Probe
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -1633,10 +1634,11 @@ func (config *RCConfig) create() error {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
-							Ports:   []api.ContainerPort{{ContainerPort: 80}},
+							Name:           config.Name,
+							Image:          config.Image,
+							Command:        config.Command,
+							Ports:          []api.ContainerPort{{ContainerPort: 80}},
+							ReadinessProbe: config.ReadinessProbe,
 						},
 					},
 					DNSPolicy: api.DNSDefault,
