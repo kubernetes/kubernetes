@@ -297,6 +297,8 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		return err
 	}
 	f.Stopped = append(f.Stopped, id)
+	// Container status should be Updated before container moved to ExitedContainerList
+	f.updateContainerStatus(id, statusExitedPrefix)
 	var newList []docker.APIContainers
 	for _, container := range f.ContainerList {
 		if container.ID == id {
@@ -323,7 +325,6 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		container.State.Running = false
 	}
 	f.ContainerMap[id] = container
-	f.updateContainerStatus(id, statusExitedPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
