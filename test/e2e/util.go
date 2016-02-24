@@ -2224,22 +2224,16 @@ func waitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName strin
 	})
 }
 
-func waitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string) error {
-	return wait.Poll(poll, 1*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
-		if err != nil {
-			return false, err
-		}
-		return deployment.Generation == deployment.Status.ObservedGeneration, nil
-	})
-}
-
 func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
 	Logf("Deployment = %+v", deployment)
 	for i := range allOldRSs {
 		Logf("All old ReplicaSets (%d/%d) of deployment %s: %+v", i+1, len(allOldRSs), deployment.Name, allOldRSs[i])
 	}
 	Logf("New ReplicaSet of deployment %s: %+v", deployment.Name, newRS)
+}
+
+func waitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string, desiredGeneration int64) error {
+	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, poll, 1*time.Minute)
 }
 
 func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) {

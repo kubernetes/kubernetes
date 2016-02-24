@@ -420,9 +420,12 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	d := *obj.(*extensions.Deployment)
 
 	if d.Spec.Paused {
+		// TODO: Implement scaling for paused deployments.
+		// Dont take any action for paused deployment.
+		// But keep the status up-to-date.
 		// Ignore paused deployments
-		glog.V(4).Infof("Ignoring paused deployment %s/%s", d.Namespace, d.Name)
-		return nil
+		glog.V(4).Infof("Updating status only for paused deployment %s/%s", d.Namespace, d.Name)
+		return dc.syncPausedDeploymentStatus(&d)
 	}
 	if d.Spec.RollbackTo != nil {
 		revision := d.Spec.RollbackTo.Revision
@@ -438,6 +441,18 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncRollingUpdateDeployment(d)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
+}
+
+// Updates the status of a paused deployment
+func (dc *DeploymentController) syncPausedDeploymentStatus(deployment *extensions.Deployment) error {
+	newRS, oldRSs, err := dc.getAllReplicaSets(*deployment, false)
+	if err != nil {
+		return err
+	}
+	allRSs := append(controller.FilterActiveReplicaSets(oldRSs), newRS)
+
+	// Sync deployment status
+	return dc.syncDeploymentStatus(allRSs, newRS, *deployment)
 }
 
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
