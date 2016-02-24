@@ -224,6 +224,8 @@ IPs.
 
 ## Other reading
 
+To learn more about network policy and access control in Kubernetes, see the [network policy document](network-policy.md)
+
 The early design of the networking model and its rationale, and some future
 plans are described in more detail in the [networking design
 document](../design/networking.md).
