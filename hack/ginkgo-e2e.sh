@@ -33,8 +33,7 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 
 # --- Setup some env vars.
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
@@ -54,7 +53,7 @@ if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
 else
     echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
 
-    source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+    source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
     prepare-e2e
 
@@ -103,7 +102,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --gke-cluster="${CLUSTER_NAME:-}" \
   --kube-master="${KUBE_MASTER:-}" \
   --cluster-tag="${CLUSTER_ID:-}" \
-  --repo-root="${KUBE_VERSION_ROOT}" \
+  --repo-root="${KUBE_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --num-nodes="${NUM_NODES:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
