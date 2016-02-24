@@ -40,10 +40,11 @@ type e2eService struct {
 	apiServerCombinedOut bytes.Buffer
 	kubeletCmd           *exec.Cmd
 	kubeletCombinedOut   bytes.Buffer
+	nodeName             string
 }
 
-func newE2eService() *e2eService {
-	return &e2eService{}
+func newE2eService(nodeName string) *e2eService {
+	return &e2eService{nodeName: nodeName}
 }
 
 func (es *e2eService) start() error {
@@ -141,7 +142,9 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 				"--v", "2", "--logtostderr", "--log_dir", "./",
 				"--api-servers", "http://127.0.0.1:8080",
 				"--address", "0.0.0.0",
-				"--port", "10250"},
+				"--port", "10250",
+				"--hostname-override", es.nodeName, // Required because hostname is inconsistent across hosts
+			},
 		})
 }
 

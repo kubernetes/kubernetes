@@ -121,19 +121,19 @@ func CreateTestArchive() string {
 func RunRemote(archive string, host string) (string, error) {
 	// Create the temp staging directory
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
-	_, err := runSshCommand("ssh", host, "--", "mkdir", tmp)
+	_, err := RunSshCommand("ssh", host, "--", "mkdir", tmp)
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		output, err := runSshCommand("ssh", host, "--", "rm", "-rf", tmp)
+		output, err := RunSshCommand("ssh", host, "--", "rm", "-rf", tmp)
 		if err != nil {
 			glog.Errorf("Failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
 		}
 	}()
 
 	// Copy the archive to the staging directory
-	_, err = runSshCommand("scp", archive, fmt.Sprintf("%s:%s/", host, tmp))
+	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", host, tmp))
 	if err != nil {
 		return "", err
 	}
@@ -142,18 +142,20 @@ func RunRemote(archive string, host string) (string, error) {
 	cmd := getSshCommand(" ; ",
 		"sudo pkill kubelet",
 		"sudo pkill kube-apiserver",
-		"sudo pkill etcd")
+		"sudo pkill etcd",
+	)
 	// No need to log an error if pkill fails since pkill will fail if the commands are not running.
 	// If we are unable to stop existing running k8s processes, we should see messages in the kubelet/apiserver/etcd
 	// logs about failing to bind the required ports.
-	runSshCommand("ssh", host, "--", "sh", "-c", cmd)
+	RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 
 	// Extract the archive and run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
-		"./e2e_node.test --logtostderr --v 2 --build-services=false --node-name `hostname`")
-	output, err := runSshCommand("ssh", host, "--", "sh", "-c", cmd)
+		fmt.Sprintf("./e2e_node.test --logtostderr --v 2 --build-services=false --node-name=%s", host),
+	)
+	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +169,7 @@ func getSshCommand(sep string, args ...string) string {
 }
 
 // runSshCommand executes the ssh or scp command, adding the flag provided --ssh-options
-func runSshCommand(cmd string, args ...string) (string, error) {
+func RunSshCommand(cmd string, args ...string) (string, error) {
 	if env, found := sshOptionsMap[*sshEnv]; found {
 		args = append(strings.Split(env, " "), args...)
 	}
@@ -176,7 +178,7 @@ func runSshCommand(cmd string, args ...string) (string, error) {
 	}
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Sprintf("%s", output), fmt.Errorf("command %q %q failed with error: %v and output: %q", cmd, args, err, output)
+		return fmt.Sprintf("%s", output), fmt.Errorf("Command [%s %s] failed with error: %v and output:\n%s", cmd, strings.Join(args, " "), err, output)
 	}
 	return fmt.Sprintf("%s", output), nil
 }
