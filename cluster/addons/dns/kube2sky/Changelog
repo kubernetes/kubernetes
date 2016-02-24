@@ -1,3 +1,11 @@
+## Version 1.13 (Jan 22, 2015 Abhishek Shah <abshah@google.com>)
+- Add hostname DNS A record based on pod annotation
+  If the pod spec has the following two annotations,
+  i. net.beta.kubernetes.io/hostName
+  ii. net.beta.kubernetes.io/setName,
+  DNS A Record will be created with the following format:
+  <hostName>.<setName>.<pod namespace>.set.cluster.local
+
 ## Version 1.12 (Dec 15 2015 Abhishek Shah <abshah@google.com>)
 - Gave pods their own cache store. (034ecbd)
 - Allow pods to have dns. (717660a)

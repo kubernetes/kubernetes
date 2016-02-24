@@ -43,6 +43,7 @@ import (
 	kselector "k8s.io/kubernetes/pkg/fields"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -62,7 +63,11 @@ const (
 	// A subdomain added to the user specified domain for all services.
 	serviceSubdomain = "svc"
 	// A subdomain added to the user specified dmoain for all pods.
-	podSubdomain = "pod"
+	podSubdomain       = "pod"
+	setSubdomain       = "set"
+	ptrRecordSuffix    = "in-addr.arpa"
+	hostNameAnnotation = "net.beta.kubernetes.io/hostName"
+	setNameAnnotation  = "net.beta.kubernetes.io/setName"
 )
 
 type etcdClient interface {
@@ -154,11 +159,10 @@ func getSkyMsg(ip string, port int) *skymsg.Service {
 func (ks *kube2sky) generateRecordsForHeadlessService(subdomain string, e *kapi.Endpoints, svc *kapi.Service) error {
 	for idx := range e.Subsets {
 		for subIdx := range e.Subsets[idx].Addresses {
-			b, err := json.Marshal(getSkyMsg(e.Subsets[idx].Addresses[subIdx].IP, 0))
+			recordValue, err := generateDNSRecordValue(e.Subsets[idx].Addresses[subIdx].IP, 0)
 			if err != nil {
 				return err
 			}
-			recordValue := string(b)
 			recordLabel := getHash(recordValue)
 			recordKey := buildDNSNameString(subdomain, recordLabel)
 
@@ -227,13 +231,52 @@ func (ks *kube2sky) handleEndpointAdd(obj interface{}) {
 }
 
 func (ks *kube2sky) handlePodCreate(obj interface{}) {
-	if e, ok := obj.(*kapi.Pod); ok {
-		// If the pod ip is not yet available, do not attempt to create.
-		if e.Status.PodIP != "" {
-			name := buildDNSNameString(ks.domain, podSubdomain, e.Namespace, santizeIP(e.Status.PodIP))
-			ks.mutateEtcdOrDie(func() error { return ks.generateRecordsForPod(name, e) })
-		}
+	if p, ok := obj.(*kapi.Pod); ok {
+		ks.createIPBasedPodRecords(p)
+		ks.createSetBasedPodRecords(p)
 	}
+}
+
+func (ks *kube2sky) createIPBasedPodRecords(e *kapi.Pod) {
+	// If the pod ip is not yet available, do not attempt to create.
+	if e.Status.PodIP != "" {
+		name := buildDNSNameString(ks.domain, podSubdomain, e.Namespace, santizeIP(e.Status.PodIP))
+		ks.mutateEtcdOrDie(func() error { return ks.generateRecordsForPod(name, e) })
+	}
+}
+
+func (ks *kube2sky) createSetBasedPodRecords(pod *kapi.Pod) {
+	hostName := ks.getPodFQDN(pod)
+	if len(hostName) <= 0 {
+		return
+	}
+
+	glog.V(4).Infof("Writing A record: %s", hostName)
+	ks.mutateEtcdOrDie(func() error {
+		// Create A Record
+		recordValue, err := generateDNSRecordValue(pod.Status.PodIP, 0)
+		if err != nil {
+			return err
+		}
+		recordLabel := getHash(pod.Name)
+		recordKey := buildDNSNameString(hostName, recordLabel)
+		glog.V(2).Infof("Setting DNS record: %v -> %q, with recordKey: %v\n", hostName, recordValue, recordKey)
+		if err := ks.writeSkyRecord(recordKey, recordValue); err != nil {
+			return err
+		}
+
+		// Create PTR Record
+		ptrRecordKey := generatePTRRecordKey(pod.Status.PodIP)
+		ptrRecordValue, err := generateDNSRecordValue(hostName, 0)
+		if err != nil {
+			return err
+		}
+		glog.V(2).Infof("Writing PTR record: %v -> %q\n", ptrRecordKey, ptrRecordValue)
+		if err := ks.writeSkyRecord(ptrRecordKey, ptrRecordValue); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (ks *kube2sky) handlePodUpdate(old interface{}, new interface{}) {
@@ -243,8 +286,12 @@ func (ks *kube2sky) handlePodUpdate(old interface{}, new interface{}) {
 	// Validate that the objects are good
 	if okOld && okNew {
 		if oldPod.Status.PodIP != newPod.Status.PodIP {
-			ks.handlePodDelete(oldPod)
-			ks.handlePodCreate(newPod)
+			ks.deleteIPBasedPodRecords(oldPod)
+			ks.createIPBasedPodRecords(newPod)
+		}
+		if ks.getPodFQDN(oldPod) != ks.getPodFQDN(newPod) {
+			ks.deleteSetBasedPodRecords(oldPod)
+			ks.createSetBasedPodRecords(newPod)
 		}
 	} else if okNew {
 		ks.handlePodCreate(newPod)
@@ -255,19 +302,57 @@ func (ks *kube2sky) handlePodUpdate(old interface{}, new interface{}) {
 
 func (ks *kube2sky) handlePodDelete(obj interface{}) {
 	if e, ok := obj.(*kapi.Pod); ok {
-		if e.Status.PodIP != "" {
-			name := buildDNSNameString(ks.domain, podSubdomain, e.Namespace, santizeIP(e.Status.PodIP))
-			ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
-		}
+		ks.deleteIPBasedPodRecords(e)
+		ks.deleteSetBasedPodRecords(e)
 	}
 }
 
+func (ks *kube2sky) deleteIPBasedPodRecords(e *kapi.Pod) {
+	if e.Status.PodIP != "" {
+		name := buildDNSNameString(ks.domain, podSubdomain, e.Namespace, santizeIP(e.Status.PodIP))
+		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
+	}
+}
+
+func (ks *kube2sky) deleteSetBasedPodRecords(pod *kapi.Pod) {
+	hostName := ks.getPodFQDN(pod)
+	if len(hostName) > 0 {
+		recordLabel := getHash(pod.Name)
+		recordKey := buildDNSNameString(hostName, recordLabel)
+		ptrRecordKey := generatePTRRecordKey(pod.Status.PodIP)
+		ks.mutateEtcdOrDie(func() error {
+			glog.V(2).Infof("Deleting A record: %v, with recordKey: %v\n", hostName, recordKey)
+			err := ks.removeDNS(recordKey)
+			if err != nil {
+				return err
+			}
+			glog.V(2).Infof("Deleting PTR record: %v\n", ptrRecordKey)
+			return ks.removeDNS(ptrRecordKey)
+		})
+	}
+}
+
+func (ks *kube2sky) getPodFQDN(e *kapi.Pod) string {
+	hostLabel := e.Annotations[hostNameAnnotation]
+	if !validation.IsDNS1123Label(hostLabel) {
+		glog.Errorf("annotation-based hostname not created for pod. hostLabel is not valid:%s", hostLabel)
+		return ""
+	}
+
+	setLabel := e.Annotations[setNameAnnotation]
+	if !validation.IsDNS1123Label(setLabel) {
+		glog.Errorf("annotation-based hostname not created for pod. setLabel is not valid:%s", setLabel)
+		return ""
+	}
+
+	return buildDNSNameString(ks.domain, setSubdomain, e.Namespace, setLabel, hostLabel)
+}
+
 func (ks *kube2sky) generateRecordsForPod(subdomain string, service *kapi.Pod) error {
-	b, err := json.Marshal(getSkyMsg(service.Status.PodIP, 0))
+	recordValue, err := generateDNSRecordValue(service.Status.PodIP, 0)
 	if err != nil {
 		return err
 	}
-	recordValue := string(b)
 	recordLabel := getHash(recordValue)
 	recordKey := buildDNSNameString(subdomain, recordLabel)
 
@@ -280,11 +365,10 @@ func (ks *kube2sky) generateRecordsForPod(subdomain string, service *kapi.Pod) e
 }
 
 func (ks *kube2sky) generateRecordsForPortalService(subdomain string, service *kapi.Service) error {
-	b, err := json.Marshal(getSkyMsg(service.Spec.ClusterIP, 0))
+	recordValue, err := generateDNSRecordValue(service.Spec.ClusterIP, 0)
 	if err != nil {
 		return err
 	}
-	recordValue := string(b)
 	recordLabel := getHash(recordValue)
 	recordKey := buildDNSNameString(subdomain, recordLabel)
 
@@ -304,6 +388,21 @@ func (ks *kube2sky) generateRecordsForPortalService(subdomain string, service *k
 		}
 	}
 	return nil
+}
+
+func generatePTRRecordKey(podIP string) string {
+	// Create PTR Record
+	ipPath := buildDNSNameString(strings.Split(podIP, ".")...)
+	return buildDNSNameString(ptrRecordSuffix, ipPath)
+}
+
+func generateDNSRecordValue(ip string, port int) (string, error) {
+	b, err := json.Marshal(getSkyMsg(ip, port))
+	if err != nil {
+		return "", err
+	}
+	recordValue := string(b)
+	return recordValue, nil
 }
 
 func santizeIP(ip string) string {
@@ -326,11 +425,11 @@ func buildPortSegmentString(portName string, portProtocol kapi.Protocol) string 
 
 func (ks *kube2sky) generateSRVRecord(subdomain, portSegment, recordName, cName string, portNumber int) error {
 	recordKey := buildDNSNameString(subdomain, portSegment, recordName)
-	srv_rec, err := json.Marshal(getSkyMsg(cName, portNumber))
+	srv_rec, err := generateDNSRecordValue(cName, portNumber)
 	if err != nil {
 		return err
 	}
-	if err := ks.writeSkyRecord(recordKey, string(srv_rec)); err != nil {
+	if err := ks.writeSkyRecord(recordKey, srv_rec); err != nil {
 		return err
 	}
 	return nil
