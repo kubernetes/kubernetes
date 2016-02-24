@@ -149,12 +149,14 @@
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Example\]"
                 export PROJECT="k8s-jkns-e2e-examples"
         - 'gce-ubernetes-lite':
-            description: 'Run all non-flaky, non-slow tests on GCE, sequentially, and in a multi-zone (Ubernetes-lite) cluster.'
+            description: 'Run all non-flaky, non-slow, non-disruptive, non-feature tests on GCE, in parallel, and in a multi-zone (Ubernetes-lite) cluster.'
             timeout: 150
             emails: '$DEFAULT_RECIPIENTS, quinton@google.com, justin@fathomdb.com'
             test-owner: 'quinton'
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gce-ubelite"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
                 export MULTIZONE="true"
                 export E2E_ZONES="us-central1-a us-central1-b us-central1-f" # Where the nodes reside.  Master is in the first one.
                 export KUBE_GCE_ZONE="us-central1-a" # Where the master resides - hangover due to legacy scripts.
