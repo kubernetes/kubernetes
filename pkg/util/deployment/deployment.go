@@ -330,6 +330,15 @@ func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 	return totalReplicaCount
 }
 
+// GetActualReplicaCountForReplicaSets returns the sum of actual replicas of the given replica sets.
+func GetActualReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
+	totalReplicaCount := 0
+	for _, rs := range replicaSets {
+		totalReplicaCount += rs.Status.Replicas
+	}
+	return totalReplicaCount
+}
+
 // Returns the number of available pods corresponding to the given replica sets.
 func GetAvailablePodsForReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) (int, error) {
 	allPods, err := GetPodsForReplicaSets(c, rss)
