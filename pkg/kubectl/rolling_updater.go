@@ -20,7 +20,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -198,12 +197,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 			oldRc.Name, originalReplicasAnnotation, oldRc.Annotations[originalReplicasAnnotation])
 	}
 	// The maximum pods which can go unavailable during the update.
-	maxUnavailable, err := extractMaxValue(config.MaxUnavailable, "maxUnavailable", desired)
+	maxUnavailable, err := intstr.GetValueFromIntOrPercent(&config.MaxUnavailable, desired, false)
 	if err != nil {
 		return err
 	}
 	// The maximum scaling increment.
-	maxSurge, err := extractMaxValue(config.MaxSurge, "maxSurge", desired)
+	maxSurge, err := intstr.GetValueFromIntOrPercent(&config.MaxSurge, desired, true)
 	if err != nil {
 		return err
 	}
@@ -484,29 +483,6 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 	default:
 		return nil
 	}
-}
-
-// func extractMaxValue is a helper to extract config max values as either
-// absolute numbers or based on percentages of the given value.
-func extractMaxValue(field intstr.IntOrString, name string, value int) (int, error) {
-	switch field.Type {
-	case intstr.Int:
-		if field.IntVal < 0 {
-			return 0, fmt.Errorf("%s must be >= 0", name)
-		}
-		return field.IntValue(), nil
-	case intstr.String:
-		s := strings.Replace(field.StrVal, "%", "", -1)
-		v, err := strconv.Atoi(s)
-		if err != nil {
-			return 0, fmt.Errorf("invalid %s value %q: %v", name, field.StrVal, err)
-		}
-		if v < 0 {
-			return 0, fmt.Errorf("%s must be >= 0", name)
-		}
-		return int(math.Ceil(float64(value) * (float64(v)) / 100)), nil
-	}
-	return 0, fmt.Errorf("invalid kind %q for %s", field.Type, name)
 }
 
 func Rename(c client.ReplicationControllersNamespacer, rc *api.ReplicationController, newName string) error {
