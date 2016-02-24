@@ -41,8 +41,7 @@
             timeout: 120
             cron-string: '@hourly'
             job-env: |
-                # TODO: Restore previous project once we have enough quota.
-                # export PROJECT="k8s-jenkins-kubemark"
+                export PROJECT="k8s-jenkins-kubemark"
                 export PROJECT="kubernetes-scale"
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
@@ -51,8 +50,7 @@
                 export NUM_NODES="10"
                 export MASTER_SIZE="n1-standard-2"
                 export NODE_SIZE="n1-standard-1"
-                # TODO: move to the us-central1 after we get a quota there
-                export KUBE_GCE_ZONE="us-east1-d"
+                export KUBE_GCE_ZONE="us-central1-b"
                 export KUBEMARK_MASTER_SIZE="n1-standard-4"
                 export KUBEMARK_NUM_NODES="100"
         - '500-gce':
