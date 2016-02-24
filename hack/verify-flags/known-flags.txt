@@ -109,10 +109,12 @@ etcd-config
 etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
+etcd-password
 etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides
+etcd-username
 event-burst
 event-qps
 event-ttl

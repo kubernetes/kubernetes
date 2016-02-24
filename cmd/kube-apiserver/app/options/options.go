@@ -207,6 +207,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EtcdConfig.KeyFile, "etcd-keyfile", s.EtcdConfig.KeyFile, "SSL key file used to secure etcd communication")
 	fs.StringVar(&s.EtcdConfig.CertFile, "etcd-certfile", s.EtcdConfig.CertFile, "SSL certification file used to secure etcd communication")
 	fs.StringVar(&s.EtcdConfig.CAFile, "etcd-cafile", s.EtcdConfig.CAFile, "SSL Certificate Authority file used to secure etcd communication")
+	fs.StringVar(&s.EtcdConfig.Username, "etcd-username", s.EtcdConfig.Username, "The user credential to add as an authorization header to etcd.")
+	fs.StringVar(&s.EtcdConfig.Password, "etcd-password", s.EtcdConfig.Password, "The password for the specified user to add as an authorization header.")
 	fs.BoolVar(&s.EtcdConfig.Quorum, "etcd-quorum-read", s.EtcdConfig.Quorum, "If true, enable quorum read")
 	fs.IntVar(&s.EtcdConfig.DeserializationCacheSize, "deserialization-cache-size", s.EtcdConfig.DeserializationCacheSize, "Number of deserialized json objects to cache in memory.")
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
