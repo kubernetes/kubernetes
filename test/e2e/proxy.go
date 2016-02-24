@@ -125,6 +125,16 @@ func proxyContext(version string) {
 				"tlsdest1": 460,
 				"tlsdest2": 462,
 			},
+			ReadinessProbe: &api.Probe{
+				Handler: api.Handler{
+					HTTPGet: &api.HTTPGetAction{
+						Port: intstr.FromInt(80),
+					},
+				},
+				InitialDelaySeconds: 1,
+				TimeoutSeconds:      5,
+				PeriodSeconds:       10,
+			},
 			Labels:      labels,
 			CreatedPods: &pods,
 		}
