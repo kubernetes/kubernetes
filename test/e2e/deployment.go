@@ -183,8 +183,9 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	Expect(err).NotTo(HaveOccurred())
 	Expect(rss.Items).Should(HaveLen(0))
 	Logf("ensuring deployment %s pods were deleted", deploymentName)
+	var pods *api.PodList
 	if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		pods, err := c.Core().Pods(ns).List(api.ListOptions{})
+		pods, err = c.Core().Pods(ns).List(api.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -193,7 +194,7 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 		}
 		return false, nil
 	}); err != nil {
-		Failf("Failed to remove deployment %s pods!", deploymentName)
+		Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", deploymentName, pods)
 	}
 }
 
