@@ -28,13 +28,16 @@ coreos:
         Documentation=http://github.com/coreos/rkt
         Requires=network-online.target
         After=network-online.target
+        Requires=kube-env.service
+        After=kube-env.service
         [Service]
         Type=oneshot
         RemainAfterExit=yes
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/mkdir -p /etc/rkt
         ExecStartPre=/usr/bin/mkdir -p /opt/downloads
-        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
+        /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
         ExecStart=/usr/bin/tar xf /opt/downloads/rkt.tar.gz -C /opt --overwrite
 
     - name: kubernetes-download-salt.service
@@ -51,7 +54,8 @@ coreos:
         RemainAfterExit=yes
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/mkdir -p /opt/downloads
-        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/downloads/kubernetes-salt.tar.gz ${SALT_TAR_URL}
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
+        /opt/downloads/kubernetes-salt.tar.gz ${SALT_TAR_URL}
         # TODO(yifan): Check hash.
         ExecStart=/usr/bin/tar xf /opt/downloads/kubernetes-salt.tar.gz -C /opt --overwrite
 
@@ -69,7 +73,8 @@ coreos:
         RemainAfterExit=yes
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/mkdir -p /opt/downloads
-        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/downloads/kubernetes-manifests.tar.gz ${KUBE_MANIFESTS_TAR_URL}
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
+        /opt/downloads/kubernetes-manifests.tar.gz ${KUBE_MANIFESTS_TAR_URL}
         # TODO(yifan): Check hash.
         ExecStartPre=/usr/bin/mkdir -p /opt/kube-manifests
         ExecStart=/usr/bin/tar xf /opt/downloads/kubernetes-manifests.tar.gz -C /opt/kube-manifests --overwrite
@@ -88,7 +93,8 @@ coreos:
         RemainAfterExit=yes
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/mkdir -p /opt/downloads
-        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/downloads/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
+        /opt/downloads/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
         # TODO(yifan): Check hash.
         ExecStart=/usr/bin/tar xf /opt/downloads/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
 
@@ -131,7 +137,6 @@ coreos:
         RestartSec=10
         
     - name: docker.service
-      command: start
       drop-ins:
         - name: 50-docker-opts.conf
           content: |
