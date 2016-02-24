@@ -77,6 +77,13 @@ plugins:
        # Install python-pip
        - [ 'chroot', '{root}', 'pip', 'install', 'awscli' ]
 
+       # Install docker 1.9.1
+       - [ 'wget', 'http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~jessie_amd64.deb', '-O', '{root}/tmp/docker.deb' ]
+       - [ '/bin/sh', '-c', 'cd {root}/tmp; echo "c58c39008fd6399177f6b2491222e4438f518d78  docker.deb" | shasum -c -' ]
+       - [ 'chroot', '{root}', '/bin/sh', '-c', 'DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --assume-yes libapparmor1' ]
+       - [ 'chroot', '{root}', '/bin/sh', '-c', 'DEBIAN_FRONTEND=noninteractive dpkg --install /tmp/docker.deb' ]
+       - [ 'rm', '{root}/tmp/docker.deb' ]
+
        # We perform a full replacement of some grub conf variables:
        #   GRUB_CMDLINE_LINUX_DEFAULT (add memory cgroup)
        #   GRUB_TIMEOUT (remove boot delay)
