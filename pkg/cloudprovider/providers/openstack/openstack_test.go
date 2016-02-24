@@ -268,7 +268,7 @@ func TestVolumes(t *testing.T) {
 
 	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
 
-	diskId, err := os.AttachDisk(vol)
+	diskId, err := os.AttachDisk(os.localInstanceID, vol)
 	if err != nil {
 		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
 	}
@@ -276,7 +276,7 @@ func TestVolumes(t *testing.T) {
 
 	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
 
-	err = os.DetachDisk(vol)
+	err = os.DetachDisk(os.localInstanceID, vol)
 	if err != nil {
 		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
 	}
