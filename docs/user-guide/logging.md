@@ -131,7 +131,7 @@ describes how to ingest cluster level logs into Elasticsearch and view them usin
 ## Ingesting Application Log Files
 
 Cluster level logging only collects the standard output and standard error output of the applications
-running in containers. The guide [Collecting log files within containers with Fluentd](http://releases.k8s.io/release-1.1/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
+running in containers. The guide [Collecting log files from within containers with Fluentd and sending them to the Google Cloud Logging service](https://github.com/kubernetes/contrib/blob/master/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
 
 ## Known issues
 
