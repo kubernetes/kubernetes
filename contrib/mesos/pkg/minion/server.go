@@ -143,7 +143,9 @@ func (ms *MinionServer) launchProxyServer() {
 		fmt.Sprintf("--bind-address=%s", bindAddress),
 		fmt.Sprintf("--v=%d", ms.proxyLogV),
 		"--logtostderr=true",
-		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
+		// TODO(jdef) resource-container is going away completely at some point, but
+		// we need to override it here to disable the current default behavior
+		"--resource-container=", // disable this; mesos slave doesn't like sub-containers yet
 		"--proxy-mode=" + ms.proxyMode,
 		"--conntrack-max=" + strconv.Itoa(ms.conntrackMax),
 		"--conntrack-tcp-timeout-established=" + strconv.Itoa(ms.conntrackTCPTimeoutEstablished),
@@ -171,7 +173,8 @@ func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{}
 	ms.AddExecutorFlags(executorFlags)
 	executorArgs, _ := filterArgsByFlagSet(allArgs, executorFlags)
 
-	executorArgs = append(executorArgs, "--resource-container="+path.Join("/", ms.mesosCgroup, "kubelet"))
+	// disable resource-container; mesos slave doesn't like sub-containers yet
+	executorArgs = append(executorArgs, "--kubelet-cgroups=")
 	if ms.cgroupRoot != "" {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
