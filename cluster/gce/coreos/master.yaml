@@ -132,18 +132,24 @@ coreos:
         
     - name: docker.service
       command: start
-      drop-ins:
-        - name: 50-docker-opts.conf
-          content: |
-            [Service]
-            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'
-            MountFlags=slave
-            LimitNOFILE=1048576
-            LimitNPROC=1048576
-            LimitCORE=infinity
-            Restart=always
-            RestartSec=2s
-            StartLimitInterval=0
+      content: |
+        [Unit]
+        Description=Docker Application Container Engine
+        Documentation=http://docs.docker.com
+        After=docker.socket early-docker.target network.target
+        Requires=docker.socket early-docker.target
+        After=network.target docker.socket
+
+        [Service]
+        Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'
+        ExecStart=/usr/bin/docker -d -H fd:// "$DOCKER_OPTS"
+        MountFlags=slave
+        LimitNOFILE=1048576
+        LimitNPROC=1048576
+        LimitCORE=infinity
+        Restart=always
+        RestartSec=2s
+        StartLimitInterval=0
 
     - name: kubernetes-configure-node.service
       command: start
