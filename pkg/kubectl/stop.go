@@ -382,11 +382,6 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return err
 	}
 
-	// Delete deployment.
-	if err := deployments.Delete(name, gracePeriod); err != nil {
-		return err
-	}
-
 	// Stop all replica sets.
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
@@ -409,7 +404,10 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	if len(errList) > 0 {
 		return utilerrors.NewAggregate(errList)
 	}
-	return nil
+
+	// Delete deployment at the end.
+	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
+	return deployments.Delete(name, gracePeriod)
 }
 
 type updateDeploymentFunc func(d *extensions.Deployment)
