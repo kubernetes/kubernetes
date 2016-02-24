@@ -41,7 +41,9 @@
             timeout: 120
             cron-string: '@hourly'
             job-env: |
-                export PROJECT="k8s-jenkins-kubemark"
+                # TODO: Restore previous project once we have enough quota.
+                # export PROJECT="k8s-jenkins-kubemark"
+                export PROJECT="google.com:k8s-jenkins-scalability"
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="\[Feature:Performance\]"
