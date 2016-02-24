@@ -136,6 +136,7 @@
                 export E2E_DOWN="false"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step2-kubectl-e2e-new'
+            runner: '{runner-new}'
             description: 'Run {version-new} kubectl tests against the cluster running {version-old}.'
             job-env: |
                 export E2E_OPT="--check_version_skew=false"
@@ -144,6 +145,7 @@
                 export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step3-upgrade-master'
+            runner: '{runner-new}'
             description: 'Upgrade the master from {version-old} to {version-new}.'
             job-env: |
                 export E2E_OPT="--check_version_skew=false"
@@ -160,6 +162,7 @@
                 export E2E_DOWN="false"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step5-upgrade-cluster'
+            runner: '{runner-new}'
             description: 'Upgrade the nodes from {version-old} to {version-new}.'
             job-env: |
                 export E2E_OPT="--check_version_skew=false"
@@ -176,6 +179,7 @@
                 export E2E_DOWN="false"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step7-e2e-new'
+            runner: '{runner-new}'
             description: 'Run {version-new} e2e tests against the cluster with master and nodes at {version-new}.'
             job-env: |
                 # TODO(15011): these really shouldn't be (very) version skewed, but
