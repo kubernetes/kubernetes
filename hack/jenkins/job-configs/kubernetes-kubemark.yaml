@@ -42,7 +42,6 @@
             cron-string: '@hourly'
             job-env: |
                 export PROJECT="k8s-jenkins-kubemark"
-                export PROJECT="kubernetes-scale"
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="\[Feature:Performance\]"
