@@ -442,17 +442,17 @@ const (
 type DaemonSetStatus struct {
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
-	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	CurrentNumberScheduled int32 `json:"currentNumberScheduled"`
 
 	// NumberMisscheduled is the number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
-	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	NumberMisscheduled int32 `json:"numberMisscheduled"`
 
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
-	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
+	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
 }
 
@@ -1021,7 +1021,7 @@ const (
 type PodSecurityPolicyList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://docs.k8s.io/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of schema objects.

@@ -77,7 +77,7 @@ Example response for support issues:
 Build-copping
 -------------
 
-* The [merge-bot submit queue](http://submit-queue.k8s.io/) ([source](https://github.com/kubernetes/contrib/tree/master/submit-queue)) should auto-merge all eligible PRs for you once they've passed all the relevant checks mentioned below and all [critical e2e tests] (https://goto.google.com/k8s-test/view/Critical%20Builds/) are passing. If the merge-bot been disabled for some reason, or tests are failing, you might need to do some manual merging to get things back on track.
+* The [merge-bot submit queue](http://submit-queue.k8s.io/) ([source](https://github.com/kubernetes/contrib/tree/master/mungegithub/mungers/submit-queue.go)) should auto-merge all eligible PRs for you once they've passed all the relevant checks mentioned below and all [critical e2e tests] (https://goto.google.com/k8s-test/view/Critical%20Builds/) are passing. If the merge-bot been disabled for some reason, or tests are failing, you might need to do some manual merging to get things back on track.
 * Once a day or so, look at the [flaky test builds](https://goto.google.com/k8s-test/view/Flaky/); if they are timing out, clusters are failing to start, or tests are consistently failing (instead of just flaking), file an issue to get things back on track.
 * Jobs that are not in [critical e2e tests] (https://goto.google.com/k8s-test/view/Critical%20Builds/) or [flaky test builds](https://goto.google.com/k8s-test/view/Flaky/) are not your responsibility to monitor. The `Test owner:` in the job description will be automatically emailed if the job is failing.
 * If you are a weekday oncall, ensure that PRs confirming to the following pre-requisites are being merged at a reasonable rate:
@@ -92,7 +92,7 @@ Build-copping
     * If a large number of tests fail, or tests that normally pass fail, that is an indication that one or more of the PR(s) in that build might be problematic (and should be reverted).
     * Use the Test Results Analyzer to see individual test history over time.
 * Flake mitigation
-  * Tests that flake (fail a small percentage of the time) need an issue filed against them. Please read [this](https://github.com/kubernetes/kubernetes/blob/doc-flaky-test/docs/devel/flaky-tests.md#filing-issues-for-flaky-tests); the build cop is expected to file issues for any flaky tests they encounter.
+  * Tests that flake (fail a small percentage of the time) need an issue filed against them. Please read [this](flaky-tests.md#filing-issues-for-flaky-tests); the build cop is expected to file issues for any flaky tests they encounter.
   * It's reasonable to manually merge PRs that fix a flake or otherwise mitigate it.
 
 Contact information
