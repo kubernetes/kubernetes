@@ -1360,7 +1360,9 @@ function prepare-e2e() {
   detect-project
 }
 
-# Writes configure-vm.sh to a temporary location with comments stripped.
+# Writes configure-vm.sh to a temporary location with comments stripped. GCE
+# limits the size of metadata fields to 32K, and stripping comments is the
+# easiest way to buy us a little more room.
 function prepare-startup-script() {
   sed '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
 }
