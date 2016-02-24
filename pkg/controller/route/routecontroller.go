@@ -19,6 +19,7 @@ package route
 import (
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -96,19 +97,23 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
+	wg := sync.WaitGroup{}
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route applies to a node we know about & has correct CIDR.
 			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
+				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route) {
 					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s: %v", route.Name, route.DestinationCIDR, err)
 					}
+					wg.Done()
 				}(route)
 			}
 		}
 	}
+	wg.Wait()
 	return nil
 }
 
