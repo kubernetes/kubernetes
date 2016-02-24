@@ -30,10 +30,12 @@ function detect-jessie-image () {
     # TODO: publish on a k8s AWS account
     aws_account="721322707521"
     # TODO: we could use tags for the image
-    image_name="k8s-1.2-debian-jessie-amd64-hvm-2016-02-23-ebs"
-    AWS_IMAGE=`aws ec2 describe-images --owner ${aws_account} --filters Name=name,Values=${image_name}  --query Images[].ImageId --output text`
-    if [[ -z "${AWS_IMAGE:-}" ]]; then
-      echo "Please specify AWS_IMAGE directly (image ${image_name} not found in region ${AWS_REGION})"
+    if [[ -z "${AWS_IMAGE_NAME:-}" ]]; then
+      AWS_IMAGE_NAME="k8s-1.2-debian-jessie-amd64-hvm-2016-02-24-ebs"
+    fi
+    AWS_IMAGE=`aws ec2 describe-images --owner ${aws_account} --filters Name=name,Values=${AWS_IMAGE_NAME} --query Images[].ImageId --output text`
+    if [[ -z "${AWS_IMAGE-}" ]]; then
+      echo "Please specify AWS_IMAGE directly (image ${AWS_IMAGE_NAME} not found in region ${AWS_REGION})"
       exit 1
     fi
   fi
