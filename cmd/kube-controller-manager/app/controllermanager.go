@@ -181,6 +181,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replication-controller")),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
+		s.LookupCacheSizeForRC,
 	).Run(s.ConcurrentRCSyncs, wait.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
@@ -285,7 +286,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 		if containsResource(resources, "replicasets") {
 			glog.Infof("Starting ReplicaSet controller")
-			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas).
+			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas, s.LookupCacheSizeForRS).
 				Run(s.ConcurrentRSSyncs, wait.NeverStop)
 		}
 	}
