@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1828,8 +1829,13 @@ func dumpAllNamespaceInfo(c *client.Client, namespace string) {
 	events, err := c.Events(namespace).List(api.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	for _, e := range events.Items {
-		Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+	// Sort events by their first timestamp
+	sortedEvents := events.Items
+	if len(sortedEvents) > 1 {
+		sort.Sort(byFirstTimestamp(sortedEvents))
+	}
+	for _, e := range sortedEvents {
+		Logf("At %v - event for %v: %v %v: %v", e.FirstTimestamp, e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 	}
 	// Note that we don't wait for any cleanup to propagate, which means
 	// that if you delete a bunch of pods right before ending your test,
@@ -1838,6 +1844,19 @@ func dumpAllNamespaceInfo(c *client.Client, namespace string) {
 	dumpAllPodInfo(c)
 
 	dumpAllNodeInfo(c)
+}
+
+// byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
+type byFirstTimestamp []api.Event
+
+func (o byFirstTimestamp) Len() int      { return len(o) }
+func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o byFirstTimestamp) Less(i, j int) bool {
+	if o[i].FirstTimestamp.Equal(o[j].FirstTimestamp) {
+		return o[i].InvolvedObject.Name < o[j].InvolvedObject.Name
+	}
+	return o[i].FirstTimestamp.Before(o[j].FirstTimestamp)
 }
 
 func dumpAllPodInfo(c *client.Client) {
@@ -2098,7 +2117,7 @@ func waitForReplicaSetPodsGone(c *client.Client, rs *extensions.ReplicaSet) erro
 // Waits for the deployment to reach desired state.
 // Returns an error if minAvailable or maxCreated is broken at any times.
 func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int) error {
-	var oldRSs, allRSs []*extensions.ReplicaSet
+	var oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
 	var newRS *extensions.ReplicaSet
 	var deployment *extensions.Deployment
 	err := wait.Poll(poll, 5*time.Minute, func() (bool, error) {
@@ -2108,7 +2127,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		if err != nil {
 			return false, err
 		}
-		oldRSs, _, err = deploymentutil.GetOldReplicaSets(*deployment, c)
+		oldRSs, allOldRSs, err = deploymentutil.GetOldReplicaSets(*deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -2127,12 +2146,12 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			return false, err
 		}
 		if totalCreated > maxCreated {
-			logReplicaSetsOfDeployment(deployment, oldRSs, newRS)
+			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
 			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
-			logReplicaSetsOfDeployment(deployment, oldRSs, newRS)
+			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
 			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
@@ -2148,7 +2167,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 	})
 
 	if err == wait.ErrWaitTimeout {
-		logReplicaSetsOfDeployment(deployment, oldRSs, newRS)
+		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
 		logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 	}
 	return err
@@ -2196,10 +2215,10 @@ func waitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string
 	})
 }
 
-func logReplicaSetsOfDeployment(deployment *extensions.Deployment, oldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
+func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
 	Logf("Deployment = %+v", deployment)
-	for i := range oldRSs {
-		Logf("Old ReplicaSets (%d/%d) of deployment %s: %+v", i+1, len(oldRSs), deployment.Name, oldRSs[i])
+	for i := range allOldRSs {
+		Logf("All old ReplicaSets (%d/%d) of deployment %s: %+v", i+1, len(allOldRSs), deployment.Name, allOldRSs[i])
 	}
 	Logf("New ReplicaSet of deployment %s: %+v", deployment.Name, newRS)
 }
