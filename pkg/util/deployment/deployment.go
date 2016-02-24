@@ -183,8 +183,8 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 		return
 	}
 	// 1. Add hash template label to the rs. This ensures that any newly created pods will have the new label.
-	if len(rs.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
-		updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), &rs, func(updated *extensions.ReplicaSet) {
+	if len(updatedRS.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+		updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
 			updated.Spec.Template.Labels = labelsutil.AddLabel(updated.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		})
 		if err != nil {
@@ -192,14 +192,14 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 		}
 		// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
 		if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
-			if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, rs.Name); err != nil {
+			if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
 				return nil, fmt.Errorf("error waiting for rs %s generation %d observed by controller: %v", updatedRS.Name, updatedRS.Generation, err)
 			}
 		}
 	}
 
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := unversioned.LabelSelectorAsSelector(updatedRS.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 
 	// 3. Update rs label and selector to include the new hash label
 	// Copy the old selector, so that we can scrub out any orphaned pods
-	if updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), &rs, func(updated *extensions.ReplicaSet) {
+	if updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
 		updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
 	}); err != nil {
