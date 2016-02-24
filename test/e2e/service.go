@@ -424,17 +424,17 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if service.Spec.Type != api.ServiceTypeClusterIP {
-			Failf("got unexpected Spec.Type for default service: %v", service)
+			Failf("got unexpected Spec.Type for default service: %#v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for default service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for default service: %#v", service)
 		}
 		port := service.Spec.Ports[0]
 		if port.NodePort != 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for default service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for default service: %#v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for default service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for default service: %#v", service)
 		}
 
 		By("creating pod to be part of service " + t.ServiceName)
@@ -447,20 +447,20 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if service.Spec.Type != api.ServiceTypeNodePort {
-			Failf("got unexpected Spec.Type for NodePort service: %v", service)
+			Failf("got unexpected Spec.Type for NodePort service: %#v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for NodePort service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for NodePort service: %#v", service)
 		}
 		port = service.Spec.Ports[0]
 		if port.NodePort == 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for NodePort service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for NodePort service: %#v", service)
 		}
 		if !ServiceNodePortRange.Contains(port.NodePort) {
-			Failf("got unexpected (out-of-range) port for NodePort service: %v", service)
+			Failf("got unexpected (out-of-range) port for NodePort service: %#v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %#v", service)
 		}
 
 		By("hitting the pod through the service's NodePort")
@@ -479,21 +479,21 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
-			Failf("got unexpected Spec.Type for LoadBalancer service: %v", service)
+			Failf("got unexpected Spec.Type for LoadBalancer service: %#v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %#v", service)
 		}
 		port = service.Spec.Ports[0]
 		if port.NodePort != nodePort1 {
-			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %#v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for LoadBalancer service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for LoadBalancer service: %#v", service)
 		}
 		ingress1 := service.Status.LoadBalancer.Ingress[0]
 		if ingress1.IP == "" && ingress1.Hostname == "" {
-			Failf("got unexpected Status.LoadBalancer.Ingress[0] for LoadBalancer service: %v", service)
+			Failf("got unexpected Status.LoadBalancer.Ingress[0] for LoadBalancer service: %#v", service)
 		}
 
 		By("hitting the pod through the service's NodePort")
@@ -514,17 +514,17 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
-			Failf("got unexpected Spec.Type for updated-NodePort service: %v", service)
+			Failf("got unexpected Spec.Type for updated-NodePort service: %#v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for updated-NodePort service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for updated-NodePort service: %#v", service)
 		}
 		port = service.Spec.Ports[0]
 		if port.NodePort != nodePort2 {
-			Failf("got unexpected Spec.Ports[0].nodePort for NodePort service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for updated-NodePort service: %#v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for updated-NodePort service: %#v", service)
 		}
 
 		By("hitting the pod through the service's updated NodePort")
@@ -557,17 +557,17 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for back-to-ClusterIP service: %#v", service)
 		}
 		if service.Spec.Type != api.ServiceTypeClusterIP {
-			Failf("got unexpected Spec.Type for back-to-ClusterIP service: %v", service)
+			Failf("got unexpected Spec.Type for back-to-ClusterIP service: %#v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for back-to-ClusterIP service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for back-to-ClusterIP service: %#v", service)
 		}
 		port = service.Spec.Ports[0]
 		if port.NodePort != 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for back-to-ClusterIP service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for back-to-ClusterIP service: %#v", service)
 		}
 
 		// Wait for the load balancer to be destroyed asynchronously
@@ -575,7 +575,7 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for back-to-ClusterIP service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for back-to-ClusterIP service: %#v", service)
 		}
 		By("checking the NodePort is closed")
 		ip = pickNodeIP(f.Client)
