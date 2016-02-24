@@ -26,6 +26,20 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
+const (
+	// The value of a LBAnnotationAllowSourceRange annotation determines
+	// the source IP ranges to allow to access a service exposed as
+	// type=LoadBalancer (when accesssed through the LoadBalancer created
+	// by the cloud provider).
+	//
+	// It should be a comma-separated list of CIDRs, e.g. `0.0.0.0/0` to
+	// allow full access (the default) or `18.0.0.0/8,56.0.0.0/8` to allow
+	// access only from the CIDRs currently allocated to MIT & the USPS.
+	//
+	// Not all cloud providers support this annotation, though AWS & GCE do.
+	LBAnnotationAllowSourceRange = "service.beta.kubernetes.io/load-balancer-source-ranges"
+)
+
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
@@ -84,7 +98,7 @@ type LoadBalancer interface {
 	// if so, what its status is.
 	GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations ServiceAnnotation) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	UpdateLoadBalancer(name, region string, hosts []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
@@ -159,11 +173,4 @@ type Zone struct {
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 	GetZone() (Zone, error)
-}
-
-type ServiceAnnotation map[string]string
-
-func (s ServiceAnnotation) GetValue(key string) (string, bool) {
-	val, ok := s[key]
-	return val, ok
 }
