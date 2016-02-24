@@ -175,7 +175,7 @@ hello-world   0/1       ExitCode:0   0          15s
 
 ## Viewing pod output
 
-You probably want to see the output of the command you ran. As with [`docker logs`](https://docs.docker.com/userguide/usingdocker/), `kubectl logs` will show you the output:
+You probably want to see the output of the command you ran. As with [`docker logs`](https://docs.docker.com/engine/reference/commandline/logs/), `kubectl logs` will show you the output:
 
 ```console
 $ kubectl logs hello-world
