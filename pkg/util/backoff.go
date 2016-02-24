@@ -36,6 +36,15 @@ type Backoff struct {
 	perItemBackoff  map[string]*backoffEntry
 }
 
+func NewFakeBackOff(initial, max time.Duration, tc *FakeClock) *Backoff {
+	return &Backoff{
+		perItemBackoff:  map[string]*backoffEntry{},
+		Clock:           tc,
+		defaultDuration: initial,
+		maxDuration:     max,
+	}
+}
+
 func NewBackOff(initial, max time.Duration) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
