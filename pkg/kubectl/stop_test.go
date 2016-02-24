@@ -538,8 +538,7 @@ func TestDeploymentStop(t *testing.T) {
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:deployments", "update:deployments",
-				"get:deployments", "get:deployments", "update:deployments",
-				"list:replicasets", "delete:deployments"},
+				"get:deployments", "list:replicasets", "delete:deployments"},
 		},
 		{
 			Name: "Deployment with single replicaset",
@@ -561,10 +560,9 @@ func TestDeploymentStop(t *testing.T) {
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:deployments", "update:deployments",
-				"get:deployments", "get:deployments", "update:deployments",
-				"list:replicasets", "get:replicasets", "get:replicasets",
-				"update:replicasets", "get:replicasets", "get:replicasets",
-				"delete:replicasets", "delete:deployments"},
+				"get:deployments", "list:replicasets", "get:replicasets",
+				"get:replicasets", "update:replicasets", "get:replicasets",
+				"get:replicasets", "delete:replicasets", "delete:deployments"},
 		},
 	}
 

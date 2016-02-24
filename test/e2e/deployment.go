@@ -543,7 +543,7 @@ func testPausedDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Use observedGeneration to determine if the controller noticed the resume.
-	err = waitForObservedDeployment(c, ns, deploymentName)
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
@@ -570,7 +570,7 @@ func testPausedDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Use observedGeneration to determine if the controller noticed the pause.
-	err = waitForObservedDeployment(c, ns, deploymentName)
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
 	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)

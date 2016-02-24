@@ -30,6 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -367,52 +368,25 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
 		d.Spec.RevisionHistoryLimit = util.IntPtr(0)
 		d.Spec.Replicas = 0
-		// TODO: un-pausing should not be necessary, remove when this is fixed:
-		// https://github.com/kubernetes/kubernetes/issues/20966
-		// Instead deployment should be Paused at this point and not at next TODO.
-		d.Spec.Paused = false
-	})
-	if err != nil {
-		return err
-	}
-
-	// wait for total no of pods drop to 0
-	if err := wait.Poll(reaper.pollInterval, reaper.timeout, func() (bool, error) {
-		curr, err := deployments.Get(name)
-		// if deployment was not found it must have been deleted, error out
-		if err != nil && errors.IsNotFound(err) {
-			return false, err
-		}
-		// if other errors happen, retry
-		if err != nil {
-			return false, nil
-		}
-		// check if deployment wasn't recreated with the same name
-		// TODO use generations when deployment will have them
-		if curr.UID != deployment.UID {
-			return false, errors.NewNotFound(extensions.Resource("Deployment"), name)
-		}
-		return curr.Status.Replicas == 0, nil
-	}); err != nil {
-		return err
-	}
-
-	// TODO: When deployments will allow running cleanup policy while being
-	// paused, move pausing to above update operation. Without it, we need to
-	// pause deployment before stopping RSs, to prevent creating new RSs.
-	// See https://github.com/kubernetes/kubernetes/issues/20966
-	deployment, err = reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		d.Spec.Paused = true
 	})
 	if err != nil {
 		return err
 	}
 
-	// remove remaining RSs
+	// Use observedGeneration to determine if the deployment controller noticed the pause.
+	if err := deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
+		return deployments.Get(name)
+	}, deployment.Generation, 10*time.Millisecond, 1*time.Minute); err != nil {
+		return err
+	}
+
+	// Stop all replica sets.
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return err
 	}
+
 	options := api.ListOptions{LabelSelector: selector}
 	rsList, err := replicaSets.List(options)
 	if err != nil {
@@ -430,7 +404,8 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return utilerrors.NewAggregate(errList)
 	}
 
-	// and finally deployment
+	// Delete deployment at the end.
+	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
 	return deployments.Delete(name, gracePeriod)
 }
 
