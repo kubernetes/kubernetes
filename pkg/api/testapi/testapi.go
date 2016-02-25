@@ -20,6 +20,7 @@ package testapi
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -50,6 +51,7 @@ var (
 type TestGroup struct {
 	externalGroupVersion unversioned.GroupVersion
 	internalGroupVersion unversioned.GroupVersion
+	internalTypes        map[string]reflect.Type
 }
 
 func init() {
@@ -62,9 +64,11 @@ func init() {
 				panic(fmt.Sprintf("Error parsing groupversion %v: %v", gvString, err))
 			}
 
+			internalGroupVersion := unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}
 			Groups[groupVersion.Group] = TestGroup{
 				externalGroupVersion: groupVersion,
-				internalGroupVersion: unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal},
+				internalGroupVersion: internalGroupVersion,
+				internalTypes:        api.Scheme.KnownTypes(internalGroupVersion),
 			}
 		}
 	}
@@ -73,24 +77,49 @@ func init() {
 		Groups[api.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: api.GroupName, Version: registered.GroupOrDie(api.GroupName).GroupVersion.Version},
 			internalGroupVersion: api.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(api.SchemeGroupVersion),
 		}
 	}
 	if _, ok := Groups[extensions.GroupName]; !ok {
 		Groups[extensions.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: registered.GroupOrDie(extensions.GroupName).GroupVersion.Version},
 			internalGroupVersion: extensions.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(extensions.SchemeGroupVersion),
 		}
 	}
 	if _, ok := Groups[autoscaling.GroupName]; !ok {
+		internalTypes := make(map[string]reflect.Type)
+		for k, t := range api.Scheme.KnownTypes(extensions.SchemeGroupVersion) {
+			if k == "Scale" {
+				continue
+			}
+			internalTypes[k] = t
+		}
 		Groups[autoscaling.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: autoscaling.GroupName, Version: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version},
 			internalGroupVersion: extensions.SchemeGroupVersion,
+			internalTypes:        internalTypes,
+		}
+	}
+	if _, ok := Groups[autoscaling.GroupName+"IntraGroup"]; !ok {
+		internalTypes := make(map[string]reflect.Type)
+		for k, t := range api.Scheme.KnownTypes(extensions.SchemeGroupVersion) {
+			if k == "Scale" {
+				internalTypes[k] = t
+				break
+			}
+		}
+		Groups[autoscaling.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: autoscaling.GroupName, Version: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version},
+			internalGroupVersion: autoscaling.SchemeGroupVersion,
+			internalTypes:        internalTypes,
 		}
 	}
 	if _, ok := Groups[batch.GroupName]; !ok {
 		Groups[batch.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: batch.GroupName, Version: registered.GroupOrDie(batch.GroupName).GroupVersion.Version},
 			internalGroupVersion: extensions.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(extensions.SchemeGroupVersion),
 		}
 	}
 
@@ -113,6 +142,11 @@ func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
 // types for this API
 func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 	return g.internalGroupVersion
+}
+
+// InternalTypes returns a map of internal API types' kind names to their Go types.
+func (g TestGroup) InternalTypes() map[string]reflect.Type {
+	return g.internalTypes
 }
 
 // Codec returns the codec for the API version to test against, as set by the
@@ -228,6 +262,6 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
 
-func NewTestGroup(external, internal unversioned.GroupVersion) TestGroup {
-	return TestGroup{external, internal}
+func NewTestGroup(external, internal unversioned.GroupVersion, internalTypes map[string]reflect.Type) TestGroup {
+	return TestGroup{external, internal, internalTypes}
 }
