@@ -176,14 +176,16 @@ func rsAndPodsWithHashKeySynced(deployment extensions.Deployment, c clientset.In
 func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interface, rs extensions.ReplicaSet, getPodList podListFunc) (updatedRS *extensions.ReplicaSet, err error) {
 	updatedRS = &rs
 	// If the rs already has the new hash label in its selector, it's done syncing
-	namespace := deployment.Namespace
-	hash := fmt.Sprintf("%d", podutil.GetPodTemplateSpecHash(api.PodTemplateSpec{
-		ObjectMeta: rs.Spec.Template.ObjectMeta,
-		Spec:       rs.Spec.Template.Spec,
-	}))
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return
 	}
+	namespace := deployment.Namespace
+	meta := rs.Spec.Template.ObjectMeta
+	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	hash := fmt.Sprintf("%d", podutil.GetPodTemplateSpecHash(api.PodTemplateSpec{
+		ObjectMeta: meta,
+		Spec:       rs.Spec.Template.Spec,
+	}))
 	// 1. Add hash template label to the rs. This ensures that any newly created pods will have the new label.
 	if len(updatedRS.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
 		updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
