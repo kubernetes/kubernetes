@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network
+package testing
 
 // helper for testing plugins
 // a fake host is created here that can be used by plugins for testing
@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 type fakeNetworkHost struct {
@@ -43,5 +44,5 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 }
 
 func (nh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
-	return &kubecontainer.FakeRuntime{}
+	return &containertest.FakeRuntime{}
 }

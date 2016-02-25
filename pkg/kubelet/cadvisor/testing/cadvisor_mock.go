@@ -14,20 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cadvisor
+package testing
 
 import (
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 type Mock struct {
 	mock.Mock
 }
 
-var _ Interface = new(Mock)
+var _ cadvisor.Interface = new(Mock)
 
 func (c *Mock) Start() error {
 	args := c.Called()

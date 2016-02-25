@@ -14,31 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package testing
 
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 type fakeCache struct {
-	runtime Runtime
+	runtime container.Runtime
 }
 
-func NewFakeCache(runtime Runtime) Cache {
+func NewFakeCache(runtime container.Runtime) container.Cache {
 	return &fakeCache{runtime: runtime}
 }
 
-func (c *fakeCache) Get(id types.UID) (*PodStatus, error) {
+func (c *fakeCache) Get(id types.UID) (*container.PodStatus, error) {
 	return c.runtime.GetPodStatus(id, "", "")
 }
 
-func (c *fakeCache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error) {
+func (c *fakeCache) GetNewerThan(id types.UID, minTime time.Time) (*container.PodStatus, error) {
 	return c.Get(id)
 }
 
-func (c *fakeCache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) {
+func (c *fakeCache) Set(id types.UID, status *container.PodStatus, err error, timestamp time.Time) {
 }
 
 func (c *fakeCache) Delete(id types.UID) {

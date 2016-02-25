@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package testing
 
 import (
 	"io"
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/pkg/api"
+	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"

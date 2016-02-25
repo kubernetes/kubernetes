@@ -25,18 +25,21 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestRunOnce(t *testing.T) {
-	cadvisor := &cadvisor.Mock{}
+	cadvisor := &cadvisortest.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	cadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
 		Usage:     400 * mb,
@@ -47,9 +50,9 @@ func TestRunOnce(t *testing.T) {
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
-	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
-	fakeRuntime := &kubecontainer.FakeRuntime{}
+	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir %v", err)
@@ -64,7 +67,7 @@ func TestRunOnce(t *testing.T) {
 		statusManager:       status.NewManager(nil, podManager),
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
-		os:                  kubecontainer.FakeOS{},
+		os:                  containertest.FakeOS{},
 		volumeManager:       newVolumeManager(),
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
@@ -73,7 +76,7 @@ func TestRunOnce(t *testing.T) {
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
-	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}

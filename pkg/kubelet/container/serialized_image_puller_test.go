@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package container_test
 
 import (
 	"errors"
@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	. "k8s.io/kubernetes/pkg/kubelet/container"
+	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -101,7 +103,7 @@ func TestSerializedPuller(t *testing.T) {
 		fakeClock := util.NewFakeClock(time.Now())
 		backOff.Clock = fakeClock
 
-		fakeRuntime := &FakeRuntime{}
+		fakeRuntime := &ctest.FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
 		puller := NewSerializedImagePuller(fakeRecorder, fakeRuntime, backOff)
 
