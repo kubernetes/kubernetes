@@ -760,6 +760,7 @@ type KubeletConfig struct {
 	NodeIP                     net.IP
 	ContainerRuntimeOptions    []kubecontainer.Option
 	HairpinMode                string
+	Options                    []kubelet.Option
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -846,6 +847,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.VolumeStatsAggPeriod,
 		kc.ContainerRuntimeOptions,
 		kc.HairpinMode,
+		kc.Options,
 	)
 
 	if err != nil {

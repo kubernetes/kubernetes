@@ -191,6 +191,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil)
 	kubelet.clock = fakeClock
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
 }
 
