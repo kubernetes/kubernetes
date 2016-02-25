@@ -2100,6 +2100,15 @@ func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, diskType
 	return gce.waitForZoneOp(createOp, zone)
 }
 
+// This function should be used only for testing of CreateDisk()
+func (gce *GCECloud) GetDiskProperties(name string, zone string) (sizeGb int64, diskType string, err error) {
+	disk, err := gce.getDiskByName(name, zone)
+	if err != nil {
+		return 0, "", err
+	}
+	return disk.Size, disk.Type, nil
+}
+
 func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 	disk, err := gce.getDiskByNameUnknownZone(diskToDelete)
 	if err != nil {
@@ -2203,6 +2212,15 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, err
 			Zone: lastComponent(disk.Zone),
 			Name: disk.Name,
 			Kind: disk.Kind,
+			Size: disk.SizeGb,
+		}
+
+		// Trim the URL from disk type (see diskTypeTemplate for expected format)
+		lastSlash := strings.LastIndex(disk.Type, "/")
+		if lastSlash > 0 {
+			d.Type = disk.Type[lastSlash+1:]
+		} else {
+			d.Type = disk.Type
 		}
 		return d, nil
 	}
@@ -2318,6 +2336,8 @@ type gceDisk struct {
 	Zone string
 	Name string
 	Kind string
+	Type string
+	Size int64
 }
 
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
