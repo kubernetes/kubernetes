@@ -187,6 +187,9 @@ type Volumes interface {
 
 	// Get labels to apply to volume on creation
 	GetVolumeLabels(volumeName string) (map[string]string, error)
+
+	// Get volume properties, used only for testing of CreateDisk
+	GetDiskProperties(diskName string) (VolumeOptions, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1442,6 +1445,31 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 		}
 	}
 	return volumeName, nil
+}
+
+// Implements Volumes.GetDiskProperties
+func (aws *AWSCloud) GetDiskProperties(volumeName string) (VolumeOptions, error) {
+	opts := VolumeOptions{}
+
+	awsDisk, err := newAWSDisk(aws, volumeName)
+	if err != nil {
+		return opts, err
+	}
+
+	info, err := awsDisk.getInfo()
+	if err != nil {
+		return opts, err
+	}
+	if info.Size != nil {
+		opts.CapacityGB = int(*info.Size)
+	}
+	if info.Iops != nil {
+		opts.IOPS = *info.Iops
+	}
+	if info.VolumeType != nil {
+		opts.VolumeType = *info.VolumeType
+	}
+	return opts, nil
 }
 
 // Implements Volumes.DeleteDisk
