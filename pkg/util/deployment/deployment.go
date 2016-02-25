@@ -435,7 +435,7 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 	switch deployment.Spec.Strategy.Type {
 	case extensions.RollingUpdateDeploymentStrategyType:
 		// Check if we can scale up.
-		maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Replicas)
+		maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Replicas, true)
 		if err != nil {
 			return 0, err
 		}
