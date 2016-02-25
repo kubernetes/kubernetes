@@ -1851,22 +1851,27 @@ func (s *AWSCloud) createTags(resourceID string, tags map[string]string) error {
 	}
 }
 
-func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
-
+func (s *AWSCloud) listPublicSubnetIDsinVPC(vpcId string) ([]string, error) {
 	subnetIds := []string{}
 
-	request := &ec2.DescribeSubnetsInput{}
+	sRequest := &ec2.DescribeSubnetsInput{}
 	filters := []*ec2.Filter{}
 	filters = append(filters, newEc2Filter("vpc-id", vpcId))
-	// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
-	// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
-	// only the public subnet (where the ELB will go) is so tagged.
 	filters = s.addFilters(filters)
-	request.Filters = filters
+	sRequest.Filters = filters
 
-	subnets, err := s.ec2.DescribeSubnets(request)
+	subnets, err := s.ec2.DescribeSubnets(sRequest)
 	if err != nil {
 		glog.Error("Error describing subnets: ", err)
+		return nil, err
+	}
+
+	rRequest := &ec2.DescribeRouteTablesInput{}
+	rRequest.Filters = filters
+
+	rt, err := s.ec2.DescribeRouteTables(rRequest)
+	if err != nil {
+		glog.Error("error describing route tables: ", err)
 		return nil, err
 	}
 
@@ -1874,6 +1879,10 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 	for _, subnet := range subnets {
 		az := orEmpty(subnet.AvailabilityZone)
 		id := orEmpty(subnet.SubnetId)
+		if !isSubnetPublic(rt, id) {
+			glog.V(2).Infof("Ignoring private subnet %q", id)
+			continue
+		}
 		if availabilityZones.Has(az) {
 			glog.Warning("Found multiple subnets per AZ '", az, "', ignoring subnet '", id, "'")
 			continue
@@ -1883,6 +1892,33 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 	}
 
 	return subnetIds, nil
+}
+
+func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) bool {
+	for _, table := range rt {
+		var found bool
+		for _, assoc := range table.Associations {
+			if aws.StringValue(assoc.SubnetId) == subnetID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		for _, route := range table.Routes {
+			// There is no direct way in the AWS API to determine if a subnet is public or private.
+			// A public subnet is one which has an internet gateway route
+			// we look for the gatewayId and make sure it has the prefix of igw to differentiate
+			// from the default in-subnet route which is called "local"
+			// or other virtual gateway (starting with vgv)
+			// or vpc peering connections (starting with pcx).
+			if strings.HasPrefix(aws.StringValue(route.GatewayId), "igw") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
@@ -1925,7 +1961,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Construct list of configured subnets
-	subnetIDs, err := s.listSubnetIDsinVPC(vpcId)
+	subnetIDs, err := s.listPublicSubnetIDsinVPC(vpcId)
 	if err != nil {
 		glog.Error("Error listing subnets in VPC", err)
 		return nil, err
