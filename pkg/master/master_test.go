@@ -568,8 +568,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			}
 
 			if len(list.Items) != len(test.items) {
-				t.Errorf("unexpected length: %d vs %d", len(list.Items), len(test.items))
-				return
+				t.Fatalf("unexpected length: %d vs %d", len(list.Items), len(test.items))
 			}
 			// The order of elements in LIST is not guaranteed.
 			mapping := make(map[string]int)
@@ -715,8 +714,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 
 	resp, err := http.Post(server.URL+"/apis/company.com/"+version+"/namespaces/default/foos", "application/json", bytes.NewBuffer(data))
 	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-		return
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	assert.Equal(http.StatusCreated, resp.StatusCode)
@@ -825,6 +823,39 @@ func httpDelete(url string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	client := &http.Client{}
+	return client.Do(req)
+}
+
+func TestInstallThirdPartyAPIListOptions(t *testing.T) {
+	for _, version := range versionsToTest {
+		testInstallThirdPartyAPIListOptionsForVersion(t, version)
+	}
+}
+
+func testInstallThirdPartyAPIListOptionsForVersion(t *testing.T, version string) {
+	_, etcdserver, server, assert := initThirdParty(t, version)
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
+	defer etcdserver.Terminate(t)
+
+	// send a GET request with query parameter
+	resp, err := httpGetWithRV(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos")
+	if !assert.NoError(err) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
+func httpGetWithRV(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	q := req.URL.Query()
+	// resourceversion is part of a ListOptions
+	q.Add("resourceversion", "0")
+	req.URL.RawQuery = q.Encode()
 	client := &http.Client{}
 	return client.Do(req)
 }
