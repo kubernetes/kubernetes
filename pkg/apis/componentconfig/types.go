@@ -399,11 +399,11 @@ type KubeControllerManagerConfiguration struct {
 	// but more CPU (and network) load.
 	ConcurrentEndpointSyncs int `json:"concurrentEndpointSyncs"`
 	// concurrentRSSyncs is the number of replica sets that are  allowed to sync
-	// concurrently. Larger number = more reponsive replica  management, but more
+	// concurrently. Larger number = more responsive replica  management, but more
 	// CPU (and network) load.
 	ConcurrentRSSyncs int `json:"concurrentRSSyncs"`
 	// concurrentRCSyncs is the number of replication controllers that are
-	// allowed to sync concurrently. Larger number = more reponsive replica
+	// allowed to sync concurrently. Larger number = more responsive replica
 	// management, but more CPU (and network) load.
 	ConcurrentRCSyncs int `json:"concurrentRCSyncs"`
 	// concurrentResourceQuotaSyncs is the number of resource quotas that are
@@ -411,20 +411,26 @@ type KubeControllerManagerConfiguration struct {
 	// management, but more CPU (and network) load.
 	ConcurrentResourceQuotaSyncs int `json:"concurrentResourceQuotaSyncs"`
 	// concurrentDeploymentSyncs is the number of deployment objects that are
-	// allowed to sync concurrently. Larger number = more reponsive deployments,
+	// allowed to sync concurrently. Larger number = more responsive deployments,
 	// but more CPU (and network) load.
 	ConcurrentDeploymentSyncs int `json:"concurrentDeploymentSyncs"`
 	// concurrentDaemonSetSyncs is the number of daemonset objects that are
-	// allowed to sync concurrently. Larger number = more reponsive DaemonSet,
+	// allowed to sync concurrently. Larger number = more responsive DaemonSet,
 	// but more CPU (and network) load.
 	ConcurrentDaemonSetSyncs int `json:"concurrentDaemonSetSyncs"`
 	// concurrentJobSyncs is the number of job objects that are
-	// allowed to sync concurrently. Larger number = more reponsive jobs,
+	// allowed to sync concurrently. Larger number = more responsive jobs,
 	// but more CPU (and network) load.
 	ConcurrentJobSyncs int `json:"concurrentJobSyncs"`
 	// concurrentNamespaceSyncs is the number of namespace objects that are
 	// allowed to sync concurrently.
 	ConcurrentNamespaceSyncs int `json:"concurrentNamespaceSyncs"`
+	// LookupCacheSizeForRC is the size of lookup cache for replication controllers.
+	// Larger number = more responsive replica management, but more MEM load.
+	LookupCacheSizeForRC int `json:"lookupCacheSizeForRC"`
+	// LookupCacheSizeForRS is the size of lookup cache for replicatsets.
+	// Larger number = more responsive replica management, but more MEM load.
+	LookupCacheSizeForRS int `json:"lookupCacheSizeForRS"`
 	// serviceSyncPeriod is the period for syncing services with their external
 	// load balancers.
 	ServiceSyncPeriod unversioned.Duration `json:"serviceSyncPeriod"`
