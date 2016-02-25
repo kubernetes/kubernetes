@@ -15175,6 +15175,10 @@
      "host": {
       "type": "string",
       "description": "Host name on which the event is generated."
+     },
+     "schedulerName": {
+      "type": "string",
+      "description": "Scheduler name on which the event is generated."
      }
     }
    },

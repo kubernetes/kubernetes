@@ -672,6 +672,7 @@ func deepCopy_v1_EventList(in EventList, out *EventList, c *conversion.Cloner) e
 func deepCopy_v1_EventSource(in EventSource, out *EventSource, c *conversion.Cloner) error {
 	out.Component = in.Component
 	out.Host = in.Host
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 

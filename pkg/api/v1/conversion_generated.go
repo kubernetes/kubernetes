@@ -866,6 +866,7 @@ func autoConvert_api_EventSource_To_v1_EventSource(in *api.EventSource, out *Eve
 	}
 	out.Component = in.Component
 	out.Host = in.Host
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
@@ -4162,6 +4163,7 @@ func autoConvert_v1_EventSource_To_api_EventSource(in *EventSource, out *api.Eve
 	}
 	out.Component = in.Component
 	out.Host = in.Host
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
