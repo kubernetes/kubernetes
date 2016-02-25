@@ -255,6 +255,7 @@ function verify-cluster {
   (
     # ensures KUBECONFIG is set
     get-kubeconfig-basicauth
+    get-kubeconfig-bearertoken
     echo
     echo "Kubernetes cluster is running."
     echo
@@ -307,6 +308,7 @@ function kube-down {
 # Update a kubernetes cluster with latest source
 function kube-push {
   get-kubeconfig-basicauth
+  get-kubeconfig-bearertoken
   create-provision-scripts
   vagrant provision
 }
