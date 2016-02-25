@@ -113,7 +113,7 @@ func (es *e2eService) startEtcd() (*exec.Cmd, error) {
 		combinedOut:    &es.etcdCombinedOut,
 		healthCheckUrl: "http://127.0.0.1:4001/v2/keys",
 		command:        "etcd",
-		args:           []string{"--data-dir", dataDir, "--name", "e2e-node"},
+		args:           []string{"--data-dir", dataDir},
 	})
 }
 

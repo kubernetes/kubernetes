@@ -15,8 +15,7 @@ limitations under the License.
 */
 
 // To run tests in this suite
-// NOTE: This test suite requires sudo capabilities to run the kubelet and kube-apiserver.
-// $ sudo -v && ginkgo test/e2e_node/ -- --logtostderr --v 2 --node-name `hostname` --start-services
+// NOTE: This test suite requires password-less sudo capabilities to run the kubelet and kube-apiserver.
 package e2e_node
 
 import (
@@ -37,7 +36,7 @@ var apiServerAddress = flag.String("api-server-address", "http://127.0.0.1:8080"
 var nodeName = flag.String("node-name", "", "Name of the node")
 var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
-var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tets")
+var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
 var e2es *e2eService
 

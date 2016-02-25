@@ -118,19 +118,21 @@ func CreateTestArchive() string {
 }
 
 // RunRemote copies the archive file to a /tmp file on host, unpacks it, and runs the e2e_node.test
-func RunRemote(archive string, host string) (string, error) {
+func RunRemote(archive string, host string, deleteFiles bool) (string, error) {
 	// Create the temp staging directory
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
 	_, err := RunSshCommand("ssh", host, "--", "mkdir", tmp)
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		output, err := RunSshCommand("ssh", host, "--", "rm", "-rf", tmp)
-		if err != nil {
-			glog.Errorf("Failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
-		}
-	}()
+	if deleteFiles {
+		defer func() {
+			output, err := RunSshCommand("ssh", host, "--", "rm", "-rf", tmp)
+			if err != nil {
+				glog.Errorf("Failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
+			}
+		}()
+	}
 
 	// Copy the archive to the staging directory
 	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", host, tmp))
