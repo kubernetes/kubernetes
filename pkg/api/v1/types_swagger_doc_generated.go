@@ -60,6 +60,15 @@ func (AttachedVolume) SwaggerDoc() map[string]string {
 	return map_AttachedVolume
 }
 
+var map_AvoidPods = map[string]string{
+	"":                "AvoidPods describes pods that should avoid this node. This is the value for a Node annotation with key scheduler.alpha.kubernetes.io/preferAvoidPods and will eventually become a field of NodeStatus.",
+	"preferAvoidPods": "Bounded-sized list of signatures of pods that should avoid this node, sorted in timestamp order from oldest to newest. Size of the slice is unspecified.",
+}
+
+func (AvoidPods) SwaggerDoc() map[string]string {
+	return map_AvoidPods
+}
+
 var map_AzureFileVolumeSource = map[string]string{
 	"":           "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
@@ -1227,6 +1236,15 @@ func (PodSecurityContext) SwaggerDoc() map[string]string {
 	return map_PodSecurityContext
 }
 
+var map_PodSignature = map[string]string{
+	"":              "Describes the class of pods that should avoid this node. Exactly one field should be set.",
+	"podController": "Reference to controller whose pods should avoid this node.",
+}
+
+func (PodSignature) SwaggerDoc() map[string]string {
+	return map_PodSignature
+}
+
 var map_PodSpec = map[string]string{
 	"":                              "PodSpec is a description of a pod.",
 	"volumes":                       "List of volumes that can be mounted by containers belonging to the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md",
@@ -1315,6 +1333,18 @@ var map_Preconditions = map[string]string{
 
 func (Preconditions) SwaggerDoc() map[string]string {
 	return map_Preconditions
+}
+
+var map_PreferAvoidPodsEntry = map[string]string{
+	"":             "Describes a class of pods that should avoid this node.",
+	"podSignature": "The class of pods.",
+	"evictionTime": "Time at which this entry was added to the list.",
+	"reason":       "(brief) reason why this entry was added to the list.",
+	"message":      "Human readable message indicating why this entry was added to the list.",
+}
+
+func (PreferAvoidPodsEntry) SwaggerDoc() map[string]string {
+	return map_PreferAvoidPodsEntry
 }
 
 var map_PreferredSchedulingTerm = map[string]string{

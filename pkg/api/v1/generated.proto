@@ -80,6 +80,15 @@ message AttachedVolume {
   optional string devicePath = 2;
 }
 
+// AvoidPods describes pods that should avoid this node. This is the value for a
+// Node annotation with key scheduler.alpha.kubernetes.io/preferAvoidPods and
+// will eventually become a field of NodeStatus.
+message AvoidPods {
+  // Bounded-sized list of signatures of pods that should avoid this node, sorted
+  // in timestamp order from oldest to newest. Size of the slice is unspecified.
+  repeated PreferAvoidPodsEntry preferAvoidPods = 1;
+}
+
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
@@ -2040,6 +2049,13 @@ message PodSecurityContext {
   optional int64 fsGroup = 5;
 }
 
+// Describes the class of pods that should avoid this node.
+// Exactly one field should be set.
+message PodSignature {
+  // Reference to controller whose pods should avoid this node.
+  optional OwnerReference podController = 1;
+}
+
 // PodSpec is a description of a pod.
 message PodSpec {
   // List of volumes that can be mounted by containers belonging to the pod.
@@ -2217,6 +2233,21 @@ message PodTemplateSpec {
 message Preconditions {
   // Specifies the target UID.
   optional string uid = 1;
+}
+
+// Describes a class of pods that should avoid this node.
+message PreferAvoidPodsEntry {
+  // The class of pods.
+  optional PodSignature podSignature = 1;
+
+  // Time at which this entry was added to the list.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time evictionTime = 2;
+
+  // (brief) reason why this entry was added to the list.
+  optional string reason = 3;
+
+  // Human readable message indicating why this entry was added to the list.
+  optional string message = 4;
 }
 
 // An empty preferred scheduling term matches all objects with implicit weight 0

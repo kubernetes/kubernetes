@@ -2408,6 +2408,34 @@ type AttachedVolume struct {
 	DevicePath string `json:"devicePath" protobuf:"bytes,2,rep,name=devicePath"`
 }
 
+// AvoidPods describes pods that should avoid this node. This is the value for a
+// Node annotation with key scheduler.alpha.kubernetes.io/preferAvoidPods and
+// will eventually become a field of NodeStatus.
+type AvoidPods struct {
+	// Bounded-sized list of signatures of pods that should avoid this node, sorted
+	// in timestamp order from oldest to newest. Size of the slice is unspecified.
+	PreferAvoidPods []PreferAvoidPodsEntry `json:"preferAvoidPods,omitempty" protobuf:"bytes,1,rep,name=preferAvoidPods"`
+}
+
+// Describes a class of pods that should avoid this node.
+type PreferAvoidPodsEntry struct {
+	// The class of pods.
+	PodSignature PodSignature `json:"podSignature" protobuf:"bytes,1,opt,name=podSignature"`
+	// Time at which this entry was added to the list.
+	EvictionTime unversioned.Time `json:"evictionTime,omitempty" protobuf:"bytes,2,opt,name=evictionTime"`
+	// (brief) reason why this entry was added to the list.
+	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// Human readable message indicating why this entry was added to the list.
+	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
+}
+
+// Describes the class of pods that should avoid this node.
+// Exactly one field should be set.
+type PodSignature struct {
+	// Reference to controller whose pods should avoid this node.
+	PodController *OwnerReference `json:"podController,omitempty" protobuf:"bytes,1,opt,name=podController"`
+}
+
 // Describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
