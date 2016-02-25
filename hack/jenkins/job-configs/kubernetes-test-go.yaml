@@ -47,7 +47,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: 30
+            timeout: '{timeout}'
             fail: true
         - timestamps
         - raw:
@@ -69,7 +69,9 @@
     suffix:
         - 'go':
             branch: 'master'
+            timeout: 45
         - 'go-release-1.1':
             branch: 'release-1.1'
+            timeout: 30
     jobs:
         - 'kubernetes-test-{suffix}'
