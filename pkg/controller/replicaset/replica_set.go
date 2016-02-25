@@ -95,7 +95,7 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController creates a new ReplicaSetController.
-func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicaSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
@@ -191,7 +191,7 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 
 	rsc.syncHandler = rsc.syncReplicaSet
 	rsc.podStoreSynced = rsc.podController.HasSynced
-	rsc.lookupCache = controller.NewMatchingCache(controller.DefaultCacheEntries)
+	rsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return rsc
 }
 

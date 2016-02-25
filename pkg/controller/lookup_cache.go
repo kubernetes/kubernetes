@@ -25,8 +25,6 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-const DefaultCacheEntries = 4096
-
 type objectWithMeta interface {
 	meta.Object
 }
