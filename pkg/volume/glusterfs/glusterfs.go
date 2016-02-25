@@ -61,7 +61,7 @@ func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Glusterfs == nil) {
 		return false
 	}
-	
+
 	return true
 
 }
