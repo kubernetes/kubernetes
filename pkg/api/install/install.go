@@ -97,7 +97,6 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"Namespace",
 		"PersistentVolume",
 		"ComponentStatus",
-		"Cluster",
 	)
 
 	// these kinds should be excluded from the list of resources
