@@ -238,7 +238,9 @@ function verify-cluster {
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local validated="0"
     until [[ "$validated" == "1" ]]; do
-      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+# -o name fails because the json selector name has the wrong case
+#      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes)
       validated=$(echo $nodes | grep -c "${NODE_NAMES[i]}") || {
         printf "."
         sleep 2
