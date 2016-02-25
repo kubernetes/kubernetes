@@ -265,7 +265,7 @@ func (r *hostPathProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolu
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-hostpath-",
+			Name: fmt.Sprintf("pv-hostpath-%s", r.options.ClaimUID),
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
 			},

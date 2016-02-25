@@ -425,8 +425,8 @@ func (c *awsElasticBlockStoreProvisioner) NewPersistentVolumeTemplate() (*api.Pe
 	// awsElasticBlockStoreProvisioner.Provision()
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-aws-",
-			Labels:       map[string]string{},
+			Name:   fmt.Sprintf("pv-aws-%s", c.options.ClaimUID),
+			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "aws-ebs-dynamic-provisioner",
 			},

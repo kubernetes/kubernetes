@@ -370,6 +370,7 @@ func (controller *PersistentVolumeProvisionerController) newProvisioner(plugin v
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 		CloudTags:                     &tags,
 		ClusterName:                   controller.clusterName,
+		ClaimUID:                      claim.UID,
 	}
 
 	if pv != nil {

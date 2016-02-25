@@ -387,8 +387,8 @@ func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.Persi
 	// gcePersistentDiskProvisioner.Provision()
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-gce-",
-			Labels:       map[string]string{},
+			Name:   fmt.Sprintf("pv-gce-%s", c.options.ClaimUID),
+			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
 			},
