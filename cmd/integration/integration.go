@@ -493,7 +493,7 @@ func runAPIVersionsTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to get api versions: %v", err)
 	}
-	versions := client.ExtractGroupVersions(g)
+	versions := unversioned.ExtractGroupVersions(g)
 
 	// Verify that the server supports the API version used by the client.
 	for _, version := range versions {
