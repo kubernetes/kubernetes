@@ -50,20 +50,22 @@ type (
 		inbox   chan podGCRequest
 		ongoing map[jobKey]cancelFunc
 		pods    unversioned_core.PodsGetter
+		done    <-chan struct{}
 	}
 )
 
-func newPodGC(pods unversioned_core.PodsGetter) *podGC {
+func newPodGC(pods unversioned_core.PodsGetter, done <-chan struct{}) *podGC {
 	return &podGC{
 		inbox:   make(chan podGCRequest),
 		ongoing: map[jobKey]cancelFunc{},
 		pods:    pods,
+		done:    done,
 	}
 }
 
 // schedule returns a response chan that generates true if GC completed normaly, otherwise false.
 // a response chan may generate multiple values but only the first one is valid.
-func (gc *podGC) schedule(host, slaveID string, done <-chan struct{}) (chan<- bool, error) {
+func (gc *podGC) schedule(host, slaveID string) (chan<- bool, error) {
 	var (
 		err      error
 		response = make(chan bool, 2)
@@ -72,7 +74,7 @@ func (gc *podGC) schedule(host, slaveID string, done <-chan struct{}) (chan<- bo
 		select {
 		case gc.inbox <- podGCRequest{jobKey{host, slaveID}, response}:
 			return response, nil
-		case <-done:
+		case <-gc.done:
 		}
 	} else {
 		err = fmt.Errorf("failed to schedule GC for host %q slaveID %q: both params are required", host, slaveID)
@@ -82,7 +84,7 @@ func (gc *podGC) schedule(host, slaveID string, done <-chan struct{}) (chan<- bo
 	return response, err
 }
 
-func (gc *podGC) run(done <-chan struct{}) {
+func (gc *podGC) run() {
 	var (
 		t        = time.NewTimer(0)
 		requests = map[jobKey][]podGCRequest{}
@@ -100,7 +102,7 @@ func (gc *podGC) run(done <-chan struct{}) {
 	<-t.C // sanity: start w/ a clear timer chan
 	for {
 		select {
-		case <-done:
+		case <-gc.done:
 			return
 
 		case r := <-gc.inbox:

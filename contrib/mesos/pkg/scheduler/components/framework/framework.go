@@ -193,8 +193,8 @@ func (k *framework) Init(sched scheduler.Scheduler, electedMaster proc.Process, 
 	k.terminate = electedMaster.Done()
 	k.offers.Init(k.terminate)
 	k.nodeRegistrator.Run(k.terminate)
-	k.podGC = newPodGC(k.client.Core())
-	go k.podGC.run(k.terminate)
+	k.podGC = newPodGC(k.client.Core(), k.terminate)
+	go k.podGC.run()
 	return k.recoverTasks()
 }
 
@@ -538,7 +538,7 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 		// dies and fails to respawn then the kubelet-executor could stay running for a very long time)
 		sid := slaveID.GetValue()
 		host := k.slaveHostNames.HostName(sid)
-		_, err := k.podGC.schedule(host, sid, k.terminate)
+		_, err := k.podGC.schedule(host, sid)
 		if err != nil {
 			log.Errorln(err.Error())
 		}
@@ -677,7 +677,7 @@ func (k *framework) SlaveLost(driver bindings.SchedulerDriver, slaveId *mesos.Sl
 	// if true, we may want to kamikaze the executor if it's still running (because if the slave proc
 	// dies and fails to respawn then the kubelet-executor could stay running for a very long time)
 	host := k.slaveHostNames.HostName(sid)
-	_, err := k.podGC.schedule(host, sid, k.terminate)
+	_, err := k.podGC.schedule(host, sid)
 	if err != nil {
 		log.Errorln(err.Error())
 	}
