@@ -116,13 +116,17 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 	}
 }
 
-func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int) (int, error) {
+func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
 	value, isPercent, err := getIntOrPercentValue(intOrPercent)
 	if err != nil {
 		return 0, fmt.Errorf("invalid value for IntOrString: %v", err)
 	}
 	if isPercent {
-		value = int(math.Ceil(float64(value) * (float64(total)) / 100))
+		if roundUp {
+			value = int(math.Ceil(float64(value) * (float64(total)) / 100))
+		} else {
+			value = int(math.Floor(float64(value) * (float64(total)) / 100))
+		}
 	}
 	return value, nil
 }
