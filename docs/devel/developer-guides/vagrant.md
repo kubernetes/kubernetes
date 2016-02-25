@@ -48,7 +48,14 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 ### Setup
 
-By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-node-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
+Setting up a cluster is as simple as running:
+
+```sh
+export KUBERNETES_PROVIDER=vagrant
+curl -sS https://get.k8s.io | bash
+```
+
+Alternatively, you can download [Kubernetes release](https://github.com/kubernetes/kubernetes/releases) and extract the archive. To start your local cluster, open a shell and run:
 
 ```sh
 cd kubernetes
@@ -59,6 +66,10 @@ export KUBERNETES_PROVIDER=vagrant
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
+By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-node-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space).
+
+Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
+
 If you installed more than one Vagrant provider, Kubernetes will usually pick the appropriate one. However, you can override which one Kubernetes will use by setting the [`VAGRANT_DEFAULT_PROVIDER`](https://docs.vagrantup.com/v2/providers/default.html) environment variable:
 
 ```sh
@@ -67,9 +78,7 @@ export KUBERNETES_PROVIDER=vagrant
 ./cluster/kube-up.sh
 ```
 
-Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
-
-By default, each VM in the cluster is running Fedora, and all of the Kubernetes services are installed into systemd.
+By default, each VM in the cluster is running Fedora.
 
 To access the master or any node:
 
@@ -78,35 +87,45 @@ vagrant ssh master
 vagrant ssh node-1
 ```
 
-If you are running more than one nodes, you can access the others by:
+If you are running more than one node, you can access the others by:
 
 ```sh
 vagrant ssh node-2
 vagrant ssh node-3
 ```
 
+Each node in the cluster installs the docker daemon and the kubelet.
+
+The master node instantiates the Kubernetes master components as pods on the machine.
+
 To view the service status and/or logs on the kubernetes-master:
 
 ```console
-$ vagrant ssh master
-[vagrant@kubernetes-master ~] $ sudo systemctl status kube-apiserver
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-apiserver
+[vagrant@kubernetes-master ~] $ vagrant ssh master
+[vagrant@kubernetes-master ~] $ sudo su
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status kube-controller-manager
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-controller-manager
+[root@kubernetes-master ~] $ systemctl status kubelet
+[root@kubernetes-master ~] $ journalctl -ru kubelet
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status etcd
-[vagrant@kubernetes-master ~] $ sudo systemctl status nginx
+[root@kubernetes-master ~] $ systemctl status docker
+[root@kubernetes-master ~] $ journalctl -ru docker
+
+[root@kubernetes-master ~] $ tail -f /var/log/kube-apiserver.log
+[root@kubernetes-master ~] $ tail -f /var/log/kube-controller-manager.log
+[root@kubernetes-master ~] $ tail -f /var/log/kube-scheduler.log
 ```
 
 To view the services on any of the nodes:
 
 ```console
-$ vagrant ssh node-1
-[vagrant@kubernetes-node-1] $ sudo systemctl status docker
-[vagrant@kubernetes-node-1] $ sudo journalctl -r -u docker
-[vagrant@kubernetes-node-1] $ sudo systemctl status kubelet
-[vagrant@kubernetes-node-1] $ sudo journalctl -r -u kubelet
+[vagrant@kubernetes-master ~] $ vagrant ssh node-1
+[vagrant@kubernetes-master ~] $ sudo su
+
+[root@kubernetes-master ~] $ systemctl status kubelet
+[root@kubernetes-master ~] $ journalctl -ru kubelet
+
+[root@kubernetes-master ~] $ systemctl status docker
+[root@kubernetes-master ~] $ journalctl -ru docker
 ```
 
 ### Interacting with your Kubernetes cluster with Vagrant.
