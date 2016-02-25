@@ -230,6 +230,10 @@ func (f *Framework) afterEach() {
 }
 
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
+	createTestingNS := testContext.CreateTestingNS
+	if createTestingNS == nil {
+		createTestingNS = CreateTestingNS
+	}
 	ns, err := createTestingNS(baseName, f.Client, labels)
 	if err == nil {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
