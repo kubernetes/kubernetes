@@ -575,7 +575,7 @@ func testPausedDeployment(f *Framework) {
 
 	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(c.Extensions().ReplicaSets(ns).Delete(newRS.Name, nil)).NotTo(HaveOccurred())
+	Expect(DeleteReplicaSet(unversionedClient, ns, newRS.Name)).NotTo(HaveOccurred())
 
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
