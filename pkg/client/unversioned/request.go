@@ -645,7 +645,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
@@ -710,7 +710,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
@@ -792,7 +792,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		req.Header = r.headers
 
-		time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
 		if err != nil {
@@ -812,7 +812,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			retries++
 			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
 				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
-				time.Sleep(time.Duration(seconds) * time.Second)
+				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
 			}
 			fn(req, resp)
