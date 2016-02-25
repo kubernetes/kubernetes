@@ -1380,25 +1380,34 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 			return output
 		},
 	}
-	sort.StringSlice(expectedPods).Sort()
+
+	expectedEndpoints := sets.NewString(expectedPods...)
 	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
 	for _, cmdFunc := range commands {
 		passed := false
-		gotPods := []string{}
+		gotEndpoints := sets.NewString()
+
 		// Retry cmdFunc for a while
-		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-			pods := strings.Split(strings.TrimSpace(cmdFunc()), "\n")
-			// Uniq pods before the sort because inserting them into a set
-			// (which is implemented using dicts) can re-order them.
-			gotPods = sets.NewString(pods...).List()
-			if api.Semantic.DeepEqual(gotPods, expectedPods) {
+		for start := time.Now(); time.Since(start) < kubeProxyLagTimeout; time.Sleep(5 * time.Second) {
+			for _, endpoint := range strings.Split(cmdFunc(), "\n") {
+				trimmedEp := strings.TrimSpace(endpoint)
+				if trimmedEp != "" {
+					gotEndpoints.Insert(trimmedEp)
+				}
+			}
+			if expectedEndpoints.Equal(gotEndpoints) {
 				passed = true
 				break
 			}
-			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, gotPods)
+			Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
 		}
 		if !passed {
-			return fmt.Errorf("service verification failed for: %s, expected %v, got %v", serviceIP, expectedPods, gotPods)
+			// Sort the lists so they're easier to visually diff.
+			exp := expectedEndpoints.List()
+			got := gotEndpoints.List()
+			sort.StringSlice(exp).Sort()
+			sort.StringSlice(got).Sort()
+			return fmt.Errorf("service verification failed for: %s\nexpected %v\nreceived %v", serviceIP, exp, got)
 		}
 	}
 	return nil
