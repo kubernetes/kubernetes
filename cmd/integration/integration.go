@@ -46,9 +46,9 @@ import (
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
@@ -203,7 +203,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
-	cadvisorInterface := new(cadvisor.Fake)
+	cadvisorInterface := new(cadvisortest.Fake)
 
 	// Kubelet (localhost)
 	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
@@ -225,7 +225,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		cadvisorInterface,
 		configFilePath,
 		nil,
-		kubecontainer.FakeOS{},
+		containertest.FakeOS{},
 		1*time.Second,  /* FileCheckFrequency */
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
@@ -257,7 +257,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		cadvisorInterface,
 		"",
 		nil,
-		kubecontainer.FakeOS{},
+		containertest.FakeOS{},
 		1*time.Second,  /* FileCheckFrequency */
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */

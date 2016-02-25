@@ -14,25 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package prober
+package container
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
-)
+// TestRunTimeCache embeds runtimeCache with some additional methods for
+// testing.
+type TestRuntimeCache struct {
+	runtimeCache
+}
 
-type FakeManager struct{}
+func (r *TestRuntimeCache) UpdateCacheWithLock() error {
+	r.Lock()
+	defer r.Unlock()
+	return r.updateCache()
+}
 
-var _ Manager = FakeManager{}
+func (r *TestRuntimeCache) GetCachedPods() []*Pod {
+	r.Lock()
+	defer r.Unlock()
+	return r.pods
+}
 
-// Unused methods.
-func (_ FakeManager) AddPod(_ *api.Pod)        {}
-func (_ FakeManager) RemovePod(_ *api.Pod)     {}
-func (_ FakeManager) CleanupPods(_ []*api.Pod) {}
-func (_ FakeManager) Start()                   {}
-
-func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *api.PodStatus) {
-	for i := range podStatus.ContainerStatuses {
-		podStatus.ContainerStatuses[i].Ready = true
-	}
+func NewTestRuntimeCache(getter podsGetter) *TestRuntimeCache {
+	c, _ := NewRuntimeCache(getter)
+	return &TestRuntimeCache{*c.(*runtimeCache)}
 }

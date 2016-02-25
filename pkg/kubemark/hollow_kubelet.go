@@ -24,7 +24,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/test/integration"
@@ -64,7 +64,7 @@ func NewHollowKubelet(
 			cadvisorInterface,
 			manifestFilePath,
 			nil, /* cloud-provider */
-			kubecontainer.FakeOS{}, /* os-interface */
+			containertest.FakeOS{}, /* os-interface */
 			20*time.Second,         /* FileCheckFrequency */
 			20*time.Second,         /* HTTPCheckFrequency */
 			1*time.Minute,          /* MinimumGCAge */
