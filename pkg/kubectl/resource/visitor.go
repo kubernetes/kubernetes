@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -219,9 +218,8 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 // URLVisitor downloads the contents of a URL, and if successful, returns
 // an info object representing the downloaded object.
 type URLVisitor struct {
-	*Mapper
-	URL    *url.URL
-	Schema validation.Schema
+	URL *url.URL
+	*StreamVisitor
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
@@ -233,18 +231,9 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 	if res.StatusCode != 200 {
 		return fmt.Errorf("unable to read URL %q, server reported %d %s", v.URL, res.StatusCode, res.Status)
 	}
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("unable to read URL %q: %v\n", v.URL, err)
-	}
-	if err := ValidateSchema(data, v.Schema); err != nil {
-		return fmt.Errorf("error validating %q: %v", v.URL, err)
-	}
-	info, err := v.Mapper.InfoForData(data, v.URL.String())
-	if err != nil {
-		return err
-	}
-	return fn(info, nil)
+
+	v.StreamVisitor.Reader = res.Body
+	return v.StreamVisitor.Visit(fn)
 }
 
 // DecoratedVisitor will invoke the decorators in order prior to invoking the visitor function
