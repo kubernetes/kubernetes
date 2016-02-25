@@ -242,10 +242,11 @@ function kube::build::is_osx() {
 
 function kube::build::update_dockerfile() {
   if kube::build::is_osx; then
-    sed -i "" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+    sed_opts=(-i '')
   else
-    sed -i "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+    sed_opts=(-i)
   fi
+  sed "${sed_opts[@]}" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
 
 function kube::build::ensure_docker_in_path() {
