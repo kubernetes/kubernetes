@@ -211,10 +211,6 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 	})
 
 	Describe("upgrade-master", func() {
-		BeforeEach(func() {
-			SkipUnlessProviderIs("gce", "gke")
-		})
-
 		It("should maintain responsive services", func() {
 			By("Validating cluster before master upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
@@ -267,13 +263,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		It("should maintain a functioning cluster", func() {
 			SkipUnlessProviderIs("gce", "gke")
 
-			By("Validating cluster before master upgrade")
-			expectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a master upgrade")
-			testMasterUpgrade(ip, v, masterUpgrade)
-			By("Checking master version")
-			expectNoError(checkMasterVersion(f.Client, v))
-			By("Validating cluster after master upgrade")
+			By("Validating cluster before node upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a node upgrade")
 			testNodeUpgrade(f, nodeUpgrade, replicas, v)
