@@ -152,13 +152,22 @@ func (w *resourceGatherWorker) singleProbe() {
 func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	defer utilruntime.HandleCrash()
 	defer w.wg.Done()
+	defer Logf("Closing worker for %v", w.nodeName)
 	select {
 	case <-time.After(initialSleep):
+		// TODO: remove after #21313 is fixed
+		Logf("Probing %v", w.nodeName)
 		w.singleProbe()
+		// TODO: remove after #21313 is fixed
+		Logf("Finished probe for %v", w.nodeName)
 		for {
 			select {
 			case <-time.After(resourceDataGatheringPeriod):
+				// TODO: remove after #21313 is fixed
+				Logf("Probing %v", w.nodeName)
 				w.singleProbe()
+				// TODO: remove after #21313 is fixed
+				Logf("Finished probe for %v", w.nodeName)
 			case <-w.stopCh:
 				return
 			}
