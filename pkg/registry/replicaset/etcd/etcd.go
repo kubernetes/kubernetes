@@ -19,7 +19,14 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	asvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -34,14 +41,17 @@ import (
 type ReplicaSetStorage struct {
 	ReplicaSet *REST
 	Status     *StatusREST
+	Scale      *ScaleREST
 }
 
 func NewStorage(opts generic.RESTOptions) ReplicaSetStorage {
 	replicaSetRest, replicaSetStatusRest := NewREST(opts)
+	replicaSetRegistry := replicaset.NewRegistry(replicaSetRest)
 
 	return ReplicaSetStorage{
 		ReplicaSet: replicaSetRest,
 		Status:     replicaSetStatusRest,
+		Scale:      &ScaleREST{registry: replicaSetRegistry},
 	}
 }
 
@@ -109,4 +119,83 @@ func (r *StatusREST) New() runtime.Object {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, obj)
+}
+
+type ScaleREST struct {
+	registry replicaset.Registry
+}
+
+// ScaleREST implements Patcher
+var _ = rest.Patcher(&ScaleREST{})
+
+// New creates a new Scale object
+func (r *ScaleREST) New() runtime.Object {
+	return &autoscaling.Scale{}
+}
+
+func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	rs, err := r.registry.GetReplicaSet(ctx, name)
+	if err != nil {
+		return nil, errors.NewNotFound(autoscaling.Resource("replicasets/scale"), name)
+	}
+	scale, err := scaleFromReplicaSet(rs)
+	if err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
+	}
+	return scale, err
+}
+
+func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	if obj == nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+	}
+	scale, ok := obj.(*autoscaling.Scale)
+	if !ok {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+	}
+
+	if errs := asvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
+	}
+
+	rs, err := r.registry.GetReplicaSet(ctx, scale.Name)
+	if err != nil {
+		return nil, false, errors.NewNotFound(autoscaling.Resource("replicasets/scale"), scale.Name)
+	}
+	rs.Spec.Replicas = scale.Spec.Replicas
+	rs.ResourceVersion = scale.ResourceVersion
+	rs, err = r.registry.UpdateReplicaSet(ctx, rs)
+	if err != nil {
+		return nil, false, err
+	}
+	newScale, err := scaleFromReplicaSet(rs)
+	if err != nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
+	}
+	return newScale, false, err
+}
+
+// scaleFromReplicaSet returns a scale subresource for a replica set.
+func scaleFromReplicaSet(rs *extensions.ReplicaSet) (*autoscaling.Scale, error) {
+	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("stored replica set object can't be represented in the form of a scale subresource because the label selector ('%v') can't be parsed: %v", rs.Spec.Selector, err)
+	}
+	return &autoscaling.Scale{
+		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
+		ObjectMeta: api.ObjectMeta{
+			Name:              rs.Name,
+			Namespace:         rs.Namespace,
+			UID:               rs.UID,
+			ResourceVersion:   rs.ResourceVersion,
+			CreationTimestamp: rs.CreationTimestamp,
+		},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: rs.Spec.Replicas,
+		},
+		Status: autoscaling.ScaleStatus{
+			Replicas: rs.Status.Replicas,
+			Selector: selector.String(),
+		},
+	}, nil
 }
