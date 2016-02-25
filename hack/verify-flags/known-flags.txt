@@ -263,6 +263,7 @@ oidc-issuer-url
 oidc-groups-claim
 oidc-username-claim
 only-idl
+only-namespaced
 oom-score-adj
 out-version
 outofdisk-transition-frequency
@@ -344,6 +345,8 @@ service-sync-period
 session-affinity
 show-all
 show-labels
+show-resources
+show-subresources
 shutdown-fd
 shutdown-fifo
 since-seconds

@@ -1598,6 +1598,24 @@ __EOF__
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   kube::test::clear_all
+
+  #############
+  # Discovery #
+  #############
+
+  kubectl api-versions
+  kubectl api-versions | grep v1
+  kubectl api-versions --show-resources
+  kubectl api-versions --show-resources | grep pod
+  kubectl api-versions --show-resources --no-headers
+  ! [[ "$(kubectl api-versions --show-resources --no-headers | grep RESOURCE)" ]]
+  kubectl api-versions --show-resources
+  ! [[ "$(kubectl api-versions --show-resources | grep '\/')" ]]
+  kubectl api-versions --show-resources --show-subresources
+  [[ "$(kubectl api-versions --show-resources --show-subresources | grep '\/')" ]]
+  kubectl api-versions --show-resources --only-namespaced
+  ! [[ "$(kubectl api-versions --show-resources --only-namespaced | grep 'false')" ]]
+
 }
 
 kube_api_versions=(
