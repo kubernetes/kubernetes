@@ -41,7 +41,8 @@ func init() {
 	}
 	testapi.Groups[testgroup.SchemeGroupVersion.Group] = testapi.NewTestGroup(
 		registered.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion,
-		testgroup.SchemeGroupVersion)
+		testgroup.SchemeGroupVersion,
+		api.Scheme.KnownTypes(testgroup.SchemeGroupVersion))
 	testHelper = testapi.Groups[testgroup.SchemeGroupVersion.Group]
 }
 
