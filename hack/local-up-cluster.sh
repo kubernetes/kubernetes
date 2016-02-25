@@ -163,7 +163,7 @@ function detect_binary {
         ;;
     esac
 
-   GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
+   GO_OUT="${KUBE_ROOT}/_output/local/go/bin/"
 }
 
 cleanup_dockerized_kubelet()
