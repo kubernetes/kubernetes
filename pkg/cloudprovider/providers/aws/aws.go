@@ -655,6 +655,10 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		}
 	}
 
+	if filterTags[TagNameKubernetesCluster] == "" {
+		glog.Errorf("Tag %q not found; Kuberentes may behave unexpectedly.", TagNameKubernetesCluster)
+	}
+
 	awsCloud.filterTags = filterTags
 	if len(filterTags) > 0 {
 		glog.Infof("AWS cloud filtering on tags: %v", filterTags)
@@ -1496,6 +1500,7 @@ func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup
 	describeSecurityGroupsRequest := &ec2.DescribeSecurityGroupsInput{
 		GroupIds: []*string{&securityGroupId},
 	}
+	// We don't apply our tag filters because we are retrieving by ID
 
 	groups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
 	if err != nil {
@@ -1731,7 +1736,8 @@ func (s *AWSCloud) ensureClusterTags(resourceID string, tags []*ec2.Tag) error {
 	return nil
 }
 
-// Makes sure the security group exists
+// Makes sure the security group exists.
+// For multi-cluster isolation, name must be globally unique, for example derived from the service UUID.
 // Returns the security group id or error
 func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID string) (string, error) {
 	groupID := ""
@@ -2046,30 +2052,64 @@ func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
 }
 
 // Returns the first security group for an instance, or nil
-// We only create instances with one security group, so we warn if there are multiple or none
-func findSecurityGroupForInstance(instance *ec2.Instance) *string {
-	var securityGroupId *string
-	for _, securityGroup := range instance.SecurityGroups {
-		if securityGroup == nil || securityGroup.GroupId == nil {
-			// Not expected, but avoid panic
-			glog.Warning("Unexpected empty security group for instance: ", orEmpty(instance.InstanceId))
+// We only create instances with one security group, so we don't expect multiple security groups.
+// However, if there are multiple security groups, we will choose the one tagged with our cluster filter.
+// Otherwise we will return an error.
+func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups map[string]*ec2.SecurityGroup) (*ec2.GroupIdentifier, error) {
+	instanceID := aws.StringValue(instance.InstanceId)
+	var best *ec2.GroupIdentifier
+	for _, group := range instance.SecurityGroups {
+		groupID := aws.StringValue(group.GroupId)
+		if groupID == "" {
+			glog.Warningf("Ignoring security group without id for instance %q: %v", instanceID, group)
+			continue
+		}
+		if best == nil {
+			best = group
 			continue
 		}
 
-		if securityGroupId != nil {
-			// We create instances with one SG
-			glog.Warningf("Multiple security groups found for instance (%s); will use first group (%s)", orEmpty(instance.InstanceId), *securityGroupId)
-			continue
+		_, bestIsTagged := taggedSecurityGroups[*best.GroupId]
+		_, groupIsTagged := taggedSecurityGroups[groupID]
+
+		if bestIsTagged && !groupIsTagged {
+			// best is still best
+		} else if groupIsTagged && !bestIsTagged {
+			best = group
 		} else {
-			securityGroupId = securityGroup.GroupId
+			// We create instances with one SG
+			// If users create multiple SGs, they must tag one of them as being k8s owned
+			return nil, fmt.Errorf("Multiple security groups found for instance (%s); ensure the k8s security group is tagged", instanceID)
 		}
 	}
 
-	if securityGroupId == nil {
-		glog.Warning("No security group found for instance ", orEmpty(instance.InstanceId))
+	if best == nil {
+		glog.Warning("No security group found for instance ", instanceID)
 	}
 
-	return securityGroupId
+	return best, nil
+}
+
+// Return all the security groups that are tagged as being part of our cluster
+func (s *AWSCloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error) {
+	request := &ec2.DescribeSecurityGroupsInput{}
+	filters := []*ec2.Filter{}
+	request.Filters = s.addFilters(filters)
+	groups, err := s.ec2.DescribeSecurityGroups(request)
+	if err != nil {
+		return nil, fmt.Errorf("error querying security groups: %v", err)
+	}
+
+	m := make(map[string]*ec2.SecurityGroup)
+	for _, group := range groups {
+		id := aws.StringValue(group.GroupId)
+		if id == "" {
+			glog.Warningf("Ignoring group without id: %v", group)
+			continue
+		}
+		m[id] = group
+	}
+	return m, nil
 }
 
 // Open security group ingress rules on the instances so that the load balancer can talk to them
@@ -2105,6 +2145,11 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		return fmt.Errorf("error querying security groups: %v", err)
 	}
 
+	taggedSecurityGroups, err := s.getTaggedSecurityGroups()
+	if err != nil {
+		return fmt.Errorf("error querying for tagged security groups: %v", err)
+	}
+
 	// Open the firewall from the load balancer to the instance
 	// We don't actually have a trivial way to know in advance which security group the instance is in
 	// (it is probably the minion security group, but we don't easily have that).
@@ -2115,23 +2160,31 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 
 	// Scan instances for groups we want open
 	for _, instance := range allInstances {
-		securityGroupId := findSecurityGroupForInstance(instance)
-		if isNilOrEmpty(securityGroupId) {
+		securityGroup, err := findSecurityGroupForInstance(instance, taggedSecurityGroups)
+		if err != nil {
+			return err
+		}
+
+		if securityGroup == nil {
 			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
 			continue
 		}
+		id := aws.StringValue(securityGroup.GroupId)
+		if id == "" {
+			glog.Warningf("found security group without id: %v", securityGroup)
+			continue
+		}
 
-		instanceSecurityGroupIds[*securityGroupId] = true
+		instanceSecurityGroupIds[id] = true
 	}
 
 	// Compare to actual groups
 	for _, actualGroup := range actualGroups {
-		if isNilOrEmpty(actualGroup.GroupId) {
+		actualGroupID := aws.StringValue(actualGroup.GroupId)
+		if actualGroupID == "" {
 			glog.Warning("Ignoring group without ID: ", actualGroup)
 			continue
 		}
-
-		actualGroupID := *actualGroup.GroupId
 
 		adding, found := instanceSecurityGroupIds[actualGroupID]
 		if found && adding {
