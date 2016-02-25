@@ -25,8 +25,8 @@ import (
 	"runtime"
 	"time"
 
-	"k8s.io/kubernetes/cmd/uber-apiserver/app"
-	"k8s.io/kubernetes/cmd/uber-apiserver/app/options"
+	"k8s.io/kubernetes/cmd/ube-apiserver/app"
+	"k8s.io/kubernetes/cmd/ube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
