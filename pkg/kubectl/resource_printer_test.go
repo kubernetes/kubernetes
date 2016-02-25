@@ -1340,6 +1340,54 @@ func TestPrintDaemonSet(t *testing.T) {
 	}
 }
 
+func TestPrintJob(t *testing.T) {
+	completions := 2
+	tests := []struct {
+		job    extensions.Job
+		expect string
+	}{
+		{
+			extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "job1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.JobSpec{
+					Completions: &completions,
+				},
+				Status: extensions.JobStatus{
+					Succeeded: 1,
+				},
+			},
+			"job1\t2\t1\n",
+		},
+		{
+			extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "job2",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.JobSpec{
+					Completions: nil,
+				},
+				Status: extensions.JobStatus{
+					Succeeded: 0,
+				},
+			},
+			"job2\t<none>\t0\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printJob(&test.job, buf, PrintOptions{false, false, false, true, false, false, []string{}})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
 func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
 		pod        api.Pod
