@@ -138,12 +138,30 @@ To inspect the HTTP calls involved in a specific kubectl operation you can turn 
 ### Examples
 
  1. Alice can do anything to all resources:                  `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "alice", "namespace": "*", "resource": "*", "apiGroup": "*"}}`
- 2. Kubelet can read any pods:                               `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "kubelet", "namespace": "*", "resource": "pods", "readonly": true}}`
- 3. Kubelet can read and write events:                       `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "kubelet", "namespace": "*", "resource": "events"}}`
+ 2. Kim can read any pods:                               `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "kim", "namespace": "*", "resource": "pods", "readonly": true}}`
+ 3. Kim can read and write events:                       `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "kim", "namespace": "*", "resource": "events"}}`
  4. Bob can just read pods in namespace "projectCaribou":    `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "bob", "namespace": "projectCaribou", "resource": "pods", "readonly": true}}`
  5. Anyone can make read-only requests to all non-API paths: `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "*", "readonly": true, "nonResourcePath": "*"}}`
 
 [Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
+
+#### In Practice
+
+If we assume a very simple setup where we have 3 users:
+ - `admin` which are external users of API (`kubectl`, third party applications, etc).
+ - `kubelet` which is the user for all `kubelet`s in the cluster.
+ - `scheduler` which is the user for the `kube-scheduler` within the cluster.
+
+And we want to allow all other users to have read only access across all of the resources.
+
+We would want a policy file like:
+```
+{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"*", "apiGroup": "*", "nonResourcePath": "*", "resource":"*", "readonly": true }}
+{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"admin", "apiGroup": "*", "namespace": "*", "resource": "*", "readonly": false }}
+{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"scheduler", "apiGroup": "*", "namespace": "*", "resource": "*", "readonly": false }}
+{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"kubelet", "apiGroup": "*", "namespace": "*", "resource": "*", "readonly": false }}
+```
+
 
 ### A quick note on service accounts
 
