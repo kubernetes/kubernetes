@@ -105,6 +105,7 @@ const (
 	DecimalExponent = Format("DecimalExponent") // e.g., 12e6
 	BinarySI        = Format("BinarySI")        // e.g., 12Mi (12 * 2^20)
 	DecimalSI       = Format("DecimalSI")       // e.g., 12M  (12 * 10^6)
+	Digit           = Format("Digit")           // e.g., 1, 2, 3 ...
 )
 
 // MustParse turns the given string into a quantity or panics; for tests
