@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/service/podsource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
+	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
@@ -44,6 +45,7 @@ import (
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // TODO(jdef): passing the value of envContainerID to all docker containers instantiated
@@ -240,6 +242,9 @@ func (s *KubeletExecutorServer) runKubelet(
 	if err != nil {
 		return err
 	}
+
+	// set option for executor to heartbeat condition updates as part of kubelet node status
+	kcfg.Options = append(kcfg.Options, kubelet.SetNodeStatus(node.SetRunningExecutorCondition(s.containerID, util.RealClock{})))
 
 	go func() {
 		for ni := range nodeInfos {
