@@ -1154,7 +1154,12 @@ function start-minions() {
 function wait-minions {
   # Wait for the minions to be running
   # TODO(justinsb): This is really not needed any more
-  attempt=0
+  local attempt=0
+  local max_attempts=30
+  # Spot instances are slower to launch
+  if [[ -n "${NODE_SPOT_PRICE:-}" ]]; then
+    max_attempts=90
+  fi
   while true; do
     find-running-minions > $LOG
     if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
@@ -1162,7 +1167,7 @@ function wait-minions {
       break
     fi
 
-    if (( attempt > 30 )); then
+    if (( attempt > max_attempts )); then
       echo
       echo "Expected number of minions did not start in time"
       echo
