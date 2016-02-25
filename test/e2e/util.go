@@ -497,6 +497,33 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	return nil
 }
 
+func logFailedContainers(ns string) {
+	c, err := loadClient()
+	if err != nil {
+		Logf("Failed to load client")
+		return
+	}
+	podList, err := c.Pods(ns).List(api.ListOptions{})
+	if err != nil {
+		Logf("Error getting pods in namespace '%s': %v", ns, err)
+		return
+	}
+	for _, pod := range podList.Items {
+		if res, err := podRunningReady(&pod); res && err == nil {
+			Logf("Ignoring Ready pod %v/%v", pod.Namespace, pod.Name)
+		} else {
+			for _, container := range pod.Spec.Containers {
+				logs, err := getPreviousPodLogs(c, ns, pod.Name, container.Name)
+				if err != nil {
+					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				}
+				By(fmt.Sprintf("Previous logs of %v/%v:%v on node %v", ns, pod.Name, container.Name, pod.Spec.NodeName))
+				Logf(logs)
+			}
+		}
+	}
+}
+
 // deleteNamespaces deletes all namespaces that match the given delete and skip filters.
 // Filter is by simple strings.Contains; first skip filter, then delete filter.
 // Returns the list of deleted namespaces or an error.
