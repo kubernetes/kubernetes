@@ -769,6 +769,15 @@ func constructSubnet(id string, az string) *ec2.Subnet {
 }
 
 func constructRouteTables(routeTablesIn map[string]bool) (routeTablesOut []*ec2.RouteTable) {
+	routeTablesOut = append(routeTablesOut,
+		&ec2.RouteTable{
+			Associations: []*ec2.RouteTableAssociation{{Main: aws.Bool(true)}},
+			Routes: []*ec2.Route{{
+				DestinationCidrBlock: aws.String("0.0.0.0/0"),
+				GatewayId:            aws.String("igw-main"),
+			}},
+		})
+
 	for subnetID := range routeTablesIn {
 		routeTablesOut = append(
 			routeTablesOut,
@@ -839,6 +848,32 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	}
 
 	result_set := make(map[string]bool)
+	for _, v := range result {
+		result_set[v] = true
+	}
+
+	for i := range subnets {
+		if !result_set[subnets[i]["id"]] {
+			t.Errorf("Expected subnet%d '%s' in result: %v", i, subnets[i]["id"], result)
+			return
+		}
+	}
+
+	// test implicit routing table - when subnets are not explicitly linked to a table they should use main
+	awsServices.ec2.RouteTables = constructRouteTables(map[string]bool{})
+
+	result, err = c.listPublicSubnetIDsinVPC(vpcID)
+	if err != nil {
+		t.Errorf("Error listing subnets: %v", err)
+		return
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 subnets but got %d", len(result))
+		return
+	}
+
+	result_set = make(map[string]bool)
 	for _, v := range result {
 		result_set[v] = true
 	}
