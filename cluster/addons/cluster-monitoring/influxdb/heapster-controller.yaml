@@ -26,7 +26,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v0.20.0-alpha7
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha8
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -41,7 +41,7 @@ spec:
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
             - --metric_resolution=60s
-        - image: gcr.io/google_containers/heapster:v0.20.0-alpha7
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha8
           name: eventer
           resources:
             # keep request = limit to keep this container in guaranteed class
