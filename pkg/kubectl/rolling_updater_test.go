@@ -430,20 +430,21 @@ Scaling foo-v1 down to 0
 Scaling foo-v2 up to 10
 `,
 		}, {
-			name:        "1->1 10/0 fast readiness",
+			name:        "1->1 25/25 maintain minimum availability",
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 1),
 			newRcExists: false,
-			maxUnavail:  intstr.FromString("10%"),
-			maxSurge:    intstr.FromString("0%"),
+			maxUnavail:  intstr.FromString("25%"),
+			maxSurge:    intstr.FromString("25%"),
 			expected: []interface{}{
-				down{oldReady: 1, newReady: 0, to: 0},
 				up{1},
+				down{oldReady: 1, newReady: 0, noop: true},
+				down{oldReady: 1, newReady: 1, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 1 pods)
-Scaling foo-v1 down to 0
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
 Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
 `,
 		}, {
 			name:        "1->1 0/10 delayed readiness",
@@ -475,7 +476,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 1, newReady: 1, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 2 pods)
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 0
 `,
@@ -655,6 +656,23 @@ Scaling foo-v1 down to 1
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 0
 Scaling foo-v2 up to 2
+`,
+		},
+		{
+			name:        "1->1 100%/0 allow maxUnavailability",
+			oldRc:       oldRc(1, 1),
+			newRc:       newRc(0, 1),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("100%"),
+			maxSurge:    intstr.FromInt(0),
+			expected: []interface{}{
+				down{oldReady: 1, newReady: 0, to: 0},
+				up{1},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 1 pods)
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 1
 `,
 		},
 	}
@@ -1568,76 +1586,6 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		}
 		if e, a := test.newReady, newReady; e != a {
 			t.Errorf("expected new ready %d, got %d", e, a)
-		}
-	}
-}
-
-func TestRollingUpdater_extractMaxValue(t *testing.T) {
-	tests := []struct {
-		field    intstr.IntOrString
-		original int
-		expected int
-		valid    bool
-	}{
-		{
-			field:    intstr.FromInt(1),
-			original: 100,
-			expected: 1,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromInt(0),
-			original: 100,
-			expected: 0,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromInt(-1),
-			original: 100,
-			valid:    false,
-		},
-		{
-			field:    intstr.FromString("10%"),
-			original: 100,
-			expected: 10,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("100%"),
-			original: 100,
-			expected: 100,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("200%"),
-			original: 100,
-			expected: 200,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("0%"),
-			original: 100,
-			expected: 0,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("-1%"),
-			original: 100,
-			valid:    false,
-		},
-	}
-
-	for i, test := range tests {
-		t.Logf("evaluating test %d", i)
-		max, err := extractMaxValue(test.field, "field", test.original)
-		if test.valid && err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !test.valid && err == nil {
-			t.Fatalf("expected an error")
-		}
-		if e, a := test.expected, max; e != a {
-			t.Fatalf("expected max %d, got %d", e, a)
 		}
 	}
 }
