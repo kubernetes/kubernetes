@@ -17,18 +17,21 @@ limitations under the License.
 package gce_pd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -144,6 +147,33 @@ func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, man
 		}}, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) parseProvisioningOptions(options volume.VolumeOptions) (gceProvisioningOptions, error) {
+	var opts gceProvisioningOptions
+
+	optStr := strings.TrimSpace(options.ProvisioningOptions)
+	if optStr != "" {
+		bytes := []byte(optStr)
+
+		err := json.Unmarshal(bytes, &opts)
+		if err != nil {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: %v", plugin.Name(), err)
+		}
+
+		// convert VolumeType to lower case
+		opts.VolumeType = strings.ToLower(opts.VolumeType)
+	}
+
+	// Apply defaults
+	if opts.VolumeType == "" {
+		opts.VolumeType = gce.DefaultDiskType
+	}
+
+	if opts.VolumeType != gce.DiskTypeSSD && opts.VolumeType != gce.DiskTypeStandard {
+		return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: Invalid VolumeType %q", plugin.Name(), opts.VolumeType)
+	}
+	return opts, nil
+}
+
 func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if len(options.AccessModes) == 0 {
 		options.AccessModes = plugin.GetAccessModes()
@@ -152,12 +182,18 @@ func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptio
 }
 
 func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.VolumeOptions, manager pdManager) (volume.Provisioner, error) {
+	provOpts, err := plugin.parseProvisioningOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
 	return &gcePersistentDiskProvisioner{
 		gcePersistentDisk: &gcePersistentDisk{
 			manager: manager,
 			plugin:  plugin,
 		},
-		options: options,
+		options:             options,
+		provisioningOptions: provOpts,
 	}, nil
 }
 
@@ -292,7 +328,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 
 func (pd *gcePersistentDisk) GetPath() string {
 	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, strings.EscapeQualifiedNameForDisk(name), pd.volName)
+	return pd.plugin.host.GetPodVolumeDir(pd.podUID, utilstrings.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
 type gcePersistentDiskCleaner struct {
@@ -356,7 +392,7 @@ var _ volume.Deleter = &gcePersistentDiskDeleter{}
 
 func (d *gcePersistentDiskDeleter) GetPath() string {
 	name := gcePersistentDiskPluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, strings.EscapeQualifiedNameForDisk(name), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(name), d.volName)
 }
 
 func (d *gcePersistentDiskDeleter) Delete() error {
@@ -365,7 +401,12 @@ func (d *gcePersistentDiskDeleter) Delete() error {
 
 type gcePersistentDiskProvisioner struct {
 	*gcePersistentDisk
-	options volume.VolumeOptions
+	options             volume.VolumeOptions
+	provisioningOptions gceProvisioningOptions
+}
+
+type gceProvisioningOptions struct {
+	VolumeType string
 }
 
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}

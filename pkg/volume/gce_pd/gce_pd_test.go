@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -291,5 +292,71 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !builder.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for builder.IsReadOnly")
+	}
+}
+
+func TestOptionParser(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+
+	cap := resource.MustParse("100Gi")
+	options := volume.VolumeOptions{
+		Capacity: cap,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+		},
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+
+	// test defaults
+	options.ProvisioningOptions = ""
+	o, err := plug.(*gcePersistentDiskPlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.VolumeType != gce.DefaultDiskType {
+		t.Errorf("Expected default volume type, got %s", o.VolumeType)
+	}
+
+	// ssd (+ everything lowercase)
+	options.ProvisioningOptions = "{ \"volumetype\": \"pd-ssd\"}"
+	o, err = plug.(*gcePersistentDiskPlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.VolumeType != gce.DiskTypeSSD {
+		t.Errorf("Expected default volume type, got %s", o.VolumeType)
+	}
+
+	// standard (+ everything uppercase + unknown (=ignored) attribute)
+	options.ProvisioningOptions = "{ \"VOLUMETYPE\": \"PD-STANDARD\", \"UNKNOWN\": \"VALUE\" }"
+	o, err = plug.(*gcePersistentDiskPlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.VolumeType != gce.DiskTypeStandard {
+		t.Errorf("Expected standard volume type, got %s", o.VolumeType)
+	}
+
+	// Error cases
+	// Unknown VolumeType
+	options.ProvisioningOptions = "{ \"VolumeType\": \"unknown\" }"
+	o, err = plug.(*gcePersistentDiskPlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+
+	// Invalid JSON
+	options.ProvisioningOptions = "{ "
+	o, err = plug.(*gcePersistentDiskPlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
 	}
 }

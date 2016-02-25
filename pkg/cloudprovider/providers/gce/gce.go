@@ -71,6 +71,15 @@ const (
 	// are iterated through to prevent infinite loops if the API
 	// were to continuously return a nextPageToken.
 	maxPages = 25
+
+	// volume types for CreateDisk()
+	DiskTypeSSD      = "pd-ssd"
+	DiskTypeStandard = "pd-standard"
+	// Use SSD by default
+	DefaultDiskType = DiskTypeSSD
+
+	// Template of GCE Disk type URL
+	diskTypeTemplate = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/diskTypes/%s"
 )
 
 //validateAllowSourceRange validates annotation of allow source ranges
@@ -2065,16 +2074,22 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 // CreateDisk creates a new Persistent Disk, with the specified name & size, in
 // the specified zone. It stores specified tags endoced in JSON in Description
 // field.
-func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error {
+func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, diskType string, tags map[string]string) error {
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
 		return err
 	}
 
+	if diskType == "" {
+		diskType = DefaultDiskType
+	}
+	diskTypeUrl := fmt.Sprintf(diskTypeTemplate, gce.projectID, zone, diskType)
+
 	diskToCreate := &compute.Disk{
 		Name:        name,
 		SizeGb:      sizeGb,
 		Description: tagsStr,
+		Type:        diskTypeUrl,
 	}
 
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
