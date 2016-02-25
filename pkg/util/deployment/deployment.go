@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -172,33 +174,37 @@ func rsAndPodsWithHashKeySynced(deployment extensions.Deployment, c clientset.In
 // 2. Add hash label to all pods this rs owns
 // 3. Add hash label to the rs's label and selector
 func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interface, rs extensions.ReplicaSet, getPodList podListFunc) (updatedRS *extensions.ReplicaSet, err error) {
+	updatedRS = &rs
 	// If the rs already has the new hash label in its selector, it's done syncing
+	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+		return
+	}
 	namespace := deployment.Namespace
+	meta := rs.Spec.Template.ObjectMeta
+	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
 	hash := fmt.Sprintf("%d", podutil.GetPodTemplateSpecHash(api.PodTemplateSpec{
-		ObjectMeta: rs.Spec.Template.ObjectMeta,
+		ObjectMeta: meta,
 		Spec:       rs.Spec.Template.Spec,
 	}))
-	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
-		return &rs, nil
-	}
 	// 1. Add hash template label to the rs. This ensures that any newly created pods will have the new label.
-	if len(rs.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
-		updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), &rs, func(updated *extensions.ReplicaSet) {
+	if len(updatedRS.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+		updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
 			updated.Spec.Template.Labels = labelsutil.AddLabel(updated.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error updating rs %s pod template label with template hash: %v", updatedRS.Name, err)
 		}
-	}
-	// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
-	if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
-		if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, rs.Name); err != nil {
-			return nil, fmt.Errorf("error waiting for rs %s generation %d observed by controller: %v", updatedRS.Name, updatedRS.Generation, err)
+		// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
+		if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
+			if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
+				return nil, fmt.Errorf("error waiting for rs %s generation %d observed by controller: %v", updatedRS.Name, updatedRS.Generation, err)
+			}
 		}
+		glog.V(4).Infof("Observed the update of rs %s's pod template with hash %s.", rs.Name, hash)
 	}
 
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := unversioned.LabelSelectorAsSelector(updatedRS.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -210,15 +216,17 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 	if err = labelPodsWithHash(podList, c, namespace, hash); err != nil {
 		return nil, err
 	}
+	glog.V(4).Infof("Labeled rs %s's pods with hash %s.", rs.Name, hash)
 
 	// 3. Update rs label and selector to include the new hash label
 	// Copy the old selector, so that we can scrub out any orphaned pods
-	if updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), &rs, func(updated *extensions.ReplicaSet) {
+	if updatedRS, err = updateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
 		updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
 	}); err != nil {
 		return nil, fmt.Errorf("error updating rs %s label and selector with template hash: %v", updatedRS.Name, err)
 	}
+	glog.V(4).Infof("Updated rs %s's selector and label with hash %s.", rs.Name, hash)
 
 	// TODO: look for orphaned pods and label them in the background somewhere else periodically
 
@@ -245,6 +253,7 @@ func labelPodsWithHash(podList *api.PodList, c clientset.Interface, namespace, h
 			}); err != nil {
 				return err
 			}
+			glog.V(4).Infof("Labeled pod %s with hash %s.", pod.Name, hash)
 		}
 	}
 	return nil
