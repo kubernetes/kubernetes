@@ -196,10 +196,6 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 	})
 
 	Describe("kube-push", func() {
-		BeforeEach(func() {
-			SkipUnlessProviderIs("gce")
-		})
-
 		It("of master should maintain responsive services", func() {
 			By("Validating cluster before master upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
@@ -261,8 +257,6 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		})
 
 		It("should maintain a functioning cluster", func() {
-			SkipUnlessProviderIs("gce", "gke")
-
 			By("Validating cluster before node upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a node upgrade")
