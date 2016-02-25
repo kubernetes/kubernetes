@@ -16,6 +16,8 @@
     - mode: 644
     - makedirs: true
     - dir_mode: 755
+    - context:
+        cpurequest: '200m'
     - require:
       - service: docker
       - service: kubelet
@@ -26,7 +28,7 @@
     - group: root
     - mode: 644
 
-#stop legacy kube-proxy service 
+#stop legacy kube-proxy service
 stop_kube-proxy:
   service.dead:
     - name: kube-proxy
