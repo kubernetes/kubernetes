@@ -35,6 +35,7 @@ var maxResponseCode = 499
 type BackoffManager interface {
 	UpdateBackoff(actualUrl *url.URL, err error, responseCode int)
 	CalculateBackoff(actualUrl *url.URL) time.Duration
+	Sleep(d time.Duration)
 }
 
 // URLBackoff struct implements the semantics on top of Backoff which
@@ -53,6 +54,9 @@ func (n *NoBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode in
 }
 func (n *NoBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 	return 0 * time.Second
+}
+func (n *NoBackoff) Sleep(d time.Duration) {
+	return
 }
 
 // Disable makes the backoff trivial, i.e., sets it to zero.  This might be used
@@ -80,7 +84,7 @@ func (b *URLBackoff) baseUrlKey(rawurl *url.URL) string {
 func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
 	// range for retry counts that we store is [0,13]
 	if responseCode > maxResponseCode || serverIsOverloadedSet.Has(responseCode) {
-		b.Backoff.Next(b.baseUrlKey(actualUrl), time.Now())
+		b.Backoff.Next(b.baseUrlKey(actualUrl), b.Backoff.Clock.Now())
 		return
 	} else if responseCode >= 300 || err != nil {
 		glog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
@@ -94,4 +98,8 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 // based on its knowledge of existing failures.
 func (b *URLBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 	return b.Backoff.Get(b.baseUrlKey(actualUrl))
+}
+
+func (b *URLBackoff) Sleep(d time.Duration) {
+	b.Backoff.Clock.Sleep(d)
 }

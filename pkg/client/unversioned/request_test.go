@@ -767,17 +767,26 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
+	clock := util.FakeClock{}
 	request.backoffMgr = &URLBackoff{
-		Backoff: util.NewBackOff(
+		// Use a fake backoff here to avoid flakes and speed the test up.
+		Backoff: util.NewFakeBackOff(
 			time.Duration(1)*time.Second,
-			time.Duration(200)*time.Second)}
+			time.Duration(200)*time.Second,
+			&clock,
+		)}
+
 	for _, sec := range seconds {
-		start := time.Now()
+		thisBackoff := request.backoffMgr.CalculateBackoff(request.URL())
+		t.Logf("Current backoff %v", thisBackoff)
+		if thisBackoff != time.Duration(sec)*time.Second {
+			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
+		}
+		now := clock.Now()
 		request.DoRaw()
-		finish := time.Since(start)
-		t.Logf("%v finished in %v", sec, finish)
-		if finish < time.Duration(sec)*time.Second || finish >= time.Duration(sec+5)*time.Second {
-			t.Fatalf("%v not in range %v", finish, sec)
+		elapsed := clock.Since(now)
+		if clock.Since(now) != thisBackoff {
+			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
 		}
 	}
 }
