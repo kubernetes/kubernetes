@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: gcr.io/google_containers/etcd:2.0.9
+        image: gcr.io/google_containers/etcd-amd64:2.2.1
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
