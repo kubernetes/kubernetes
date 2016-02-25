@@ -35,6 +35,7 @@ import (
 
 const (
 	resourceDataGatheringPeriod = 60 * time.Second
+	probeDuration               = 15 * time.Second
 )
 
 type resourceConstraint struct {
@@ -137,7 +138,7 @@ type resourceGatherWorker struct {
 
 func (w *resourceGatherWorker) singleProbe() {
 	data := make(resourceUsagePerContainer)
-	nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, 15*time.Second, func() []string { return w.containerIDs }, true)
+	nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, probeDuration, func() []string { return w.containerIDs }, true)
 	if err != nil {
 		Logf("Error while reading data from %v: %v", w.nodeName, err)
 		return
@@ -168,9 +169,11 @@ func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 }
 
 func (g *containerResourceGatherer) getKubeSystemContainersResourceUsage(c *client.Client) {
-	delay := resourceDataGatheringPeriod / time.Duration(len(g.workers))
+	delayPeriod := resourceDataGatheringPeriod / time.Duration(len(g.workers))
+	delay := time.Duration(0)
 	for i := range g.workers {
 		go g.workers[i].gather(delay)
+		delay += delayPeriod
 	}
 	g.workerWg.Wait()
 }
