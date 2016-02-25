@@ -53,7 +53,7 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, name 
 			{Key: aws.String(TagNameKubernetesService), Value: aws.String(namespacedName.String())},
 		}
 
-		glog.Infof("Creating load balancer for %v with name: ", namespacedName, name)
+		glog.Infof("Creating load balancer for %v with name: %s", namespacedName, name)
 		_, err := s.elb.CreateLoadBalancer(createRequest)
 		if err != nil {
 			return nil, err
