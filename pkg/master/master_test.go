@@ -918,3 +918,54 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		}
 	}
 }
+
+func TestThirdPartyDiscovery(t *testing.T) {
+	for _, version := range versionsToTest {
+		testThirdPartyDiscovery(t, version)
+	}
+}
+
+func testThirdPartyDiscovery(t *testing.T, version string) {
+	_, etcdserver, server, assert := initThirdParty(t, version)
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
+	defer etcdserver.Terminate(t)
+
+	resp, err := http.Get(server.URL + "/apis/company.com/")
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	group := unversioned.APIGroup{}
+	assert.NoError(decodeResponse(resp, &group))
+	assert.Equal(group.APIVersion, "v1")
+	assert.Equal(group.Kind, "APIGroup")
+	assert.Equal(group.Name, "company.com")
+	assert.Equal(group.Versions, []unversioned.GroupVersionForDiscovery{
+		{
+			GroupVersion: "company.com/" + version,
+			Version:      version,
+		},
+	})
+	assert.Equal(group.PreferredVersion, unversioned.GroupVersionForDiscovery{})
+
+	resp, err = http.Get(server.URL + "/apis/company.com/" + version)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	resourceList := unversioned.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &resourceList))
+	assert.Equal(resourceList.APIVersion, "v1")
+	assert.Equal(resourceList.Kind, "APIResourceList")
+	assert.Equal(resourceList.GroupVersion, "company.com/"+version)
+	assert.Equal(resourceList.APIResources, []unversioned.APIResource{
+		{
+			Name:       "foos",
+			Namespaced: true,
+			Kind:       "Foo",
+		},
+	})
+}
