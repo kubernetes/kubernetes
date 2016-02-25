@@ -556,9 +556,6 @@ var _ = Describe("Services", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
-		}
 		if service.Spec.Type != api.ServiceTypeClusterIP {
 			Failf("got unexpected Spec.Type for back-to-ClusterIP service: %v", service)
 		}
