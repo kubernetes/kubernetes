@@ -19,13 +19,13 @@ package internalclientset
 import (
 	"github.com/golang/glog"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Interface interface {
-	Discovery() unversioned.DiscoveryInterface
+	Discovery() discovery.DiscoveryInterface
 	Core() unversionedcore.CoreInterface
 	Extensions() unversionedextensions.ExtensionsInterface
 }
@@ -33,7 +33,7 @@ type Interface interface {
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
-	*unversioned.DiscoveryClient
+	*discovery.DiscoveryClient
 	*unversionedcore.CoreClient
 	*unversionedextensions.ExtensionsClient
 }
@@ -49,7 +49,7 @@ func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
 }
 
@@ -66,7 +66,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 		return &clientset, err
 	}
 
-	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(c)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
@@ -80,7 +80,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
+	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
@@ -90,6 +90,6 @@ func New(c *restclient.RESTClient) *Clientset {
 	clientset.CoreClient = unversionedcore.New(c)
 	clientset.ExtensionsClient = unversionedextensions.New(c)
 
-	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
+	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset
 }
