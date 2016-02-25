@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
@@ -288,7 +289,7 @@ func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
 
-func (c *Fake) Discovery() client.DiscoveryInterface {
+func (c *Fake) Discovery() discovery.DiscoveryInterface {
 	return &FakeDiscovery{c}
 }
 
