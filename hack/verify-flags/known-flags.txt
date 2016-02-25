@@ -28,6 +28,7 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
+build-only
 build-services
 cadvisor-port
 cert-dir
@@ -35,6 +36,7 @@ certificate-authority
 cgroup-root
 chaos-chance
 clean-start
+cleanup
 cleanup-iptables
 client-ca-file
 client-certificate
