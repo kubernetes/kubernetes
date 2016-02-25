@@ -639,7 +639,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		OptionsExternalVersion: &optionsExternalVersion,
 
 		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
-		ParameterCodec: api.ParameterCodec,
+		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
 		Context: m.RequestContextMapper,
 
