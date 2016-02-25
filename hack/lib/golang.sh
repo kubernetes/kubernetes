@@ -36,7 +36,7 @@ kube::golang::server_targets() {
     cmd/hyperkube
     cmd/linkcheck
     plugin/cmd/kube-scheduler
-    cmd/uber-apiserver
+    cmd/ube-apiserver
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
@@ -155,7 +155,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-scheduler
   kube-proxy
   kubectl
-  uber-apiserver
+  ube-apiserver
 )
 
 kube::golang::is_statically_linked_library() {
