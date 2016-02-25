@@ -112,7 +112,11 @@ func (s *KubeletExecutorServer) runExecutor(
 	registry executor.Registry,
 ) (<-chan struct{}, error) {
 	executorWrapper := &executorWrapper{}
+	var executorOptions []executor.Option
+
 	staticPodFilters := podutil.Filters{
+		// defer map creation so that we'll see the slaveID and slaveHost after
+		// registration has completed.
 		podutil.FilterFunc(func(pod *api.Pod) (bool, error) {
 			podutil.Annotate(&pod.ObjectMeta, map[string]string{
 				// grab the slaveID from the wrapper since it will have intercepted the registration
@@ -128,11 +132,28 @@ func (s *KubeletExecutorServer) runExecutor(
 		}),
 	}
 	if s.containerID != "" {
+		// tag static pods with annotation that reflects the executor container UUID and the
+		// birth-time of the executor. useful for GC.
+		timestamp := time.Now().UTC().Format(time.RFC3339)
+		uuidAnnotator := podutil.FilterFunc(func(pod *api.Pod) (bool, error) {
+			podutil.Annotate(&pod.ObjectMeta, map[string]string{
+				meta.TimestampedExecutorContainerUUID: s.containerID + ";" + timestamp,
+			})
+			return true, nil
+		})
+
 		// tag all pod containers with the containerID so that they can be properly GC'd by Mesos
-		staticPodFilters = append(staticPodFilters, podutil.Environment([]api.EnvVar{
+		userContainerEnv := podutil.Environment([]api.EnvVar{
 			{Name: envContainerID, Value: s.containerID},
-		}))
+		})
+		staticPodFilters = append(staticPodFilters, uuidAnnotator, userContainerEnv)
+
+		// annotate non-static pods with a timestamped executor container UUID as well. we need to
+		// do this here instead of at the custom pod source because we want the annotation reflected
+		// in the Pod that's visible in the apiserver.
+		executorOptions = append(executorOptions, executor.PodTaskFilters(podutil.Filters{uuidAnnotator}))
 	}
+	executorOptions = append(executorOptions, executor.StaticPods(staticPodsConfigPath, staticPodFilters))
 	executorWrapper.Executor = executor.New(executor.Config{
 		Registry:       registry,
 		APIClient:      apiclient,
@@ -140,9 +161,7 @@ func (s *KubeletExecutorServer) runExecutor(
 		SuicideTimeout: s.SuicideTimeout,
 		ExitFunc:       os.Exit,
 		NodeInfos:      nodeInfos,
-		Options: []executor.Option{
-			executor.StaticPods(staticPodsConfigPath, staticPodFilters),
-		},
+		Options:        executorOptions,
 	})
 
 	// initialize driver and initialize the executor with it

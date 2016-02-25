@@ -97,6 +97,7 @@ type Executor struct {
 	exitFunc             func(int)
 	staticPodsConfigPath string
 	staticPodsFilters    podutil.Filters
+	podTaskFilters       podutil.Filters // applied at binding time
 	launchGracePeriod    time.Duration
 	nodeInfos            chan<- NodeInfo
 	initCompleted        chan struct{} // closes upon completion of Init()
@@ -170,6 +171,13 @@ func StaticPods(configPath string, f podutil.Filters) Option {
 	return func(k *Executor) {
 		k.staticPodsFilters = f
 		k.staticPodsConfigPath = configPath
+	}
+}
+
+// PodTaskFilters creates a pod-task filters Option for an Executor
+func PodTaskFilters(f podutil.Filters) Option {
+	return func(k *Executor) {
+		k.podTaskFilters = f
 	}
 }
 
@@ -466,6 +474,15 @@ func (k *Executor) bindAndWatchTask(driver bindings.ExecutorDriver, task *mesos.
 		log.Errorf("failed to generate pod-task starting data for task %v pod %v/%v: %v",
 			task.TaskId.GetValue(), pod.Namespace, pod.Name, err)
 		k.sendStatus(driver, newStatus(task.TaskId, mesos.TaskState_TASK_FAILED, err.Error()))
+		return
+	}
+
+	// apply pod task filters
+	ok, err := k.podTaskFilters.Accept(pod)
+	if !ok || err != nil {
+		log.Errorf("failed to apply pod filters for task %v pod %v/%v: %v",
+			task.TaskId.GetValue(), pod.Namespace, pod.Name, err)
+		k.sendStatus(driver, newStatus(task.TaskId, mesos.TaskState_TASK_FAILED, fmt.Sprintf("filter failed: %v", err)))
 		return
 	}
 

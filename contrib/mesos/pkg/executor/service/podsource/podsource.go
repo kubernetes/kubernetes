@@ -128,7 +128,7 @@ func Mesos(
 }
 
 func filterMirrorPod(p *api.Pod) (*api.Pod, bool) {
-	_, ok := (*p).Annotations[kubetypes.ConfigMirrorAnnotationKey]
+	_, ok := p.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return p, ok
 }
 
