@@ -69,7 +69,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// TODO: We actually don't need any type information to generate the clientset,
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
+	const pkgDiscovery = "k8s.io/kubernetes/pkg/client/typed/discovery"
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 
 	type arg struct {
@@ -89,11 +89,11 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		"Config":                           c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
 		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
-		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryInterface"}),
-		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "DiscoveryClient"}),
-		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfig"}),
-		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClientForConfigOrDie"}),
-		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "NewDiscoveryClient"}),
+		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryInterface"}),
+		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryClient"}),
+		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfig"}),
+		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfigOrDie"}),
+		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClient"}),
 	}
 	sw.Do(clientsetInterfaceTemplate, m)
 	sw.Do(clientsetTemplate, m)
