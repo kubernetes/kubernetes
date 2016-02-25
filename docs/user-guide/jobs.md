@@ -47,6 +47,8 @@ Documentation for other releases can be found at
       - [Controlling Parallelism](#controlling-parallelism)
   - [Handling Pod and Container Failures](#handling-pod-and-container-failures)
   - [Job Patterns](#job-patterns)
+  - [Advanced Usage](#advanced-usage)
+    - [Specifying your own pod selector](#specifying-your-own-pod-selector)
   - [Alternatives](#alternatives)
     - [Bare Pods](#bare-pods)
     - [Replication Controller](#replication-controller)
@@ -76,19 +78,14 @@ It takes around 10s to complete.
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: pi
 spec:
-  selector:
-    matchLabels:
-      app: pi
   template:
     metadata:
       name: pi
-      labels:
-        app: pi
     spec:
       containers:
       - name: pi
@@ -170,21 +167,9 @@ Only a [`RestartPolicy`](pod-states.md) equal to `Never` or `OnFailure` are allo
 
 ### Pod Selector
 
-The `.spec.selector` field is a label query over a set of pods.
+The `.spec.selector` field is optional.  In almost all cases you should not specify it.
+See section [specifying your own pod selector](#specifying-your-own-pod-selector).
 
-The `spec.selector` is an object consisting of two fields:
-* `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](replication-controller.md)
-* `matchExpressions` - allows to build more sophisticated selectors by specifying key,
-  list of values and an operator that relates the key and values.
-
-When the two are specified the result is ANDed.
-
-If `.spec.selector` is unspecified, `.spec.selector.matchLabels` will be defaulted to
-`.spec.template.metadata.labels`.
-
-Also you should not normally create any pods whose labels match this selector, either directly,
-via another Job, or via another controller such as ReplicationController.  Otherwise, the Job will
-think that those pods were created by it.  Kubernetes will not stop you from doing this.
 
 ### Parallel Jobs
 
@@ -323,6 +308,70 @@ Here, `W` is the number of work items.
 | Single Job with Static Work Assignment                                     |          W          |        any           |
 
 
+## Advanced Usage
+
+### Specifying your own pod selector
+
+Normally, when you create a job object, you do not specify `spec.selector`.
+The system defaulting logic adds this field when the job is created.
+It picks a selector value that will not overlap with any other jobs.
+
+However, in some cases, you might need to override this automatically set selector.
+To do this, you can specify the `spec.selector` of the job.
+
+Be very careful when doing this.  If you specify a label selector which is not
+unique to the pods of that job, and which matches unrelated pods, then pods of the unrelated
+job may be deleted, or this job may count other pods as completing it, or one or both
+of the jobs may refuse to create pods or run to completion.  If a non-unique selector is
+chosen, then other controllers (e.g. ReplicationController) and their pods may behave
+in unpredicatable ways too.  Kubernetes will not stop you from making a mistake when
+specifying `spec.selector`.
+
+Here is an example of a case when you might want to use this feature.
+
+Say job `old` is already running.  You want existing pods
+to keep running, but you want the rest of the pods it creates
+to use a different pod template and for the job to have a new name.
+You cannot update the job because these fields are not updatable.
+Therefore, you delete job `old` but leave its pods
+running, using `kubectl delete jobs/old-one --cascade=false`.
+Before deleting it, you make a note of what selector it uses:
+
+```
+kind: Job
+metadata:
+  name: old
+  ...
+spec:
+  selector:
+    matchLabels:
+      job-uid: a8f3d00d-c6d2-11e5-9f87-42010af00002
+  ...
+```
+
+Then you create a new job with name `new` and you explicitly specify the same selector.
+Since the existing pods have label `job-uid=a8f3d00d-c6d2-11e5-9f87-42010af00002`,
+they are controlled by job `new` as well.
+
+You need to specify `manualSelector: true` in the new job since you are not using
+the selector that the system normally generates for you automatically.
+
+```
+kind: Job
+metadata:
+  name: new
+  ...
+spec:
+  manualSelector: true
+  selector:
+    matchLabels:
+      job-uid: a8f3d00d-c6d2-11e5-9f87-42010af00002
+  ...
+```
+
+The new Job itself will have a different uid from `a8f3d00d-c6d2-11e5-9f87-42010af00002`.  Setting
+`manualSelector: true` tells the system to that you know what you are doing and to allow this
+mismatch.
 
 ## Alternatives
 
