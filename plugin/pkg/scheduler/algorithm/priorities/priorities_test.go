@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -927,6 +928,140 @@ func TestPrioritiesRegistered(t *testing.T) {
 				t.Errorf("priority %s is implemented as public but seems not registered or used in any other place",
 					function.Name)
 			}
+		}
+	}
+}
+
+func TestNodePreferAvoidPriority(t *testing.T) {
+	label1 := map[string]string{"foo": "bar"}
+	label2 := map[string]string{"bar": "foo"}
+	annotations1 := map[string]string{
+		api.PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+							                    "apiVersion": "v1",
+							                    "kind": "ReplicationController",
+							                    "name": "foo",
+							                    "uid": "abcdef123456",
+							                    "controller": true
+							                }
+							            },
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+	}
+	annotations2 := map[string]string{
+		api.PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+							                    "apiVersion": "v1",
+							                    "kind": "ReplicaSet",
+							                    "name": "foo",
+							                    "uid": "qwert12345",
+							                    "controller": true
+							                }
+							            },
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+	}
+	testNodes := []*api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "machine1", Annotations: annotations1},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "machine2", Annotations: annotations2},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "machine3"},
+		},
+	}
+	tests := []struct {
+		pod          *api.Pod
+		rcs          []api.ReplicationController
+		rss          []extensions.ReplicaSet
+		nodes        []*api.Node
+		expectedList schedulerapi.HostPriorityList
+		test         string
+	}{
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default", Labels: label1}},
+			rcs: []api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Namespace: "default",
+						Name:      "foo",
+						UID:       "abcdef123456",
+					},
+					Spec: api.ReplicationControllerSpec{Selector: label1},
+				},
+			},
+			nodes:        testNodes,
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 10}, {"machine3", 10}},
+			test:         "pod managed by ReplicationController should avoid a node, this node get lowest priority score",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default", Labels: label2}},
+			rss: []extensions.ReplicaSet{
+				{
+					TypeMeta: unversioned.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ReplicaSet",
+					},
+					ObjectMeta: api.ObjectMeta{
+						Namespace: "default",
+						Name:      "bar",
+						UID:       "qwert12345",
+					},
+					Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: label2}},
+				},
+			},
+			nodes:        testNodes,
+			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}, {"machine3", 10}},
+			test:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default"}},
+			rcs: []api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Namespace: "default",
+						Name:      "foo",
+						UID:       "abcdef123456",
+					},
+					Spec: api.ReplicationControllerSpec{Selector: label1},
+				},
+			},
+			nodes:        testNodes,
+			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}, {"machine3", 10}},
+			test:         "pod should not avoid these nodes, all nodes get highest priority score",
+		},
+	}
+
+	for _, test := range tests {
+		prioritizer := NodePreferAvoidPod{
+			controllerLister: algorithm.FakeControllerLister(test.rcs),
+			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
+		}
+		list, err := prioritizer.CalculateNodePreferAvoidPodsPriority(test.pod, map[string]*schedulercache.NodeInfo{}, algorithm.FakeNodeLister(test.nodes))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		// sort the two lists to avoid failures on account of different ordering
+		sort.Sort(test.expectedList)
+		sort.Sort(list)
+		if !reflect.DeepEqual(test.expectedList, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
 		}
 	}
 }

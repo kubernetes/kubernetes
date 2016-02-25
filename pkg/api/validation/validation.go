@@ -1724,6 +1724,41 @@ func ValidateNodeSelector(nodeSelector *api.NodeSelector, fldPath *field.Path) f
 	return allErrs
 }
 
+// ValidateAvoidPodsInNodeAnnotations tests that the serialized AvoidPods in Node.Annotations has valid data
+func ValidateAvoidPodsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	avoids, err := api.GetAvoidPodsFromNodeAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("AvoidPods"), api.PreferAvoidPodsAnnotationKey, err.Error()))
+		return allErrs
+	}
+
+	if len(avoids.PreferAvoidPods) != 0 {
+		for i, pa := range avoids.PreferAvoidPods {
+			idxPath := fldPath.Child(api.PreferAvoidPodsAnnotationKey).Index(i)
+			allErrs = append(allErrs, validatePreferAvoidPodsEntry(pa, idxPath)...)
+		}
+	}
+
+	return allErrs
+}
+
+// validatePreferAvoidPodsEntry tests if given PreferAvoidPodsEntry has valid data.
+func validatePreferAvoidPodsEntry(avoidPodEntry api.PreferAvoidPodsEntry, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if avoidPodEntry.PodSignature.PodController == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("PodSignature"), ""))
+	} else {
+		if *(avoidPodEntry.PodSignature.PodController.Controller) != true {
+			allErrors = append(allErrors,
+				field.Invalid(fldPath.Child("PodSignature").Child("PodController").Child("Controller"),
+					*(avoidPodEntry.PodSignature.PodController.Controller), "must point to a controller"))
+		}
+	}
+	return allErrors
+}
+
 // ValidatePreferredSchedulingTerms tests that the specified SoftNodeAffinity fields has valid data
 func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -2359,10 +2394,14 @@ func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *fie
 }
 
 func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	if annotations[api.TaintsAnnotationKey] != "" {
-		return ValidateTaintsInNodeAnnotations(annotations, fldPath)
+	allErrs := field.ErrorList{}
+	if annotations[api.PreferAvoidPodsAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateAvoidPodsInNodeAnnotations(annotations, fldPath)...)
 	}
-	return field.ErrorList{}
+	if annotations[api.TaintsAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateTaintsInNodeAnnotations(annotations, fldPath)...)
+	}
+	return allErrs
 }
 
 // ValidateNode tests if required fields in the node are set.
