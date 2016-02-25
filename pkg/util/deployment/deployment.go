@@ -334,7 +334,9 @@ func SetFromReplicaSetTemplate(deployment *extensions.Deployment, template api.P
 func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 	totalReplicaCount := 0
 	for _, rs := range replicaSets {
-		totalReplicaCount += rs.Spec.Replicas
+		if rs != nil {
+			totalReplicaCount += rs.Spec.Replicas
+		}
 	}
 	return totalReplicaCount
 }
@@ -343,7 +345,9 @@ func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 func GetActualReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 	totalReplicaCount := 0
 	for _, rs := range replicaSets {
-		totalReplicaCount += rs.Status.Replicas
+		if rs != nil {
+			totalReplicaCount += rs.Status.Replicas
+		}
 	}
 	return totalReplicaCount
 }
@@ -388,17 +392,19 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
 func GetPodsForReplicaSets(c clientset.Interface, replicaSets []*extensions.ReplicaSet) ([]api.Pod, error) {
 	allPods := map[string]api.Pod{}
 	for _, rs := range replicaSets {
-		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-		options := api.ListOptions{LabelSelector: selector}
-		podList, err := c.Core().Pods(rs.ObjectMeta.Namespace).List(options)
-		if err != nil {
-			return nil, fmt.Errorf("error listing pods: %v", err)
-		}
-		for _, pod := range podList.Items {
-			allPods[pod.Name] = pod
+		if rs != nil {
+			selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+			if err != nil {
+				return nil, fmt.Errorf("invalid label selector: %v", err)
+			}
+			options := api.ListOptions{LabelSelector: selector}
+			podList, err := c.Core().Pods(rs.ObjectMeta.Namespace).List(options)
+			if err != nil {
+				return nil, fmt.Errorf("error listing pods: %v", err)
+			}
+			for _, pod := range podList.Items {
+				allPods[pod.Name] = pod
+			}
 		}
 	}
 	requiredPods := []api.Pod{}
