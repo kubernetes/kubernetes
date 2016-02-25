@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const CreatedByAnnotation = "kubernetes.io/created-by"
@@ -91,9 +92,11 @@ type ControllerExpectationsInterface interface {
 	ExpectDeletions(controllerKey string, dels int) error
 	CreationObserved(controllerKey string)
 	DeletionObserved(controllerKey string)
+	RaiseExpectations(controllerKey string, add, del int)
+	LowerExpectations(controllerKey string, add, del int)
 }
 
-// ControllerExpectations is a ttl cache mapping controllers to what they expect to see before being woken up for a sync.
+// ControllerExpectations is a cache mapping controllers to what they expect to see before being woken up for a sync.
 type ControllerExpectations struct {
 	cache.Store
 }
@@ -123,6 +126,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
 			return true
+		} else if exp.isExpired() {
+			glog.V(4).Infof("Controller expectations expired %#v", exp)
+			return true
 		} else {
 			glog.V(4).Infof("Controller still waiting on expectations %#v", exp)
 			return false
@@ -142,9 +148,17 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 	return true
 }
 
+// TODO: Extend ExpirationCache to support explicit expiration.
+// TODO: Make this possible to disable in tests.
+// TODO: Parameterize timeout.
+// TODO: Support injection of clock.
+func (exp *ControlleeExpectations) isExpired() bool {
+	return util.RealClock{}.Since(exp.timestamp) > 10*time.Second
+}
+
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey}
+	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: util.RealClock{}.Now()}
 	glog.V(4).Infof("Setting expectations %+v", exp)
 	return r.Add(exp)
 }
@@ -158,22 +172,31 @@ func (r *ControllerExpectations) ExpectDeletions(controllerKey string, dels int)
 }
 
 // Decrements the expectation counts of the given controller.
-func (r *ControllerExpectations) lowerExpectations(controllerKey string, add, del int) {
+func (r *ControllerExpectations) LowerExpectations(controllerKey string, add, del int) {
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
-		exp.Seen(int64(add), int64(del))
+		exp.Add(int64(-add), int64(-del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Lowering expectations %+v", exp)
+		glog.V(4).Infof("Lowered expectations %+v", exp)
+	}
+}
+
+// Increments the expectation counts of the given controller.
+func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, del int) {
+	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
+		exp.Add(int64(add), int64(del))
+		// The expectations might've been modified since the update on the previous line.
+		glog.V(4).Infof("Raised expectations %+v", exp)
 	}
 }
 
 // CreationObserved atomically decrements the `add` expecation count of the given controller.
 func (r *ControllerExpectations) CreationObserved(controllerKey string) {
-	r.lowerExpectations(controllerKey, 1, 0)
+	r.LowerExpectations(controllerKey, 1, 0)
 }
 
 // DeletionObserved atomically decrements the `del` expectation count of the given controller.
 func (r *ControllerExpectations) DeletionObserved(controllerKey string) {
-	r.lowerExpectations(controllerKey, 0, 1)
+	r.LowerExpectations(controllerKey, 0, 1)
 }
 
 // Expectations are either fulfilled, or expire naturally.
@@ -183,15 +206,16 @@ type Expectations interface {
 
 // ControlleeExpectations track controllee creates/deletes.
 type ControlleeExpectations struct {
-	add int64
-	del int64
-	key string
+	add       int64
+	del       int64
+	key       string
+	timestamp time.Time
 }
 
-// Seen decrements the add and del counters.
-func (e *ControlleeExpectations) Seen(add, del int64) {
-	atomic.AddInt64(&e.add, -add)
-	atomic.AddInt64(&e.del, -del)
+// Add increments the add and del counters.
+func (e *ControlleeExpectations) Add(add, del int64) {
+	atomic.AddInt64(&e.add, add)
+	atomic.AddInt64(&e.del, del)
 }
 
 // Fulfilled returns true if this expectation has been fulfilled.

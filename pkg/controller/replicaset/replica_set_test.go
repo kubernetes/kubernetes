@@ -836,7 +836,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	}
 
 	// This should have no effect, since we've deleted the ReplicaSet.
-	podExp.Seen(1, 0)
+	podExp.Add(-1, 0)
 	manager.podStore.Store.Replace(make([]interface{}, 0), "0")
 	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 0, 0)
