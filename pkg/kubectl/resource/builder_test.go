@@ -316,25 +316,31 @@ func TestURLBuilder(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
+		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test1"}})))
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer s.Close()
 
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, s.URL).
-		NamespaceParam("test")
+		NamespaceParam("foo")
 
 	test := &testVisitor{}
-	singular := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || !singular || len(test.Infos) != 1 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().Visit(test.Handle)
+	if err != nil || len(test.Infos) != 2 {
+		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
 	}
 	info := test.Infos[0]
 	if info.Name != "test" || info.Namespace != "foo" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
+
+	info = test.Infos[1]
+	if info.Name != "test1" || info.Namespace != "foo" || info.Object == nil {
+		t.Errorf("unexpected info: %#v", info)
+	}
+
 }
 
 func TestURLBuilderRequireNamespace(t *testing.T) {
