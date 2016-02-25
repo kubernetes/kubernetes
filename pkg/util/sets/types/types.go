@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package types just provides input types to the set generator. It also
-// contains a "go generate" block. (You must first `go install`
-// cmd/libs/go2idl/set-gen.)
+// contains a "go generate" block.
+// (You must first `go install k8s.io/kubernetes/cmd/libs/go2idl/set-gen`)
 package types
 
 //go:generate set-gen -i k8s.io/kubernetes/pkg/util/sets/types
