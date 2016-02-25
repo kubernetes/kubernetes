@@ -291,7 +291,6 @@ pv-recycler-pod-template-filepath-nfs
 pv-recycler-maximum-retry
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
-rc-lookup-cache-size
 read-only-port
 really-crash-for-testing
 reconcile-cidr
@@ -305,6 +304,8 @@ registry-qps
 reject-methods
 reject-paths
 repair-malformed-updates
+replication-controller-lookup-cache-size
+replicaset-lookup-cache-size
 repo-root
 report-dir
 required-contexts
@@ -317,7 +318,6 @@ rkt-path
 rkt-stage1-image
 root-ca-file
 root-dir
-rs-lookup-cache-size
 run-proxy
 runtime-config
 runtime-cgroups
