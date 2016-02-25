@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -196,6 +198,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 				return nil, fmt.Errorf("error waiting for rs %s generation %d observed by controller: %v", updatedRS.Name, updatedRS.Generation, err)
 			}
 		}
+		glog.V(4).Infof("Observed the update of rs %s's pod template with hash %s.", rs.Name, hash)
 	}
 
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
@@ -211,6 +214,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 	if err = labelPodsWithHash(podList, c, namespace, hash); err != nil {
 		return nil, err
 	}
+	glog.V(4).Infof("Labeled rs %s's pods with hash %s.", rs.Name, hash)
 
 	// 3. Update rs label and selector to include the new hash label
 	// Copy the old selector, so that we can scrub out any orphaned pods
@@ -220,6 +224,7 @@ func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interfa
 	}); err != nil {
 		return nil, fmt.Errorf("error updating rs %s label and selector with template hash: %v", updatedRS.Name, err)
 	}
+	glog.V(4).Infof("Updated rs %s's selector and label with hash %s.", rs.Name, hash)
 
 	// TODO: look for orphaned pods and label them in the background somewhere else periodically
 
@@ -246,6 +251,7 @@ func labelPodsWithHash(podList *api.PodList, c clientset.Interface, namespace, h
 			}); err != nil {
 				return err
 			}
+			glog.V(4).Infof("Labeled pod %s with hash %s.", pod.Name, hash)
 		}
 	}
 	return nil
