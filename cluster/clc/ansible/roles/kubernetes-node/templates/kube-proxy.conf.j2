@@ -1,0 +1,15 @@
+description "kube-proxy service"
+author "mark ramach"
+
+script
+
+	KUBE_PROXY_OPTS="\
+    --bind-address=0.0.0.0\
+    --kubeconfig="/var/lib/kubelet/kubeconfig"\
+    --master={{ apiserver_endpoint }}\
+    --resource-container=\"\"\
+		"
+
+	exec kube-proxy $KUBE_PROXY_OPTS > /var/log/kube-proxy.log
+
+end script

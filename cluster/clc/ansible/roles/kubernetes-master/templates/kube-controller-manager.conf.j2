@@ -1,0 +1,15 @@
+description "kube-controller-manager service"
+author "mark ramach"
+
+script
+
+	KUBE_CONTROLLER_MANAGER_OPTS=" \
+		--address=0.0.0.0 \
+		--kubeconfig=/srv/kubernetes/kubeconfig \
+		--service-account-private-key-file=/srv/kubernetes/server.key \
+		--v=1 \
+	"
+	exec kube-controller-manager $KUBE_CONTROLLER_MANAGER_OPTS > /var/log/kube-controller-manager.log
+
+
+end script

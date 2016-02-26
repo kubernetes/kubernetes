@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: es{{ app_label }}
+  namespace: kube-system  
+  labels:
+    component: elasticsearch
+    role: {{ es_role }}
+spec:
+  replicas: {{ es_replica_count }}
+  template:
+    metadata:
+      labels:
+        component: elasticsearch
+        role: {{ es_role }}
+    spec:
+      serviceAccount: elasticsearch
+      containers:
+      - name: es{{ app_label }}
+        securityContext:
+          capabilities:
+            add:
+              - IPC_LOCK
+        image: quay.io/pires/docker-elasticsearch-kubernetes:2.1.1
+        env:
+        - name: KUBERNETES_CA_CERTIFICATE_FILE
+          value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CLUSTER_NAME
+          value: "{{ es_cluster_name }}"
+{# annoying: elasticsearch requires that the boolean values be quoted #}
+{# and lower case, thus the weird jinja2 templating #}
+        - name: NODE_MASTER
+          value: "{{ es_is_master_node|string|lower }}"
+        - name: NODE_DATA
+          value: "{{ es_is_data_node|string|lower }}"
+        - name: HTTP_ENABLE
+          value: "{{ es_enable_http|string|lower }}"
+        ports:
+{% if es_enable_http %}
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+{% endif %}
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data
+          name: storage
+      volumes:
+      - name: storage
+        emptyDir: {}

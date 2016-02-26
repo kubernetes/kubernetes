@@ -1,0 +1,103 @@
+---
+# tasks file for clc-provisioning
+
+- name: Create a CenturyLink Cloud group {{ clc_cluster_name }}.{{ server_group }} for the servers
+  clc_group:
+    name: "{{ clc_cluster_name }}.{{ server_group }}"
+    parent: "{{ clc_cluster_name }}"
+    location: "{{ datacenter }}"
+    state: present
+
+
+##########
+# Create a clc_server_name variable combining a distinctive tag and the first
+# characters of the server_group_tag
+- set_fact:
+     clc_server_name: "{{ [ distinctive_tag, server_group_tag ] | join | truncate(6, True, '') }}"
+
+##########
+# The initial play to create a set of servers in the server_group.  This play
+# creates an exact count of servers, and will run only if the number of
+# servers in the group does not match the exact_count value.
+# This task is skipped if the add_nodes variable is set
+- name: Create exact number of CLC servers in group {{ clc_cluster_name }}.{{ server_group }}, group count is {{ server_count }}
+  clc_server:
+    name: "{{ clc_server_name }}"
+    location: "{{ datacenter }}"
+    template: "{{ server_vm_template }}"
+    os_type:  "{{ server_physical_os }}"
+    exact_count: "{{ server_count }}"
+    count_group: "{{ clc_cluster_name }}.{{ server_group }}"
+    group: "{{ clc_cluster_name }}.{{ server_group }}"
+    cpu: "{{ server_cpu }}"
+    memory: "{{ server_memory }}"
+    type: "{{ server_type }}"
+    storage_type: "{{ server_storage }}"
+    configuration_id: "{{ physical_config[server_config_id] }}"
+    additional_disks: "{{ server_additional_disks }}"
+  register: clc_servers_initial
+  async: "{{ async_time }}"
+  poll: "{{ async_poll }}"
+  when: add_nodes is not defined or not add_nodes
+
+##########
+# Take the list of servers created and preserve it in the clc_servers variable
+# This task is skipped if the add_nodes variable is set
+- set_fact:
+     clc_servers: "{{ clc_servers_initial }}"
+  when:  add_nodes is not defined or not add_nodes
+
+
+##########
+# The play to create new servers, adding them to the server_group.
+# This task is run only if the add_nodes variable is set
+- name: Create additional new CLC servers in group {{ clc_cluster_name }}.{{ server_group }}, adding {{ server_count }}
+  clc_server:
+    name: "{{ clc_server_name }}"
+    location: "{{ datacenter }}"
+    template: "{{ server_vm_template }}"
+    os_type:  "{{ server_physical_os }}"
+    count: "{{ server_count }}"
+    group: "{{ clc_cluster_name }}.{{ server_group }}"
+    cpu: "{{ server_cpu }}"
+    memory: "{{ server_memory }}"
+    type: "{{ server_type }}"
+    storage_type: "{{ server_storage }}"
+    configuration_id: "{{ server_config_id }}"
+    additional_disks: "{{ server_additional_disks }}"
+  register: clc_servers_additional
+  async: "{{ async_time }}"
+  poll: "{{ async_poll }}"
+  when: add_nodes is defined and add_nodes
+
+##########
+# Take the list of servers created and preserve it in the clc_servers variable
+# This task is run only if the add_nodes variable is set
+- set_fact:
+     clc_servers: "{{ clc_servers_additional }}"
+  when: add_nodes is defined and add_nodes
+
+
+##########
+# ssh-copy-id the ssh keys to the servers which have just been created
+- name: Deploy ssh keys to servers in {{ clc_cluster_name }}.{{ server_group }}
+  clc_blueprint_package:
+    server_ids: "{{ item.name }}"
+    package_id: "{{ ssh_key_package_id }}"
+    package_params:
+      User: "root"
+      SshKey: "{{ lookup('file', '{{ server_cert_store }}/id_rsa.pub') }}"
+  with_flattened:
+    - "{{ clc_servers.servers }}"
+  async: "{{ async_time }}"
+  poll: "{{ async_poll }}"
+
+- name: Make sure local hosts directory exists
+  file:
+    name: "{{ ansible_hosts_directory }}"
+    state: directory
+
+##########
+# Write a new ansible hosts file for the servers newly created
+- name: Write hosts file for {{ clc_cluster_name }}-{{ server_group }}
+  template: src="hosts.j2" dest="{{ ansible_hosts_directory }}/hosts-{{ clc_cluster_name }}-{{ server_group }}-{{ ansible_date_time.epoch }}"

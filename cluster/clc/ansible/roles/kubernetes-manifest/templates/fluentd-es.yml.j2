@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: fluentd-logging
+  namespace: kube-system
+  labels:
+    app: fluentd-logging
+spec:
+  template:
+    metadata:
+      labels:
+        app: fluentd-logging
+    spec:
+      containers:
+      - name: fluentd-elasticsearch
+        image: gcr.io/google_containers/fluentd-elasticsearch:1.13
+        resources:
+          limits:
+            cpu: 100m
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /data/var/lib/docker/containers
+          readOnly: true
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /data/var/lib/docker/containers

@@ -1,0 +1,17 @@
+
+- set_fact: app_label=""
+
+- name: Set application label, used in templates
+  set_fact: app_label="-{{ application_tag }}"
+  when: application_tag is defined
+
+- name: Create manifest folder
+  file: path=/opt/kubernetes/manifest state=directory mode=0755
+
+- name: Add kubernetes application files
+  template: src={{ item }}.yml.j2 dest="/opt/kubernetes/manifest/{{ item }}{{ app_label }}.yml"
+  with_items: "{{ k8s_apps }}"
+
+- name: Install the kubernetes applications
+  shell: kubectl create -f "/opt/kubernetes/manifest/{{ item }}{{ app_label }}.yml"
+  with_items: "{{ k8s_apps }}"

@@ -1,0 +1,2 @@
+flannel_url: https://github.com/coreos/flannel/releases/download/v0.5.4/flannel-0.5.4-linux-amd64.tar.gz
+flannel_version: flannel-0.5.4

@@ -1,0 +1,5 @@
+---
+etcd_version: v2.2.2
+etcd_install_dir: /usr/local/bin
+etcd_cluster_name: etcd_k8s
+etcd_install_and_run_service: False

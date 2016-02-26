@@ -1,0 +1,3 @@
+---
+## directory in which to create or use ssh keys
+server_cert_store: "{{ lookup('env','HOME') }}/ssh/"

@@ -1,0 +1,44 @@
+---
+## defaults file for clc-provisioning
+
+## in addition, user must specify:
+# server_group:   // a group name for these servers, also used by CLC in generating the hostname
+# datacenter:     // desired datacenter location, VA1, WA1, etc
+
+clc_cluster_home: "{{ lookup('env','HOME') }}/.clc_kube/{{ clc_cluster_name }}"
+
+## default to ubuntu
+server_vm_template: "ubuntu-14-64"
+server_physical_os: "ubuntu14_64Bit"
+
+## @see vars/main.yml
+# server_config_id: "{{ physical_server_4_core_conf_id }}"
+server_config_id: "{{ default_config_id }}"
+
+## directory in which to create or use ssh keys
+server_cert_store: "{{ clc_cluster_home }}/ssh"
+
+## number of servers
+server_count: 1
+
+## options are
+# standard (vm)
+# bareMetal
+server_type: standard
+
+## options are
+# standard (vm)
+# bareMetal
+server_storage: standard
+
+## mount addition filesystem storage
+## must be left empty for physical servers
+## otherwise could be set wtih:
+##     server_additional_disks:
+##       - path: /data
+##         sizeGB: 100
+##         type: partitioned
+server_additional_disks: []
+
+## an ansible inventory file will be written to this directory
+ansible_hosts_directory: "{{ clc_cluster_home }}/hosts"

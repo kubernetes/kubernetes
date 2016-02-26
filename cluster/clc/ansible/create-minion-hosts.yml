@@ -1,0 +1,65 @@
+---
+- name: Check ansible version
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - fail: msg="This playbook requires Ansible 2.0 or greater (found {{ ansible_version.full }})."
+      when: "{{ ansible_version|version_compare(2.0,'<') }}"
+
+- name: Get machine resources for k8s minion
+  hosts: localhost
+  gather_facts: True
+  connection: local
+
+  vars:
+    - server_group: minion
+    - datacenter: VA1
+    - server_count: 2
+    - server_memory: 4
+    - server_cpu: 2
+    - skip_minion: False
+    - async_time: 7200
+    - async_poll: 5
+
+  pre_tasks:
+    - name: include vars for configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+    - name: Check for Minion_type
+      set_fact:
+        server_type: "{{ minion_type }}"
+      when: minion_type is defined
+
+    - name: Check for Minion_count
+      set_fact:
+        server_count: "{{ minion_count }}"
+      when: minion_count is defined
+
+    - name: Check for vm_cpu
+      set_fact:
+        server_cpu: "{{ vm_cpu }}"
+      when: vm_cpu is defined
+
+    - name: Check for vm_memory
+      set_fact:
+        server_memory: "{{ vm_memory }}"
+      when: vm_memory is defined
+
+    - name: Allocate additional_disks /data space on virtual ("standard") minions
+      set_fact:
+        server_additional_disks:
+          - path: /data
+            sizeGB: 100
+            type: partitioned
+      when: server_type == "standard"
+
+    - name: Set Async time differently if type = bareMetal
+      set_fact:
+        async_time: 14400
+        async_poll: 10
+      when: server_type == "bareMetal"
+
+  roles:
+    - { role: clc-provisioning, when: skip_minion == False }

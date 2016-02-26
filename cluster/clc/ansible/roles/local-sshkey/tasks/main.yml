@@ -1,0 +1,11 @@
+---
+- name: Prepare local certificate store
+  file: path={{ server_cert_store }} state=directory mode=0755
+
+- name: Prepare local certificate file
+  stat: path="{{ server_cert_store }}/id_rsa"
+  register: sshkeyfile
+
+- name: Establish local ssh key
+  command: ssh-keygen -N '' -f {{ server_cert_store }}/id_rsa
+  when: sshkeyfile.stat.exists == False

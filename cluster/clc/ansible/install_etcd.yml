@@ -1,0 +1,54 @@
+---
+
+- name: "Install etcd on group {{ etcd_group }}"
+  hosts: "{{ etcd_group }}"
+  gather_facts: True
+  vars:
+    - etcd_install_and_run_service: True
+  vars_files:
+    - vars.yml
+    - "{{ config_vars }}"
+
+  pre_tasks:
+
+    - name: include vars from master configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+    - name: "Set etcd url for cluster in group {{ etcd_group }}"
+      set_fact:
+        etcd_endpoint: "{% for host in groups[etcd_group] %}http://{{ hostvars[host]['ansible_default_ipv4']['address'] }}:2379{% if not loop.last %},{% endif %}{% endfor %}"
+
+  roles:
+    - etcd
+
+
+- name: write etcd configuration information into local config files
+  hosts: localhost
+  vars_files:
+    - vars.yml
+
+  pre_tasks:
+    - name: include vars from master configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+  tasks:
+
+    # - debug: var=hostvars[groups[etcd_group][0]]
+
+    - name: etcd_endpoint -> master config
+      lineinfile:
+        dest: "~/.clc_kube/{{ clc_cluster_name }}/config/master_config.yml"
+        line: "etcd_endpoint: {{ hostvars[ item ].etcd_endpoint }}"
+        state: present
+        regexp: "^etcd_endpoint:"
+      with_items: "{{groups[etcd_group][0]}}"
+
+    - name: etcd_endpoint -> minion config
+      lineinfile:
+        dest: "~/.clc_kube/{{ clc_cluster_name }}/config/minion_config.yml"
+        line: "etcd_endpoint: {{ hostvars[ item ].etcd_endpoint }}"
+        state: present
+        regexp: "^etcd_endpoint:"
+      with_items: "{{groups[etcd_group][0]}}"

@@ -1,0 +1,17 @@
+---
+- name: Create parent group
+  hosts: localhost
+  gather_facts: False
+  connection: local
+
+  pre_tasks:
+    - name: include vars for configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+  tasks:
+    - name: Ensure CenturyLink Cloud group {{ clc_cluster_name }} exists
+      clc_group:
+        name: "{{ clc_cluster_name }}"
+        location: "{{ datacenter }}"
+        state: present

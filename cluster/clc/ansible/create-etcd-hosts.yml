@@ -1,0 +1,27 @@
+---
+- name: Check ansible version
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - fail: msg="This playbook requires Ansible 2.0 or greater (found {{ ansible_version.full }})."
+      when: "{{ ansible_version|version_compare(2.0,'<') }}"
+    - fail: msg="The clc_cluster_name variable must be set"
+      when: clc_cluster_name is undefined
+
+- name: Get machine resources for etcd
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  vars:
+    - server_group: etcd
+    - datacenter: VA1
+    - server_count: 3
+    - server_memory: 2
+    - server_cpu: 1
+    - skip_etcd: False
+    - async_time: 7200
+    - async_poll: 5
+
+  roles:
+    - { role: clc-provisioning, when: skip_etcd == False }

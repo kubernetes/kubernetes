@@ -1,0 +1,18 @@
+---
+## vars file for clc-provisioning, contains constants that are defined by the
+## CenturyLink infrastructure and are unlikely to be overridden
+
+# distinctive CenturyLink Kubernetes tag for server names -> [version][K8].
+# Is combined with other characters at deployment time to meet the 6 char limit
+distinctive_tag: V03K8
+
+## identifier for the blueprint that copies ssh keys
+ssh_key_package_id: "77abb844-579d-478d-3955-c69ab4a7ba1a"
+
+## identifier for the physical server types
+##  from:  curl -vvv  -H "Accept:*/*"  -H "Authorization: Bearer $CLC_V2_API_BEARERTOKEN" https://api.ctl.io/v2/datacenters/NTFR/VA1/bareMetalCapabilities
+physical_config:
+  physical_server_20_core: "8057e3629403e92d6693352ad17a807dc8970aef"
+  physical_server_12_core: "f24b18ba2ce23657657444601649c7b8b7f9b60c"
+  physical_server_4_core: "529e2592a3e640a7c2617b5e8bc8feaed94eac22"
+  default: "529e2592a3e640a7c2617b5e8bc8feaed94eac22"

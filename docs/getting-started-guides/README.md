@@ -99,6 +99,7 @@ few commands, and have active community support.
 - [GCE](gce.md)
 - [AWS](aws.md)
 - [Azure](coreos/azure/README.md)
+- [CenturyLink Cloud](/cluster/clc/README.md)
 
 ### Custom Solutions
 

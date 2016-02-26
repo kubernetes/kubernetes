@@ -1,0 +1,18 @@
+---
+- name: Collect Facts
+  hosts: all
+  gather_facts: True
+  vars_files:
+    - vars.yml
+
+- hosts: kube-master[0]
+  gather_facts: True
+  vars_files:
+    - vars.yml
+  vars:
+    - apiserver_endpoint: https://{{ ansible_default_ipv4.address }}:6443
+  pre_tasks:
+    - name: set master ip address
+      set_fact: ip_address={{ ansible_default_ipv4.address }}
+  roles:
+    - kubernetes-manifest

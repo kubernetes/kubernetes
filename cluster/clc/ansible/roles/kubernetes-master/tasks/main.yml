@@ -1,0 +1,75 @@
+- name: Add kube-apiserver service configuration.
+  template:
+    src: kube-apiserver.conf.j2
+    dest: /etc/init/kube-apiserver.conf
+
+- name: Create server pki cert directory
+  file:
+   path: "/srv/kubernetes"
+   state: directory
+
+- name: Copy server pki CA files
+  copy:
+   src: "{{ cert_dir }}/{{ item }}"
+   dest: "/srv/kubernetes/{{ item }}"
+  with_items:
+   - ca.crt
+   - server.crt
+   - server.key
+
+- name: Create a placeholder token file
+  file:
+    path: /srv/kubernetes/known_tokens.csv
+    state: touch
+  changed_when: False
+
+- set_fact:
+    kube_admin_password: "{{ lookup('password', '{{ kube_config_local }}/admin_password.txt') }}"
+
+- name: Add kube-apiserver password
+  template:
+    src: basic-auth.j2
+    dest: /srv/kubernetes/password
+  notify:
+    - restart kube-apiserver
+
+- name: Template kubeconfig with certificate data
+  template:
+    src: kubeconfig.j2
+    dest: /srv/kubernetes/kubeconfig
+  notify:
+    - restart kube-apiserver
+
+- name: Start kube-apiserver service.
+  service:
+    name: kube-apiserver
+    state: running
+    enabled: True
+
+
+- name: Add kube-controller-manager service configuration.
+  template:
+    src: kube-controller-manager.conf.j2
+    dest: /etc/init/kube-controller-manager.conf
+  notify:
+    - restart kube-controller-manager
+
+- name: Start kube-controller-manager service.
+  service:
+    name: kube-controller-manager
+    state: running
+    enabled: True
+
+
+- name: Add kube-scheduler service configuration.
+  template:
+    src: kube-scheduler.conf.j2
+    dest: /etc/init/kube-scheduler.conf
+  notify:
+    - restart kube-scheduler
+
+- name: Start kube-scheduler service.
+  service:
+    name: kube-scheduler
+    state: running
+    enabled: True

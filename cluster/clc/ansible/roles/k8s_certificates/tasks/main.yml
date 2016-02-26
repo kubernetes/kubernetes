@@ -1,0 +1,117 @@
+---
+- name: Create certificate directory
+  file:
+    path: "{{ cert_dir }}"
+    state: directory
+
+
+- block:
+  - name: Template openssl configuration (server)
+    template:
+      src: openssl.cnf.j2
+      dest: "{{ cert_dir }}/openssl.cnf"
+
+  - name: Template openssl configuration (client)
+    template:
+      src: openssl-client.cnf.j2
+      dest: "{{ cert_dir }}/openssl-client.cnf"
+
+  - name: Generate CA key
+    shell: >
+      openssl genrsa
+      -out "{{ cert_dir }}/ca-key.pem"
+      2048
+    args:
+      creates: "{{ cert_dir }}/ca-key.pem"
+
+  - name: Generate CA cert
+    shell: >
+      openssl req
+      -x509
+      -sha256
+      -new
+      -nodes
+      -key "{{ cert_dir }}/ca-key.pem"
+      -days 10000
+      -subj "/CN=kube-ca"
+      -out "{{ cert_dir }}/ca.crt"
+    args:
+      creates: "{{ cert_dir }}/ca.crt"
+
+  when: create_ca is defined and create_ca
+
+
+- block :
+  - name: Generate server key
+    shell: >
+      openssl genrsa
+      -out "{{ cert_dir }}/server.key" 2048
+    args:
+      creates:  "{{ cert_dir }}/server.key"
+
+  - name: Generate server request
+    shell: >
+      openssl req
+      -new
+      -sha256
+      -key "{{ cert_dir }}/server.key"
+      -subj "/CN=kubernetes-master"
+      -config "{{ cert_dir }}/openssl.cnf"
+      -out "{{ cert_dir }}/server.csr"
+    args:
+      creates: "{{ cert_dir }}/server.csr"
+
+  - name: Generate server cert
+    shell: >
+      openssl x509 -req
+      -sha256
+      -in "{{ cert_dir }}/server.csr"
+      -CA "{{ cert_dir }}/ca.crt"
+      -CAkey "{{ cert_dir }}/ca-key.pem"
+      -CAcreateserial
+      -days 365
+      -extensions v3_req
+      -extfile "{{ cert_dir }}/openssl.cnf"
+      -out "{{ cert_dir }}/server.crt"
+    args:
+      creates: "{{ cert_dir }}/server.crt"
+
+  when: create_server is defined and create_server
+
+
+
+- block:
+  - name: Generate client key
+    shell: >
+      openssl genrsa
+      -out "{{ cert_dir }}/{{ cert_client }}.key"
+      2048
+    args:
+      creates: "{{ cert_dir }}/{{ cert_client }}.key"
+
+  - name: Generate client request
+    shell: >
+      openssl req
+      -new
+      -key "{{ cert_dir }}/{{ cert_client }}.key"
+      -subj "/CN={{ cert_client }}"
+      -config "{{ cert_dir }}/openssl-client.cnf"
+      -out "{{ cert_dir }}/{{ cert_client }}.csr"
+    args:
+      creates: "{{ cert_dir }}/{{ cert_client }}.csr"
+
+  - name: Generate client cert
+    shell: >
+      openssl x509 -req
+      -in "{{ cert_dir }}/{{ cert_client }}.csr"
+      -CA "{{ cert_dir }}/ca.crt"
+      -CAkey "{{ cert_dir }}/ca-key.pem"
+      -CAcreateserial
+      -days 365
+      -extensions v3_req
+      -extfile "{{ cert_dir }}/openssl-client.cnf"
+      -out "{{ cert_dir }}/{{ cert_client }}.crt"
+    args:
+      creates:  "{{ cert_dir }}/{{ cert_client }}.crt"
+
+  when: cert_client is defined
