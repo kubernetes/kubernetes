@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rand"
 
 	"github.com/rackspace/gophercloud"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestReadConfig(t *testing.T) {
@@ -169,7 +170,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 	}
 
-	_, exists, err := lb.GetLoadBalancer("noexist", "region")
+	_, exists, err := lb.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
 	if err != nil {
 		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 	}

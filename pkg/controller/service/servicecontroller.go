@@ -18,7 +18,6 @@ package service
 
 import (
 	"fmt"
-	"net"
 	"sort"
 	"sync"
 	"time"
@@ -29,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
@@ -83,7 +82,7 @@ type ServiceController struct {
 // (like load balancers) in sync with the registry.
 func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
+	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{kubeClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
 
 	return &ServiceController{
@@ -259,7 +258,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
 		s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-		err := s.balancer.EnsureLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
+		err := s.balancer.EnsureLoadBalancerDeleted(service)
 		if err != nil {
 			message := "Error deleting load balancer (will retry): " + err.Error()
 			s.eventRecorder.Event(service, api.EventTypeWarning, "DeletingLoadBalancerFailed", message)
@@ -297,7 +296,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 			// If we don't have any cached memory of the load balancer, we have to ask
 			// the cloud provider for what it knows about it.
 			// Technically EnsureLoadBalancerDeleted can cope, but we want to post meaningful events
-			_, exists, err := s.balancer.GetLoadBalancer(s.loadBalancerName(service), s.zone.Region)
+			_, exists, err := s.balancer.GetLoadBalancer(service)
 			if err != nil {
 				return fmt.Errorf("Error getting LB for service %s: %v", namespacedName, err), retryable
 			}
@@ -309,7 +308,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		if needDelete {
 			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", namespacedName)
 			s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-			if err := s.balancer.EnsureLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region); err != nil {
+			if err := s.balancer.EnsureLoadBalancerDeleted(service); err != nil {
 				return err, retryable
 			}
 			s.eventRecorder.Event(service, api.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
@@ -323,8 +322,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 
 		// The load balancer doesn't exist yet, so create it.
 		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-
-		err := s.createLoadBalancer(service, namespacedName)
+		err := s.createLoadBalancer(service)
 		if err != nil {
 			return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
 		}
@@ -374,21 +372,16 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 	return err
 }
 
-func (s *ServiceController) createLoadBalancer(service *api.Service, serviceName types.NamespacedName) error {
-	ports, err := getPortsForLB(service)
-	if err != nil {
-		return err
-	}
+func (s *ServiceController) createLoadBalancer(service *api.Service) error {
 	nodes, err := s.nodeLister.List()
 	if err != nil {
 		return err
 	}
-	name := s.loadBalancerName(service)
+
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	status, err := s.balancer.EnsureLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
-		ports, hostsFromNodeList(&nodes), serviceName, service.Spec.SessionAffinity, service.ObjectMeta.Annotations)
+	status, err := s.balancer.EnsureLoadBalancer(service, hostsFromNodeList(&nodes))
 	if err != nil {
 		return err
 	} else {
@@ -482,6 +475,9 @@ func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api
 	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
 		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "ExternalIP", "Count: %v -> %v",
 			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
+		return true
+	}
+	if len(oldService.Labels) != len(newService.Labels) {
 		return true
 	}
 	for i := range oldService.Spec.ExternalIPs {
@@ -704,16 +700,15 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 	}
 
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
-	name := cloudprovider.GetLoadBalancerName(service)
-	err := s.balancer.UpdateLoadBalancer(name, s.zone.Region, hosts)
+	err := s.balancer.UpdateLoadBalancer(service, hosts)
 	if err == nil {
 		s.eventRecorder.Event(service, api.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
 		return nil
 	}
 
 	// It's only an actual error if the load balancer still exists.
-	if _, exists, err := s.balancer.GetLoadBalancer(name, s.zone.Region); err != nil {
-		glog.Errorf("External error while checking if load balancer %q exists: name, %v", name, err)
+	if _, exists, err := s.balancer.GetLoadBalancer(service); err != nil {
+		glog.Errorf("External error while checking if load balancer %q exists: name, %v", cloudprovider.GetLoadBalancerName(service), err)
 	} else if !exists {
 		return nil
 	}
