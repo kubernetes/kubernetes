@@ -93,8 +93,10 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
-			client:        &fake,
-			eventRecorder: &record.FakeRecorder{},
+			client:          &fake,
+			eventRecorder:   &record.FakeRecorder{},
+			podExpectations: controller.NewControllerExpectations(),
+			rsExpectations:  controller.NewControllerExpectations(),
 		}
 		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
 		if err != nil {
@@ -267,11 +269,13 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			return false, nil, nil
 		})
 		controller := &DeploymentController{
-			client:        &fakeClientset,
-			eventRecorder: &record.FakeRecorder{},
+			client:          &fakeClientset,
+			eventRecorder:   &record.FakeRecorder{},
+			podExpectations: controller.NewControllerExpectations(),
+			rsExpectations:  controller.NewControllerExpectations(),
 		}
 
-		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment, false)
+		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -371,8 +375,10 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		})
 
 		controller := &DeploymentController{
-			client:        &fakeClientset,
-			eventRecorder: &record.FakeRecorder{},
+			client:          &fakeClientset,
+			eventRecorder:   &record.FakeRecorder{},
+			podExpectations: controller.NewControllerExpectations(),
+			rsExpectations:  controller.NewControllerExpectations(),
 		}
 		cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, test.maxCleanupCount)
 		if err != nil {
@@ -458,8 +464,10 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			return false, nil, nil
 		})
 		controller := &DeploymentController{
-			client:        &fakeClientset,
-			eventRecorder: &record.FakeRecorder{},
+			client:          &fakeClientset,
+			eventRecorder:   &record.FakeRecorder{},
+			podExpectations: controller.NewControllerExpectations(),
+			rsExpectations:  controller.NewControllerExpectations(),
 		}
 		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
 		if err != nil {
