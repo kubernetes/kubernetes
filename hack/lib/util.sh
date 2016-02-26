@@ -27,8 +27,8 @@ kube::util::realpath() {
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
-  local wait=${3:-0.5}
-  local times=${4:-25}
+  local wait=${3:-1}
+  local times=${4:-30}
 
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
