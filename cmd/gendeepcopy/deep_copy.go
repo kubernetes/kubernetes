@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -44,9 +45,18 @@ import (
 const pkgBase = "k8s.io/kubernetes/pkg"
 
 var (
-	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
-	groupVersion = flag.StringP("version", "v", "api/v1", "groupPath/version for conversion.")
+	functionDest = flag.StringP("funcDest", "f", "-", "Output for deep copy functions; '-' means stdout")
+	groupVersion = flag.StringP("version", "v", "", "groupPath/version for deep copies.")
+	overwrites   = flag.StringP("overwrites", "o", "", "Comma-separated overwrites for package names")
 )
+
+// types inside the api package don't need to say "api.Scheme"; all others do.
+func destScheme(gv unversioned.GroupVersion) string {
+	if gv == api.SchemeGroupVersion {
+		return "Scheme"
+	}
+	return "api.Scheme"
+}
 
 // We're moving to pkg/apis/group/version. This handles new and legacy packages.
 func pkgPath(group, version string) string {
@@ -54,7 +64,7 @@ func pkgPath(group, version string) string {
 		group = "api"
 	}
 	gv := group
-	if version != "" {
+	if version != "__internal" {
 		gv = path.Join(group, version)
 	}
 	switch {
@@ -89,42 +99,58 @@ func main() {
 		glog.Fatalf("Error parsing groupversion %v: %v", *groupVersion, err)
 	}
 
-	_, err = data.WriteString(fmt.Sprintf("package %v\n", gv.Version))
+	registerTo := destScheme(gv)
+	var pkgname string
+	if gv.Group == "" {
+		// the internal version of v1 is registered in package api
+		pkgname = "api"
+	} else {
+		pkgname = gv.Group
+	}
+	if len(gv.Version) != 0 && gv.Version != kruntime.APIVersionInternal {
+		pkgname = gv.Version
+	}
+
+	_, err = data.WriteString(fmt.Sprintf("package %s\n", pkgname))
 	if err != nil {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
 	versionPath := pkgPath(gv.Group, gv.Version)
-	generator := kruntime.NewConversionGenerator(api.Scheme, versionPath)
-	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
-	generator.AddImport(path.Join(pkgBase, "api/resource"))
-	// TODO(wojtek-t): Change the overwrites to a flag.
-	generator.OverwritePackage(gv.Version, "")
+	generator := kruntime.NewDeepCopyGenerator(api.Scheme, versionPath, sets.NewString("k8s.io/kubernetes"))
+	generator.AddImport(path.Join(pkgBase, "api"))
+
+	if len(*overwrites) > 0 {
+		for _, overwrite := range strings.Split(*overwrites, ",") {
+			if !strings.Contains(overwrite, "=") {
+				glog.Fatalf("Invalid overwrite syntax: %s", overwrite)
+			}
+			vals := strings.Split(overwrite, "=")
+			generator.OverwritePackage(vals[0], vals[1])
+		}
+	}
+
 	for _, knownType := range api.Scheme.KnownTypes(gv) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}
-		if err := generator.GenerateConversionsForType(gv, knownType); err != nil {
-			glog.Errorf("Error while generating conversion functions for %v: %v", knownType, err)
+		if err := generator.AddType(knownType); err != nil {
+			glog.Errorf("Error while generating deep copy functions for %v: %v", knownType, err)
 		}
 	}
-	generator.RepackImports(sets.NewString())
+	generator.RepackImports()
 	if err := generator.WriteImports(data); err != nil {
 		glog.Fatalf("Error while writing imports: %v", err)
 	}
-	if err := generator.WriteConversionFunctions(data); err != nil {
-		glog.Fatalf("Error while writing conversion functions: %v", err)
+	if err := generator.WriteDeepCopyFunctions(data); err != nil {
+		glog.Fatalf("Error while writing deep copy functions: %v", err)
 	}
-	if err := generator.RegisterConversionFunctions(data, fmt.Sprintf("%s.Scheme", apiShort)); err != nil {
-		glog.Fatalf("Error while writing conversion functions: %v", err)
+	if err := generator.RegisterDeepCopyFunctions(data, registerTo); err != nil {
+		glog.Fatalf("Error while registering deep copy functions: %v", err)
 	}
-
 	b, err := imports.Process("", data.Bytes(), nil)
 	if err != nil {
-		for i, s := range bytes.Split(data.Bytes(), []byte("\n")) {
-			glog.Infof("%d:\t%s", i, s)
-		}
-		glog.Fatalf("Error while update imports: %v\n", err)
+		glog.Fatalf("Error while update imports: %v", err)
 	}
 	if _, err := funcOut.Write(b); err != nil {
 		glog.Fatalf("Error while writing out the resulting file: %v", err)
