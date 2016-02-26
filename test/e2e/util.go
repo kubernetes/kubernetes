@@ -2497,15 +2497,11 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 	return hosts
 }
 
-// NodeSSHHosts returns SSH-able host names for all nodes. It returns an error
-// if it can't find an external IP for every node, though it still returns all
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this exludes master node.
+// It returns an error if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
 func NodeSSHHosts(c *client.Client) ([]string, error) {
-	// It should be OK to list unschedulable Nodes here.
-	nodelist, err := c.Nodes().List(api.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error getting nodes: %v", err)
-	}
+	nodelist := ListSchedulableNodesOrDie(c)
 
 	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
 	hosts := NodeAddresses(nodelist, api.NodeExternalIP)
