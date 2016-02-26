@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -72,6 +73,8 @@ import (
 )
 
 const (
+	// How long to wait for the pod to be listable
+	podListTimeout = time.Minute
 	// Initial pod start can be delayed O(minutes) by slow docker pulls
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
@@ -110,6 +113,9 @@ const (
 
 	// How long pods have to be "ready" when a test begins.
 	podReadyBeforeTimeout = 2 * time.Minute
+
+	// How long pods have to become scheduled onto nodes
+	podScheduledBeforeTimeout = podListTimeout + (20 * time.Second)
 
 	podRespondingTimeout     = 2 * time.Minute
 	serviceRespondingTimeout = 2 * time.Minute
@@ -304,6 +310,12 @@ func Skipf(format string, args ...interface{}) {
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	if testContext.CloudConfig.NumNodes < minNodeCount {
 		Skipf("Requires at least %d nodes (not %d)", minNodeCount, testContext.CloudConfig.NumNodes)
+	}
+}
+
+func SkipUnlessAtLeast(value int, minValue int, message string) {
+	if value < minValue {
+		Skipf(message)
 	}
 }
 
@@ -1836,6 +1848,26 @@ func (config *RCConfig) start() error {
 	return nil
 }
 
+// Simplified version of RunRC, that does not create RC, but creates plain Pods.
+// optionally waits for pods to start running (if waitForRunning == true)
+func startPods(c *client.Client, replicas int, namespace string, podNamePrefix string, pod api.Pod, waitForRunning bool) {
+	startPodsID := string(util.NewUUID()) // So that we can label and find them
+	for i := 0; i < replicas; i++ {
+		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
+		pod.ObjectMeta.Name = podName
+		pod.ObjectMeta.Labels["name"] = podName
+		pod.ObjectMeta.Labels["startPodsID"] = startPodsID
+		pod.Spec.Containers[0].Name = podName
+		_, err := c.Pods(namespace).Create(&pod)
+		expectNoError(err)
+	}
+	if waitForRunning {
+		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
+		err := waitForPodsWithLabelRunning(c, namespace, label)
+		expectNoError(err, "Error waiting for %d pods to be running - probably a timeout", replicas)
+	}
+}
+
 func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	badNodes := sets.NewString()
 	for _, p := range pods {
@@ -2028,7 +2060,42 @@ waitLoop:
 	return nil
 }
 
-// Wait up to 10 minutes for getting pods with certain label
+// Returns true if all the specified pods are scheduled, else returns false.
+func podsWithLabelScheduled(c *client.Client, ns string, label labels.Selector) (bool, error) {
+	podStore := newPodStore(c, ns, label, fields.Everything())
+	defer podStore.Stop()
+	pods := podStore.List()
+	if len(pods) == 0 {
+		return false, nil
+	}
+	for _, pod := range pods {
+		if pod.Spec.NodeName == "" {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// Wait for all matching pods to become scheduled and at least one
+// matching pod exists.  Return the list of matching pods.
+func waitForPodsWithLabelScheduled(c *client.Client, ns string, label labels.Selector) (pods *api.PodList, err error) {
+	err = wait.PollImmediate(poll, podScheduledBeforeTimeout,
+		func() (bool, error) {
+			pods, err = waitForPodsWithLabel(c, ns, label)
+			if err != nil {
+				return false, err
+			}
+			for _, pod := range pods.Items {
+				if pod.Spec.NodeName == "" {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	return pods, err
+}
+
+// Wait up to podListTimeout for getting pods with certain label
 func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (pods *api.PodList, err error) {
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
 		options := api.ListOptions{LabelSelector: label}
@@ -3148,4 +3215,13 @@ func unblockNetwork(from string, to string) {
 		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 			"required on host %s: remove rule %s, if exists", from, iptablesRule)
 	}
+}
+
+func isElementOf(podUID types.UID, pods *api.PodList) bool {
+	for _, pod := range pods.Items {
+		if pod.UID == podUID {
+			return true
+		}
+	}
+	return false
 }
