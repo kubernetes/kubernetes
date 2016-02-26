@@ -186,6 +186,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		} else {
 			dumpAllNamespaceInfo(c, api.NamespaceSystem)
 		}
+		logFailedContainers(api.NamespaceSystem)
 		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
