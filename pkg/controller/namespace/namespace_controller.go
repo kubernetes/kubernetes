@@ -112,11 +112,16 @@ func (nm *NamespaceController) worker() {
 			if err := nm.syncNamespaceFromKey(key.(string)); err != nil {
 				if estimate, ok := err.(*contentRemainingError); ok {
 					go func() {
+						defer utilruntime.HandleCrash()
 						t := estimate.Estimate/2 + 1
 						glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
 						time.Sleep(time.Duration(t) * time.Second)
 						nm.queue.Add(key)
 					}()
+				} else {
+					// rather than wait for a full resync, re-add the namespace to the queue to be processed
+					nm.queue.Add(key)
+					utilruntime.HandleError(err)
 				}
 			}
 		}()

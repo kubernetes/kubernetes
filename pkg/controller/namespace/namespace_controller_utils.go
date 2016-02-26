@@ -244,6 +244,12 @@ func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVers
 	// we have removed content, so mark it finalized by us
 	result, err := retryOnConflictError(kubeClient, namespace, finalizeNamespaceFunc)
 	if err != nil {
+		// in normal practice, this should not be possible, but if a deployment is running
+		// two controllers to do namespace deletion that share a common finalizer token it's
+		// possible that a not found could occur since the other controller would have finished the delete.
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
