@@ -1034,15 +1034,12 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 	}
 
+	config, err := NewConfig("/bin/rkt/rkt", "", "--debug=false --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data")
+	assert.NoError(t, err)
+
 	rkt := &Runtime{
 		rktBinAbsPath: "/bin/rkt/rkt",
-		config: &Config{
-			Path:            "/bin/rkt/rkt",
-			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
-			Dir:             "/var/data",
-			InsecureOptions: "image,ondisk",
-			LocalConfigDir:  "/var/rkt/local/data",
-		},
+		config:        config,
 	}
 
 	for i, tt := range tests {

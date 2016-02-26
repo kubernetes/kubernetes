@@ -186,7 +186,7 @@ func NewMainKubelet(
 	cgroupRoot string,
 	containerRuntime string,
 	rktPath string,
-	rktStage1Image string,
+	rktOptions string,
 	mounter mount.Interface,
 	writer kubeio.Writer,
 	configureCBR0 bool,
@@ -425,11 +425,11 @@ func NewMainKubelet(
 		)
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
-		conf := &rkt.Config{
-			Path:            rktPath,
-			Stage1Image:     rktStage1Image,
-			InsecureOptions: "image,ondisk",
+		conf, err := rkt.NewConfig(rktPath, rktOptions)
+		if err != nil {
+			return nil, err
 		}
+
 		rktRuntime, err := rkt.New(
 			conf,
 			klet,

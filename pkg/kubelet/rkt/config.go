@@ -16,7 +16,12 @@ limitations under the License.
 
 package rkt
 
-import "fmt"
+import (
+	"flag"
+	"strings"
+)
+
+const DefaultOptions = "--dir=/var/lib/rkt --insecure-options=image,ondisk --local-config=/etc/rkt"
 
 // Config stores the global configuration for the rkt runtime.
 // Detailed documents can be found at:
@@ -24,8 +29,6 @@ import "fmt"
 type Config struct {
 	// The absolute path to the binary, or leave empty to find it in $PATH.
 	Path string
-	// The image to use as stage1.
-	Stage1Image string
 	// The debug flag for rkt.
 	Debug bool
 	// The rkt data directory.
@@ -33,24 +36,41 @@ type Config struct {
 	// Comma-separated list of security features to disable.
 	// Allowed values: "none", "image", "tls", "ondisk", "http", "all".
 	InsecureOptions string
-	// The local config directory.
-	LocalConfigDir string
+	// Local configuration directory.
+	LocalConfig string
+	// System configuration directory.
+	SystemConfig string
+	// Automatically trust gpg keys fetched from https.
+	TrustKeysFromHttps bool
+	// User configuration directory.
+	UserConfig string
+
+	// The Option strings. This string passed to rkt directly.
+	Options string
+}
+
+func NewConfig(path, options string) (*Config, error) {
+	fs := flag.NewFlagSet("rktflags", flag.ContinueOnError)
+	config := &Config{
+		Path:    path,
+		Options: options,
+	}
+
+	fs.BoolVar(&config.Debug, "debug", false, "print out more debug information to stderr")
+	fs.StringVar(&config.Dir, "dir", "", "rkt data directory")
+	fs.StringVar(&config.InsecureOptions, "insecure-options", "", `comma-separated list of security features to disable. Allowed values: "none", "image", "tls", "ondisk", "http", "all"`)
+	fs.StringVar(&config.LocalConfig, "local-config", "", "local configuration directory")
+	fs.StringVar(&config.SystemConfig, "system-config", "", "system configuration directory")
+	fs.BoolVar(&config.TrustKeysFromHttps, "trust-keys-from-https", false, "automatically trust gpg keys fetched from https")
+	fs.StringVar(&config.UserConfig, "user-config", "", "user configuration directory")
+
+	if err := fs.Parse(strings.Fields(options)); err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 // buildGlobalOptions returns an array of global command line options.
 func (c *Config) buildGlobalOptions() []string {
-	var result []string
-	if c == nil {
-		return result
-	}
-
-	result = append(result, fmt.Sprintf("--debug=%v", c.Debug))
-	result = append(result, fmt.Sprintf("--insecure-options=%s", c.InsecureOptions))
-	if c.LocalConfigDir != "" {
-		result = append(result, fmt.Sprintf("--local-config=%s", c.LocalConfigDir))
-	}
-	if c.Dir != "" {
-		result = append(result, fmt.Sprintf("--dir=%s", c.Dir))
-	}
-	return result
+	return strings.Fields(c.Options)
 }

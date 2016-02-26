@@ -317,7 +317,7 @@ resource-quota-sync-period
 resource-version
 retry_time
 rkt-path
-rkt-stage1-image
+rkt-options
 root-ca-file
 root-dir
 rs-lookup-cache-size

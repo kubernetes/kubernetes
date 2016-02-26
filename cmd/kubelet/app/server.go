@@ -239,7 +239,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Reservation:                    *reservation,
 		KubeletCgroups:                 s.KubeletCgroups,
 		RktPath:                        s.RktPath,
-		RktStage1Image:                 s.RktStage1Image,
+		RktOptions:                     s.RktOptions,
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
 		SerializeImagePulls:            s.SerializeImagePulls,
@@ -743,7 +743,7 @@ type KubeletConfig struct {
 	ResolverConfig                 string
 	KubeletCgroups                 string
 	RktPath                        string
-	RktStage1Image                 string
+	RktOptions                     string
 	RootDirectory                  string
 	Runonce                        bool
 	SerializeImagePulls            bool
@@ -824,7 +824,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.RktPath,
-		kc.RktStage1Image,
+		kc.RktOptions,
 		kc.Mounter,
 		kc.Writer,
 		kc.ConfigureCBR0,

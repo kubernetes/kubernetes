@@ -197,8 +197,8 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthCo
 	}
 
 	localConfigDir := rktLocalConfigDir
-	if r.config.LocalConfigDir != "" {
-		localConfigDir = r.config.LocalConfigDir
+	if r.config.LocalConfig != "" {
+		localConfigDir = r.config.LocalConfig
 	}
 	authDir := path.Join(localConfigDir, "auth.d")
 	if _, err := os.Stat(authDir); os.IsNotExist(err) {

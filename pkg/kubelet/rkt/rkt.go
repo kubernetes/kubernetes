@@ -55,8 +55,8 @@ const (
 	RktType = "rkt"
 
 	minimumAppcVersion       = "0.7.4"
-	minimumRktBinVersion     = "0.13.0"
-	recommendedRktBinVersion = "0.13.0"
+	minimumRktBinVersion     = "1.0.0"
+	recommendedRktBinVersion = "1.0.0"
 	minimumRktApiVersion     = "1.0.0-alpha"
 	minimumSystemdVersion    = "219"
 
@@ -773,9 +773,6 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 
 	// Run 'rkt prepare' to get the rkt UUID.
 	cmds := []string{"prepare", "--quiet", "--pod-manifest", manifestFile.Name()}
-	if r.config.Stage1Image != "" {
-		cmds = append(cmds, "--stage1-image", r.config.Stage1Image)
-	}
 	output, err := r.runCommand(cmds...)
 	if err != nil {
 		return "", nil, err

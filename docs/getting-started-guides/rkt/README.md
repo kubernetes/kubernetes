@@ -127,15 +127,14 @@ for rkt.
 To use rkt as the container runtime, we need to supply the following flags to kubelet:
 - `--container-runtime=rkt` chooses the container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
 - `--rkt-path=$PATH_TO_RKT_BINARY` sets the path of rkt binary. Leave empty to use the first rkt in $PATH.
-- `--rkt-stage1-image` sets the path of the stage1 image. Local paths and http/https URLs are supported. Leave empty to use the 'stage1.aci' that locates in the same directory as the rkt binary.
+- `--rkt-options` sets the options we want to pass to rkt. e.g. `--rkt-options=--dir=/var/lib/rkt --insecure-options=image,ondisk --local-config=/etc/rkt`
 
-If you are using the [hack/local-up-cluster.sh](../../../hack/local-up-cluster.sh) script to launch the local cluster, then you can edit the environment variable `CONTAINER_RUNTIME`, `RKT_PATH` and `RKT_STAGE1_IMAGE` to
-set these flags:
+If you are using the [hack/local-up-cluster.sh](../../../hack/local-up-cluster.sh) script to launch the local cluster, then you can edit the environment variable `CONTAINER_RUNTIME`, `RKT_PATH` and `RKT_OPTIONS` to set these flags:
 
 ```console
 $ export CONTAINER_RUNTIME=rkt
 $ export RKT_PATH=$PATH_TO_RKT_BINARY
-$ export RKT_STAGE1_IMAGE=PATH=$PATH_TO_STAGE1_IMAGE
+$ export RKT_OPTIONS=$RKT_CLI_OPTIONS
 ```
 
 Then we can launch the local cluster using the script:

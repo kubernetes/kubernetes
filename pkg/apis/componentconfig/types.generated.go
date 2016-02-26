@@ -1144,7 +1144,7 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq2[51] = x.SystemCgroups != ""
 			yyq2[52] = x.CgroupRoot != ""
 			yyq2[54] = x.RktPath != ""
-			yyq2[56] = x.RktStage1Image != ""
+			yyq2[55] = x.RktOptions != ""
 			yyq2[72] = true
 			yyq2[73] = x.NodeIP != ""
 			var yynn2 int
@@ -2313,8 +2313,33 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym185 := z.EncBinary()
-				_ = yym185
+				if yyq2[55] {
+					yym185 := z.EncBinary()
+					_ = yym185
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.RktOptions))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq2[55] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("rktOptions"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym186 := z.EncBinary()
+					_ = yym186
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.RktOptions))
+					}
+				}
+			}
+			if yyr2 || yy2arr2 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				yym188 := z.EncBinary()
+				_ = yym188
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.LockFilePath))
@@ -2323,36 +2348,11 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("lockFilePath"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym186 := z.EncBinary()
-				_ = yym186
+				yym189 := z.EncBinary()
+				_ = yym189
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.LockFilePath))
-				}
-			}
-			if yyr2 || yy2arr2 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[56] {
-					yym188 := z.EncBinary()
-					_ = yym188
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.RktStage1Image))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2[56] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("rktStage1Image"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym189 := z.EncBinary()
-					_ = yym189
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.RktStage1Image))
-					}
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -3226,17 +3226,17 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			} else {
 				x.RktPath = string(r.DecodeString())
 			}
+		case "rktOptions":
+			if r.TryDecodeAsNil() {
+				x.RktOptions = ""
+			} else {
+				x.RktOptions = string(r.DecodeString())
+			}
 		case "lockFilePath":
 			if r.TryDecodeAsNil() {
 				x.LockFilePath = ""
 			} else {
 				x.LockFilePath = string(r.DecodeString())
-			}
-		case "rktStage1Image":
-			if r.TryDecodeAsNil() {
-				x.RktStage1Image = ""
-			} else {
-				x.RktStage1Image = string(r.DecodeString())
 			}
 		case "configureCbr0":
 			if r.TryDecodeAsNil() {
@@ -4351,9 +4351,9 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LockFilePath = ""
+		x.RktOptions = ""
 	} else {
-		x.LockFilePath = string(r.DecodeString())
+		x.RktOptions = string(r.DecodeString())
 	}
 	yyj91++
 	if yyhl91 {
@@ -4367,9 +4367,9 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.RktStage1Image = ""
+		x.LockFilePath = ""
 	} else {
-		x.RktStage1Image = string(r.DecodeString())
+		x.LockFilePath = string(r.DecodeString())
 	}
 	yyj91++
 	if yyhl91 {
