@@ -35,8 +35,13 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&awsElasticBlockStorePlugin{nil}}
+func init() {
+	volume.RegisterFactory(awsElasticBlockStorePluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&awsElasticBlockStorePlugin{}}
 }
 
 type awsElasticBlockStorePlugin struct {

@@ -43,13 +43,13 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins(volume.VolumeConfig{}))
 }
 
 func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	_, host := newTestHost(t, nil)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
@@ -80,7 +80,7 @@ func TestPlugin(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
@@ -152,7 +152,7 @@ func TestPluginIdempotent(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
@@ -213,7 +213,7 @@ func TestPluginReboot(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {

@@ -45,7 +45,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/somepath/fake", nil, ProbeVolumePlugins()))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/somepath/fake", nil, ProbeVolumePlugins(volume.VolumeConfig{})))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
 	if err != nil {
@@ -106,7 +106,7 @@ func TestNewBuilder(t *testing.T) {
 					ClaimName: "claimA",
 				},
 			},
-			plugin: gce_pd.ProbeVolumePlugins()[0],
+			plugin: gce_pd.ProbeVolumePlugins(volume.VolumeConfig{})[0],
 			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
 				if !strings.Contains(builder.GetPath(), utilstrings.EscapeQualifiedNameForDisk(plugin.Name())) {
 					return fmt.Errorf("builder path expected to contain plugin name.  Got: %s", builder.GetPath())
@@ -182,7 +182,7 @@ func TestNewBuilder(t *testing.T) {
 					ClaimName: "claimA",
 				},
 			},
-			plugin: gce_pd.ProbeVolumePlugins()[0],
+			plugin: gce_pd.ProbeVolumePlugins(volume.VolumeConfig{})[0],
 			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
 				if builder != nil {
 					return fmt.Errorf("Unexpected non-nil builder: %+v", builder)
@@ -225,7 +225,7 @@ func TestNewBuilder(t *testing.T) {
 					ClaimName: "claimA",
 				},
 			},
-			plugin: gce_pd.ProbeVolumePlugins()[0],
+			plugin: gce_pd.ProbeVolumePlugins(volume.VolumeConfig{})[0],
 			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
 				if builder != nil {
 					return fmt.Errorf("Unexpected non-nil builder: %+v", builder)
@@ -311,8 +311,8 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 
 func testProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(volume.VolumeConfig{})...)
-	allPlugins = append(allPlugins, ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, ProbeVolumePlugins(volume.VolumeConfig{})...)
 	return allPlugins
 }

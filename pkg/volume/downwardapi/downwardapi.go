@@ -35,9 +35,14 @@ import (
 	"github.com/golang/glog"
 )
 
-// ProbeVolumePlugins is the entry point for plugin detection in a package.
-func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&downwardAPIPlugin{}}
+// This is the primary entrypoint for volume plugins.
+func init() {
+	volume.RegisterFactory(downwardAPIPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&downwardAPIPlugin{nil}}
 }
 
 const (

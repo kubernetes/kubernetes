@@ -201,42 +201,6 @@ func (spec *Spec) Name() string {
 	}
 }
 
-// VolumeConfig is how volume plugins receive configuration.  An instance specific to the plugin will be passed to
-// the plugin's ProbeVolumePlugins(config) func.  Reasonable defaults will be provided by the binary hosting
-// the plugins while allowing override of those default values.  Those config values are then set to an instance of
-// VolumeConfig and passed to the plugin.
-//
-// Values in VolumeConfig are intended to be relevant to several plugins, but not necessarily all plugins.  The
-// preference is to leverage strong typing in this struct.  All config items must have a descriptive but non-specific
-// name (i.e, RecyclerMinimumTimeout is OK but RecyclerMinimumTimeoutForNFS is !OK).  An instance of config will be
-// given directly to the plugin, so config names specific to plugins are unneeded and wrongly expose plugins
-// in this VolumeConfig struct.
-//
-// OtherAttributes is a map of string values intended for one-off configuration of a plugin or config that is only
-// relevant to a single plugin.  All values are passed by string and require interpretation by the plugin.
-// Passing config as strings is the least desirable option but can be used for truly one-off configuration.
-// The binary should still use strong typing for this value when binding CLI values before they are passed as strings
-// in OtherAttributes.
-type VolumeConfig struct {
-	// RecyclerPodTemplate is pod template that understands how to scrub clean a persistent volume after its release.
-	// The template is used by plugins which override specific properties of the pod in accordance with that plugin.
-	// See NewPersistentVolumeRecyclerPodTemplate for the properties that are expected to be overridden.
-	RecyclerPodTemplate *api.Pod
-
-	// RecyclerMinimumTimeout is the minimum amount of time in seconds for the recycler pod's ActiveDeadlineSeconds attribute.
-	// Added to the minimum timeout is the increment per Gi of capacity.
-	RecyclerMinimumTimeout int
-
-	// RecyclerTimeoutIncrement is the number of seconds added to the recycler pod's ActiveDeadlineSeconds for each
-	// Gi of capacity in the persistent volume.
-	// Example: 5Gi volume x 30s increment = 150s + 30s minimum = 180s ActiveDeadlineSeconds for recycler pod
-	RecyclerTimeoutIncrement int
-
-	// OtherAttributes stores config as strings.  These strings are opaque to the system and only understood by the binary
-	// hosting the plugin and the plugin itself.
-	OtherAttributes map[string]string
-}
-
 // NewSpecFromVolume creates an Spec from an api.Volume
 func NewSpecFromVolume(vs *api.Volume) *Spec {
 	return &Spec{

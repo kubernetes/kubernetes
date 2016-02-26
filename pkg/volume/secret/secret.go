@@ -31,8 +31,13 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-// ProbeVolumePlugin is the entry point for plugin detection in a package.
-func ProbeVolumePlugins() []volume.VolumePlugin {
+// This is the primary entrypoint for volume plugins.
+func init() {
+	volume.RegisterFactory(secretPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{&secretPlugin{}}
 }
 

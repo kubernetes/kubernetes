@@ -37,13 +37,13 @@ func newTestHost(t *testing.T) (string, volume.VolumeHost) {
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins(volume.VolumeConfig{}))
 }
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	_, host := newTestHost(t)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
@@ -220,7 +220,7 @@ func doTestPlugin(scenario struct {
 
 	plugMgr := volume.VolumePluginMgr{}
 	rootDir, host := newTestHost(t)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), host)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {

@@ -34,7 +34,7 @@ import (
 // Construct an instance of a plugin, by name.
 func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(basePath, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(basePath, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {

@@ -29,58 +29,43 @@ import (
 
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/aws_ebs"
-	"k8s.io/kubernetes/pkg/volume/cinder"
-	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
-
-	"github.com/golang/glog"
 )
 
 // ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.
 func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
-	allPlugins := []volume.VolumePlugin{}
-
-	// The list of plugins to probe is decided by this binary, not
-	// by dynamic linking or other "magic".  Plugins will be analyzed and
-	// initialized later.
-
 	// Each plugin can make use of VolumeConfig.  The single arg to this func contains *all* enumerated
 	// options meant to configure volume plugins.  From that single config, create an instance of volume.VolumeConfig
 	// for a specific plugin and pass that instance to the plugin's ProbeVolumePlugins(config) func.
-
 	// HostPath recycling is for testing and development purposes only!
 	hostPathConfig := volume.VolumeConfig{
 		RecyclerMinimumTimeout:   config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath,
 		RecyclerTimeoutIncrement: config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
-		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
-	}
-	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
-
 	nfsConfig := volume.VolumeConfig{
 		RecyclerMinimumTimeout:   config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS,
 		RecyclerTimeoutIncrement: config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
-		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
+	configs := map[string]volume.VolumeConfig{
+		host_path.HostPathPluginName: hostPathConfig,
+		nfs.NfsPluginName:            nfsConfig,
 	}
-	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-
-	return allPlugins
+	// Instantiate all plugins and filter out any non-recyclable
+	plugins := volume.CreateVolumePlugins(configs)
+	recyclablePlugins := []volume.VolumePlugin{}
+	for _, plugin := range plugins {
+		_, ok := plugin.(volume.RecyclableVolumePlugin)
+		if ok {
+			recyclablePlugins = append(recyclablePlugins, plugin)
+		}
+	}
+	return recyclablePlugins
 }
 
 // NewVolumeProvisioner returns a volume provisioner to use when running in a cloud or development environment.
@@ -88,17 +73,20 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // We explicitly map clouds to volume plugins here which allows us to configure many later without backwards compatibility issues.
 // Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
 func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
-	switch {
-	case cloud == nil && config.EnableHostPathProvisioning:
-		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
-	case cloud != nil && aws.ProviderName == cloud.ProviderName():
-		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
-	case cloud != nil && gce.ProviderName == cloud.ProviderName():
-		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
-	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
-		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
+	if cloud != nil && config.EnableHostPathProvisioning {
+		return nil, fmt.Errorf("host-path provisioner is not supported when running in a cloud")
 	}
-	return nil, nil
+	// Instantiate all plugins and find the first provisionable one
+	// TODO: make all the provisioners available to the user
+	plugins := volume.CreateVolumePlugins(map[string]volume.VolumeConfig{})
+	for _, plugin := range plugins {
+		provisionablePlugin, ok := plugin.(volume.ProvisionableVolumePlugin)
+		if !ok {
+			continue
+		}
+		return provisionablePlugin, nil
+	}
+	return nil, fmt.Errorf("Cannot find any provisionable volume plugin")
 }
 
 func getProvisionablePluginFromVolumePlugins(plugins []volume.VolumePlugin) (volume.ProvisionableVolumePlugin, error) {

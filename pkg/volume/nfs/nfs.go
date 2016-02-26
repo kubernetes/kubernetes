@@ -30,15 +30,17 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-// The volumeConfig arg provides the ability to configure recycler behavior.  It is implemented as a pointer to allow nils.
-// The nfsPlugin is used to store the volumeConfig and give it, when needed, to the func that creates NFS Recyclers.
-// Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
-func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
+func init() {
+	volume.RegisterFactory(NfsPluginName, ProbeVolumePlugins)
+}
+
+// This should be used only when single volume plugin is needed, e.g. in tests
+func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&nfsPlugin{
 			host:            nil,
 			newRecyclerFunc: newRecycler,
-			config:          volumeConfig,
+			config:          config,
 		},
 	}
 }
@@ -55,7 +57,7 @@ var _ volume.PersistentVolumePlugin = &nfsPlugin{}
 var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
 
 const (
-	nfsPluginName = "kubernetes.io/nfs"
+	NfsPluginName = "kubernetes.io/nfs"
 )
 
 func (plugin *nfsPlugin) Init(host volume.VolumeHost) error {
@@ -64,7 +66,7 @@ func (plugin *nfsPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (plugin *nfsPlugin) Name() string {
-	return nfsPluginName
+	return NfsPluginName
 }
 
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -136,7 +138,7 @@ type nfs struct {
 }
 
 func (nfsVolume *nfs) GetPath() string {
-	name := nfsPluginName
+	name := NfsPluginName
 	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
