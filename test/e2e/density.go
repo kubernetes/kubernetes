@@ -99,7 +99,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 	}
 	constraints["influxdb"] = resourceConstraint{
 		cpuConstraint:    2,
-		memoryConstraint: 300 * (1024 * 1024),
+		memoryConstraint: 500 * (1024 * 1024),
 	}
 	return constraints
 }
