@@ -640,10 +640,10 @@ const (
 
 // Represents a Persistent Disk resource in Google Compute Engine.
 //
-// A GCE PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same GCE project and zone as the kubelet.
-// A GCE PD can only be mounted as read/write once.
-// GCE PDs support ownership management and SELinux relabeling.
+// A GCE PD must exist before mounting to a container. The disk must
+// also be in the same GCE project and zone as the kubelet. A GCE PD
+// can only be mounted as read/write once or read-only many times. GCE
+// PDs support ownership management and SELinux relabeling.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource in GCE. Used to identify the disk in GCE.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
@@ -686,10 +686,10 @@ type FlexVolumeSource struct {
 
 // Represents a Persistent Disk resource in AWS.
 //
-// An AWS EBS disk must exist and be formatted before mounting to a container.
-// The disk must also be in the same AWS zone as the kubelet.
-// An AWS EBS disk can only be mounted as read/write once.
-// AWS EBS volumes support ownership management and SELinux relabeling.
+// An AWS EBS disk must exist before mounting to a container. The disk
+// must also be in the same AWS zone as the kubelet. An AWS EBS disk
+// can only be mounted as read/write once. AWS EBS volumes support
+// ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
