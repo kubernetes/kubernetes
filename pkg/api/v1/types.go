@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/bytestr"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -2905,7 +2906,7 @@ type Secret struct {
 	// The serialized form of the secret data is a base64 encoded string,
 	// representing the arbitrary (possibly non-string) data value here.
 	// Described in https://tools.ietf.org/html/rfc4648#section-4
-	Data map[string][]byte `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
+	Data map[string]bytestr.StringOrByteSlice `json:"data,omitempty" protobuf:"bytes,2,rep,name=data,castvalue=\"k8s.io/kubernetes/pkg/util/bytestr.StringOrByteSlice\""`
 
 	// Used to facilitate programmatic handling of secret data.
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`

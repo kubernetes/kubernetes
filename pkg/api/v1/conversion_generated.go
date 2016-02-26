@@ -27,6 +27,7 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
+	bytestr "k8s.io/kubernetes/pkg/util/bytestr"
 )
 
 func init() {
@@ -5874,7 +5875,7 @@ func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversi
 		*out = make(map[string][]byte, len(*in))
 		for key, val := range *in {
 			newVal := new([]byte)
-			if err := conversion.Convert_Slice_byte_To_Slice_byte(&val, newVal, s); err != nil {
+			if err := api.Convert_bytestr_StringOrByteSlice_To_Slice_byte(&val, newVal, s); err != nil {
 				return err
 			}
 			(*out)[key] = *newVal
@@ -5899,10 +5900,10 @@ func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversi
 	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
-		*out = make(map[string][]byte, len(*in))
+		*out = make(map[string]bytestr.StringOrByteSlice, len(*in))
 		for key, val := range *in {
-			newVal := new([]byte)
-			if err := conversion.Convert_Slice_byte_To_Slice_byte(&val, newVal, s); err != nil {
+			newVal := new(bytestr.StringOrByteSlice)
+			if err := api.Convert_Slice_byte_To_bytestr_StringOrByteSlice(&val, newVal, s); err != nil {
 				return err
 			}
 			(*out)[key] = *newVal
