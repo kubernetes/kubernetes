@@ -2681,6 +2681,12 @@ func autoConvert_v1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.J
 	} else {
 		out.Selector = nil
 	}
+	if in.ManualSelector != nil {
+		out.ManualSelector = new(bool)
+		*out.ManualSelector = *in.ManualSelector
+	} else {
+		out.ManualSelector = nil
+	}
 	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -2884,6 +2890,12 @@ func autoConvert_extensions_JobSpec_To_v1_JobSpec(in *extensions.JobSpec, out *J
 		}
 	} else {
 		out.Selector = nil
+	}
+	if in.ManualSelector != nil {
+		out.ManualSelector = new(bool)
+		*out.ManualSelector = *in.ManualSelector
+	} else {
+		out.ManualSelector = nil
 	}
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err

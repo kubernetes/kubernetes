@@ -204,26 +204,15 @@ var jobV1 string = `
     "kind": "Job",
     "apiVersion": "batch/v1",
     "metadata": {
-        "name": "pi",
-        "labels": {
-            "app": "pi"
-        }
+        "name": "pi"
     },
     "spec": {
         "parallelism": 1,
         "completions": 1,
-        "selector": {
-            "matchLabels": {
-                "app": "pi"
-            }
-        },
         "template": {
             "metadata": {
                 "name": "pi",
-                "creationTimestamp": null,
-                "labels": {
-                    "app": "pi"
-                }
+                "creationTimestamp": null
             },
             "spec": {
                 "containers": [

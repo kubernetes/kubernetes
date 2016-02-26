@@ -53,6 +53,7 @@ func validNewJob() *extensions.Job {
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
+			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -165,3 +166,9 @@ func TestWatch(t *testing.T) {
 }
 
 // TODO: test update /status
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
+}

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -975,12 +976,15 @@ func TestValidateDeploymentRollback(t *testing.T) {
 }
 
 func TestValidateJob(t *testing.T) {
-	validSelector := &unversioned.LabelSelector{
+	validManualSelector := &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
-	validPodTemplateSpec := api.PodTemplateSpec{
+	validGeneratedSelector := &unversioned.LabelSelector{
+		MatchLabels: map[string]string{"collection-uid": "1a2b3c"},
+	}
+	validPodTemplateSpecForManual := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector.MatchLabels,
+			Labels: validManualSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -988,21 +992,45 @@ func TestValidateJob(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	successCases := []extensions.Job{
-		{
+	validPodTemplateSpecForGenerated := api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Labels: validGeneratedSelector.MatchLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		},
+	}
+	successCases := map[string]extensions.Job{
+		"manual selector": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Selector: validSelector,
-				Template: validPodTemplateSpec,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForManual,
+			},
+		},
+		"generated selector": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: extensions.JobSpec{
+				Selector:       validGeneratedSelector,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
 	}
-	for _, successCase := range successCases {
-		if errs := ValidateJob(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+	for k, v := range successCases {
+		if errs := ValidateJob(&v); len(errs) != 0 {
+			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
 	negative := -1
@@ -1012,54 +1040,83 @@ func TestValidateJob(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Parallelism: &negative,
-				Selector:    validSelector,
-				Template:    validPodTemplateSpec,
+				Parallelism:    &negative,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.completions:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Completions: &negative,
-				Selector:    validSelector,
-				Template:    validPodTemplateSpec,
+				Completions:    &negative,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.activeDeadlineSeconds:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
 				ActiveDeadlineSeconds: &negative64,
-				Selector:              validSelector,
-				Template:              validPodTemplateSpec,
+				Selector:              validManualSelector,
+				ManualSelector:        newBool(true),
+				Template:              validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.selector:Required value": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Template: validPodTemplateSpec,
+				Template: validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Selector: validSelector,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyOnFailure,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+					},
+				},
+			},
+		},
+		"spec.template.metadata.labels: Invalid value: {\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: extensions.JobSpec{
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template: api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{"controller-uid": "4d5e6f"},
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -1073,12 +1130,14 @@ func TestValidateJob(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Selector: validSelector,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector.MatchLabels,
+						Labels: validManualSelector.MatchLabels,
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyAlways,
@@ -2069,4 +2128,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			t.Errorf("Expected success for %s, got %v", k, errs)
 		}
 	}
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }
