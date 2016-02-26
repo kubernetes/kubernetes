@@ -23,7 +23,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+<<<<<<< b20252842d53206ad46e096e52db6ef76f84cdc5:hack/after-build/verify-generated-conversions.sh
 APIROOTS=${APIROOTS:-pkg/api pkg/apis/authorization pkg/apis/autoscaling pkg/apis/batch pkg/apis/extensions pkg/apis/metrics}
+=======
+gendeepcopy=$(kube::util::find-binary "gendeepcopy")
+
+APIROOTS=${APIROOTS:-pkg/api pkg/apis/authorization pkg/apis/autoscaling pkg/apis/batch pkg/apis/extensions pkg/apis/metrics pkg/apis/clusters}
+>>>>>>> add api group for 'clusters':hack/after-build/verify-generated-deep-copies.sh
 _tmp="${KUBE_ROOT}/_tmp"
 
 cleanup() {
