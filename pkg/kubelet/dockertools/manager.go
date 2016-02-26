@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -158,6 +159,9 @@ type DockerManager struct {
 	// A false value means the kubelet just backs off from setting it,
 	// it might already be true.
 	configureHairpinMode bool
+
+	// The api version cache of docker daemon.
+	versionCache *VersionCache
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -235,6 +239,7 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 		enableCustomMetrics:    enableCustomMetrics,
 		configureHairpinMode:   hairpinMode,
+		versionCache:           NewVersionCache(),
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
@@ -248,6 +253,21 @@ func NewDockerManager(
 	for _, optf := range options {
 		optf(dm)
 	}
+
+	apiVersion, err := dm.APIVersion()
+	if err != nil {
+		glog.Errorf("Failed to get api version from docker %v", err)
+	}
+
+	daemonVersion, err := dm.Version()
+	if err != nil {
+		glog.Errorf("Failed to get daemon version from docker %v", err)
+	}
+
+	// Update version cache periodically
+	go wait.Until(func() {
+		dm.versionCache.Update(dm.machineInfo.MachineID, apiVersion, daemonVersion)
+	}, 5*time.Second, wait.NeverStop)
 
 	return dm
 }
@@ -1437,17 +1457,7 @@ func (dm *DockerManager) applyOOMScoreAdj(container *api.Container, containerInf
 		}
 		return err
 	}
-	// Set OOM score of the container based on the priority of the container.
-	// Processes in lower-priority pods should be killed first if the system runs out of memory.
-	// The main pod infrastructure container is considered high priority, since if it is killed the
-	// whole pod will die.
-	// TODO: Cache this value.
-	var oomScoreAdj int
-	if containerInfo.Name == PodInfraContainerName {
-		oomScoreAdj = qos.PodInfraOOMAdj
-	} else {
-		oomScoreAdj = qos.GetContainerOOMScoreAdjust(container, int64(dm.machineInfo.MemoryCapacity))
-	}
+	oomScoreAdj := dm.calculateOomScoreAdj(container)
 	if err = dm.oomAdjuster.ApplyOOMScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
 		if err == os.ErrNotExist {
 			// Container exited. We cannot do anything about it. Ignore this error.
@@ -1482,17 +1492,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		utsMode = namespaceModeHost
 	}
 
-	// Set OOM score of the container based on the priority of the container.
-	// Processes in lower-priority pods should be killed first if the system runs out of memory.
-	// The main pod infrastructure container is considered high priority, since if it is killed the
-	// whole pod will die.
-	var oomScoreAdj int
-	if container.Name == PodInfraContainerName {
-		oomScoreAdj = qos.PodInfraOOMAdj
-	} else {
-		oomScoreAdj = qos.GetContainerOOMScoreAdjust(container, int64(dm.machineInfo.MemoryCapacity))
-
-	}
+	oomScoreAdj := dm.calculateOomScoreAdj(container)
 
 	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount, oomScoreAdj)
 	if err != nil {
@@ -1566,20 +1566,52 @@ func (dm *DockerManager) applyOOMScoreAdjIfNeeded(container *api.Container, cont
 	return nil
 }
 
-// Check current docker API version against expected version.
+func (dm *DockerManager) calculateOomScoreAdj(container *api.Container) int {
+	// Set OOM score of the container based on the priority of the container.
+	// Processes in lower-priority pods should be killed first if the system runs out of memory.
+	// The main pod infrastructure container is considered high priority, since if it is killed the
+	// whole pod will die.
+	var oomScoreAdj int
+	if container.Name == PodInfraContainerName {
+		oomScoreAdj = qos.PodInfraOOMAdj
+	} else {
+		oomScoreAdj = qos.GetContainerOOMScoreAdjust(container, int64(dm.machineInfo.MemoryCapacity))
+
+	}
+
+	return oomScoreAdj
+}
+
+// getCachedApiVersion gets cached api version of docker runtime.
+func (dm *DockerManager) getCachedApiVersion() (kubecontainer.Version, error) {
+	apiVersion, _, err := dm.versionCache.Get(dm.machineInfo.MachineID)
+	if err != nil {
+		glog.Errorf("Failed to get cached docker api version %v ", err)
+	}
+	// If we got nil apiVersion, try to get api version directly.
+	if apiVersion == nil {
+		apiVersion, err = dm.APIVersion()
+		if err != nil {
+			glog.Errorf("Failed to get docker api version directly %v ", err)
+		}
+		dm.versionCache.Update(dm.machineInfo.MachineID, apiVersion, nil)
+	}
+	return apiVersion, err
+}
+
+// checkDockerAPIVersion checks current docker API version against expected version.
 // Return:
 // 1 : newer than expected version
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) int {
-	apiVersion, err := dm.APIVersion()
+	apiVersion, err := dm.getCachedApiVersion()
 	if err != nil {
-		glog.Errorf("failed to get current docker version - %v", err)
+		glog.Errorf("Failed to get cached docker api version %v ", err)
 	}
-
 	result, err := apiVersion.Compare(expectedVersion)
 	if err != nil {
-		glog.Errorf("failed to compare current docker version %v with OOMScoreAdj supported Docker version %q - %v",
+		glog.Errorf("Failed to compare current docker api version %v with OOMScoreAdj supported Docker version %q - %v",
 			apiVersion, expectedVersion, err)
 	}
 	return result

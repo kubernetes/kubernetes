@@ -55,8 +55,10 @@ type Runtime interface {
 
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
-	// APIVersion returns the API version information of the container
-	// runtime. This may be different from the runtime engine's version.
+
+	// APIVersion returns the cached API version information of the container
+	// runtime. Implementation is expected to update this cache periodically.
+	// This may be different from the runtime engine's version.
 	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
 	// Status returns error if the runtime is unhealthy; nil otherwise.
