@@ -74,7 +74,7 @@ type HeapsterMetricsClient struct {
 }
 
 var averageFunction = func(metrics heapster.MetricResultList) (intAndFloat, int, time.Time) {
-	sum, count, timestamp := calculateSumFromLatestSample(metrics)
+	sum, count, timestamp := calculateSumFromTimeSample(metrics, time.Minute)
 	result := intAndFloat{0, 0}
 	if count > 0 {
 		result.intValue = sum.intValue / int64(count)
@@ -218,7 +218,7 @@ func (h *HeapsterMetricsClient) getForPods(metricSpec metricDefinition, namespac
 	return &sum, timestamp, nil
 }
 
-func calculateSumFromLatestSample(metrics heapster.MetricResultList) (sum intAndFloat, count int, timestamp time.Time) {
+func calculateSumFromTimeSample(metrics heapster.MetricResultList, duration time.Duration) (sum intAndFloat, count int, timestamp time.Time) {
 	sum = intAndFloat{0, 0}
 	count = 0
 	timestamp = time.Time{}
@@ -236,12 +236,29 @@ func calculateSumFromLatestSample(metrics heapster.MetricResultList) (sum intAnd
 			if oldest == nil || newest.Timestamp.Before(*oldest) {
 				oldest = &newest.Timestamp
 			}
+			intervalSum := intAndFloat{0, 0}
+			intSumCount := 0
+			floatSumCount := 0
+			for _, metricPoint := range metrics.Metrics {
+				if metricPoint.Timestamp.Add(duration).After(newest.Timestamp) {
+					intervalSum.intValue += int64(metricPoint.Value)
+					intSumCount++
+					if metricPoint.FloatValue != nil {
+						intervalSum.floatValue += *metricPoint.FloatValue
+						floatSumCount++
+					}
+				}
+			}
 			if newest.FloatValue == nil {
-				sum.intValue += int64(newest.Value)
-				sum.floatValue += float64(newest.Value)
+				if intSumCount > 0 {
+					sum.intValue += int64(intervalSum.intValue / int64(intSumCount))
+					sum.floatValue += float64(intervalSum.intValue / int64(intSumCount))
+				}
 			} else {
-				sum.intValue += int64(*newest.FloatValue)
-				sum.floatValue += *newest.FloatValue
+				if floatSumCount > 0 {
+					sum.intValue += int64(intervalSum.floatValue / float64(floatSumCount))
+					sum.floatValue += intervalSum.floatValue / float64(floatSumCount)
+				}
 			}
 			count++
 		}

@@ -413,4 +413,42 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestAggregateSum(t *testing.T) {
+	//calculateSumFromTimeSample(metrics heapster.MetricResultList, duration time.Duration) (sum intAndFloat, count int, timestamp time.Time) {
+	now := time.Now()
+	result := heapster.MetricResultList{
+		Items: []heapster.MetricResult{
+			{
+				Metrics: []heapster.MetricPoint{
+					{now, 50, nil},
+					{now.Add(-15 * time.Second), 100, nil},
+					{now.Add(-60 * time.Second), 100000, nil}},
+				LatestTimestamp: now,
+			},
+		},
+	}
+	sum, cnt, _ := calculateSumFromTimeSample(result, time.Minute)
+	assert.Equal(t, int64(75), sum.intValue)
+	assert.InEpsilon(t, 75.0, sum.floatValue, 0.1)
+	assert.Equal(t, 1, cnt)
+}
+
+func TestAggregateSumSingle(t *testing.T) {
+	now := time.Now()
+	result := heapster.MetricResultList{
+		Items: []heapster.MetricResult{
+			{
+				Metrics: []heapster.MetricPoint{
+					{now, 50, nil},
+					{now.Add(-65 * time.Second), 100000, nil}},
+				LatestTimestamp: now,
+			},
+		},
+	}
+	sum, cnt, _ := calculateSumFromTimeSample(result, time.Minute)
+	assert.Equal(t, int64(50), sum.intValue)
+	assert.InEpsilon(t, 50.0, sum.floatValue, 0.1)
+	assert.Equal(t, 1, cnt)
+}
+
 // TODO: add proper tests for request
