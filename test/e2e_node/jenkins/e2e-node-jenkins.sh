@@ -35,4 +35,6 @@ if [ "$INSTALL_GODEP" = true ] ; then
 fi
 
 godep go build test/e2e_node/environment/conformance.go
-godep go run test/e2e_node/runner/run_e2e.go  --logtostderr --v="2" --ssh-env="gce" --zone="$GCE_ZONE" --project="$GCE_PROJECT"  --hosts="$GCE_HOSTS" --images="$GCE_IMAGES"
+godep go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+  --zone="$GCE_ZONE" --project="$GCE_PROJECT"  \
+  --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP"
