@@ -27,6 +27,8 @@ const (
 
 	SlaveReadyReason  = "SlaveReady"
 	SlaveReadyMessage = "mesos reports ready status"
+
+	RunningExecutorMessage = "node is running k8sm executor"
 )
 
 // SetRunningExecutorCondition serves to associate an executor heartbeat w/ the
@@ -40,6 +42,7 @@ func SetRunningExecutorCondition(mesosContainerID string, clock util.Clock) func
 			nodeCondition *api.NodeCondition
 		)
 
+		reasonCode := "uuid_" + mesosContainerID
 		for i := range node.Status.Conditions {
 			if node.Status.Conditions[i].Type == RunningExecutorCondition {
 				nodeCondition = &node.Status.Conditions[i]
@@ -48,12 +51,16 @@ func SetRunningExecutorCondition(mesosContainerID string, clock util.Clock) func
 
 		if nodeCondition != nil {
 			nodeCondition.LastHeartbeatTime = currentTime
+			if nodeCondition.Reason != reasonCode {
+				nodeCondition.Reason = reasonCode
+				nodeCondition.LastTransitionTime = currentTime
+			}
 		} else {
 			nodeCondition = &api.NodeCondition{
 				Type:               RunningExecutorCondition,
 				Status:             api.ConditionTrue,
-				Reason:             "uuid=" + mesosContainerID,
-				Message:            "node is running k8sm executor",
+				Reason:             reasonCode,
+				Message:            RunningExecutorMessage,
 				LastHeartbeatTime:  currentTime,
 				LastTransitionTime: currentTime,
 			}
