@@ -237,7 +237,7 @@ $ kubectl port-forward zeppelin-controller-ja09s 8080:8080
 ```
 
 This forwards `localhost` 8080 to container port 8080. You can then find
-Zeppelin at (https://localhost:8080/)[https://localhost:8080/].
+Zeppelin at [https://localhost:8080/](https://localhost:8080/).
 
 Create a "New Notebook". In there, type:
 

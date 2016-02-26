@@ -24,15 +24,15 @@ Advantages of a harmonized image:
 ## bootstrap-vz
 
 Currently images are built using
-(bootstrap-vz)[https://github.com/andsens/bootstrap-vz], because this is
+[bootstrap-vz](https://github.com/andsens/bootstrap-vz), because this is
 default builder for the official Debian images, and because it supports
 multiple clouds including AWS, Azure & GCE.  It also supports KVM, which should
 support OpenStack.
 
 ## Building an image
 
-A go program/script to build images in (in
-progress)[https://github.com/kubernetes/contrib/pull/486], in the contrib
+A go program/script to build images in
+[in progress](https://github.com/kubernetes/contrib/pull/486), in the contrib
 project.
 
 
