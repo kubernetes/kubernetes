@@ -192,7 +192,11 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   NUM_NODES=${KUBEMARK_NUM_NODES:-$NUM_NODES}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   # If start-kubemark fails, we trigger empty set of tests that would trigger storing logs from the base cluster.
-  ./test/kubemark/start-kubemark.sh || go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
+  ./test/kubemark/start-kubemark.sh && kubemark_started="$?" || kubemark_started="$?"
+  if [[ "${kubemark_started}" != "0" ]]; then
+    go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
+    exit 1
+  fi
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false"
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
