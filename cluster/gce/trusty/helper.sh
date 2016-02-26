@@ -29,7 +29,8 @@ function create-node-instance-template {
   create-node-template "$template_name" "${scope_flags[*]}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
     "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml" \
-    "configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh"
+    "configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh" \
+    "cluster-name=${KUBE_TEMP}/cluster-name.txt"
 }
 
 # create-master-instance creates the master instance. If called with
@@ -62,6 +63,6 @@ function create-master-instance {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/trusty/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/trusty/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
