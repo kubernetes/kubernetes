@@ -1262,7 +1262,7 @@
    },
    "v1.GCEPersistentDiskVolumeSource": {
     "id": "v1.GCEPersistentDiskVolumeSource",
-    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once. GCE PDs support ownership management and SELinux relabeling.",
+    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
     "required": [
      "pdName"
     ],
@@ -1288,7 +1288,7 @@
    },
    "v1.AWSElasticBlockStoreVolumeSource": {
     "id": "v1.AWSElasticBlockStoreVolumeSource",
-    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist and be formatted before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
+    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
     "required": [
      "volumeID"
     ],
