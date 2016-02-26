@@ -51,7 +51,7 @@ function create-master-instance {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
+      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     ${preemptible_master}
 }
@@ -61,5 +61,6 @@ function create-node-instance-template {
   local template_name="$1"
   create-node-template "$template_name" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
+    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
+    "cluster-name=${KUBE_TEMP}/cluster-name.txt"
 }

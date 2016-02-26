@@ -268,7 +268,7 @@ function detect-node-names {
     done
     echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]}" >&2
     echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
-  else 
+  else
     echo "INSTANCE_GROUPS=" >&2
     echo "NODE_NAMES=" >&2
   fi
@@ -393,9 +393,7 @@ function get-template-name-from-version {
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
-# $3: The minion start script metadata from file.
-# $4: The kube-env metadata.
-# $5 and others: Additional user defined metadata.
+# $3 and others: Metadata entries (must all be from a file).
 function create-node-template {
   detect-project
   local template_name="$1"
@@ -530,6 +528,7 @@ function kube-up {
   else
     check-existing
     create-network
+    write-cluster-name
     create-master
     create-nodes-firewall
     create-nodes-template
@@ -670,7 +669,7 @@ function create-nodes-template() {
 # Assumes:
 # - MAX_INSTANCES_PER_MIG
 # - NUM_NODES
-# exports: 
+# exports:
 # - NUM_MIGS
 function set_num_migs() {
   local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
