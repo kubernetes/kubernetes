@@ -58,6 +58,13 @@ func ExampleOfOptionsConfig() {
 	defaultConfig.AuthInfos["red-mage-via-token"] = &AuthInfo{
 		Token: "my-secret-token",
 	}
+	defaultConfig.AuthInfos["blue-mage-via-token"] = &AuthInfo{
+		Token: "my-other-secret-token",
+		OIDCInfo: &OIDCInfo{
+			RefreshToken: "my-refresh-token",
+		},
+	}
+
 	defaultConfig.Contexts["bravo-as-black-mage"] = &Context{
 		Cluster:   "bravo",
 		AuthInfo:  "black-mage-via-file",
@@ -109,6 +116,11 @@ func ExampleOfOptionsConfig() {
 	// preferences:
 	//   colors: true
 	// users:
+	//   blue-mage-via-token:
+	//     LocationOfOrigin: ""
+	//     oidc:
+	//       refresh-token: my-refresh-token
+	//     token: my-other-secret-token
 	//   red-mage-via-token:
 	//     LocationOfOrigin: ""
 	//     token: my-secret-token

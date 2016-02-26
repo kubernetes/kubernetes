@@ -92,8 +92,14 @@ type AuthInfo struct {
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	Password string `json:"password,omitempty"`
+	// OIDCInfo contains information needed for authentication with OpenID Connect Identity Providers
+	OIDCInfo *OIDCInfo `json:"oidc,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+}
+
+type OIDCInfo struct {
+	RefreshToken string `json:"refresh-token,omitempty"`
 }
 
 // Context is a tuple of references to a cluster (how do I communicate with a kubernetes cluster), a user (how do I identify myself), and a namespace (what subset of resources do I want to work with)
