@@ -53,11 +53,11 @@ if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   KUBE_OS_DISTRIBUTION=vivid
 fi
 
-# For GCE script compatability
+# For GCE script compatibility
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION}
 
 case "${KUBE_OS_DISTRIBUTION}" in
-  trusty|wheezy|jessie|vivid|coreos)
+  trusty|wheezy|jessie|vivid|wily|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -271,6 +271,9 @@ case "${KUBE_OS_DISTRIBUTION}" in
     ;;
   vivid)
     detect-vivid-image
+    ;;
+  wily)
+    detect-wily-image
     ;;
   wheezy)
     detect-wheezy-image
@@ -934,15 +937,15 @@ function kube-up {
     # Create the master
     start-master
 
+    # Build ~/.kube/config
+    build-config
+
     # Start minions
     start-minions
     wait-minions
 
     # Wait for the master to be ready
     wait-master
-
-    # Build ~/.kube/config
-    build-config
   fi
 
   # Check the cluster is OK
@@ -1118,6 +1121,12 @@ function start-minions() {
   else
     public_ip_option="--no-associate-public-ip-address"
   fi
+  local spot_price_option
+  if [[ -n "${NODE_SPOT_PRICE:-}" ]]; then
+    spot_price_option="--spot-price ${NODE_SPOT_PRICE}"
+  else
+    spot_price_option=""
+  fi
   ${AWS_ASG_CMD} create-launch-configuration \
       --launch-configuration-name ${ASG_NAME} \
       --image-id $KUBE_NODE_IMAGE \
@@ -1126,6 +1135,7 @@ function start-minions() {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${NODE_SG_ID} \
       ${public_ip_option} \
+      ${spot_price_option} \
       --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
       --user-data "fileb://${KUBE_TEMP}/node-user-data.gz"
 
@@ -1144,7 +1154,12 @@ function start-minions() {
 function wait-minions {
   # Wait for the minions to be running
   # TODO(justinsb): This is really not needed any more
-  attempt=0
+  local attempt=0
+  local max_attempts=30
+  # Spot instances are slower to launch
+  if [[ -n "${NODE_SPOT_PRICE:-}" ]]; then
+    max_attempts=90
+  fi
   while true; do
     find-running-minions > $LOG
     if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
@@ -1152,7 +1167,7 @@ function wait-minions {
       break
     fi
 
-    if (( attempt > 30 )); then
+    if (( attempt > max_attempts )); then
       echo
       echo "Expected number of minions did not start in time"
       echo
@@ -1431,7 +1446,7 @@ function kube-push {
 }
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e-test.sh
+# Cluster specific test helpers used from hack/e2e.go
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -1443,11 +1458,13 @@ function test-build-release {
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up (it is run after kube-up).
+# called from hack/e2e.go only when running -up.
 #
 # Assumed vars:
 #   Variables from config.sh
 function test-setup {
+  "${KUBE_ROOT}/cluster/kube-up.sh"
+
   VPC_ID=$(get_vpc_id)
   detect-security-groups
 

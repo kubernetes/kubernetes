@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1beta1
 
-// This file contains a collection of methods that can be used from go-resful to
+// This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
 // information on the implementation: https://github.com/emicklei/go-restful/pull/215
 //
@@ -185,6 +185,7 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 
 var map_DeploymentStatus = map[string]string{
 	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
 	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",

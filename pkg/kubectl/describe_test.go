@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
@@ -268,7 +268,7 @@ func TestDescribeContainers(t *testing.T) {
 				ContainerStatuses: []api.ContainerStatus{testCase.status},
 			},
 		}
-		describeContainers(&pod, out)
+		DescribeContainers(pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), out)
 		output := out.String()
 		for _, expected := range testCase.expectedElements {
 			if !strings.Contains(output, expected) {

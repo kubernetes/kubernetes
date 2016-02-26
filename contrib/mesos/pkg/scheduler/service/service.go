@@ -43,6 +43,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
@@ -377,6 +378,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		uri, executorCmd := s.serveFrameworkArtifact(s.executorPath)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 		ci.Value = proto.String(fmt.Sprintf("./%s", executorCmd))
+		ci.Arguments = append(ci.Arguments, ci.GetValue())
 	} else if !hks.FindServer(hyperkube.CommandMinion) {
 		return nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
 	} else {
@@ -395,7 +397,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 			ci.Value = proto.String(fmt.Sprintf("./%s", kmCmd))
 		}
-		ci.Arguments = append(ci.Arguments, hyperkube.CommandMinion)
+		ci.Arguments = append(ci.Arguments, ci.GetValue(), hyperkube.CommandMinion)
 
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--run-proxy=%v", s.runProxy))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.proxyBindall))
@@ -406,6 +408,8 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-size=%v", s.minionLogMaxSize.String()))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-backups=%d", s.minionLogMaxBackups))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-age=%d", s.minionLogMaxAgeInDays))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 	}
 
 	if s.sandboxOverlay != "" {
@@ -443,8 +447,6 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.kubeletSyncFrequency))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.containPodResources))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 
 	if s.kubeconfig != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
@@ -494,6 +496,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	// running executors in a cluster.
 	execInfo.ExecutorId = executorinfo.NewID(execInfo)
 	execInfo.Data = data
+	log.V(1).Infof("started with executor id %v", execInfo.ExecutorId.GetValue())
 
 	return execInfo, nil
 }
@@ -594,8 +597,14 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 		validation := ha.ValidationFunc(validateLeadershipTransition)
 		srv := ha.NewCandidate(schedulerProcess, driverFactory, validation)
 		path := meta.ElectionPath(s.frameworkName)
-		log.Infof("registering for election at %v with id %v", path, eid.GetValue())
-		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, eid.GetValue(), srv, nil)
+		uuid := eid.GetValue() + ":" + uuid.New() // unique for each scheduler instance
+		log.Infof("registering for election at %v with id %v", path, uuid)
+		go election.Notify(
+			election.NewEtcdMasterElector(etcdClient),
+			path,
+			uuid,
+			srv,
+			nil)
 	} else {
 		log.Infoln("self-electing in non-HA mode")
 		schedulerProcess.Elect(driverFactory)
@@ -650,8 +659,28 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 
 func validateLeadershipTransition(desired, current string) {
 	log.Infof("validating leadership transition")
+	// desired, current are of the format <executor-id>:<scheduler-uuid> (see Run()).
+	// parse them and ensure that executor ID's match, otherwise the cluster can get into
+	// a bad state after scheduler failover: executor ID is a config hash that must remain
+	// consistent across failover events.
+	var (
+		i = strings.LastIndex(desired, ":")
+		j = strings.LastIndex(current, ":")
+	)
+
+	if i > -1 {
+		desired = desired[0:i]
+	} else {
+		log.Fatalf("desired id %q is invalid", desired)
+	}
+	if j > -1 {
+		current = current[0:j]
+	} else if current != "" {
+		log.Fatalf("current id %q is invalid", current)
+	}
+
 	if desired != current && current != "" {
-		log.Fatalf("desired executor id != current executor id", desired, current)
+		log.Fatalf("desired executor id %q != current executor id %q", desired, current)
 	}
 }
 
@@ -771,6 +800,16 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	schedulerProcess := ha.New(framework)
+
+	// try publishing on the same IP as the slave
+	var publishedAddress net.IP
+	if libprocessIP := os.Getenv("LIBPROCESS_IP"); libprocessIP != "" {
+		publishedAddress = net.ParseIP(libprocessIP)
+	}
+	if publishedAddress != nil {
+		log.V(1).Infof("driver will publish address %v", publishedAddress)
+	}
+
 	dconfig := &bindings.DriverConfig{
 		Scheduler:        schedulerProcess,
 		Framework:        info,
@@ -778,6 +817,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		Credential:       cred,
 		BindingAddress:   s.address,
 		BindingPort:      uint16(s.driverPort),
+		PublishedAddress: publishedAddress,
 		HostnameOverride: s.hostnameOverride,
 		WithAuthContext: func(ctx context.Context) context.Context {
 			ctx = auth.WithLoginProvider(ctx, s.mesosAuthProvider)
@@ -826,7 +866,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	)
 
 	runtime.On(framework.Registration(), func() { sched.Run(schedulerProcess.Terminal()) })
-	runtime.On(framework.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
+	runtime.On(framework.Registration(), s.newServiceWriter(publishedAddress, schedulerProcess.Terminal()))
 	runtime.On(framework.Registration(), func() { nodeCtl.Run(schedulerProcess.Terminal()) })
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {

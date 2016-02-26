@@ -180,7 +180,7 @@ func doRoundTripTest(group testapi.TestGroup, kind string, t *testing.T) {
 	if api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
 		roundTripSame(t, group, item, nonRoundTrippableTypesByVersion[kind]...)
 	}
-	if !nonInternalRoundTrippableTypes.Has(kind) {
+	if !nonInternalRoundTrippableTypes.Has(kind) && api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
 		roundTrip(t, group.Codec(), fuzzInternalObject(t, group.InternalGroupVersion(), item, rand.Int63()))
 	}
 }

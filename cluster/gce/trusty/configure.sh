@@ -261,7 +261,7 @@ health_monitoring() {
   # We simply kill the process when there is a failure. Another upstart job will automatically
   # restart the process.
   while [ 1 ]; do
-    if ! timeout 20 docker ps > /dev/null; then
+    if ! timeout 10 docker version > /dev/null; then
       echo "Docker daemon failed!"
       pkill docker
     fi
@@ -628,9 +628,9 @@ prepare_kube_addons() {
     file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    heapster_memory="300Mi"
+    heapster_memory="200Mi"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 1 ]; then
-      heapster_memory="$((${NUM_NODES} * 12 + 200))Mi"
+      heapster_memory="$((${NUM_NODES} * 3 + 200))Mi"
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then

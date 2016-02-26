@@ -31,7 +31,7 @@ PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 
 
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20160127}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-v1-2-v20160218}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"${MASTER_IMAGE}"}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
@@ -80,10 +80,6 @@ fi
 # Optional: customize runtime config
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
-# Optional: enable v1beta1 related features
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
-
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
@@ -120,8 +116,8 @@ OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
-# Should the kubelet configure hairpin mode on the bridge?
-HAIRPIN_MODE="${HAIRPIN_MODE:-true}" # true, false
+# How should the kubelet configure hairpin mode?
+HAIRPIN_MODE="${HAIRPIN_MODE:-promiscuous-bridge}" # promiscuous-bridge, hairpin-veth, none
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

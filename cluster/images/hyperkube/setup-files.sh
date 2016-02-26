@@ -23,6 +23,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Additional address of the API server to be added to the
+# list of Subject Alternative Names of the server TLS certificate
+# Should contain internal IP, i.e. IP:10.0.0.1 for 10.0.0.0/24 cluster IP range
+EXTRA_SANS=$1
+
 create_token() {
   echo $(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 }
@@ -32,7 +37,7 @@ echo "admin,admin,admin" > /data/basic_auth.csv
 
 # Create HTTPS certificates
 groupadd -f -r kube-cert-test
-CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -i)
+CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -i) ${EXTRA_SANS}
 
 # Create known tokens for service accounts
 echo "$(create_token),admin,admin" >> /data/known_tokens.csv

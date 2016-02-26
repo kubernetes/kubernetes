@@ -334,12 +334,12 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v, could take up to %v before a ReplicaSet recreates a replica", obj, controller.ExpectationsTimeout)
+			glog.Errorf("Couldn't get object from tombstone %+v", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v, could take up to %v before ReplicaSet recreates a replica", obj, controller.ExpectationsTimeout)
+			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
 			return
 		}
 	}
@@ -397,6 +397,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
+	if !dc.rsStoreSynced() || !dc.podStoreSynced() {
+		// Sleep so we give the replica set / pod reflector goroutine a chance to run.
+		time.Sleep(StoreSyncedPollPeriod)
+		glog.Infof("Waiting for replica set / pod controller to sync, requeuing deployment %s", key)
+		dc.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := dc.dStore.Store.GetByKey(key)
 	if err != nil {
 		glog.Infof("Unable to retrieve deployment %v from store: %v", key, err)
@@ -410,18 +418,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	d := *obj.(*extensions.Deployment)
-	if !dc.rsStoreSynced() || !dc.podStoreSynced() {
-		// Sleep so we give the replica set / pod reflector goroutine a chance to run.
-		time.Sleep(StoreSyncedPollPeriod)
-		glog.Infof("Waiting for replica set / pod controller to sync, requeuing deployment %s", d.Name)
-		dc.enqueueDeployment(&d)
-		return nil
-	}
 
 	if d.Spec.Paused {
+		// TODO: Implement scaling for paused deployments.
+		// Dont take any action for paused deployment.
+		// But keep the status up-to-date.
 		// Ignore paused deployments
-		glog.V(4).Infof("Ignoring paused deployment %s/%s", d.Namespace, d.Name)
-		return nil
+		glog.V(4).Infof("Updating status only for paused deployment %s/%s", d.Namespace, d.Name)
+		return dc.syncPausedDeploymentStatus(&d)
 	}
 	if d.Spec.RollbackTo != nil {
 		revision := d.Spec.RollbackTo.Revision
@@ -439,9 +443,21 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
 
+// Updates the status of a paused deployment
+func (dc *DeploymentController) syncPausedDeploymentStatus(deployment *extensions.Deployment) error {
+	newRS, oldRSs, err := dc.getAllReplicaSets(*deployment, false)
+	if err != nil {
+		return err
+	}
+	allRSs := append(controller.FilterActiveReplicaSets(oldRSs), newRS)
+
+	// Sync deployment status
+	return dc.syncDeploymentStatus(allRSs, newRS, *deployment)
+}
+
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
 func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRevision *int64) (*extensions.Deployment, error) {
-	newRS, allOldRSs, err := dc.getAllReplicaSets(*deployment)
+	newRS, allOldRSs, err := dc.getAllReplicaSets(*deployment, true)
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +509,8 @@ func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(deployment *e
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment)
+	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down
+	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, false)
 	if err != nil {
 		return err
 	}
@@ -507,6 +524,16 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 	if scaledDown {
 		// Update DeploymentStatus
 		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+	}
+
+	// If we need to create a new RS, create it now
+	// TODO: Create a new RS without re-listing all RSs.
+	if newRS == nil {
+		newRS, oldRSs, err = dc.getAllReplicaSets(deployment, true)
+		if err != nil {
+			return err
+		}
+		allRSs = append(oldRSs, newRS)
 	}
 
 	// scale up new replica set
@@ -529,7 +556,7 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 }
 
 func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment)
+	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, true)
 	if err != nil {
 		return err
 	}
@@ -565,19 +592,19 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 }
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
-func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) error {
-	totalReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRSs, newRS, deployment)
+func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d extensions.Deployment) error {
+	totalActualReplicas, updatedReplicas, availableReplicas, _, err := dc.calculateStatus(allRSs, newRS, d)
 	if err != nil {
 		return err
 	}
-	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas || deployment.Status.AvailableReplicas != availableReplicas {
-		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+	if d.Generation > d.Status.ObservedGeneration || d.Status.Replicas != totalActualReplicas || d.Status.UpdatedReplicas != updatedReplicas || d.Status.AvailableReplicas != availableReplicas {
+		return dc.updateDeploymentStatus(allRSs, newRS, d)
 	}
 	return nil
 }
 
 // getAllReplicaSets returns all the replica sets for the provided deployment (new and all old).
-func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployment) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployment, createIfNotExisted bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	_, allOldRSs, err := dc.getOldReplicaSets(deployment)
 	if err != nil {
 		return nil, nil, err
@@ -586,13 +613,13 @@ func (dc *DeploymentController) getAllReplicaSets(deployment extensions.Deployme
 	maxOldV := maxRevision(allOldRSs)
 
 	// Get new replica set with the updated revision number
-	newRS, err := dc.getNewReplicaSet(deployment, maxOldV)
+	newRS, err := dc.getNewReplicaSet(deployment, maxOldV, allOldRSs, createIfNotExisted)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Sync deployment's revision number with new replica set
-	if newRS.Annotations != nil && len(newRS.Annotations[deploymentutil.RevisionAnnotation]) > 0 &&
+	if newRS != nil && newRS.Annotations != nil && len(newRS.Annotations[deploymentutil.RevisionAnnotation]) > 0 &&
 		(deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != newRS.Annotations[deploymentutil.RevisionAnnotation]) {
 		if err = dc.updateDeploymentRevision(deployment, newRS.Annotations[deploymentutil.RevisionAnnotation]); err != nil {
 			glog.V(4).Infof("Error: %v. Unable to update deployment revision, will retry later.", err)
@@ -648,11 +675,15 @@ func (dc *DeploymentController) getOldReplicaSets(deployment extensions.Deployme
 // Returns a replica set that matches the intent of the given deployment.
 // It creates a new replica set if required.
 // The revision of the new replica set will be updated to maxOldRevision + 1
-func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deployment, maxOldRevision int64) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deployment, maxOldRevision int64, oldRSs []*extensions.ReplicaSet, createIfNotExisted bool) (*extensions.ReplicaSet, error) {
 	// Calculate revision number for this new replica set
 	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
 
 	existingNewRS, err := deploymentutil.GetNewReplicaSetFromList(deployment, dc.client,
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
+			podList, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
+			return &podList, err
+		},
 		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
 			return dc.rsStore.ReplicaSets(namespace).List(options.LabelSelector)
 		})
@@ -665,6 +696,11 @@ func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deploymen
 		}
 		return existingNewRS, nil
 	}
+
+	if !createIfNotExisted {
+		return nil, nil
+	}
+
 	// Check the replica set expectations of the deployment before creating a new one.
 	dKey, err := controller.KeyFunc(&deployment)
 	if err != nil {
@@ -701,14 +737,22 @@ func (dc *DeploymentController) getNewReplicaSet(deployment extensions.Deploymen
 	}
 	// Set new replica set's annotation
 	setNewReplicaSetAnnotations(&deployment, &newRS, newRevision)
+	allRSs := append(oldRSs, &newRS)
+	newReplicasCount, err := deploymentutil.NewRSNewReplicas(&deployment, allRSs, &newRS)
+	if err != nil {
+		return nil, err
+	}
+	newRS.Spec.Replicas = newReplicasCount
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
 		dc.rsExpectations.DeleteExpectations(dKey)
 		return nil, fmt.Errorf("error creating replica set: %v", err)
 	}
+	if newReplicasCount > 0 {
+		dc.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", "up", createdRS.Name, newReplicasCount)
+	}
 
-	err = dc.updateDeploymentRevision(deployment, newRevision)
-	return createdRS, err
+	return createdRS, dc.updateDeploymentRevision(deployment, newRevision)
 }
 
 // setNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
@@ -752,9 +796,12 @@ func (dc *DeploymentController) updateDeploymentRevision(deployment extensions.D
 	if deployment.Annotations == nil {
 		deployment.Annotations = make(map[string]string)
 	}
-	deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
-	_, err := dc.updateDeployment(&deployment)
-	return err
+	if deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {
+		deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
+		_, err := dc.updateDeployment(&deployment)
+		return err
+	}
+	return nil
 }
 
 func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) (bool, error) {
@@ -764,29 +811,15 @@ func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*extensions.Repl
 	}
 	if newRS.Spec.Replicas > deployment.Spec.Replicas {
 		// Scale down.
-		_, err := dc.scaleReplicaSetAndRecordEvent(newRS, deployment.Spec.Replicas, deployment)
-		return true, err
+		scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, deployment.Spec.Replicas, deployment)
+		return scaled, err
 	}
-	// Check if we can scale up.
-	maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Replicas)
+	newReplicasCount, err := deploymentutil.NewRSNewReplicas(&deployment, allRSs, newRS)
 	if err != nil {
 		return false, err
 	}
-
-	// Find the total number of pods
-	currentPodCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-	maxTotalPods := deployment.Spec.Replicas + maxSurge
-	if currentPodCount >= maxTotalPods {
-		// Cannot scale up.
-		return false, nil
-	}
-	// Scale up.
-	scaleUpCount := maxTotalPods - currentPodCount
-	// Do not exceed the number of desired replicas.
-	scaleUpCount = integer.IntMin(scaleUpCount, deployment.Spec.Replicas-newRS.Spec.Replicas)
-	newReplicasCount := newRS.Spec.Replicas + scaleUpCount
-	_, err = dc.scaleReplicaSetAndRecordEvent(newRS, newReplicasCount, deployment)
-	return true, err
+	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, newReplicasCount, deployment)
+	return scaled, err
 }
 
 // Set expectationsCheck to false to bypass expectations check when testing
@@ -814,7 +847,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*extensions.Rep
 		return false, fmt.Errorf("could not find available pods: %v", err)
 	}
 
-	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
+	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas, false)
 	if err != nil {
 		return false, err
 	}
@@ -903,7 +936,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*extensions.Re
 
 		scaledDownCount := integer.IntMin(maxCleanupCount-totalScaledDown, targetRS.Spec.Replicas-readyPodCount)
 		newReplicasCount := targetRS.Spec.Replicas - scaledDownCount
-		_, err = dc.scaleReplicaSetAndRecordEvent(targetRS, newReplicasCount, deployment)
+		_, _, err = dc.scaleReplicaSetAndRecordEvent(targetRS, newReplicasCount, deployment)
 		if err != nil {
 			return totalScaledDown, err
 		}
@@ -915,7 +948,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*extensions.Re
 // scaleDownOldReplicaSetsForRollingUpdate scales down old replica sets when deployment strategy is "RollingUpdate".
 // Need check maxUnavailable to ensure availability
 func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs []*extensions.ReplicaSet, oldRSs []*extensions.ReplicaSet, deployment extensions.Deployment) (int, error) {
-	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
+	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas, false)
 	if err != nil {
 		return 0, err
 	}
@@ -949,7 +982,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs [
 		// Scale down.
 		scaleDownCount := integer.IntMin(targetRS.Spec.Replicas, totalScaleDownCount-totalScaledDown)
 		newReplicasCount := targetRS.Spec.Replicas - scaleDownCount
-		_, err = dc.scaleReplicaSetAndRecordEvent(targetRS, newReplicasCount, deployment)
+		_, _, err = dc.scaleReplicaSetAndRecordEvent(targetRS, newReplicasCount, deployment)
 		if err != nil {
 			return totalScaledDown, err
 		}
@@ -968,23 +1001,21 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*ext
 		if rs.Spec.Replicas == 0 {
 			continue
 		}
-		_, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
+		scaledRS, _, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
 		if err != nil {
 			return false, err
 		}
-		scaled = true
+		if scaledRS {
+			scaled = true
+		}
 	}
 	return scaled, nil
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate"
 func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(newRS *extensions.ReplicaSet, deployment extensions.Deployment) (bool, error) {
-	if newRS.Spec.Replicas == deployment.Spec.Replicas {
-		// Scaling not required.
-		return false, nil
-	}
-	_, err := dc.scaleReplicaSetAndRecordEvent(newRS, deployment.Spec.Replicas, deployment)
-	return true, err
+	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, deployment.Spec.Replicas, deployment)
+	return scaled, err
 }
 
 func (dc *DeploymentController) cleanupOldReplicaSets(oldRSs []*extensions.ReplicaSet, deployment extensions.Deployment) error {
@@ -1013,14 +1044,16 @@ func (dc *DeploymentController) cleanupOldReplicaSets(oldRSs []*extensions.Repli
 }
 
 func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) error {
-	totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas, err := dc.calculateStatus(allRSs, newRS, deployment)
+	totalActualReplicas, updatedReplicas, availableReplicas, unavailableReplicas, err := dc.calculateStatus(allRSs, newRS, deployment)
 	if err != nil {
 		return err
 	}
 	newDeployment := deployment
 	// TODO: Reconcile this with API definition. API definition talks about ready pods, while this just computes created pods.
 	newDeployment.Status = extensions.DeploymentStatus{
-		Replicas:            totalReplicas,
+		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
+		ObservedGeneration:  deployment.Generation,
+		Replicas:            totalActualReplicas,
 		UpdatedReplicas:     updatedReplicas,
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
@@ -1029,20 +1062,25 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	return err
 }
 
-func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) (totalReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
-	totalReplicas = deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-	updatedReplicas = deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS})
+func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment extensions.Deployment) (totalActualReplicas, updatedReplicas, availableReplicas, unavailableReplicas int, err error) {
+	totalActualReplicas = deploymentutil.GetActualReplicaCountForReplicaSets(allRSs)
+	updatedReplicas = deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS})
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	availableReplicas, err = deploymentutil.GetAvailablePodsForReplicaSets(dc.client, allRSs, minReadySeconds)
 	if err != nil {
 		err = fmt.Errorf("failed to count available pods: %v", err)
 		return
 	}
+	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	unavailableReplicas = totalReplicas - availableReplicas
 	return
 }
 
-func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.ReplicaSet, newScale int, deployment extensions.Deployment) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.ReplicaSet, newScale int, deployment extensions.Deployment) (bool, *extensions.ReplicaSet, error) {
+	// No need to scale
+	if rs.Spec.Replicas == newScale {
+		return false, rs, nil
+	}
 	scalingOperation := "down"
 	if rs.Spec.Replicas < newScale {
 		scalingOperation = "up"
@@ -1051,7 +1089,7 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 	if err == nil {
 		dc.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 	}
-	return newRS, err
+	return true, newRS, err
 }
 
 func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int) (*extensions.ReplicaSet, error) {

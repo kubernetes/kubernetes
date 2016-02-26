@@ -52,6 +52,11 @@ remove-docker-artifacts() {
 
 # Finds the master PD device
 find-master-pd() {
+  if ( grep "/mnt/master-pd" /proc/mounts ); then
+    echo "Master PD already mounted; won't remount"
+    MASTER_PD_DEVICE=""
+    return
+  fi
   echo "Waiting for master pd to be attached"
   attempt=0
   while true; do
@@ -64,6 +69,9 @@ find-master-pd() {
     attempt=$(($attempt+1))
     sleep 1
   done
+
+  # Mount the master PD as early as possible
+  echo "/dev/xvdb /mnt/master-pd ext4 noatime 0 0" >> /etc/fstab
 }
 
 fix-apt-sources() {

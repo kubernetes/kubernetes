@@ -34,7 +34,7 @@ var _ = Describe("Downward API volume", func() {
 	f := NewFramework("downward-api")
 	It("should provide podname only [Conformance]", func() {
 		podName := "downwardapi-volume-" + string(util.NewUUID())
-		pod := downwardAPIVolumePod(podName, map[string]string{}, map[string]string{}, "/etc/podname")
+		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 
 		testContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
@@ -45,7 +45,7 @@ var _ = Describe("Downward API volume", func() {
 		podName := "metadata-volume-" + string(util.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
-		pod := downwardAPIVolumePod(podName, map[string]string{}, map[string]string{}, "/etc/podname")
+		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 		pod.Spec.SecurityContext = &api.PodSecurityContext{
 			RunAsUser: &uid,
 			FSGroup:   &gid,
@@ -61,7 +61,7 @@ var _ = Describe("Downward API volume", func() {
 		labels["key2"] = "value2"
 
 		podName := "labelsupdate" + string(util.NewUUID())
-		pod := downwardAPIVolumePod(podName, labels, map[string]string{}, "/etc/labels")
+		pod := downwardAPIVolumePodForUpdateTest(podName, labels, map[string]string{}, "/etc/labels")
 		containerName := "client-container"
 		defer func() {
 			By("Deleting the pod")
@@ -98,7 +98,7 @@ var _ = Describe("Downward API volume", func() {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
 		podName := "annotationupdate" + string(util.NewUUID())
-		pod := downwardAPIVolumePod(podName, map[string]string{}, annotations, "/etc/annotations")
+		pod := downwardAPIVolumePodForUpdateTest(podName, map[string]string{}, annotations, "/etc/annotations")
 
 		containerName := "client-container"
 		defer func() {
@@ -132,7 +132,50 @@ var _ = Describe("Downward API volume", func() {
 	})
 })
 
-func downwardAPIVolumePod(name string, labels, annotations map[string]string, filePath string) *api.Pod {
+func downwardAPIVolumePodForSimpleTest(name string, filePath string) *api.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+
+	pod.Spec.Containers = []api.Container{
+		{
+			Name:    "client-container",
+			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Command: []string{"/mt", "--file_content=" + filePath},
+			VolumeMounts: []api.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+	return pod
+}
+
+func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *api.Pod {
+	pod := downwardAPIVolumeBasePod(name, labels, annotations)
+
+	pod.Spec.Containers = []api.Container{
+		{
+			Name:    "client-container",
+			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+			VolumeMounts: []api.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+	applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations, pod)
+	return pod
+}
+
+func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string) *api.Pod {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:        name,
@@ -140,20 +183,6 @@ func downwardAPIVolumePod(name string, labels, annotations map[string]string, fi
 			Annotations: annotations,
 		},
 		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:    "client-container",
-					Image:   "gcr.io/google_containers/mounttest:0.6",
-					Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name:      "podinfo",
-							MountPath: "/etc",
-							ReadOnly:  false,
-						},
-					},
-				},
-			},
 			Volumes: []api.Volume{
 				{
 					Name: "podinfo",
@@ -176,6 +205,10 @@ func downwardAPIVolumePod(name string, labels, annotations map[string]string, fi
 		},
 	}
 
+	return pod
+}
+
+func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]string, pod *api.Pod) {
 	if len(labels) > 0 {
 		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, api.DownwardAPIVolumeFile{
 			Path: "labels",
@@ -195,7 +228,6 @@ func downwardAPIVolumePod(name string, labels, annotations map[string]string, fi
 			},
 		})
 	}
-	return pod
 }
 
 // TODO: add test-webserver example as pointed out in https://github.com/kubernetes/kubernetes/pull/5093#discussion-diff-37606771

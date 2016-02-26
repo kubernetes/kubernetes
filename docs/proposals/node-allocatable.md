@@ -129,8 +129,8 @@ behavior is equivalent to the 1.1 behavior with scheduling based on Capacity.
 
 In the initial implementation, `SystemReserved` will be functionally equivalent to
 [`KubeReserved`](#system-reserved), but with a different semantic meaning. While KubeReserved
-designates resources set asside for kubernetes components, SystemReserved designates resources set
-asside for non-kubernetes components (currently this is reported as all the processes lumped
+designates resources set aside for kubernetes components, SystemReserved designates resources set
+aside for non-kubernetes components (currently this is reported as all the processes lumped
 together in the `/system` raw container).
 
 ## Issues
@@ -159,7 +159,7 @@ according to `KubeReserved`.
 **API server expects `Allocatable` but does not receive it:** If the kubelet is older and does not
   provide `Allocatable` in the `NodeStatus`, then `Allocatable` will be
   [defaulted](../../pkg/api/v1/defaults.go) to
-  `Capacity` (which will yield todays behavior of scheduling based on capacity).
+  `Capacity` (which will yield today's behavior of scheduling based on capacity).
 
 ### 3rd party schedulers
 

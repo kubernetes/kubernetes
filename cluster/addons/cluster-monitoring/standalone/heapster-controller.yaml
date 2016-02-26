@@ -1,7 +1,7 @@
-{% set heapster_memory = "300Mi" -%}
+{% set heapster_memory = "200Mi" -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% if num_nodes >= 0 -%}
-  {% set heapster_memory = (200 + num_nodes * 12)|string + "Mi" -%}
+  {% set heapster_memory = (200 + num_nodes * 3)|string + "Mi" -%}
 {% endif -%}
 
 apiVersion: v1
@@ -26,7 +26,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v0.20.0-alpha6
+        - image: gcr.io/google_containers/heapster:v0.20.0-alpha7
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class

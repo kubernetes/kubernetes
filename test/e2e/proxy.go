@@ -125,6 +125,16 @@ func proxyContext(version string) {
 				"tlsdest1": 460,
 				"tlsdest2": 462,
 			},
+			ReadinessProbe: &api.Probe{
+				Handler: api.Handler{
+					HTTPGet: &api.HTTPGetAction{
+						Port: intstr.FromInt(80),
+					},
+				},
+				InitialDelaySeconds: 1,
+				TimeoutSeconds:      5,
+				PeriodSeconds:       10,
+			},
 			Labels:      labels,
 			CreatedPods: &pods,
 		}
@@ -136,6 +146,9 @@ func proxyContext(version string) {
 		// Try proxying through the service and directly to through the pod.
 		svcProxyURL := func(scheme, port string) string {
 			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
+		}
+		subresourceServiceProxyURL := func(scheme, port string) string {
+			return prefix + "/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port) + "/proxy"
 		}
 		podProxyURL := func(scheme, port string) string {
 			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
@@ -158,6 +171,13 @@ func proxyContext(version string) {
 			svcProxyURL("https", "443") + "/":          "tls baz",
 			svcProxyURL("https", "tlsportname2") + "/": "tls qux",
 			svcProxyURL("https", "444") + "/":          "tls qux",
+
+			subresourceServiceProxyURL("", "portname1") + "/":         "foo",
+			subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
+			subresourceServiceProxyURL("", "portname2") + "/":         "bar",
+			subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
+			subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
+			subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
 
 			podProxyURL("", "80") + "/":  `<a href="` + podProxyURL("", "80") + `/rewriteme">test</a>`,
 			podProxyURL("", "160") + "/": "foo",

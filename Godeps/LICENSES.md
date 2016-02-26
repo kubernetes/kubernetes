@@ -51,8 +51,10 @@ github.com/google/gofuzz | Apache-2
 github.com/gorilla/context | spdxBSD3
 github.com/gorilla/mux | spdxBSD3
 github.com/hashicorp/go-msgpack | spdxBSD3
+github.com/hashicorp/golang-lru | IntelPart08
 github.com/hashicorp/raft | IntelPart08
 github.com/hashicorp/raft-boltdb | IntelPart08
+github.com/hawkular/hawkular-client-go | Apache-2
 github.com/imdario/mergo | spdxBSD3
 github.com/inconshreveable/mousetrap | Apache-2
 github.com/influxdb/influxdb | MITname

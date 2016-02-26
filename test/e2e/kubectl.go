@@ -94,6 +94,12 @@ var (
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
 	jobsVersion = version.MustParse("v1.1.0")
+
+	// Deployments were introduced by default in v1.2, so we don't expect tests that rely on
+	// deployments to work on clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
+	deploymentsVersion = version.MustParse("v1.2.0-alpha.7.726")
 )
 
 var _ = Describe("Kubectl client", func() {
@@ -567,14 +573,15 @@ var _ = Describe("Kubectl client", func() {
 				requiredStrings := [][]string{
 					{"Name:", "redis-master-"},
 					{"Namespace:", ns},
-					{"Image(s):", "redis"},
 					{"Node:"},
 					{"Labels:", "app=redis", "role=master"},
 					{"Status:", "Running"},
-					{"Reason:"},
-					{"Message:"},
 					{"IP:"},
-					{"Controllers:", "ReplicationController/redis-master"}}
+					{"Controllers:", "ReplicationController/redis-master"},
+					{"Image:", "redis"},
+					{"cpu:", "BestEffort"},
+					{"State:", "Running"},
+				}
 				checkOutput(output, requiredStrings)
 			})
 
@@ -910,6 +917,8 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create a deployment from an image [Conformance]", func() {
+			SkipUnlessServerVersionGTE(deploymentsVersion, c)
+
 			image := "nginx"
 
 			By("running the image " + image)
@@ -1185,10 +1194,11 @@ func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse strin
 }
 
 func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (string, error) {
-	result, err := c.Get().
-		Prefix("proxy").
-		Namespace(ns).
-		Resource("services").
+	proxyRequest, errProxy := getServicesProxyRequest(c, c.Get())
+	if errProxy != nil {
+		return "", errProxy
+	}
+	result, err := proxyRequest.Namespace(ns).
 		Name("frontend").
 		Suffix("/guestbook.php").
 		Param("cmd", cmd).

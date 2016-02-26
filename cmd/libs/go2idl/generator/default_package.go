@@ -20,7 +20,7 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 )
 
-// DefaultPackage contains a default implentation of Package.
+// DefaultPackage contains a default implementation of Package.
 type DefaultPackage struct {
 	// Short name of package, used in the "package xxxx" line.
 	PackageName string

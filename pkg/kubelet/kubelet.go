@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -113,7 +114,7 @@ const (
 
 	etcHostsPath = "/etc/hosts"
 
-	// Capacity of the channel for recieving pod lifecycle events. This number
+	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity = 1000
 
@@ -144,6 +145,9 @@ type SyncHandler interface {
 }
 
 type SourcesReadyFn func(sourcesSeen sets.String) bool
+
+// Option is a functional option type for Kubelet
+type Option func(*Kubelet)
 
 // New instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
@@ -204,7 +208,8 @@ func NewMainKubelet(
 	enableCustomMetrics bool,
 	volumeStatsAggPeriod time.Duration,
 	containerRuntimeOptions []kubecontainer.Option,
-	hairpinMode bool,
+	hairpinMode string,
+	kubeOptions []Option,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -326,6 +331,7 @@ func NewMainKubelet(
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
+		hairpinMode:                  componentconfig.HairpinMode(hairpinMode),
 	}
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod)
@@ -357,10 +363,41 @@ func NewMainKubelet(
 
 	klet.podCache = kubecontainer.NewCache()
 
+	// The hairpin mode setting doesn't matter if:
+	// - We're not using a bridge network. This is hard to check because we might
+	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
+	//   don't pipe it down to any plugins.
+	// - It's set to hairpin-veth for a container runtime that doesn't know how
+	//   to set the hairpin flag on the veth's of containers. Currently the
+	//   docker runtime is the only one that understands this.
+	// - It's set to "none" or an unrecognized string.
+	switch hairpinMode {
+	case componentconfig.PromiscuousBridge:
+		if !configureCBR0 {
+			glog.Warningf("Hairpin mode set to %v but configureCBR0 is false", hairpinMode)
+			break
+		}
+		fallthrough
+	case componentconfig.HairpinVeth:
+		if containerRuntime != "docker" {
+			glog.Warningf("Hairpin mode set to %v but container runtime is %v", hairpinMode, containerRuntime)
+			break
+		}
+		fallthrough
+	case componentconfig.HairpinNone:
+		if configureCBR0 {
+			glog.Warningf("Hairpin mode set to %q and configureCBR0 is true, this might result in loss of hairpin packets.", hairpinMode)
+			break
+		}
+		glog.Infof("Hairpin mode set to %q", hairpinMode)
+	default:
+		glog.Infof("Unrecognized hairpin mode setting %q, setting it to %v", hairpinMode, componentconfig.HairpinNone)
+		hairpinMode = componentconfig.HairpinNone
+	}
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
-		glog.Infof("Hairpin mode set to %v", hairpinMode)
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
@@ -383,7 +420,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			hairpinMode,
+			hairpinMode == componentconfig.HairpinVeth,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
@@ -456,6 +493,12 @@ func NewMainKubelet(
 	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
+	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
+
+	// apply functional Option's
+	for _, opt := range kubeOptions {
+		opt(klet)
+	}
 	return klet, nil
 }
 
@@ -683,6 +726,14 @@ type Kubelet struct {
 
 	// support gathering custom metrics.
 	enableCustomMetrics bool
+
+	// How the Kubelet should setup hairpin NAT. Can take the values: "promiscuous-bridge"
+	// (make cbr0 promiscuous), "hairpin-veth" (set the hairpin flag on veth interfaces)
+	// or "none" (do nothing).
+	hairpinMode componentconfig.HairpinMode
+
+	// handlers called during the tryUpdateNodeStatus cycle
+	setNodeStatusFuncs []func(*api.Node) error
 }
 
 // Validate given node IP belongs to the current host
@@ -970,7 +1021,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:   kl.nodeName,
-			Labels: map[string]string{"kubernetes.io/hostname": kl.hostname},
+			Labels: map[string]string{unversioned.LabelHostname: kl.hostname},
 		},
 		Spec: api.NodeSpec{
 			Unschedulable: !kl.registerSchedulable,
@@ -1579,7 +1630,7 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 }
 
 // One of the following aruguements must be non-nil: runningPod, status.
-// TODO: Modify containerRuntime.KillPod() to accept the right arguements.
+// TODO: Modify containerRuntime.KillPod() to accept the right arguments.
 func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus) error {
 	var p kubecontainer.Pod
 	if runningPod != nil {
@@ -2114,7 +2165,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		glog.Errorf("Failed to cleanup terminated pods: %v", err)
 	}
 
-	// Clear out any old bandwith rules
+	// Clear out any old bandwidth rules
 	if err = kl.cleanupBandwidthLimits(allPods); err != nil {
 		return err
 	}
@@ -2633,7 +2684,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr); err != nil {
+	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge); err != nil {
 		return err
 	}
 	if kl.shaper == nil {
@@ -2842,8 +2893,8 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 	} else {
 		for _, image := range containerImages {
 			imagesOnNode = append(imagesOnNode, api.ContainerImage{
-				RepoTags: image.RepoTags,
-				Size:     image.Size,
+				Names:     image.RepoTags,
+				SizeBytes: image.Size,
 			})
 		}
 	}
@@ -2995,14 +3046,37 @@ func (kl *Kubelet) recordNodeSchdulableEvent(node *api.Node) {
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condtion code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
-	if err := kl.setNodeAddress(node); err != nil {
-		return err
+	for _, f := range kl.setNodeStatusFuncs {
+		if err := f(node); err != nil {
+			return err
+		}
 	}
-	kl.setNodeStatusInfo(node)
-	kl.setNodeOODCondition(node)
-	kl.setNodeReadyCondition(node)
-	kl.recordNodeSchdulableEvent(node)
 	return nil
+}
+
+// defaultNodeStatusFuncs is a factory that generates the default set of setNodeStatus funcs
+func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
+	// initial set of node status update handlers, can be modified by Option's
+	withoutError := func(f func(*api.Node)) func(*api.Node) error {
+		return func(n *api.Node) error {
+			f(n)
+			return nil
+		}
+	}
+	return []func(*api.Node) error{
+		kl.setNodeAddress,
+		withoutError(kl.setNodeStatusInfo),
+		withoutError(kl.setNodeOODCondition),
+		withoutError(kl.setNodeReadyCondition),
+		withoutError(kl.recordNodeSchdulableEvent),
+	}
+}
+
+// SetNodeStatus returns a functional Option that adds the given node status update handler to the Kubelet
+func SetNodeStatus(f func(*api.Node) error) Option {
+	return func(k *Kubelet) {
+		k.setNodeStatusFuncs = append(k.setNodeStatusFuncs, f)
+	}
 }
 
 // FIXME: Why not combine this with container runtime health check?

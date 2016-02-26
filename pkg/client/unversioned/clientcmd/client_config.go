@@ -67,25 +67,25 @@ type DirectClientConfig struct {
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
 func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) ClientConfig {
-	return DirectClientConfig{config, config.CurrentContext, overrides, nil}
+	return &DirectClientConfig{config, config.CurrentContext, overrides, nil}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
 func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides) ClientConfig {
-	return DirectClientConfig{config, contextName, overrides, nil}
+	return &DirectClientConfig{config, contextName, overrides, nil}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
 func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return DirectClientConfig{config, contextName, overrides, fallbackReader}
+	return &DirectClientConfig{config, contextName, overrides, fallbackReader}
 }
 
-func (config DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
+func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
 }
 
 // ClientConfig implements ClientConfig
-func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
+func (config *DirectClientConfig) ClientConfig() (*client.Config, error) {
 	if err := config.ConfirmUsable(); err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func canIdentifyUser(config client.Config) bool {
 }
 
 // Namespace implements KubeConfig
-func (config DirectClientConfig) Namespace() (string, bool, error) {
+func (config *DirectClientConfig) Namespace() (string, bool, error) {
 	if err := config.ConfirmUsable(); err != nil {
 		return "", false, err
 	}
@@ -237,7 +237,7 @@ func (config DirectClientConfig) Namespace() (string, bool, error) {
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
-func (config DirectClientConfig) ConfirmUsable() error {
+func (config *DirectClientConfig) ConfirmUsable() error {
 	validationErrors := make([]error, 0)
 	validationErrors = append(validationErrors, validateAuthInfo(config.getAuthInfoName(), config.getAuthInfo())...)
 	validationErrors = append(validationErrors, validateClusterInfo(config.getClusterName(), config.getCluster())...)
@@ -249,7 +249,7 @@ func (config DirectClientConfig) ConfirmUsable() error {
 	return newErrConfigurationInvalid(validationErrors)
 }
 
-func (config DirectClientConfig) getContextName() string {
+func (config *DirectClientConfig) getContextName() string {
 	if len(config.overrides.CurrentContext) != 0 {
 		return config.overrides.CurrentContext
 	}
@@ -260,21 +260,21 @@ func (config DirectClientConfig) getContextName() string {
 	return config.config.CurrentContext
 }
 
-func (config DirectClientConfig) getAuthInfoName() string {
+func (config *DirectClientConfig) getAuthInfoName() string {
 	if len(config.overrides.Context.AuthInfo) != 0 {
 		return config.overrides.Context.AuthInfo
 	}
 	return config.getContext().AuthInfo
 }
 
-func (config DirectClientConfig) getClusterName() string {
+func (config *DirectClientConfig) getClusterName() string {
 	if len(config.overrides.Context.Cluster) != 0 {
 		return config.overrides.Context.Cluster
 	}
 	return config.getContext().Cluster
 }
 
-func (config DirectClientConfig) getContext() clientcmdapi.Context {
+func (config *DirectClientConfig) getContext() clientcmdapi.Context {
 	contexts := config.config.Contexts
 	contextName := config.getContextName()
 
@@ -287,7 +287,7 @@ func (config DirectClientConfig) getContext() clientcmdapi.Context {
 	return mergedContext
 }
 
-func (config DirectClientConfig) getAuthInfo() clientcmdapi.AuthInfo {
+func (config *DirectClientConfig) getAuthInfo() clientcmdapi.AuthInfo {
 	authInfos := config.config.AuthInfos
 	authInfoName := config.getAuthInfoName()
 
@@ -300,7 +300,7 @@ func (config DirectClientConfig) getAuthInfo() clientcmdapi.AuthInfo {
 	return mergedAuthInfo
 }
 
-func (config DirectClientConfig) getCluster() clientcmdapi.Cluster {
+func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfos := config.config.Clusters
 	clusterInfoName := config.getClusterName()
 

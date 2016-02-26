@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
@@ -209,6 +211,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
+
 	// Install extensions unless disabled.
 	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
@@ -216,7 +219,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 		extensionResources := m.getExtensionResources(c)
 		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
-		// Update the prefered version as per StorageVersions in the config.
+		// Update the preferred version as per StorageVersions in the config.
 		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
 		if !found {
 			glog.Fatalf("Couldn't find storage version of group %v", extensionsGroupMeta.GroupVersion.Group)
@@ -250,44 +253,113 @@ func (m *Master) InstallAPIs(c *Config) {
 		}
 		allGroups = append(allGroups, group)
 	}
+
+	// Install autoscaling unless disabled.
+	if !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable {
+		autoscalingResources := m.getAutoscalingResources(c)
+		autoscalingGroupMeta := registered.GroupOrDie(autoscaling.GroupName)
+
+		// Hard code preferred group version to autoscaling/v1
+		autoscalingGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *autoscalingGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": autoscalingResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		autoscalingGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: autoscalingGroupMeta.GroupVersion.String(),
+			Version:      autoscalingGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             autoscalingGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
+			PreferredVersion: autoscalingGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+
+	// Install batch unless disabled.
+	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
+		batchResources := m.getBatchResources(c)
+		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
+
+		// Hard code preferred group version to batch/v1
+		batchGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "batch", Version: "v1"}
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *batchGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": batchResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		batchGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: batchGroupMeta.GroupVersion.String(),
+			Version:      batchGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             batchGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{batchGVForDiscovery},
+			PreferredVersion: batchGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
-	storageDecorator := m.StorageDecorator()
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.Get("", resource) }
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   dbClient(resource),
+			Decorator: m.StorageDecorator(),
+		}
+	}
 
-	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"), storageDecorator)
+	podTemplateStorage := podtemplateetcd.NewREST(restOptions("podTemplates"))
 
-	eventStorage := eventetcd.NewREST(dbClient("events"), storageDecorator, uint64(c.EventTTL.Seconds()))
-	limitRangeStorage := limitrangeetcd.NewREST(dbClient("limitRanges"), storageDecorator)
+	eventStorage := eventetcd.NewREST(restOptions("events"), uint64(c.EventTTL.Seconds()))
+	limitRangeStorage := limitrangeetcd.NewREST(restOptions("limitRanges"))
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(dbClient("resourceQuotas"), storageDecorator)
-	secretStorage := secretetcd.NewREST(dbClient("secrets"), storageDecorator)
-	serviceAccountStorage := serviceaccountetcd.NewREST(dbClient("serviceAccounts"), storageDecorator)
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(dbClient("persistentVolumes"), storageDecorator)
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(dbClient("persistentVolumeClaims"), storageDecorator)
-	configMapStorage := configmapetcd.NewREST(dbClient("configMaps"), storageDecorator)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(restOptions("resourceQuotas"))
+	secretStorage := secretetcd.NewREST(restOptions("secrets"))
+	serviceAccountStorage := serviceaccountetcd.NewREST(restOptions("serviceAccounts"))
+	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(restOptions("persistentVolumes"))
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(restOptions("persistentVolumeClaims"))
+	configMapStorage := configmapetcd.NewREST(restOptions("configMaps"))
 
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(dbClient("namespaces"), storageDecorator)
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptions("namespaces"))
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), storageDecorator)
+	endpointsStorage := endpointsetcd.NewREST(restOptions("endpoints"))
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage := nodeetcd.NewStorage(dbClient("nodes"), storageDecorator, c.KubeletClient, m.ProxyTransport)
+	nodeStorage := nodeetcd.NewStorage(restOptions("nodes"), c.KubeletClient, m.ProxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
-		dbClient("pods"),
-		storageDecorator,
+		restOptions("pods"),
 		kubeletclient.ConnectionInfoGetter(nodeStorage.Node),
 		m.ProxyTransport,
 	)
 
-	serviceStorage, serviceStatusStorage := serviceetcd.NewREST(dbClient("services"), storageDecorator)
+	serviceStorage, serviceStatusStorage := serviceetcd.NewREST(restOptions("services"))
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
 
 	var serviceClusterIPRegistry service.RangeRegistry
@@ -313,8 +385,11 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"), storageDecorator)
+	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(restOptions("replicationControllers"))
 
+	serviceRest := service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport)
+
+	// TODO: Factor out the core API registration
 	m.v1ResourcesStorage = map[string]rest.Storage{
 		"pods":             podStorage.Pod,
 		"pods/attach":      podStorage.Attach,
@@ -330,13 +405,18 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 		"replicationControllers":        controllerStorage,
 		"replicationControllers/status": controllerStatusStorage,
-		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
-		"services/status":               serviceStatusStorage,
-		"endpoints":                     endpointsStorage,
-		"nodes":                         nodeStorage.Node,
-		"nodes/status":                  nodeStorage.Status,
-		"nodes/proxy":                   nodeStorage.Proxy,
-		"events":                        eventStorage,
+
+		"services":        serviceRest.Service,
+		"services/proxy":  serviceRest.Proxy,
+		"services/status": serviceStatusStorage,
+
+		"endpoints": endpointsStorage,
+
+		"nodes":        nodeStorage.Node,
+		"nodes/status": nodeStorage.Status,
+		"nodes/proxy":  nodeStorage.Proxy,
+
+		"events": eventStorage,
 
 		"limitRanges":                   limitRangeStorage,
 		"resourceQuotas":                resourceQuotaStorage,
@@ -532,7 +612,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 }
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
-	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, generic.UndecoratedStorage, group, kind)
+	resourceStorage := thirdpartyresourcedataetcd.NewREST(generic.RESTOptions{m.thirdPartyStorage, generic.UndecoratedStorage}, group, kind)
 
 	apiRoot := makeThirdPartyPath("")
 
@@ -570,7 +650,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // getExperimentalResources returns the resources for extensions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("horizontalpodautoscalers", "ingresses", "jobs", "replicasets", "deployments")
+	enabledResources := sets.NewString("daemonsets", "deployments", "horizontalpodautoscalers", "ingresses", "jobs", "replicasets")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
@@ -580,22 +660,23 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		}
 		return enabled
 	}
-	storageDecorator := m.StorageDecorator()
-	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.Get(extensions.GroupName, resource)
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   c.StorageDestinations.Get(extensions.GroupName, resource),
+			Decorator: m.StorageDecorator(),
+		}
 	}
 
 	storage := map[string]rest.Storage{}
 	if isEnabled("horizontalpodautoscalers") {
-		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
-		storage["horizontalpodautoscalers"] = autoscalerStorage
-		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
-		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)
+		m.constructHPAResources(c, storage)
+		controllerStorage := expcontrolleretcd.NewStorage(
+			generic.RESTOptions{c.StorageDestinations.Get("", "replicationControllers"), m.StorageDecorator()})
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
 	if isEnabled("thirdpartyresources") {
-		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"), storageDecorator)
+		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptions("thirdpartyresources"))
 		thirdPartyControl := ThirdPartyController{
 			master: m,
 			thirdPartyResourceRegistry: thirdPartyResourceStorage,
@@ -612,12 +693,12 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	}
 
 	if isEnabled("daemonsets") {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"), storageDecorator)
+		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptions("daemonsets"))
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	if isEnabled("deployments") {
-		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"), storageDecorator)
+		deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		// TODO(madhusudancs): Install scale when Scale group issues are fixed (see issue #18528).
@@ -625,25 +706,95 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 	}
 	if isEnabled("jobs") {
-		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
-		storage["jobs"] = jobStorage
-		storage["jobs/status"] = jobStatusStorage
+		m.constructJobResources(c, storage)
 	}
 	if isEnabled("ingresses") {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptions("ingresses"))
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 	if isEnabled("podsecuritypolicy") {
-		podSecurityPolicyStorage := pspetcd.NewREST(dbClient("podsecuritypolicy"), storageDecorator)
+		podSecurityPolicyStorage := pspetcd.NewREST(restOptions("podsecuritypolicy"))
 		storage["podSecurityPolicies"] = podSecurityPolicyStorage
 	}
 	if isEnabled("replicasets") {
-		replicaSetStorage := replicasetetcd.NewStorage(dbClient("replicasets"), storageDecorator)
+		replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
 	}
 
+	return storage
+}
+
+// constructHPAResources makes HPA resources and adds them to the storage map.
+// They're installed in both autoscaling and extensions. It's assumed that
+// you've already done the check that they should be on.
+func (m *Master) constructHPAResources(c *Config, restStorage map[string]rest.Storage) {
+	// Note that hpa's storage settings are changed by changing the autoscaling
+	// group. Clearly we want all hpas to be stored in the same place no
+	// matter where they're accessed from.
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   c.StorageDestinations.Search([]string{autoscaling.GroupName, extensions.GroupName}, resource),
+			Decorator: m.StorageDecorator(),
+		}
+	}
+	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptions("horizontalpodautoscalers"))
+	restStorage["horizontalpodautoscalers"] = autoscalerStorage
+	restStorage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
+}
+
+// getAutoscalingResources returns the resources for autoscaling api
+func (m *Master) getAutoscalingResources(c *Config) map[string]rest.Storage {
+	resourceOverrides := m.ApiGroupVersionOverrides["autoscaling/v1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		if enabled, ok := resourceOverrides[resource]; ok {
+			return enabled
+		}
+		return !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable
+	}
+
+	storage := map[string]rest.Storage{}
+	if isEnabled("horizontalpodautoscalers") {
+		m.constructHPAResources(c, storage)
+	}
+	return storage
+}
+
+// constructJobResources makes Job resources and adds them to the storage map.
+// They're installed in both batch and extensions. It's assumed that you've
+// already done the check that they should be on.
+func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.Storage) {
+	// Note that job's storage settings are changed by changing the batch
+	// group. Clearly we want all jobs to be stored in the same place no
+	// matter where they're accessed from.
+	restOptions := func(resource string) generic.RESTOptions {
+		return generic.RESTOptions{
+			Storage:   c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource),
+			Decorator: m.StorageDecorator(),
+		}
+	}
+	jobStorage, jobStatusStorage := jobetcd.NewREST(restOptions("jobs"))
+	restStorage["jobs"] = jobStorage
+	restStorage["jobs/status"] = jobStatusStorage
+}
+
+// getBatchResources returns the resources for batch api
+func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
+	resourceOverrides := m.ApiGroupVersionOverrides["batch/v1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		if enabled, ok := resourceOverrides[resource]; ok {
+			return enabled
+		}
+		return !m.ApiGroupVersionOverrides["batch/v1"].Disable
+	}
+
+	storage := map[string]rest.Storage{}
+	if isEnabled("jobs") {
+		m.constructJobResources(c, storage)
+	}
 	return storage
 }
 

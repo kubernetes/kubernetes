@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -207,7 +208,7 @@ func NewNodeController(
 				return nc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Node{},
+		&extensions.DaemonSet{},
 		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{},
 	)
@@ -342,7 +343,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	}
 
 	// delete terminating pods that have been scheduled on
-	// nonexistant nodes
+	// nonexistent nodes
 	if !found {
 		nc.forcefullyDeletePod(pod)
 		return
@@ -525,7 +526,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 				nc.recordNodeStatusChange(n, "CIDRNotAvailable")
 				continue
 			}
-			glog.V(4).Infof("Assigning node %s CIDR %s", n.Name, podCIDR)
+			glog.V(1).Infof("Assigning node %s CIDR %s", n.Name, podCIDR)
 			n.Spec.PodCIDR = podCIDR
 			if _, err := nc.kubeClient.Core().Nodes().Update(n); err != nil {
 				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")

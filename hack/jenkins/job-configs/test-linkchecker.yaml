@@ -1,0 +1,35 @@
+- job:
+    name: 'kubernetes-test-linkchecker'
+    description: |
+        Grab the latest from GitHub, then run hack/verify-linkcheck.sh.<br>
+        Test Owner: Build Cop
+    logrotate:
+        numToKeep: 200
+    builders:
+        - shell: |
+            export PATH=${PATH}:/usr/local/go/bin
+            ./hack/verify-linkcheck.sh
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - email-ext:
+            recipients: 'xuchao@google.com'
+    scm:
+        - git:
+            url: https://github.com/kubernetes/kubernetes
+            branches:
+                - 'master'
+            browser: githubweb
+            browser-url: https://github.com/kubernetes/kubernetes
+            wipe-workspace: false
+            skip-tag: true
+    triggers:
+        - timed: '@daily'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 60
+            fail: true
+        - timestamps
+        - workspace-cleanup

@@ -252,9 +252,11 @@ func TestNewAWSCloud(t *testing.T) {
 }
 
 type FakeEC2 struct {
-	aws                  *FakeAWSServices
-	Subnets              []*ec2.Subnet
-	DescribeSubnetsInput *ec2.DescribeSubnetsInput
+	aws                      *FakeAWSServices
+	Subnets                  []*ec2.Subnet
+	DescribeSubnetsInput     *ec2.DescribeSubnetsInput
+	RouteTables              []*ec2.RouteTable
+	DescribeRouteTablesInput *ec2.DescribeRouteTablesInput
 }
 
 func contains(haystack []*string, needle string) bool {
@@ -275,6 +277,20 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 		}
 		return contains(filter.Values, *instance.PrivateDnsName)
 	}
+
+	if name == "instance-state-name" {
+		return contains(filter.Values, *instance.State.Name)
+	}
+
+	if name == "tag:"+TagNameKubernetesCluster {
+		for _, tag := range instance.Tags {
+			if *tag.Key == TagNameKubernetesCluster {
+				return contains(filter.Values, *tag.Value)
+			}
+		}
+		return false
+	}
+
 	panic("Unknown filter name: " + name)
 }
 
@@ -401,8 +417,9 @@ func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, err
 	panic("Not implemented")
 }
 
-func (s *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
-	panic("Not implemented")
+func (ec2 *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
+	ec2.DescribeRouteTablesInput = request
+	return ec2.RouteTables, nil
 }
 
 func (s *FakeEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
@@ -715,7 +732,7 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 
 	serviceName := types.NamespacedName{Namespace: "foo", Name: "bar"}
 
-	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, serviceName, api.ServiceAffinityNone)
+	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, serviceName, api.ServiceAffinityNone, nil)
 	if err == nil || err.Error() != errorMessage {
 		t.Errorf("Expected EnsureLoadBalancer region mismatch error.")
 	}
@@ -751,6 +768,35 @@ func constructSubnet(id string, az string) *ec2.Subnet {
 	}
 }
 
+func constructRouteTables(routeTablesIn map[string]bool) (routeTablesOut []*ec2.RouteTable) {
+	for subnetID := range routeTablesIn {
+		routeTablesOut = append(
+			routeTablesOut,
+			constructRouteTable(
+				subnetID,
+				routeTablesIn[subnetID],
+			),
+		)
+	}
+	return
+}
+
+func constructRouteTable(subnetID string, public bool) *ec2.RouteTable {
+	var gatewayID string
+	if public {
+		gatewayID = "igw-" + subnetID[len(subnetID)-8:8]
+	} else {
+		gatewayID = "vgw-" + subnetID[len(subnetID)-8:8]
+	}
+	return &ec2.RouteTable{
+		Associations: []*ec2.RouteTableAssociation{{SubnetId: aws.String(subnetID)}},
+		Routes: []*ec2.Route{{
+			DestinationCidrBlock: aws.String("0.0.0.0/0"),
+			GatewayId:            aws.String(gatewayID),
+		}},
+	}
+}
+
 func TestSubnetIDsinVPC(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
@@ -774,7 +820,14 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	subnets[2]["az"] = "af-south-1c"
 	awsServices.ec2.Subnets = constructSubnets(subnets)
 
-	result, err := c.listSubnetIDsinVPC(vpcID)
+	routeTables := map[string]bool{
+		"subnet-a0000001": true,
+		"subnet-b0000001": true,
+		"subnet-c0000001": true,
+	}
+	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
+
+	result, err := c.listPublicSubnetIDsinVPC(vpcID)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
@@ -803,8 +856,10 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	subnets[3]["id"] = "subnet-c0000002"
 	subnets[3]["az"] = "af-south-1c"
 	awsServices.ec2.Subnets = constructSubnets(subnets)
+	routeTables["subnet-c0000002"] = true
+	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
 
-	result, err = c.listSubnetIDsinVPC(vpcID)
+	result, err = c.listPublicSubnetIDsinVPC(vpcID)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
@@ -815,6 +870,41 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		return
 	}
 
+	// test with 6 subnets from 3 different AZs
+	// with 3 private subnets
+	subnets[4] = make(map[string]string)
+	subnets[4]["id"] = "subnet-d0000001"
+	subnets[4]["az"] = "af-south-1a"
+	subnets[5] = make(map[string]string)
+	subnets[5]["id"] = "subnet-d0000002"
+	subnets[5]["az"] = "af-south-1b"
+
+	awsServices.ec2.Subnets = constructSubnets(subnets)
+	routeTables["subnet-a0000001"] = false
+	routeTables["subnet-b0000001"] = false
+	routeTables["subnet-c0000001"] = false
+	routeTables["subnet-c0000002"] = true
+	routeTables["subnet-d0000001"] = true
+	routeTables["subnet-d0000002"] = true
+	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
+	result, err = c.listPublicSubnetIDsinVPC(vpcID)
+	if err != nil {
+		t.Errorf("Error listing subnets: %v", err)
+		return
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 subnets but got %d", len(result))
+		return
+	}
+
+	expected := []*string{aws.String("subnet-c0000002"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
+	for _, s := range result {
+		if !contains(expected, s) {
+			t.Errorf("Unexpected subnet '%s' found", s)
+			return
+		}
+	}
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
@@ -935,5 +1025,104 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, true)
 	if equals {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+}
+
+func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+
+	nodeName := "my-dns.internal"
+
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
+	var runningInstance ec2.Instance
+	runningInstance.InstanceId = aws.String("i-running")
+	runningInstance.PrivateDnsName = aws.String(nodeName)
+	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
+	runningInstance.Tags = tags
+
+	var terminatedInstance ec2.Instance
+	terminatedInstance.InstanceId = aws.String("i-terminated")
+	terminatedInstance.PrivateDnsName = aws.String(nodeName)
+	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
+	terminatedInstance.Tags = tags
+
+	instances := []*ec2.Instance{&terminatedInstance, &runningInstance}
+	awsServices.instances = append(awsServices.instances, instances...)
+
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	instance, err := c.findInstanceByNodeName(nodeName)
+
+	if err != nil {
+		t.Errorf("Failed to find instance: %v", err)
+		return
+	}
+
+	if *instance.InstanceId != "i-running" {
+		t.Errorf("Expected running instance but got %v", *instance.InstanceId)
+	}
+}
+
+func TestFindInstancesByNodeName(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+
+	nodeNameOne := "my-dns.internal"
+	nodeNameTwo := "my-dns-two.internal"
+
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
+	var runningInstance ec2.Instance
+	runningInstance.InstanceId = aws.String("i-running")
+	runningInstance.PrivateDnsName = aws.String(nodeNameOne)
+	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
+	runningInstance.Tags = tags
+
+	var secondInstance ec2.Instance
+
+	secondInstance.InstanceId = aws.String("i-running")
+	secondInstance.PrivateDnsName = aws.String(nodeNameTwo)
+	secondInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("running")}
+	secondInstance.Tags = tags
+
+	var terminatedInstance ec2.Instance
+	terminatedInstance.InstanceId = aws.String("i-terminated")
+	terminatedInstance.PrivateDnsName = aws.String(nodeNameOne)
+	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
+	terminatedInstance.Tags = tags
+
+	instances := []*ec2.Instance{&secondInstance, &runningInstance, &terminatedInstance}
+	awsServices.instances = append(awsServices.instances, instances...)
+
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	nodeNames := []string{nodeNameOne}
+	returnedInstances, errr := c.getInstancesByNodeNames(nodeNames)
+
+	if errr != nil {
+		t.Errorf("Failed to find instance: %v", err)
+		return
+	}
+
+	if len(returnedInstances) != 1 {
+		t.Errorf("Expected a single isntance but found: %v", returnedInstances)
+	}
+
+	if *returnedInstances[0].PrivateDnsName != nodeNameOne {
+		t.Errorf("Expected node name %v but got %v", nodeNameOne, returnedInstances[0].PrivateDnsName)
 	}
 }

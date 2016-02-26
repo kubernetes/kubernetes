@@ -39,9 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -191,6 +191,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil)
 	kubelet.clock = fakeClock
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
 }
 
@@ -2344,7 +2345,7 @@ func TestGetHostPortConflicts(t *testing.T) {
 	// The new pod should cause conflict and be reported.
 	pods = append(pods, expected)
 	if !hasHostPortConflicts(pods) {
-		t.Errorf("expected no conflict, Got no conflicts")
+		t.Errorf("expected conflict, Got no conflicts")
 	}
 }
 
@@ -2723,12 +2724,12 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -2958,12 +2959,12 @@ func TestDockerRuntimeVersion(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -3142,12 +3143,12 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -3422,12 +3423,12 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					Size:     123,
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 				{
-					RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					Size:     456,
+					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},

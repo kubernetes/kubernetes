@@ -122,6 +122,12 @@ func New(config Config) Framework {
 				// the node must be registered and have up-to-date labels
 				n := config.LookupNode(o.GetHostname())
 				if n == nil || !node.IsUpToDate(n, node.SlaveAttributesToLabels(o.GetAttributes())) {
+					if n == nil {
+						log.V(1).Infof("cannot find node %v", o.GetHostname())
+					} else {
+						log.V(1).Infof("node %v's attributes do not match: %v != %v",
+							o.GetHostname(), n.Labels, o.GetAttributes())
+					}
 					return false
 				}
 
@@ -130,12 +136,14 @@ func New(config Config) Framework {
 				case eids > 1:
 					// at most one executor id expected. More than one means that
 					// the given node is seriously in trouble.
+					log.V(1).Infof("at most one executor id is expected, but got %v (%v)", eids, o.GetExecutorIds())
 					return false
 
 				case eids == 1:
 					// the executor id must match, otherwise the running executor
 					// is incompatible with the current scheduler configuration.
 					if eid := o.GetExecutorIds()[0]; eid.GetValue() != config.ExecutorId.GetValue() {
+						log.V(1).Infof("executor ids do not match: %v != %v", eid.GetValue(), config.ExecutorId.GetValue())
 						return false
 					}
 				}
@@ -315,7 +323,7 @@ func (k *framework) Registered(drv bindings.SchedulerDriver, fid *mesos.Framewor
 }
 
 // Reregistered is called when the scheduler re-registered with the master successfully.
-// This happends when the master fails over.
+// This happens when the master fails over.
 func (k *framework) Reregistered(drv bindings.SchedulerDriver, mi *mesos.MasterInfo) {
 	log.Infof("Scheduler reregistered with the master: %v\n", mi)
 

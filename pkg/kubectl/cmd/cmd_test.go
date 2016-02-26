@@ -180,7 +180,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			return t.Mapper, t.Typer
+			priorityRESTMapper := meta.PriorityRESTMapper{
+				Delegate: t.Mapper,
+				ResourcePriority: []unversioned.GroupVersionResource{
+					{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+				},
+				KindPriority: []unversioned.GroupVersionKind{
+					{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+				},
+			}
+			return priorityRESTMapper, t.Typer
 		},
 		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
@@ -212,7 +221,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	f, t, c := NewTestFactory()
 	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
-		return meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+		priorityRESTMapper := meta.PriorityRESTMapper{
+			Delegate: meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()},
+			ResourcePriority: []unversioned.GroupVersionResource{
+				{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+			},
+			KindPriority: []unversioned.GroupVersionKind{
+				{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+			},
+		}
+		return priorityRESTMapper, runtime.MultiObjectTyper{t.Typer, api.Scheme}
 	}
 	f.ClientForMapping = func(m *meta.RESTMapping) (resource.RESTClient, error) {
 		if m.ObjectConvertor == api.Scheme {
@@ -357,14 +375,17 @@ func ExamplePrintReplicationControllerWithNamespace() {
 				},
 			},
 		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   REPLICAS   AGE
-	// beep        foo          1          10y
+	// NAMESPACE   NAME      DESIRED   CURRENT   AGE
+	// beep        foo       1         1         10y
 }
 
 func ExamplePrintReplicationControllerWithWide() {
@@ -398,14 +419,17 @@ func ExamplePrintReplicationControllerWithWide() {
 				},
 			},
 		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// CONTROLLER   REPLICAS   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
-	// foo          1          10y       foo            someimage   foo=bar
+	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
+	// foo       1         1         10y       foo            someimage   foo=bar
 }
 
 func ExamplePrintPodWithWideFormat() {

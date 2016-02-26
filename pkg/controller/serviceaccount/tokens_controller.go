@@ -331,8 +331,12 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	}
 
 	// Save the secret
-	if _, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
+	if createdToken, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
 		return err
+	} else {
+		// Manually add the new token to the cache store.
+		// This prevents the service account update (below) triggering another token creation, if the referenced token couldn't be found in the store
+		e.secrets.Add(createdToken)
 	}
 
 	liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, api.ObjectReference{Name: secret.Name})

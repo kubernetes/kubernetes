@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -50,8 +51,8 @@ type Framework struct {
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
-	gatherer containerResourceGatherer
-	// Constraints that passed to a check which is exectued after data is gathered to
+	gatherer *containerResourceGatherer
+	// Constraints that passed to a check which is executed after data is gathered to
 	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
 	// as expectations vary greatly. Constraints are groupped by the container names.
 	addonResourceConstraints map[string]resourceConstraint
@@ -115,7 +116,12 @@ func (f *Framework) beforeEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.startGatheringData(c, resourceDataGatheringPeriodSeconds*time.Second)
+		f.gatherer, err = NewResourceUsageGatherer(c)
+		if err != nil {
+			Logf("Error while creating NewResourceUsageGatherer: %v", err)
+		} else {
+			go f.gatherer.startGatheringData()
+		}
 	}
 
 	if testContext.GatherLogsSizes {
@@ -146,7 +152,11 @@ func (f *Framework) afterEach() {
 					timeout = f.NamespaceDeletionTimeout
 				}
 				if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
-					Failf("Couldn't delete ns %q: %s", ns.Name, err)
+					if !apierrs.IsNotFound(err) {
+						Failf("Couldn't delete ns %q: %s", ns.Name, err)
+					} else {
+						Logf("Namespace %v was already deleted", ns.Name)
+					}
 				}
 			}
 			f.namespacesToDelete = nil
@@ -161,24 +171,11 @@ func (f *Framework) afterEach() {
 
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
-		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
-		for _, e := range events.Items {
-			Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
-		}
-		// Note that we don't wait for any cleanup to propagate, which means
-		// that if you delete a bunch of pods right before ending your test,
-		// you may or may not see the killing/deletion/cleanup events.
-
-		dumpAllPodInfo(f.Client)
-
-		dumpAllNodeInfo(f.Client)
+		dumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 	}
 
 	summaries := make([]TestDataSummary, 0)
-	if testContext.GatherKubeSystemResourceUsageData {
+	if testContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
 	}
@@ -233,6 +230,10 @@ func (f *Framework) afterEach() {
 }
 
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
+	createTestingNS := testContext.CreateTestingNS
+	if createTestingNS == nil {
+		createTestingNS = CreateTestingNS
+	}
 	ns, err := createTestingNS(baseName, f.Client, labels)
 	if err == nil {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
@@ -254,6 +255,12 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 // It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
 func (f *Framework) WaitForPodRunningSlow(podName string) error {
 	return waitForPodRunningInNamespaceSlow(f.Client, podName, f.Namespace.Name)
+}
+
+// WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
+// success or failure.
+func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
+	return waitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
 // Runs the given pod and verifies that the output of exact container matches the desired output.

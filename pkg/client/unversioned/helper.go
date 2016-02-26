@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -155,16 +157,34 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 
-	if _, err := registered.Group(extensions.GroupName); err != nil {
-		return &Client{RESTClient: client, ExtensionsClient: nil, DiscoveryClient: discoveryClient}, nil
-	}
-	experimentalConfig := *c
-	experimentalClient, err := NewExtensions(&experimentalConfig)
-	if err != nil {
-		return nil, err
+	var autoscalingClient *AutoscalingClient
+	if registered.IsRegistered(autoscaling.GroupName) {
+		autoscalingConfig := *c
+		autoscalingClient, err = NewAutoscaling(&autoscalingConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return &Client{RESTClient: client, ExtensionsClient: experimentalClient, DiscoveryClient: discoveryClient}, nil
+	var batchClient *BatchClient
+	if registered.IsRegistered(batch.GroupName) {
+		batchConfig := *c
+		batchClient, err = NewBatch(&batchConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var extensionsClient *ExtensionsClient
+	if registered.IsRegistered(extensions.GroupName) {
+		extensionsConfig := *c
+		extensionsClient, err = NewExtensions(&extensionsConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &Client{RESTClient: client, AutoscalingClient: autoscalingClient, BatchClient: batchClient, ExtensionsClient: extensionsClient, DiscoveryClient: discoveryClient}, nil
 }
 
 // MatchesServerVersion queries the server to compares the build version

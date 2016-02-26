@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
@@ -41,7 +42,7 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 	}
 
 	fakeClient := &Fake{}
-	fakeClient.AddReactor("*", "*", ObjectReaction(o, api.RESTMapper))
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, registered.RESTMapper()))
 
 	fakeClient.AddWatchReactor("*", DefaultWatchReactor(watch.NewFake(), nil))
 
@@ -274,6 +275,14 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
+func (c *Fake) Autoscaling() client.AutoscalingInterface {
+	return &FakeAutoscaling{c}
+}
+
+func (c *Fake) Batch() client.BatchInterface {
+	return &FakeBatch{c}
+}
+
 func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
@@ -302,6 +311,32 @@ func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDecl
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
+}
+
+// NewSimpleFakeAutoscaling returns a client that will respond with the provided objects
+func NewSimpleFakeAutoscaling(objects ...runtime.Object) *FakeAutoscaling {
+	return &FakeAutoscaling{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeAutoscaling struct {
+	*Fake
+}
+
+func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
+	return &FakeHorizontalPodAutoscalersV1{Fake: c, Namespace: namespace}
+}
+
+// NewSimpleFakeBatch returns a client that will respond with the provided objects
+func NewSimpleFakeBatch(objects ...runtime.Object) *FakeBatch {
+	return &FakeBatch{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeBatch struct {
+	*Fake
+}
+
+func (c *FakeBatch) Jobs(namespace string) client.JobInterface {
+	return &FakeJobsV1{Fake: c, Namespace: namespace}
 }
 
 // NewSimpleFakeExp returns a client that will respond with the provided objects

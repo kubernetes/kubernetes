@@ -145,6 +145,14 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
+	// Give this error when it is constructed rather than when you get the
+	// first watch item, because it's much easier to track down that way.
+	if obj, ok := config.Type.(runtime.Object); ok {
+		if err := runtime.CheckCodec(config.Storage.Codec(), obj); err != nil {
+			panic("storage codec doesn't seem to match given type: " + err.Error())
+		}
+	}
+
 	cacher := &Cacher{
 		usable:     sync.RWMutex{},
 		storage:    config.Storage,
@@ -163,9 +171,8 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		stopCh: make(chan struct{}),
 		stopWg: sync.WaitGroup{},
 	}
+	// See startCaching method for explanation and where this is unlocked.
 	cacher.usable.Lock()
-	// See startCaching method for why explanation on it.
-	watchCache.SetOnReplace(func() { cacher.usable.Unlock() })
 	watchCache.SetOnEvent(cacher.processEvent)
 
 	stopCh := cacher.stopCh
@@ -184,16 +191,22 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
-	// Whenever we enter startCaching method, usable mutex is held.
-	// We explicitly do NOT Unlock it in this method, because we do
-	// not want to allow any Watch/List methods not explicitly redirected
-	// to the underlying storage when the cache is being initialized.
-	// Once the underlying cache is propagated, onReplace handler will
-	// be called, which will do the usable.Unlock() as configured in
-	// NewCacher().
-	// Note: the same behavior is also triggered every time we fall out of
-	// backend storage watch event window.
-	defer c.usable.Lock()
+	// The 'usable' lock is always 'RLock'able when it is safe to use the cache.
+	// It is safe to use the cache after a successful list until a disconnection.
+	// We start with usable (write) locked. The below OnReplace function will
+	// unlock it after a successful list. The below defer will then re-lock
+	// it when this function exits (always due to disconnection), only if
+	// we actually got a successful list. This cycle will repeat as needed.
+	successfulList := false
+	c.watchCache.SetOnReplace(func() {
+		successfulList = true
+		c.usable.Unlock()
+	})
+	defer func() {
+		if successfulList {
+			c.usable.Lock()
+		}
+	}()
 
 	c.terminateAllWatchers()
 	// Note that since onReplace may be not called due to errors, we explicitly

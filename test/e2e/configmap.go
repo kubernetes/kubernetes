@@ -181,7 +181,7 @@ var _ = Describe("ConfigMap", func() {
 		// Kubelet projects the update into the volume and the container picks
 		// it up. This timeout is based on the default Kubelet sync period (1
 		// minute) plus additional time for fudge factor.
-		const podLogTimeout = 90 * time.Second
+		const podLogTimeout = 300 * time.Second
 
 		name := "configmap-test-upd-" + string(util.NewUUID())
 		volumeName := "configmap-volume"
@@ -267,6 +267,7 @@ var _ = Describe("ConfigMap", func() {
 		_, err = f.Client.ConfigMaps(f.Namespace.Name).Update(configMap)
 		Expect(err).NotTo(HaveOccurred())
 
+		By("waiting to observe update in volume")
 		Eventually(pollLogs, podLogTimeout, poll).Should(ContainSubstring("value-2"))
 	})
 

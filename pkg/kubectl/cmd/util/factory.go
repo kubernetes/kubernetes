@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/metrics"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -63,7 +67,6 @@ const (
 type Factory struct {
 	clients *ClientCache
 	flags   *pflag.FlagSet
-	cmd     string
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -141,6 +144,7 @@ const (
 	NamespaceV1GeneratorName                    = "namespace/v1"
 	SecretV1GeneratorName                       = "secret/v1"
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
+	ConfigMapV1GeneratorName                    = "configmap/v1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -190,7 +194,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	return &Factory{
 		clients: clients,
 		flags:   flags,
-		cmd:     recordCommand(os.Args),
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -200,7 +203,24 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				cmdApiVersion = *cfg.GroupVersion
 			}
 
-			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}, api.Scheme
+			outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
+
+			// eventually this should allow me choose a group priority based on the order of the discovery doc, for now hardcode a given order
+			priorityRESTMapper := meta.PriorityRESTMapper{
+				Delegate: outputRESTMapper,
+				ResourcePriority: []unversioned.GroupVersionResource{
+					{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: metrics.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+				},
+				KindPriority: []unversioned.GroupVersionKind{
+					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+				},
+			}
+
+			return priorityRESTMapper, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
@@ -217,6 +237,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch mapping.GroupVersionKind.Group {
 			case api.GroupName:
 				return client.RESTClient, nil
+			case autoscaling.GroupName:
+				return client.AutoscalingClient.RESTClient, nil
+			case batch.GroupName:
+				return client.BatchClient.RESTClient, nil
 			case extensions.GroupName:
 				return client.ExtensionsClient.RESTClient, nil
 			}
@@ -547,15 +571,16 @@ func GetFirstPod(client *client.Client, namespace string, selector labels.Select
 	return pod, nil
 }
 
-func recordCommand(args []string) string {
-	if len(args) > 0 {
-		args[0] = "kubectl"
-	}
-	return strings.Join(args, " ")
-}
-
+// Command will stringify and return all environment arguments ie. a command run by a client
+// using the factory.
+// TODO: We need to filter out stuff like secrets.
 func (f *Factory) Command() string {
-	return f.cmd
+	if len(os.Args) == 0 {
+		return ""
+	}
+	base := filepath.Base(os.Args[0])
+	args := append([]string{base}, os.Args[1:]...)
+	return strings.Join(args, " ")
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
@@ -699,6 +724,18 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	}
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
+	}
+	if gvk.Group == autoscaling.GroupName {
+		if c.c.AutoscalingClient == nil {
+			return errors.New("unable to validate: no autoscaling client")
+		}
+		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+	}
+	if gvk.Group == batch.GroupName {
+		if c.c.BatchClient == nil {
+			return errors.New("unable to validate: no batch client")
+		}
+		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
 	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {

@@ -79,7 +79,7 @@ Guide](../admin/README.md).
   Document style advice for contributors.
 
 * **Running a cluster locally** ([running-locally.md](running-locally.md)):
-  A fast and lightweight local cluster deployment for developement.
+  A fast and lightweight local cluster deployment for development.
 
 ## Developing against the Kubernetes API
 

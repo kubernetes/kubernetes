@@ -164,6 +164,7 @@ func init() {
 		DeepCopy_api_ServiceAccountList,
 		DeepCopy_api_ServiceList,
 		DeepCopy_api_ServicePort,
+		DeepCopy_api_ServiceProxyOptions,
 		DeepCopy_api_ServiceSpec,
 		DeepCopy_api_ServiceStatus,
 		DeepCopy_api_TCPSocketAction,
@@ -495,14 +496,14 @@ func DeepCopy_api_Container(in Container, out *Container, c *conversion.Cloner) 
 }
 
 func DeepCopy_api_ContainerImage(in ContainerImage, out *ContainerImage, c *conversion.Cloner) error {
-	if in.RepoTags != nil {
-		in, out := in.RepoTags, &out.RepoTags
+	if in.Names != nil {
+		in, out := in.Names, &out.Names
 		*out = make([]string, len(in))
 		copy(*out, in)
 	} else {
-		out.RepoTags = nil
+		out.Names = nil
 	}
-	out.Size = in.Size
+	out.SizeBytes = in.SizeBytes
 	return nil
 }
 
@@ -2741,6 +2742,14 @@ func DeepCopy_api_ServicePort(in ServicePort, out *ServicePort, c *conversion.Cl
 		return err
 	}
 	out.NodePort = in.NodePort
+	return nil
+}
+
+func DeepCopy_api_ServiceProxyOptions(in ServiceProxyOptions, out *ServiceProxyOptions, c *conversion.Cloner) error {
+	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
 	return nil
 }
 

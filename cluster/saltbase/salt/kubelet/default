@@ -107,17 +107,17 @@
 {% set system_container = "" -%}
 {% set kubelet_container = "" -%}
 {% set runtime_container = "" -%}
-{% if grains['os_family'] == 'Debian' -%}  
+{% if grains['os_family'] == 'Debian' -%}
   {% if pillar.get('is_systemd') %}
     {% set cgroup_root = "--cgroup-root=docker" -%}
   {% else %}
     {% set cgroup_root = "--cgroup-root=/" -%}
-    {% set system_container = "--system-cgroups=/system" -%}    
+    {% set system_container = "--system-cgroups=/system" -%}
     {% set runtime_container = "--runtime-cgroups=/docker-daemon" -%}
     {% set kubelet_container= "--kubelet-cgroups=/kubelet" -%}
   {% endif %}
 {% endif -%}
-{% if grains['oscodename'] == 'vivid' -%}
+{% if grains['oscodename'] in ['vivid','wily'] -%}
   {% set cgroup_root = "--cgroup-root=docker" -%}
 {% endif -%}
 
@@ -151,11 +151,18 @@
   {% endif -%}
 {% endif -%}
 
-{% set configure_hairpin_mode = "--configure-hairpin-mode=true" -%}
-{% if pillar.get('hairpin_mode', '').lower() == 'false' %}
-  {% set configure_hairpin_mode = "--configure-hairpin-mode=false" %}
+# Don't pipe the --hairpin-mode flag by default. This allows the kubelet to pick
+# an appropriate value.
+{% set hairpin_mode = "" -%}
+# The master cannot see Services because it doesn't run kube-proxy, so we don't
+# need to make its container bridge promiscuous. We also don't want to set
+# the hairpin-veth flag on the master because it increases the chances of
+# running into the kernel bug described in #20096.
+{% if grains['roles'][0] == 'kubernetes-master' -%}
+  {% set hairpin_mode = "--hairpin-mode=none" -%}
+{% elif pillar['hairpin_mode'] is defined and pillar['hairpin_mode'] in ['promiscuous-bridge', 'hairpin-veth', 'none'] -%}
+  {% set hairpin_mode = "--hairpin-mode=" + pillar['hairpin_mode'] -%}
 {% endif -%}
-
 
 {% set kubelet_port = "" -%}
 {% if pillar['kubelet_port'] is defined -%}
@@ -172,5 +179,10 @@
   {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 {% endif -%}
 
+{% set node_labels = "" %}
+{% if pillar['node_labels'] is defined -%}
+  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+{% endif -%}
+
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{ reconcile_cidr_args }} {{ configure_hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{ reconcile_cidr_args }} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{test_args}}"

@@ -317,7 +317,8 @@ function kube-down {
 }
 
 function test-setup {
-  echo "TODO: test-setup" 1>&2
+  echo "test-setup" 1>&2
+  "${KUBE_ROOT}/cluster/kube-up.sh"
 }
 
 # Execute after running tests to perform any required clean-up

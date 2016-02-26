@@ -55,6 +55,7 @@ func CoreDump(dir string) {
 		{"cat /var/log/kube-apiserver.log", "kube-apiserver"},
 		{"cat /var/log/kube-scheduler.log", "kube-scheduler"},
 		{"cat /var/log/kube-controller-manager.log", "kube-controller-manager"},
+		{"cat /var/log/etcd.log", "kube-etcd"},
 	}
 	if isUsingSystemdKubelet(provider, master) {
 		cmds = append(cmds, command{"sudo journalctl --output=cat -u kubelet.service", "kubelet"})
@@ -62,6 +63,10 @@ func CoreDump(dir string) {
 		cmds = append(cmds, []command{
 			{"cat /var/log/kubelet.log", "kubelet"},
 			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
+			{"cat /var/log/supervisor/kubelet-stdout.log", "supervisord-kubelet-stdout"},
+			{"cat /var/log/supervisor/kubelet-stderr.log", "supervisord-kubelet-stderr"},
+			{"cat /var/log/kern.log", "kern.log"},
+			{"cat /var/log/docker.log", "docker.log"},
 		}...)
 	}
 
@@ -87,7 +92,10 @@ func CoreDump(dir string) {
 		cmds = append(cmds, []command{
 			{"cat /var/log/kubelet.log", "kubelet"},
 			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
-			{"cat /var/log/dmesg", "dmesg"},
+			{"cat /var/log/supervisor/kubelet-stdout.log", "supervisord-kubelet-stdout"},
+			{"cat /var/log/supervisor/kubelet-stderr.log", "supervisord-kubelet-stderr"},
+			{"cat /var/log/kern.log", "kern.log"},
+			{"cat /var/log/docker.log", "docker.log"},
 		}...)
 	}
 

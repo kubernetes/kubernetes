@@ -30,9 +30,8 @@ KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 
-
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20160127}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-v1-2-v20160218}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"${MASTER_IMAGE}"}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
@@ -49,10 +48,6 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
-
-# Optional: enable v1beta1 related features
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-true}"
-ENABLE_REPLICASETS="${KUBE_ENABLE_REPLICASETS:-true}"
 
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
@@ -139,8 +134,8 @@ OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
-# Should the kubelet configure hairpin mode on the bridge?
-HAIRPIN_MODE="${HAIRPIN_MODE:-true}" # true, false
+# How should the kubelet configure hairpin mode?
+HAIRPIN_MODE="${HAIRPIN_MODE:-promiscuous-bridge}" # promiscuous-bridge, hairpin-veth, none
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

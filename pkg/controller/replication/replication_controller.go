@@ -87,12 +87,14 @@ type ReplicationManager struct {
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
 
+	lookupCache *controller.MatchingCache
+
 	// Controllers that need to be synced
 	queue *workqueue.Type
 }
 
 // NewReplicationManager creates a new ReplicationManager.
-func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
+func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
@@ -123,6 +125,24 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
+				oldRC := old.(*api.ReplicationController)
+				curRC := cur.(*api.ReplicationController)
+
+				// We should invalidate the whole lookup cache if a RC's selector has been updated.
+				//
+				// Imagine that you have two RCs:
+				// * old RC1
+				// * new RC2
+				// You also have a pod that is attached to RC2 (because it doesn't match RC1 selector).
+				// Now imagine that you are changing RC1 selector so that it is now matching that pod,
+				// in such case, we must invalidate the whole cache so that pod could be adopted by RC1
+				//
+				// This makes the lookup cache less helpful, but selector update does not happen often,
+				// so it's not a big problem
+				if !reflect.DeepEqual(oldRC.Spec.Selector, curRC.Spec.Selector) {
+					rm.lookupCache.InvalidateAll()
+				}
+
 				// You might imagine that we only really need to enqueue the
 				// controller when Spec changes, but it is safer to sync any
 				// time this function is triggered. That way a full informer
@@ -135,8 +155,6 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 				// this function), but in general extra resyncs shouldn't be
 				// that bad as rcs that haven't met expectations yet won't
 				// sync, and all the listing is done using local stores.
-				oldRC := old.(*api.ReplicationController)
-				curRC := cur.(*api.ReplicationController)
 				if oldRC.Status.Replicas != curRC.Status.Replicas {
 					glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
 				}
@@ -172,6 +190,7 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 
 	rm.syncHandler = rm.syncReplicationController
 	rm.podStoreSynced = rm.podController.HasSynced
+	rm.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return rm
 }
 
@@ -200,6 +219,20 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
 func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
+	// look up in the cache, if cached and the cache is valid, just return cached value
+	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
+		controller, ok := obj.(*api.ReplicationController)
+		if !ok {
+			// This should not happen
+			glog.Errorf("lookup cache does not retuen a ReplicationController object")
+			return nil
+		}
+		if cached && rm.isCacheValid(pod, controller) {
+			return controller
+		}
+	}
+
+	// if not cached or cached value is invalid, search all the rc to find the matching one, and update cache
 	controllers, err := rm.rcStore.GetPodControllers(pod)
 	if err != nil {
 		glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
@@ -217,7 +250,37 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 		glog.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(OverlappingControllers(controllers))
 	}
+
+	// update lookup cache
+	rm.lookupCache.Update(pod, &controllers[0])
+
 	return &controllers[0]
+}
+
+// isCacheValid check if the cache is valid
+func (rm *ReplicationManager) isCacheValid(pod *api.Pod, cachedRC *api.ReplicationController) bool {
+	_, exists, err := rm.rcStore.Get(cachedRC)
+	// rc has been deleted or updated, cache is invalid
+	if err != nil || !exists || !isControllerMatch(pod, cachedRC) {
+		return false
+	}
+	return true
+}
+
+// isControllerMatch take a Pod and ReplicationController, return whether the Pod and ReplicationController are matching
+// TODO(mqliang): This logic is a copy from GetPodControllers(), remove the duplication
+func isControllerMatch(pod *api.Pod, rc *api.ReplicationController) bool {
+	if rc.Namespace != pod.Namespace {
+		return false
+	}
+	labelSet := labels.Set(rc.Spec.Selector)
+	selector := labels.Set(rc.Spec.Selector).AsSelector()
+
+	// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+	if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		return false
+	}
+	return true
 }
 
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
@@ -285,12 +348,12 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v, could take up to %v before a controller recreates a replica", obj, controller.ExpectationsTimeout)
+			glog.Errorf("Couldn't get object from tombstone %+v", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v, could take up to %v before controller recreates a replica", obj, controller.ExpectationsTimeout)
+			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
 			return
 		}
 	}
@@ -409,6 +472,14 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		glog.V(4).Infof("Finished syncing controller %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
+	if !rm.podStoreSynced() {
+		// Sleep so we give the pod reflector goroutine a chance to run.
+		time.Sleep(PodStoreSyncedPollPeriod)
+		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", key)
+		rm.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := rm.rcStore.Store.GetByKey(key)
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
@@ -421,13 +492,6 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return err
 	}
 	rc := *obj.(*api.ReplicationController)
-	if !rm.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", rc.Name)
-		rm.enqueueController(&rc)
-		return nil
-	}
 
 	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters

@@ -33,12 +33,10 @@ fi
 # Dynamically set the master size by the number of nodes, these are guesses
 # TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_NODES} < 50 )); then
-    MASTER_SIZE="t2.micro"
-  elif (( ${NUM_NODES} < 150 )); then
-    MASTER_SIZE="t2.small"
+  if (( ${NUM_NODES} < 150 )); then
+    MASTER_SIZE="m3.medium"
   else
-    MASTER_SIZE="t2.medium"
+    MASTER_SIZE="m3.large"
   fi
 fi
 
@@ -85,10 +83,6 @@ MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 
 # Runtime config
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
-
-# Enable various v1beta1 features
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup

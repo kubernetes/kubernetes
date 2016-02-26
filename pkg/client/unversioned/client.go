@@ -41,6 +41,8 @@ type Interface interface {
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
 	ConfigMapsNamespacer
+	Autoscaling() AutoscalingInterface
+	Batch() BatchInterface
 	Extensions() ExtensionsInterface
 	Discovery() DiscoveryInterface
 }
@@ -111,6 +113,8 @@ func (c *Client) ConfigMaps(namespace string) ConfigMapsInterface {
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
+	*AutoscalingClient
+	*BatchClient
 	*ExtensionsClient
 	*DiscoveryClient
 }
@@ -144,6 +148,14 @@ func IsTimeout(err error) bool {
 		return true
 	}
 	return false
+}
+
+func (c *Client) Autoscaling() AutoscalingInterface {
+	return c.AutoscalingClient
+}
+
+func (c *Client) Batch() BatchInterface {
+	return c.BatchClient
 }
 
 func (c *Client) Extensions() ExtensionsInterface {

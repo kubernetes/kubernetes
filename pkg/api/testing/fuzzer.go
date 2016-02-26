@@ -397,6 +397,10 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			s.MinReplicas = &minReplicas
 			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(int32(c.RandUint64()))}
 		},
+		func(s *extensions.SubresourceReference, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			s.Subresource = "scale"
+		},
 		func(psp *extensions.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again
 			userTypes := []extensions.RunAsUserStrategy{extensions.RunAsUserStrategyMustRunAsNonRoot, extensions.RunAsUserStrategyMustRunAs, extensions.RunAsUserStrategyRunAsAny}

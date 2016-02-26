@@ -178,7 +178,7 @@ kube::log::status "Starting kube-apiserver"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
-KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -247,6 +247,7 @@ runTests() {
   secret_data=".data"
   secret_type=".type"
   deployment_image_field="(index .spec.template.spec.containers 0).image"
+  change_cause_annotation='.*kubernetes.io/change-cause.*'
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -325,9 +326,9 @@ runTests() {
   kube::test::get_object_jsonpath_assert 'pod/valid-pod' "{$id_field}" 'valid-pod'
   kube::test::get_object_jsonpath_assert 'pods/valid-pod' "{$id_field}" 'valid-pod'
   # Describe command should print detailed information
-  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Node:" "Labels:" "Status:" "Controllers"
+  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert pods "Name:" "Image(s):" "Node:" "Labels:" "Status:" "Controllers"
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
 
   ### Validate Export ###
   kube::test::get_object_assert 'pods/valid-pod' "{{.metadata.namespace}} {{.metadata.name}}" '<no value> valid-pod' "--export=true"
@@ -437,7 +438,7 @@ runTests() {
   kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:'
   # Command
   kubectl label pods valid-pod new-name=new-valid-pod "${kube_flags[@]}"
-  # Post-conditon: valid-pod is labelled
+  # Post-condition: valid-pod is labelled
   kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:new-valid-pod:'
 
   ### Delete POD by label
@@ -458,9 +459,11 @@ runTests() {
 
   ## Patch pod can change image
   # Command
-  kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
+  kubectl patch "${kube_flags[@]}" pod valid-pod --record -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  # Post-condition: valid-pod has the record annotation
+  kube::test::get_object_assert pods "{{range.items}}{{$annotations_field}}:{{end}}" "${change_cause_annotation}"
   # prove that patch can use different types 
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx2"}]'
   # Post-condition: valid-pod POD has image nginx
@@ -694,12 +697,12 @@ __EOF__
   ## 6. kubectl autoscale --save-config should generate configuration annotation
   # Pre-Condition: no RC exists, then create the rc "frontend", which shouldn't have configuration annotation
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
-  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   ! [[ "$(kubectl get rc frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Command: autoscale rc "frontend"
-  kubectl autoscale -f examples/guestbook/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
+  kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
-  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  [[ "$(kubectl get hpa.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up
   kubectl delete rc,hpa frontend "${kube_flags[@]}"
 
@@ -724,6 +727,8 @@ __EOF__
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
+  # Post-condition: no pods exist.
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -823,6 +828,34 @@ __EOF__
   # Clean up
   kubectl delete namespace test-secrets
 
+  ######################
+  # ConfigMap          #
+  ######################
+
+  kubectl create -f docs/user-guide/configmap/configmap.yaml
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
+  kubectl delete configmap test-configmap "${kube_flags[@]}"
+
+  ### Create a new namespace
+  # Pre-condition: the test-configmaps namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-configmaps\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-configmaps
+  # Post-condition: namespace 'test-configmaps' is created.
+  kube::test::get_object_assert 'namespaces/test-configmaps' "{{$id_field}}" 'test-configmaps'
+
+  ### Create a generic configmap in a specific namespace
+  # Pre-condition: no configmaps namespace exists
+  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
+  # Post-condition: configmap exists and has expected values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value1')" ]]
+  # Clean-up
+  kubectl delete configmap test-configmap --namespace=test-configmaps
+  kubectl delete namespace test-configmaps
+  
   #################
   # Pod templates #
   #################
@@ -956,7 +989,7 @@ __EOF__
   # Pre-condition: no replication controller exists
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   kubectl delete rc frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend controller
   kube::test::get_object_assert 'pods -l "name=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -965,7 +998,7 @@ __EOF__
   # Pre-condition: no replication controller exists
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend replication controller is created
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
@@ -1001,7 +1034,7 @@ __EOF__
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
-  kubectl scale  --replicas=2 -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl scale  --replicas=2 -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   # Post-condition: 2 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Clean-up
@@ -1048,7 +1081,7 @@ __EOF__
   kubectl delete deployment/nginx-deployment service/nginx-deployment "${kube_flags[@]}"
 
   ### Expose replication controller as service
-  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
@@ -1118,7 +1151,7 @@ __EOF__
   # Pre-condition: no replication controller exists
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
@@ -1135,10 +1168,10 @@ __EOF__
   # Pre-condition: no replication controller exists
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # autoscale 1~2 pods, CPU utilization 70%, rc specified by file
-  kubectl autoscale -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
+  kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale 2~3 pods, default CPU utilization (80%), rc specified by name
@@ -1158,10 +1191,10 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   # autoscale 2~3 pods, default CPU utilization (80%)
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kube::test::get_object_assert 'hpa.extensions nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
-  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment.extensions nginx-deployment "${kube_flags[@]}"
 
   ### Rollback a deployment
   # Pre-condition: no deployment exists
@@ -1176,7 +1209,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
   # Rollback to revision 1
   kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
   sleep 1
@@ -1269,15 +1302,6 @@ __EOF__
   kubectl delete rs frontend redis-slave "${kube_flags[@]}" # delete multiple replica sets at once
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
-
-
-  ######################
-  # ConfigMap          #
-  ######################
-
-  kubectl create -f docs/user-guide/configmap/config-map.yaml
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
-  kubectl delete configmap test-configmap "${kube_flags[@]}"
 
   ######################
   # Multiple Resources #
@@ -1581,7 +1605,7 @@ kube_api_versions=(
   v1
 )
 for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1,extensions/v1beta1" runTests "${version}"
+  KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" runTests "${version}"
 done
 
 kube::log::status "TEST PASSED"

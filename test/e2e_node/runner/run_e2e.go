@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,194 +14,233 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// To run the e2e tests against one or more hosts on gce: $ go run run_e2e.go --hosts <comma separated hosts>
-// Requires gcloud compute ssh access to the hosts
+// To run the e2e tests against one or more hosts on gce:
+// $ go run run_e2e.go --logtostderr --v 2 --ssh-env gce --hosts <comma separated hosts>
+// To run the e2e tests against one or more images on gce and provision them:
+// $ go run run_e2e.go --logtostderr --v 2 --project <project> --zone <zone> --ssh-env gce --images <comma separated images>
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
-	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
-	"runtime"
+	"k8s.io/kubernetes/test/e2e_node"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/test/e2e_node/gcloud"
-	"path/filepath"
+	"github.com/pborman/uuid"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/compute/v1"
 )
 
-type RunFunc func(host string, port string) ([]byte, error)
-
-type Result struct {
-	host   string
-	output []byte
-	err    error
-}
-
-const gray = "\033[1;30m"
-const blue = "\033[0;34m"
-const noColour = "\033[0m"
-
-var u = sync.WaitGroup{}
+var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
+var project = flag.String("project", "", "gce project the hosts live in")
+var images = flag.String("images", "", "images to test")
 var hosts = flag.String("hosts", "", "hosts to test")
-var wait = flag.Bool("wait", false, "if true, wait for input before running tests")
-var kubeOutputRelPath = flag.String("k8s-build-output", "_output/local/bin/linux/amd64", "Where k8s binary files are written")
 
-var kubeRoot = ""
+var computeService *compute.Service
 
-const buildScriptRelPath = "hack/build-go.sh"
-const ginkgoTestRelPath = "test/e2e_node"
-const healthyTimeoutDuration = time.Minute * 3
+type TestResult struct {
+	output string
+	err    error
+	host   string
+}
 
 func main() {
 	flag.Parse()
-	if *hosts == "" {
-		glog.Fatalf("Must specific --hosts flag")
+
+	if *hosts == "" && *images == "" {
+		glog.Fatalf("Must specify one of --images or --hosts flag.")
+	}
+	if *images != "" && *zone == "" {
+		glog.Fatal("Must specify --zone flag")
+	}
+	if *images != "" && *project == "" {
+		glog.Fatal("Must specify --project flag")
+	}
+	if *instanceNamePrefix == "" {
+		*instanceNamePrefix = "tmp-node-e2e-" + uuid.NewUUID().String()[:8]
 	}
 
-	// Figure out the kube root
-	_, path, _, _ := runtime.Caller(0)
-	kubeRoot, _ = filepath.Split(path)
-	kubeRoot = strings.Split(kubeRoot, "/test/e2e_node")[0]
-
-	// Build the go code
-	out, err := exec.Command(filepath.Join(kubeRoot, buildScriptRelPath)).CombinedOutput()
-	if err != nil {
-		glog.Fatalf("Failed to build go packages %s: %v", out, err)
+	// Setup coloring
+	stat, _ := os.Stdout.Stat()
+	useColor := (stat.Mode() & os.ModeCharDevice) != 0
+	blue := ""
+	noColour := ""
+	if useColor {
+		blue = "\033[0;34m"
+		noColour = "\033[0m"
 	}
 
-	// Copy kubelet to each host and run test
-	if *wait {
-		u.Add(1)
-	}
+	archive := e2e_node.CreateTestArchive()
+	defer os.Remove(archive)
 
 	results := make(chan *TestResult)
-	hs := strings.Split(*hosts, ",")
-	for _, h := range hs {
-		go func(host string) { results <- runTests(host) }(h)
-	}
+	running := 0
+	if *images != "" {
+		// Setup the gce client for provisioning instances
+		// Getting credentials on gce jenkins is flaky, so try a couple times
+		var err error
+		for i := 0; i < 10; i++ {
+			var client *http.Client
+			client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+			if err != nil {
+				continue
+			}
+			computeService, err = compute.New(client)
+			if err != nil {
+				continue
+			}
+			time.Sleep(time.Second * 6)
+		}
+		if err != nil {
+			glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+		}
 
-	// Maybe wait for user input before running tests
-	if *wait {
-		WaitForUser()
+		for _, image := range strings.Split(*images, ",") {
+			running++
+			fmt.Printf("Initializing e2e tests using image %s.\n", image)
+			go func(image string) { results <- testImage(image, archive) }(image)
+		}
+	}
+	if *hosts != "" {
+		for _, host := range strings.Split(*hosts, ",") {
+			fmt.Printf("Initializing e2e tests using host %s.\n", host)
+			running++
+			go func(host string) {
+				results <- testHost(host, archive)
+			}(host)
+		}
 	}
 
 	// Wait for all tests to complete and emit the results
 	errCount := 0
-	for i := 0; i < len(hs); i++ {
+	for i := 0; i < running; i++ {
 		tr := <-results
-		host := tr.fullhost
+		host := tr.host
+		fmt.Printf("%s================================================================%s\n", blue, noColour)
 		if tr.err != nil {
 			errCount++
-			glog.Infof("%s================================================================%s", blue, noColour)
-			glog.Infof("Failure Finished Host %s Test Suite %s %v", host, tr.testCombinedOutput, tr.err)
-			glog.V(2).Infof("----------------------------------------------------------------")
-			glog.V(5).Infof("Host %s Etcd Logs\n%s%s%s", host, gray, tr.etcdCombinedOutput, noColour)
-			glog.V(5).Infof("----------------------------------------------------------------")
-			glog.V(5).Infof("Host %s Apiserver Logs\n%s%s%s", host, gray, tr.apiServerCombinedOutput, noColour)
-			glog.V(5).Infof("----------------------------------------------------------------")
-			glog.V(2).Infof("Host %s Kubelet Logs\n%s%s%s", host, gray, tr.kubeletCombinedOutput, noColour)
-			glog.Infof("%s================================================================%s", blue, noColour)
+			fmt.Printf("Failure Finished Host %s Test Suite\n%s\n%v\n", host, tr.output, tr.err)
 		} else {
-			glog.Infof("================================================================")
-			glog.Infof("Success Finished Host %s Test Suite %s", host, tr.testCombinedOutput)
-			glog.Infof("================================================================")
+			fmt.Printf("Success Finished Host %s Test Suite\n%s\n", host, tr.output)
 		}
+		fmt.Printf("%s================================================================%s\n", blue, noColour)
 	}
 
 	// Set the exit code if there were failures
 	if errCount > 0 {
-		glog.Errorf("Failure: %d errors encountered.", errCount)
+		fmt.Printf("Failure: %d errors encountered.", errCount)
 		os.Exit(1)
 	}
 }
 
-func WaitForUser() {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Printf("Enter \"y\" to run tests\n")
-	for scanner.Scan() {
-		if strings.ToUpper(scanner.Text()) != "Y\n" {
-			break
+// Run tests in archive against host
+func testHost(host, archive string) *TestResult {
+	output, err := e2e_node.RunRemote(archive, host)
+	return &TestResult{
+		output: output,
+		err:    err,
+		host:   host,
+	}
+}
+
+// Provision a gce instance using image and run the tests in archive against the instance.
+// Delete the instance afterward.
+func testImage(image, archive string) *TestResult {
+	host, err := createInstance(image)
+	defer deleteInstance(image)
+	if err != nil {
+		return &TestResult{
+			err: fmt.Errorf("Unable to create gce instance with running docker daemon for image %s.  %v", image, err),
 		}
-		fmt.Printf("Enter \"y\" to run tests\n")
 	}
-	u.Done()
+	return testHost(host, archive)
 }
 
-type TestResult struct {
-	fullhost                string
-	err                     error
-	testCombinedOutput      string
-	etcdCombinedOutput      string
-	apiServerCombinedOutput string
-	kubeletCombinedOutput   string
+// Provision a gce instance using image
+func createInstance(image string) (string, error) {
+	name := imageToInstanceName(image)
+	i := &compute.Instance{
+		Name:        name,
+		MachineType: machineType(),
+		NetworkInterfaces: []*compute.NetworkInterface{
+			{
+				AccessConfigs: []*compute.AccessConfig{
+					{
+						Type: "ONE_TO_ONE_NAT",
+						Name: "External NAT",
+					},
+				}},
+		},
+		Disks: []*compute.AttachedDisk{
+			{
+				AutoDelete: true,
+				Boot:       true,
+				Type:       "PERSISTENT",
+				InitializeParams: &compute.AttachedDiskInitializeParams{
+					SourceImage: sourceImage(image),
+				},
+			},
+		},
+	}
+	op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+	if err != nil {
+		return "", err
+	}
+	if op.Error != nil {
+		return "", fmt.Errorf("Could not create instance %s: %+v", name, op.Error)
+	}
+
+	instanceRunning := false
+	for i := 0; i < 30 && !instanceRunning; i++ {
+		if i > 0 {
+			time.Sleep(time.Second * 20)
+		}
+		var instance *compute.Instance
+		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
+		if err != nil {
+			continue
+		}
+		if strings.ToUpper(instance.Status) != "RUNNING" {
+			err = fmt.Errorf("Instance %s not in state RUNNING, was %s.", name, instance.Status)
+			continue
+		}
+		var output string
+		output, err = e2e_node.RunSshCommand("ssh", name, "--", "sudo", "docker", "version")
+		if err != nil {
+			err = fmt.Errorf("Instance %s not running docker daemon - Command failed: %s", name, output)
+			continue
+		}
+		if !strings.Contains(output, "Server") {
+			err = fmt.Errorf("Instance %s not running docker daemon - Server not found: %s", name, output)
+			continue
+		}
+		instanceRunning = true
+	}
+	return name, err
 }
 
-func runTests(fullhost string) *TestResult {
-	result := &TestResult{fullhost: fullhost}
-
-	host := strings.Split(fullhost, ".")[0]
-	c := gcloud.NewGCloudClient(host, *zone)
-	// TODO(pwittrock): Come up with something better for bootstrapping the environment.
-	eh, err := c.RunAndWaitTillHealthy(
-		false, false, "4001", healthyTimeoutDuration, "v2/keys/", "etcd", "--data-dir", "./", "--name", "e2e-node")
-	defer func() {
-		eh.TearDown()
-		result.etcdCombinedOutput = fmt.Sprintf("%s", eh.CombinedOutput.Bytes())
-	}()
+func deleteInstance(image string) {
+	_, err := computeService.Instances.Delete(*project, *zone, imageToInstanceName(image)).Do()
 	if err != nil {
-		result.err = fmt.Errorf("Host %s failed to run command %v", host, err)
-		return result
+		glog.Infof("Error deleting instance %s", imageToInstanceName(image))
 	}
+}
 
-	apiBin := filepath.Join(kubeRoot, *kubeOutputRelPath, "kube-apiserver")
-	ah, err := c.RunAndWaitTillHealthy(
-		true, true, "8080", healthyTimeoutDuration, "healthz", apiBin, "--service-cluster-ip-range",
-		"10.0.0.1/24", "--insecure-bind-address", "0.0.0.0", "--etcd-servers", "http://127.0.0.1:4001",
-		"--v", "2", "--alsologtostderr", "--kubelet-port", "10250")
-	defer func() {
-		ah.TearDown()
-		result.apiServerCombinedOutput = fmt.Sprintf("%s", ah.CombinedOutput.Bytes())
-	}()
-	if err != nil {
-		result.err = fmt.Errorf("Host %s failed to run command %v", host, err)
-		return result
-	}
+func imageToInstanceName(image string) string {
+	return *instanceNamePrefix + "-" + image
+}
 
-	kubeletBin := filepath.Join(kubeRoot, *kubeOutputRelPath, "kubelet")
-	// TODO: Used --v 4 or higher and upload to gcs instead of printing to the console
-	// TODO: Copy /var/log/messages and upload to GCS for failed tests
-	kh, err := c.RunAndWaitTillHealthy(
-		true, true, "10255", healthyTimeoutDuration, "healthz", kubeletBin, "--api-servers", "http://127.0.0.1:8080",
-		"--v", "2", "--alsologtostderr", "--address", "0.0.0.0", "--port", "10250")
-	defer func() {
-		kh.TearDown()
-		result.kubeletCombinedOutput = fmt.Sprintf("%s", kh.CombinedOutput.Bytes())
-	}()
-	if err != nil {
-		result.err = fmt.Errorf("Host %s failed to run command %v", host, err)
-	}
+func sourceImage(image string) string {
+	return fmt.Sprintf("projects/%s/global/images/%s", *project, image)
+}
 
-	// Run the tests
-	glog.Infof("Kubelet healthy on host %s", host)
-	glog.Infof("Kubelet host %s tunnel running on port %s", host, ah.LPort)
-	u.Wait()
-	glog.Infof("Running ginkgo tests against host %s", host)
-	ginkgoTests := filepath.Join(kubeRoot, ginkgoTestRelPath)
-	out, err := exec.Command(
-		"ginkgo", ginkgoTests, "--",
-		"--kubelet-address", fmt.Sprintf("http://127.0.0.1:%s", kh.LPort),
-		"--api-server-address", fmt.Sprintf("http://127.0.0.1:%s", ah.LPort),
-		"--node-name", fullhost,
-		"--v", "2", "--alsologtostderr").CombinedOutput()
-
-	result.err = err
-	result.testCombinedOutput = fmt.Sprintf("%s", out)
-	return result
+func machineType() string {
+	return fmt.Sprintf("zones/%s/machineTypes/n1-standard-1", *zone)
 }

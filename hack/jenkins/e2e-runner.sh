@@ -140,11 +140,11 @@ fi
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 if [[ ! -z "${CLOUDSDK_BUCKET:-}" ]]; then
-    gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
+    gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~
     rm -rf ~/repo ~/cloudsdk
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
-    tar zvxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
+    tar zxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
     export CLOUDSDK_CORE_DISABLE_PROMPTS=1
     export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
     ~/cloudsdk/google-cloud-sdk/install.sh --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
@@ -173,7 +173,9 @@ fi
 if [[ "${E2E_TEST,,}" == "true" ]]; then
     # Check to make sure the cluster is up before running tests, and fail if it's not.
     go run ./hack/e2e.go ${E2E_OPT:-} -v --isup
-    go run ./hack/e2e.go ${E2E_OPT:-} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
+    go run ./hack/e2e.go ${E2E_OPT:-} -v --test \
+      ${GINKGO_TEST_ARGS:+--test_args="${GINKGO_TEST_ARGS}"} \
+      && exitcode=0 || exitcode=$?
     if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${build_version:-} ]]; then
         echo "publish build_version to ci/latest-green.txt: ${build_version}"
         echo "${build_version}" > ${WORKSPACE}/build_version.txt
@@ -192,6 +194,8 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false"
   ./test/kubemark/stop-kubemark.sh
+  # Run empty test of tests that would trigger storing logs from base cluster.
+  go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
   unset RUN_FROM_DISTRO

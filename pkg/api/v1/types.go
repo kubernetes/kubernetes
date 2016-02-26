@@ -128,9 +128,7 @@ type ObjectMeta struct {
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
 	// A sequence number representing a specific generation of the desired state.
-	// Currently only implemented by replication controllers.
-	// Populated by the system.
-	// Read-only.
+	// Populated by the system. Read-only.
 	Generation int64 `json:"generation,omitempty"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
@@ -630,7 +628,7 @@ const (
 	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
-// Protocol defines network protocols supported for things like conatiner ports.
+// Protocol defines network protocols supported for things like container ports.
 type Protocol string
 
 const (
@@ -1831,7 +1829,7 @@ type ServiceSpec struct {
 	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
-// ServicePort conatins information on service's port.
+// ServicePort contains information on service's port.
 type ServicePort struct {
 	// The name of this port within the service. This must be a DNS_LABEL.
 	// All ports within a ServiceSpec must have unique names. This maps to
@@ -1850,8 +1848,9 @@ type ServicePort struct {
 	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
 	// If this is a string, it will be looked up as a named port in the
 	// target Pod's container ports. If this is not specified, the value
-	// of Port is used (an identity map).
-	// Defaults to the service port.
+	// of the 'port' field is used (an identity map).
+	// This field is ignored for services with clusterIP=None, and should be
+	// omitted or set equal to the 'port' field.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service
 	TargetPort intstr.IntOrString `json:"targetPort,omitempty"`
 
@@ -2105,9 +2104,9 @@ type NodeStatus struct {
 type ContainerImage struct {
 	// Names by which this image is known.
 	// e.g. ["gcr.io/google_containers/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
-	RepoTags []string `json:"repoTags"`
+	Names []string `json:"names"`
 	// The size of the image in bytes.
-	Size int64 `json:"size,omitempty"`
+	SizeBytes int64 `json:"sizeBytes,omitempty"`
 }
 
 type NodePhase string
@@ -2346,7 +2345,7 @@ type PodLogOptions struct {
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceSeconds *int64 `json:"sinceSeconds,omitempty"`
 	// An RFC3339 timestamp from which to show logs. If this value
-	// preceeds the time a pod was started, only logs since the pod start will be returned.
+	// precedes the time a pod was started, only logs since the pod start will be returned.
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceTime *unversioned.Time `json:"sinceTime,omitempty"`
@@ -2436,6 +2435,18 @@ type NodeProxyOptions struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Path is the URL path to use for the current proxy request to node.
+	Path string `json:"path,omitempty"`
+}
+
+// ServiceProxyOptions is the query options to a Service's proxy call.
+type ServiceProxyOptions struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// Path is the part of URLs that include service endpoints, suffixes,
+	// and parameters to use for the current proxy request to service.
+	// For example, the whole request URL is
+	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
+	// Path is _search?q=user:kimchy.
 	Path string `json:"path,omitempty"`
 }
 

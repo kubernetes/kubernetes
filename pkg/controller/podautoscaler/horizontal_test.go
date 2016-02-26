@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -66,6 +66,7 @@ type testCase struct {
 	reportedCPURequests []resource.Quantity
 	cmTarget            *extensions.CustomMetricTargetList
 	scaleUpdated        bool
+	statusUpdated       bool
 	eventCreated        bool
 	verifyEvents        bool
 }
@@ -77,6 +78,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	podNamePrefix := "test-pod"
 
 	tc.scaleUpdated = false
+	tc.statusUpdated = false
 	tc.eventCreated = false
 
 	fakeClient := &fake.Clientset{}
@@ -97,6 +99,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 						MinReplicas: &tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
+					},
+					Status: extensions.HorizontalPodAutoscalerStatus{
+						CurrentReplicas: tc.initialReplicas,
+						DesiredReplicas: tc.initialReplicas,
 					},
 				},
 			},
@@ -191,6 +197,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
+		tc.statusUpdated = true
 		return true, obj, nil
 	})
 
@@ -209,6 +216,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 func (tc *testCase) verifyResults(t *testing.T) {
 	assert.Equal(t, tc.initialReplicas != tc.desiredReplicas, tc.scaleUpdated)
+	assert.True(t, tc.statusUpdated)
 	if tc.verifyEvents {
 		assert.Equal(t, tc.initialReplicas != tc.desiredReplicas, tc.eventCreated)
 	}
@@ -329,6 +337,45 @@ func TestMinReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{10, 95, 10},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+	}
+	tc.runTest(t)
+}
+
+func TestZeroReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         3,
+		maxReplicas:         5,
+		initialReplicas:     0,
+		desiredReplicas:     3,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{},
+	}
+	tc.runTest(t)
+}
+
+func TestToFewReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         3,
+		maxReplicas:         5,
+		initialReplicas:     2,
+		desiredReplicas:     3,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{},
+	}
+	tc.runTest(t)
+}
+
+func TestTooManyReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         3,
+		maxReplicas:         5,
+		initialReplicas:     10,
+		desiredReplicas:     5,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{},
 	}
 	tc.runTest(t)
 }

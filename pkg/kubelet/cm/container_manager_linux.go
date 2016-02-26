@@ -357,7 +357,7 @@ func isProcessRunningInHost(pid int) (bool, error) {
 }
 
 func getPidsForProcess(name string) ([]int, error) {
-	out, err := exec.Command("pidof", "name").Output()
+	out, err := exec.Command("pidof", name).Output()
 	if err != nil {
 		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
 	}

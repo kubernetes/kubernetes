@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
 	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
@@ -249,7 +249,7 @@ var _ = Describe("Kubelet", func() {
 					Expect(*container.Logs.UsedBytes).NotTo(BeZero(), spew.Sdump(container))
 
 				}
-				Expect(podsList).To(ConsistOf(podNames))
+				Expect(podsList).To(ConsistOf(podNames), spew.Sdump(summary))
 			})
 		})
 

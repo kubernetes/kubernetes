@@ -440,7 +440,7 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r})
+		gvk, err := b.mapper.KindFor(unversioned.ParseGroupResource(r).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}
@@ -460,7 +460,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if _, ok := mappings[r.Resource]; ok {
 			continue
 		}
-		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r.Resource})
+		gvk, err := b.mapper.KindFor(unversioned.ParseGroupResource(r.Resource).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}

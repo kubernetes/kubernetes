@@ -28,6 +28,7 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
+build-services
 cadvisor-port
 cert-dir
 certificate-authority
@@ -150,6 +151,7 @@ input-dirs
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
+instance-name-prefix
 iptables-masquerade-bit
 iptables-sync-period
 ir-data-source
@@ -158,9 +160,11 @@ ir-influxdb-host
 ir-namespace-only
 ir-password
 ir-user
+ir-hawkular
 jenkins-host
 jenkins-jobs
 k8s-build-output
+k8s-bin-dir
 keep-gogoproto
 km-path
 kube-api-burst
@@ -288,6 +292,7 @@ pv-recycler-pod-template-filepath-nfs
 pv-recycler-maximum-retry
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
+rc-lookup-cache-size
 read-only-port
 really-crash-for-testing
 reconcile-cidr
@@ -313,6 +318,7 @@ rkt-path
 rkt-stage1-image
 root-ca-file
 root-dir
+rs-lookup-cache-size
 run-proxy
 runtime-config
 runtime-cgroups
@@ -322,6 +328,7 @@ scheduler-name
 schema-cache-dir
 secure-port
 serialize-image-pulls
+server-start-timeout
 service-account-key-file
 service-account-lookup
 service-account-private-key-file
@@ -343,10 +350,14 @@ skip-generated-rewrite
 skip-munges
 sort-by
 source-file
+ssh-env
 ssh-keyfile
+ssh-options
 ssh-user
+start-services
 static-pods-config
 stats-port
+stop-services
 storage-version
 storage-versions
 streaming-connection-idle-timeout
@@ -389,5 +400,5 @@ leader-elect-lease-duration
 leader-elect-renew-deadline
 leader-elect-retry-period
 watch-cache-sizes
-configure-hairpin-mode
 lock-file
+hairpin-mode

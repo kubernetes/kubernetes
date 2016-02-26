@@ -18,12 +18,10 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -124,6 +122,7 @@ func main() {
 	}
 
 	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
+	os.Setenv("KUBE_TEST_DEBUG", "y")
 
 	if *pushup {
 		if IsUp() {
@@ -177,7 +176,6 @@ func Up() bool {
 			return false
 		}
 	}
-
 	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 
@@ -256,14 +254,6 @@ func PrepareVersion(version string) (string, error) {
 	return localReleaseDir, nil
 }
 
-// Fisher-Yates shuffle using the given RNG r
-func shuffleStrings(strings []string, r *rand.Rand) {
-	for i := len(strings) - 1; i > 0; i-- {
-		j := r.Intn(i + 1)
-		strings[i], strings[j] = strings[j], strings[i]
-	}
-}
-
 func Test() bool {
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
@@ -272,25 +262,6 @@ func Test() bool {
 	ValidateClusterSize()
 
 	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
-}
-
-// All nonsense below is temporary until we have go versions of these things.
-
-// call the returned anonymous function to stop.
-func runBashUntil(stepName string, cmd *exec.Cmd) func() {
-	log.Printf("Running in background: %v", stepName)
-	output := bytes.NewBuffer(nil)
-	cmd.Stdout, cmd.Stderr = output, output
-	if err := cmd.Start(); err != nil {
-		log.Printf("Unable to start '%v': '%v'", stepName, err)
-		return func() {}
-	}
-	return func() {
-		cmd.Process.Signal(os.Interrupt)
-		headerprefix := stepName + " "
-		lineprefix := "  "
-		printBashOutputs(headerprefix, lineprefix, string(output.Bytes()), false)
-	}
 }
 
 func finishRunning(stepName string, cmd *exec.Cmd) bool {
@@ -308,19 +279,6 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 		return false
 	}
 	return true
-}
-
-func printBashOutputs(headerprefix, lineprefix, output string, escape bool) {
-	if output != "" {
-		fmt.Printf("%voutput: |\n", headerprefix)
-		printPrefixedLines(lineprefix, output)
-	}
-}
-
-func printPrefixedLines(prefix, s string) {
-	for _, line := range strings.Split(s, "\n") {
-		fmt.Printf("%v%v\n", prefix, line)
-	}
 }
 
 // returns either "", or a list of args intended for appending with the

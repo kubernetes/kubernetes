@@ -67,7 +67,7 @@ type SwaggerSchemaInterface interface {
 	SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
 }
 
-// DiscoveryClient implements the functions that dicovery server-supported API groups,
+// DiscoveryClient implements the functions that discover server-supported API groups,
 // versions and resources.
 type DiscoveryClient struct {
 	*RESTClient

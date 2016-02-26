@@ -37,8 +37,8 @@ import (
 // In general, using this requires that the caller posses the NET_CAP_ADMIN capability, though if you
 // do this within an container, it only requires the NS_CAPABLE capability for manipulations to that
 // container's network namespace.
-// Uses the hierarchical token bucket queueing discipline (htb), this requires Linux 2.4.20 or newer
-// or a custom kernel with that queueing discipline backported.
+// Uses the hierarchical token bucket queuing discipline (htb), this requires Linux 2.4.20 or newer
+// or a custom kernel with that queuing discipline backported.
 type tcShaper struct {
 	e     exec.Interface
 	iface string

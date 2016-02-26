@@ -69,7 +69,7 @@ local Ubuntu system:
 
     sudo add-apt-repository ppa:juju/stable
     sudo apt-get update
-    sudo apt-get install juju-core juju-quickstart
+    sudo apt-get install juju-core juju-quickstart juju-deployer
 
 
 ### With Docker

@@ -79,11 +79,13 @@ func ClusterLevelLoggingWithKibana(f *Framework) {
 	By("Checking to make sure we get a response from the Kibana UI.")
 	err = nil
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
+		proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+		if errProxy != nil {
+			Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			continue
+		}
 		// Query against the root URL for Kibana.
-		_, err = f.Client.Get().
-			Namespace(api.NamespaceSystem).
-			Prefix("proxy").
-			Resource("services").
+		_, err = proxyRequest.Namespace(api.NamespaceSystem).
 			Name("kibana-logging").
 			DoRaw()
 		if err != nil {

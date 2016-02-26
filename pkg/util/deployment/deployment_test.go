@@ -22,13 +22,43 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
+
+func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
+	fakeClient.AddReactor("list", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addListPodsReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addUpdateRSReactor(fakeClient *fake.Clientset) *fake.Clientset {
+	fakeClient.AddReactor("update", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
+		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addUpdatePodsReactor(fakeClient *fake.Clientset) *fake.Clientset {
+	fakeClient.AddReactor("update", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := action.(testclient.UpdateAction).GetObject().(*api.Pod)
+		return true, obj, nil
+	})
+	return fakeClient
+}
 
 func newPod(now time.Time, ready bool, beforeSec int) api.Pod {
 	conditionStatus := api.ConditionFalse
@@ -190,47 +220,47 @@ func TestGetNewRC(t *testing.T) {
 
 	tests := []struct {
 		test     string
-		rsList   extensions.ReplicaSetList
+		objs     []runtime.Object
 		expected *extensions.ReplicaSet
 	}{
 		{
 			"No new ReplicaSet",
-			extensions.ReplicaSetList{
-				Items: []extensions.ReplicaSet{
-					generateRS(generateDeployment("foo")),
-					generateRS(generateDeployment("bar")),
+			[]runtime.Object{
+				&api.PodList{},
+				&extensions.ReplicaSetList{
+					Items: []extensions.ReplicaSet{
+						generateRS(generateDeployment("foo")),
+						generateRS(generateDeployment("bar")),
+					},
 				},
 			},
 			nil,
 		},
 		{
 			"Has new ReplicaSet",
-			extensions.ReplicaSetList{
-				Items: []extensions.ReplicaSet{
-					generateRS(generateDeployment("foo")),
-					generateRS(generateDeployment("bar")),
-					generateRS(generateDeployment("abc")),
-					newRC,
-					generateRS(generateDeployment("xyz")),
+			[]runtime.Object{
+				&api.PodList{},
+				&extensions.ReplicaSetList{
+					Items: []extensions.ReplicaSet{
+						generateRS(generateDeployment("foo")),
+						generateRS(generateDeployment("bar")),
+						generateRS(generateDeployment("abc")),
+						newRC,
+						generateRS(generateDeployment("xyz")),
+					},
 				},
 			},
 			&newRC,
 		},
 	}
 
-	ns := api.NamespaceDefault
 	for _, test := range tests {
-		c := &simple.Client{
-			Request: simple.Request{
-				Method: "GET",
-				Path:   testapi.Default.ResourcePath("replicaSets", ns, ""),
-			},
-			Response: simple.Response{
-				StatusCode: 200,
-				Body:       &test.rsList,
-			},
-		}
-		rs, err := GetNewReplicaSet(newDeployment, c.Setup(t).Clientset)
+		fakeClient := &fake.Clientset{}
+		fakeClient = addListPodsReactor(fakeClient, test.objs[0])
+		fakeClient = addListRSReactor(fakeClient, test.objs[1])
+		fakeClient = addUpdatePodsReactor(fakeClient)
+		fakeClient = addUpdateRSReactor(fakeClient)
+		rs, err := GetNewReplicaSet(newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
@@ -313,12 +343,24 @@ func TestGetOldRCs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rss, _, err := GetOldReplicaSets(newDeployment, fake.NewSimpleClientset(test.objs...))
+		fakeClient := &fake.Clientset{}
+		fakeClient = addListPodsReactor(fakeClient, test.objs[0])
+		fakeClient = addListRSReactor(fakeClient, test.objs[1])
+		fakeClient = addUpdatePodsReactor(fakeClient)
+		fakeClient = addUpdateRSReactor(fakeClient)
+		rss, _, err := GetOldReplicaSets(newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
 		if !equal(rss, test.expected) {
-			t.Errorf("In test case %q, expected %v, got %v", test.test, test.expected, rss)
+			t.Errorf("In test case %q, expected:", test.test)
+			for _, rs := range test.expected {
+				t.Errorf("rs = %+v", rs)
+			}
+			t.Errorf("In test case %q, got:", test.test)
+			for _, rs := range rss {
+				t.Errorf("rs = %+v", rs)
+			}
 		}
 	}
 }

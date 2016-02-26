@@ -196,7 +196,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		Run(3, wait.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas, 4096).
 		Run(3, wait.NeverStop)
 
 	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),

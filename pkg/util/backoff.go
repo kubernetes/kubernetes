@@ -36,6 +36,15 @@ type Backoff struct {
 	perItemBackoff  map[string]*backoffEntry
 }
 
+func NewFakeBackOff(initial, max time.Duration, tc *FakeClock) *Backoff {
+	return &Backoff{
+		perItemBackoff:  map[string]*backoffEntry{},
+		Clock:           tc,
+		defaultDuration: initial,
+		maxDuration:     max,
+	}
+}
+
 func NewBackOff(initial, max time.Duration) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
@@ -120,6 +129,12 @@ func (p *Backoff) GC() {
 	}
 }
 
+func (p *Backoff) DeleteEntry(id string) {
+	p.Lock()
+	defer p.Unlock()
+	delete(p.perItemBackoff, id)
+}
+
 // Take a lock on *Backoff, before calling initEntryUnsafe
 func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
 	entry := &backoffEntry{backoff: p.defaultDuration}
@@ -127,7 +142,7 @@ func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
 	return entry
 }
 
-// After 2*maxDuration we restart the backoff factor to the begining
+// After 2*maxDuration we restart the backoff factor to the beginning
 func hasExpired(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
 	return eventTime.Sub(lastUpdate) > maxDuration*2 // consider stable if it's ok for twice the maxDuration
 }

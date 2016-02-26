@@ -263,7 +263,14 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 // Otherwise, the caller is assumed to have set up the KubeletConfig object and all defaults
 // will be ignored.
 func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
-	var err error
+	err := run(s, kcfg)
+	if err != nil {
+		glog.Errorf("Failed running kubelet: %v", err)
+	}
+	return err
+}
+
+func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	if s.LockFilePath != "" {
 		glog.Infof("aquiring lock on %q", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
@@ -752,7 +759,8 @@ type KubeletConfig struct {
 	ExperimentalFlannelOverlay bool
 	NodeIP                     net.IP
 	ContainerRuntimeOptions    []kubecontainer.Option
-	HairpinMode                bool
+	HairpinMode                string
+	Options                    []kubelet.Option
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -839,6 +847,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.VolumeStatsAggPeriod,
 		kc.ContainerRuntimeOptions,
 		kc.HairpinMode,
+		kc.Options,
 	)
 
 	if err != nil {

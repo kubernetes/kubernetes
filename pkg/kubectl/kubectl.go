@@ -18,12 +18,14 @@ limitations under the License.
 package kubectl
 
 import (
+	"errors"
+	"fmt"
+	"path"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
@@ -72,51 +74,105 @@ func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...s
 }
 
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes
-// resources.
+// resources.  It expands the resource first, then invokes the wrapped RESTMapper
 type ShortcutExpander struct {
-	meta.RESTMapper
+	RESTMapper meta.RESTMapper
 }
 
 var _ meta.RESTMapper = &ShortcutExpander{}
 
-// KindFor implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
-// mapper.
 func (e ShortcutExpander) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
-	resource = expandResourceShortcut(resource)
-	return e.RESTMapper.KindFor(resource)
+	return e.RESTMapper.KindFor(expandResourceShortcut(resource))
 }
 
-// ResourceSingularizer expands the named resource and then singularizes it.
+func (e ShortcutExpander) KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error) {
+	return e.RESTMapper.KindsFor(expandResourceShortcut(resource))
+}
+
+func (e ShortcutExpander) ResourcesFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
+	return e.RESTMapper.ResourcesFor(expandResourceShortcut(resource))
+}
+
+func (e ShortcutExpander) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
+}
+
 func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
 	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
+}
+
+func (e ShortcutExpander) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return e.RESTMapper.RESTMapping(gk, versions...)
+}
+
+func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
+	return e.RESTMapper.AliasesForResource(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
+}
+
+// shortForms is the list of short names to their expanded names
+var shortForms = map[string]string{
+	// Please keep this alphabetized
+	// If you add an entry here, please also take a look at pkg/kubectl/cmd/cmd.go
+	// and add an entry to valid_resources when appropriate.
+	"cs":     "componentstatuses",
+	"ds":     "daemonsets",
+	"ep":     "endpoints",
+	"ev":     "events",
+	"hpa":    "horizontalpodautoscalers",
+	"ing":    "ingresses",
+	"limits": "limitranges",
+	"no":     "nodes",
+	"ns":     "namespaces",
+	"po":     "pods",
+	"psp":    "podSecurityPolicies",
+	"pvc":    "persistentvolumeclaims",
+	"pv":     "persistentvolumes",
+	"quota":  "resourcequotas",
+	"rc":     "replicationcontrollers",
+	"rs":     "replicasets",
+	"svc":    "services",
 }
 
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
 func expandResourceShortcut(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
-	shortForms := map[string]unversioned.GroupVersionResource{
-		// Please keep this alphabetized
-		"cs":     api.SchemeGroupVersion.WithResource("componentstatuses"),
-		"ds":     extensions.SchemeGroupVersion.WithResource("daemonsets"),
-		"ep":     api.SchemeGroupVersion.WithResource("endpoints"),
-		"ev":     api.SchemeGroupVersion.WithResource("events"),
-		"hpa":    extensions.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
-		"ing":    extensions.SchemeGroupVersion.WithResource("ingresses"),
-		"limits": api.SchemeGroupVersion.WithResource("limitranges"),
-		"no":     api.SchemeGroupVersion.WithResource("nodes"),
-		"ns":     api.SchemeGroupVersion.WithResource("namespaces"),
-		"po":     api.SchemeGroupVersion.WithResource("pods"),
-		"psp":    api.SchemeGroupVersion.WithResource("podSecurityPolicies"),
-		"pvc":    api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-		"pv":     api.SchemeGroupVersion.WithResource("persistentvolumes"),
-		"quota":  api.SchemeGroupVersion.WithResource("resourcequotas"),
-		"rc":     api.SchemeGroupVersion.WithResource("replicationcontrollers"),
-		"rs":     extensions.SchemeGroupVersion.WithResource("replicasets"),
-		"svc":    api.SchemeGroupVersion.WithResource("services"),
-	}
 	if expanded, ok := shortForms[resource.Resource]; ok {
-		return expanded
+		// don't change the group or version that's already been specified
+		resource.Resource = expanded
 	}
 	return resource
+}
+
+// parseFileSource parses the source given. Acceptable formats include:
+//
+// 1.  source-path: the basename will become the key name
+// 2.  source-name=source-path: the source-name will become the key name and source-path is the path to the key file
+//
+// Key names cannot include '='.
+func parseFileSource(source string) (keyName, filePath string, err error) {
+	numSeparators := strings.Count(source, "=")
+	switch {
+	case numSeparators == 0:
+		return path.Base(source), source, nil
+	case numSeparators == 1 && strings.HasPrefix(source, "="):
+		return "", "", fmt.Errorf("key name for file path %v missing.", strings.TrimPrefix(source, "="))
+	case numSeparators == 1 && strings.HasSuffix(source, "="):
+		return "", "", fmt.Errorf("file path for key name %v missing.", strings.TrimSuffix(source, "="))
+	case numSeparators > 1:
+		return "", "", errors.New("Key names or file paths cannot contain '='.")
+	default:
+		components := strings.Split(source, "=")
+		return components[0], components[1], nil
+	}
+}
+
+// parseLiteralSource parses the source key=val pair
+func parseLiteralSource(source string) (keyName, value string, err error) {
+	items := strings.Split(source, "=")
+	if len(items) != 2 {
+		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
+	}
+
+	return items[0], items[1], nil
 }

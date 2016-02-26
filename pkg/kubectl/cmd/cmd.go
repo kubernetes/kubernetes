@@ -110,8 +110,13 @@ __custom_func() {
     esac
 }
 `
+
+	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
+	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	valid_resources = `Valid resource types include:
    * componentstatuses (aka 'cs')
+   * daemonsets (aka 'ds')
+   * deployments
    * events (aka 'ev')
    * endpoints (aka 'ep')
    * horizontalpodautoscalers (aka 'hpa')

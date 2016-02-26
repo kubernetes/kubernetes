@@ -114,7 +114,7 @@ func (p *PodSyncResult) AddPodSyncResult(result PodSyncResult) {
 	p.SyncError = result.SyncError
 }
 
-// Fail fails the PodSyncResult with an error occured in SyncPod() and KillPod() itself
+// Fail fails the PodSyncResult with an error occurred in SyncPod() and KillPod() itself
 func (p *PodSyncResult) Fail(err error) {
 	p.SyncError = err
 }

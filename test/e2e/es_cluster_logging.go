@@ -30,8 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Flaky issue #17873
-var _ = Describe("Cluster level logging using Elasticsearch [Flaky]", func() {
+var _ = Describe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
 	f := NewFramework("es-logging")
 
 	BeforeEach(func() {
@@ -110,11 +109,13 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	err = nil
 	var body []byte
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
+		proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+		if errProxy != nil {
+			Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			continue
+		}
 		// Query against the root URL for Elasticsearch.
-		body, err = f.Client.Get().
-			Namespace(api.NamespaceSystem).
-			Prefix("proxy").
-			Resource("services").
+		body, err = proxyRequest.Namespace(api.NamespaceSystem).
 			Name("elasticsearch-logging").
 			DoRaw()
 		if err != nil {
@@ -161,10 +162,12 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	By("Checking health of Elasticsearch service.")
 	healthy := false
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		body, err = f.Client.Get().
-			Namespace(api.NamespaceSystem).
-			Prefix("proxy").
-			Resource("services").
+		proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+		if errProxy != nil {
+			Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			continue
+		}
+		body, err = proxyRequest.Namespace(api.NamespaceSystem).
 			Name("elasticsearch-logging").
 			Suffix("_cluster/health").
 			Param("level", "indices").
@@ -321,13 +324,15 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			}
 		}
 
+		proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+		if errProxy != nil {
+			Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			continue
+		}
 		// Ask Elasticsearch to return all the log lines that were tagged with the underscore
 		// version of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
-		body, err = f.Client.Get().
-			Namespace(api.NamespaceSystem).
-			Prefix("proxy").
-			Resource("services").
+		body, err = proxyRequest.Namespace(api.NamespaceSystem).
 			Name("elasticsearch-logging").
 			Suffix("_search").
 			Param("q", fmt.Sprintf("log:%s", taintName)).

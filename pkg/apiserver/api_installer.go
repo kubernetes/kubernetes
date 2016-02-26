@@ -100,7 +100,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws.Path(a.prefix)
 	// a.prefix contains "prefix/group/version"
 	ws.Doc("API at " + a.prefix)
-	// Backwards compatibilty, we accepted objects with empty content-type at V1.
+	// Backwards compatibility, we accepted objects with empty content-type at V1.
 	// If we stop using go-restful, we can default empty content-type to application/json on an
 	// endpoint by endpoint basis
 	ws.Consumes("*/*")

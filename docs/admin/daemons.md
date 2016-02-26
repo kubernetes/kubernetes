@@ -52,7 +52,6 @@ Documentation for other releases can be found at
     - [Bare Pods](#bare-pods)
     - [Static Pods](#static-pods)
     - [Replication Controller](#replication-controller)
-  - [Caveats](#caveats)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -100,11 +99,17 @@ A pod template in a DaemonSet must have a [`RestartPolicy`](../user-guide/pod-st
 ### Pod Selector
 
 The `.spec.selector` field is a pod selector.  It works the same as the `.spec.selector` of
-a [ReplicationController](../user-guide/replication-controller.md) or
-[Job](../user-guide/jobs.md).
+a [Job](../user-guide/jobs.md) or other new resources.
 
-If the `.spec.selector` is specified, it must equal the `.spec.template.metadata.labels`.  If not
-specified, the are default to be equal.  Config with these unequal will be rejected by the API.
+The `spec.selector` is an object consisting of two fields:
+* `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](../user-guide/replication-controller.md)
+* `matchExpressions` - allows to build more sophisticated selectors by specifying key,
+  list of values and an operator that relates the key and values.
+
+When the two are specified the result is ANDed.
+
+If the `.spec.selector` is specified, it must match the `.spec.template.metadata.labels`.  If not
+specified, they are defaulted to be equal.  Config with these not matching will be rejected by the API.
 
 Also you should not normally create any pods whose labels match this selector, either directly, via
 another DaemonSet, or via other controller such as ReplicationController.  Otherwise, the DaemonSet
@@ -207,18 +212,6 @@ Use a replication controller for stateless services, like frontends, where scali
 number of replicas and rolling out updates are more important than controlling exactly which host
 the pod runs on.  Use a Daemon Controller when it is important that a copy of a pod always run on
 all or certain hosts, and when it needs to start before other pods.
-
-## Caveats
-
-DaemonSet objects are in the [`extensions` API Group](../api.md#api-groups).
-DaemonSet is not enabled by default. Enable it by setting
-`--runtime-config=extensions/v1beta1/daemonsets=true` on the api server. This can be
-achieved by exporting KUBE_ENABLE_DAEMONSETS=true before running kube-up.sh script
-on GCE.
-
-DaemonSet objects effectively have [API version `v1alpha1`](../api.md#api-versioning).
- Alpha objects may change or even be discontinued in future software releases.
-However, due to to a known issue, they will appear as API version `v1beta1` if enabled.
 
 
 

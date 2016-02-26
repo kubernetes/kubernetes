@@ -1570,7 +1570,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	}
 
 	// No pod secrets for the infra container.
-	// The message isnt needed for the Infra container
+	// The message isn't needed for the Infra container
 	if err, msg := dm.imagePuller.PullImage(pod, container, nil); err != nil {
 		return "", err, msg
 	}

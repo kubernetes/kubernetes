@@ -25,10 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -75,7 +77,7 @@ func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	case api.Kind("Service"):
 		return &ServiceReaper{c}, nil
 
-	case extensions.Kind("Job"):
+	case extensions.Kind("Job"), batch.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
 
 	case extensions.Kind("Deployment"):
@@ -361,65 +363,30 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	replicaSets := reaper.Extensions().ReplicaSets(namespace)
 	rsReaper, _ := ReaperFor(extensions.Kind("ReplicaSet"), reaper)
 
-	deployment, err := deployments.Get(name)
+	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
+		// set deployment's history and scale to 0
+		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
+		d.Spec.RevisionHistoryLimit = util.IntPtr(0)
+		d.Spec.Replicas = 0
+		d.Spec.Paused = true
+	})
 	if err != nil {
 		return err
 	}
 
-	// set deployment's history and scale to 0
-	// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
-	zero := 0
-	deployment.Spec.RevisionHistoryLimit = &zero
-	deployment.Spec.Replicas = 0
-	// TODO: un-pausing should not be necessary, remove when this is fixed:
-	// https://github.com/kubernetes/kubernetes/issues/20966
-	// Instead deployment should be Paused at this point and not at next TODO.
-	deployment.Spec.Paused = false
-	deployment, err = deployments.Update(deployment)
-	if err != nil {
+	// Use observedGeneration to determine if the deployment controller noticed the pause.
+	if err := deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
+		return deployments.Get(name)
+	}, deployment.Generation, 10*time.Millisecond, 1*time.Minute); err != nil {
 		return err
 	}
 
-	// wait for total no of pods drop to 0
-	if err := wait.Poll(reaper.pollInterval, reaper.timeout, func() (bool, error) {
-		curr, err := deployments.Get(name)
-		// if deployment was not found it must have been deleted, error out
-		if err != nil && errors.IsNotFound(err) {
-			return false, err
-		}
-		// if other errors happen, retry
-		if err != nil {
-			return false, nil
-		}
-		// check if deployment wasn't recreated with the same name
-		// TODO use generations when deployment will have them
-		if curr.UID != deployment.UID {
-			return false, errors.NewNotFound(extensions.Resource("Deployment"), name)
-		}
-		return curr.Status.Replicas == 0, nil
-	}); err != nil {
-		return err
-	}
-
-	// TODO: When deployments will allow running cleanup policy while being
-	// paused, move pausing to above update operation. Without it, we need to
-	// pause deployment before stopping RSs, to prevent creating new RSs.
-	// See https://github.com/kubernetes/kubernetes/issues/20966
-	deployment, err = deployments.Get(name)
-	if err != nil {
-		return err
-	}
-	deployment.Spec.Paused = true
-	deployment, err = deployments.Update(deployment)
-	if err != nil {
-		return err
-	}
-
-	// remove remaining RSs
+	// Stop all replica sets.
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return err
 	}
+
 	options := api.ListOptions{LabelSelector: selector}
 	rsList, err := replicaSets.List(options)
 	if err != nil {
@@ -437,8 +404,27 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return utilerrors.NewAggregate(errList)
 	}
 
-	// and finally deployment
+	// Delete deployment at the end.
+	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
 	return deployments.Delete(name, gracePeriod)
+}
+
+type updateDeploymentFunc func(d *extensions.Deployment)
+
+func (reaper *DeploymentReaper) updateDeploymentWithRetries(namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
+	deployments := reaper.Extensions().Deployments(namespace)
+	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if deployment, err = deployments.Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(deployment)
+		if deployment, err = deployments.Update(deployment); err == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	return deployment, err
 }
 
 func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {

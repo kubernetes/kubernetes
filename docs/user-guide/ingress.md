@@ -55,7 +55,7 @@ Documentation for other releases can be found at
 
 __Terminology__
 
-Throughout this doc you will see a few terms that are sometimes used interchangably elsewhere, that might cause confusion. This section attempts to clarify them.
+Throughout this doc you will see a few terms that are sometimes used interchangeably elsewhere, that might cause confusion. This section attempts to clarify them.
 
 * Node: A single virtual or physical machine in a Kubernetes cluster.
 * Cluster: A group of nodes firewalled from the internet, that are the primary compute resources managed by Kubernetes.
