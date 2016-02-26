@@ -448,7 +448,7 @@ var _ = Describe("Kubectl client", func() {
 				execOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Extensions().Jobs(ns).Delete("run-test", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test", nil)).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
 			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -456,7 +456,7 @@ var _ = Describe("Kubectl client", func() {
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", nil)).To(BeNil())
 
 			By("executing a command with run and attach with stdin with open stdin should remain running")
 			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -486,7 +486,7 @@ var _ = Describe("Kubectl client", func() {
 			}
 			Expect(err).To(BeNil())
 
-			Expect(c.Extensions().Jobs(ns).Delete("run-test-3", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test-3", nil)).To(BeNil())
 		})
 
 		It("should support port-forward", func() {

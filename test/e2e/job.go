@@ -264,7 +264,7 @@ func createJob(c *client.Client, ns string, job *extensions.Job) (*extensions.Jo
 }
 
 func deleteJob(c *client.Client, ns, name string) error {
-	return c.Extensions().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
+	return c.Extensions().Jobs(ns).Delete(name, nil)
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
