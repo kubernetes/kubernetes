@@ -33,7 +33,6 @@ import (
 )
 
 const (
-	podListTimeout     = time.Minute
 	serverStartTimeout = podStartTimeout + 3*time.Minute
 )
 
