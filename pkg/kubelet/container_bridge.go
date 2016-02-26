@@ -43,15 +43,16 @@ func createCBR0(wantCIDR *net.IPNet) error {
 		glog.Error(err)
 		return err
 	}
-	// restart docker
+	// Stop docker so that babysitter process can restart it again with proper configurations and
+	// checkpoint file
 	// For now just log the error. The containerRuntime check will catch docker failures.
 	// TODO (dawnchen) figure out what we should do for rkt here.
 	if util.UsingSystemdInitSystem() {
-		if err := exec.Command("systemctl", "restart", "docker").Run(); err != nil {
+		if err := exec.Command("systemctl", "stop", "docker").Run(); err != nil {
 			glog.Error(err)
 		}
 	} else {
-		if err := exec.Command("service", "docker", "restart").Run(); err != nil {
+		if err := exec.Command("service", "docker", "stop").Run(); err != nil {
 			glog.Error(err)
 		}
 	}
