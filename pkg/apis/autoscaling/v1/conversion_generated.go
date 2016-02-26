@@ -24,6 +24,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
@@ -132,6 +133,54 @@ func Convert_v1_ObjectMeta_To_api_ObjectMeta(in *v1.ObjectMeta, out *api.ObjectM
 	return autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in, out, s)
 }
 
+func autoConvert_autoscaling_Scale_To_v1_Scale(in *autoscaling.Scale, out *Scale, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*autoscaling.Scale))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_autoscaling_ScaleStatus_To_v1_ScaleStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_autoscaling_Scale_To_v1_Scale(in *autoscaling.Scale, out *Scale, s conversion.Scope) error {
+	return autoConvert_autoscaling_Scale_To_v1_Scale(in, out, s)
+}
+
+func autoConvert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*autoscaling.ScaleSpec))(in)
+	}
+	out.Replicas = int32(in.Replicas)
+	return nil
+}
+
+func Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
+	return autoConvert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in, out, s)
+}
+
+func autoConvert_autoscaling_ScaleStatus_To_v1_ScaleStatus(in *autoscaling.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*autoscaling.ScaleStatus))(in)
+	}
+	out.Replicas = int32(in.Replicas)
+	out.Selector = in.Selector
+	return nil
+}
+
+func Convert_autoscaling_ScaleStatus_To_v1_ScaleStatus(in *autoscaling.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
+	return autoConvert_autoscaling_ScaleStatus_To_v1_ScaleStatus(in, out, s)
+}
+
 func autoConvert_v1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *extensions.HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscaler))(in)
@@ -230,6 +279,54 @@ func autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAut
 
 func Convert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *extensions.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	return autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in, out, s)
+}
+
+func autoConvert_v1_Scale_To_autoscaling_Scale(in *Scale, out *autoscaling.Scale, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Scale))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ScaleSpec_To_autoscaling_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_Scale_To_autoscaling_Scale(in *Scale, out *autoscaling.Scale, s conversion.Scope) error {
+	return autoConvert_v1_Scale_To_autoscaling_Scale(in, out, s)
+}
+
+func autoConvert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ScaleSpec))(in)
+	}
+	out.Replicas = int(in.Replicas)
+	return nil
+}
+
+func Convert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
+	return autoConvert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in, out, s)
+}
+
+func autoConvert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ScaleStatus))(in)
+	}
+	out.Replicas = int(in.Replicas)
+	out.Selector = in.Selector
+	return nil
+}
+
+func Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
+	return autoConvert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in, out, s)
 }
 
 func autoConvert_extensions_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *extensions.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
@@ -335,6 +432,9 @@ func Convert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutosca
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		autoConvert_api_ObjectMeta_To_v1_ObjectMeta,
+		autoConvert_autoscaling_ScaleSpec_To_v1_ScaleSpec,
+		autoConvert_autoscaling_ScaleStatus_To_v1_ScaleStatus,
+		autoConvert_autoscaling_Scale_To_v1_Scale,
 		autoConvert_extensions_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList,
 		autoConvert_extensions_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
 		autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
@@ -344,6 +444,9 @@ func init() {
 		autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus,
 		autoConvert_v1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler,
 		autoConvert_v1_ObjectMeta_To_api_ObjectMeta,
+		autoConvert_v1_ScaleSpec_To_autoscaling_ScaleSpec,
+		autoConvert_v1_ScaleStatus_To_autoscaling_ScaleStatus,
+		autoConvert_v1_Scale_To_autoscaling_Scale,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
