@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"reflect"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -34,11 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
-	"reflect"
 )
 
 const (
-	workerGoroutines = 10
+	workerGoroutines = 20
 
 	// How long to wait before retrying the processing of a service change.
 	// If this changes, the sleep in hack/jenkins/e2e.sh before downing a cluster
@@ -52,14 +53,107 @@ const (
 	notRetryable = false
 )
 
+// TODO: Limit how many times a given delta can be retried.
 type cachedService struct {
-	// The last-known state of the service
-	lastState *api.Service
-	// The state as successfully applied to the load balancer
-	appliedState *api.Service
+	// The last-known state of the service.
+	lastReceivedState *api.Service
+	// The state as successfully applied to the load balancer.
+	lastAppliedState *api.Service
 
-	// Ensures only one goroutine can operate on this service at any given time.
+	// Must be held to do any work reconciling the service. Protects both
+	// lastReceivedState and lastAppliedState.
+	// It should be a channel of size 1. Iff you can send to it without blocking
+	// (as can be determined with a select statement), then you have the right to
+	// process the latest state of the service. When done processing, read the
+	// item back off the channel to allow future work to proceed.
+	// TODO(DONOTSUBMIT): Prefer chan interface{} or chan bool?
+	processorSemaphore chan bool
+	// Object from the most recently received delta for the service that has not
+	// yet been applied.
+	queuedState *api.Service
+	// Type of the most recently received delta for the service that has not yet
+	// been applied.
+	queuedDeltaType *cache.DeltaType
+	// Protects lastAppliedState, processorSemaphore and queuedState, so that a
+	// goroutine can atomically add the most recently received service to
+	// queuedState and check whether it has the right to process it.
 	mu sync.Mutex
+}
+
+// Safely gets the last applied state. Needs to be handled specially because
+// it's accessed by the node sync loop in addition to the service sync loop.
+func (c *cachedService) getLastAppliedState() *api.Service {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.lastAppliedState
+}
+
+// newStateForService safely enqueues the new state for processing and
+// determines whether it's safe to do the processing immediately, returning true
+// if it is.
+func (c *cachedService) newStateForService(service *api.Service, deltaType cache.DeltaType) (bool, *api.Service) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Ensure that deletes have a service object to use (and thus that we never
+	// store a nil service in lastReceivedState or queuedState.
+	if service == nil {
+		service = c.lastReceivedState
+	} else {
+		c.lastReceivedState = service
+	}
+
+	c.queuedState = service
+	c.queuedDeltaType = &deltaType
+
+	select {
+	case c.processorSemaphore <- true:
+		// Pop the service off the 1-item queue since we're going to process it now.
+		c.queuedState = nil
+		c.queuedDeltaType = nil
+		return true, service
+	default:
+		return false, service
+	}
+}
+
+// finishProcessingState safely resolves the new state for processing and
+// determines whether it's safe to do the processing immediately, returning true
+// if it is.
+func (c *cachedService) finishProcessingState(service *api.Service, deltaType cache.DeltaType, err error, retry bool) (*api.Service, *cache.DeltaType) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err == nil {
+		c.lastAppliedState = service
+	}
+
+	// If we've received a new update while processing the one that we just
+	// finished, keep our hold on the processorSemaphore and immediately process
+	// the new state.
+	if c.queuedDeltaType != nil {
+		if err != nil {
+			namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+			glog.Infof("Received new state for service %s, reconciling to that state instead of the previously failed one.", namespacedName)
+		}
+		queuedState := c.queuedState
+		queuedDeltaType := c.queuedDeltaType
+		c.queuedState = nil
+		c.queuedDeltaType = nil
+		return queuedState, queuedDeltaType
+	}
+
+	// If we failed with a retryable error, keep our hold on processorSemaphore
+	// and retry.
+	if err != nil && retry {
+		time.Sleep(processingRetryInterval)
+		return service, &deltaType
+	}
+
+	// Otherwise, there's nothing left to do here. Free up processorSemaphore and
+	// return that there's no work to do on the service.
+	<-c.processorSemaphore
+	return nil, nil
 }
 
 type serviceCache struct {
@@ -183,23 +277,19 @@ func (s *ServiceController) watchServices(serviceQueue *cache.DeltaFIFO) {
 			glog.Errorf("Received nil delta from watcher queue.")
 			continue
 		}
-		err, shouldRetry := s.processDelta(delta)
-		if shouldRetry {
-			// Add the failed service back to the queue so we'll retry it.
-			glog.Errorf("Failed to process service delta. Retrying: %v", err)
-			time.Sleep(processingRetryInterval)
-			serviceQueue.AddIfNotPresent(deltas)
-		} else if err != nil {
+		err := s.processDelta(delta)
+		if err != nil {
 			runtime.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
 		}
 	}
 }
 
-// Returns an error if processing the delta failed, along with a boolean
-// indicator of whether the processing should be retried.
-func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
+// Returns an error if processing the delta failed.
+func (s *ServiceController) processDelta(delta *cache.Delta) error {
+	// Look up or create the cachedService object for the service that the Delta
+	// corresponds to.
 	service, ok := delta.Object.(*api.Service)
-	var namespacedName types.NamespacedName
+	deltaType := delta.Type
 	var cachedService *cachedService
 	if !ok {
 		// If the DeltaFIFO saw a key in our cache that it didn't know about, it
@@ -207,38 +297,57 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		// cache for deleting.
 		key, ok := delta.Object.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			return fmt.Errorf("Delta contained object that wasn't a service or a deleted key: %+v", delta), notRetryable
+			return fmt.Errorf("Delta contained object that wasn't a service or a deleted key: %+v", delta)
 		}
 		cachedService, ok = s.cache.get(key.Key)
 		if !ok {
-			return fmt.Errorf("Service %s not in cache even though the watcher thought it was. Ignoring the deletion.", key), notRetryable
+			return fmt.Errorf("Service %s not in cache even though the watcher thought it was. Ignoring the deletion.", key)
 		}
-		service = cachedService.lastState
-		delta.Object = cachedService.lastState
-		namespacedName = types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	} else {
-		namespacedName.Namespace = service.Namespace
-		namespacedName.Name = service.Name
+		namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 		cachedService = s.cache.getOrCreate(namespacedName.String())
 	}
-	glog.V(2).Infof("Got new %s delta for service: %+v", delta.Type, service)
+	glog.V(2).Infof("Got new %s delta for service: %+v", deltaType, service)
 
-	// Ensure that no other goroutine will interfere with our processing of the
-	// service.
-	cachedService.mu.Lock()
-	defer cachedService.mu.Unlock()
+	// Enqueue the new state for processing, and determine whether we should
+	// process it now or just return.
+	doWorkNow, service := cachedService.newStateForService(service, deltaType)
+	if !doWorkNow {
+		return nil
+	}
 
-	// Update the cached service (used above for populating synthetic deletes)
-	cachedService.lastState = service
+	// Continue processing the service as long as there continue being new queued
+	// updates for it (or it needs to be retried).
+	for {
+		err, retry := s.applyState(service, cachedService.getLastAppliedState(), deltaType)
+		nextService, nextDeltaType := cachedService.finishProcessingState(service, deltaType, err, retry)
+		if nextDeltaType == nil {
+			if deltaType == cache.Deleted {
+				namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+				// TODO(DONOTSUBMIT): Does the channel need to be explicitly closed?
+				s.cache.delete(namespacedName.String())
+			}
+			return nil
+		}
+		service = nextService
+		deltaType = *nextDeltaType
+	}
 
+	return nil
+}
+
+// Does the actual work of processing a new service state. Returns any error
+// that's encountered as well as whether applying the state should be retried.
+func (s *ServiceController) applyState(service *api.Service, lastAppliedState *api.Service, deltaType cache.DeltaType) (error, bool) {
 	// TODO: Handle added, updated, and sync differently?
-	switch delta.Type {
+	switch deltaType {
 	case cache.Added:
 		fallthrough
 	case cache.Updated:
 		fallthrough
 	case cache.Sync:
-		err, retry := s.createLoadBalancerIfNeeded(namespacedName, service, cachedService.appliedState)
+		namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+		err, retry := s.createLoadBalancerIfNeeded(namespacedName, service, lastAppliedState)
 		if err != nil {
 			message := "Error creating load balancer"
 			if retry {
@@ -251,12 +360,6 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 
 			return err, retry
 		}
-		// Always update the cache upon success.
-		// NOTE: Since we update the cached service if and only if we successfully
-		// processed it, a cached service being nil implies that it hasn't yet
-		// been successfully processed.
-		cachedService.appliedState = service
-		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
 		s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 		err := s.balancer.EnsureLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
@@ -266,10 +369,10 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 			return err, retryable
 		}
 		s.eventRecorder.Event(service, api.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
-		s.cache.delete(namespacedName.String())
 	default:
-		glog.Errorf("Unexpected delta type: %v", delta.Type)
+		return fmt.Errorf("Unexpected delta type: %v", deltaType), notRetryable
 	}
+
 	return nil, notRetryable
 }
 
@@ -410,7 +513,7 @@ func (s *serviceCache) ListKeys() []string {
 	return keys
 }
 
-// GetByKey returns the value stored in the serviceMap under the given key
+// GetByKey returns the value stored in the serviceMap under the given key.
 func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -444,16 +547,10 @@ func (s *serviceCache) getOrCreate(serviceName string) *cachedService {
 	defer s.mu.Unlock()
 	service, ok := s.serviceMap[serviceName]
 	if !ok {
-		service = &cachedService{}
+		service = &cachedService{processorSemaphore: make(chan bool, 1)}
 		s.serviceMap[serviceName] = service
 	}
 	return service
-}
-
-func (s *serviceCache) set(serviceName string, service *cachedService) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.serviceMap[serviceName] = service
 }
 
 func (s *serviceCache) delete(serviceName string) {
@@ -678,16 +775,15 @@ func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, hosts []string) (servicesToRetry []*cachedService) {
 	for _, service := range services {
 		func() {
-			service.mu.Lock()
-			defer service.mu.Unlock()
+			lastAppliedState := service.getLastAppliedState()
 			// If the applied state is nil, that means it hasn't yet been successfully dealt
 			// with by the load balancer reconciler. We can trust the load balancer
 			// reconciler to ensure the service's load balancer is created to target
 			// the correct nodes.
-			if service.appliedState == nil {
+			if lastAppliedState == nil {
 				return
 			}
-			if err := s.lockedUpdateLoadBalancerHosts(service.appliedState, hosts); err != nil {
+			if err := s.lockedUpdateLoadBalancerHosts(lastAppliedState, hosts); err != nil {
 				glog.Errorf("External error while updating load balancer: %v.", err)
 				servicesToRetry = append(servicesToRetry, service)
 			}
