@@ -295,11 +295,11 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 
 func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	pod, ok := obj.(*api.Pod)
-	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
 	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new rc will not be woken up till the periodic resync.
+	// changed labels the new daemonset will not be woken up till the periodic
+	// resync.
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -312,6 +312,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 			return
 		}
 	}
+	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
