@@ -498,6 +498,11 @@ func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api
 	if !reflect.DeepEqual(oldService.Annotations, newService.Annotations) {
 		return true
 	}
+	if oldService.UID != newService.UID {
+		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "UID", "%v -> %v",
+			oldService.UID, newService.UID)
+		return true
+	}
 
 	return false
 }
