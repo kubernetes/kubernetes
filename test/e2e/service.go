@@ -1809,7 +1809,7 @@ func NewServerTest(client *client.Client, namespace string, serviceName string) 
 	t.services = make(map[string]bool)
 
 	t.name = "webserver"
-	t.image = "gcr.io/google_containers/test-webserver"
+	t.image = "gcr.io/google_containers/test-webserver:e2e"
 
 	return t
 }
