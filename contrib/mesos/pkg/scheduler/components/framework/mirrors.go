@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 )
 
@@ -163,7 +162,7 @@ mainLoop:
 		log.V(1).Infof("garbage collecting pods on host %q slave %q", k.host, k.slaveID)
 
 		// get a snapshot of all the pods on the node
-		sel := fields.OneTermEqualSelector(client.PodHost, k.host)
+		sel := fields.OneTermEqualSelector(api.PodHostField, k.host)
 		list, err := gc.pods.Pods(api.NamespaceAll).List(api.ListOptions{FieldSelector: sel})
 		if err != nil {
 			respondTo(req, false)

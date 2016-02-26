@@ -24,6 +24,9 @@ import (
 
 const (
 	RunningExecutorCondition api.NodeConditionType = "RunningExecutor"
+
+	SlaveReadyReason  = "SlaveReady"
+	SlaveReadyMessage = "mesos reports ready status"
 )
 
 // SetRunningExecutorCondition serves to associate an executor heartbeat w/ the
