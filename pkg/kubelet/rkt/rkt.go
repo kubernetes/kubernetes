@@ -1482,9 +1482,3 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 
 	return podStatus, nil
 }
-
-type sortByRestartCount []*kubecontainer.ContainerStatus
-
-func (s sortByRestartCount) Len() int           { return len(s) }
-func (s sortByRestartCount) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s sortByRestartCount) Less(i, j int) bool { return s[i].RestartCount < s[j].RestartCount }
