@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/bytestr"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -40,6 +41,8 @@ func init() {
 		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_bytestr_StringOrByteSlice_To_Slice_byte,
+		Convert_Slice_byte_To_bytestr_StringOrByteSlice,
 		Convert_unversioned_Time_To_unversioned_Time,
 		Convert_Slice_string_To_unversioned_Time,
 		Convert_string_To_labels_Selector,
@@ -110,6 +113,13 @@ func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrStrin
 	out.IntVal = in.IntVal
 	out.StrVal = in.StrVal
 	return nil
+}
+
+func Convert_bytestr_StringOrByteSlice_To_Slice_byte(in *bytestr.StringOrByteSlice, out *[]byte, s conversion.Scope) error {
+	return conversion.Convert_Slice_byte_To_Slice_byte((*[]byte)(in), out, s)
+}
+func Convert_Slice_byte_To_bytestr_StringOrByteSlice(in *[]byte, out *bytestr.StringOrByteSlice, s conversion.Scope) error {
+	return conversion.Convert_Slice_byte_To_Slice_byte(in, (*[]byte)(out), s)
 }
 
 func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {

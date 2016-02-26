@@ -29,6 +29,7 @@ import (
 	pkg2_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg5_runtime "k8s.io/kubernetes/pkg/runtime"
 	pkg1_types "k8s.io/kubernetes/pkg/types"
+	pkg6_bytestr "k8s.io/kubernetes/pkg/util/bytestr"
 	pkg4_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
@@ -69,9 +70,10 @@ func init() {
 		var v1 pkg2_unversioned.Time
 		var v2 pkg5_runtime.RawExtension
 		var v3 pkg1_types.UID
-		var v4 pkg4_intstr.IntOrString
-		var v5 time.Time
-		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5
+		var v4 pkg6_bytestr.StringOrByteSlice
+		var v5 pkg4_intstr.IntOrString
+		var v6 time.Time
+		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
 	}
 }
 
@@ -48041,7 +48043,7 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 						_ = yym9
 						if false {
 						} else {
-							h.encMapstringSliceuint8((map[string][]uint8)(x.Data), e)
+							h.encMapstringbytestr_StringOrByteSlice((map[string]pkg6_bytestr.StringOrByteSlice)(x.Data), e)
 						}
 					}
 				} else {
@@ -48059,7 +48061,7 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 						_ = yym10
 						if false {
 						} else {
-							h.encMapstringSliceuint8((map[string][]uint8)(x.Data), e)
+							h.encMapstringbytestr_StringOrByteSlice((map[string]pkg6_bytestr.StringOrByteSlice)(x.Data), e)
 						}
 					}
 				}
@@ -48206,7 +48208,7 @@ func (x *Secret) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym6
 				if false {
 				} else {
-					h.decMapstringSliceuint8((*map[string][]uint8)(yyv5), d)
+					h.decMapstringbytestr_StringOrByteSlice((*map[string]pkg6_bytestr.StringOrByteSlice)(yyv5), d)
 				}
 			}
 		case "type":
@@ -48277,7 +48279,7 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		_ = yym13
 		if false {
 		} else {
-			h.decMapstringSliceuint8((*map[string][]uint8)(yyv12), d)
+			h.decMapstringbytestr_StringOrByteSlice((*map[string]pkg6_bytestr.StringOrByteSlice)(yyv12), d)
 		}
 	}
 	yyj10++
@@ -57312,7 +57314,7 @@ func (x codecSelfer1234) decSliceResourceQuota(v *[]ResourceQuota, d *codec1978.
 	}
 }
 
-func (x codecSelfer1234) encMapstringSliceuint8(v map[string][]uint8, e *codec1978.Encoder) {
+func (x codecSelfer1234) encMapstringbytestr_StringOrByteSlice(v map[string]pkg6_bytestr.StringOrByteSlice, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -57332,15 +57334,18 @@ func (x codecSelfer1234) encMapstringSliceuint8(v map[string][]uint8, e *codec19
 			yym3 := z.EncBinary()
 			_ = yym3
 			if false {
+			} else if z.HasExtensions() && z.EncExt(yyv1) {
+			} else if !yym3 && z.IsJSONHandle() {
+				z.EncJSONMarshal(yyv1)
 			} else {
-				r.EncodeStringBytes(codecSelferC_RAW1234, []byte(yyv1))
+				h.encbytestr_StringOrByteSlice((pkg6_bytestr.StringOrByteSlice)(yyv1), e)
 			}
 		}
 	}
 	z.EncSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x codecSelfer1234) decMapstringSliceuint8(v *map[string][]uint8, d *codec1978.Decoder) {
+func (x codecSelfer1234) decMapstringbytestr_StringOrByteSlice(v *map[string]pkg6_bytestr.StringOrByteSlice, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -57350,11 +57355,11 @@ func (x codecSelfer1234) decMapstringSliceuint8(v *map[string][]uint8, d *codec1
 	yybh1 := z.DecBasicHandle()
 	if yyv1 == nil {
 		yyrl1, _ := z.DecInferLen(yyl1, yybh1.MaxInitLen, 40)
-		yyv1 = make(map[string][]uint8, yyrl1)
+		yyv1 = make(map[string]pkg6_bytestr.StringOrByteSlice, yyrl1)
 		*v = yyv1
 	}
 	var yymk1 string
-	var yymv1 []uint8
+	var yymv1 pkg6_bytestr.StringOrByteSlice
 	var yymg1 bool
 	if yybh1.MapValueReset {
 		yymg1 = true
@@ -57381,8 +57386,11 @@ func (x codecSelfer1234) decMapstringSliceuint8(v *map[string][]uint8, d *codec1
 				yym4 := z.DecBinary()
 				_ = yym4
 				if false {
+				} else if z.HasExtensions() && z.DecExt(yyv3) {
+				} else if !yym4 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv3)
 				} else {
-					*yyv3 = r.DecodeBytes(*(*[]byte)(yyv3), false, false)
+					h.decbytestr_StringOrByteSlice((*pkg6_bytestr.StringOrByteSlice)(yyv3), d)
 				}
 			}
 
@@ -57412,8 +57420,11 @@ func (x codecSelfer1234) decMapstringSliceuint8(v *map[string][]uint8, d *codec1
 				yym7 := z.DecBinary()
 				_ = yym7
 				if false {
+				} else if z.HasExtensions() && z.DecExt(yyv6) {
+				} else if !yym7 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv6)
 				} else {
-					*yyv6 = r.DecodeBytes(*(*[]byte)(yyv6), false, false)
+					h.decbytestr_StringOrByteSlice((*pkg6_bytestr.StringOrByteSlice)(yyv6), d)
 				}
 			}
 
@@ -57425,7 +57436,7 @@ func (x codecSelfer1234) decMapstringSliceuint8(v *map[string][]uint8, d *codec1
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x codecSelfer1234) encSliceuint8(v []uint8, e *codec1978.Encoder) {
+func (x codecSelfer1234) encbytestr_StringOrByteSlice(v pkg6_bytestr.StringOrByteSlice, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -57442,7 +57453,7 @@ func (x codecSelfer1234) encSliceuint8(v []uint8, e *codec1978.Encoder) {
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSliceuint8(v *[]uint8, d *codec1978.Decoder) {
+func (x codecSelfer1234) decbytestr_StringOrByteSlice(v *pkg6_bytestr.StringOrByteSlice, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
