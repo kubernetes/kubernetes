@@ -352,22 +352,6 @@ func TestSetWithVersion(t *testing.T) {
 	}
 }
 
-func TestSetWithoutResourceVersioner(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	defer server.Terminate(t)
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
-	helper.versioner = nil
-	returnedObj := &api.Pod{}
-	err := helper.Set(context.TODO(), "/some/key", obj, returnedObj, 3)
-	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
-	}
-	if returnedObj.ResourceVersion != "" {
-		t.Errorf("Resource revision should not be set on returned objects")
-	}
-}
-
 func TestSetNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	server := etcdtesting.NewEtcdTestClientServer(t)
