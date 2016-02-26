@@ -963,7 +963,7 @@ var _ = Describe("Pods", func() {
 		if err != nil {
 			Failf("failed to get pod: %v", err)
 		}
-		pod.Spec.Containers[0].Image = "nginx"
+		pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx:1.7.9"
 		pod, err = podClient.Update(pod)
 		if err != nil {
 			Failf("error updating pod=%s/%s %v", podName, containerName, err)
