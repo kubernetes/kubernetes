@@ -114,10 +114,10 @@ func (g *GenericPLEG) Start() {
 }
 
 func generateEvent(podID types.UID, cid string, oldState, newState plegContainerState) *PodLifecycleEvent {
-	glog.V(7).Infof("GenericPLEG: %v/%v: %v -> %v", podID, cid, oldState, newState)
 	if newState == oldState {
 		return nil
 	}
+	glog.V(4).Infof("GenericPLEG: %v/%v: %v -> %v", podID, cid, oldState, newState)
 	switch newState {
 	case plegContainerRunning:
 		return &PodLifecycleEvent{ID: podID, Type: ContainerStarted, Data: cid}
@@ -254,7 +254,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	if pod == nil {
 		// The pod is missing in the current relist. This means that
 		// the pod has no visible (active or inactive) containers.
-		glog.V(8).Infof("PLEG: Delete status for pod %q", string(pid))
+		glog.V(4).Infof("PLEG: Delete status for pod %q", string(pid))
 		g.cache.Delete(pid)
 		return nil
 	}
@@ -263,7 +263,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	// GetPodStatus(pod *kubecontainer.Pod) so that Docker can avoid listing
 	// all containers again.
 	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
-	glog.V(8).Infof("PLEG: Write status for %s/%s: %+v (err: %v)", pod.Name, pod.Namespace, status, err)
+	glog.V(4).Infof("PLEG: Write status for %s/%s: %+v (err: %v)", pod.Name, pod.Namespace, status, err)
 	g.cache.Set(pod.ID, status, err, timestamp)
 	return err
 }
