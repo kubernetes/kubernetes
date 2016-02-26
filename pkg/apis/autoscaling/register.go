@@ -47,8 +47,11 @@ func AddToScheme(scheme *runtime.Scheme) {
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Scale{},
 		&extensions.HorizontalPodAutoscaler{},
 		&extensions.HorizontalPodAutoscalerList{},
 		&api.ListOptions{},
 	)
 }
+
+func (obj *Scale) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
