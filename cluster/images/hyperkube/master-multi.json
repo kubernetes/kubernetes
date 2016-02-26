@@ -65,7 +65,7 @@
       "image": "gcr.io/google_containers/hyperkube-ARCH:VERSION",
       "command": [
               "/setup-files.sh",
-              "IP:10.0.0.1"
+              "IP:10.0.0.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
       ],
       "volumeMounts": [
         {

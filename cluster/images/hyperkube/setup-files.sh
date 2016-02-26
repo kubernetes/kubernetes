@@ -37,7 +37,9 @@ echo "admin,admin,admin" > /data/basic_auth.csv
 
 # Create HTTPS certificates
 groupadd -f -r kube-cert-test
-CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -i) ${EXTRA_SANS}
+
+# hostname -I gets the ip of the node
+CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -I | awk '{print $1}') ${EXTRA_SANS}
 
 # Create known tokens for service accounts
 echo "$(create_token),admin,admin" >> /data/known_tokens.csv
