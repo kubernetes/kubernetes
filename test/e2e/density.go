@@ -41,7 +41,11 @@ import (
 )
 
 // NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
-const NodeStartupThreshold = 4 * time.Second
+const (
+	NodeStartupThreshold       = 4 * time.Second
+	MinSaturationThreshold     = 2 * time.Minute
+	MinPodsPerSecondThroughput = 10
+)
 
 // Maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
@@ -115,9 +119,19 @@ var _ = Describe("Density", func() {
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
+	var e2eStartupTime time.Duration
+	var totalPods int
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
+		saturationData := SaturationTime{
+			TimeToSaturate: e2eStartupTime,
+			NumberOfNodes:  nodeCount,
+			NumberOfPods:   totalPods,
+			Throughput:     float32(totalPods) / float32(e2eStartupTime/time.Second),
+		}
+		Logf("Cluster saturation time: %s", prettyPrintJSON(saturationData))
+
 		// Verify latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
@@ -204,7 +218,7 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
-			totalPods := itArg.podsPerNode * nodeCount
+			totalPods = itArg.podsPerNode * nodeCount
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
 			fileHndl, err := os.Create(fmt.Sprintf(testContext.OutputDir+"/%s/pod_states.csv", uuid))
 			expectNoError(err)
@@ -276,8 +290,9 @@ var _ = Describe("Density", func() {
 			// Start the replication controller.
 			startTime := time.Now()
 			expectNoError(RunRC(config))
-			e2eStartupTime := time.Now().Sub(startTime)
+			e2eStartupTime = time.Now().Sub(startTime)
 			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
+			Logf("Throughput during cluster saturation phase: %v", float32(totalPods)/float32(e2eStartupTime))
 
 			By("Waiting for all events to be recorded")
 			last := -1
@@ -484,6 +499,12 @@ var _ = Describe("Density", func() {
 				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 				c.Pods(ns).Delete(name, nil)
 			}
+
+			saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
+			if saturationThreshold < MinSaturationThreshold {
+				saturationThreshold = MinSaturationThreshold
+			}
+			Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
 		})
 	}
 })
