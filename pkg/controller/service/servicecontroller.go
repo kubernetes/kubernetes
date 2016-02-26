@@ -478,6 +478,10 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 			return true
 		}
 	}
+	if oldService.UID != newService.UID {
+		return true
+	}
+
 	return false
 }
 
