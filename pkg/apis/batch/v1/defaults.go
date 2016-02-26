@@ -23,18 +23,6 @@ import (
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
 		func(obj *Job) {
-			labels := obj.Spec.Template.Labels
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
 			// For a non-parallel job, you can leave both `.spec.completions` and
 			// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
 			if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {

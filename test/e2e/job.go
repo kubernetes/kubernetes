@@ -204,8 +204,9 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 			Name: name,
 		},
 		Spec: extensions.JobSpec{
-			Parallelism: &parallelism,
-			Completions: &completions,
+			Parallelism:    &parallelism,
+			Completions:    &completions,
+			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
@@ -311,4 +312,10 @@ func waitForJobFail(c *client.Client, ns, jobName string) error {
 		}
 		return false, nil
 	})
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }
