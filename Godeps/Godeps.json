@@ -15,6 +15,11 @@
 			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
 		},
 		{
+			"ImportPath": "github.com/CenturyLinkCloud/clc-sdk",
+			"Comment": "0.0.2-6-gf1c763b",
+			"Rev": "f1c763bade7d91f2b8914267bd98a8fd207f50f9"
+		},
+		{
 			"ImportPath": "github.com/ClusterHQ/flocker-go",
 			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
 		},
@@ -897,6 +902,10 @@
 		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
+		},
+		{
+			"ImportPath": "github.com/mikebeyer/env",
+			"Rev": "b6ce30ccdcad3ed9d5ca80329829f5aeaa856e99"
 		},
 		{
 			"ImportPath": "github.com/mistifyio/go-zfs",
