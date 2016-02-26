@@ -201,7 +201,11 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return err
 		}
 
-		name, namespace, obj := info.Name, info.Namespace, info.Object
+		obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion().String())
+		if err != nil {
+			return err
+		}
+		name, namespace := info.Name, info.Namespace
 		oldData, err := json.Marshal(obj)
 		if err != nil {
 			return err
