@@ -141,3 +141,38 @@ func TestInt64Min(t *testing.T) {
 		}
 	}
 }
+
+func TestRoundToInt(t *testing.T) {
+	tests := []struct {
+		num float64
+		exp int
+	}{
+		{
+			num: 5.5,
+			exp: 6,
+		},
+		{
+			num: -3.7,
+			exp: -4,
+		},
+		{
+			num: 3.49,
+			exp: 3,
+		},
+		{
+			num: -7.9,
+			exp: -8,
+		},
+		{
+			num: -4.499999,
+			exp: -4,
+		},
+	}
+
+	for i, test := range tests {
+		t.Logf("executing scenario %d", i)
+		if got := RoundToInt(test.num); got != test.exp {
+			t.Errorf("expected %d, got %d", test.exp, got)
+		}
+	}
+}

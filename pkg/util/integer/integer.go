@@ -16,6 +16,8 @@ limitations under the License.
 
 package integer
 
+import "math"
+
 func IntMax(a, b int) int {
 	if b > a {
 		return b
@@ -42,4 +44,17 @@ func Int64Min(a, b int64) int64 {
 		return b
 	}
 	return a
+}
+
+func RoundToInt(a float64) int {
+	absA := math.Abs(a)
+	intA := int(absA)
+
+	if absA-float64(intA) >= 0.5 {
+		if a < float64(0) {
+			return int(a) - 1
+		}
+		return int(a) + 1
+	}
+	return int(a)
 }
