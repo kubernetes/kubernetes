@@ -165,6 +165,21 @@ validate-hash() {
 }
 
 apt-get-install() {
+  local -r packages=( $@ )
+  installed=true
+  for package in "${packages[@]}"; do
+    if ! dpkg -s "${package}" &>/dev/null; then
+      installed=false
+      break
+    fi
+  done
+  if [[ "${installed}" == "true" ]]; then
+    echo "== ${packages[@]} already installed, skipped apt-get install ${packages[@]} =="
+    return
+  fi
+
+  apt-get-update
+
   # Forcibly install packages (options borrowed from Salt logs).
   until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install $@; do
     echo "== install of packages $@ failed, retrying =="
@@ -176,7 +191,7 @@ apt-get-update() {
   echo "== Refreshing package database =="
   until apt-get update; do
     echo "== apt-get update failed, retrying =="
-    echo sleep 5
+    sleep 5
   done
 }
 
@@ -795,7 +810,6 @@ if [[ -z "${is_push}" ]]; then
   set-broken-motd
   ensure-basic-networking
   fix-apt-sources
-  apt-get-update
   ensure-install-dir
   ensure-packages
   set-kube-env
