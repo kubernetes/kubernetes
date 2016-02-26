@@ -2503,6 +2503,8 @@ type EventSource struct {
 	Component string `json:"component,omitempty"`
 	// Host name on which the event is generated.
 	Host string `json:"host,omitempty"`
+	// Scheduler name on which the event is generated.
+	SchedulerName string `json:"schedulerName,omitempty"`
 }
 
 // Valid values for event types (new types could be added in future)
