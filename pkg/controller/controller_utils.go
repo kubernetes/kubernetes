@@ -427,20 +427,29 @@ func (s ActivePods) Less(i, j int) bool {
 	}
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
-	// 4. Been ready for less time < more time
+	// 4. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
 	if api.IsPodReady(s[i]) && api.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return podReadyTime(s[i]).After(podReadyTime(s[j]).Time)
+		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
-	// 6. Newer pods < older pods
+	// 6. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
-		return s[i].CreationTimestamp.After(s[j].CreationTimestamp.Time)
+		return afterOrZero(s[i].CreationTimestamp, s[j].CreationTimestamp)
 	}
 	return false
+}
+
+// afterOrZero checks if time t1 is after time t2; if one of them
+// is zero, the zero time is seen as after non-zero time.
+func afterOrZero(t1, t2 unversioned.Time) bool {
+	if t1.Time.IsZero() || t2.Time.IsZero() {
+		return t1.Time.IsZero()
+	}
+	return t1.After(t2.Time)
 }
 
 func podReadyTime(pod *api.Pod) unversioned.Time {
