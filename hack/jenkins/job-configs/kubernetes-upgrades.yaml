@@ -192,7 +192,7 @@
     name: 'upgrade-gke'
     provider-env: |
         {gke-provider-env}
-        export JENKINS_FORCE_GET_TARS="y"
+        export JENKINS_TOLERATE_DIRTY_WORKSPACE="y"
         export FAIL_ON_GCP_RESOURCE_LEAK="false"
     jobs:
         - '{provider}-{version-old}-{version-new}-upgrades':
@@ -233,7 +233,7 @@
     provider-env: |
         {gce-provider-env}
         export NUM_NODES=5
-        export JENKINS_FORCE_GET_TARS="y"
+        export JENKINS_TOLERATE_DIRTY_WORKSPACE="y"
         export FAIL_ON_GCP_RESOURCE_LEAK="false"
     jobs:
         - '{provider}-{version-old}-{version-new}-upgrades':

@@ -21,96 +21,129 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+function check_dirty_workspace() {
+    if [[ "${JENKINS_TOLERATE_DIRTY_WORKSPACE:-}" =~ ^[yY]$ ]]; then
+        echo "Tolerating dirty workspace (because JENKINS_TOLERATE_DIRTY_WORKSPACE)."
+    else
+        echo "Checking dirty workspace."
+        # .config and its children are created by the gcloud call that we use to
+        # get the GCE service account.
+        #
+        # console-log.txt is created by Jenkins, but is usually not flushed out
+        # this early in this script.
+        if [[ $(find . -not -path "./.config*" -not -name "console-log.txt" | wc -l) != 1 ]]; then
+            echo "${PWD} not empty, bailing!"
+            find .
+            exit 1
+        fi
+    fi
+}
+
+function fetch_output_tars() {
+    clean_binaries
+    echo "Using binaries from _output."
+    cp _output/release-tars/kubernetes*.tar.gz .
+    unpack_binaries
+}
+
+function fetch_server_version_tars() {
+    clean_binaries
+    local -r msg=$(gcloud ${CMD_GROUP} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
+    # msg will look like "defaultClusterVersion: 1.0.1". Strip
+    # everything up to, including ": "
+    local -r build_version="v${msg##*: }"
+    fetch_tars_from_gcs "release" "${build_version}"
+    unpack_binaries
+}
+
+# Use a published version like "ci/latest" (default), "release/latest",
+# "release/latest-1", or "release/stable"
+function fetch_published_version_tars() {
+    clean_binaries
+    local -r published_version="${1}"
+    IFS='/' read -a varr <<< "${published_version}"
+    bucket="${varr[0]}"
+    build_version=$(gsutil cat gs://kubernetes-release/${published_version}.txt)
+    echo "Using published version $bucket/$build_version (from ${published_version})"
+    fetch_tars_from_gcs "${bucket}" "${build_version}"
+    unpack_binaries
+    # Set CLUSTER_API_VERSION for GKE CI
+    export CLUSTER_API_VERSION=$(echo ${build_version} | cut -c 2-)
+}
+
+# TODO(ihmccreery) I'm not sure if this is necesssary, with the workspace check
+# below.
+function clean_binaries() {
+    echo "Cleaning up binaries."
+    rm -rf kubernetes*
+}
+
+function fetch_tars_from_gcs() {
+    local -r bucket="${1}"
+    local -r build_version="${1}"
+    echo "Pulling binaries from GCS; using server version ${bucket}/${build_version}."
+    gsutil -mq cp \
+        "gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz" \
+        "gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz" \
+        .
+}
+
+function unpack_binaries() {
+    md5sum kubernetes*.tar.gz
+    tar -xzf kubernetes.tar.gz
+    tar -xzf kubernetes-test.tar.gz
+}
+
 echo "--------------------------------------------------------------------------------"
 echo "Test Environment:"
 printenv | sort
 echo "--------------------------------------------------------------------------------"
 
-# We get the Kubernetes tarballs on either cluster creation or when we want to
-# replace existing ones in a multi-step job (e.g. a cluster upgrade).
-if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
-    if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
-        echo "Found KUBE_RUN_FROM_OUTPUT=y; will use binaries from _output"
-        cp _output/release-tars/kubernetes*.tar.gz .
-    else
-        echo "Pulling binaries from GCS"
-        # In a multi-step job, clean up just the kubernetes build files.
-        # Otherwise, we want a completely empty directory.
-        if [[ "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
-            rm -rf kubernetes*
-        # .config and its children are created by the gcloud call that we use to
-        # get the GCE service account.
-        # console-log.txt is created by Jenkins, but is usually not flushed out
-        # this early in the script.
-        elif [[ $(find . -not -path "./.config*" -not -name "console-log.txt" \
-                  | wc -l) != 1 ]]; then
-            echo "${PWD} not empty, bailing!"
-            find .
-            exit 1
-        fi
+# We get the Kubernetes tarballs unless we are going to use old ones
+if [[ "${JENKINS_USE_EXISTING_BINARIES:-}" =~ ^[yY]$ ]]; then
+    echo "Using existing binaries; not cleaning, fetching, or unpacking new ones."
+elif [[ "${KUBE_RUN_FROM_OUTPUT:-}" =~ ^[yY]$ ]]; then
+    # TODO(spxtr) This should probably be JENKINS_USE_BINARIES_FROM_OUTPUT or
+    # something, rather than being prepended with KUBE, since it's sort of a
+    # meta-thing.
+    fetch_output_tars
+elif [[ "${JENKINS_USE_SERVER_VERSION:-}" =~ ^[yY]$ ]]; then
+    # This is for test, staging, and prod jobs on GKE, where we want to
+    # test what's running in GKE by default rather than some CI build.
+    check_dirty_workspace
+    fetch_server_version_tars
+else
+    # use JENKINS_PUBLISHED_VERSION, default to 'ci/latest', since that's
+    # usually what we're testing.
+    check_dirty_workspace
+    fetch_published_version_tars "${JENKINS_PUBLISHED_VERSION:-'ci/latest'}"
+fi
 
-        # This is for test, staging, and prod jobs on GKE, where we want to
-        # test what's running in GKE by default rather than some CI build.
-        if [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
-            # for GKE we can use server default version.
-            bucket="release"
-            msg=$(gcloud ${CMD_GROUP} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
-            # msg will look like "defaultClusterVersion: 1.0.1". Strip
-            # everything up to, including ": "
-            build_version="v${msg##*: }"
-            echo "Using server version $bucket/$build_version"
-        else  # use JENKINS_PUBLISHED_VERSION, for CI
-            # Use a published version like "ci/latest" (default),
-            # "release/latest", "release/latest-1", or "release/stable"
-            JENKINS_PUBLISHED_VERSION=${JENKINS_PUBLISHED_VERSION:-'ci/latest'}
-            IFS='/' read -a varr <<< "${JENKINS_PUBLISHED_VERSION}"
-            bucket="${varr[0]}"
-            build_version=$(gsutil cat gs://kubernetes-release/${JENKINS_PUBLISHED_VERSION}.txt)
-            echo "Using published version $bucket/$build_version (from ${JENKINS_PUBLISHED_VERSION})"
-            # Set CLUSTER_API_VERSION for GKE CI
-            export CLUSTER_API_VERSION=$(echo ${build_version} | cut -c 2-)
-        fi
-        # At this point, we want to have the following vars set:
-        # - bucket
-        # - build_version
-        gsutil -mq cp \
-            "gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz" \
-            "gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz" \
-            .
-    fi
-
-    if [[ ! "${CIRCLECI:-}" == "true" ]]; then
-        # Copy GCE keys so we don't keep cycling them.
-        # To set this up, you must know the <project>, <zone>, and <instance>
-        # on which your jenkins jobs are running. Then do:
-        #
-        # # SSH from your computer into the instance.
-        # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
-        #
-        # # Generate a key by ssh'ing from the instance into itself, then exit.
-        # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
-        # $ ^D
-        #
-        # # Copy the keys to the desired location (e.g. /var/lib/jenkins/gce_keys/).
-        # $ sudo mkdir -p /var/lib/jenkins/gce_keys/
-        # $ sudo cp ~/.ssh/google_compute_engine /var/lib/jenkins/gce_keys/
-        # $ sudo cp ~/.ssh/google_compute_engine.pub /var/lib/jenkins/gce_keys/
-        #
-        # # Move the permissions for the keys to Jenkins.
-        # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
-        # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
-        if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-            echo "Skipping SSH key copying for AWS"
-        else
-            mkdir -p ${WORKSPACE}/.ssh/
-            cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
-            cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
-        fi
-    fi
-
-    md5sum kubernetes*.tar.gz
-    tar -xzf kubernetes.tar.gz
-    tar -xzf kubernetes-test.tar.gz
+# Copy GCE keys so we don't keep cycling them.
+# To set this up, you must know the <project>, <zone>, and <instance>
+# on which your jenkins jobs are running. Then do:
+#
+# # SSH from your computer into the instance.
+# $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
+#
+# # Generate a key by ssh'ing from the instance into itself, then exit.
+# $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
+# $ ^D
+#
+# # Copy the keys to the desired location (e.g. /var/lib/jenkins/gce_keys/).
+# $ sudo mkdir -p /var/lib/jenkins/gce_keys/
+# $ sudo cp ~/.ssh/google_compute_engine /var/lib/jenkins/gce_keys/
+# $ sudo cp ~/.ssh/google_compute_engine.pub /var/lib/jenkins/gce_keys/
+#
+# # Move the permissions for the keys to Jenkins.
+# $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
+# $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
+if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+    echo "Skipping SSH key copying for AWS"
+else
+    mkdir -p ${WORKSPACE}/.ssh/
+    cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
+    cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
 fi
 
 cd kubernetes
@@ -177,9 +210,8 @@ if [[ "${E2E_TEST,,}" == "true" ]]; then
       ${GINKGO_TEST_ARGS:+--test_args="${GINKGO_TEST_ARGS}"} \
       && exitcode=0 || exitcode=$?
     if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${build_version:-} ]]; then
-        echo "publish build_version to ci/latest-green.txt: ${build_version}"
-        echo "${build_version}" > ${WORKSPACE}/build_version.txt
-        gsutil cp ${WORKSPACE}/build_version.txt gs://kubernetes-release/ci/latest-green.txt
+        echo "Publish build_version to ci/latest-green.txt: ${build_version}"
+        gsutil cp ./version gs://kubernetes-release/ci/latest-green.txt
     fi
 fi
 
