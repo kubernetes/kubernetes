@@ -772,67 +772,6 @@ type IngressBackend struct {
 	ServicePort intstr.IntOrString `json:"servicePort"`
 }
 
-type NodeResource string
-
-const (
-	// Percentage of node's CPUs that is currently used.
-	CpuConsumption NodeResource = "CpuConsumption"
-
-	// Percentage of node's CPUs that is currently requested for pods.
-	CpuRequest NodeResource = "CpuRequest"
-
-	// Percentage od node's memory that is currently used.
-	MemConsumption NodeResource = "MemConsumption"
-
-	// Percentage of node's CPUs that is currently requested for pods.
-	MemRequest NodeResource = "MemRequest"
-)
-
-// NodeUtilization describes what percentage of a particular resource is used on a node.
-type NodeUtilization struct {
-	Resource NodeResource `json:"resource"`
-
-	// The accepted values are from 0 to 1.
-	Value float64 `json:"value"`
-}
-
-// Configuration of the Cluster Autoscaler
-type ClusterAutoscalerSpec struct {
-	// Minimum number of nodes that the cluster should have.
-	MinNodes int32 `json:"minNodes"`
-
-	// Maximum number of nodes that the cluster should have.
-	MaxNodes int32 `json:"maxNodes"`
-
-	// Target average utilization of the cluster nodes. New nodes will be added if one of the
-	// targets is exceeded. Cluster size will be decreased if the current utilization is too low
-	// for all targets.
-	TargetUtilization []NodeUtilization `json:"target"`
-}
-
-type ClusterAutoscaler struct {
-	unversioned.TypeMeta `json:",inline"`
-
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// For now (experimental api) it is required that the name is set to "ClusterAutoscaler" and namespace is "default".
-	v1.ObjectMeta `json:"metadata,omitempty"`
-
-	// Spec defines the desired behavior of this daemon set.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	Spec ClusterAutoscalerSpec `json:"spec,omitempty"`
-}
-
-// There will be just one (or none) ClusterAutoscaler.
-type ClusterAutoscalerList struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
-
-	Items []ClusterAutoscaler `json:"items"`
-}
-
 // ExportOptions is the query options to the standard REST get call.
 type ExportOptions struct {
 	unversioned.TypeMeta `json:",inline"`
