@@ -75,6 +75,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 	for _, route := range routes {
 		routeMap[route.TargetInstance] = route
 	}
+	wg := sync.WaitGroup{}
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
@@ -89,15 +90,17 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 				DestinationCIDR: node.Spec.PodCIDR,
 			}
 			nameHint := string(node.UID)
+			wg.Add(1)
 			go func(nameHint string, route *cloudprovider.Route) {
 				if err := rc.routes.CreateRoute(rc.clusterName, nameHint, route); err != nil {
 					glog.Errorf("Could not create route %s %s: %v", nameHint, route.DestinationCIDR, err)
 				}
+				wg.Done()
 			}(nameHint, route)
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
-	wg := sync.WaitGroup{}
+	wg.Wait()
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route applies to a node we know about & has correct CIDR.
