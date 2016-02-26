@@ -177,7 +177,7 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 			glog.Warningf("Retrying attach for EBS Disk %q (retry count=%v).", b.volumeID, numRetries)
 		}
 
-		devicePath, err := awsCloud.AttachDisk(b.volumeID, b.plugin.host.GetHostName(), b.readOnly)
+		devicePath, err := awsCloud.AttachDisk(b.volumeID, "", b.readOnly)
 		if err != nil {
 			glog.Errorf("Error attaching PD %q: %v", b.volumeID, err)
 			time.Sleep(errorSleepDuration)
@@ -248,7 +248,7 @@ func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
 			glog.Warningf("Retrying detach for EBS Disk %q (retry count=%v).", c.volumeID, numRetries)
 		}
 
-		devicePath, err := awsCloud.DetachDisk(c.volumeID, c.plugin.host.GetHostName())
+		devicePath, err := awsCloud.DetachDisk(c.volumeID, "")
 		if err != nil {
 			glog.Errorf("Error detaching PD %q: %v", c.volumeID, err)
 			time.Sleep(errorSleepDuration)
