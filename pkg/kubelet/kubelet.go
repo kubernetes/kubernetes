@@ -3276,6 +3276,9 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 		return status
 	}
 
+	// Make the latest container status comes first.
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+
 	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
 	// Create a map of expected containers based on the pod spec.
 	expectedContainers := make(map[string]api.Container)
