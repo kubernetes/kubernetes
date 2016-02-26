@@ -61,6 +61,9 @@ type worker struct {
 	lastResult results.Result
 	// How many times in a row the probe has returned the same result.
 	resultRun int
+
+	// If set, skip probing.
+	onHold bool
 }
 
 // Creates and starts a new probe worker.
@@ -165,6 +168,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		// We've got a new container; resume probing.
+		w.onHold = false
+	}
+
+	if w.onHold {
+		// Worker is on hold until there is a new container.
+		return true
 	}
 
 	if c.State.Running == nil {
@@ -202,6 +212,14 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
+
+	if w.probeType == liveness && result == results.Failure {
+		// The container fails a liveness check, it will need to be restared.
+		// Stop probing until we see a new container ID. This is to reduce the
+		// chance of hitting #21751, where running `docker exec` when a
+		// container is being stopped may lead to corrupted container state.
+		w.onHold = true
+	}
 
 	return true
 }
