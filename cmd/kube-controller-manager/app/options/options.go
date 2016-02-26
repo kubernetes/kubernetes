@@ -55,6 +55,7 @@ func NewCMServer() *CMServer {
 			ConcurrentNamespaceSyncs:          2,
 			LookupCacheSizeForRC:              4096,
 			LookupCacheSizeForRS:              4096,
+			LookupCacheSizeForDaemonSet:       1024,
 			ServiceSyncPeriod:                 unversioned.Duration{5 * time.Minute},
 			NodeSyncPeriod:                    unversioned.Duration{10 * time.Second},
 			ResourceQuotaSyncPeriod:           unversioned.Duration{5 * time.Minute},
@@ -102,6 +103,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ConcurrentNamespaceSyncs, "concurrent-namespace-syncs", s.ConcurrentNamespaceSyncs, "The number of namespace objects that are allowed to sync concurrently. Larger number = more responsive namespace termination, but more CPU (and network) load")
 	fs.IntVar(&s.LookupCacheSizeForRC, "replication-controller-lookup-cache-size", s.LookupCacheSizeForRC, "The the size of lookup cache for replication controllers. Larger number = more responsive replica management, but more MEM load.")
 	fs.IntVar(&s.LookupCacheSizeForRS, "replicaset-lookup-cache-size", s.LookupCacheSizeForRS, "The the size of lookup cache for replicatsets. Larger number = more responsive replica management, but more MEM load.")
+	fs.IntVar(&s.LookupCacheSizeForDaemonSet, "daemonset-lookup-cache-size", s.LookupCacheSizeForDaemonSet, "The the size of lookup cache for daemonsets. Larger number = more responsive daemonsets, but more MEM load.")
 	fs.DurationVar(&s.ServiceSyncPeriod.Duration, "service-sync-period", s.ServiceSyncPeriod.Duration, "The period for syncing services with their external load balancers")
 	fs.DurationVar(&s.NodeSyncPeriod.Duration, "node-sync-period", s.NodeSyncPeriod.Duration, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
