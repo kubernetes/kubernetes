@@ -52,6 +52,12 @@ in the given examples. You can scale to **any number of nodes** by changing some
 The original idea was heavily inspired by @jainvipin 's ubuntu single node
 work, which has been merge into this document.
 
+The scripting referenced here can be used to deploy Kubernetes with
+networking based either on Flannel or on a CNI plugin that you supply.
+This document is focused on the Flannel case.  See
+`kubernetes/cluster/ubuntu/config-default.sh` for remarks on how to
+use a CNI plugin instead.
+
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
 ## Prerequisites

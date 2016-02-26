@@ -32,6 +32,28 @@ export NUM_NODES=${NUM_NODES:-3}
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
 export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-192.168.3.0/24}  # formerly PORTAL_NET
 # define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
+
+# The Ubuntu scripting supports two ways of networking: Flannel and
+# CNI.  To use CNI: (1) put a CNI configuration file, whose basename
+# is the configured network type plus ".conf", somewhere on the driver
+# machine (the one running `kube-up.sh`) and set CNI_PLUGIN_CONF to a
+# pathname of that file, (2) put one or more executable binaries on
+# the driver machine and set CNI_PLUGIN_EXES to a space-separated list
+# of their pathnames, and (3) set CNI_KUBELET_TRIGGER to identify an
+# appropriate service on which to trigger the start and stop of the
+# kubelet on non-master machines.  For (1) and (2) the pathnames may
+# be relative, in which case they are relative to kubernetes/cluster.
+# If either of CNI_PLUGIN_CONF or CNI_PLUGIN_EXES is undefined or has
+# a zero length value then Flannel will be used instead of CNI.
+
+export CNI_PLUGIN_CONF CNI_PLUGIN_EXES CNI_KUBELET_TRIGGER
+CNI_PLUGIN_CONF=${CNI_PLUGIN_CONF:-""}
+CNI_PLUGIN_EXES=${CNI_PLUGIN_EXES:-""}
+CNI_KUBELET_TRIGGER=${CNI_KUBELET_TRIGGER:-networking}
+
+# Flannel networking is used if CNI networking is not.  The following
+# variable defines the CIDR block from which cluster addresses are
+# drawn.
 export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 
 # Optionally add other contents to the Flannel configuration JSON
