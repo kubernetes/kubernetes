@@ -194,7 +194,7 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 		}
 		return false, nil
 	}); err != nil {
-		Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", deploymentName, pods)
+		Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", err, deploymentName, pods)
 	}
 }
 
