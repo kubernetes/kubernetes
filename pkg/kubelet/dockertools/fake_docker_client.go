@@ -297,8 +297,6 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		return err
 	}
 	f.Stopped = append(f.Stopped, id)
-	// Container status should be Updated before container moved to ExitedContainerList
-	f.updateContainerStatus(id, statusExitedPrefix)
 	var newList []docker.APIContainers
 	for _, container := range f.ContainerList {
 		if container.ID == id {
@@ -325,6 +323,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		container.State.Running = false
 	}
 	f.ContainerMap[id] = container
+	f.updateContainerStatus(id, statusExitedPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -334,20 +333,11 @@ func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) e
 	defer f.Unlock()
 	f.called = append(f.called, "remove")
 	err := f.popError("remove")
-	if err != nil {
-		return err
+	if err == nil {
+		f.Removed = append(f.Removed, opts.ID)
 	}
-	for i := range f.ExitedContainerList {
-		if f.ExitedContainerList[i].ID == opts.ID {
-			delete(f.ContainerMap, opts.ID)
-			f.ExitedContainerList = append(f.ExitedContainerList[:i], f.ExitedContainerList[i+1:]...)
-			f.Removed = append(f.Removed, opts.ID)
-			return nil
-		}
-
-	}
-	// To be a good fake, report error if container is not stopped.
-	return fmt.Errorf("container not stopped")
+	delete(f.ContainerMap, opts.ID)
+	return err
 }
 
 // Logs is a test-spy implementation of DockerInterface.Logs.
