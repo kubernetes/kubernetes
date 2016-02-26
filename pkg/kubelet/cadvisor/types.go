@@ -35,6 +35,7 @@ type Interface interface {
 
 	// Returns usage information about the filesystem holding Docker images.
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
+	RktImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 
 	// Returns usage information about the root filesystem.
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)

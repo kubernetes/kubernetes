@@ -265,7 +265,7 @@ func NewMainKubelet(
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
+	diskSpaceManager, err := newDiskSpaceManager(containerRuntime, cadvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
@@ -2225,7 +2225,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	outOfDockerDisk := false
 	outOfRootDisk := false
 	// Check disk space once globally and reject or accept all new pods.
-	withinBounds, err := kl.diskSpaceManager.IsDockerDiskSpaceAvailable()
+	withinBounds, err := kl.diskSpaceManager.IsContainerDiskSpaceAvailable()
 	// Assume enough space in case of errors.
 	if err == nil && !withinBounds {
 		outOfDockerDisk = true
@@ -3475,6 +3475,10 @@ func (kl *Kubelet) GetContainerInfoV2(name string, options cadvisorapiv2.Request
 
 func (kl *Kubelet) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return kl.cadvisor.DockerImagesFsInfo()
+}
+
+func (kl *Kubelet) RktImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return kl.cadvisor.RktImagesFsInfo()
 }
 
 func (kl *Kubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {

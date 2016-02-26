@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ const mb = 1024 * 1024
 type diskSpaceManager interface {
 	// Checks the available disk space
 	IsRootDiskSpaceAvailable() (bool, error)
-	IsDockerDiskSpaceAvailable() (bool, error)
+	IsContainerDiskSpaceAvailable() (bool, error)
 }
 
 type DiskSpacePolicy struct {
@@ -59,7 +59,24 @@ type realDiskSpaceManager struct {
 	policy     DiskSpacePolicy   // thresholds. Set at creation time.
 }
 
-func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
+type rktDiskSpaceManager struct {
+	realDiskSpaceManager
+}
+
+func (dm *rktDiskSpaceManager) IsContainerDiskSpaceAvailable() (bool, error) {
+	glog.Infof("IsContainerDiskSpaceAvailable: rkt version")
+	return dm.realDiskSpaceManager.IsRktDiskSpaceAvailable()
+}
+
+type dockerDiskSpaceManager struct {
+	realDiskSpaceManager
+}
+
+func (dm *dockerDiskSpaceManager) IsContainerDiskSpaceAvailable() (bool, error) {
+	return dm.realDiskSpaceManager.IsDockerDiskSpaceAvailable()
+}
+
+func (dm realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 	fsi := fsInfo{}
@@ -83,15 +100,19 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 	return fsi, nil
 }
 
-func (dm *realDiskSpaceManager) IsDockerDiskSpaceAvailable() (bool, error) {
+func (dm realDiskSpaceManager) IsDockerDiskSpaceAvailable() (bool, error) {
 	return dm.isSpaceAvailable("docker", dm.policy.DockerFreeDiskMB, dm.cadvisor.DockerImagesFsInfo)
 }
 
-func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
+func (dm realDiskSpaceManager) IsRktDiskSpaceAvailable() (bool, error) {
+	return dm.isSpaceAvailable("rkt", dm.policy.DockerFreeDiskMB, dm.cadvisor.RktImagesFsInfo)
+}
+
+func (dm realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
 	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.cadvisor.RootFsInfo)
 }
 
-func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
+func (dm realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
 	fsInfo, err := dm.getFsInfo(fsType, f)
 	if err != nil {
 		return true, fmt.Errorf("failed to get fs info for %q: %v", fsType, err)
@@ -120,18 +141,26 @@ func validatePolicy(policy DiskSpacePolicy) error {
 	return nil
 }
 
-func newDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy) (diskSpaceManager, error) {
+func newDiskSpaceManager(containerRuntime string, cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy) (diskSpaceManager, error) {
+	glog.Infof("newDiskSpaceManager: containerRuntime = %v", containerRuntime)
 	// validate policy
 	err := validatePolicy(policy)
 	if err != nil {
 		return nil, err
 	}
 
-	dm := &realDiskSpaceManager{
+	dm := realDiskSpaceManager{
 		cadvisor:   cadvisorInterface,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
 	}
 
-	return dm, nil
+	switch containerRuntime {
+	case "docker":
+		return &dockerDiskSpaceManager{dm}, nil
+	case "rkt":
+		return &rktDiskSpaceManager{dm}, nil
+	default:
+		return nil, fmt.Errorf("Unknown container runtime: %v", containerRuntime)
+	}
 }

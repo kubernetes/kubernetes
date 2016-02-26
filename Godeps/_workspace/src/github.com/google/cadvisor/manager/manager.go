@@ -29,6 +29,7 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/configure"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
 	"github.com/google/cadvisor/events"
@@ -92,6 +93,8 @@ type Manager interface {
 	// Get version information about different components we depend on.
 	GetVersionInfo() (*info.VersionInfo, error)
 
+	GetRuntime() string
+
 	// Get filesystem information for a given label.
 	// Returns information for all global filesystems if label is empty.
 	GetFsInfo(label string) ([]v2.FsInfo, error)
@@ -117,9 +120,30 @@ type Manager interface {
 	DebugInfo() map[string][]string
 }
 
+type Config struct {
+	MemoryCache              *memory.InMemoryCache
+	Sysfs                    sysfs.SysFs
+	MaxHousekeepingInterval  time.Duration
+	AllowDynamicHousekeeping bool
+	ContainerRuntime         string
+}
+
 // New takes a memory storage and returns a new manager.
 func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool) (Manager, error) {
-	if memoryCache == nil {
+	config := Config{
+		MemoryCache: memoryCache,
+		Sysfs:       sysfs,
+		MaxHousekeepingInterval:  maxHousekeepingInterval,
+		AllowDynamicHousekeeping: allowDynamicHousekeeping,
+		ContainerRuntime:         "docker",
+	}
+	return NewWithConfig(config)
+}
+
+func NewWithConfig(c Config) (Manager, error) {
+	glog.Infof("cAdvisor: containerRuntme = %q", c.ContainerRuntime)
+
+	if c.MemoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
 
@@ -130,12 +154,16 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	}
 	glog.Infof("cAdvisor running in container: %q", selfContainer)
 
-	dockerInfo, err := docker.DockerInfo()
+	contConfigure, err := configure.GetContConfigure(c.ContainerRuntime)
 	if err != nil {
-		glog.Warningf("Unable to connect to Docker: %v", err)
+		return nil, err
 	}
-	context := fs.Context{DockerRoot: docker.RootDir(), DockerInfo: dockerInfo}
-	fsInfo, err := fs.NewFsInfo(context)
+
+	fsContext, err := contConfigure.GetFsContext()
+	if err != nil {
+		return nil, err
+	}
+	fsInfo, err := fs.NewFsInfo(fsContext)
 	if err != nil {
 		return nil, err
 	}
@@ -147,18 +175,20 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		inHostNamespace = true
 	}
 	newManager := &manager{
+		containerRuntime:         c.ContainerRuntime,
 		containers:               make(map[namespacedContainerName]*containerData),
 		quitChannels:             make([]chan error, 0, 2),
-		memoryCache:              memoryCache,
+		memoryCache:              c.MemoryCache,
 		fsInfo:                   fsInfo,
 		cadvisorContainer:        selfContainer,
 		inHostNamespace:          inHostNamespace,
 		startupTime:              time.Now(),
-		maxHousekeepingInterval:  maxHousekeepingInterval,
-		allowDynamicHousekeeping: allowDynamicHousekeeping,
+		maxHousekeepingInterval:  c.MaxHousekeepingInterval,
+		allowDynamicHousekeeping: c.AllowDynamicHousekeeping,
+		contConfigure:            contConfigure,
 	}
 
-	machineInfo, err := getMachineInfo(sysfs, fsInfo, inHostNamespace)
+	machineInfo, err := getMachineInfo(c.Sysfs, fsInfo, inHostNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +215,7 @@ type namespacedContainerName struct {
 }
 
 type manager struct {
+	containerRuntime         string
 	containers               map[namespacedContainerName]*containerData
 	containersLock           sync.RWMutex
 	memoryCache              *memory.InMemoryCache
@@ -198,24 +229,20 @@ type manager struct {
 	startupTime              time.Time
 	maxHousekeepingInterval  time.Duration
 	allowDynamicHousekeeping bool
+	contConfigure            configure.ContainerConfiguration
 }
 
 // Start the container manager.
 func (self *manager) Start() error {
-	// Register Docker container factory.
-	err := docker.Register(self, self.fsInfo)
+	err := self.contConfigure.RegisterRuntime(self, self.fsInfo)
 	if err != nil {
-		glog.Errorf("Docker container factory registration failed: %v.", err)
+		glog.Errorf("Container Runtime (%q) factory registration failed: %v.", self.containerRuntime, err)
 	}
 
-	// Register the raw driver.
 	err = raw.Register(self, self.fsInfo)
 	if err != nil {
 		glog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
-
-	self.DockerInfo()
-	self.DockerImages()
 
 	if *enableLoadReader {
 		// Create cpu load reader.
@@ -621,6 +648,7 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 }
 
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
+	glog.Infof("cadvisor: GetFsInfo: label = %q", label)
 	var empty time.Time
 	// Get latest data from filesystems hanging off root container.
 	stats, err := self.memoryCache.RecentStats("/", empty, empty, 1)
@@ -655,6 +683,7 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 			Available:  fs.Available,
 			Labels:     labels,
 		}
+		glog.Infof("cadvisor: GetFsInfo: mount = %q free size = %v", mountpoint, fs.Available)
 		fsInfo = append(fsInfo, fi)
 	}
 	return fsInfo, nil
@@ -1236,4 +1265,8 @@ func (m *manager) DebugInfo() map[string][]string {
 
 	debugInfo["Managed containers"] = lines
 	return debugInfo
+}
+
+func (m *manager) GetRuntime() string {
+	return m.containerRuntime
 }

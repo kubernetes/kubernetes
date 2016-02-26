@@ -23,6 +23,8 @@ type CpuSpec struct {
 	Limit    uint64 `json:"limit"`
 	MaxLimit uint64 `json:"max_limit"`
 	Mask     string `json:"mask,omitempty"`
+	Quota    uint64 `json:"quota,omitempty"`
+	Period   uint64 `json:"period,omitempty"`
 }
 
 type MemorySpec struct {

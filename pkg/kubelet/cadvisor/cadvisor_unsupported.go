@@ -31,7 +31,7 @@ type cadvisorUnsupported struct {
 
 var _ Interface = new(cadvisorUnsupported)
 
-func New(port uint) (Interface, error) {
+func New(port uint, containerRuntime string) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 
@@ -66,6 +66,10 @@ func (cu *cadvisorUnsupported) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 }
 
 func (cu *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, unsupportedErr
+}
+
+func (cu *cadvisorUnsupported) RktImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, unsupportedErr
 }
 

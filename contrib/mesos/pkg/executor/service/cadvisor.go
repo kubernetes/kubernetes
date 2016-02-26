@@ -29,7 +29,7 @@ type MesosCadvisor struct {
 }
 
 func NewMesosCadvisor(cores int, mem uint64, port uint) (*MesosCadvisor, error) {
-	c, err := cadvisor.New(port)
+	c, err := cadvisor.New(port, "docker")
 	if err != nil {
 		return nil, err
 	}

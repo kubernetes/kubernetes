@@ -134,6 +134,7 @@ func newDockerContainerHandler(
 	id := ContainerNameToDockerId(name)
 
 	// Add the Containers dir where the log files are stored.
+	// FIXME: Give `otherStorageDir` a more descriptive name.
 	otherStorageDir := path.Join(storageDir, pathToContainersDir, id)
 
 	rwLayerID, err := getRwLayerID(id, storageDir, storageDriver, dockerVersion)
