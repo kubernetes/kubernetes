@@ -341,13 +341,16 @@ var _ = Describe("[Feature:Example]", func() {
 			secretYaml := mkpath("secret.yaml")
 			podYaml := mkpath("secret-pod.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podName := "secret-test-pod"
 
 			By("creating secret and pod")
 			runKubectlOrDie("create", "-f", secretYaml, nsFlag)
 			runKubectlOrDie("create", "-f", podYaml, nsFlag)
+			err := waitForPodNoLongerRunningInNamespace(c, podName, ns)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if secret was read correctly")
-			_, err := lookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			_, err = lookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -363,11 +366,13 @@ var _ = Describe("[Feature:Example]", func() {
 
 			By("creating the pod")
 			runKubectlOrDie("create", "-f", podYaml, nsFlag)
+			err := waitForPodNoLongerRunningInNamespace(c, podName, ns)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if name and namespace were passed correctly")
-			_, err := lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAMESPACE=%v", ns), serverStartTimeout)
+			_, err = lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAME=%v", podName), serverStartTimeout)
+			_, err = lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
