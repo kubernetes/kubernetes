@@ -637,15 +637,18 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		availabilityZone: zone,
 	}
 
+	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
+	if err != nil {
+		return nil, err
+	}
+
+	awsCloud.selfAWSInstance = selfAWSInstance
+
 	filterTags := map[string]string{}
 	if cfg.Global.KubernetesClusterTag != "" {
 		filterTags[TagNameKubernetesCluster] = cfg.Global.KubernetesClusterTag
 	} else {
-		selfInstance, err := awsCloud.getSelfAWSInstance()
-		if err != nil {
-			return nil, err
-		}
-		selfInstanceInfo, err := selfInstance.getInfo()
+		selfInstanceInfo, err := selfAWSInstance.getInfo()
 		if err != nil {
 			return nil, err
 		}
@@ -1223,29 +1226,28 @@ func (self *awsDisk) deleteVolume() (bool, error) {
 
 // Gets the awsInstance for the EC2 instance on which we are running
 // may return nil in case of error
-func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
+func (c *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
+	return c.selfAWSInstance, nil
+}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	i := s.selfAWSInstance
-	if i == nil {
-		instanceId, err := s.metadata.GetMetadata("instance-id")
-		if err != nil {
-			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
-		}
-		// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
-		// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
-		instance, err := s.getInstanceByID(instanceId)
-		if err != nil {
-			return nil, fmt.Errorf("error finding instance %s: %v", instanceId, err)
-		}
-		i = newAWSInstance(s.ec2, instance)
-		s.selfAWSInstance = i
+// Builds the awsInstance for the EC2 instance on which we are running.
+// This is called when the AWSCloud is initialized, and should not be called otherwise (because the awsInstance for the local instance is a singleton with drive mapping state)
+func (c *AWSCloud) buildSelfAWSInstance() (*awsInstance, error) {
+	if c.selfAWSInstance != nil {
+		panic("do not call buildSelfAWSInstance directly")
 	}
-
-	return i, nil
+	instanceId, err := c.metadata.GetMetadata("instance-id")
+	if err != nil {
+		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+	}
+	// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+	// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
+	instance, err := c.getInstanceByID(instanceId)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instance %s: %v", instanceId, err)
+	}
+	return newAWSInstance(c.ec2, instance), nil
 }
 
 // Gets the awsInstance with node-name nodeName, or the 'self' instance if nodeName == ""
