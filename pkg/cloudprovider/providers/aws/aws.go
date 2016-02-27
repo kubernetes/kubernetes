@@ -939,14 +939,44 @@ type awsInstance struct {
 	deviceMappings map[mountDevice]string
 }
 
-func newAWSInstance(ec2 EC2, awsID, nodeName, availabilityZone, instanceType string) *awsInstance {
-	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName, availabilityZone: availabilityZone, instanceType: instanceType}
+// newAWSInstance creates a new awsInstance object
+func newAWSInstance(ec2 EC2, instance *ec2.Instance) *awsInstance {
+	self := &awsInstance{
+		ec2:              ec2,
+		awsID:            aws.StringValue(instance.InstanceId),
+		nodeName:         aws.StringValue(instance.PrivateDnsName),
+		availabilityZone: aws.StringValue(instance.Placement.AvailabilityZone),
+		instanceType:     aws.StringValue(instance.InstanceType),
+	}
 
 	// We lazy-init deviceMappings
 	self.deviceMappings = nil
 
 	return self
 }
+
+// newAwsInstanceFromMetadata would build a new awsInstance from the metadata service,
+// avoiding an EC2 API call.  BUT if we have a VPC with a custom DNS suffix, the metadata
+// service returns the wrong PrivateDnsName.  So we can't use it until we figure out a workaround
+// or no longer require the nodeName (e.g. if we use AWS InstanceID as the NodeName)
+//func newAWSInstanceFromMetadata() *awsInstance {
+//	instanceId, err := s.metadata.GetMetadata("instance-id")
+//	if err != nil {
+//		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+//	}
+//	// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+//	// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
+//	privateDnsName := aws.StringValue(instance.PrivateDnsName)
+//	availabilityZone, err := getAvailabilityZone(s.metadata)
+//	if err != nil {
+//		return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
+//	}
+//	instanceType, err := getInstanceType(s.metadata)
+//	if err != nil {
+//		return nil, fmt.Errorf("error fetching instance type from ec2 metadata service: %v", err)
+//	}
+//
+//}
 
 // Gets the awsInstanceType that models the instance type of this instance
 func (self *awsInstance) getInstanceType() *awsInstanceType {
@@ -1211,17 +1241,7 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error finding instance %s: %v", instanceId, err)
 		}
-		privateDnsName := aws.StringValue(instance.PrivateDnsName)
-		availabilityZone, err := getAvailabilityZone(s.metadata)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
-		}
-		instanceType, err := getInstanceType(s.metadata)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching instance type from ec2 metadata service: %v", err)
-		}
-
-		i = newAWSInstance(s.ec2, instanceId, privateDnsName, availabilityZone, instanceType)
+		i = newAWSInstance(s.ec2, instance)
 		s.selfAWSInstance = i
 	}
 
@@ -1243,7 +1263,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName), orEmpty(instance.Placement.AvailabilityZone), orEmpty(instance.InstanceType))
+		awsInstance = newAWSInstance(aws.ec2, instance)
 	}
 
 	return awsInstance, nil
