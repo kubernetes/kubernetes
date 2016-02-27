@@ -19,16 +19,17 @@ package cluster
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiclusters "k8s.io/kubernetes/pkg/apis/clusters"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store Cluster objects.
 type Registry interface {
-	ListClusters(ctx api.Context, options *api.ListOptions) (*api.ClusterList, error)
+	ListClusters(ctx api.Context, options *api.ListOptions) (*apiclusters.ClusterList, error)
 	WatchCluster(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetCluster(ctx api.Context, clusterID string) (*api.Cluster, error)
-	CreateCluster(ctx api.Context, cluster *api.Cluster) error
-	UpdateCluster(ctx api.Context, cluster *api.Cluster) error
+	GetCluster(ctx api.Context, clusterID string) (*apiclusters.Cluster, error)
+	CreateCluster(ctx api.Context, cluster *apiclusters.Cluster) error
+	UpdateCluster(ctx api.Context, cluster *apiclusters.Cluster) error
 	DeleteCluster(ctx api.Context, clusterID string) error
 }
 
@@ -44,32 +45,32 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusters(ctx api.Context, options *api.ListOptions) (*api.ClusterList, error) {
+func (s *storage) ListClusters(ctx api.Context, options *api.ListOptions) (*apiclusters.ClusterList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*api.ClusterList), nil
+	return obj.(*apiclusters.ClusterList), nil
 }
 
 func (s *storage) WatchCluster(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCluster(ctx api.Context, clusterID string) (*api.Cluster, error) {
+func (s *storage) GetCluster(ctx api.Context, clusterID string) (*apiclusters.Cluster, error) {
 	obj, err := s.Get(ctx, clusterID)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*api.Cluster), nil
+	return obj.(*apiclusters.Cluster), nil
 }
 
-func (s *storage) CreateCluster(ctx api.Context, cluster *api.Cluster) error {
+func (s *storage) CreateCluster(ctx api.Context, cluster *apiclusters.Cluster) error {
 	_, err := s.Create(ctx, cluster)
 	return err
 }
 
-func (s *storage) UpdateCluster(ctx api.Context, cluster *api.Cluster) error {
+func (s *storage) UpdateCluster(ctx api.Context, cluster *apiclusters.Cluster) error {
 	_, _, err := s.Update(ctx, cluster)
 	return err
 }

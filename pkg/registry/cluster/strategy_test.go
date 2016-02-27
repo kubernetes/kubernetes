@@ -22,13 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	apiclusters "k8s.io/kubernetes/pkg/apis/clusters"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"reflect"
 )
 
-func validNewCluster() *api.Cluster {
-	return &api.Cluster{
+func validNewCluster() *apiclusters.Cluster {
+	return &apiclusters.Cluster{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "4",
@@ -36,28 +37,28 @@ func validNewCluster() *api.Cluster {
 				"name": "foo",
 			},
 		},
-		Spec: api.ClusterSpec{
-			Address: api.ClusterAddress{
+		Spec: apiclusters.ClusterSpec{
+			Address: apiclusters.ClusterAddress{
 				Url: "http://localhost:8888",
 			},
 		},
-		Status: api.ClusterStatus{
-			Phase: api.ClusterTerminated,
+		Status: apiclusters.ClusterStatus{
+			Phase: apiclusters.ClusterTerminated,
 		},
 	}
 }
 
-func invalidNewCluster() *api.Cluster {
-	return &api.Cluster{
+func invalidNewCluster() *apiclusters.Cluster {
+	return &apiclusters.Cluster{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "5",
 		},
-		Spec: api.ClusterSpec{
+		Spec: apiclusters.ClusterSpec{
 			Credential: "bar",
 		},
-		Status: api.ClusterStatus{
-			Phase: api.ClusterOffline,
+		Status: apiclusters.ClusterStatus{
+			Phase: apiclusters.ClusterOffline,
 		},
 	}
 }
@@ -73,7 +74,7 @@ func TestClusterStrategy(t *testing.T) {
 
 	cluster := validNewCluster()
 	Strategy.PrepareForCreate(cluster)
-	if cluster.Status.Phase != api.ClusterPending {
+	if cluster.Status.Phase != apiclusters.ClusterPending {
 		t.Errorf("Cluster should not allow setting phase on create")
 	}
 	errs := Strategy.Validate(ctx, cluster)
@@ -146,7 +147,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Cluster",
-		labels.Set(ClusterToSelectableFields(&api.Cluster{})),
+		labels.Set(ClusterToSelectableFields(&apiclusters.Cluster{})),
 		nil,
 	)
 }
