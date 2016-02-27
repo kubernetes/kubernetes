@@ -398,7 +398,7 @@ var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
-var jobColumns = []string{"NAME", "SUCCESSFUL"}
+var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
@@ -838,11 +838,22 @@ func printJob(job *extensions.Job, w io.Writer, options PrintOptions) error {
 	}
 
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-	_, err := fmt.Fprintf(w, "%s\t%d",
-		name,
-		job.Status.Succeeded)
-	if err != nil {
-		return err
+	if job.Spec.Completions != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%d",
+			name,
+			*job.Spec.Completions,
+			job.Status.Succeeded,
+		); err != nil {
+			return err
+		}
+	} else {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%d",
+			name,
+			"<none>",
+			job.Status.Succeeded,
+		); err != nil {
+			return err
+		}
 	}
 	if options.Wide {
 		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s",
