@@ -205,6 +205,7 @@ type AWSCloud struct {
 	filterTags map[string]string
 
 	// The AWS instance that we are running on
+	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
 	selfAWSInstance *awsInstance
 
 	mutex sync.Mutex
@@ -368,9 +369,8 @@ func (self *AWSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error
 	return errors.New("unimplemented")
 }
 
-func (a *AWSCloud) CurrentNodeName(hostname string) (string, error) {
-	selfInstance := a.getSelfAWSInstance()
-	return selfInstance.nodeName, nil
+func (c *AWSCloud) CurrentNodeName(hostname string) (string, error) {
+	return c.selfAWSInstance.nodeName, nil
 }
 
 // Implementation of EC2.Instances
@@ -711,12 +711,11 @@ func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	self := aws.getSelfAWSInstance()
-	if self.nodeName == name || len(name) == 0 {
+func (c *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
 		addresses := []api.NodeAddress{}
 
-		internalIP, err := aws.metadata.GetMetadata("local-ipv4")
+		internalIP, err := c.metadata.GetMetadata("local-ipv4")
 		if err != nil {
 			return nil, err
 		}
@@ -724,7 +723,7 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		// Legacy compatibility: the private ip was the legacy host ip
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: internalIP})
 
-		externalIP, err := aws.metadata.GetMetadata("public-ipv4")
+		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
 			//TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
@@ -735,7 +734,7 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 
 		return addresses, nil
 	}
-	instance, err := aws.getInstanceByNodeName(name)
+	instance, err := c.getInstanceByNodeName(name)
 	if err != nil {
 		return nil, err
 	}
@@ -768,15 +767,14 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	awsInstance := aws.getSelfAWSInstance()
-	if awsInstance.nodeName == name {
+func (c *AWSCloud) ExternalID(name string) (string, error) {
+	if c.selfAWSInstance.nodeName == name {
 		// We assume that if this is run on the instance itself, the instance exists and is alive
-		return awsInstance.awsID, nil
+		return c.selfAWSInstance.awsID, nil
 	} else {
 		// We must verify that the instance still exists
 		// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-		instance, err := aws.findInstanceByNodeName(name)
+		instance, err := c.findInstanceByNodeName(name)
 		if err != nil {
 			return "", err
 		}
@@ -788,14 +786,13 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-func (aws *AWSCloud) InstanceID(name string) (string, error) {
-	awsInstance := aws.getSelfAWSInstance()
+func (c *AWSCloud) InstanceID(name string) (string, error) {
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
-	if awsInstance.nodeName == name {
-		return "/" + awsInstance.availabilityZone + "/" + awsInstance.awsID, nil
+	if c.selfAWSInstance.nodeName == name {
+		return "/" + c.selfAWSInstance.availabilityZone + "/" + c.selfAWSInstance.awsID, nil
 	} else {
-		inst, err := aws.getInstanceByNodeName(name)
+		inst, err := c.getInstanceByNodeName(name)
 		if err != nil {
 			return "", err
 		}
@@ -804,12 +801,11 @@ func (aws *AWSCloud) InstanceID(name string) (string, error) {
 }
 
 // InstanceType returns the type of the specified instance.
-func (aws *AWSCloud) InstanceType(name string) (string, error) {
-	awsInstance := aws.getSelfAWSInstance()
-	if awsInstance.nodeName == name {
-		return awsInstance.instanceType, nil
+func (c *AWSCloud) InstanceType(name string) (string, error) {
+	if c.selfAWSInstance.nodeName == name {
+		return c.selfAWSInstance.instanceType, nil
 	} else {
-		inst, err := aws.getInstanceByNodeName(name)
+		inst, err := c.getInstanceByNodeName(name)
 		if err != nil {
 			return "", err
 		}
@@ -878,9 +874,8 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 
 // GetZone implements Zones.GetZone
 func (c *AWSCloud) GetZone() (cloudprovider.Zone, error) {
-	i := c.getSelfAWSInstance()
 	return cloudprovider.Zone{
-		FailureDomain: i.availabilityZone,
+		FailureDomain: c.selfAWSInstance.availabilityZone,
 		Region:        c.region,
 	}, nil
 }
@@ -1209,13 +1204,6 @@ func (self *awsDisk) deleteVolume() (bool, error) {
 	return true, nil
 }
 
-// Gets the awsInstance for the EC2 instance on which we are running
-// may return nil in case of error
-func (c *AWSCloud) getSelfAWSInstance() *awsInstance {
-	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
-	return c.selfAWSInstance
-}
-
 // Builds the awsInstance for the EC2 instance on which we are running.
 // This is called when the AWSCloud is initialized, and should not be called otherwise (because the awsInstance for the local instance is a singleton with drive mapping state)
 func (c *AWSCloud) buildSelfAWSInstance() (*awsInstance, error) {
@@ -1236,17 +1224,17 @@ func (c *AWSCloud) buildSelfAWSInstance() (*awsInstance, error) {
 }
 
 // Gets the awsInstance with node-name nodeName, or the 'self' instance if nodeName == ""
-func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
+func (c *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 	var awsInstance *awsInstance
 	if nodeName == "" {
-		awsInstance = aws.getSelfAWSInstance()
+		awsInstance = c.selfAWSInstance
 	} else {
-		instance, err := aws.getInstanceByNodeName(nodeName)
+		instance, err := c.getInstanceByNodeName(nodeName)
 		if err != nil {
 			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, instance)
+		awsInstance = newAWSInstance(c.ec2, instance)
 	}
 
 	return awsInstance, nil
@@ -1387,11 +1375,11 @@ func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, e
 func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	// Default to creating in the current zone
 	// TODO: Spread across zones?
-	selfInstance := s.getSelfAWSInstance()
+	createAZ := s.selfAWSInstance.availabilityZone
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
-	request.AvailabilityZone = &selfInstance.availabilityZone
+	request.AvailabilityZone = &createAZ
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
 	request.VolumeType = aws.String(DefaultVolumeType)
