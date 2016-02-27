@@ -1390,6 +1390,7 @@ func (b kubectlBuilder) withStdinReader(reader io.Reader) *kubectlBuilder {
 
 func (b kubectlBuilder) execOrDie() string {
 	str, err := b.exec()
+	Logf("stdout: %q", str)
 	Expect(err).NotTo(HaveOccurred())
 	return str
 }
@@ -1416,7 +1417,6 @@ func (b kubectlBuilder) exec() (string, error) {
 		b.cmd.Process.Kill()
 		return "", fmt.Errorf("Timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
-	Logf("stdout: %q", stdout.String())
 	Logf("stderr: %q", stderr.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String()), nil
