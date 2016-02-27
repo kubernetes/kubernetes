@@ -541,6 +541,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer) {
 			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, out)
 		case volume.VolumeSource.RBD != nil:
 			printRBDVolumeSource(volume.VolumeSource.RBD, out)
+		case volume.VolumeSource.DownwardAPI != nil:
+			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
 		default:
 			fmt.Fprintf(out, "  <Volume Type Not Found>\n")
 		}
@@ -637,6 +639,13 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
 		"    SecretRef:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+}
+
+func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
+	for _, mapping := range d.Items {
+		fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+	}
 }
 
 type PersistentVolumeDescriber struct {
