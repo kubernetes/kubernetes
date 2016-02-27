@@ -209,20 +209,6 @@ PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 kube::log::status "Checking kubectl version"
 kubectl version
 
-# TODO: we need to note down the current default namespace and set back to this
-# namespace after the tests are done.
-kubectl config view
-CONTEXT="test"
-kubectl config set-context "${CONTEXT}"
-kubectl config use-context "${CONTEXT}"
-
-i=0
-create_and_use_new_namespace() {
-  i=$(($i+1))
-  kubectl create namespace "namespace${i}"
-  kubectl config set-context "${CONTEXT}" --namespace="namespace${i}"
-}
-
 runTests() {
   version="$1"
   echo "Testing api version: $1"
@@ -325,7 +311,6 @@ runTests() {
 
   ### Create POD valid-pod from JSON
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create "${kube_flags[@]}" -f docs/admin/limitrange/valid-pod.yaml
@@ -361,10 +346,9 @@ runTests() {
 
   ### Create POD valid-pod from dumped YAML
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  echo "${output_pod}" | sed '/namespace:/d' | kubectl create -f - "${kube_flags[@]}"
+  echo "${output_pod}" | kubectl create -f - "${kube_flags[@]}"
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -376,9 +360,8 @@ runTests() {
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
-  ### Create POD valid-pod from JSON
+  ### Create POD redis-master from JSON
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
@@ -393,9 +376,8 @@ runTests() {
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
-  ### Create POD valid-pod from YAML
+  ### Create POD valid-pod from JSON
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
@@ -428,7 +410,6 @@ runTests() {
 
   ### Create two PODs
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
@@ -446,7 +427,6 @@ runTests() {
 
   ### Create valid-pod POD
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
@@ -471,7 +451,6 @@ runTests() {
 
   ### Create valid-pod POD
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
@@ -610,7 +589,6 @@ __EOF__
 
   ### Create two PODs from 1 yaml file
   # Pre-condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f docs/user-guide/multi-pod.yaml "${kube_flags[@]}"
@@ -628,7 +606,6 @@ __EOF__
   ## kubectl apply should update configuration annotations only if apply is already called
   ## 1. kubectl create doesn't set the annotation
   # Pre-Condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create a pod "test-pod"
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
@@ -669,7 +646,6 @@ __EOF__
   ## Configuration annotations should be set when --save-config is enabled
   ## 1. kubectl create --save-config should generate configuration annotation
   # Pre-Condition: no POD exists
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create a pod "test-pod"
   kubectl create -f hack/testdata/pod.yaml --save-config "${kube_flags[@]}"
@@ -679,7 +655,6 @@ __EOF__
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ## 2. kubectl edit --save-config should generate configuration annotation
   # Pre-Condition: no POD exists, then create pod "test-pod", which shouldn't have configuration annotation
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
@@ -694,7 +669,6 @@ __EOF__
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ## 3. kubectl replace --save-config should generate configuration annotation
   # Pre-Condition: no POD exists, then create pod "test-pod", which shouldn't have configuration annotation
-  create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
@@ -713,7 +687,7 @@ __EOF__
   [[ "$(kubectl get rc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   ## 5. kubectl expose --save-config should generate configuration annotation
   # Pre-Condition: no service exists
-  kube::test::get_object_assert svc "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert svc "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command: expose the rc "nginx"
   kubectl expose rc nginx --save-config --port=80 --target-port=8000 "${kube_flags[@]}"
   # Post-Condition: service "nginx" has configuration annotation
@@ -770,8 +744,7 @@ __EOF__
 
   ### Create a new namespace
   # Pre-condition: only the "default" namespace exists
-  # The Pre-condition doesn't hold anymore after we create and switch namespaces before creating pods with same name in the test.
-  # kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:'
+  kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:'
   # Command
   kubectl create namespace my-namespace
   # Post-condition: namespace 'my-namespace' is created.
@@ -911,8 +884,7 @@ __EOF__
   ############
   # Services #
   ############
-  # switch back to the default namespace
-  kubectl config set-context "${CONTEXT}" --namespace=""
+
   kube::log::status "Testing kubectl(${version}:services)"
 
   ### Create redis-master service from JSON
@@ -1603,7 +1575,7 @@ __EOF__
   ############################
 
   # Pre-condition: the "default" namespace exists
-  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $id_field \\\"default\\\"}}{{$id_field}}:{{end}}{{end}}" 'default:'
+  kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:'
 
   ### Create POD
   # Pre-condition: no POD exists
