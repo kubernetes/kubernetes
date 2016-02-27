@@ -54,16 +54,16 @@ var _ = Describe("Deployment", func() {
 	It("deployment should delete old replica sets", func() {
 		testDeploymentCleanUpPolicy(f)
 	})
-	It("[Flaky] deployment should support rollover", func() {
+	It("deployment should support rollover", func() {
 		testRolloverDeployment(f)
 	})
-	It("[Flaky] paused deployment should be ignored by the controller", func() {
+	It("paused deployment should be ignored by the controller", func() {
 		testPausedDeployment(f)
 	})
-	It("[Flaky] deployment should support rollback", func() {
+	It("deployment should support rollback", func() {
 		testRollbackDeployment(f)
 	})
-	It("[Flaky] deployment should support rollback when there's replica set with no revision", func() {
+	It("deployment should support rollback when there's replica set with no revision", func() {
 		testRollbackDeploymentRSNoRevision(f)
 	})
 	It("deployment should label adopted RSs and pods", func() {
