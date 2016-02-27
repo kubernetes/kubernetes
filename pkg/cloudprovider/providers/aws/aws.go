@@ -2149,6 +2149,11 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
+	// Bail out early if there are no subnets
+	if len(subnetIDs) == 0 {
+		return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
+	}
+
 	// Create a security group for the load balancer
 	var securityGroupID string
 	{
