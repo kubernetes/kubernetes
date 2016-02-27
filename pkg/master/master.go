@@ -91,9 +91,10 @@ import (
 type Config struct {
 	*genericapiserver.Config
 
-	EnableCoreControllers bool
-	EventTTL              time.Duration
-	KubeletClient         kubeletclient.KubeletClient
+	EnableCoreControllers   bool
+	DeleteCollectionWorkers int
+	EventTTL                time.Duration
+	KubeletClient           kubeletclient.KubeletClient
 	// Used to start and monitor tunneling
 	Tunneler Tunneler
 }
@@ -105,7 +106,8 @@ type Master struct {
 	// Map of v1 resources to their REST storages.
 	v1ResourcesStorage map[string]rest.Storage
 
-	enableCoreControllers bool
+	enableCoreControllers   bool
+	deleteCollectionWorkers int
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
@@ -149,9 +151,10 @@ func New(c *Config) (*Master, error) {
 	}
 
 	m := &Master{
-		GenericAPIServer:      s,
-		enableCoreControllers: c.EnableCoreControllers,
-		tunneler:              c.Tunneler,
+		GenericAPIServer:        s,
+		enableCoreControllers:   c.EnableCoreControllers,
+		deleteCollectionWorkers: c.DeleteCollectionWorkers,
+		tunneler:                c.Tunneler,
 	}
 	m.InstallAPIs(c)
 
@@ -327,8 +330,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.Get("", resource) }
 	restOptions := func(resource string) generic.RESTOptions {
 		return generic.RESTOptions{
-			Storage:   dbClient(resource),
-			Decorator: m.StorageDecorator(),
+			Storage:                 dbClient(resource),
+			Decorator:               m.StorageDecorator(),
+			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		}
 	}
 
@@ -612,7 +616,8 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 }
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
-	resourceStorage := thirdpartyresourcedataetcd.NewREST(generic.RESTOptions{m.thirdPartyStorage, generic.UndecoratedStorage}, group, kind)
+	resourceStorage := thirdpartyresourcedataetcd.NewREST(
+		generic.RESTOptions{m.thirdPartyStorage, generic.UndecoratedStorage, m.deleteCollectionWorkers}, group, kind)
 
 	apiRoot := makeThirdPartyPath("")
 
@@ -662,8 +667,9 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	}
 	restOptions := func(resource string) generic.RESTOptions {
 		return generic.RESTOptions{
-			Storage:   c.StorageDestinations.Get(extensions.GroupName, resource),
-			Decorator: m.StorageDecorator(),
+			Storage:                 c.StorageDestinations.Get(extensions.GroupName, resource),
+			Decorator:               m.StorageDecorator(),
+			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		}
 	}
 
@@ -671,7 +677,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	if isEnabled("horizontalpodautoscalers") {
 		m.constructHPAResources(c, storage)
 		controllerStorage := expcontrolleretcd.NewStorage(
-			generic.RESTOptions{c.StorageDestinations.Get("", "replicationControllers"), m.StorageDecorator()})
+			generic.RESTOptions{c.StorageDestinations.Get("", "replicationControllers"), m.StorageDecorator(), m.deleteCollectionWorkers})
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
@@ -735,8 +741,9 @@ func (m *Master) constructHPAResources(c *Config, restStorage map[string]rest.St
 	// matter where they're accessed from.
 	restOptions := func(resource string) generic.RESTOptions {
 		return generic.RESTOptions{
-			Storage:   c.StorageDestinations.Search([]string{autoscaling.GroupName, extensions.GroupName}, resource),
-			Decorator: m.StorageDecorator(),
+			Storage:                 c.StorageDestinations.Search([]string{autoscaling.GroupName, extensions.GroupName}, resource),
+			Decorator:               m.StorageDecorator(),
+			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		}
 	}
 	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptions("horizontalpodautoscalers"))
@@ -771,8 +778,9 @@ func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.St
 	// matter where they're accessed from.
 	restOptions := func(resource string) generic.RESTOptions {
 		return generic.RESTOptions{
-			Storage:   c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource),
-			Decorator: m.StorageDecorator(),
+			Storage:                 c.StorageDestinations.Search([]string{batch.GroupName, extensions.GroupName}, resource),
+			Decorator:               m.StorageDecorator(),
+			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		}
 	}
 	jobStorage, jobStatusStorage := jobetcd.NewREST(restOptions("jobs"))

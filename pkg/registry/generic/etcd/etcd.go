@@ -19,6 +19,7 @@ package etcd
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -83,6 +85,10 @@ type Etcd struct {
 
 	// Returns a matcher corresponding to the provided labels and fields.
 	PredicateFunc func(label labels.Selector, field fields.Selector) generic.Matcher
+
+	// DeleteCollectionWorkers is the maximum number of workers in a single
+	// DeleteCollection call.
+	DeleteCollectionWorkers int
 
 	// Called on all objects returned from the underlying store, after
 	// the exit hooks are invoked. Decorators are intended for integrations
@@ -459,16 +465,63 @@ func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, lis
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range items {
-		accessor, err := meta.Accessor(item)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
-			return nil, err
-		}
+	// Spawn a number of goroutines, so that we can issue requests to etcd
+	// in parallel to speed up deletion.
+	// TODO: Make this proportional to the number of items to delete, up to
+	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
+	// workers to delete 10 items).
+	workersNumber := e.DeleteCollectionWorkers
+	if workersNumber < 1 {
+		workersNumber = 1
 	}
-	return listObj, nil
+	wg := sync.WaitGroup{}
+	toProcess := make(chan int, 2*workersNumber)
+	errs := make(chan error, workersNumber+1)
+
+	go func() {
+		defer utilruntime.HandleCrash(func(panicReason interface{}) {
+			errs <- fmt.Errorf("DeleteCollection distributor panicked: %v", panicReason)
+		})
+		for i := 0; i < len(items); i++ {
+			toProcess <- i
+		}
+		close(toProcess)
+	}()
+
+	wg.Add(workersNumber)
+	for i := 0; i < workersNumber; i++ {
+		go func() {
+			// panics don't cross goroutine boundaries
+			defer utilruntime.HandleCrash(func(panicReason interface{}) {
+				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
+			})
+			defer wg.Done()
+
+			for {
+				index, ok := <-toProcess
+				if !ok {
+					return
+				}
+				accessor, err := meta.Accessor(items[index])
+				if err != nil {
+					errs <- err
+					return
+				}
+				if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	select {
+	case err := <-errs:
+		return nil, err
+	default:
+		return listObj, nil
+	}
 }
 
 func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {

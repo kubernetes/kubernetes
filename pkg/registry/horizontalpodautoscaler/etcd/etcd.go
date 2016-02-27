@@ -62,7 +62,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return horizontalpodautoscaler.MatchAutoscaler(label, field)
 		},
-		QualifiedResource: extensions.Resource("horizontalpodautoscalers"),
+		QualifiedResource:       extensions.Resource("horizontalpodautoscalers"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate autoscaler creation
 		CreateStrategy: horizontalpodautoscaler.Strategy,

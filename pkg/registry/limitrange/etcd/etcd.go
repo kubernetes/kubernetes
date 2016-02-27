@@ -54,7 +54,8 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return limitrange.MatchLimitRange(label, field)
 		},
-		QualifiedResource: api.Resource("limitranges"),
+		QualifiedResource:       api.Resource("limitranges"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: limitrange.Strategy,
 		UpdateStrategy: limitrange.Strategy,

@@ -54,7 +54,8 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return endpoint.MatchEndpoints(label, field)
 		},
-		QualifiedResource: api.Resource("endpoints"),
+		QualifiedResource:       api.Resource("endpoints"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,

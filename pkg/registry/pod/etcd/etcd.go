@@ -80,7 +80,8 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return pod.MatchPod(label, field)
 		},
-		QualifiedResource: api.Resource("pods"),
+		QualifiedResource:       api.Resource("pods"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,

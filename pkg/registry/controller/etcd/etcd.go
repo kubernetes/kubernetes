@@ -66,6 +66,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		},
 		QualifiedResource: api.Resource("replicationcontrollers"),
 
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+
 		// Used to validate controller creation
 		CreateStrategy: controller.Strategy,
 
