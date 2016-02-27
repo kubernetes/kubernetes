@@ -765,43 +765,43 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/scheduler",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Comment": "before-0.26-protos-29-gb755e34",
-			"Rev": "b755e34cdb14a6de15ccb50605786c9ecacbfc1f"
+			"Comment": "before-0.26-protos-33-g45c8b08",
+			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
