@@ -401,7 +401,7 @@ func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.Persi
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:    "dummy",
+					PDName:    volume.ProvisionedVolumeName,
 					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,

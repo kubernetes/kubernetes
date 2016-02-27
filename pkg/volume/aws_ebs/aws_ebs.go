@@ -439,7 +439,7 @@ func (c *awsElasticBlockStoreProvisioner) NewPersistentVolumeTemplate() (*api.Pe
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-					VolumeID:  "dummy",
+					VolumeID:  volume.ProvisionedVolumeName,
 					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,
