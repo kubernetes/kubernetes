@@ -36,13 +36,14 @@ function cleanup {
 }
 trap cleanup EXIT
 
+cp -r "${KUBE_ROOT}/LICENSE" "${_tmpdir}/"
 cp -r "${KUBE_ROOT}/Godeps" "${_tmpdir}/Godeps"
 
 # Update Godep Licenses
 KUBE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-godep-licenses.sh"
 
 # Compare Godep Licenses
-if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES.md ${_tmpdir}/Godeps/LICENSES.md)"; then
+if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES ${_tmpdir}/Godeps/LICENSES)"; then
   echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh and commit the results."
   echo "${_out}"
   exit 1
