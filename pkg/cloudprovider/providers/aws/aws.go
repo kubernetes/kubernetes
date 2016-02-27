@@ -648,11 +648,12 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	if cfg.Global.KubernetesClusterTag != "" {
 		filterTags[TagNameKubernetesCluster] = cfg.Global.KubernetesClusterTag
 	} else {
-		selfInstanceInfo, err := selfAWSInstance.getInfo()
+		// TODO: Clean up double-API query
+		info, err := selfAWSInstance.describeInstance()
 		if err != nil {
 			return nil, err
 		}
-		for _, tag := range selfInstanceInfo.Tags {
+		for _, tag := range info.Tags {
 			if orEmpty(tag.Key) == TagNameKubernetesCluster {
 				filterTags[TagNameKubernetesCluster] = orEmpty(tag.Value)
 			}
@@ -989,7 +990,7 @@ func (self *awsInstance) getInstanceType() *awsInstanceType {
 }
 
 // Gets the full information about this instance from the EC2 API
-func (self *awsInstance) getInfo() (*ec2.Instance, error) {
+func (self *awsInstance) describeInstance() (*ec2.Instance, error) {
 	instanceID := self.awsID
 	request := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{&instanceID},
@@ -1025,7 +1026,7 @@ func (self *awsInstance) getMountDevice(volumeID string, assign bool) (assigned 
 
 	// We cache both for efficiency and correctness
 	if self.deviceMappings == nil {
-		info, err := self.getInfo()
+		info, err := self.describeInstance()
 		if err != nil {
 			return "", false, err
 		}
@@ -1145,7 +1146,7 @@ func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
 }
 
 // Gets the full information about this volume from the EC2 API
-func (self *awsDisk) getInfo() (*ec2.Volume, error) {
+func (self *awsDisk) describeVolume() (*ec2.Volume, error) {
 	volumeID := self.awsID
 
 	request := &ec2.DescribeVolumesInput{
@@ -1171,7 +1172,7 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 	maxAttempts := 60
 
 	for {
-		info, err := self.getInfo()
+		info, err := self.describeVolume()
 		if err != nil {
 			return err
 		}
@@ -1451,7 +1452,7 @@ func (c *AWSCloud) GetVolumeLabels(volumeName string) (map[string]string, error)
 	if err != nil {
 		return nil, err
 	}
-	info, err := awsDisk.getInfo()
+	info, err := awsDisk.describeVolume()
 	if err != nil {
 		return nil, err
 	}
