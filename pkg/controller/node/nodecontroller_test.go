@@ -1040,8 +1040,9 @@ func TestCheckPod(t *testing.T) {
 
 	for i, tc := range tcs {
 		var deleteCalls int
-		nc.forcefullyDeletePod = func(_ *api.Pod) {
+		nc.forcefullyDeletePod = func(_ *api.Pod) error {
 			deleteCalls++
+			return nil
 		}
 
 		nc.maybeDeleteTerminatingPod(&tc.pod)
