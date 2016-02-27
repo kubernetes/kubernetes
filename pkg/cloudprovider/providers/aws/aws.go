@@ -201,6 +201,7 @@ type AWSCloud struct {
 	cfg              *AWSCloudConfig
 	availabilityZone string
 	region           string
+	vpcID            string
 
 	filterTags map[string]string
 
@@ -643,6 +644,7 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	}
 
 	awsCloud.selfAWSInstance = selfAWSInstance
+	awsCloud.vpcID = selfAWSInstance.vpcID
 
 	filterTags := map[string]string{}
 	if cfg.Global.KubernetesClusterTag != "" {
@@ -933,6 +935,12 @@ type awsInstance struct {
 	// availability zone the instance resides in
 	availabilityZone string
 
+	// ID of VPC the instance resides in
+	vpcID string
+
+	// ID of subnet the instance resides in
+	subnetID string
+
 	// instance type
 	instanceType string
 
@@ -951,6 +959,8 @@ func newAWSInstance(ec2 EC2, instance *ec2.Instance) *awsInstance {
 		nodeName:         aws.StringValue(instance.PrivateDnsName),
 		availabilityZone: aws.StringValue(instance.Placement.AvailabilityZone),
 		instanceType:     aws.StringValue(instance.InstanceType),
+		vpcID:            aws.StringValue(instance.VpcId),
+		subnetID:         aws.StringValue(instance.SubnetId),
 	}
 
 	// We lazy-init deviceMappings
@@ -1833,7 +1843,7 @@ func (s *AWSCloud) ensureClusterTags(resourceID string, tags []*ec2.Tag) error {
 // Makes sure the security group exists.
 // For multi-cluster isolation, name must be globally unique, for example derived from the service UUID.
 // Returns the security group id or error
-func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID string) (string, error) {
+func (s *AWSCloud) ensureSecurityGroup(name string, description string) (string, error) {
 	groupID := ""
 	attempt := 0
 	for {
@@ -1842,7 +1852,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		request := &ec2.DescribeSecurityGroupsInput{}
 		filters := []*ec2.Filter{
 			newEc2Filter("group-name", name),
-			newEc2Filter("vpc-id", vpcID),
+			newEc2Filter("vpc-id", s.vpcID),
 		}
 		// Note that we do _not_ add our tag filters; group-name + vpc-id is the EC2 primary key.
 		// However, we do check that it matches our tags.
@@ -1869,7 +1879,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		}
 
 		createRequest := &ec2.CreateSecurityGroupInput{}
-		createRequest.VpcId = &vpcID
+		createRequest.VpcId = &s.vpcID
 		createRequest.GroupName = &name
 		createRequest.Description = &description
 
@@ -1951,9 +1961,9 @@ func (s *AWSCloud) createTags(resourceID string, tags map[string]string) error {
 	}
 }
 
-func (s *AWSCloud) listPublicSubnetIDsinVPC(vpcId string) ([]string, error) {
+func (s *AWSCloud) listPublicSubnetIDsinVPC() ([]string, error) {
 	sRequest := &ec2.DescribeSubnetsInput{}
-	vpcIdFilter := newEc2Filter("vpc-id", vpcId)
+	vpcIdFilter := newEc2Filter("vpc-id", s.vpcID)
 	var filters []*ec2.Filter
 	filters = append(filters, vpcIdFilter)
 	filters = s.addFilters(filters)
@@ -2084,14 +2094,8 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
-	vpcId, err := s.findVPCID()
-	if err != nil {
-		glog.Error("Error finding VPC", err)
-		return nil, err
-	}
-
 	// Construct list of configured subnets
-	subnetIDs, err := s.listPublicSubnetIDsinVPC(vpcId)
+	subnetIDs, err := s.listPublicSubnetIDsinVPC()
 	if err != nil {
 		glog.Error("Error listing subnets in VPC: ", err)
 		return nil, err
@@ -2102,7 +2106,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	{
 		sgName := "k8s-elb-" + name
 		sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", name, serviceName)
-		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription, vpcId)
+		securityGroupID, err = s.ensureSecurityGroup(sgName, sgDescription)
 		if err != nil {
 			glog.Error("Error creating load balancer security group: ", err)
 			return nil, err
