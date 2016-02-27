@@ -778,6 +778,10 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
+		// if the pod has already been deleted, ignore it
+		if pod.DeletionGracePeriodSeconds != nil {
+			continue
+		}
 		// if the pod is managed by a daemonset, ignore it
 		_, err := nc.daemonSetStore.GetPodDaemonSets(&pod)
 		if err == nil { // No error means at least one daemonset was found
@@ -786,7 +790,7 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 
 		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
 		nc.recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := nc.forcefullyDeletePod(&pod); err != nil {
+		if err := nc.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
 		remaining = true
