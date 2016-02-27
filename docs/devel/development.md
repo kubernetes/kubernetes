@@ -228,9 +228,8 @@ It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimi
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
 
-6) If you updated the Godeps, please also update `Godeps/LICENSES.md` by running `hack/update-godep-licenses.sh`.
+6) If you updated the Godeps, please also update `Godeps/LICENSES` by running `hack/update-godep-licenses.sh`.
 
-_If Godep does not automatically vendor the proper license file for a new dependency, be sure to add an exception entry to `hack/update-godep-licenses.sh`._
 
 ## Unit tests
 
