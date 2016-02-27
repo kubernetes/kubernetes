@@ -469,9 +469,10 @@ func Run(s *options.APIServer) error {
 			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
 			Serializer:                api.Codecs,
 		},
-		EnableCoreControllers: true,
-		EventTTL:              s.EventTTL,
-		KubeletClient:         kubeletClient,
+		EnableCoreControllers:   true,
+		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
+		EventTTL:                s.EventTTL,
+		KubeletClient:           kubeletClient,
 
 		Tunneler: tunneler,
 	}

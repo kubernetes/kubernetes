@@ -68,6 +68,8 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		QualifiedResource: api.Resource("configmaps"),
 
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,
 

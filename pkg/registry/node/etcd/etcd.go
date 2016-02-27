@@ -79,8 +79,9 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc:     node.MatchNode,
-		QualifiedResource: api.Resource("nodes"),
+		PredicateFunc:           node.MatchNode,
+		QualifiedResource:       api.Resource("nodes"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,

@@ -55,7 +55,8 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return podsecuritypolicy.MatchPodSecurityPolicy(label, field)
 		},
-		QualifiedResource: extensions.Resource("podsecuritypolicies"),
+		QualifiedResource:       extensions.Resource("podsecuritypolicies"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      podsecuritypolicy.Strategy,
 		UpdateStrategy:      podsecuritypolicy.Strategy,

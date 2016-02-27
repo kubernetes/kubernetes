@@ -57,9 +57,10 @@ func NewREST(opts generic.RESTOptions, group, kind string) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return thirdpartyresourcedata.Matcher(label, field)
 		},
-		QualifiedResource: extensions.Resource("thirdpartyresourcedatas"),
-		CreateStrategy:    thirdpartyresourcedata.Strategy,
-		UpdateStrategy:    thirdpartyresourcedata.Strategy,
+		QualifiedResource:       extensions.Resource("thirdpartyresourcedatas"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		CreateStrategy:          thirdpartyresourcedata.Strategy,
+		UpdateStrategy:          thirdpartyresourcedata.Strategy,
 
 		Storage: storageInterface,
 	}

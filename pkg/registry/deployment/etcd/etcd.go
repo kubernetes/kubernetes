@@ -89,7 +89,8 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return deployment.MatchDeployment(label, field)
 		},
-		QualifiedResource: extensions.Resource("deployments"),
+		QualifiedResource:       extensions.Resource("deployments"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate deployment creation.
 		CreateStrategy: deployment.Strategy,
