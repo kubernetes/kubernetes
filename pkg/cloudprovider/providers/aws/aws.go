@@ -194,14 +194,13 @@ type InstanceGroupInfo interface {
 
 // AWSCloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type AWSCloud struct {
-	ec2              EC2
-	elb              ELB
-	asg              ASG
-	metadata         EC2Metadata
-	cfg              *AWSCloudConfig
-	availabilityZone string
-	region           string
-	vpcID            string
+	ec2      EC2
+	elb      ELB
+	asg      ASG
+	metadata EC2Metadata
+	cfg      *AWSCloudConfig
+	region   string
+	vpcID    string
 
 	filterTags map[string]string
 
@@ -626,13 +625,12 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	}
 
 	awsCloud := &AWSCloud{
-		ec2:              ec2,
-		elb:              elb,
-		asg:              asg,
-		metadata:         metadata,
-		cfg:              cfg,
-		region:           regionName,
-		availabilityZone: zone,
+		ec2:      ec2,
+		elb:      elb,
+		asg:      asg,
+		metadata: metadata,
+		cfg:      cfg,
+		region:   regionName,
 	}
 
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
@@ -879,10 +877,11 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 }
 
 // GetZone implements Zones.GetZone
-func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
+func (c *AWSCloud) GetZone() (cloudprovider.Zone, error) {
+	i := c.getSelfAWSInstance()
 	return cloudprovider.Zone{
-		FailureDomain: self.availabilityZone,
-		Region:        self.region,
+		FailureDomain: i.availabilityZone,
+		Region:        c.region,
 	}, nil
 }
 
@@ -1099,13 +1098,11 @@ type awsDisk struct {
 	name string
 	// id in AWS
 	awsID string
-	// az which holds the volume
-	az string
 }
 
 func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
 	if !strings.HasPrefix(name, "aws://") {
-		name = "aws://" + aws.availabilityZone + "/" + name
+		name = "aws://" + "" + "/" + name
 	}
 	// name looks like aws://availability-zone/id
 	url, err := url.Parse(name)
@@ -1126,14 +1123,9 @@ func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
 	if strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "vol-") {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
 	}
-	az := url.Host
-	// TODO: Better validation?
-	// TODO: Default to our AZ?  Look it up?
-	// TODO: Should this be a region or an AZ?
-	if az == "" {
-		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
-	}
-	disk := &awsDisk{ec2: aws.ec2, name: name, awsID: awsID, az: az}
+	// az := url.Host
+	// TODO: Validate AZ?
+	disk := &awsDisk{ec2: aws.ec2, name: name, awsID: awsID}
 	return disk, nil
 }
 
@@ -1393,10 +1385,13 @@ func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, e
 
 // Implements Volumes.CreateVolume
 func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
-	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
+	// Default to creating in the current zone
+	// TODO: Spread across zones?
+	selfInstance := s.getSelfAWSInstance()
 
+	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
-	request.AvailabilityZone = &s.availabilityZone
+	request.AvailabilityZone = &selfInstance.availabilityZone
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
 	request.VolumeType = aws.String(DefaultVolumeType)
@@ -1426,8 +1421,8 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 }
 
 // Implements Volumes.DeleteDisk
-func (aws *AWSCloud) DeleteDisk(volumeName string) (bool, error) {
-	awsDisk, err := newAWSDisk(aws, volumeName)
+func (c *AWSCloud) DeleteDisk(volumeName string) (bool, error) {
+	awsDisk, err := newAWSDisk(c, volumeName)
 	if err != nil {
 		return false, err
 	}
