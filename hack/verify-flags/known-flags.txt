@@ -20,6 +20,7 @@ apiserver-count
 auth-path
 authorization-mode
 authorization-policy-file
+authorization-webhook-config-file
 basic-auth-file
 bench-pods
 bench-quiet
