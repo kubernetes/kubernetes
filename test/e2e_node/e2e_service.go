@@ -109,54 +109,51 @@ func (es *e2eService) startEtcd() (*exec.Cmd, error) {
 		return nil, err
 	}
 	es.etcdDataDir = dataDir
-	return es.startServer(healthCheckCommand{
-		combinedOut:    &es.etcdCombinedOut,
-		healthCheckUrl: "http://127.0.0.1:4001/v2/keys",
-		command:        "etcd",
-		args:           []string{"--data-dir", dataDir},
-	})
+	cmd := exec.Command("etcd")
+	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
+	// configuration (e.g. --name in version 0.4.9)
+	cmd.Dir = es.etcdDataDir
+	hcc := newHealthCheckCommand(
+		"http://127.0.0.1:4001/v2/keys/", // Trailing slash is required,
+		cmd,
+		&es.etcdCombinedOut)
+	return cmd, es.startServer(hcc)
 }
 
 func (es *e2eService) startApiServer() (*exec.Cmd, error) {
-	return es.startServer(
-		healthCheckCommand{
-			combinedOut:    &es.apiServerCombinedOut,
-			healthCheckUrl: "http://127.0.0.1:8080/healthz",
-			command:        "sudo",
-			args: []string{getApiServerBin(),
-				"--v", "2", "--logtostderr", "--log_dir", "./",
-				"--etcd-servers", "http://127.0.0.1:4001",
-				"--insecure-bind-address", "0.0.0.0",
-				"--service-cluster-ip-range", "10.0.0.1/24",
-				"--kubelet-port", "10250"},
-		})
+	cmd := exec.Command("sudo", getApiServerBin(),
+		"--v", "2", "--logtostderr", "--log_dir", "./",
+		"--etcd-servers", "http://127.0.0.1:4001",
+		"--insecure-bind-address", "0.0.0.0",
+		"--service-cluster-ip-range", "10.0.0.1/24",
+		"--kubelet-port", "10250")
+	hcc := newHealthCheckCommand(
+		"http://127.0.0.1:8080/healthz",
+		cmd,
+		&es.apiServerCombinedOut)
+	return cmd, es.startServer(hcc)
 }
 
 func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
-	return es.startServer(
-		healthCheckCommand{
-			combinedOut:    &es.kubeletCombinedOut,
-			healthCheckUrl: "http://127.0.0.1:10255/healthz",
-			command:        "sudo",
-			args: []string{getKubeletServerBin(),
-				"--v", "2", "--logtostderr", "--log_dir", "./",
-				"--api-servers", "http://127.0.0.1:8080",
-				"--address", "0.0.0.0",
-				"--port", "10250",
-				"--hostname-override", es.nodeName, // Required because hostname is inconsistent across hosts
-			},
-		})
+	cmd := exec.Command("sudo", getKubeletServerBin(),
+		"--v", "2", "--logtostderr", "--log_dir", "./",
+		"--api-servers", "http://127.0.0.1:8080",
+		"--address", "0.0.0.0",
+		"--port", "10250",
+		"--hostname-override", es.nodeName) // Required because hostname is inconsistent across hosts
+	hcc := newHealthCheckCommand(
+		"http://127.0.0.1:10255/healthz",
+		cmd,
+		&es.kubeletCombinedOut)
+	return cmd, es.startServer(hcc)
 }
 
-func (es *e2eService) startServer(hcc healthCheckCommand) (*exec.Cmd, error) {
+func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 	cmdErrorChan := make(chan error)
-	cmd := exec.Command(hcc.command, hcc.args...)
-	cmd.Stdout = hcc.combinedOut
-	cmd.Stderr = hcc.combinedOut
 	go func() {
 		err := cmd.Run()
 		if err != nil {
-			cmdErrorChan <- fmt.Errorf("%v Exited with status %v.  Output:\n%s", hcc, err, *hcc.combinedOut)
+			cmdErrorChan <- fmt.Errorf("%s Exited with status %v.  Output:\n%s", cmd, err, *cmd.OutputBuffer)
 		}
 		close(cmdErrorChan)
 	}()
@@ -165,24 +162,33 @@ func (es *e2eService) startServer(hcc healthCheckCommand) (*exec.Cmd, error) {
 	for endTime.After(time.Now()) {
 		select {
 		case err := <-cmdErrorChan:
-			return nil, err
+			return err
 		case <-time.After(time.Second):
-			resp, err := http.Get(hcc.healthCheckUrl)
+			resp, err := http.Get(cmd.HealthCheckUrl)
 			if err == nil && resp.StatusCode == http.StatusOK {
-				return cmd, nil
+				return nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("Timeout waiting for service %v", hcc)
+	return fmt.Errorf("Timeout waiting for service %s", cmd)
 }
 
 type healthCheckCommand struct {
-	healthCheckUrl string
-	command        string
-	args           []string
-	combinedOut    *bytes.Buffer
+	*exec.Cmd
+	HealthCheckUrl string
+	OutputBuffer   *bytes.Buffer
+}
+
+func newHealthCheckCommand(healthCheckUrl string, cmd *exec.Cmd, combinedOutput *bytes.Buffer) *healthCheckCommand {
+	cmd.Stdout = combinedOutput
+	cmd.Stderr = combinedOutput
+	return &healthCheckCommand{
+		HealthCheckUrl: healthCheckUrl,
+		Cmd:            cmd,
+		OutputBuffer:   combinedOutput,
+	}
 }
 
 func (hcc *healthCheckCommand) String() string {
-	return fmt.Sprintf("`%s %s` %s", hcc.command, strings.Join(hcc.args, " "), hcc.healthCheckUrl)
+	return fmt.Sprintf("`%s %s` health-check: %s", hcc.Path, strings.Join(hcc.Args, " "), hcc.HealthCheckUrl)
 }
