@@ -370,10 +370,7 @@ func (self *AWSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error
 }
 
 func (a *AWSCloud) CurrentNodeName(hostname string) (string, error) {
-	selfInstance, err := a.getSelfAWSInstance()
-	if err != nil {
-		return "", err
-	}
+	selfInstance := a.getSelfAWSInstance()
 	return selfInstance.nodeName, nil
 }
 
@@ -717,10 +714,7 @@ func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	self, err := aws.getSelfAWSInstance()
-	if err != nil {
-		return nil, err
-	}
+	self := aws.getSelfAWSInstance()
 	if self.nodeName == name || len(name) == 0 {
 		addresses := []api.NodeAddress{}
 
@@ -777,11 +771,7 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	awsInstance, err := aws.getSelfAWSInstance()
-	if err != nil {
-		return "", err
-	}
-
+	awsInstance := aws.getSelfAWSInstance()
 	if awsInstance.nodeName == name {
 		// We assume that if this is run on the instance itself, the instance exists and is alive
 		return awsInstance.awsID, nil
@@ -801,11 +791,7 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (aws *AWSCloud) InstanceID(name string) (string, error) {
-	awsInstance, err := aws.getSelfAWSInstance()
-	if err != nil {
-		return "", err
-	}
-
+	awsInstance := aws.getSelfAWSInstance()
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
 	if awsInstance.nodeName == name {
@@ -821,11 +807,7 @@ func (aws *AWSCloud) InstanceID(name string) (string, error) {
 
 // InstanceType returns the type of the specified instance.
 func (aws *AWSCloud) InstanceType(name string) (string, error) {
-	awsInstance, err := aws.getSelfAWSInstance()
-	if err != nil {
-		return "", err
-	}
-
+	awsInstance := aws.getSelfAWSInstance()
 	if awsInstance.nodeName == name {
 		return awsInstance.instanceType, nil
 	} else {
@@ -1237,9 +1219,9 @@ func (self *awsDisk) deleteVolume() (bool, error) {
 
 // Gets the awsInstance for the EC2 instance on which we are running
 // may return nil in case of error
-func (c *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
+func (c *AWSCloud) getSelfAWSInstance() *awsInstance {
 	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
-	return c.selfAWSInstance, nil
+	return c.selfAWSInstance
 }
 
 // Builds the awsInstance for the EC2 instance on which we are running.
@@ -1264,12 +1246,8 @@ func (c *AWSCloud) buildSelfAWSInstance() (*awsInstance, error) {
 // Gets the awsInstance with node-name nodeName, or the 'self' instance if nodeName == ""
 func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 	var awsInstance *awsInstance
-	var err error
 	if nodeName == "" {
-		awsInstance, err = aws.getSelfAWSInstance()
-		if err != nil {
-			return nil, fmt.Errorf("error getting self-instance: %v", err)
-		}
+		awsInstance = aws.getSelfAWSInstance()
 	} else {
 		instance, err := aws.getInstanceByNodeName(nodeName)
 		if err != nil {
