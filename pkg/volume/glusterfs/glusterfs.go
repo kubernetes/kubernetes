@@ -61,15 +61,8 @@ func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Glusterfs == nil) {
 		return false
 	}
-	// see if glusterfs mount helper is there
-	// this needs a ls because the plugin container may be on a filesystem
-	// that is not visible to the volume plugin process.
-	_, err := plugin.execCommand("ls", []string{"/sbin/mount.glusterfs"})
-	if err == nil {
-		return true
-	}
 
-	return false
+	return true
 
 }
 
