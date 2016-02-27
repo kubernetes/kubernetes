@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
@@ -61,6 +62,19 @@ type baz struct {
 
 func (obj *baz) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
+// childStructs tests some of the types we serialize to query params for log API calls
+// notably, the nested time struct
+type childStructs struct {
+	Container    string            `json:"container,omitempty"`
+	Follow       bool              `json:"follow,omitempty"`
+	Previous     bool              `json:"previous,omitempty"`
+	SinceSeconds *int64            `json:"sinceSeconds,omitempty"`
+	SinceTime    *unversioned.Time `json:"sinceTime,omitempty"`
+	EmptyTime    *unversioned.Time `json:"emptyTime"`
+}
+
+func (obj *childStructs) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+
 func validateResult(t *testing.T, input interface{}, actual, expected url.Values) {
 	local := url.Values{}
 	for k, v := range expected {
@@ -73,7 +87,6 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 			} else {
 				t.Errorf("%#v: values don't match: actual: %#v, expected: %#v", input, v, ev)
 			}
-			break
 		}
 		delete(local, k)
 	}
@@ -83,6 +96,9 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 }
 
 func TestConvert(t *testing.T) {
+	sinceSeconds := int64(123)
+	sinceTime := unversioned.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
+
 	tests := []struct {
 		input    interface{}
 		expected url.Values
@@ -157,6 +173,27 @@ func TestConvert(t *testing.T) {
 				Ptr: intp(5),
 			},
 			expected: url.Values{"ptr": {"5"}},
+		},
+		{
+			input: &childStructs{
+				Container:    "mycontainer",
+				Follow:       true,
+				Previous:     true,
+				SinceSeconds: &sinceSeconds,
+				SinceTime:    &sinceTime, // test a custom marshaller
+				EmptyTime:    nil,        // test a nil custom marshaller without omitempty
+			},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "sinceTime": {"2000-01-01T12:34:56Z"}, "emptyTime": {""}},
+		},
+		{
+			input: &childStructs{
+				Container:    "mycontainer",
+				Follow:       true,
+				Previous:     true,
+				SinceSeconds: &sinceSeconds,
+				SinceTime:    nil, // test a nil custom marshaller with omitempty
+			},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "emptyTime": {""}},
 		},
 	}
 
