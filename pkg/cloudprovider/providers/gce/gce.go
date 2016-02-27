@@ -153,6 +153,19 @@ func getCurrentExternalIDViaMetadata() (string, error) {
 	return externalID, nil
 }
 
+func getCurrentMachineTypeViaMetadata() (string, error) {
+	mType, err := metadata.Get("instance/machine-type")
+	if err != nil {
+		return "", fmt.Errorf("couldn't get machine type: %v", err)
+	}
+	parts := strings.Split(mType, "/")
+	if len(parts) != 4 {
+		return "", fmt.Errorf("unexpected response for machine type: %s", mType)
+	}
+
+	return parts[3], nil
+}
+
 func getNetworkNameViaMetadata() (string, error) {
 	result, err := metadata.Get("instance/network-interfaces/0/network")
 	if err != nil {
@@ -1825,6 +1838,15 @@ func (gce *GCECloud) ExternalID(instance string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (gce *GCECloud) InstanceID(instanceName string) (string, error) {
+	if gce.useMetadataServer {
+		// Use metadata, if possible, to fetch ID. See issue #12000
+		if gce.isCurrentInstance(instanceName) {
+			projectID, zone, err := getProjectAndZone()
+			if err == nil {
+				return projectID + "/" + zone + "/" + canonicalizeInstanceName(instanceName), nil
+			}
+		}
+	}
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		return "", err
@@ -1834,6 +1856,15 @@ func (gce *GCECloud) InstanceID(instanceName string) (string, error) {
 
 // InstanceType returns the type of the specified instance.
 func (gce *GCECloud) InstanceType(instanceName string) (string, error) {
+	if gce.useMetadataServer {
+		// Use metadata, if possible, to fetch ID. See issue #12000
+		if gce.isCurrentInstance(instanceName) {
+			mType, err := getCurrentMachineTypeViaMetadata()
+			if err == nil {
+				return mType, nil
+			}
+		}
+	}
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		return "", err
