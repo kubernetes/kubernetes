@@ -120,7 +120,7 @@ type NodeController struct {
 	daemonSetController *framework.Controller
 	daemonSetStore      cache.StoreToDaemonSetLister
 
-	forcefullyDeletePod func(*api.Pod) error
+	forcefullyDeletePod func(*api.Pod)
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -167,7 +167,7 @@ func NewNodeController(
 		now:                    unversioned.Now,
 		clusterCIDR:            clusterCIDR,
 		allocateNodeCIDRs:      allocateNodeCIDRs,
-		forcefullyDeletePod:    func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
+		forcefullyDeletePod:    func(p *api.Pod) { forcefullyDeletePod(kubeClient, p) },
 	}
 
 	nc.podStore.Store, nc.podController = framework.NewInformer(
@@ -329,7 +329,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 
 	// delete terminating pods that have not yet been scheduled
 	if len(pod.Spec.NodeName) == 0 {
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
+		nc.forcefullyDeletePod(pod)
 		return
 	}
 
@@ -345,7 +345,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	// delete terminating pods that have been scheduled on
 	// nonexistent nodes
 	if !found {
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
+		nc.forcefullyDeletePod(pod)
 		return
 	}
 
@@ -358,18 +358,21 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
+		nc.forcefullyDeletePod(pod)
 		return
 	}
 	if gracefulDeletionVersion.GT(v) {
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
+		nc.forcefullyDeletePod(pod)
 		return
 	}
 }
 
-func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) error {
+func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) {
 	var zero int64
-	return c.Core().Pods(pod.Namespace).Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &zero})
+	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &zero})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
@@ -778,6 +781,10 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
+		// if the pod has already been deleted, ignore it
+		if pod.DeletionGracePeriodSeconds != nil {
+			continue
+		}
 		// if the pod is managed by a daemonset, ignore it
 		_, err := nc.daemonSetStore.GetPodDaemonSets(&pod)
 		if err == nil { // No error means at least one daemonset was found
@@ -786,7 +793,7 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 
 		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
 		nc.recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := nc.forcefullyDeletePod(&pod); err != nil {
+		if err := nc.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
 		remaining = true
