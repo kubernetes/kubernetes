@@ -406,7 +406,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 		} else if shouldRun && len(daemonPods) > 1 {
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
-			sort.Sort(podByCreationTimestamp(daemonPods))
+			sort.Sort(controller.PodByCreationTimestamp(daemonPods))
 			for i := 1; i < len(daemonPods); i++ {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
 			}
@@ -623,18 +623,6 @@ func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-}
-
-type podByCreationTimestamp []*api.Pod
-
-func (o podByCreationTimestamp) Len() int      { return len(o) }
-func (o podByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o podByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}

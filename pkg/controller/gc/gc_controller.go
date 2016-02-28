@@ -86,7 +86,7 @@ func (gcc *GCController) Run(stop <-chan struct{}) {
 func (gcc *GCController) gc() {
 	terminatedPods, _ := gcc.podStore.List(labels.Everything())
 	terminatedPodCount := len(terminatedPods)
-	sort.Sort(byCreationTimestamp(terminatedPods))
+	sort.Sort(controller.PodByCreationTimestamp(terminatedPods))
 
 	deleteCount := terminatedPodCount - gcc.threshold
 
@@ -109,17 +109,4 @@ func (gcc *GCController) gc() {
 		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
 	}
 	wait.Wait()
-}
-
-// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*api.Pod
-
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }

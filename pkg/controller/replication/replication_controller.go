@@ -248,7 +248,7 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 		// overlap, sort by creation timestamp, subsort by name, then pick
 		// the first.
 		glog.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels)
-		sort.Sort(OverlappingControllers(controllers))
+		sort.Sort(overlappingControllers(controllers))
 	}
 
 	// update lookup cache
