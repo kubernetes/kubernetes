@@ -113,6 +113,8 @@ func (config *DirectClientConfig) ClientConfig() (*client.Config, error) {
 		var err error
 
 		// mergo is a first write wins for map value and a last writing wins for interface values
+		// NOTE: This behavior changed with https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a.
+		//       Our mergo.Merge version is older than this change.
 		userAuthPartialConfig, err := getUserIdentificationPartialConfig(configAuthInfo, config.fallbackReader)
 		if err != nil {
 			return nil, err
