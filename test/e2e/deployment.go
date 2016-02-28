@@ -142,7 +142,7 @@ func checkDeploymentRevision(c *clientset.Clientset, ns, deploymentName, revisio
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	// Check revision of the new replica set of this deployment
-	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS.Annotations).NotTo(Equal(nil))
 	Expect(newRS.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal(revision))
@@ -280,7 +280,7 @@ func testRollingUpdateDeployment(f *Framework) {
 	// There should be 1 old RS (nginx-controller, which is adopted)
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
-	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, c)
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(allOldRSs)).Should(Equal(1))
 	// The old RS should contain pod-template-hash in its selector, label, and template label
@@ -340,7 +340,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// There should be 2 events, one to scale up the new ReplicaSet and then to scale down
 	// the old ReplicaSet.
 	Expect(len(events.Items)).Should(Equal(2))
-	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 1", newRS.Name)))
@@ -395,7 +395,7 @@ func testRecreateDeployment(f *Framework) {
 	}
 	// There should be 2 events, one to scale up the new ReplicaSet and then to scale down the old ReplicaSet.
 	Expect(len(events.Items)).Should(Equal(2))
-	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
@@ -529,7 +529,7 @@ func testPausedDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that there is no latest state realized for the new deployment.
-	rs, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	if rs != nil {
 		err = fmt.Errorf("unexpected new rs/%s for deployment/%s", rs.Name, deployment.Name)
@@ -573,7 +573,7 @@ func testPausedDeployment(f *Framework) {
 	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
-	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(DeleteReplicaSet(unversionedClient, ns, newRS.Name)).NotTo(HaveOccurred())
 
@@ -584,7 +584,7 @@ func testPausedDeployment(f *Framework) {
 		err = fmt.Errorf("deployment %q should be paused", deployment.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-	shouldBeNil, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	shouldBeNil, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	if shouldBeNil != nil {
 		err = fmt.Errorf("deployment %q shouldn't have a replica set but there is %q", deployment.Name, shouldBeNil.Name)
@@ -848,7 +848,7 @@ func testDeploymentLabelAdopted(f *Framework) {
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 		// TODO: remove this once we can delete replica sets with deployment
-		newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+		newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(c.Extensions().ReplicaSets(ns).Delete(newRS.Name, nil)).NotTo(HaveOccurred())
 	}()
@@ -863,12 +863,12 @@ func testDeploymentLabelAdopted(f *Framework) {
 	// There should be no old RSs (overlapping RS)
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
-	oldRSs, allOldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, c)
+	oldRSs, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(oldRSs)).Should(Equal(0))
 	Expect(len(allOldRSs)).Should(Equal(0))
 	// New RS should contain pod-template-hash in its selector, label, and template label
-	newRS, err := deploymentutil.GetNewReplicaSet(*deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
 	Expect(len(newRS.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
