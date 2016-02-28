@@ -2248,11 +2248,11 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		if err != nil {
 			return false, err
 		}
-		oldRSs, allOldRSs, err = deploymentutil.GetOldReplicaSets(*deployment, c)
+		oldRSs, allOldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c)
 		if err != nil {
 			return false, err
 		}
-		newRS, err = deploymentutil.GetNewReplicaSet(*deployment, c)
+		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -2318,7 +2318,7 @@ func waitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName strin
 		if err != nil {
 			return false, err
 		}
-		_, oldRSs, err := deploymentutil.GetOldReplicaSets(*deployment, c)
+		_, oldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c)
 		if err != nil {
 			return false, err
 		}

@@ -49,7 +49,7 @@ const (
 
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func GetOldReplicaSets(deployment extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	return GetOldReplicaSetsFromLists(deployment, c,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
@@ -66,7 +66,7 @@ type podListFunc func(string, api.ListOptions) (*api.PodList, error)
 
 // GetOldReplicaSetsFromLists returns two sets of old replica sets targeted by the given Deployment; get PodList and ReplicaSetList with input functions.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.Interface, getPodList podListFunc, getRSList rsListFunc) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func GetOldReplicaSetsFromLists(deployment *extensions.Deployment, c clientset.Interface, getPodList podListFunc, getRSList rsListFunc) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	// Find all pods whose labels match deployment.Spec.Selector, and corresponding replica sets for pods in podList.
 	// All pods and replica sets are labeled with pod-template-hash to prevent overlapping
 	// TODO: Right now we list all replica sets and then filter. We should add an API for this.
@@ -109,7 +109,7 @@ func GetOldReplicaSetsFromLists(deployment extensions.Deployment, c clientset.In
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
-func GetNewReplicaSet(deployment extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
+func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
 	return GetNewReplicaSetFromList(deployment, c,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
@@ -122,7 +122,7 @@ func GetNewReplicaSet(deployment extensions.Deployment, c clientset.Interface) (
 
 // GetNewReplicaSetFromList returns a replica set that matches the intent of the given deployment; get ReplicaSetList with the input function.
 // Returns nil if the new replica set doesn't exist yet.
-func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Interface, getPodList podListFunc, getRSList rsListFunc) (*extensions.ReplicaSet, error) {
+func GetNewReplicaSetFromList(deployment *extensions.Deployment, c clientset.Interface, getPodList podListFunc, getRSList rsListFunc) (*extensions.ReplicaSet, error) {
 	rsList, _, err := rsAndPodsWithHashKeySynced(deployment, c, getRSList, getPodList)
 	if err != nil {
 		return nil, fmt.Errorf("error listing ReplicaSets: %v", err)
@@ -140,7 +140,7 @@ func GetNewReplicaSetFromList(deployment extensions.Deployment, c clientset.Inte
 }
 
 // rsAndPodsWithHashKeySynced returns the RSs and pods the given deployment targets, with pod-template-hash information synced.
-func rsAndPodsWithHashKeySynced(deployment extensions.Deployment, c clientset.Interface, getRSList rsListFunc, getPodList podListFunc) ([]extensions.ReplicaSet, *api.PodList, error) {
+func rsAndPodsWithHashKeySynced(deployment *extensions.Deployment, c clientset.Interface, getRSList rsListFunc, getPodList podListFunc) ([]extensions.ReplicaSet, *api.PodList, error) {
 	namespace := deployment.Namespace
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
@@ -173,7 +173,7 @@ func rsAndPodsWithHashKeySynced(deployment extensions.Deployment, c clientset.In
 // 1. Add hash label to the rs's pod template, and make sure the controller sees this update so that no orphaned pods will be created
 // 2. Add hash label to all pods this rs owns
 // 3. Add hash label to the rs's label and selector
-func addHashKeyToRSAndPods(deployment extensions.Deployment, c clientset.Interface, rs extensions.ReplicaSet, getPodList podListFunc) (updatedRS *extensions.ReplicaSet, err error) {
+func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interface, rs extensions.ReplicaSet, getPodList podListFunc) (updatedRS *extensions.ReplicaSet, err error) {
 	updatedRS = &rs
 	// If the rs already has the new hash label in its selector, it's done syncing
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
@@ -307,7 +307,7 @@ func updatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 }
 
 // Returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
-func GetNewReplicaSetTemplate(deployment extensions.Deployment) api.PodTemplateSpec {
+func GetNewReplicaSetTemplate(deployment *extensions.Deployment) api.PodTemplateSpec {
 	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
 	newRSTemplate := api.PodTemplateSpec{
 		ObjectMeta: deployment.Spec.Template.ObjectMeta,

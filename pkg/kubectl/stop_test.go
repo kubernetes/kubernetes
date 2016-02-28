@@ -512,7 +512,7 @@ func TestDeploymentStop(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplate(deployment)
+	template := deploymentutil.GetNewReplicaSetTemplate(&deployment)
 	tests := []struct {
 		Name            string
 		Objs            []runtime.Object
