@@ -245,7 +245,7 @@ func TestActivePodFiltering(t *testing.T) {
 }
 
 func TestSortingActivePods(t *testing.T) {
-	numPods := 5
+	numPods := 9
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
 	podList := newPodList(nil, numPods, api.PodRunning, rc)
@@ -266,10 +266,35 @@ func TestSortingActivePods(t *testing.T) {
 	// pods[3] is running but not ready.
 	pods[3].Spec.NodeName = "foo"
 	pods[3].Status.Phase = api.PodRunning
-	// pods[4] is running and ready.
+	// pods[4] is running and ready but without LastTransitionTime.
+	now := unversioned.Now()
 	pods[4].Spec.NodeName = "foo"
 	pods[4].Status.Phase = api.PodRunning
 	pods[4].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
+	pods[4].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[5] is running and ready and with LastTransitionTime.
+	pods[5].Spec.NodeName = "foo"
+	pods[5].Status.Phase = api.PodRunning
+	pods[5].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: now}}
+	pods[5].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[6] is running ready for a longer time than pods[5].
+	then := unversioned.Time{Time: now.AddDate(0, -1, 0)}
+	pods[6].Spec.NodeName = "foo"
+	pods[6].Status.Phase = api.PodRunning
+	pods[6].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[6].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[7] has lower container restart count than pods[6].
+	pods[7].Spec.NodeName = "foo"
+	pods[7].Status.Phase = api.PodRunning
+	pods[7].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[7].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[7].CreationTimestamp = now
+	// pods[8] is older than pods[7].
+	pods[8].Spec.NodeName = "foo"
+	pods[8].Status.Phase = api.PodRunning
+	pods[8].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[8].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[8].CreationTimestamp = then
 
 	getOrder := func(pods []*api.Pod) []string {
 		names := make([]string, len(pods))

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/integer"
 )
 
 const (
@@ -422,20 +423,66 @@ func (s ActivePods) Len() int      { return len(s) }
 func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s ActivePods) Less(i, j int) bool {
-	// Unassigned < assigned
-	if s[i].Spec.NodeName == "" && s[j].Spec.NodeName != "" {
-		return true
+	// 1. Unassigned < assigned
+	// If only one of the pods is unassigned, the unassigned one is smaller
+	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
+		return len(s[i].Spec.NodeName) == 0
 	}
-	// PodPending < PodUnknown < PodRunning
+	// 2. PodPending < PodUnknown < PodRunning
 	m := map[api.PodPhase]int{api.PodPending: 0, api.PodUnknown: 1, api.PodRunning: 2}
 	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
 		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
 	}
-	// Not ready < ready
-	if !api.IsPodReady(s[i]) && api.IsPodReady(s[j]) {
-		return true
+	// 3. Not ready < ready
+	// If only one of the pods is not ready, the not ready one is smaller
+	if api.IsPodReady(s[i]) != api.IsPodReady(s[j]) {
+		return !api.IsPodReady(s[i])
+	}
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 4. Been ready for empty time < less time < more time
+	// If both pods are ready, the latest ready one is smaller
+	if api.IsPodReady(s[i]) && api.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
+		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
+	}
+	// 5. Pods with containers with higher restart counts < lower restart counts
+	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
+		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	}
+	// 6. Empty creation time pods < newer pods < older pods
+	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
+		return afterOrZero(s[i].CreationTimestamp, s[j].CreationTimestamp)
 	}
 	return false
+}
+
+// afterOrZero checks if time t1 is after time t2; if one of them
+// is zero, the zero time is seen as after non-zero time.
+func afterOrZero(t1, t2 unversioned.Time) bool {
+	if t1.Time.IsZero() || t2.Time.IsZero() {
+		return t1.Time.IsZero()
+	}
+	return t1.After(t2.Time)
+}
+
+func podReadyTime(pod *api.Pod) unversioned.Time {
+	if api.IsPodReady(pod) {
+		for _, c := range pod.Status.Conditions {
+			// we only care about pod ready conditions
+			if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+				return c.LastTransitionTime
+			}
+		}
+	}
+	return unversioned.Time{}
+}
+
+func maxContainerRestarts(pod *api.Pod) int {
+	maxRestarts := 0
+	for _, c := range pod.Status.ContainerStatuses {
+		maxRestarts = integer.IntMax(maxRestarts, c.RestartCount)
+	}
+	return maxRestarts
 }
 
 // FilterActivePods returns pods that have not terminated.
