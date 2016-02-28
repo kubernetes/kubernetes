@@ -37,7 +37,7 @@ set-kube-env() {
   local kube_env_yaml="/etc/kubernetes/kube_env.yaml"
 
   # kube-env has all the environment variables we care about, in a flat yaml format
-  eval "$(python -c '
+  eval "$(python3 -c '
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():

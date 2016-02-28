@@ -123,7 +123,7 @@ function get_igw_id {
 function get_elbs_in_vpc {
   # ELB doesn't seem to be on the same platform as the rest of AWS; doesn't support filtering
   aws elb --output json describe-load-balancers  | \
-    python -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if lb['VPCId'] == '$1']; print('\n'.join(lst))"
+    python3 -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if lb['VPCId'] == '$1']; print('\n'.join(lst))"
 }
 
 function get_instanceid_from_name {

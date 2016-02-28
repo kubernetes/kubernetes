@@ -60,7 +60,7 @@ download_kube_env() {
     -o "${tmp_install_dir}/kube_env.yaml" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
   # Convert the yaml format file into a shell-style file.
-  eval $(python -c '''
+  eval $(python3 -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
