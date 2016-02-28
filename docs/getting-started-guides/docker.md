@@ -119,24 +119,14 @@ $ chmod 755 kubectl
 $ PATH=$PATH:`pwd`
 ```
 
-Create configuration:
-
-```
-$ kubectl config set-cluster test-doc --server=http://localhost:8080
-$ kubectl config set-context test-doc --cluster=test-doc
-$ kubectl config use-context test-doc
-```
-
-For Max OS X users instead of `localhost` you will have to use IP address of your docker machine,
-which you can find by running `docker-machine env <machinename>` (see [documentation](https://docs.docker.com/machine/reference/env/)
-for details).
+Max OS X users might have to `export KUBERNETES_SERVER=http://${K8S_MASTER_IP}:8080` and replace `${K8S_MASTER_IP}` with the IP of the `docker-machine`. Find out by running: `docker-machine env <machinename>` (see the [documentation](https://docs.docker.com/machine/reference/env/) for more details).
 
 ### Test it out
 
 List the nodes in your cluster by running:
 
-```sh
-kubectl get nodes
+```console
+$ kubectl get nodes
 ```
 
 This should print:
@@ -148,43 +138,43 @@ NAME        LABELS                             STATUS
 
 ### Run an application
 
-```sh
-kubectl run nginx --image=nginx --port=80
+```console
+$ kubectl run nginx --image=nginx --port=80
 ```
 
 Now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
 
 ### Expose it as a service
 
-```sh
-kubectl expose rc nginx --port=80
+```console
+$ kubectl expose rc nginx --port=80
 ```
 
 Run the following command to obtain the IP of this service we just created. There are two IPs, the first one is internal (CLUSTER_IP), and the second one is the external load-balanced IP (if a LoadBalancer is configured)
 
-```sh
-kubectl get svc nginx
+```console
+$ kubectl get svc nginx
 ```
 
 Alternatively, you can obtain only the first IP (CLUSTER_IP) by running:
 
-```sh
-kubectl get svc nginx --template={{.spec.clusterIP}}
+```console
+$ kubectl get svc nginx --template={{.spec.clusterIP}}
 ```
 
 Hit the webserver with the first IP (CLUSTER_IP):
 
-```sh
-curl <insert-cluster-ip-here>
+```console
+$ curl <insert-cluster-ip-here>
 ```
 
 Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
 
-## Deploy a DNS
+### Deploy a DNS
 
 See [here](docker-multinode/deployDNS.md) for instructions.
 
-### A note on turning down your cluster
+## A note on turning down your cluster
 
 Many of these containers run under the management of the `kubelet` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
 the cluster, you need to first kill the kubelet container, and then any other containers.
