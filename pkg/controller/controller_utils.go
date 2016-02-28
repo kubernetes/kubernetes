@@ -36,7 +36,21 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-const CreatedByAnnotation = "kubernetes.io/created-by"
+const (
+	CreatedByAnnotation = "kubernetes.io/created-by"
+
+	// If a watch drops a delete event for a pod, it'll take this long
+	// before a dormant controller waiting for those packets is woken up anyway. It is
+	// specifically targeted at the case where some problem prevents an update
+	// of expectations, without it the controller could stay asleep forever. This should
+	// be set based on the expected latency of watch events.
+	//
+	// Currently a controller can service (create *and* observe the watch events for said
+	// creation) about 10 pods a second, so it takes about 1 min to service
+	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
+	// latency/pod at the scale of 3000 pods over 100 nodes.
+	ExpectationsTimeout = 5 * time.Minute
+)
 
 var (
 	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
@@ -150,10 +164,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 
 // TODO: Extend ExpirationCache to support explicit expiration.
 // TODO: Make this possible to disable in tests.
-// TODO: Parameterize timeout.
 // TODO: Support injection of clock.
 func (exp *ControlleeExpectations) isExpired() bool {
-	return util.RealClock{}.Since(exp.timestamp) > 10*time.Second
+	return util.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
