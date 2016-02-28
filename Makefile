@@ -150,6 +150,6 @@ release:
 # Example:
 #   make release-skip-tests
 release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n build/release.sh
+	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
 
