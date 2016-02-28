@@ -4,6 +4,8 @@
   - [Downloads](#downloads)
   - [Highlights](#highlights)
   - [Known Issues and Important Steps before Upgrading](#known-issues-and-important-steps-before-upgrading)
+      - [ThirdPartyResource](#thirdpartyresource)
+      - [kubectl](#kubectl)
       - [kubernetes Core Known Issues](#kubernetes-core-known-issues)
       - [Docker runtime Known Issues](#docker-runtime-known-issues)
       - [Rkt runtime Known Issues](#rkt-runtime-known-issues)
