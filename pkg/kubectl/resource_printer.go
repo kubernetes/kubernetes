@@ -398,12 +398,12 @@ var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
-var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL"}
+var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
-var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
+var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "STATUS", "AGE"}
-var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR"}
+var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR", "AGE"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
@@ -839,18 +839,20 @@ func printJob(job *extensions.Job, w io.Writer, options PrintOptions) error {
 
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 	if job.Spec.Completions != nil {
-		if _, err := fmt.Fprintf(w, "%s\t%d\t%d",
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
 			name,
 			*job.Spec.Completions,
 			job.Status.Succeeded,
+			translateTimestamp(job.CreationTimestamp),
 		); err != nil {
 			return err
 		}
 	} else {
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%d",
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s",
 			name,
 			"<none>",
 			job.Status.Succeeded,
+			translateTimestamp(job.CreationTimestamp),
 		); err != nil {
 			return err
 		}
@@ -1002,11 +1004,13 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v",
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%s",
 		name,
 		"-",
 		backendStringer(ingress.Spec.Backend),
-		loadBalancerStatusStringer(ingress.Status.LoadBalancer)); err != nil {
+		loadBalancerStatusStringer(ingress.Status.LoadBalancer),
+		translateTimestamp(ingress.CreationTimestamp),
+	); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, appendLabels(ingress.Labels, options.ColumnLabels)); err != nil {
@@ -1078,11 +1082,12 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions)
 		// this shouldn't happen if LabelSelector passed validation
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s\t%s",
 		name,
 		desiredScheduled,
 		currentScheduled,
 		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
+		translateTimestamp(ds.CreationTimestamp),
 	); err != nil {
 		return err
 	}
