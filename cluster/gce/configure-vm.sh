@@ -183,7 +183,8 @@ apt-get-update() {
 # Restart any services that need restarting due to a library upgrade
 # Uses needrestart
 restart-updated-services() {
-  if [[ "${AUTO_RESTART_SERVICES:-auto}" == "no" ]]; then
+  # We default to restarting services, because this is only done as part of an update
+  if [[ "${AUTO_RESTART_SERVICES:-true}" != "true" ]]; then
     echo "Auto restart of services prevented by AUTO_RESTART_SERVICES=${AUTO_RESTART_SERVICES}"
     return
   fi
@@ -205,7 +206,8 @@ reboot-if-required() {
     cat /var/run/reboot-required.pkgs
   fi
 
-  if [[ "${AUTO_REBOOT:-auto}" == "no" ]]; then
+  # We default to rebooting the machine because this is only done as part of an update
+  if [[ "${AUTO_REBOOT:-true}" != "true" ]]; then
     echo "Reboot prevented by AUTO_REBOOT=${AUTO_REBOOT}"
     return
   fi
@@ -218,6 +220,11 @@ reboot-if-required() {
 
 # Install upgrades using unattended-upgrades, then reboot or restart services
 auto-upgrade() {
+  # We default to not installing upgrades
+  if [[ "${AUTO_UPGRADE:-false}" != "true" ]]; then
+    echo "AUTO_UPGRADE not set to true; won't auto-upgrade"
+    return
+  fi
   apt-get-install unattended-upgrades needrestart
   unattended-upgrade --debug
   reboot-if-required # We may reboot the machine right here
@@ -838,9 +845,7 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   ensure-packages
   set-kube-env
-  if [[ "${AUTO_UPGRADE:-auto}" != "no" ]]; then
-    auto-upgrade
-  fi
+  auto-upgrade
   ensure-local-disks
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
