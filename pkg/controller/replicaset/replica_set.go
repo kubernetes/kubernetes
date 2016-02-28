@@ -289,21 +289,24 @@ func isReplicaSetMatch(pod *api.Pod, rs *extensions.ReplicaSet) bool {
 // When a pod is created, enqueue the replica set that manages it and update it's expectations.
 func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
+
+	rs := rsc.getPodReplicaSet(pod)
+	if rs == nil {
+		return
+	}
+	rsKey, err := controller.KeyFunc(rs)
+	if err != nil {
+		glog.Errorf("Couldn't get key for replication controller %#v: %v", rs, err)
+		return
+	}
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		rsc.deletePod(pod)
-		return
-	}
-	if rs := rsc.getPodReplicaSet(pod); rs != nil {
-		rsKey, err := controller.KeyFunc(rs)
-		if err != nil {
-			glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
-			return
-		}
+		rsc.expectations.DeletionObserved(rsKey)
+	} else {
 		rsc.expectations.CreationObserved(rsKey)
-		rsc.enqueueReplicaSet(rs)
 	}
+	rsc.enqueueReplicaSet(rs)
 }
 
 // When a pod is updated, figure out what replica set/s manage it and wake them
@@ -314,22 +317,28 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// A periodic relist will send update events for all known pods.
 		return
 	}
-	// TODO: Write a unittest for this case
 	curPod := cur.(*api.Pod)
-	if curPod.DeletionTimestamp != nil {
-		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
-		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an ReplicaSet to create more replicas asap, not wait
-		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
-		// a ReplicaSet never initiates a phase change, and so is never asleep waiting for the same.
-		rsc.deletePod(curPod)
+	rs := rsc.getPodReplicaSet(curPod)
+	if rs == nil {
 		return
 	}
-	if rs := rsc.getPodReplicaSet(curPod); rs != nil {
-		rsc.enqueueReplicaSet(rs)
+	rsKey, err := controller.KeyFunc(rs)
+	if err != nil {
+		glog.Errorf("Couldn't get key for replication controller %#v: %v", rs, err)
+		return
 	}
 	oldPod := old.(*api.Pod)
-	// Only need to get the old replica set if the labels changed.
+
+	if curPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
+		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
+		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
+		// for modification of the deletion timestamp and expect an rc to create more replicas asap, not wait
+		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
+		// an rc never initiates a phase change, and so is never asleep waiting for the same.
+		rsc.expectations.DeletionObserved(rsKey)
+	}
+
+	rsc.enqueueReplicaSet(rs)
 	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
 		// If the old and new ReplicaSet are the same, the first one that syncs
 		// will set expectations preventing any damage from the second.
@@ -366,7 +375,11 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
 			return
 		}
-		rsc.expectations.DeletionObserved(rsKey)
+		// This method only manages expectations for the case where a pod is
+		// deleted without a grace period.
+		if pod.DeletionTimestamp == nil {
+			rsc.expectations.DeletionObserved(rsKey)
+		}
 		rsc.enqueueReplicaSet(rs)
 	}
 }

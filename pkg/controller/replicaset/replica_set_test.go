@@ -910,3 +910,85 @@ func TestOverlappingRSs(t *testing.T) {
 		}
 	}
 }
+
+func TestDeletionTimestamp(t *testing.T) {
+	c := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	labelMap := map[string]string{"foo": "bar"}
+	manager := NewReplicaSetController(c, controller.NoResyncPeriodFunc, 10, 0)
+	manager.podStoreSynced = alwaysReady
+
+	rs := newReplicaSet(1, labelMap)
+	manager.rsStore.Store.Add(rs)
+	rsKey, err := controller.KeyFunc(rs)
+	if err != nil {
+		t.Errorf("Couldn't get key for object %+v: %v", rs, err)
+	}
+	pod := newPodList(nil, 1, api.PodPending, labelMap, rs).Items[0]
+	pod.DeletionTimestamp = &unversioned.Time{time.Now()}
+	manager.expectations.SetExpectations(rsKey, 0, 1)
+
+	// A pod added with a deletion timestamp should decrement deletions, not creations.
+	manager.addPod(&pod)
+
+	queueRC, _ := manager.queue.Get()
+	if queueRC != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRC)
+	}
+	manager.queue.Done(rsKey)
+
+	podExp, exists, err := manager.expectations.GetExpectations(rsKey)
+	if !exists || err != nil || !podExp.Fulfilled() {
+		t.Fatalf("Wrong expectations %+v", podExp)
+	}
+
+	// An update from no deletion timestamp to having one should be treated
+	// as a deletion.
+	oldPod := newPodList(nil, 1, api.PodPending, labelMap, rs).Items[0]
+	manager.expectations.SetExpectations(rsKey, 0, 1)
+	manager.updatePod(&oldPod, &pod)
+
+	queueRC, _ = manager.queue.Get()
+	if queueRC != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRC)
+	}
+	manager.queue.Done(rsKey)
+
+	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
+	if !exists || err != nil || !podExp.Fulfilled() {
+		t.Fatalf("Wrong expectations %+v", podExp)
+	}
+
+	// An update to the pod (including an update to the deletion timestamp)
+	// should not be counted as a second delete.
+	manager.expectations.SetExpectations(rsKey, 0, 1)
+	oldPod.DeletionTimestamp = &unversioned.Time{time.Now()}
+	manager.updatePod(&oldPod, &pod)
+
+	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
+	if !exists || err != nil || podExp.Fulfilled() {
+		t.Fatalf("Wrong expectations %+v", podExp)
+	}
+
+	// A pod with a non-nil deletion timestamp should also be ignored by the
+	// delete handler, because it's already been counted in the update.
+	manager.deletePod(&pod)
+	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
+	if !exists || err != nil || podExp.Fulfilled() {
+		t.Fatalf("Wrong expectations %+v", podExp)
+	}
+
+	// A pod with a nil timestamp should be counted as a deletion.
+	pod.DeletionTimestamp = nil
+	manager.deletePod(&pod)
+
+	queueRC, _ = manager.queue.Get()
+	if queueRC != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRC)
+	}
+	manager.queue.Done(rsKey)
+
+	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
+	if !exists || err != nil || !podExp.Fulfilled() {
+		t.Fatalf("Wrong expectations %+v", podExp)
+	}
+}
