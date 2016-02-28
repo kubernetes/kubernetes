@@ -165,9 +165,7 @@ func (g *GenericPLEG) relist() {
 		return
 	}
 	pods := kubecontainer.Pods(podList)
-	for _, pod := range pods {
-		g.podRecords.setCurrent(pod)
-	}
+	g.podRecords.setCurrent(pods)
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
@@ -308,12 +306,17 @@ func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 	return r.current
 }
 
-func (pr podRecords) setCurrent(pod *kubecontainer.Pod) {
-	if r, ok := pr[pod.ID]; ok {
-		r.current = pod
-		return
+func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
+	for i := range pr {
+		pr[i].current = nil
 	}
-	pr[pod.ID] = &podRecord{current: pod}
+	for _, pod := range pods {
+		if r, ok := pr[pod.ID]; ok {
+			r.current = pod
+		} else {
+			pr[pod.ID] = &podRecord{current: pod}
+		}
+	}
 }
 
 func (pr podRecords) update(id types.UID) {
