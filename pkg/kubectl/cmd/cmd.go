@@ -152,6 +152,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	}
 
 	f.BindFlags(cmds.PersistentFlags())
+	f.BindExternalFlags(cmds.PersistentFlags())
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(util.WarnWordSepNormalizeFunc)

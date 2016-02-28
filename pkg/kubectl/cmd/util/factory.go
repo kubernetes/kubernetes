@@ -585,9 +585,6 @@ func (f *Factory) Command() string {
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
-	// any flags defined by external projects (not part of pflags)
-	flags.AddGoFlagSet(flag.CommandLine)
-
 	// Merge factory's flags
 	flags.AddFlagSet(f.flags)
 
@@ -600,6 +597,12 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+}
+
+// BindCommonFlags adds any flags defined by external projects (not part of pflags)
+func (f *Factory) BindExternalFlags(flags *pflag.FlagSet) {
+	// any flags defined by external projects (not part of pflags)
+	flags.AddGoFlagSet(flag.CommandLine)
 }
 
 func getPorts(spec api.PodSpec) []string {
