@@ -167,7 +167,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
-	template := GetNewReplicaSetTemplate(deployment)
+	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
 			Name:   api.SimpleNameGenerator.GenerateName("replicaset"),
@@ -260,7 +260,7 @@ func TestGetNewRC(t *testing.T) {
 		fakeClient = addListRSReactor(fakeClient, test.objs[1])
 		fakeClient = addUpdatePodsReactor(fakeClient)
 		fakeClient = addUpdateRSReactor(fakeClient)
-		rs, err := GetNewReplicaSet(newDeployment, fakeClient)
+		rs, err := GetNewReplicaSet(&newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
@@ -348,7 +348,7 @@ func TestGetOldRCs(t *testing.T) {
 		fakeClient = addListRSReactor(fakeClient, test.objs[1])
 		fakeClient = addUpdatePodsReactor(fakeClient)
 		fakeClient = addUpdateRSReactor(fakeClient)
-		rss, _, err := GetOldReplicaSets(newDeployment, fakeClient)
+		rss, _, err := GetOldReplicaSets(&newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
