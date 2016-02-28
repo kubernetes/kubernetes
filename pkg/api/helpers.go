@@ -79,9 +79,82 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
+var standardResourceQuotaScopes = sets.NewString(
+	string(ResourceQuotaScopeTerminating),
+	string(ResourceQuotaScopeNotTerminating),
+	string(ResourceQuotaScopeBestEffort),
+	string(ResourceQuotaScopeNotBestEffort),
+)
+
+// IsStandardResourceQuotaScope returns true if the scope is a standard value
+func IsStandardResourceQuotaScope(str string) bool {
+	return standardResourceQuotaScopes.Has(str)
+}
+
+var podObjectCountQuotaResources = sets.NewString(
+	string(ResourcePods),
+)
+
+var podComputeQuotaResources = sets.NewString(
+	string(ResourceCPU),
+	string(ResourceMemory),
+	string(ResourceLimitsCPU),
+	string(ResourceLimitsMemory),
+	string(ResourceRequestsCPU),
+	string(ResourceRequestsMemory),
+)
+
+// IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
+func IsResourceQuotaScopeValidForResource(scope ResourceQuotaScope, resource string) bool {
+	switch scope {
+	case ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeNotBestEffort:
+		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
+	case ResourceQuotaScopeBestEffort:
+		return podObjectCountQuotaResources.Has(resource)
+	default:
+		return true
+	}
+}
+
+var standardContainerResources = sets.NewString(
+	string(ResourceCPU),
+	string(ResourceMemory),
+)
+
+// IsStandardContainerResourceName returns true if the container can make a resource request
+// for the specified resource
+func IsStandardContainerResourceName(str string) bool {
+	return standardContainerResources.Has(str)
+}
+
+var standardQuotaResources = sets.NewString(
+	string(ResourceCPU),
+	string(ResourceMemory),
+	string(ResourceRequestsCPU),
+	string(ResourceRequestsMemory),
+	string(ResourceLimitsCPU),
+	string(ResourceLimitsMemory),
+	string(ResourcePods),
+	string(ResourceQuotas),
+	string(ResourceServices),
+	string(ResourceReplicationControllers),
+	string(ResourceSecrets),
+	string(ResourcePersistentVolumeClaims),
+)
+
+// IsStandardQuotaResourceName returns true if the resource is known to
+// the quota tracking system
+func IsStandardQuotaResourceName(str string) bool {
+	return standardQuotaResources.Has(str)
+}
+
 var standardResources = sets.NewString(
 	string(ResourceCPU),
 	string(ResourceMemory),
+	string(ResourceRequestsCPU),
+	string(ResourceRequestsMemory),
+	string(ResourceLimitsCPU),
+	string(ResourceLimitsMemory),
 	string(ResourcePods),
 	string(ResourceQuotas),
 	string(ResourceServices),

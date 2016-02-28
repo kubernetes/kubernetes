@@ -4044,10 +4044,50 @@ func TestValidateResourceQuota(t *testing.T) {
 		Hard: api.ResourceList{
 			api.ResourceCPU:                    resource.MustParse("100"),
 			api.ResourceMemory:                 resource.MustParse("10000"),
+			api.ResourceRequestsCPU:            resource.MustParse("100"),
+			api.ResourceRequestsMemory:         resource.MustParse("10000"),
+			api.ResourceLimitsCPU:              resource.MustParse("100"),
+			api.ResourceLimitsMemory:           resource.MustParse("10000"),
 			api.ResourcePods:                   resource.MustParse("10"),
 			api.ResourceServices:               resource.MustParse("0"),
 			api.ResourceReplicationControllers: resource.MustParse("10"),
 			api.ResourceQuotas:                 resource.MustParse("10"),
+		},
+	}
+
+	terminatingSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU:       resource.MustParse("100"),
+			api.ResourceLimitsCPU: resource.MustParse("200"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating},
+	}
+
+	nonTerminatingSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
+	}
+
+	bestEffortSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourcePods: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+	}
+
+	nonBestEffortSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
+	}
+
+	// storage is not yet supported as a quota tracked resource
+	invalidQuotaResourceSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceStorage: resource.MustParse("10"),
 		},
 	}
 
@@ -4077,6 +4117,27 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 
+	invalidTerminatingScopePairsSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating, api.ResourceQuotaScopeNotTerminating},
+	}
+
+	invalidBestEffortScopePairsSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourcePods: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort, api.ResourceQuotaScopeNotBestEffort},
+	}
+
+	invalidScopeNameSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScope("foo")},
+	}
+
 	successCases := []api.ResourceQuota{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -4091,6 +4152,34 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: fractionalComputeSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: terminatingSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: nonTerminatingSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: bestEffortSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: nonBestEffortSpec,
 		},
 	}
 
@@ -4127,6 +4216,22 @@ func TestValidateResourceQuota(t *testing.T) {
 		"fractional-api-resource": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
 			isNotIntegerErrorMsg,
+		},
+		"invalid-quota-resource": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
+			isInvalidQuotaResource,
+		},
+		"invalid-quota-terminating-pair": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
+			"conflicting scopes",
+		},
+		"invalid-quota-besteffort-pair": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidBestEffortScopePairsSpec},
+			"conflicting scopes",
+		},
+		"invalid-quota-scope-name": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
+			"unsupported scope",
 		},
 	}
 	for k, v := range errorCases {

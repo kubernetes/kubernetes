@@ -17515,8 +17515,19 @@
      "hard": {
       "type": "any",
       "description": "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"
+     },
+     "scopes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ResourceQuotaScope"
+      },
+      "description": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects."
      }
     }
+   },
+   "v1.ResourceQuotaScope": {
+    "id": "v1.ResourceQuotaScope",
+    "properties": {}
    },
    "v1.ResourceQuotaStatus": {
     "id": "v1.ResourceQuotaStatus",

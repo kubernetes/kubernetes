@@ -262,35 +262,40 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 		fmt.Fprint(w, "No resource quota.\n")
 		return
 	}
-	resources := []api.ResourceName{}
-	hard := map[api.ResourceName]resource.Quantity{}
-	used := map[api.ResourceName]resource.Quantity{}
+	sort.Sort(SortableResourceQuotas(quotas.Items))
+
+	fmt.Fprint(w, "Resource Quotas")
 	for _, q := range quotas.Items {
+		fmt.Fprintf(w, "\n Name:\t%s\n", q.Name)
+		if len(q.Spec.Scopes) > 0 {
+			scopes := []string{}
+			for _, scope := range q.Spec.Scopes {
+				scopes = append(scopes, string(scope))
+			}
+			sort.Strings(scopes)
+			fmt.Fprintf(w, " Scopes:\t%s\n", strings.Join(scopes, ", "))
+			for _, scope := range scopes {
+				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
+				if len(helpText) > 0 {
+					fmt.Fprintf(w, "  * %s\n", helpText)
+				}
+			}
+		}
+
+		fmt.Fprintf(w, " Resource\tUsed\tHard\n")
+		fmt.Fprint(w, " --------\t---\t---\n")
+
+		resources := []api.ResourceName{}
 		for resource := range q.Status.Hard {
 			resources = append(resources, resource)
+		}
+		sort.Sort(SortableResourceNames(resources))
+
+		for _, resource := range resources {
 			hardQuantity := q.Status.Hard[resource]
 			usedQuantity := q.Status.Used[resource]
-
-			// if for some reason there are multiple quota documents, we take least permissive
-			prevQuantity, ok := hard[resource]
-			if ok {
-				if hardQuantity.Value() < prevQuantity.Value() {
-					hard[resource] = hardQuantity
-				}
-			} else {
-				hard[resource] = hardQuantity
-			}
-			used[resource] = usedQuantity
+			fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
 		}
-	}
-
-	sort.Sort(SortableResourceNames(resources))
-	fmt.Fprint(w, "Resource Quotas\n Resource\tUsed\tHard\n")
-	fmt.Fprint(w, " ---\t---\t---\n")
-	for _, resource := range resources {
-		hardQuantity := hard[resource]
-		usedQuantity := used[resource]
-		fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
 	}
 }
 
@@ -397,10 +402,38 @@ func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error
 	return describeQuota(resourceQuota)
 }
 
+func helpTextForResourceQuotaScope(scope api.ResourceQuotaScope) string {
+	switch scope {
+	case api.ResourceQuotaScopeTerminating:
+		return "Matches all pods that have an active deadline."
+	case api.ResourceQuotaScopeNotTerminating:
+		return "Matches all pods that do not have an active deadline."
+	case api.ResourceQuotaScopeBestEffort:
+		return "Matches all pods that have best effort quality of service."
+	case api.ResourceQuotaScopeNotBestEffort:
+		return "Matches all pods that do not have best effort quality of service."
+	default:
+		return ""
+	}
+}
 func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", resourceQuota.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", resourceQuota.Namespace)
+		if len(resourceQuota.Spec.Scopes) > 0 {
+			scopes := []string{}
+			for _, scope := range resourceQuota.Spec.Scopes {
+				scopes = append(scopes, string(scope))
+			}
+			sort.Strings(scopes)
+			fmt.Fprintf(out, "Scopes:\t%s\n", strings.Join(scopes, ", "))
+			for _, scope := range scopes {
+				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
+				if len(helpText) > 0 {
+					fmt.Fprintf(out, " * %s\n", helpText)
+				}
+			}
+		}
 		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
 		fmt.Fprintf(out, "--------\t----\t----\n")
 
