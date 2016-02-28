@@ -117,7 +117,7 @@ until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}
   sleep 1
 done
 
-password=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
+password=$(python3 -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
 
 gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
   --command="sudo mkdir /srv/kubernetes -p && \

@@ -203,7 +203,7 @@ You will need the jinja2 package if you do not already have it: `pip install --u
 Now, use this one-line python program to expand the template:
 
 ```
-$ alias render_template='python -c "from jinja2 import Template; import sys; print(Template(sys.stdin.read()).render());"'
+$ alias render_template='python3 -c "from jinja2 import Template; import sys; print(Template(sys.stdin.read()).render());"'
 ```
 
 
