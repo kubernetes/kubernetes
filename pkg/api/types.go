@@ -2189,12 +2189,37 @@ const (
 	ResourceSecrets ResourceName = "secrets"
 	// ResourcePersistentVolumeClaims, number
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	// CPU request, in cores. (500m = .5 cores)
+	ResourceRequestsCPU ResourceName = "requests.cpu"
+	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceRequestsMemory ResourceName = "requests.memory"
+	// CPU limit, in cores. (500m = .5 cores)
+	ResourceLimitsCPU ResourceName = "limits.cpu"
+	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceLimitsMemory ResourceName = "limits.memory"
+)
+
+// A ResourceQuotaScope defines a filter that must match each object tracked by a quota
+type ResourceQuotaScope string
+
+const (
+	// Match all pod objects where spec.activeDeadlineSeconds
+	ResourceQuotaScopeTerminating ResourceQuotaScope = "Terminating"
+	// Match all pod objects where !spec.activeDeadlineSeconds
+	ResourceQuotaScopeNotTerminating ResourceQuotaScope = "NotTerminating"
+	// Match all pod objects that have best effort quality of service
+	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
+	// Match all pod objects that do not have best effort quality of service
+	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
 	Hard ResourceList `json:"hard,omitempty"`
+	// A collection of filters that must match each object tracked by a quota.
+	// If not specified, the quota matches all objects.
+	Scopes []ResourceQuotaScope `json:"scopes,omitempty"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use

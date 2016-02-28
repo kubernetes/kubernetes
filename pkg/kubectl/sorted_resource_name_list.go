@@ -33,3 +33,17 @@ func (list SortableResourceNames) Swap(i, j int) {
 func (list SortableResourceNames) Less(i, j int) bool {
 	return list[i] < list[j]
 }
+
+type SortableResourceQuotas []api.ResourceQuota
+
+func (list SortableResourceQuotas) Len() int {
+	return len(list)
+}
+
+func (list SortableResourceQuotas) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableResourceQuotas) Less(i, j int) bool {
+	return list[i].Name < list[j].Name
+}

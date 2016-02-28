@@ -2666,6 +2666,14 @@ func autoConvert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(in *api.ResourceQ
 	} else {
 		out.Hard = nil
 	}
+	if in.Scopes != nil {
+		out.Scopes = make([]ResourceQuotaScope, len(in.Scopes))
+		for i := range in.Scopes {
+			out.Scopes[i] = ResourceQuotaScope(in.Scopes[i])
+		}
+	} else {
+		out.Scopes = nil
+	}
 	return nil
 }
 
@@ -5886,6 +5894,14 @@ func autoConvert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuota
 	}
 	if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
 		return err
+	}
+	if in.Scopes != nil {
+		out.Scopes = make([]api.ResourceQuotaScope, len(in.Scopes))
+		for i := range in.Scopes {
+			out.Scopes[i] = api.ResourceQuotaScope(in.Scopes[i])
+		}
+	} else {
+		out.Scopes = nil
 	}
 	return nil
 }
