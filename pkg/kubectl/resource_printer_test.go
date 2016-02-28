@@ -1326,7 +1326,7 @@ func TestPrintDaemonSet(t *testing.T) {
 					DesiredNumberScheduled: 3,
 				},
 			},
-			"test1\t3\t2\t<none>\n",
+			"test1\t3\t2\t<none>\t0s\n",
 		},
 	}
 
@@ -1359,13 +1359,13 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 1,
 				},
 			},
-			"job1\t2\t1\n",
+			"job1\t2\t1\t0s\n",
 		},
 		{
 			extensions.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "job2",
-					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: extensions.JobSpec{
 					Completions: nil,
@@ -1374,7 +1374,7 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 0,
 				},
 			},
-			"job2\t<none>\t0\n",
+			"job2\t<none>\t0\t10y\n",
 		},
 	}
 
