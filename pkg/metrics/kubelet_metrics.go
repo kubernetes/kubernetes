@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -133,14 +134,27 @@ func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 }
 
 func (g *MetricsGrabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
-	rawOutput, err := g.client.Get().
-		Prefix("proxy").
-		Resource("nodes").
-		Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
-		Suffix("metrics").
-		Do().Raw()
-	if err != nil {
-		return "", err
+	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
+	// Hanging goroutine will be leaked.
+	finished := make(chan struct{})
+	var err error
+	var rawOutput []byte
+	go func() {
+		rawOutput, err = g.client.Get().
+			Prefix("proxy").
+			Resource("nodes").
+			Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
+			Suffix("metrics").
+			Do().Raw()
+		finished <- struct{}{}
+	}()
+	select {
+	case <-time.After(ProxyTimeout):
+		return "", fmt.Errorf("Timed out when waiting for proxy to gather metrics from %v", nodeName)
+	case <-finished:
+		if err != nil {
+			return "", err
+		}
+		return string(rawOutput), nil
 	}
-	return string(rawOutput), nil
 }
