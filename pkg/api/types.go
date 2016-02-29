@@ -742,7 +742,7 @@ type VolumeMount struct {
 	Name string `json:"name"`
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `json:"readOnly,omitempty"`
-	// Required.
+	// Required. Must not contain ':'.
 	MountPath string `json:"mountPath"`
 }
 
