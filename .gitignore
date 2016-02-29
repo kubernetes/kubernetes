@@ -93,3 +93,8 @@ kubernetes/
 
 # direnv .envrc files
 .envrc
+
+# local cluster yaml files
+namespace.yaml
+skydns-rc.yaml
+skydns-svc.yaml
