@@ -79,14 +79,24 @@ If your machines don't have any ephemeral disks, this will default to the aufs d
 
 **KUBE_OS_DISTRIBUTION**
 
-The distribution to use.  Valid options: `trusty`, `vivid`, `coreos`, `wheezy`, `jessie`
+The distribution to use.  Defaults to `jessie`
 
-Defaults to vivid (Ubuntu Vivid Vervet), which has a modern kernel and does not require updating or a reboot.
+Supported options:
 
-`coreos` is also a good option.
+* `jessie`: Debian Jessie, running a custom kubernetes-optimized image.  Should
+  be supported until 2018 by the debian-security team, and until 2020 by the
+  debian-LTS team.
+* `wily`: Ubuntu Wily.  Wily is not an LTS release, and OS support is due to
+  end in July 2016.
+* `vivid`: Ubuntu Vivid.  Vivid OS support ended in early February 2016.
 
-Other options may require reboots, updates or configuration, and should be used only if you have a compelling
-requirement to do so.
+Given the support situation, we recommend using Debian Jessie.  In Kubernetes
+1.3 Ubuntu should have their next LTS release out, so we should be able to
+recommend Ubuntu again at that time.
+
+Using kube-up with other operating systems is neither supported nor
+recommended.  But we would welcome increased OS support for kube-up, so please
+contribute!
 
 **NON_MASQUERADE_CIDR**
 
