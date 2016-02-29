@@ -53,7 +53,7 @@ const (
 	cordon_long = `Mark node as unschedulable.
 `
 	cordon_example = `# Mark node "foo" as unschedulable.
-$ kubectl cordon foo
+kubectl cordon foo
 `
 )
 

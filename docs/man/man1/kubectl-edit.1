@@ -163,13 +163,13 @@ saved copy to include the latest resource version.
 
 .nf
   # Edit the service named 'docker\-registry':
-  $ kubectl edit svc/docker\-registry
+  kubectl edit svc/docker\-registry
 
   # Use an alternative editor
-  $ KUBE\_EDITOR="nano" kubectl edit svc/docker\-registry
+  KUBE\_EDITOR="nano" kubectl edit svc/docker\-registry
 
   # Edit the service 'docker\-registry' in JSON using the v1 API format:
-  $ kubectl edit svc/docker\-registry \-\-output\-version=v1 \-o json
+  kubectl edit svc/docker\-registry \-\-output\-version=v1 \-o json
 
 .fi
 .RE

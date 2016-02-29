@@ -51,7 +51,7 @@ Currently only deployments support being paused.`
 	pause_example = `# Mark the nginx deployment as paused. Any current state of
 # the deployment will continue its function, new updates to the deployment will not
 # have an effect as long as the deployment is paused.
-$ kubectl rollout pause deployment/nginx`
+kubectl rollout pause deployment/nginx`
 )
 
 func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -64,13 +64,13 @@ to apply your changes to the newer version of the resource, or update your tempo
 saved copy to include the latest resource version.`
 
 	editExample = `  # Edit the service named 'docker-registry':
-  $ kubectl edit svc/docker-registry
+  kubectl edit svc/docker-registry
 
   # Use an alternative editor
-  $ KUBE_EDITOR="nano" kubectl edit svc/docker-registry
+  KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
   # Edit the service 'docker-registry' in JSON using the v1 API format:
-  $ kubectl edit svc/docker-registry --output-version=v1 -o json`
+  kubectl edit svc/docker-registry --output-version=v1 -o json`
 )
 
 var errExit = fmt.Errorf("exit directly")
