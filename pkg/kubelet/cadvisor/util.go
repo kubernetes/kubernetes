@@ -30,9 +30,6 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 		api.ResourceMemory: *resource.NewQuantity(
 			info.MemoryCapacity,
 			resource.BinarySI),
-		api.ResourceDevices: *resource.NewQuantity(
-			info.DevicesCapacity,
-			resource.Digit),
 	}
 	return c
 }
