@@ -2169,7 +2169,7 @@ func (dm *DockerManager) getGPUProbeInfo(labels map[string]string) (string, stri
 }
 
 func (dm *DockerManager) ProbeGPUStatus() error {
-	glog.Infof("Hans: probeGPUStatus()")
+	glog.Infof("Hans: ProbeGPUStatus()")
 	// only fetch the running container
 	containers, err := dm.client.ListContainers(docker.ListContainersOptions{All: false})
 	if err != nil {
@@ -2184,7 +2184,7 @@ func (dm *DockerManager) ProbeGPUStatus() error {
 		}
 
 		glog.V(4).Infof("Container inspect result: %+v", *iResult)
-		glog.Infof("Hans: probeGPUStatus():Container inspect result: %+v", *iResult)
+		glog.Infof("Hans: ProbeGPUStatus():Container inspect result: %+v", *iResult)
 
 		// it only collect gpu usage of running container
 		if !iResult.State.Running {
@@ -2210,7 +2210,10 @@ func (dm *DockerManager) ProbeGPUStatus() error {
 	//update each gpu status kept in gpuPlugin
 	for _, gpuPlugin := range dm.gpuPlugins {
 		if gpuStatus, found := gpuUsageStatus[gpuPlugin.Name()]; found {
+			glog.V(4).Infof("Hans: ProbeGPUStatus(): type(%s); new gpu Status: %+v", gpuPlugin.Name(), gpuStatus)
 			gpuPlugin.UpdateGPUUsageStatus(&gpuStatus)
+		} else {
+			gpuPlugin.UpdateGPUUsageStatus(&map[gpuTypes.PodCotainerHashID]gpuTypes.GPUUsageStatus{})
 		}
 	}
 
