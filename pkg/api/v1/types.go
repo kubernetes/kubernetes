@@ -866,7 +866,8 @@ type VolumeMount struct {
 	// Mounted read-only if true, read-write otherwise (false or unspecified).
 	// Defaults to false.
 	ReadOnly bool `json:"readOnly,omitempty"`
-	// Path within the container at which the volume should be mounted.
+	// Path within the container at which the volume should be mounted.  Must
+	// not contain ':'.
 	MountPath string `json:"mountPath"`
 }
 
