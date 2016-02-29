@@ -314,8 +314,30 @@ var _ = Describe("Density", func() {
 			badEvents := BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
 
+			// Print some data about Pod to Node allocation
+			By("Printing Pod to Node allocation data")
+			podList, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
+			expectNoError(err)
+			pausePodAllocation := make(map[string]int)
+			systemPodAllocation := make(map[string][]string)
+			for _, pod := range podList.Items {
+				if pod.Namespace == api.NamespaceSystem {
+					systemPodAllocation[pod.Spec.NodeName] = append(systemPodAllocation[pod.Spec.NodeName], pod.Name)
+				} else {
+					pausePodAllocation[pod.Spec.NodeName]++
+				}
+			}
+			nodeNames := make([]string, 0)
+			for k := range pausePodAllocation {
+				nodeNames = append(nodeNames, k)
+			}
+			sort.Strings(nodeNames)
+			for _, node := range nodeNames {
+				Logf("%v: %v pause pods, system pods: %v", node, pausePodAllocation[node], systemPodAllocation[node])
+			}
+
 			if itArg.runLatencyTest {
-				Logf("Schedling additional Pods to measure startup latencies")
+				By("Scheduling additional Pods to measure startup latencies")
 
 				createTimes := make(map[string]unversioned.Time, 0)
 				nodes := make(map[string]string, 0)
@@ -395,7 +417,7 @@ var _ = Describe("Density", func() {
 				}
 				wg.Wait()
 
-				Logf("Waiting for all Pods begin observed by the watch...")
+				By("Waiting for all Pods begin observed by the watch...")
 				for start := time.Now(); len(watchTimes) < nodeCount; time.Sleep(10 * time.Second) {
 					if time.Since(start) < timeout {
 						Failf("Timeout reached waiting for all Pods being observed by the watch.")
