@@ -28,14 +28,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
 	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubetypes.SyncPodType, updateComplete func())
-	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
+	ForgetNonExistingPodWorkers(desiredPods sets.String)
 	ForgetWorker(uid types.UID)
+	GetAllWorkers() sets.String
+	WorkerExists(uid types.UID) bool
 }
 
 type syncPodFnType func(*api.Pod, *api.Pod, *kubecontainer.PodStatus, kubetypes.SyncPodType) error
@@ -81,6 +84,9 @@ type podWorkers struct {
 
 	// podCache stores kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.Cache
+
+	// A set of terminating workers by pod UID.
+	terminating sets.String
 }
 
 type workUpdate struct {
@@ -109,13 +115,16 @@ func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQ
 		resyncInterval:            resyncInterval,
 		backOffPeriod:             backOffPeriod,
 		podCache:                  podCache,
+		terminating:               sets.NewString(),
 	}
 }
 
 func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 	var lastSyncTime time.Time
+	var podID types.UID
 	for newWork := range podUpdates {
-		err := func() error {
+		podID = newWork.pod.UID
+		err := func() (err error) {
 			podID := newWork.pod.UID
 			// This is a blocking call that would return only if the cache
 			// has an entry for the pod that is newer than minRuntimeCache
@@ -140,6 +149,11 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 		}
 		p.wrapUp(newWork.pod.UID, err)
 	}
+
+	// Delete the pod ID to signal that the worker has terminated.
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	p.terminating.Delete(string(podID))
 }
 
 // Apply the new setting to the specified pod. updateComplete is called when the update is completed.
@@ -187,6 +201,7 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kube
 
 func (p *podWorkers) removeWorker(uid types.UID) {
 	if ch, ok := p.podUpdates[uid]; ok {
+		p.terminating.Insert(string(uid))
 		close(ch)
 		delete(p.podUpdates, uid)
 		// If there is an undelivered work update for this pod we need to remove it
@@ -197,17 +212,18 @@ func (p *podWorkers) removeWorker(uid types.UID) {
 		}
 	}
 }
+
 func (p *podWorkers) ForgetWorker(uid types.UID) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	p.removeWorker(uid)
 }
 
-func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {
+func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods sets.String) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	for key := range p.podUpdates {
-		if _, exists := desiredPods[key]; !exists {
+		if !desiredPods.Has(string(key)) {
 			p.removeWorker(key)
 		}
 	}
@@ -235,4 +251,24 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 	} else {
 		p.isWorking[uid] = false
 	}
+}
+
+func (p *podWorkers) GetAllWorkers() sets.String {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	workers := sets.NewString(p.terminating.List()...)
+	for uid := range p.podUpdates {
+		workers.Insert(string(uid))
+	}
+	return workers
+}
+
+func (p *podWorkers) WorkerExists(uid types.UID) bool {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	if _, ok := p.podUpdates[uid]; ok {
+		return true
+	}
+	p.terminating.Has(string(uid))
+	return false
 }

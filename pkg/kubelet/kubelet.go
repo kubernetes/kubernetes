@@ -1826,14 +1826,12 @@ func (kl *Kubelet) getDesiredVolumes(pods []*api.Pod) map[string]api.Volume {
 
 // cleanupOrphanedPodDirs removes a pod directory if the pod is not in the
 // desired set of pods and there is no running containers in the pod.
-func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, busyPods sets.String) error {
 	active := sets.NewString()
 	for _, pod := range pods {
 		active.Insert(string(pod.UID))
 	}
-	for _, pod := range runningPods {
-		active.Insert(string(pod.ID))
-	}
+	active = active.Union(busyPods)
 
 	found, err := kl.listPodsFromDisk()
 	if err != nil {
@@ -1905,20 +1903,18 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 // This method is blocking:
 // 1) it talks to API server to find volumes bound to persistent volume claims
 // 2) it talks to cloud to detach volumes
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, activePods sets.String) error {
 	desiredVolumes := kl.getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
-
-	runningSet := sets.String{}
-	for _, pod := range runningPods {
-		runningSet.Insert(string(pod.ID))
-	}
-
 	for name, cleanerTuple := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
 			parts := strings.Split(name, "/")
-			if runningSet.Has(parts[0]) {
+			if activePods.Has(parts[0]) {
 				glog.Infof("volume %q, still has a container running %q, skipping teardown", name, parts[0])
+				continue
+			}
+			if activePods.Has(parts[0]) {
+				glog.Infof("volume %q, used by %q, still has a active worker, skipping teardown", name, parts[0])
 				continue
 			}
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
@@ -1951,18 +1947,11 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 }
 
 // Delete any pods that are no longer running and are marked for deletion.
-func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, activePods sets.String) error {
 	var terminating []*api.Pod
 	for _, pod := range pods {
 		if pod.DeletionTimestamp != nil {
-			found := false
-			for _, runningPod := range runningPods {
-				if runningPod.ID == pod.UID {
-					found = true
-					break
-				}
-			}
-			if found {
+			if activePods.Has(string(pod.UID)) {
 				glog.V(5).Infof("Keeping terminated pod %q, still running", format.Pod(pod))
 				continue
 			}
@@ -2110,63 +2099,66 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	//      to the apiserver, it could still restart the terminated pod (even
 	//      though the pod was not considered terminated by the apiserver).
 	// These two conditions could be alleviated by checkpointing kubelet.
-	activePods := kl.filterOutTerminatedPods(allPods)
+	desiredPodList := kl.filterOutTerminatedPods(allPods)
 
-	desiredPods := make(map[types.UID]empty)
-	for _, pod := range activePods {
-		desiredPods[pod.UID] = empty{}
+	// desiredPods are pods that are bound to the node and are in
+	// non-terminated state.
+	desiredPods := sets.NewString()
+	for _, pod := range desiredPodList {
+		desiredPods.Insert(string(pod.UID))
 	}
-	// Stop the workers for no-longer existing pods.
-	// TODO: is here the best place to forget pod workers?
-	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
-	kl.probeManager.CleanupPods(activePods)
+	// busyPods are pods whose corresponding pod worker still exists. Most
+	// cleanup tasks for a pod should wait until its pod worker terminates
+	// to avoid any unecessary race condition.
+	busyPods := kl.podWorkers.GetAllWorkers()
 
-	runningPods, err := kl.runtimeCache.GetPods()
+	// runningPods are pods associated with at least one running container.
+	// Most cleanup tasks for a pod should wait until all containers
+	// terminate.
+	runningPodList, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		glog.Errorf("Error listing containers: %#v", err)
 		return err
 	}
-	for _, pod := range runningPods {
-		if _, found := desiredPods[pod.ID]; !found {
+
+	runningPods := sets.NewString()
+	for _, pod := range runningPodList {
+		runningPods.Insert(string(pod.ID))
+	}
+
+	// Stop the workers for no-longer desired pods.
+	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
+	// Stop the probers for pods that are not desired and not busy.
+	kl.probeManager.CleanupPods(desiredPods.Union(busyPods))
+	// Kill the pods that are not desired and not busy.
+	for _, pod := range runningPodList {
+		if !desiredPods.Has(string(pod.ID)) && !busyPods.Has(string(pod.ID)) {
 			kl.podKillingCh <- &kubecontainer.PodPair{nil, pod}
 		}
 	}
-
+	// TODO: Consider not removing the status until the pod worker has
+	// terminated.
 	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
-	// Note that we just killed the unwanted pods. This may not have reflected
-	// in the cache. We need to bypass the cache to get the latest set of
-	// running pods to clean up the volumes.
-	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningPods, err = kl.containerRuntime.GetPods(false)
-	if err != nil {
-		glog.Errorf("Error listing containers: %#v", err)
-		return err
-	}
 
-	// Remove any orphaned volumes.
+	// Remove any orphaned volumes and pod directories.
 	// Note that we pass all pods (including terminated pods) to the function,
-	// so that we don't remove volumes associated with terminated but not yet
-	// deleted pods.
-	err = kl.cleanupOrphanedVolumes(allPods, runningPods)
-	if err != nil {
+	// so that we don't remove volumes/directoris associated with terminated
+	// but not yet deleted pods.
+	if err = kl.cleanupOrphanedVolumes(allPods, runningPods.Union(busyPods)); err != nil {
 		glog.Errorf("Failed cleaning up orphaned volumes: %v", err)
 		return err
 	}
-
-	// Remove any orphaned pod directories.
-	// Note that we pass all pods (including terminated pods) to the function,
-	// so that we don't remove directories associated with terminated but not yet
-	// deleted pods.
-	err = kl.cleanupOrphanedPodDirs(allPods, runningPods)
-	if err != nil {
+	if err = kl.cleanupOrphanedPodDirs(allPods, runningPods.Union(busyPods)); err != nil {
 		glog.Errorf("Failed cleaning up orphaned pod directories: %v", err)
 		return err
 	}
 
 	// Remove any orphaned mirror pods.
+	// TODO: Consider not deleting the mirror pods until the pod worker has
+	// terminated.
 	kl.podManager.DeleteOrphanedMirrorPods()
 
-	if err := kl.cleanupTerminatedPods(allPods, runningPods); err != nil {
+	if err := kl.cleanupTerminatedPods(allPods, busyPods); err != nil {
 		glog.Errorf("Failed to cleanup terminated pods: %v", err)
 	}
 

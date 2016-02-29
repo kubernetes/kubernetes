@@ -21,6 +21,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -41,9 +42,13 @@ func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType 
 	}
 }
 
-func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {}
+func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods sets.String) {}
 
 func (f *fakePodWorkers) ForgetWorker(uid types.UID) {}
+
+func (f *fakePodWorkers) GetAllWorkers() sets.String { return sets.NewString() }
+
+func (f *fakePodWorkers) WorkerExists(uid types.UID) bool { return false }
 
 type TestingInterface interface {
 	Errorf(format string, args ...interface{})
