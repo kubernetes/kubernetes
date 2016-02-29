@@ -19,6 +19,7 @@ package metrics
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -27,6 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
+)
+
+const (
+	ProxyTimeout = 2 * time.Minute
 )
 
 type MetricsCollection struct {
