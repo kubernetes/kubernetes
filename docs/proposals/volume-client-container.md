@@ -57,7 +57,7 @@ Many storage systems require specific software to connect.  The current volume a
 * **Story 15**: As a tire-kicker I want to run network storage examples with no additional configuration.
 
 * **Story 16**: As a tire-kicker I want to run network storage examples with no manual VCS configuration
-* 
+
 * **Story 17**: As a Framework Maintainer I want to containerized the Framework.
 
 # Design
