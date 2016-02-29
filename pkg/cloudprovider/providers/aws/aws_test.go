@@ -30,7 +30,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/types"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const TestClusterId = "clusterid.test"
@@ -257,6 +261,7 @@ type FakeEC2 struct {
 	DescribeSubnetsInput     *ec2.DescribeSubnetsInput
 	RouteTables              []*ec2.RouteTable
 	DescribeRouteTablesInput *ec2.DescribeRouteTablesInput
+	mock.Mock
 }
 
 func contains(haystack []*string, needle string) bool {
@@ -376,8 +381,9 @@ func (ec2 *FakeEC2) DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.Volu
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
-	panic("Not implemented")
+func (e *FakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
+	args := e.Called(request)
+	return args.Get(0).([]*ec2.Volume), nil
 }
 
 func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
@@ -1160,4 +1166,26 @@ func TestFindInstancesByNodeName(t *testing.T) {
 	if *returnedInstances[0].PrivateDnsName != nodeNameOne {
 		t.Errorf("Expected node name %v but got %v", nodeNameOne, returnedInstances[0].PrivateDnsName)
 	}
+}
+
+func TestGetVolumeLabels(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	assert.Nil(t, err, "Error building aws cloud: %v", err)
+	volumeId := aws.String("vol-VolumeId")
+	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId}}
+	awsServices.ec2.On("DescribeVolumes", expectedVolumeRequest).Return([]*ec2.Volume{
+		{
+			VolumeId:         volumeId,
+			AvailabilityZone: &awsServices.availabilityZone,
+		},
+	})
+
+	labels, err := c.GetVolumeLabels(*volumeId)
+
+	assert.Nil(t, err, "Error creating Volume %v", err)
+	assert.Equal(t, map[string]string{
+		unversioned.LabelZoneFailureDomain: "us-east-1a",
+		unversioned.LabelZoneRegion:        "us-east-1"}, labels)
+	awsServices.ec2.AssertExpectations(t)
 }
