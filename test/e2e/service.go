@@ -1395,7 +1395,14 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 					gotEndpoints.Insert(trimmedEp)
 				}
 			}
-			if expectedEndpoints.Equal(gotEndpoints) {
+			// TODO: simply checking that the retrieved endpoints is a superset
+			// of the expected allows us to ignore intermitten network flakes that
+			// result in output like "wget timed out", but these should be rare
+			// and we need a better way to track how often it occurs.
+			if gotEndpoints.IsSuperset(expectedEndpoints) {
+				if !gotEndpoints.Equal(expectedEndpoints) {
+					Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
+				}
 				passed = true
 				break
 			}
