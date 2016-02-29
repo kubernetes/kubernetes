@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
@@ -39,7 +40,7 @@ var _ = Describe("Kubelet", func() {
 	var cl *client.Client
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&client.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
 	})
 
 	Describe("pod scheduling", func() {

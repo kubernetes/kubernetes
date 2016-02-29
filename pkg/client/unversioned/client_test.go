@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -48,7 +49,7 @@ func TestGetServerVersion(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&restclient.Config{Host: server.URL})
 
 	got, err := client.Discovery().ServerVersion()
 	if err != nil {
@@ -84,7 +85,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&restclient.Config{Host: server.URL})
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
@@ -121,7 +122,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&restclient.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
 	resourceMap, err := client.Discovery().ServerResources()
 	if err != nil {
@@ -214,7 +215,7 @@ func TestGetServerResources(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&restclient.Config{Host: server.URL})
 	for _, test := range tests {
 		got, err := client.Discovery().ServerResourcesForGroupVersion(test.request)
 		if test.expectErr {
@@ -277,7 +278,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
 
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&restclient.Config{Host: server.URL})
 	got, err := client.Discovery().SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
@@ -297,7 +298,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
 
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&restclient.Config{Host: server.URL})
 	got, err := client.Discovery().SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)

@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
@@ -86,7 +86,7 @@ func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, err
 }
 
 // ClientConfig implements ClientConfig
-func (config *DeferredLoadingClientConfig) ClientConfig() (*client.Config, error) {
+func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, error) {
 	mergedClientConfig, err := config.createClientConfig()
 	if err != nil {
 		return nil, err

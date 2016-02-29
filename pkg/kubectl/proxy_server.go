@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -146,7 +146,7 @@ type ProxyServer struct {
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
 // 'filter', if non-nil, protects requests to the api only.
-func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *client.Config) (*ProxyServer, error) {
+func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *restclient.Config) (*ProxyServer, error) {
 	host := cfg.Host
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
@@ -156,7 +156,7 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 		return nil, err
 	}
 	proxy := newProxy(target)
-	if proxy.Transport, err = client.TransportFor(cfg); err != nil {
+	if proxy.Transport, err = restclient.TransportFor(cfg); err != nil {
 		return nil, err
 	}
 	proxyServer := http.Handler(proxy)

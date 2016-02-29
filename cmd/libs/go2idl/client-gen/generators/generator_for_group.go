@@ -53,7 +53,7 @@ func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
+	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
 	apiPath := func(group string) string {
@@ -75,10 +75,10 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"Group":                      namer.IC(g.group),
 		"canonicalGroup":             canonize(g.group),
 		"types":                      g.types,
-		"Config":                     c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
-		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
-		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
+		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
+		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
+		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "RESTClientFor"}),
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"apiPath":                    apiPath(g.group),

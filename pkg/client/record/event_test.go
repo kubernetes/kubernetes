@@ -26,7 +26,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	_ "k8s.io/kubernetes/pkg/api/install" // To register api.Pod used in tests below
+	"k8s.io/kubernetes/pkg/client/restclient"
 	k8sruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
@@ -391,7 +392,7 @@ func TestWriteEventError(t *testing.T) {
 		"giveUp1": {
 			timesToSendError: 1000,
 			attemptsWanted:   1,
-			err:              &client.RequestConstructionError{},
+			err:              &restclient.RequestConstructionError{},
 		},
 		"giveUp2": {
 			timesToSendError: 1000,

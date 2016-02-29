@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -132,7 +132,7 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 }
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
-	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	manager := NewDaemonSetsController(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}

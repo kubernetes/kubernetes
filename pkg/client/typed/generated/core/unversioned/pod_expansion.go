@@ -18,13 +18,13 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.
 type PodExpansion interface {
 	Bind(binding *api.Binding) error
-	GetLogs(name string, opts *api.PodLogOptions) *unversioned.Request
+	GetLogs(name string, opts *api.PodLogOptions) *restclient.Request
 }
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
@@ -33,6 +33,6 @@ func (c *pods) Bind(binding *api.Binding) error {
 }
 
 // Get constructs a request for getting the logs for a pod
-func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *unversioned.Request {
+func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
 	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
 }

@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -102,7 +101,7 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 		0,
 	)
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {

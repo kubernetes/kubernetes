@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -122,7 +122,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -194,7 +194,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdGet(f, buf)
 		cmd.SetOutput(buf)
@@ -236,7 +236,7 @@ func TestGetSchemaObject(t *testing.T) {
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -461,7 +461,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)

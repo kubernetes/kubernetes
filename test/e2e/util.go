@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -131,7 +132,7 @@ const (
 var subResourcePodProxyVersion = version.MustParse("v1.1.0")
 var subResourceServiceAndNodeProxyVersion = version.MustParse("v1.2.0")
 
-func getServicesProxyRequest(c *client.Client, request *client.Request) (*client.Request, error) {
+func getServicesProxyRequest(c *client.Client, request *restclient.Request) (*restclient.Request, error) {
 	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
 	if err != nil {
 		return nil, err
@@ -142,7 +143,7 @@ func getServicesProxyRequest(c *client.Client, request *client.Request) (*client
 	return request.Prefix("proxy").Resource("services"), nil
 }
 
-func GetServicesProxyRequest(c *client.Client, request *client.Request) (*client.Request, error) {
+func GetServicesProxyRequest(c *client.Client, request *restclient.Request) (*restclient.Request, error) {
 	return getServicesProxyRequest(c, request)
 }
 
@@ -1185,7 +1186,7 @@ func serviceResponding(c *client.Client, ns, name string) error {
 	})
 }
 
-func loadConfig() (*client.Config, error) {
+func loadConfig() (*restclient.Config, error) {
 	switch {
 	case testContext.KubeConfig != "":
 		Logf(">>> testContext.KubeConfig: %s\n", testContext.KubeConfig)
@@ -1203,7 +1204,7 @@ func loadConfig() (*client.Config, error) {
 	}
 }
 
-func loadClientFromConfig(config *client.Config) (*client.Client, error) {
+func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
 	c, err := client.New(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
@@ -2933,9 +2934,9 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // headersForConfig extracts any http client logic necessary for the provided
 // config.
-func headersForConfig(c *client.Config) (http.Header, error) {
+func headersForConfig(c *restclient.Config) (http.Header, error) {
 	extract := &extractRT{}
-	rt, err := client.HTTPWrappersForConfig(c, extract)
+	rt, err := restclient.HTTPWrappersForConfig(c, extract)
 	if err != nil {
 		return nil, err
 	}
@@ -2947,8 +2948,8 @@ func headersForConfig(c *client.Config) (http.Header, error) {
 
 // OpenWebSocketForURL constructs a websocket connection to the provided URL, using the client
 // config, with the specified protocols.
-func OpenWebSocketForURL(url *url.URL, config *client.Config, protocols []string) (*websocket.Conn, error) {
-	tlsConfig, err := client.TLSConfigFor(config)
+func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
+	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tls config: %v", err)
 	}

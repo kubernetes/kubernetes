@@ -17,10 +17,10 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-func (c *FakeServices) ProxyGet(scheme, name, port, path string, params map[string]string) client.ResponseWrapper {
+func (c *FakeServices) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
 	return c.Fake.InvokesProxy(core.NewProxyGetAction("services", c.ns, scheme, name, port, path, params))
 }

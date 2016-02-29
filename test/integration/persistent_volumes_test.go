@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -49,9 +49,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	deleteAllEtcdKeys()
 	// Use higher QPS and Burst, there is a test for race condition below, which
 	// creates many claims and default values were too low.
-	binderClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
-	recyclerClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
-	testClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	recyclerClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	host := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
 	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0}}

@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type BatchInterface interface {
@@ -28,26 +29,26 @@ type BatchInterface interface {
 
 // BatchClient is used to interact with Kubernetes batch features.
 type BatchClient struct {
-	*RESTClient
+	*restclient.RESTClient
 }
 
 func (c *BatchClient) Jobs(namespace string) JobInterface {
 	return newJobsV1(c, namespace)
 }
 
-func NewBatch(c *Config) (*BatchClient, error) {
+func NewBatch(c *restclient.Config) (*BatchClient, error) {
 	config := *c
 	if err := setBatchDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := RESTClientFor(&config)
+	client, err := restclient.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
 	return &BatchClient{client}, nil
 }
 
-func NewBatchOrDie(c *Config) *BatchClient {
+func NewBatchOrDie(c *restclient.Config) *BatchClient {
 	client, err := NewBatch(c)
 	if err != nil {
 		panic(err)
@@ -55,7 +56,7 @@ func NewBatchOrDie(c *Config) *BatchClient {
 	return client
 }
 
-func setBatchDefaults(config *Config) error {
+func setBatchDefaults(config *restclient.Config) error {
 	// if batch group is not registered, return an error
 	g, err := registered.Group(batch.GroupName)
 	if err != nil {
@@ -63,7 +64,7 @@ func setBatchDefaults(config *Config) error {
 	}
 	config.APIPath = defaultAPIPath
 	if config.UserAgent == "" {
-		config.UserAgent = DefaultKubernetesUserAgent()
+		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {

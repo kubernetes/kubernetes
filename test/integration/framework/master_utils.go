@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -104,8 +105,8 @@ func NewMasterComponents(c *Config) *MasterComponents {
 		DeleteAllEtcdKeys()
 	}
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
-	clientset := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
+	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	controllerManager := replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, c.Burst, 4096)
 
@@ -271,7 +272,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	defer func() {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
-	hostField := fields.OneTermEqualSelector(client.PodHost, host)
+	hostField := fields.OneTermEqualSelector(api.PodHostField, host)
 	options := api.ListOptions{FieldSelector: hostField}
 	pods, err := restClient.Pods(TestNS).List(options)
 	if err != nil || len(pods.Items) == numPods {

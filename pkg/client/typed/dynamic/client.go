@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -37,12 +37,12 @@ import (
 // Client is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
 type Client struct {
-	cl *client.RESTClient
+	cl *restclient.RESTClient
 }
 
 // NewClient returns a new client based on the passed in config. The
 // codec is ignored, as the dynamic client uses it's own codec.
-func NewClient(conf *client.Config) (*Client, error) {
+func NewClient(conf *restclient.Config) (*Client, error) {
 	// avoid changing the original config
 	confCopy := *conf
 	conf = &confCopy
@@ -54,7 +54,7 @@ func NewClient(conf *client.Config) (*Client, error) {
 	}
 
 	if len(conf.UserAgent) == 0 {
-		conf.UserAgent = client.DefaultKubernetesUserAgent()
+		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 
 	if conf.QPS == 0.0 {
@@ -64,7 +64,7 @@ func NewClient(conf *client.Config) (*Client, error) {
 		conf.Burst = 10
 	}
 
-	cl, err := client.RESTClientFor(conf)
+	cl, err := restclient.RESTClientFor(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 // ResourceClient is an API interface to a specific resource under a
 // dynamic client.
 type ResourceClient struct {
-	cl       *client.RESTClient
+	cl       *restclient.RESTClient
 	resource *unversioned.APIResource
 	ns       string
 }
@@ -94,7 +94,7 @@ type ResourceClient struct {
 // namespace applies a namespace to the request if the configured
 // resource is a namespaced resource. Otherwise, it just returns the
 // passed in request.
-func (rc *ResourceClient) namespace(req *client.Request) *client.Request {
+func (rc *ResourceClient) namespace(req *restclient.Request) *restclient.Request {
 	if rc.resource.Namespaced {
 		return req.Namespace(rc.ns)
 	}

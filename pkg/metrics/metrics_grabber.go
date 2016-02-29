@@ -91,7 +91,7 @@ func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controll
 }
 
 func (g *MetricsGrabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error) {
-	nodes, err := g.client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{client.ObjectNameField: nodeName}.AsSelector()})
+	nodes, err := g.client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector()})
 	if err != nil {
 		return KubeletMetrics{}, err
 	}

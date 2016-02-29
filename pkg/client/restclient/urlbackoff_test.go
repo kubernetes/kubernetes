@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package restclient
 
 import (
-	"k8s.io/kubernetes/pkg/util"
 	"net/url"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func parse(raw string) *url.URL {

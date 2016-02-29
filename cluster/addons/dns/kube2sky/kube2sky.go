@@ -37,6 +37,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
@@ -466,7 +467,7 @@ func expandKubeMasterURL() (string, error) {
 // TODO: evaluate using pkg/client/clientcmd
 func newKubeClient() (*kclient.Client, error) {
 	var (
-		config    *kclient.Config
+		config    *restclient.Config
 		err       error
 		masterURL string
 	)
@@ -480,9 +481,9 @@ func newKubeClient() (*kclient.Client, error) {
 
 	if masterURL != "" && *argKubecfgFile == "" {
 		// Only --kube-master-url was provided.
-		config = &kclient.Config{
+		config = &restclient.Config{
 			Host:          masterURL,
-			ContentConfig: kclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
 		}
 	} else {
 		// We either have:

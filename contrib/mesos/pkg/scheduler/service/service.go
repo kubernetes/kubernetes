@@ -74,8 +74,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
@@ -534,7 +534,7 @@ func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, stati
 }
 
 // TODO(jdef): hacked from plugin/cmd/kube-scheduler/app/server.go
-func (s *SchedulerServer) createAPIServerClientConfig() (*client.Config, error) {
+func (s *SchedulerServer) createAPIServerClientConfig() (*restclient.Config, error) {
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.apiServerList[0], s.kubeconfig)
 	if err != nil {
 		return nil, err

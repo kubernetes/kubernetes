@@ -17,11 +17,6 @@ limitations under the License.
 package unversioned_test
 
 import (
-	. "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
-
-import (
 	"net/url"
 	"testing"
 
@@ -29,13 +24,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func getHorizontalPodAutoscalersResoureName() string {
 	return "horizontalpodautoscalers"
 }
 
-func getHPAClient(t *testing.T, c *simple.Client, ns, resourceGroup string) HorizontalPodAutoscalerInterface {
+func getHPAClient(t *testing.T, c *simple.Client, ns, resourceGroup string) unversioned.HorizontalPodAutoscalerInterface {
 	switch resourceGroup {
 	case autoscaling.GroupName:
 		return c.Setup(t).Autoscaling().HorizontalPodAutoscalers(ns)

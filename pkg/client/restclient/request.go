@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package restclient
 
 import (
 	"bytes"
@@ -292,22 +292,22 @@ func (r *Request) RequestURI(uri string) *Request {
 const (
 	// A constant that clients can use to refer in a field selector to the object name field.
 	// Will be automatically emitted as the correct name for the API version.
-	NodeUnschedulable = "spec.unschedulable"
-	ObjectNameField   = "metadata.name"
-	PodHost           = "spec.nodeName"
-	PodStatus         = "status.phase"
-	SecretType        = "type"
+	nodeUnschedulable = "spec.unschedulable"
+	objectNameField   = "metadata.name"
+	podHost           = "spec.nodeName"
+	podStatus         = "status.phase"
+	secretType        = "type"
 
-	EventReason                  = "reason"
-	EventSource                  = "source"
-	EventType                    = "type"
-	EventInvolvedKind            = "involvedObject.kind"
-	EventInvolvedNamespace       = "involvedObject.namespace"
-	EventInvolvedName            = "involvedObject.name"
-	EventInvolvedUID             = "involvedObject.uid"
-	EventInvolvedAPIVersion      = "involvedObject.apiVersion"
-	EventInvolvedResourceVersion = "involvedObject.resourceVersion"
-	EventInvolvedFieldPath       = "involvedObject.fieldPath"
+	eventReason                  = "reason"
+	eventSource                  = "source"
+	eventType                    = "type"
+	eventInvolvedKind            = "involvedObject.kind"
+	eventInvolvedNamespace       = "involvedObject.namespace"
+	eventInvolvedName            = "involvedObject.name"
+	eventInvolvedUID             = "involvedObject.uid"
+	eventInvolvedAPIVersion      = "involvedObject.apiVersion"
+	eventInvolvedResourceVersion = "involvedObject.resourceVersion"
+	eventInvolvedFieldPath       = "involvedObject.fieldPath"
 )
 
 type clientFieldNameToAPIVersionFieldName map[string]string
@@ -350,34 +350,34 @@ func (v versionToResourceToFieldMapping) filterField(groupVersion *unversioned.G
 var fieldMappings = versionToResourceToFieldMapping{
 	v1.SchemeGroupVersion: resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   ObjectNameField,
-			NodeUnschedulable: NodeUnschedulable,
+			objectNameField:   objectNameField,
+			nodeUnschedulable: nodeUnschedulable,
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost:   PodHost,
-			PodStatus: PodStatus,
+			podHost:   podHost,
+			podStatus: podStatus,
 		},
 		"secrets": clientFieldNameToAPIVersionFieldName{
-			SecretType: SecretType,
+			secretType: secretType,
 		},
 		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: ObjectNameField,
+			objectNameField: objectNameField,
 		},
 		"endpoints": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: ObjectNameField,
+			objectNameField: objectNameField,
 		},
 		"events": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:              ObjectNameField,
-			EventReason:                  EventReason,
-			EventSource:                  EventSource,
-			EventType:                    EventType,
-			EventInvolvedKind:            EventInvolvedKind,
-			EventInvolvedNamespace:       EventInvolvedNamespace,
-			EventInvolvedName:            EventInvolvedName,
-			EventInvolvedUID:             EventInvolvedUID,
-			EventInvolvedAPIVersion:      EventInvolvedAPIVersion,
-			EventInvolvedResourceVersion: EventInvolvedResourceVersion,
-			EventInvolvedFieldPath:       EventInvolvedFieldPath,
+			objectNameField:              objectNameField,
+			eventReason:                  eventReason,
+			eventSource:                  eventSource,
+			eventType:                    eventType,
+			eventInvolvedKind:            eventInvolvedKind,
+			eventInvolvedNamespace:       eventInvolvedNamespace,
+			eventInvolvedName:            eventInvolvedName,
+			eventInvolvedUID:             eventInvolvedUID,
+			eventInvolvedAPIVersion:      eventInvolvedAPIVersion,
+			eventInvolvedResourceVersion: eventInvolvedResourceVersion,
+			eventInvolvedFieldPath:       eventInvolvedFieldPath,
 		},
 	},
 }
