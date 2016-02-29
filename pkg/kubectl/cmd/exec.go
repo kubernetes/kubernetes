@@ -35,14 +35,14 @@ import (
 
 const (
 	exec_example = `# Get output from running 'date' from pod 123456-7890, using the first container by default
-$ kubectl exec 123456-7890 date
+kubectl exec 123456-7890 date
 	
 # Get output from running 'date' in ruby-container from pod 123456-7890
-$ kubectl exec 123456-7890 -c ruby-container date
+kubectl exec 123456-7890 -c ruby-container date
 
 # Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 # and sends stdout/stderr from 'bash' back to the client
-$ kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`
+kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`
 )
 
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
