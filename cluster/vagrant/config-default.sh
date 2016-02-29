@@ -75,8 +75,8 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # --insecure-registry for local registries, or globally configuring selinux options
 # TODO Enable selinux when Fedora 21 repositories get an updated docker package
 #   see https://bugzilla.redhat.com/show_bug.cgi?id=1216151
-#EXTRA_DOCKER_OPTS="-b=cbr0 --selinux-enabled --insecure-registry 10.0.0.0/8"
-EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+#EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-} -b=cbr0 --selinux-enabled --insecure-registry 10.0.0.0/8"
+EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-} --insecure-registry 10.0.0.0/8"
 
 # Flag to tell the kubelet to enable CFS quota support
 ENABLE_CPU_CFS_QUOTA="${KUBE_ENABLE_CPU_CFS_QUOTA:-true}"
