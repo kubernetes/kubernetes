@@ -219,7 +219,7 @@ network, primarily aiming at Docker integration.
 
 ### Calico
 
-[Calico](https://github.com/Metaswitch/calico) uses BGP to enable real container
+[Calico](https://github.com/projectcalico/calico-containers) uses BGP to enable real container
 IPs.
 
 ## Other reading
