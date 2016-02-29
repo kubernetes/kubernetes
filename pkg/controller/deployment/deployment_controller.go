@@ -127,7 +127,19 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 			},
 			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
 			DeleteFunc: func(obj interface{}) {
-				d := obj.(*extensions.Deployment)
+				d, ok := obj.(*extensions.Deployment)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						glog.Errorf("Couldn't get object from tombstone %+v", obj)
+						return
+					}
+					d, ok = tombstone.Obj.(*extensions.Deployment)
+					if !ok {
+						glog.Errorf("Tombstone contained object that is not a Deployment %+v", obj)
+						return
+					}
+				}
 				glog.V(4).Infof("Deleting deployment %s", d.Name)
 				dc.enqueueDeployment(d)
 			},
