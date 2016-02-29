@@ -273,6 +273,56 @@ func TestGetObjects(t *testing.T) {
 	}
 }
 
+func TestGetSortedObjects(t *testing.T) {
+	pods := &api.PodList{
+		ListMeta: unversioned.ListMeta{
+			ResourceVersion: "15",
+		},
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
+		},
+	}
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+
+	// sorting with metedata.name
+	cmd.Flags().Set("sort-by", ".metadata.name")
+	cmd.Run(cmd, []string{"pods"})
+
+	// expect sorted: a,b,c
+	expected := []runtime.Object{&pods.Items[2], &pods.Items[1], &pods.Items[0]}
+	actual := tf.Printer.(*testPrinter).Objects
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %#v", actual)
+	}
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
+
+}
+
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	pods, _, _ := testData()
 

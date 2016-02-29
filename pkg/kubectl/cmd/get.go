@@ -248,6 +248,23 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	sorting, err := cmd.Flags().GetString("sort-by")
 	var sorter *kubectl.RuntimeSort
 	if err == nil && len(sorting) > 0 && len(objs) > 1 {
+		clientConfig, err := f.ClientConfig()
+		if err != nil {
+			return err
+		}
+
+		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+		if err != nil {
+			return err
+		}
+
+		for ix := range infos {
+			objs[ix], err = infos[ix].Mapping.ConvertToVersion(infos[ix].Object, version.String())
+			if err != nil {
+				return err
+			}
+		}
+
 		// TODO: questionable
 		if sorter, err = kubectl.SortObjects(f.Decoder(true), objs, sorting); err != nil {
 			return err
@@ -262,10 +279,13 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	for ix := range objs {
 		var mapping *meta.RESTMapping
+		var original runtime.Object
 		if sorter != nil {
 			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+			original = infos[sorter.OriginalPosition(ix)].Object
 		} else {
 			mapping = infos[ix].Mapping
+			original = infos[ix].Object
 		}
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
@@ -275,12 +295,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			lastMapping = mapping
 		}
 		if _, found := printer.(*kubectl.HumanReadablePrinter); found {
-			if err := printer.PrintObj(objs[ix], w); err != nil {
+			if err := printer.PrintObj(original, w); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := printer.PrintObj(objs[ix], w); err != nil {
+		if err := printer.PrintObj(original, w); err != nil {
 			return err
 		}
 	}
