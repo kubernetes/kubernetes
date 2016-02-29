@@ -124,17 +124,17 @@ func generateEvent(podID types.UID, cid string, oldState, newState plegContainer
 	case plegContainerExited:
 		return &PodLifecycleEvent{ID: podID, Type: ContainerDied, Data: cid}
 	case plegContainerUnknown:
-		// Don't generate any event if the status is unknown.
-		return nil
+		return &PodLifecycleEvent{ID: podID, Type: ContainerChanged, Data: cid}
 	case plegContainerNonExistent:
 		// We report "ContainerDied" when container was stopped OR removed. We
 		// may want to distinguish the two cases in the future.
 		switch oldState {
 		case plegContainerExited:
-			// We already reported that the container died before. There is no
-			// need to do it again.
-			return nil
+			// We already reported that the container died before.
+			return &PodLifecycleEvent{ID: podID, Type: ContainerRemoved, Data: cid}
 		default:
+			// TODO: We may want to generate a ContainerRemoved event as well.
+			// It's ok now because no one relies on the ContainerRemoved event.
 			return &PodLifecycleEvent{ID: podID, Type: ContainerDied, Data: cid}
 		}
 	default:
@@ -165,9 +165,7 @@ func (g *GenericPLEG) relist() {
 		return
 	}
 	pods := kubecontainer.Pods(podList)
-	for _, pod := range pods {
-		g.podRecords.setCurrent(pod)
-	}
+	g.podRecords.setCurrent(pods)
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
@@ -204,6 +202,10 @@ func (g *GenericPLEG) relist() {
 		// Update the internal storage and send out the events.
 		g.podRecords.update(pid)
 		for i := range events {
+			// Filter out events that are not reliable and no other components use yet.
+			if events[i].Type == ContainerChanged || events[i].Type == ContainerRemoved {
+				continue
+			}
 			g.eventChannel <- events[i]
 		}
 	}
@@ -304,12 +306,17 @@ func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 	return r.current
 }
 
-func (pr podRecords) setCurrent(pod *kubecontainer.Pod) {
-	if r, ok := pr[pod.ID]; ok {
-		r.current = pod
-		return
+func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
+	for i := range pr {
+		pr[i].current = nil
 	}
-	pr[pod.ID] = &podRecord{current: pod}
+	for _, pod := range pods {
+		if r, ok := pr[pod.ID]; ok {
+			r.current = pod
+		} else {
+			pr[pod.ID] = &podRecord{current: pod}
+		}
+	}
 }
 
 func (pr podRecords) update(id types.UID) {
