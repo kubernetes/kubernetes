@@ -174,7 +174,7 @@ $ kubectl get pods -l 'environment,environment notin (frontend)'
 
 ### Set references in API objects
 
-Some Kubernetes objects, such as [`service`s](services.md) and [`replicationcontroller`s](replication-controller.md), also use label selectors to specify sets of other resources, such as [pods](pods.md).
+Some Kubernetes objects, such as [services](services.md) and [replicationcontrollers](replication-controller.md), also use label selectors to specify sets of other resources, such as [pods](pods.md).
 
 #### Service and ReplicationController
 
