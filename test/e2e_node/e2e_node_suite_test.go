@@ -22,9 +22,11 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -42,6 +44,7 @@ var e2es *e2eService
 
 func TestE2eNode(t *testing.T) {
 	flag.Parse()
+	rand.Seed(time.Now().UTC().UnixNano())
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "E2eNode Suite")
 }
