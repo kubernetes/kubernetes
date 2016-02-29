@@ -77,7 +77,7 @@ var _ = Describe("ServiceAccounts", func() {
 		expectNoError(f.Client.Secrets(f.Namespace.Name).Delete(secrets[0].Name))
 
 		// wait for the referenced secret to be removed, and another one autocreated
-		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+		expectNoError(wait.Poll(time.Millisecond*500, serviceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token reference")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if err != nil {
@@ -121,7 +121,7 @@ var _ = Describe("ServiceAccounts", func() {
 		}
 
 		// wait for another one to be autocreated
-		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+		expectNoError(wait.Poll(time.Millisecond*500, serviceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token to be created and added")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if err != nil {
@@ -156,7 +156,7 @@ var _ = Describe("ServiceAccounts", func() {
 		var rootCAContent string
 
 		// Standard get, update retry loop
-		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+		expectNoError(wait.Poll(time.Millisecond*500, serviceAccountProvisionTimeout, func() (bool, error) {
 			By("getting the auto-created API token")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if apierrors.IsNotFound(err) {
