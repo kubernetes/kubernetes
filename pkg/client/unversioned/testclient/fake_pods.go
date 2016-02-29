@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -104,7 +104,7 @@ func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) GetLogs(name string, opts *api.PodLogOptions) *client.Request {
+func (c *FakePods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
 	action := GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.Namespace
@@ -113,5 +113,5 @@ func (c *FakePods) GetLogs(name string, opts *api.PodLogOptions) *client.Request
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &api.Pod{})
-	return &client.Request{}
+	return &restclient.Request{}
 }

@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -61,7 +61,7 @@ type LogsOptions struct {
 	ClientMapper resource.ClientMapper
 	Decoder      runtime.Decoder
 
-	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
 
 	Out io.Writer
 }

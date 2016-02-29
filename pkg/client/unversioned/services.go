@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type ServiceInterface interface {
 	UpdateStatus(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	ProxyGet(scheme, name, port, path string, params map[string]string) ResponseWrapper
+	ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper
 }
 
 // services implements ServicesNamespacer interface
@@ -106,7 +107,7 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // ProxyGet returns a response of the service by calling it through the proxy.
-func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) ResponseWrapper {
+func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
 	request := c.r.Get().
 		Namespace(c.ns).
 		Resource("services").

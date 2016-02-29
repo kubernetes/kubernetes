@@ -22,7 +22,7 @@ import (
 
 	"github.com/imdario/mergo"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
@@ -244,7 +244,7 @@ func TestCreateMissingContext(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	expectedConfig := &client.Config{Host: clientConfig.Host}
+	expectedConfig := &restclient.Config{Host: clientConfig.Host}
 
 	if !reflect.DeepEqual(expectedConfig, clientConfig) {
 		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)

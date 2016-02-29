@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -295,7 +294,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	var (
 		pw = cache.NewListWatchFromClient(apiclient.CoreClient, "pods", api.NamespaceAll,
-			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
+			fields.OneTermEqualSelector(api.PodHostField, s.HostnameOverride),
 		)
 		reg = executor.NewRegistry(apiclient)
 	)

@@ -32,7 +32,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -727,7 +726,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 // returns true if the provided node still has pods scheduled to it, or an error if
 // the server could not be contacted.
 func (nc *NodeController) hasPods(nodeName string) (bool, error) {
-	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
+	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 	if err != nil {
@@ -762,7 +761,7 @@ func (nc *NodeController) cancelPodEviction(nodeName string) bool {
 // if any pods were deleted.
 func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 	remaining := false
-	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
+	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 	if err != nil {
@@ -802,7 +801,7 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 // return true if success
 func (nc *NodeController) markAllPodsNotReady(nodeName string) error {
 	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
-	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, nodeName)}
+	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName)}
 	pods, err := nc.kubeClient.Core().Pods(api.NamespaceAll).List(opts)
 	if err != nil {
 		return err
@@ -843,7 +842,7 @@ func (nc *NodeController) terminatePods(nodeName string, since time.Time) (bool,
 	// have we deleted all pods
 	complete := true
 
-	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
+	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
 	if err != nil {

@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
@@ -64,7 +64,7 @@ type ProxyReactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
 	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
-	React(action Action) (handled bool, ret client.ResponseWrapper, err error)
+	React(action Action) (handled bool, ret restclient.ResponseWrapper, err error)
 }
 
 // ReactionFunc is a function that returns an object or error for a given Action.  If "handled" is false,
@@ -77,7 +77,7 @@ type WatchReactionFunc func(action Action) (handled bool, ret watch.Interface, e
 
 // ProxyReactionFunc is a function that returns a ResponseWrapper interface for a given Action.  If "handled" is false,
 // then the test client will continue ignore the results and continue to the next ProxyReactionFunc
-type ProxyReactionFunc func(action Action) (handled bool, ret client.ResponseWrapper, err error)
+type ProxyReactionFunc func(action Action) (handled bool, ret restclient.ResponseWrapper, err error)
 
 // AddReactor appends a reactor to the end of the chain
 func (c *Fake) AddReactor(verb, resource string, reaction ReactionFunc) {
@@ -155,7 +155,7 @@ func (c *Fake) InvokesWatch(action Action) (watch.Interface, error) {
 }
 
 // InvokesProxy records the provided Action and then invokes the ReactFn (if provided).
-func (c *Fake) InvokesProxy(action Action) client.ResponseWrapper {
+func (c *Fake) InvokesProxy(action Action) restclient.ResponseWrapper {
 	c.Lock()
 	defer c.Unlock()
 

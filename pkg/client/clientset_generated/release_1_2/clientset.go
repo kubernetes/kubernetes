@@ -18,6 +18,7 @@ package release_1_2
 
 import (
 	"github.com/golang/glog"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
@@ -53,7 +54,7 @@ func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
-func NewForConfig(c *unversioned.Config) (*Clientset, error) {
+func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	var clientset Clientset
 	var err error
 	clientset.CoreClient, err = v1core.NewForConfig(c)
@@ -74,7 +75,7 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversioned.Config) *Clientset {
+func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
@@ -84,7 +85,7 @@ func NewForConfigOrDie(c *unversioned.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *unversioned.RESTClient) *Clientset {
+func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.New(c)
 	clientset.ExtensionsClient = v1beta1extensions.New(c)
