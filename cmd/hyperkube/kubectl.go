@@ -28,7 +28,6 @@ func NewKubectlServer() *Server {
 		SimpleUsage: "Kubernetes command line client",
 		Long:        "Kubernetes command line client",
 		Run: func(s *Server, args []string) error {
-			os.Args = os.Args[1:]
 			if err := app.Run(); err != nil {
 				os.Exit(1)
 			}
