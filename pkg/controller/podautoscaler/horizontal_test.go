@@ -257,6 +257,19 @@ func (tc *testCase) runTest(t *testing.T) {
 	tc.verifyResults(t)
 }
 
+func TestDefaultScaleUp(t *testing.T) {
+	tc := testCase{
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     4,
+		desiredReplicas:     5,
+		verifyCPUCurrent:    true,
+		reportedLevels:      []uint64{900, 950, 950, 1000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUp(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
@@ -286,6 +299,19 @@ func TestScaleUpCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{20, 10, 30},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
+func TestDefaultScaleDown(t *testing.T) {
+	tc := testCase{
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     5,
+		desiredReplicas:     4,
+		verifyCPUCurrent:    true,
+		reportedLevels:      []uint64{400, 500, 600, 700, 800},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
 }
