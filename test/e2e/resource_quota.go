@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -87,15 +88,23 @@ var _ = Describe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a secret.", func() {
+		By("Discovering how many secrets are in namespace by default")
+		secrets, err := f.Client.Secrets(f.Namespace.Name).List(api.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		defaultSecrets := fmt.Sprintf("%d", len(secrets.Items))
+		hardSecrets := fmt.Sprintf("%d", len(secrets.Items)+1)
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota.Spec.Hard[api.ResourceSecrets] = resource.MustParse(hardSecrets)
+		resourceQuota, err = createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
+		usedResources[api.ResourceSecrets] = resource.MustParse(defaultSecrets)
 		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -106,8 +115,7 @@ var _ = Describe("ResourceQuota", func() {
 
 		By("Ensuring resource quota status captures secret creation")
 		usedResources = api.ResourceList{}
-		usedResources[api.ResourceQuotas] = resource.MustParse("1")
-		usedResources[api.ResourceSecrets] = resource.MustParse("2")
+		usedResources[api.ResourceSecrets] = resource.MustParse(hardSecrets)
 		// we expect there to be two secrets because each namespace will receive
 		// a service account token secret by default
 		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
@@ -118,7 +126,7 @@ var _ = Describe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
-		usedResources[api.ResourceSecrets] = resource.MustParse("1")
+		usedResources[api.ResourceSecrets] = resource.MustParse(defaultSecrets)
 		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -379,7 +387,6 @@ func newTestResourceQuota(name string) *api.ResourceQuota {
 	hard[api.ResourceQuotas] = resource.MustParse("1")
 	hard[api.ResourceCPU] = resource.MustParse("1")
 	hard[api.ResourceMemory] = resource.MustParse("500Mi")
-	hard[api.ResourceSecrets] = resource.MustParse("2")
 	return &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec:       api.ResourceQuotaSpec{Hard: hard},
