@@ -64,7 +64,7 @@ var map_HorizontalPodAutoscalerSpec = map[string]string{
 	"scaleTargetRef":                 "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
 	"minReplicas":                    "lower limit for the number of pods that can be set by the autoscaler, default 1.",
 	"maxReplicas":                    "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
-	"targetCPUUtilizationPercentage": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods;",
+	"targetCPUUtilizationPercentage": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used.",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
