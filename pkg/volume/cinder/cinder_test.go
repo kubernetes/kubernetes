@@ -354,3 +354,52 @@ func TestAttachDetachRace(t *testing.T) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
 }
+
+func TestOptionParser(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+
+	cap := resource.MustParse("100Gi")
+	options := volume.VolumeOptions{
+		Capacity: cap,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+		},
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+
+	// test defaults
+	options.ProvisioningOptions = ""
+	o, err := plug.(*cinderPlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.VolumeType != "" {
+		t.Errorf("Expected default volume type, got %s", o.VolumeType)
+	}
+
+	// some volume type
+	options.ProvisioningOptions = "{ \"volumetype\": \"test\"}"
+	o, err = plug.(*cinderPlugin).parseProvisioningOptions(options)
+	if err != nil {
+		t.Errorf("Unexpected parsing error: %v", err)
+	}
+	if o.VolumeType != "test" {
+		t.Errorf("Expected volume type \"test\", got %s", o.VolumeType)
+	}
+
+	// Error cases
+	// Invalid JSON
+	options.ProvisioningOptions = "{ "
+	o, err = plug.(*cinderPlugin).parseProvisioningOptions(options)
+	if err == nil {
+		t.Errorf("Expected error and got none")
+	}
+}

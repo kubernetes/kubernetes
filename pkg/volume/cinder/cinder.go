@@ -17,10 +17,12 @@ limitations under the License.
 package cinder
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -30,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -143,13 +145,38 @@ func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume
 	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
 }
 
+func (plugin *cinderPlugin) parseProvisioningOptions(options volume.VolumeOptions) (cinderProvisioningOptions, error) {
+	var opts cinderProvisioningOptions
+
+	optStr := strings.TrimSpace(options.ProvisioningOptions)
+	if optStr != "" {
+		bytes := []byte(optStr)
+
+		err := json.Unmarshal(bytes, &opts)
+		if err != nil {
+			return opts, fmt.Errorf("error parsing configuration of %s provisioning plugin: %v", plugin.Name(), err)
+		}
+
+		// convert VolumeType to lower case
+		opts.VolumeType = strings.ToLower(opts.VolumeType)
+	}
+
+	return opts, nil
+}
+
 func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions, manager cdManager) (volume.Provisioner, error) {
+	provOpts, err := plugin.parseProvisioningOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
 	return &cinderVolumeProvisioner{
 		cinderVolume: &cinderVolume{
 			manager: manager,
 			plugin:  plugin,
 		},
-		options: options,
+		options:             options,
+		provisioningOptions: provOpts,
 	}, nil
 }
 
@@ -311,7 +338,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 
 func (cd *cinderVolume) GetPath() string {
 	name := cinderVolumePluginName
-	return cd.plugin.host.GetPodVolumeDir(cd.podUID, strings.EscapeQualifiedNameForDisk(name), cd.volName)
+	return cd.plugin.host.GetPodVolumeDir(cd.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cd.volName)
 }
 
 type cinderVolumeCleaner struct {
@@ -400,7 +427,7 @@ var _ volume.Deleter = &cinderVolumeDeleter{}
 
 func (r *cinderVolumeDeleter) GetPath() string {
 	name := cinderVolumePluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, strings.EscapeQualifiedNameForDisk(name), r.volName)
+	return r.plugin.host.GetPodVolumeDir(r.podUID, utilstrings.EscapeQualifiedNameForDisk(name), r.volName)
 }
 
 func (r *cinderVolumeDeleter) Delete() error {
@@ -409,10 +436,15 @@ func (r *cinderVolumeDeleter) Delete() error {
 
 type cinderVolumeProvisioner struct {
 	*cinderVolume
-	options volume.VolumeOptions
+	options             volume.VolumeOptions
+	provisioningOptions cinderProvisioningOptions
 }
 
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
+
+type cinderProvisioningOptions struct {
+	VolumeType string
+}
 
 func (c *cinderVolumeProvisioner) Provision(pv *api.PersistentVolume) error {
 	volumeID, sizeGB, err := c.manager.CreateVolume(c)
