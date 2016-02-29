@@ -142,10 +142,10 @@ JSON and YAML formats are accepted.
 
 .nf
 # Apply the configuration in pod.json to a pod.
-$ kubectl apply \-f ./pod.json
+kubectl apply \-f ./pod.json
 
 # Apply the JSON passed into stdin to a pod.
-$ cat pod.json | kubectl apply \-f \-
+cat pod.json | kubectl apply \-f \-
 
 .fi
 .RE
