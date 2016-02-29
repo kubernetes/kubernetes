@@ -197,7 +197,12 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
     go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
     exit 1
   fi
-  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false"
+  # Similarly, if tests fail, we trigger empty set of tests that would trigger storing logs from the base cluster.
+  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false" && kubemark_succeeded="$?" || kubemark_succeeded="$?"
+  if [[ "${kubemark_succeeded}" != "0" ]]; then
+    go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
+    exit 1
+  fi
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
