@@ -44,7 +44,7 @@ type UndoOptions struct {
 const (
 	undo_long    = `undo rolls back to a previous rollout.`
 	undo_example = `# Rollback to the previous deployment
-$ kubectl rollout undo deployment/abc`
+kubectl rollout undo deployment/abc`
 )
 
 func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {

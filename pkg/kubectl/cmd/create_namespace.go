@@ -31,7 +31,7 @@ const (
 Create a namespace with the specified name.`
 
 	namespaceExample = `  # Create a new namespace named my-namespace
-  $ kubectl create namespace my-namespace`
+  kubectl create namespace my-namespace`
 )
 
 // NewCmdCreateNamespace is a macro command to create a new namespace

@@ -48,22 +48,22 @@ Note that the delete command does NOT do resource version checks, so if someone
 submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.`
 	delete_example = `# Delete a pod using the type and name specified in pod.json.
-$ kubectl delete -f ./pod.json
+kubectl delete -f ./pod.json
 
 # Delete a pod based on the type and name in the JSON passed into stdin.
-$ cat pod.json | kubectl delete -f -
+cat pod.json | kubectl delete -f -
 
 # Delete pods and services with same names "baz" and "foo"
-$ kubectl delete pod,service baz foo
+kubectl delete pod,service baz foo
 
 # Delete pods and services with label name=myLabel.
-$ kubectl delete pods,services -l name=myLabel
+kubectl delete pods,services -l name=myLabel
 
 # Delete a pod with UID 1234-56-7890-234234-456456.
-$ kubectl delete pod 1234-56-7890-234234-456456
+kubectl delete pod 1234-56-7890-234234-456456
 
 # Delete all pods
-$ kubectl delete pods --all`
+kubectl delete pods --all`
 )
 
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
