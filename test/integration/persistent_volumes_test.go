@@ -33,6 +33,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -52,9 +53,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	recyclerClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
-	host := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
-	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0}}
+	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0}}
 	cloud := &fake_cloud.FakeCloud{}
 
 	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 10*time.Second)
