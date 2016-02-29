@@ -50,7 +50,8 @@ kubernetes/server/bin/kube-apiserver \
 	--client-ca-file=/srv/kubernetes/ca.crt \
 	--token-auth-file=/srv/kubernetes/known_tokens.csv \
 	--secure-port=443 \
-	--basic-auth-file=/srv/kubernetes/basic_auth.csv &> /var/log/kube-apiserver.log &
+	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
+	--delete-collection-workers=16 &> /var/log/kube-apiserver.log &
 
 # kube-contoller-manager now needs running kube-api server to actually start
 until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
