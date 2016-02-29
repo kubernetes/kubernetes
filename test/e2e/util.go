@@ -2165,12 +2165,16 @@ func DeleteRC(c *client.Client, ns, name string) error {
 	}
 	deleteRCTime := time.Now().Sub(startTime)
 	Logf("Deleting RC %s took: %v", name, deleteRCTime)
-	if err == nil {
-		err = waitForRCPodsGone(c, rc)
+	if err != nil {
+		return fmt.Errorf("error while stopping RC: %s: %v", name, err)
+	}
+	err = waitForRCPodsGone(c, rc)
+	if err != nil {
+		return fmt.Errorf("error while deleting RC %s: %v", name, err)
 	}
 	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
 	Logf("Terminating RC %s pods took: %v", name, terminatePodTime)
-	return err
+	return nil
 }
 
 // waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
