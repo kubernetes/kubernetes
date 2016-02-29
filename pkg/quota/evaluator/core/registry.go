@@ -30,6 +30,7 @@ func NewRegistry(kubeClient clientset.Interface) quota.Registry {
 	replicationController := NewReplicationControllerEvaluator(kubeClient)
 	resourceQuota := NewResourceQuotaEvaluator(kubeClient)
 	secret := NewSecretEvaluator(kubeClient)
+	configMap := NewConfigMapEvaluator(kubeClient)
 	persistentVolumeClaim := NewPersistentVolumeClaimEvaluator(kubeClient)
 	return &generic.GenericRegistry{
 		InternalEvaluators: map[unversioned.GroupKind]quota.Evaluator{
@@ -37,6 +38,7 @@ func NewRegistry(kubeClient clientset.Interface) quota.Registry {
 			service.GroupKind():               service,
 			replicationController.GroupKind(): replicationController,
 			secret.GroupKind():                secret,
+			configMap.GroupKind():             configMap,
 			resourceQuota.GroupKind():         resourceQuota,
 			persistentVolumeClaim.GroupKind(): persistentVolumeClaim,
 		},
