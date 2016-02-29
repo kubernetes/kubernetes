@@ -181,7 +181,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 					return r.kubeClient.Core().Secrets(api.NamespaceAll).Watch(options)
 				},
 			},
-			&api.PersistentVolumeClaim{},
+			&api.Secret{},
 			options.ResyncPeriod(),
 			framework.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
