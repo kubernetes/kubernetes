@@ -492,8 +492,10 @@ func TestTokenCreation(t *testing.T) {
 		"deleted secret with serviceaccount without reference": {
 			ExistingServiceAccount: serviceAccount(emptySecretReferences()),
 
-			DeletedSecret:   serviceAccountTokenSecret(),
-			ExpectedActions: []core.Action{},
+			DeletedSecret: serviceAccountTokenSecret(),
+			ExpectedActions: []core.Action{
+				core.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+			},
 		},
 	}
 
