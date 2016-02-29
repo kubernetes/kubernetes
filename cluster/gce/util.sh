@@ -257,8 +257,8 @@ function detect-nodes () {
     if [[ -z "${node_ip-}" ]] ; then
       echo "Did not find ${NODE_NAMES[$i]}" >&2
     else
-      echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
-      KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
+      echo "Found ${NODE_NAMES[$i]} at ${node_ip}"
+      KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
     fi
   done
   if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
