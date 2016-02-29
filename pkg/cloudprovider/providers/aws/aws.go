@@ -928,12 +928,16 @@ type awsInstance struct {
 }
 
 // newAWSInstance creates a new awsInstance object
-func newAWSInstance(ec2 EC2, instance *ec2.Instance) *awsInstance {
+func newAWSInstance(ec2Service EC2, instance *ec2.Instance) *awsInstance {
+	az := ""
+	if instance.Placement != nil {
+		az = aws.StringValue(instance.Placement.AvailabilityZone)
+	}
 	self := &awsInstance{
-		ec2:              ec2,
+		ec2:              ec2Service,
 		awsID:            aws.StringValue(instance.InstanceId),
 		nodeName:         aws.StringValue(instance.PrivateDnsName),
-		availabilityZone: aws.StringValue(instance.Placement.AvailabilityZone),
+		availabilityZone: az,
 		instanceType:     aws.StringValue(instance.InstanceType),
 		vpcID:            aws.StringValue(instance.VpcId),
 		subnetID:         aws.StringValue(instance.SubnetId),
