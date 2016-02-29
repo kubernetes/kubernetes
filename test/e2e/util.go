@@ -1833,6 +1833,8 @@ func (config *RCConfig) start() error {
 
 		if failedContainers > maxContainerFailures {
 			dumpNodeDebugInfo(config.Client, containerRestartNodes.List())
+			// Get the logs from the failed containers to help diagnose what caused them to fail
+			logFailedContainers(config.Namespace)
 			return fmt.Errorf("%d containers failed which is more than allowed %d", failedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
