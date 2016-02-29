@@ -20,6 +20,7 @@ package oidc
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,6 +30,7 @@ import (
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
@@ -47,10 +49,21 @@ type OIDCAuthenticator struct {
 	stopSyncProvider chan struct{}
 }
 
-// New creates a new OpenID Connect client with the given issuerURL and clientID.
+type OIDCHTTPHandler struct {
+	client *oidc.Client
+}
+
+// New creates a new request Authenticator which uses OpenID Connect ID Tokens for authentication.
+//
+// Internally, an OIDC client with the given issuerURL, clientID and
+// clientSecret is created.
+//
+// A path to a Certificate Authority file can be provided for communicating with
+// the Issuer. If none is provided, the hosts's root CA set will be used.
+//
 // NOTE(yifan): For now we assume the server provides the "jwks_uri" so we don't
 // need to manager the key sets by ourselves.
-func New(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (*OIDCAuthenticator, error) {
+func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim string) (*OIDCAuthenticator, error) {
 	var cfg oidc.ProviderConfig
 	var err error
 	var roots *x509.CertPool
@@ -100,8 +113,11 @@ func New(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (*OIDCA
 	glog.Infof("Fetched provider config from %s: %#v", issuerURL, cfg)
 
 	ccfg := oidc.ClientConfig{
-		HTTPClient:     hc,
-		Credentials:    oidc.ClientCredentials{ID: clientID},
+		HTTPClient: hc,
+		Credentials: oidc.ClientCredentials{
+			ID:     clientID,
+			Secret: clientSecret,
+		},
 		ProviderConfig: cfg,
 	}
 
@@ -116,6 +132,19 @@ func New(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (*OIDCA
 	stop := client.SyncProviderConfig(issuerURL)
 
 	return &OIDCAuthenticator{ccfg, client, usernameClaim, groupsClaim, stop}, nil
+}
+
+// NewOIDCHTTPHandler creates an http.Handler which provides additional endpoints useful for OIDC-related authentication.
+//
+// An OIDCAuthenticator created with a client-secret is necessary, or else an
+// error is returned.
+func (a *OIDCAuthenticator) NewOIDCHTTPHandler() (*OIDCHTTPHandler, error) {
+	if a.clientConfig.Credentials.Secret == "" {
+		return nil, errors.New("OIDCHTTPHandler requires a client config with a client secret")
+	}
+	return &OIDCHTTPHandler{
+		client: a.client,
+	}, nil
 }
 
 // AuthenticateToken decodes and verifies a JWT using the OIDC client, if the verification succeeds,
@@ -176,4 +205,8 @@ func (a *OIDCAuthenticator) Close() {
 	// This guarantees that when this function returns, there is no flying requests,
 	// because a send to an unbuffered channel happens after the receive from the channel.
 	a.stopSyncProvider <- struct{}{}
+}
+
+func (t *OIDCHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
 }

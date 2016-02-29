@@ -38,6 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc"
+
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -391,15 +393,20 @@ func Run(s *options.APIServer) error {
 		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(etcdStorage)
 	}
 
+	var oAuth *oidc.OIDCAuthenticator
+	if len(s.OIDCIssuerURL) > 0 && len(s.OIDCClientID) > 0 {
+		oAuth, err = oidc.New(s.OIDCIssuerURL,
+			s.OIDCClientID,
+			s.OIDCClientSecret,
+			s.OIDCCAFile,
+			s.OIDCUsernameClaim,
+			s.OIDCGroupsClaim)
+	}
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
 		BasicAuthFile:             s.BasicAuthFile,
 		ClientCAFile:              s.ClientCAFile,
 		TokenAuthFile:             s.TokenAuthFile,
-		OIDCIssuerURL:             s.OIDCIssuerURL,
-		OIDCClientID:              s.OIDCClientID,
-		OIDCCAFile:                s.OIDCCAFile,
-		OIDCUsernameClaim:         s.OIDCUsernameClaim,
-		OIDCGroupsClaim:           s.OIDCGroupsClaim,
+		OIDCAuthenticator:         oAuth,
 		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
 		ServiceAccountLookup:      s.ServiceAccountLookup,
 		ServiceAccountTokenGetter: serviceAccountGetter,
@@ -489,6 +496,17 @@ func Run(s *options.APIServer) error {
 	m, err := master.New(config)
 	if err != nil {
 		return err
+	}
+
+	// NOTE: I don't love that this handler is in this place; it seems like it
+	// should belong in GenericAPIServer.init() but couldn't think of a clean
+	// way to do that at the time. Would like feedback.
+	if oAuth != nil && s.OIDCClientSecret != "" {
+		oidcHandler, err := oAuth.NewOIDCHTTPHandler()
+		if err != nil {
+			return err
+		}
+		m.MuxHelper.Handle("oidc-get-tokens", oidcHandler)
 	}
 
 	m.Run(s.ServerRunOptions)

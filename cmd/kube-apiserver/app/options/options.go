@@ -71,6 +71,7 @@ type APIServer struct {
 	MinRequestTimeout          int
 	OIDCCAFile                 string
 	OIDCClientID               string
+	OIDCClientSecret           string
 	OIDCIssuerURL              string
 	OIDCUsernameClaim          string
 	OIDCGroupsClaim            string
@@ -209,6 +210,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
 	fs.StringVar(&s.OIDCIssuerURL, "oidc-issuer-url", s.OIDCIssuerURL, "The URL of the OpenID issuer, only HTTPS scheme will be accepted. If set, it will be used to verify the OIDC JSON Web Token (JWT)")
 	fs.StringVar(&s.OIDCClientID, "oidc-client-id", s.OIDCClientID, "The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set")
+	fs.StringVar(&s.OIDCClientSecret, "oidc-client-secret", s.OIDCClientID, "The client secret for the OpenID Connect client; must be set to be able to use OIDC refresh tokens.")
 	fs.StringVar(&s.OIDCCAFile, "oidc-ca-file", s.OIDCCAFile, "If set, the OpenID server's certificate will be verified by one of the authorities in the oidc-ca-file, otherwise the host's root CA set will be used")
 	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
 		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') is not "+

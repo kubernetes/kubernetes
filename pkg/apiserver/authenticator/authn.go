@@ -36,11 +36,7 @@ type AuthenticatorConfig struct {
 	BasicAuthFile             string
 	ClientCAFile              string
 	TokenAuthFile             string
-	OIDCIssuerURL             string
-	OIDCClientID              string
-	OIDCCAFile                string
-	OIDCUsernameClaim         string
-	OIDCGroupsClaim           string
+	OIDCAuthenticator         *oidc.OIDCAuthenticator
 	ServiceAccountKeyFile     string
 	ServiceAccountLookup      bool
 	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
@@ -76,11 +72,8 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		authenticators = append(authenticators, tokenAuth)
 	}
 
-	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCGroupsClaim)
-		if err != nil {
-			return nil, err
-		}
+	if config.OIDCAuthenticator != nil {
+		oidcAuth := bearertoken.New(config.OIDCAuthenticator)
 		authenticators = append(authenticators, oidcAuth)
 	}
 
@@ -129,16 +122,6 @@ func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Requ
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error
 func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request, error) {
 	tokenAuthenticator, err := tokenfile.NewCSV(tokenAuthFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return bearertoken.New(tokenAuthenticator), nil
-}
-
-// newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
-func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (authenticator.Request, error) {
-	tokenAuthenticator, err := oidc.New(issuerURL, clientID, caFile, usernameClaim, groupsClaim)
 	if err != nil {
 		return nil, err
 	}

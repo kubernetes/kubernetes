@@ -204,7 +204,7 @@ func TestOIDCDiscoveryTimeout(t *testing.T) {
 	retryBackoff = time.Second
 	expectErr := fmt.Errorf("failed to fetch provider config after 3 retries")
 
-	_, err := New("https://foo/bar", "client-foo", "", "sub", "")
+	_, err := New("https://foo/bar", "client-foo", "client-secret", "", "sub", "")
 	if !reflect.DeepEqual(err, expectErr) {
 		t.Errorf("Expecting %v, but got %v", expectErr, err)
 	}
@@ -237,7 +237,7 @@ func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 		Issuer: mustParseURL(t, srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
 	}
 
-	_, err = New(srv.URL, "client-foo", cert, "sub", "")
+	_, err = New(srv.URL, "client-foo", "client-secret", cert, "sub", "")
 	if !reflect.DeepEqual(err, expectErr) {
 		t.Errorf("Expecting %v, but got %v", expectErr, err)
 	}
@@ -260,7 +260,7 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 
 	expectErr := fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", srv.URL, "http")
 
-	_, err := New(srv.URL, "client-foo", "", "sub", "")
+	_, err := New(srv.URL, "client-foo", "client-secret", "", "sub", "")
 	if !reflect.DeepEqual(err, expectErr) {
 		t.Errorf("Expecting %v, but got %v", expectErr, err)
 	}
@@ -296,7 +296,7 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	}
 
 	// Create a client using cert2, should fail.
-	_, err = New(tlsSrv.URL, "client-foo", cert2, "sub", "")
+	_, err = New(tlsSrv.URL, "client-foo", "client-secret", cert2, "sub", "")
 	if err == nil {
 		t.Fatalf("Expecting error, but got nothing")
 	}
@@ -417,7 +417,7 @@ func TestOIDCAuthentication(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		client, err := New(srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim)
+		client, err := New(srv.URL, "client-foo", "", cert, tt.userClaim, tt.groupsClaim)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -440,5 +440,42 @@ func TestOIDCAuthentication(t *testing.T) {
 			t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
 		}
 		client.Close()
+	}
+}
+
+func TestNewOIDCHttpHandler(t *testing.T) {
+
+	tests := []struct {
+		clientSecret string
+		wantErr      bool
+	}{
+		{
+			clientSecret: "secret",
+			wantErr:      false,
+		},
+		{
+			clientSecret: "",
+			wantErr:      true,
+		},
+	}
+
+	for i, tt := range tests {
+		auth := OIDCAuthenticator{
+			clientConfig: oidc.ClientConfig{
+				Credentials: oidc.ClientCredentials{
+					Secret: tt.clientSecret,
+				},
+			},
+		}
+
+		hdlr, err := auth.NewOIDCHTTPHandler()
+		gotErr := err != nil
+		if tt.wantErr != gotErr {
+			t.Errorf("#%d: wantErr: %v, gotErr %v, err: %v", i, tt.wantErr, gotErr, err)
+		}
+
+		if !tt.wantErr && hdlr == nil {
+			t.Errorf("#%d: Want non-nil hdlr", i)
+		}
 	}
 }
