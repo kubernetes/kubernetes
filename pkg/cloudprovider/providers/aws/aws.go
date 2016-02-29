@@ -949,29 +949,6 @@ func newAWSInstance(ec2Service EC2, instance *ec2.Instance) *awsInstance {
 	return self
 }
 
-// newAwsInstanceFromMetadata would build a new awsInstance from the metadata service,
-// avoiding an EC2 API call.  BUT if we have a VPC with a custom DNS suffix, the metadata
-// service returns the wrong PrivateDnsName.  So we can't use it until we figure out a workaround
-// or no longer require the nodeName (e.g. if we use AWS InstanceID as the NodeName)
-//func newAWSInstanceFromMetadata() *awsInstance {
-//	instanceId, err := s.metadata.GetMetadata("instance-id")
-//	if err != nil {
-//		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
-//	}
-//	// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
-//	// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
-//	privateDnsName := aws.StringValue(instance.PrivateDnsName)
-//	availabilityZone, err := getAvailabilityZone(s.metadata)
-//	if err != nil {
-//		return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
-//	}
-//	instanceType, err := getInstanceType(s.metadata)
-//	if err != nil {
-//		return nil, fmt.Errorf("error fetching instance type from ec2 metadata service: %v", err)
-//	}
-//
-//}
-
 // Gets the awsInstanceType that models the instance type of this instance
 func (self *awsInstance) getInstanceType() *awsInstanceType {
 	// TODO: Make this real
@@ -1100,10 +1077,19 @@ type awsDisk struct {
 }
 
 func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
+	// name looks like aws://availability-zone/id
+
+	// The original idea of the URL-style name was to put the AZ into the
+	// host, so we could find the AZ immediately from the name without
+	// querying the API.  But it turns out we don't actually need it for
+	// Ubernetes-Lite, as we put the AZ into the labels on the PV instead.
+	// However, if in future we want to support Ubernetes-Lite
+	// volume-awareness without using PersistentVolumes, we likely will
+	// want the AZ in the host.
+
 	if !strings.HasPrefix(name, "aws://") {
 		name = "aws://" + "" + "/" + name
 	}
-	// name looks like aws://availability-zone/id
 	url, err := url.Parse(name)
 	if err != nil {
 		// TODO: Maybe we should pass a URL into the Volume functions
@@ -1122,8 +1108,7 @@ func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
 	if strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "vol-") {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
 	}
-	// az := url.Host
-	// TODO: Validate AZ?
+
 	disk := &awsDisk{ec2: aws.ec2, name: name, awsID: awsID}
 	return disk, nil
 }
@@ -1218,8 +1203,15 @@ func (c *AWSCloud) buildSelfAWSInstance() (*awsInstance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
 	}
-	// privateDnsName, err := s.metadata.GetMetadata("local-hostname")
-	// See #11543 - need to use ec2 API to get the privateDnsName in case of private dns zone e.g. mydomain.io
+
+	// We want to fetch the hostname via the EC2 metadata service
+	// (`GetMetadata("local-hostname")`): But see #11543 - we need to use
+	// the EC2 API to get the privateDnsName in case of a private DNS zone
+	// e.g. mydomain.io, because the metadata service returns the wrong
+	// hostname.  Once we're doing that, we might as well get all our
+	// information from the instance returned by the EC2 API - it is a
+	// single API call to get all the information, and it means we don't
+	// have two code paths.
 	instance, err := c.getInstanceByID(instanceId)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instance %s: %v", instanceId, err)
