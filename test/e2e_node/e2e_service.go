@@ -140,6 +140,7 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		"--api-servers", "http://127.0.0.1:8080",
 		"--address", "0.0.0.0",
 		"--port", "10250",
+		"--nosystemd", "true",
 		"--hostname-override", es.nodeName) // Required because hostname is inconsistent across hosts
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
