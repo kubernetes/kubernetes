@@ -21,42 +21,44 @@ Many storage systems require specific software to connect.  The current volume a
 * **VCS** - Volume (Client/Control) Software. Any packages or utilities required to mount/read/write/admin a storage volume. Provided by host platform.
 * **Storage Control Plane** - Storage Administrator operation interface for create/delete/modify type functions of the storage subsystem external from Kubernetes. Example: Browser interface to SAN fabric configuration.
 
+# Primary User Story
+* **Story 0**: As a Kubernetes Administrator I do not want to install VCS.
 
-# User Stories
+# Detailed User Stories
 
 * **Story 1**: As a Framework maintainer, I want to provide a no-setup storage experience for non-production environments.
 
 * **Story 2**: As a Framework maintainer, I want to allow custom configuration for production environments.
 
-* **Story  3**: As a Kubernetes Administrator I do not want to install volume drivers.
+* **Story 3**: As a Framework Maintainer I want to reduce kube configuration required to use kubernetes storage.
 
-* **Story  4**: As a Framework Maintainer I want to reduce kube configuration required to use kubernetes storage.
+* **Story 4**: As a Framework Maintainer I want to reduce/eliminate platform configuration required to use storage.
 
-* **Story  5**: As a Framework Maintainer I want to reduce/eliminate platform configuration required to use storage.
+* **Story 5**: As a Framework Maintainer I want to provide VCS support for volume types that works out-of-the-box.
 
-* **Story  6**: As a Framework Maintainer I want to provide VCS support for volume types that works out-of-the-box.
+* **Story 6**: As a Framework Maintainer I want a workable zero-configuration out-of-the-box experience.
 
-* **Story  7**: As a Framework Maintainer I want a workable zero-configuration out-of-the-box experience.
+* **Story 7**: As a Framework Maintainer I want applications to be portable across Platforms.
 
-* **Story  8**: As a Framework Maintainer I want applications to be portable across Platforms.
+* **Story 8**: As a Framework Maintainer I want supported volumes to work regardless of Platform.
 
-* **Story  9**: As a Framework Maintainer I want supported volumes to work regardless of Platform.
+* **Story 9**: As a Storage Framework Maintainer I want to provide enhanced or custom supported VCS.
 
-* **Story  10**: As a Storage Framework Maintainer I want to provide enhanced or custom supported VCS.
+* **Story  10**: As a Storage Framework Maintainer I want to provide out-of-tree VCS.
 
-* **Story  11**: As a Storage Framework Maintainer I want to provide out-of-tree VCS.
+* **Story 11**: As a Storage Administrator I want a deliberate upgrade path for VCS.
 
-* **Story  12**: As a Storage Administrator I want a deliberate upgrade path for VCS.
+* **Story 12**: As a Storage Framework Maintainer my storage system requires the VCS to continue running while the storage is being used. (TSR/Daemon requried for client)
 
-* **Story  13**: As a Storage Framework Maintainer my storage system requires the VCS to continue running while the storage is being used. (TSR/Daemon requried for client)
+* **Story 13**: As a Platform Maintainer I want the VCS containerized
 
-* **Story  14**: As a Platform Matinaer I want the VCS containerized
+* **Story 14**: As a Platform Maintainer I do not want the VCS containerized or managed by the Framework. The platform will manage the VCS.
 
-* **Story  15**: As a Platform Maintainer I do not want the VCS containerized or managed by the Framework. The platform will manage the VCS.
+* **Story 15**: As a tire-kicker I want to run network storage examples with no additional configuration.
 
-* **Story  16**: As a tire-kicker I want to run network storage examples with no additional configuration.
-
-* **Story  17**: As a tire-kicker I want to run network storage examples with no manual VCS configuration
+* **Story 16**: As a tire-kicker I want to run network storage examples with no manual VCS configuration
+* 
+* **Story 17**: As a Framework Maintainer I want to containerized the Framework.
 
 # Design
 Some storage volumes are supported by default in the host kernel but others require specific software packages (VCS). The VCS is typically dependent on the host platform, which presents configuration and administration difficulties for the Framework Maintainer.
@@ -71,7 +73,7 @@ With Docker 1.10 its possible to share a slave mount namespace with the root nam
 # Configuration
 As of Kubernetes 1.2, the volume plugins expect that the VCS is installed on the host.  *Each plugin will have to opt-in to container usage* this may leave a undeseriable "out of the box" experience until the default is changed to opt-out. This design prsents a pattern which will be added to plugins independently.
 
-For greater flexibility each plugin will specify whether to support containerized or host based mount, or both.  If containerized mount is not specified, then host based mount is assumed.  If containerized mount is supported, the container images can either retrieved from ConfigMap like the following:
+For greater flexibility each plugin will specify whether to support containerized or host based mount, or both.  If containerized mount is not specified, then host based mount is assumed.  If containerized mount is supported, the container images can either retrieved from ConfigMap or with the following:
 
 --nfs_mount_container="k8/nfs_container:latest"
 
@@ -84,10 +86,8 @@ In many cases its as simple as creating a container with the entire VCS and exec
 
 With other scenarios it may be desirable to override the mount command, or continue running.  Each in-tree plugin should handle this on a case-by-case basis.
 
-# Limitation
-
+# Limitations
 FUSE mount is not supported in the first pass. 
 
-# Design Alternatives
 
 
