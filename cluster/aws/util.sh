@@ -48,9 +48,9 @@ MASTER_DISK_ID=
 # Well known tags
 TAG_KEY_MASTER_IP="kubernetes.io/master-ip"
 
-# Defaults: ubuntu -> vivid
+# Defaults: ubuntu -> wily
 if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-  KUBE_OS_DISTRIBUTION=vivid
+  KUBE_OS_DISTRIBUTION=wily
 fi
 
 # For GCE script compatibility
