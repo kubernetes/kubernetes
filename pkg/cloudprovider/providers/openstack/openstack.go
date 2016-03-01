@@ -45,6 +45,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -685,12 +686,12 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
-	sourceRanges, err := cloudprovider.GetSourceRangeAnnotations(annotations)
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
 	if err != nil {
 		return nil, err
 	}
 
-	if !cloudprovider.IsAllowAll(sourceRanges) {
+	if !service.IsAllowAll(sourceRanges) {
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
 	}
 
