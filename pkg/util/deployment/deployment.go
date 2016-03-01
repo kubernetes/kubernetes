@@ -206,15 +206,15 @@ func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interf
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
 	selector, err := unversioned.LabelSelectorAsSelector(updatedRS.Spec.Selector)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
 	options := api.ListOptions{LabelSelector: selector}
 	podList, err := getPodList(namespace, options)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
 	}
 	if err = labelPodsWithHash(podList, c, namespace, hash); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error in adding template hash label %s to pods %+v: %s", hash, podList, err)
 	}
 	glog.V(4).Infof("Labeled rs %s's pods with hash %s.", rs.Name, hash)
 
@@ -251,7 +251,7 @@ func labelPodsWithHash(podList *api.PodList, c clientset.Interface, namespace, h
 			if _, err := updatePodWithRetries(c.Core().Pods(namespace), &pod, func(updated *api.Pod) {
 				pod.Labels = labelsutil.AddLabel(pod.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 			}); err != nil {
-				return err
+				return fmt.Errorf("error in adding template hash label %s to pod %+v: %s", hash, pod, err)
 			}
 			glog.V(4).Infof("Labeled pod %s with hash %s.", pod.Name, hash)
 		}
@@ -303,6 +303,9 @@ func updatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 		}
 		return false, nil
 	})
+	if err == wait.ErrWaitTimeout {
+		return nil, fmt.Errorf("timed out trying to update pod: %+v", oldPod)
+	}
 	return pod, err
 }
 
