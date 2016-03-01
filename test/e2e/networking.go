@@ -17,14 +17,12 @@ limitations under the License.
 package e2e
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
@@ -52,7 +50,7 @@ var _ = Describe("Networking", func() {
 
 	It("should provide Internet connection for containers [Conformance]", func() {
 		By("Running container which tries to wget google.com")
-		expectNoError(checkConnectivityToHost(f, "", "wget-test", "google.com"))
+		expectNoError(CheckConnectivityToHost(f, "", "wget-test", "google.com"))
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -112,7 +110,7 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := getReadyNodes(f)
+		nodes, err := GetReadyNodes(f)
 		expectNoError(err)
 
 		if len(nodes.Items) == 1 {
@@ -220,17 +218,17 @@ var _ = Describe("Networking", func() {
 		It("should function for pod communication on a single node", func() {
 
 			By("Picking a node")
-			nodes, err := getReadyNodes(f)
+			nodes, err := GetReadyNodes(f)
 			expectNoError(err)
 			node := nodes.Items[0]
 
 			By("Creating a webserver pod")
 			podName := "same-node-webserver"
 			defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
-			ip := launchWebserverPod(f, podName, node.Name)
+			ip := LaunchWebserverPod(f, podName, node.Name)
 
 			By("Checking that the webserver is accessible from a pod on the same node")
-			expectNoError(checkConnectivityToHost(f, node.Name, "same-node-wget", ip))
+			expectNoError(CheckConnectivityToHost(f, node.Name, "same-node-wget", ip))
 		})
 
 		It("should function for pod communication between nodes", func() {
@@ -238,7 +236,7 @@ var _ = Describe("Networking", func() {
 			podClient := f.Client.Pods(f.Namespace.Name)
 
 			By("Picking multiple nodes")
-			nodes, err := getReadyNodes(f)
+			nodes, err := GetReadyNodes(f)
 			expectNoError(err)
 
 			if len(nodes.Items) == 1 {
@@ -251,10 +249,10 @@ var _ = Describe("Networking", func() {
 			By("Creating a webserver pod")
 			podName := "different-node-webserver"
 			defer podClient.Delete(podName, nil)
-			ip := launchWebserverPod(f, podName, node1.Name)
+			ip := LaunchWebserverPod(f, podName, node1.Name)
 
 			By("Checking that the webserver is accessible from a pod on a different node")
-			expectNoError(checkConnectivityToHost(f, node2.Name, "different-node-wget", ip))
+			expectNoError(CheckConnectivityToHost(f, node2.Name, "different-node-wget", ip))
 		})
 	})
 })
@@ -297,82 +295,4 @@ func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name, version st
 		podNames = append(podNames, pod.ObjectMeta.Name)
 	}
 	return podNames
-}
-
-func getReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
-	nodes = ListSchedulableNodesOrDie(f.Client)
-	// previous tests may have cause failures of some nodes. Let's skip
-	// 'Not Ready' nodes, just in case (there is no need to fail the test).
-	filterNodes(nodes, func(node api.Node) bool {
-		return !node.Spec.Unschedulable && isNodeConditionSetAsExpected(&node, api.NodeReady, true)
-	})
-
-	if len(nodes.Items) == 0 {
-		return nil, errors.New("No Ready nodes found.")
-	}
-	return nodes, nil
-}
-
-func launchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
-	containerName := fmt.Sprintf("%s-container", podName)
-	port := 8080
-	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: api.ObjectMeta{
-			Name: podName,
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:  containerName,
-					Image: "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
-					Env:   []api.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
-					Ports: []api.ContainerPort{{ContainerPort: port}},
-				},
-			},
-			NodeName:      nodeName,
-			RestartPolicy: api.RestartPolicyNever,
-		},
-	}
-	podClient := f.Client.Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
-	expectNoError(err)
-	expectNoError(f.WaitForPodRunning(podName))
-	createdPod, err := podClient.Get(podName)
-	expectNoError(err)
-	ip = fmt.Sprintf("%s:%d", createdPod.Status.PodIP, port)
-	Logf("Target pod IP:port is %s", ip)
-	return
-}
-
-func checkConnectivityToHost(f *Framework, nodeName, podName, host string) error {
-	contName := fmt.Sprintf("%s-container", podName)
-	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: api.ObjectMeta{
-			Name: podName,
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:    contName,
-					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"wget", "-s", host},
-				},
-			},
-			NodeName:      nodeName,
-			RestartPolicy: api.RestartPolicyNever,
-		},
-	}
-	podClient := f.Client.Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
-	if err != nil {
-		return err
-	}
-	defer podClient.Delete(podName, nil)
-	return waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
 }
