@@ -183,13 +183,15 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 	configs := make([]*RCConfig, 0, count)
 	for i := 1; i <= count; i++ {
 		config := &RCConfig{
-			Client:    c,
-			Name:      groupName + "-" + strconv.Itoa(i),
-			Namespace: ns,
-			Timeout:   10 * time.Minute,
-			Image:     image,
-			Command:   command,
-			Replicas:  size,
+			Client:     c,
+			Name:       groupName + "-" + strconv.Itoa(i),
+			Namespace:  ns,
+			Timeout:    10 * time.Minute,
+			Image:      image,
+			Command:    command,
+			Replicas:   size,
+			CpuRequest: 20,       // 0.02 core
+			MemRequest: 52428800, // 50MB
 		}
 		configs = append(configs, config)
 	}
