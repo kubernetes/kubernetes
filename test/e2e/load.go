@@ -128,17 +128,24 @@ var _ = Describe("Load capacity", func() {
 
 			// We would like to spread creating replication controllers over time
 			// to make it possible to create/schedule them in the meantime.
-			// Currently we assume 5 pods/second average throughput.
-			// We may want to revisit it in the future.
-			creatingTime := time.Duration(totalPods/5) * time.Second
+			// Currently we assume 10 pods/second average throughput.
+			creatingTime := time.Duration(totalPods/10) * time.Second
+			// TODO: Remove it after speeding up scheduler #22262.
+			if nodeCount > 500 {
+				creatingTime = time.Duration(totalPods/5) * time.Second
+			}
 			createAllRC(configs, creatingTime)
 			By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
 			// to make it possible to create/schedule & delete them in the meantime.
-			// Currently we assume that 5 pods/second average throughput.
+			// Currently we assume that 10 pods/second average throughput.
 			// The expected number of created/deleted pods is less than totalPods/3.
-			scalingTime := time.Duration(totalPods/15) * time.Second
+			scalingTime := time.Duration(totalPods/30) * time.Second
+			// TODO: Remove it after speeding up scheduler #22262.
+			if nodeCount > 500 {
+				scalingTime = time.Duration(totalPods/15) * time.Second
+			}
 			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
@@ -147,8 +154,11 @@ var _ = Describe("Load capacity", func() {
 
 			// Cleanup all created replication controllers.
 			// Currently we assume 5 pods/second average deletion throughput.
-			// We may want to revisit it in the future.
-			deletingTime := time.Duration(totalPods/5) * time.Second
+			deletingTime := time.Duration(totalPods/10) * time.Second
+			// TODO: Remove it after speeding up scheduler #22262.
+			if nodeCount > 500 {
+				deletingTime = time.Duration(totalPods/5) * time.Second
+			}
 			deleteAllRC(configs, deletingTime)
 		})
 	}
