@@ -41,52 +41,39 @@ Documentation for other releases can be found at
 
 ### Introduction
 
-Garbage collection is managed by kubelet automatically, mainly including unreferenced
-images and dead containers. kubelet applies container garbage collection every minute
-and image garbage collection every 5 minutes.
-Note that we don't recommend external garbage collection tool generally, since it could
-break the behavior of kubelet potentially if it attempts to remove all of the containers
-which acts as the tombstone kubelet relies on. Yet those garbage collector aims to deal
-with the docker leaking issues would be appreciated.
+Garbage collection is a helpful function of kubelet that will clean up unreferenced images and unused containers. kubelet will perform garbage collection for containers every minute and garbage collection for images every five minutes.
+
+External garbage collection tools are not recommended as these tools can potentially break the behavior of kubelet by removing containers expected to exist.
 
 ### Image Collection
 
-kubernetes manages lifecycle of all images through imageManager, with the cooperation
+Kubernetes manages lifecycle of all images through imageManager, with the cooperation
 of cadvisor.
-The policy for garbage collecting images we apply takes two factors into consideration,
-`HighThresholdPercent` and `LowThresholdPercent`. Disk usage above the high threshold
-will trigger garbage collection, which attempts to delete unused images until the low
-threshold is met. Least recently used images are deleted first.
+
+The policy for garbage collecting images takes two factors into consideration:
+`HighThresholdPercent` and `LowThresholdPercent`. Disk usage above the the high threshold
+will trigger garbage collection. The garbage collection will delete least recently used images until the low
+threshold has been met.
 
 ### Container Collection
 
-The policy for garbage collecting containers we apply takes on three variables, which can
-be user-defined. `MinAge` is the minimum age at which a container can be garbage collected,
-zero for no limit. `MaxPerPodContainer` is the max number of dead containers any single
-pod (UID, container name) pair is allowed to have, less than zero for no limit.
-`MaxContainers` is the max number of total dead containers, less than zero for no limit as well.
+The policy for garbage collecting containers considers three user-defined variables. `MinAge` is the minimum age at which a container can be garbage collected. `MaxPerPodContainer` is the maximum number of dead containers any single
+pod (UID, container name) pair is allowed to have. `MaxContainers` is the maximum number of total dead containers. These variables can be individually disabled by setting 'Min Age' to zero and setting 'MaxPerPodContainer' and 'MaxContainers' respectively to less than zero.
 
-kubelet sorts out containers which are unidentified or stay out of bounds set by previous
-mentioned three flags. Generally the oldest containers are removed first. Since we take both
-`MaxPerPodContainer` and `MaxContainers` into consideration, it could happen when they
-have conflict -- retaining the max number of containers per pod goes out of range set by max
-number of global dead containers. In this case, we would sacrifice the `MaxPerPodContainer`
-a little bit. For the worst case, we first downgrade it to 1 container per pod, and then
-evict the oldest containers for the greater good.
+kubelet will act on containers that are unidentified or outside of the boundaries set by the previously mentioned flags. The oldest containers will generally be removed first. 'MaxPerPodContainer' and 'MaxContainer' may potentially conflict with each other in situations where retaining the maximum number of containers per pod ('MaxPerPodContainer') would go outside the allowable range of global dead containers ('MaxContainers'). 'MaxPerPodContainer' would be adjusted in this situation: A worst case scenario would be to downgrade 'MaxPerPodContainer' to 1 and evict the oldest containers.
 
-When kubelet removes the dead containers, all the files inside the container will be cleaned up as well.
-Note that we will skip the containers that are not managed by kubelet.
+Containers that are not managed by kubelet are not subject to container garbage collection.
 
 ### User Configuration
 
-Users are free to set their own value to address image garbage collection.
+Users can adjust the following thresholds to tune image garbage collection with the following kubelet flags :
 
 1. `image-gc-high-threshold`, the percent of disk usage which triggers image garbage collection.
 Default is 90%.
 2. `image-gc-low-threshold`, the percent of disk usage to which image garbage collection attempts
 to free. Default is 80%.
 
-We also allow users to customize garbage collection policy, basically via following three flags.
+We also allow users to customize garbage collection policy through the following kubelet flags:
 
 1. `minimum-container-ttl-duration`, minimum age for a finished container before it is
 garbage collected. Default is 1 minute.
@@ -95,14 +82,8 @@ per container. Default is 2.
 3. `maximum-dead-containers`, maximum number of old instances of containers to retain globally.
 Default is 100.
 
-Note that we highly recommend a large enough value for `maximum-dead-containers-per-container`
-to allow at least 2 dead containers retaining per expected container when you customize the flag
-configuration. A loose value for `maximum-dead-containers` also assumes importance for a similar reason.
+Containers can potentially be garbage collected before their usefulness has expired. These containers can contain logs and other data that can be useful for troubleshooting. A sufficiently large value for `maximum-dead-containers-per-container` is highly recommended to allow at least 2 dead containers to be retained per expected container. A higher value for `maximum-dead-containers` is also recommended for a similiar reason.
 See [this issue](https://github.com/kubernetes/kubernetes/issues/13287) for more details.
-
-
-
-
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
