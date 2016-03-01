@@ -1,15 +1,15 @@
 # Containerized Volume Clients for Kubernetes
-This document presents user stories, design and examples for containerized volume clients.
+This document presents user stories and design for containerized volume clients.
 
 # Motivation
-Many storage systems require specific software to connect.  The current volume architecture requires volume client software installed on each host for the kubelet to access volumes.  Its an common mistake to forget to install the packages on one or more hosts.  In addition, its often difficult to install the packages potentially impossible on some OS.
+Many storage systems require specific software pakcages to connect.  The current volume architecture requires that volume client software (VCS) is installed on each host for kubelet to access the volumes.  Its a common mistake to forget to install packages on one or more hosts.  And on some platforms the volume client configuration is difficult or impossible.
 
-1. No client installed on host
+**Benefits:**
+1. No client installed on host.
 2. No client configuration on host.
 
-
 # Roles and Definitions
-* **Platform** Host environment running kubernetes (Ex: Fedora-atomic, CentOS)
+* **Platform** - Host environment running kubernetes (Ex: Fedora-atomic, CentOS)
 * **Platform Maintainer** - Maintains host platform.
 * **Framework** - Kubernetes or applications packaging Kubernetes
 * **Framework Maintainer** - Builds, packages, bundles or distributes framework.
@@ -19,7 +19,6 @@ Many storage systems require specific software to connect.  The current volume a
 * **User** - End user of Kubernetes.  Submits applications to running framework.
 * **Tire Kicker** - Single/simple deployer of Kubernetes.  Runs example, non production use cases with the combined responsibilities of Storage, Kube and Platform administrator and end user.
 * **VCS** - Volume (Client/Control) Software. Any packages or utilities required to mount/read/write/admin a storage volume. Provided by host platform.
-* **Storage Control Plane** - Storage Administrator operation interface for create/delete/modify type functions of the storage subsystem external from Kubernetes. Example: Browser interface to SAN fabric configuration.
 
 # Primary User Story
 * **Story 0**: As a Kubernetes Administrator I do not want to install VCS.
@@ -60,34 +59,55 @@ Many storage systems require specific software to connect.  The current volume a
 
 * **Story 17**: As a Framework Maintainer I want to containerized the Framework.
 
+* **Story 18**: As a Framework Maintainer I want the volume end-to-end tests to be portable across platforms.
+
 # Design
-Some storage volumes are supported by default in the host kernel but others require specific software packages (VCS). The VCS is typically dependent on the host platform, which presents configuration and administration difficulties for the Framework Maintainer.
+Some storage volumes are supported by default in the platforms kernel while others require specific software packages. The exact VCS depends on the platform which presents configuration and administration difficulties for the Framework Maintainer.
 
 By containerizing the VCS they become portable across multiple platforms. A containerized VCS can mount the volume then export the mount to other containers eliminating the need for VCS installed on the host.
 
 # Mount Namespace
-The platform maintains a root mount namespace and each new user or container instance creates a slave namespace.  Mounts in the root namespace are visible to slaves, but slave namespace mounts are not visible to the root or other slave mount namespaces by default.
+The platform maintains a root mount namespace and each new user or container instance creates a slave namespace.  Mounts in the root namespace are visible to slaves but slave namespace mounts are not visible to the root or other slave mount namespaces by default.
 
 With Docker 1.10 its possible to share a slave mount namespace with the root namespace.  By sharing the namespace, one container can mount a filesystem thats visible by another container.
 
-# Configuration
-As of Kubernetes 1.2, the volume plugins expect that the VCS is installed on the host.  *Each plugin will have to opt-in to container usage* this may leave a undeseriable "out of the box" experience until the default is changed to opt-out. This design prsents a pattern which will be added to plugins independently.
+# Container "Sidecar"
+When a pod's container(s) needs access to a volume type who's client runs in a container its required that the VCS conatainer runs on the same host.  This can be achieved by enhancing  Kubelet to be aware of the VCS container, or by launching a pod targeted at the specific node.
 
-For greater flexibility each plugin will specify whether to support containerized or host based mount, or both.  If containerized mount is not specified, then host based mount is assumed.  If containerized mount is supported, the container images can either retrieved from ConfigMap or with the following:
+This design proposes enhancing Kubelet with knowledge of the VCS for these reasons:
+1. Pod lifecycle is overly heavy 
+2. VCS Pods would show up in status or must be filtered out.
+3. Codependency of the pods (VCS and main) would require a controller to manage. 
+ 
+# Configuration
+As of Kubernetes 1.2, the volume plugins expect that the VCS is installed on the host.  **Each plugin will have to opt-in to container usage** this may leave a undeseriable "out of the box" experience (User Stories 1, 15, 16) until the default is changed to opt-out. This design prsents a pattern which will be added to plugins independently.
+
+For greater flexibility each plugin will specify whether to support containerized VCS, host installed VCS or both on a case-by-case basis and enhanced as contributed by the community.  If containerized VCS is not specified then host based VCS is assumed for all plugins.  If containerized VCS is supported the container image configuration can either retrieved from ConfigMap or with the following:
 
 --nfs_mount_container="k8/nfs_container:latest"
 
+**ConfigMap:**
+``` yaml
 
-# Container State #
-The volume plugin will manage the containers state if necesarry.  If a container must remain running while the mount is available, the container should ensure as such.  Once the volume is cleaned the container may be released.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volume-client
+data:
+  volume-plugin: "nfs"
+  docker-container: "k8io/nfs:latest"
+```
+
+# Container State 
+The volume plugin will manage its containers state if necesarry.  If a container must remain running while the mount is available the container should ensure as such.  Once the volume is unbound the container may be released.
 
 # Container Design
 In many cases its as simple as creating a container with the entire VCS and executing the same mount command that would have been executed on host.  This allows a single mount command to work both on a host VCS or containerized VCS.
 
-With other scenarios it may be desirable to override the mount command, or continue running.  Each in-tree plugin should handle this on a case-by-case basis.
+With other scenarios it may be desirable to override the mount command or continue running.  Each in-tree plugin should handle this on a case-by-case basis.
 
 # Limitations
-FUSE mount is not supported in the first pass. 
+FUSE mount is not supported in the first pass (user story 12). 
 
 
 
