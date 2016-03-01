@@ -248,8 +248,8 @@ func labelPodsWithHash(podList *api.PodList, c clientset.Interface, namespace, h
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			if _, err := updatePodWithRetries(c.Core().Pods(namespace), &pod, func(updated *api.Pod) {
-				pod.Labels = labelsutil.AddLabel(pod.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
+			if _, err := updatePodWithRetries(c.Core().Pods(namespace), &pod, func(podToUpdate *api.Pod) {
+				podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 			}); err != nil {
 				return err
 			}
