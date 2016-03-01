@@ -224,16 +224,9 @@ function do-node-upgrade() {
   # Do the actual upgrade.
   # NOTE(zmerlynn): If you are changing this gcloud command, update
   #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
-  # TODO(zmerlynn): Remove this hack on July 29, 2015, when the migration to
-  #                 `gcloud alpha compute rolling-updates` is complete.
-  local subgroup="preview"
-  local exists=$(gcloud ${subgroup} rolling-updates -h &>/dev/null; echo $?) || true
-  if [[ "${exists}" != "0" ]]; then
-    subgroup="alpha compute"
-  fi
   local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
   for group in ${INSTANCE_GROUPS[@]}; do
-    gcloud ${subgroup} rolling-updates \
+    gcloud alpha compute rolling-updates \
         --project="${PROJECT}" \
         --zone="${ZONE}" \
         start \
