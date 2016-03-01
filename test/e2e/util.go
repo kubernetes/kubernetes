@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"net"
@@ -58,6 +59,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -509,6 +511,60 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	return nil
 }
 
+func podFromManifest(filename string) (*api.Pod, error) {
+	var pod api.Pod
+	Logf("Parsing pod from %v", filename)
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &pod); err != nil {
+		return nil, err
+	}
+	return &pod, nil
+}
+
+// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
+// to flip to Ready, log its output and delete it.
+func runKubernetesServiceTestContainer(repoRoot string, ns string) {
+	c, err := loadClient()
+	if err != nil {
+		Logf("Failed to load client")
+		return
+	}
+	path := filepath.Join(repoRoot, "test", "images", "clusterapi-tester", "pod.yaml")
+	p, err := podFromManifest(path)
+	if err != nil {
+		Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
+		return
+	}
+	p.Namespace = ns
+	if _, err := c.Pods(ns).Create(p); err != nil {
+		Logf("Failed to create %v: %v", p.Name, err)
+		return
+	}
+	defer func() {
+		if err := c.Pods(ns).Delete(p.Name, nil); err != nil {
+			Logf("Failed to delete pod %v: %v", p.Name, err)
+		}
+	}()
+	timeout := 5 * time.Minute
+	if err := waitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, podRunningReady); err != nil {
+		Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
+		return
+	}
+	logs, err := getPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
+	if err != nil {
+		Logf("Failed to retrieve logs from %v: %v", p.Name, err)
+	} else {
+		Logf("Output of clusterapi-tester:\n%v", logs)
+	}
+}
+
 func logFailedContainers(ns string) {
 	c, err := loadClient()
 	if err != nil {
@@ -520,16 +576,18 @@ func logFailedContainers(ns string) {
 		Logf("Error getting pods in namespace '%s': %v", ns, err)
 		return
 	}
+	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
-		if res, err := podRunningReady(&pod); res && err == nil {
-			Logf("Ignoring Ready pod %v/%v", pod.Namespace, pod.Name)
-		} else {
+		if res, err := podRunningReady(&pod); !res || err != nil {
 			for _, container := range pod.Spec.Containers {
-				logs, err := getPreviousPodLogs(c, ns, pod.Name, container.Name)
+				logs, err := getPodLogs(c, ns, pod.Name, container.Name)
 				if err != nil {
-					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+					logs, err = getPreviousPodLogs(c, ns, pod.Name, container.Name)
+					if err != nil {
+						Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+					}
 				}
-				By(fmt.Sprintf("Previous logs of %v/%v:%v on node %v", ns, pod.Name, container.Name, pod.Spec.NodeName))
+				By(fmt.Sprintf("Logs of %v/%v:%v on node %v", ns, pod.Name, container.Name, pod.Spec.NodeName))
 				Logf(logs)
 			}
 		}
