@@ -15,31 +15,34 @@
 package cloudinfo
 
 import (
-	"strings"
-
 	info "github.com/google/cadvisor/info/v1"
-
-	"google.golang.org/cloud/compute/metadata"
+	"io/ioutil"
+	"strings"
 )
 
-func onGCE() bool {
-	return metadata.OnGCE()
+const (
+	SysVendorFileName    = "/sys/class/dmi/id/sys_vendor"
+	BiosUUIDFileName     = "/sys/class/dmi/id/product_uuid"
+	MicrosoftCorporation = "Microsoft Corporation"
+)
+
+func onAzure() bool {
+	data, err := ioutil.ReadFile(SysVendorFileName)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), MicrosoftCorporation)
 }
 
-func getGceInstanceType() info.InstanceType {
-	machineType, err := metadata.Get("instance/machine-type")
-	if err != nil {
-		return info.UnknownInstance
-	}
-
-	responseParts := strings.Split(machineType, "/") // Extract the instance name from the machine type.
-	return info.InstanceType(responseParts[len(responseParts)-1])
+//TODO: Implement method.
+func getAzureInstanceType() info.InstanceType {
+	return info.UnknownInstance
 }
 
-func getGceInstanceID() info.InstanceID {
-	instanceID, err := metadata.Get("instance/id")
+func getAzureInstanceID() info.InstanceID {
+	data, err := ioutil.ReadFile(BiosUUIDFileName)
 	if err != nil {
-		return info.UnknownInstance
+		return info.UnNamedInstance
 	}
-	return info.InstanceID(info.InstanceType(instanceID))
+	return info.InstanceID(strings.TrimSuffix(string(data), "\n"))
 }
