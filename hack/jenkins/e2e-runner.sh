@@ -80,7 +80,7 @@ function clean_binaries() {
 
 function fetch_tars_from_gcs() {
     local -r bucket="${1}"
-    local -r build_version="${1}"
+    local -r build_version="${2}"
     echo "Pulling binaries from GCS; using server version ${bucket}/${build_version}."
     gsutil -mq cp \
         "gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz" \
