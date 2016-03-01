@@ -124,9 +124,16 @@ type PodStartupLatency struct {
 }
 
 type SchedulingLatency struct {
-	Scheduling LatencyMetric `json:"scheduling:`
+	Scheduling LatencyMetric `json:"scheduling"`
 	Binding    LatencyMetric `json:"binding"`
 	Total      LatencyMetric `json:"total"`
+}
+
+type SaturationTime struct {
+	TimeToSaturate time.Duration `json:"timeToStaturate"`
+	NumberOfNodes  int           `json:"numberOfNodes"`
+	NumberOfPods   int           `json:"numberOfPods"`
+	Throughput     float32       `json:"throughput"`
 }
 
 type APICall struct {
