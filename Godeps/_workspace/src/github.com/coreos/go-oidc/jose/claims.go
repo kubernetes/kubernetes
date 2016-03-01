@@ -3,6 +3,7 @@ package jose
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -70,13 +71,33 @@ func (c Claims) Int64Claim(name string) (int64, bool, error) {
 	return v, true, nil
 }
 
+func (c Claims) Float64Claim(name string) (float64, bool, error) {
+	cl, ok := c[name]
+	if !ok {
+		return 0, false, nil
+	}
+
+	v, ok := cl.(float64)
+	if !ok {
+		vi, ok := cl.(int64)
+		if !ok {
+			return 0, false, fmt.Errorf("unable to parse claim as float64: %v", name)
+		}
+		v = float64(vi)
+	}
+
+	return v, true, nil
+}
+
 func (c Claims) TimeClaim(name string) (time.Time, bool, error) {
-	v, ok, err := c.Int64Claim(name)
+	v, ok, err := c.Float64Claim(name)
 	if !ok || err != nil {
 		return time.Time{}, ok, err
 	}
 
-	return time.Unix(v, 0).UTC(), true, nil
+	s := math.Trunc(v)
+	ns := (v - s) * math.Pow(10, 9)
+	return time.Unix(int64(s), int64(ns)).UTC(), true, nil
 }
 
 func decodeClaims(payload []byte) (Claims, error) {

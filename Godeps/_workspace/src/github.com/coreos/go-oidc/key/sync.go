@@ -29,7 +29,7 @@ func (s *KeySetSyncer) Run() chan struct{} {
 		var failing bool
 		var next time.Duration
 		for {
-			exp, err := sync(s.readable, s.writable, s.clock)
+			exp, err := syncKeySet(s.readable, s.writable, s.clock)
 			if err != nil || exp == 0 {
 				if !failing {
 					failing = true
@@ -62,12 +62,12 @@ func (s *KeySetSyncer) Run() chan struct{} {
 }
 
 func Sync(r ReadableKeySetRepo, w WritableKeySetRepo) (time.Duration, error) {
-	return sync(r, w, clockwork.NewRealClock())
+	return syncKeySet(r, w, clockwork.NewRealClock())
 }
 
-// sync copies the keyset from r to the KeySet at w and returns the duration in which the KeySet will expire.
+// syncKeySet copies the keyset from r to the KeySet at w and returns the duration in which the KeySet will expire.
 // If keyset has already expired, returns a zero duration.
-func sync(r ReadableKeySetRepo, w WritableKeySetRepo, clock clockwork.Clock) (exp time.Duration, err error) {
+func syncKeySet(r ReadableKeySetRepo, w WritableKeySetRepo, clock clockwork.Clock) (exp time.Duration, err error) {
 	var ks KeySet
 	ks, err = r.Get()
 	if err != nil {

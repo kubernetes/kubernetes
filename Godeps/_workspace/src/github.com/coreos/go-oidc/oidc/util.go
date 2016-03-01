@@ -59,8 +59,8 @@ func NewClaims(iss, sub string, aud interface{}, iat, exp time.Time) jose.Claims
 		"iss": iss,
 		"sub": sub,
 		"aud": aud,
-		"iat": float64(iat.Unix()),
-		"exp": float64(exp.Unix()),
+		"iat": iat.Unix(),
+		"exp": exp.Unix(),
 	}
 }
 

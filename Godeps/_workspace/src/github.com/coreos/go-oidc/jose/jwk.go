@@ -70,6 +70,10 @@ func (j *JWK) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type JWKSet struct {
+	Keys []JWK `json:"keys"`
+}
+
 func decodeExponent(e string) (int, error) {
 	decE, err := decodeBase64URLPaddingOptional(e)
 	if err != nil {
