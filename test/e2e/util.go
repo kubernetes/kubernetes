@@ -1159,6 +1159,65 @@ func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.
 	return wait.PollImmediate(poll, podRespondingTimeout, podProxyResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
 }
 
+func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList, error) {
+	timeout := 2 * time.Minute
+	// List the pods, making sure we observe all the replicas.
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		options := api.ListOptions{LabelSelector: label}
+		pods, err := c.Pods(ns).List(options)
+		if err != nil {
+			return nil, err
+		}
+
+		created := []api.Pod{}
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
+			created = append(created, pod)
+		}
+		Logf("Pod name %s: Found %d pods out of %d", name, len(created), replicas)
+
+		if len(created) == replicas {
+			pods.Items = created
+			return pods, nil
+		}
+	}
+	return nil, fmt.Errorf("Pod name %s: Gave up waiting %v for %d pods to come up", name, timeout, replicas)
+}
+
+func podsRunning(c *client.Client, pods *api.PodList) []error {
+	// Wait for the pods to enter the running state. Waiting loops until the pods
+	// are running so non-running pods cause a timeout for this test.
+	By("ensuring each pod is running")
+	e := []error{}
+	for _, pod := range pods.Items {
+		// TODO: make waiting parallel.
+		err := waitForPodRunningInNamespace(c, pod.Name, pod.Namespace)
+		if err != nil {
+			e = append(e, err)
+		}
+	}
+	return e
+}
+
+func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) error {
+	pods, err := podsCreated(c, ns, name, replicas)
+	if err != nil {
+		return err
+	}
+	e := podsRunning(c, pods)
+	if len(e) > 0 {
+		return fmt.Errorf("failed to wait for pods running: %v", e)
+	}
+	err = podsResponding(c, ns, name, wantName, pods)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pods responding: %v", err)
+	}
+	return nil
+}
+
 func serviceResponding(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
