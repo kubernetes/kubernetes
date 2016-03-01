@@ -41,7 +41,8 @@ const (
 
 type resourceTest struct {
 	podsPerNode int
-	limits      containersCPUSummary
+	cpuLimits   containersCPUSummary
+	memLimits   resourceUsagePerContainer
 }
 
 func logPodsOnNodes(c *client.Client, nodeNames []string) {
@@ -55,7 +56,8 @@ func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	}
 }
 
-func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, rm *resourceMonitor, expected map[string]map[float64]float64) {
+func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, rm *resourceMonitor,
+	expectedCPU map[string]map[float64]float64, expectedMemory resourceUsagePerContainer) {
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
 	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
@@ -94,19 +96,14 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 
 	By("Reporting overall resource usage")
 	logPodsOnNodes(framework.Client, nodeNames.List())
-	rm.LogLatest()
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("%s", rm.FormatResourceUsage(usageSummary))
-	// TODO(yujuhong): Set realistic values after gathering enough data.
-	verifyMemoryLimits(resourceUsagePerContainer{
-		"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
-		"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
-	}, usageSummary)
+	verifyMemoryLimits(expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	Logf("%s", rm.FormatCPUSummary(cpuSummary))
-	verifyCPULimits(expected, cpuSummary)
+	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
 	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
@@ -208,15 +205,29 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 		// noise.
 		rTests := []resourceTest{
 			{podsPerNode: 0,
-				limits: containersCPUSummary{
+				cpuLimits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.06, 0.95: 0.08},
 					"/docker-daemon": {0.50: 0.05, 0.95: 0.06},
 				},
+				// We set the memory limits generously because the distribution
+				// of the addon pods affect the memory usage on each node.
+				memLimits: resourceUsagePerContainer{
+					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
+					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
+				},
 			},
+			// TODO(yujuhong): change this test to ~100 pods per node after
+			// --max-pods have been changed.
 			{podsPerNode: 35,
-				limits: containersCPUSummary{
+				cpuLimits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.12, 0.95: 0.14},
 					"/docker-daemon": {0.50: 0.06, 0.95: 0.08},
+				},
+				// We set the memory limits generously because the distribution
+				// of the addon pods affect the memory usage on each node.
+				memLimits: resourceUsagePerContainer{
+					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 75 * 1024 * 1024},
+					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
 				},
 			},
 		}
@@ -226,7 +237,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			name := fmt.Sprintf(
 				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, itArg.limits)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, itArg.cpuLimits, itArg.memLimits)
 			})
 		}
 	})
@@ -237,7 +248,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			name := fmt.Sprintf(
 				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, nil)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, nil, nil)
 			})
 		}
 	})
