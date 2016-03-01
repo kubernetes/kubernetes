@@ -267,19 +267,17 @@ func updateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 	var err error
 	oldRs := rs
 	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		rs, err = rsClient.Get(oldRs.Name)
+		if err != nil {
+			return false, err
+		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
 		if rs, err = rsClient.Update(rs); err == nil {
-			// rs contains the latest controller post update
+			// Update successful.
 			return true, nil
 		}
-		// Update the controller with the latest resource version, if the update failed we
-		// can't trust rs so use oldRs.Name.
-		if rs, err = rsClient.Get(oldRs.Name); err != nil {
-			// The Get failed: Value in rs cannot be trusted.
-			rs = oldRs
-		}
-		// The Get passed: rs contains the latest controller, expect a poll for the update.
+		// Update could have failed due to conflict error. Try again.
 		return false, nil
 	})
 	// If the error is non-nil the returned controller cannot be trusted, if it is nil, the returned
@@ -293,14 +291,17 @@ func updatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 	var err error
 	oldPod := pod
 	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		pod, err = podClient.Get(oldPod.Name)
+		if err != nil {
+			return false, err
+		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(pod)
 		if pod, err = podClient.Update(pod); err == nil {
+			// Update successful.
 			return true, nil
 		}
-		if pod, err = podClient.Get(oldPod.Name); err != nil {
-			pod = oldPod
-		}
+		// Update could have failed due to conflict error. Try again.
 		return false, nil
 	})
 	return pod, err

@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -40,6 +41,23 @@ func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clie
 func addListPodsReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addGetRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
+	rsList, ok := obj.(*extensions.ReplicaSetList)
+	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		name := action.(testclient.GetAction).GetName()
+		if ok {
+			for _, rs := range rsList.Items {
+				if rs.Name == name {
+					return true, &rs, nil
+				}
+			}
+		}
+		return false, nil, fmt.Errorf("could not find the requested replica set: %s", name)
+
 	})
 	return fakeClient
 }
@@ -346,6 +364,7 @@ func TestGetOldRCs(t *testing.T) {
 		fakeClient := &fake.Clientset{}
 		fakeClient = addListPodsReactor(fakeClient, test.objs[0])
 		fakeClient = addListRSReactor(fakeClient, test.objs[1])
+		fakeClient = addGetRSReactor(fakeClient, test.objs[1])
 		fakeClient = addUpdatePodsReactor(fakeClient)
 		fakeClient = addUpdateRSReactor(fakeClient)
 		rss, _, err := GetOldReplicaSets(&newDeployment, fakeClient)
