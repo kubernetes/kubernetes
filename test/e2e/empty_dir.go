@@ -35,7 +35,7 @@ const (
 
 var _ = Describe("EmptyDir volumes", func() {
 
-	f := NewFramework("emptydir")
+	f := NewDefaultFramework("emptydir")
 
 	Context("when FSGroup is specified [Feature:FSGroup]", func() {
 		It("new files should be created with FSGroup ownership when container is root", func() {

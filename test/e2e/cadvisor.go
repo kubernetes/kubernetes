@@ -33,7 +33,7 @@ const (
 
 var _ = Describe("Cadvisor", func() {
 
-	f := NewFramework("cadvisor")
+	f := NewDefaultFramework("cadvisor")
 
 	It("should be healthy on every node.", func() {
 		CheckCadvisorHealthOnAllNodes(f.Client, 5*time.Minute)

@@ -49,7 +49,7 @@ const (
 )
 
 var _ = Describe("Restart [Disruptive]", func() {
-	f := NewFramework("restart")
+	f := NewDefaultFramework("restart")
 	var ps *podStore
 
 	BeforeEach(func() {

@@ -47,7 +47,7 @@ var _ = Describe("Pod Disks", func() {
 		host0Name string
 		host1Name string
 	)
-	framework := NewFramework("pod-disks")
+	framework := NewDefaultFramework("pod-disks")
 
 	BeforeEach(func() {
 		SkipUnlessNodeCountIsAtLeast(2)

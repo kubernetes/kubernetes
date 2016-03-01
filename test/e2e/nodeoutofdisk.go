@@ -67,7 +67,7 @@ const (
 var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 	var c *client.Client
 	var unfilledNodeName, recoveredNodeName string
-	framework := NewFramework("node-outofdisk")
+	framework := NewDefaultFramework("node-outofdisk")
 
 	BeforeEach(func() {
 		c = framework.Client

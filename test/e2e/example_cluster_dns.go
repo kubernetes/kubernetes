@@ -42,7 +42,7 @@ except:
 	print 'err'`
 
 var _ = Describe("ClusterDns [Feature:Example]", func() {
-	framework := NewFramework("cluster-dns")
+	framework := NewDefaultFramework("cluster-dns")
 
 	var c *client.Client
 	BeforeEach(func() {

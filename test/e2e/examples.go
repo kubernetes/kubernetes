@@ -37,7 +37,7 @@ const (
 )
 
 var _ = Describe("[Feature:Example]", func() {
-	framework := NewFramework("examples")
+	framework := NewDefaultFramework("examples")
 	var c *client.Client
 	var ns string
 	BeforeEach(func() {

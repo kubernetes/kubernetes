@@ -62,7 +62,7 @@ const loadBalancerCreateTimeout = 20 * time.Minute
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
 var _ = Describe("Services", func() {
-	f := NewFramework("services")
+	f := NewDefaultFramework("services")
 
 	var c *client.Client
 

@@ -71,7 +71,7 @@ var _ = Describe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = NewFramework("daemonsets")
+	f = NewDefaultFramework("daemonsets")
 
 	image := "gcr.io/google_containers/serve_hostname:1.1"
 	dsName := "daemon-set"

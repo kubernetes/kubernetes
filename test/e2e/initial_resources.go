@@ -30,7 +30,7 @@ import (
 //
 // Flaky issue #20272
 var _ = Describe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
-	f := NewFramework("initial-resources")
+	f := NewDefaultFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {
 		// TODO(piosz): Add cleanup data in InfluxDB that left from previous tests.

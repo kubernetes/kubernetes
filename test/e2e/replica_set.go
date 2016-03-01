@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("ReplicaSet", func() {
-	framework := NewFramework("replicaset")
+	framework := NewDefaultFramework("replicaset")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
 		ReplicaSetServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")

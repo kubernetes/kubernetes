@@ -25,7 +25,7 @@ import (
 
 var _ = Describe("SSH", func() {
 
-	f := NewFramework("ssh")
+	f := NewDefaultFramework("ssh")
 
 	BeforeEach(func() {
 		// When adding more providers here, also implement their functionality in util.go's getSigner(...).
