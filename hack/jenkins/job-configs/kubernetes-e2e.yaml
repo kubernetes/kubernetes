@@ -507,6 +507,7 @@
         export EXIT_ON_WEAK_ERROR="false"
         # Reduce logs verbosity
         export TEST_CLUSTER_LOG_LEVEL="--v=1"
+        export MAX_INSTANCES_PER_MIG="1000"
         # Increase resync period to simulate production
         export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
         # Increase delete collection parallelism
