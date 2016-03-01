@@ -116,7 +116,7 @@ else
     # use JENKINS_PUBLISHED_VERSION, default to 'ci/latest', since that's
     # usually what we're testing.
     check_dirty_workspace
-    fetch_published_version_tars "${JENKINS_PUBLISHED_VERSION:-'ci/latest'}"
+    fetch_published_version_tars "${JENKINS_PUBLISHED_VERSION:-ci/latest}"
 fi
 
 # Copy GCE keys so we don't keep cycling them.
