@@ -104,7 +104,7 @@ func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds in
 // rate of approximately 1 per second.
 var _ = Describe("Namespaces [Serial]", func() {
 
-	f := NewFramework("namespaces")
+	f := NewDefaultFramework("namespaces")
 
 	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
 		func() { extinguish(f, 100, 10, 150) })

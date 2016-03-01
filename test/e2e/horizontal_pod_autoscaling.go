@@ -36,7 +36,7 @@ const (
 // These tests take ~20 minutes each.
 var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow]", func() {
 	var rc *ResourceConsumer
-	f := NewFramework("horizontal-pod-autoscaling")
+	f := NewDefaultFramework("horizontal-pod-autoscaling")
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"

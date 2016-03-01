@@ -48,7 +48,7 @@ const (
 )
 
 func proxyContext(version string) {
-	f := NewFramework("proxy")
+	f := NewDefaultFramework("proxy")
 	prefix := "/api/" + version
 
 	// Port here has to be kept in sync with default kubelet port.

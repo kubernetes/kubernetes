@@ -38,7 +38,7 @@ const (
 //
 // These tests take ~20 minutes to run each.
 var _ = Describe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
-	f := NewFramework("autoscaling")
+	f := NewDefaultFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
 	var memCapacityMb int

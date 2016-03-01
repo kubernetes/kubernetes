@@ -30,7 +30,7 @@ import (
 )
 
 var _ = Describe("ReplicationController", func() {
-	framework := NewFramework("replication-controller")
+	framework := NewDefaultFramework("replication-controller")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
 		ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")

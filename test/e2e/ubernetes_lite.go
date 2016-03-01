@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("Ubernetes Lite", func() {
-	framework := NewFramework("ubernetes-lite")
+	framework := NewDefaultFramework("ubernetes-lite")
 	var zoneCount int
 	var err error
 	image := "gcr.io/google_containers/serve_hostname:1.1"

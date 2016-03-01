@@ -210,7 +210,7 @@ var _ = Describe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	var repoRoot string
 	var client *client.Client
 
-	framework := NewFramework("servicelb")
+	framework := NewDefaultFramework("servicelb")
 
 	BeforeEach(func() {
 		client = framework.Client

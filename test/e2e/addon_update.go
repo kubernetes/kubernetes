@@ -192,7 +192,7 @@ var _ = Describe("Addon update", func() {
 
 	var dir string
 	var sshClient *ssh.Client
-	f := NewFramework("addon-update-test")
+	f := NewDefaultFramework("addon-update-test")
 
 	BeforeEach(func() {
 		// This test requires:

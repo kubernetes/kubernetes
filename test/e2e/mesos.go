@@ -30,7 +30,7 @@ import (
 )
 
 var _ = Describe("Mesos", func() {
-	framework := NewFramework("pods")
+	framework := NewDefaultFramework("pods")
 	var c *client.Client
 	var ns string
 

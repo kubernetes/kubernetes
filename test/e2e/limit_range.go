@@ -27,7 +27,7 @@ import (
 )
 
 var _ = Describe("LimitRange", func() {
-	f := NewFramework("limitrange")
+	f := NewDefaultFramework("limitrange")
 
 	It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		By("Creating a LimitRange")

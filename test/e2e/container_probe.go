@@ -36,7 +36,7 @@ const (
 )
 
 var _ = Describe("Probing container", func() {
-	framework := NewFramework("container-probe")
+	framework := NewDefaultFramework("container-probe")
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}
 

@@ -30,7 +30,7 @@ import (
 //
 // Slow by design (7 min)
 var _ = Describe("Garbage collector [Slow]", func() {
-	f := NewFramework("garbage-collector")
+	f := NewDefaultFramework("garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		SkipUnlessProviderIs("gce")
 
