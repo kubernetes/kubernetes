@@ -208,6 +208,7 @@ func NewMainKubelet(
 	volumeStatsAggPeriod time.Duration,
 	containerRuntimeOptions []kubecontainer.Option,
 	hairpinMode string,
+	babysitDaemons bool,
 	kubeOptions []Option,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
@@ -331,6 +332,7 @@ func NewMainKubelet(
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
 		hairpinMode:                  componentconfig.HairpinMode(hairpinMode),
+		babysitDaemons:               babysitDaemons,
 	}
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod)
@@ -730,6 +732,9 @@ type Kubelet struct {
 	// (make cbr0 promiscuous), "hairpin-veth" (set the hairpin flag on veth interfaces)
 	// or "none" (do nothing).
 	hairpinMode componentconfig.HairpinMode
+
+	// The node has babysitter process monitoring docker and kubelet
+	babysitDaemons bool
 
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*api.Node) error
@@ -2666,7 +2671,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge); err != nil {
+	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
 		return err
 	}
 	if kl.shaper == nil {

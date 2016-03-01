@@ -164,6 +164,11 @@
   {% set hairpin_mode = "--hairpin-mode=" + pillar['hairpin_mode'] -%}
 {% endif -%}
 
+{% set babysit_daemons = "" -%}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
+  {% set babysit_daemons = "--babysit-daemons=true" -%}
+{% endif -%}
+
 {% set kubelet_port = "" -%}
 {% if pillar['kubelet_port'] is defined -%}
   {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
