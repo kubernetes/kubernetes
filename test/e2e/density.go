@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -121,6 +122,8 @@ var _ = Describe("Density", func() {
 	var uuid string
 	var e2eStartupTime time.Duration
 	var totalPods int
+	var nodeCpuCapacity int64
+	var nodeMemCapacity int64
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
@@ -159,6 +162,9 @@ var _ = Describe("Density", func() {
 		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
+
+		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue()
+		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value()
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
@@ -216,7 +222,8 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
-			totalPods = itArg.podsPerNode * nodeCount
+			podsPerNode := itArg.podsPerNode
+			totalPods = podsPerNode * nodeCount
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
 			fileHndl, err := os.Create(fmt.Sprintf(testContext.OutputDir+"/%s/pod_states.csv", uuid))
 			expectNoError(err)
@@ -228,8 +235,8 @@ var _ = Describe("Density", func() {
 				PollInterval:         itArg.interval,
 				PodStatusFile:        fileHndl,
 				Replicas:             totalPods,
-				CpuRequest:           20,       // 0.02 core
-				MemRequest:           52428800, // 50MB
+				CpuRequest:           nodeCpuCapacity / 100,
+				MemRequest:           nodeMemCapacity / 100,
 				MaxContainerFailures: &MaxContainerFailures,
 			}
 
@@ -388,7 +395,7 @@ var _ = Describe("Density", func() {
 				}
 
 				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
-				_, controller := controllerframework.NewInformer(
+				latencyPodsStore, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
@@ -424,9 +431,21 @@ var _ = Describe("Density", func() {
 				podLabels := map[string]string{
 					"name": additionalPodsPrefix,
 				}
+				// Explicitly set requests here.
+				// Thanks to it we trigger increasing priority function by scheduling
+				// a pod to a node, which in turn will result in spreading latency pods
+				// more evenly between nodes.
+				cpuRequest := *resource.NewMilliQuantity(nodeCpuCapacity/5, resource.DecimalSI)
+				memRequest := *resource.NewQuantity(nodeMemCapacity/5, resource.DecimalSI)
+				if podsPerNode > 30 {
+					// This is to make them schedulable on high-density tests
+					// (e.g. 100 pods/node kubemark).
+					cpuRequest = *resource.NewMilliQuantity(0, resource.DecimalSI)
+					memRequest = *resource.NewQuantity(0, resource.DecimalSI)
+				}
 				for i := 1; i <= nodeCount; i++ {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-					go createRunningPod(&wg, c, name, ns, "gcr.io/google_containers/pause:2.0", podLabels)
+					go createRunningPod(&wg, c, name, ns, "gcr.io/google_containers/pause:2.0", podLabels, cpuRequest, memRequest)
 					time.Sleep(200 * time.Millisecond)
 				}
 				wg.Wait()
@@ -438,6 +457,17 @@ var _ = Describe("Density", func() {
 					}
 				}
 				close(stopCh)
+
+				nodeToLatencyPods := make(map[string]int)
+				for _, item := range latencyPodsStore.List() {
+					pod := item.(*api.Pod)
+					nodeToLatencyPods[pod.Spec.NodeName]++
+				}
+				for node, count := range nodeToLatencyPods {
+					if count > 1 {
+						Logf("%d latency pods scheduled on %s", count, node)
+					}
+				}
 
 				selector := fields.Set{
 					"involvedObject.kind":      "Pod",
@@ -530,7 +560,7 @@ var _ = Describe("Density", func() {
 	}
 })
 
-func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image string, labels map[string]string) {
+func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image string, labels map[string]string, cpuRequest, memRequest resource.Quantity) {
 	defer GinkgoRecover()
 	defer wg.Done()
 	pod := &api.Pod{
@@ -546,6 +576,12 @@ func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image stri
 				{
 					Name:  name,
 					Image: image,
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    cpuRequest,
+							api.ResourceMemory: memRequest,
+						},
+					},
 				},
 			},
 			DNSPolicy: api.DNSDefault,

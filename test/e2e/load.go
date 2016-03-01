@@ -188,8 +188,8 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 			Image:      image,
 			Command:    command,
 			Replicas:   size,
-			CpuRequest: 20,       // 0.02 core
-			MemRequest: 52428800, // 50MB
+			CpuRequest: 10,       // 0.01 core
+			MemRequest: 26214400, // 25MB
 		}
 		configs = append(configs, config)
 	}
