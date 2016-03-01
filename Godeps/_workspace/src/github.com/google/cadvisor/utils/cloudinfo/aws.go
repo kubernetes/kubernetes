@@ -15,31 +15,31 @@
 package cloudinfo
 
 import (
-	"strings"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 
 	info "github.com/google/cadvisor/info/v1"
-
-	"google.golang.org/cloud/compute/metadata"
 )
 
-func onGCE() bool {
-	return metadata.OnGCE()
+func onAWS() bool {
+	client := ec2metadata.New(session.New(&aws.Config{}))
+	return client.Available()
 }
 
-func getGceInstanceType() info.InstanceType {
-	machineType, err := metadata.Get("instance/machine-type")
+func getAwsMetadata(name string) string {
+	client := ec2metadata.New(session.New(&aws.Config{}))
+	data, err := client.GetMetadata(name)
 	if err != nil {
 		return info.UnknownInstance
 	}
-
-	responseParts := strings.Split(machineType, "/") // Extract the instance name from the machine type.
-	return info.InstanceType(responseParts[len(responseParts)-1])
+	return data
 }
 
-func getGceInstanceID() info.InstanceID {
-	instanceID, err := metadata.Get("instance/id")
-	if err != nil {
-		return info.UnknownInstance
-	}
-	return info.InstanceID(info.InstanceType(instanceID))
+func getAwsInstanceType() info.InstanceType {
+	return info.InstanceType(getAwsMetadata("instance-type"))
+}
+
+func getAwsInstanceID() info.InstanceID {
+	return info.InstanceID(getAwsMetadata("instance-id"))
 }

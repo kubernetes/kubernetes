@@ -542,10 +542,16 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.CreationTime.Unix()), baseLabelValues...)
 
 		if container.Spec.HasCpu {
+			desc = prometheus.NewDesc("container_spec_cpu_period", "CPU period of the container.", baseLabels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Period), baseLabelValues...)
+			if container.Spec.Cpu.Quota != 0 {
+				desc = prometheus.NewDesc("container_spec_cpu_quota", "CPU quota of the container.", baseLabels, nil)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Quota), baseLabelValues...)
+			}
 			desc := prometheus.NewDesc("container_spec_cpu_shares", "CPU share of the container.", baseLabels, nil)
 			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Limit), baseLabelValues...)
-		}
 
+		}
 		if container.Spec.HasMemory {
 			desc := prometheus.NewDesc("container_spec_memory_limit_bytes", "Memory limit for the container.", baseLabels, nil)
 			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.Limit), baseLabelValues...)
