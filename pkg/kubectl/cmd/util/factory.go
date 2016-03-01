@@ -139,6 +139,7 @@ const (
 	RunPodV1GeneratorName                       = "run-pod/v1"
 	ServiceV1GeneratorName                      = "service/v1"
 	ServiceV2GeneratorName                      = "service/v2"
+	ServiceAccountV1GeneratorName               = "serviceaccount/v1"
 	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
