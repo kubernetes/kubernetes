@@ -157,6 +157,9 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		ns = framework.Namespace.Name
 		nodeList = ListSchedulableNodesOrDie(c)
 
+		err := checkTestingNSDeletedExcept(c, ns)
+		expectNoError(err)
+
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
 		// It is so because we need to have precise control on what's running in the cluster.
