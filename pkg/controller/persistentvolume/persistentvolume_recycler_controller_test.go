@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
+
+	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 const (
@@ -84,7 +86,7 @@ func TestRecyclingRetry(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	// Use a fake NewRecycler function
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newFailingMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newFailingMockRecycler, volume.VolumeConfig{}), volumetesting.NewFakeVolumeHost("/tmp/fake", nil, nil))
 	// Reset a global call counter
 	failedCallCount = 0
 
@@ -126,7 +128,7 @@ func TestRecyclingRetryAlwaysFail(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	// Use a fake NewRecycler function
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newAlwaysFailingMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newAlwaysFailingMockRecycler, volume.VolumeConfig{}), volumetesting.NewFakeVolumeHost("/tmp/fake", nil, nil))
 	// Reset a global call counter
 	failedCallCount = 0
 

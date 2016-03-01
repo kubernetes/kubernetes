@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -38,7 +39,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetesting.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -62,7 +63,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetesting.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -130,7 +131,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetesting.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -281,7 +282,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetesting.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
