@@ -188,18 +188,20 @@ var _ = Describe("Density", func() {
 		// TODO: Expose runLatencyTest as ginkgo flag.
 		{podsPerNode: 3, runLatencyTest: false, interval: 10 * time.Second},
 		{podsPerNode: 30, runLatencyTest: true, interval: 10 * time.Second},
-		// More than 30 pods per node is outside our v1.0 goals.
-		// We might want to enable those tests in the future.
 		{podsPerNode: 50, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerNode: 95, runLatencyTest: true, interval: 10 * time.Second},
 		{podsPerNode: 100, runLatencyTest: false, interval: 1 * time.Second},
 	}
 
 	for _, testArg := range densityTests {
 		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
-		if testArg.podsPerNode == 30 {
+		switch testArg.podsPerNode {
+		case 30:
 			name = "[Feature:Performance] " + name
 			framework.addonResourceConstraints = density30AddonResourceVerifier()
-		} else {
+		case 95:
+			name = "[Feature:HighDensityPerformance]" + name
+		default:
 			name = "[Feature:ManualPerformance] " + name
 		}
 		itArg := testArg
@@ -313,7 +315,6 @@ var _ = Describe("Density", func() {
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
-
 			// Print some data about Pod to Node allocation
 			By("Printing Pod to Node allocation data")
 			podList, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
