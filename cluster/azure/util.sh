@@ -22,32 +22,30 @@
 set -e
 
 SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+while [ -h "$SOURCE" ]; do
   DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
   SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-AZURE_ROOT="$DIR"
-KUBE_ROOT="$DIR/../.."
-KUBE_CONFIG_FILE="${KUBE_CONFIG_FILE:-"${AZURE_ROOT}/config-default.sh"}"
+KUBE_ROOT="${DIR}/../.."
+KUBE_CONFIG_FILE="${KUBE_CONFIG_FILE:-"${DIR}/config-default.sh"}"
 source "${KUBE_CONFIG_FILE}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
-
 function verify-prereqs() {
-    required_binaries=("docker")
+    required_binaries=("docker" "jq")
 
     for rb in "${required_binaries[@]}"; do
     if ! which "$rb" > /dev/null 2>&1; then
-        echo "Couldn't find $rb in PATH"
+        echo "Couldn't find ${rb} in PATH"
         exit 1
     fi
     done
 
-    if ! "$KUBE_ROOT/cluster/kubectl.sh" >/dev/null 2>&1 ; then
-        echo "kubectl is unavailable. Ensure $KUBE_ROOT/cluster/kubectl.sh runs with a successful exit."
+    if ! "${KUBE_ROOT}/cluster/kubectl.sh" >/dev/null 2>&1 ; then
+        echo "kubectl is unavailable. Ensure ${KUBE_ROOT}/cluster/kubectl.sh runs with a successful exit."
         exit 1
     fi
 }
@@ -61,12 +59,6 @@ function azure-ensure-config() {
         echo "AZURE_TENANT_ID must be set"
         exit 1
     fi
-    export AZURE_DEPLOY_ID="${AZURE_DEPLOY_ID:-kube-$(date +"%Y%m%d-%H%M%S")}"
-    export AZURE_LOCATION="${AZURE_LOCATION:-westus}"
-    export AZURE_MASTER_SIZE="${AZURE_MASTER_SIZE:-"Standard_A1"}"
-    export AZURE_NODE_SIZE="${AZURE_NODE_SIZE:-"Standard_A1"}"
-    export NODE_COUNT="${NODE_COUNT:-3}"
-    export AZURE_USERNAME="${AZURE_USERNAME:-"kube"}"
 
     export AZURE_OUTPUT_RELDIR="_deployments/${AZURE_DEPLOY_ID}"
     export AZURE_OUTPUT_DIR="${DIR}/${AZURE_OUTPUT_RELDIR}"
@@ -83,76 +75,165 @@ function azure-ensure-config() {
                 exit 1
             fi
             ;;
-        "device")
-            ;;
         "")
             echo "AZURE_AUTH_METHOD not set, assuming \"device\"."
-            echo " - This will be interactive."
-            echo " - Set AZURE_AUTH_METHOD=client_secret and AZURE_CLIENT_ID/AZURE_CLIENT_SECRET to avoid the prompt"
+            ;;
+        "device" | "")
+            echo "This will be interactive. (export AZURE_AUTH_METHOD=client_secret to avoid the prompt)"
             export AZURE_AUTH_METHOD="device"
             ;;
         *)
-            echo "AZURE_AUTH_METHOD is an unsupported value: ${AZURE_AUTH_METHOD}"
+            echo "AZURE_AUTH_METHOD is an unsupported value: \"${AZURE_AUTH_METHOD}\""
             exit 1
             ;;
     esac
 }
 
+function repo-contains-image() {
+    registry="$1"
+    repo="$2"
+    image="$3"
+    version="$4"
+
+    prefix="${registry}"
+    if [[ "${prefix}" == "docker.io" ]]; then
+        prefix="registry.hub.docker.com/v2/repositories"
+        tags_json=$(curl "https://registry.hub.docker.com/v2/repositories/${repo}/${image}/tags/${version}/" 2>/dev/null)
+        tags_found="$(echo "${tags_json}" | jq ".v2?")"
+    elif [[ "${prefix}" == "gcr.io" ]]; then
+        tags_json=$(curl "https://gcr.io/v2/${repo}/${image}/tags/list" 2>/dev/null)
+        tags_found="$(echo "${tags_json}" | jq ".tags | indices([\"${version}\"]) | any")"
+    fi
+
+
+    if [[ "${tags_found}" == "true" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+function ensure-hyperkube() {
+    hyperkube="hyperkube-amd64"
+    official_image_tag="gcr.io/google_containers/${hyperkube}:${KUBE_GIT_VERSION}"
+
+    if repo-contains-image "gcr.io" "google_containers" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
+        echo "${hyperkube}:${KUBE_GIT_VERSION} was found in the gcr.io/google_containers repository"
+        export AZURE_HYPERKUBE_SPEC="${official_image_tag}"
+        return 0
+    fi
+
+    echo "${hyperkube}:${KUBE_GIT_VERSION} was not found in the gcr.io/google_containers repository"
+    if [[ -z "${AZURE_DOCKER_REGISTRY:-}" || -z "${AZURE_DOCKER_REPO:-}" ]]; then
+        echo "AZURE_DOCKER_REGISTRY and AZURE_DOCKER_REPO must be set in order to push ${hyperkube}:${KUBE_GIT_VERSION}"
+        return 1
+    fi
+
+    # check if it is already in the user owned docker hub
+    local user_image_tag="${AZURE_DOCKER_REGISTRY}/${AZURE_DOCKER_REPO}/${hyperkube}:${KUBE_GIT_VERSION}"
+    if repo-contains-image "${AZURE_DOCKER_REGISTRY}" "${AZURE_DOCKER_REPO}" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
+        echo "${image}:${version} was found in ${repo} (success)"
+        export AZURE_HYPERKUBE_SPEC="${user_image_tag}"
+        return 0
+    fi
+
+    # should these steps tell them to just immediately tag it with the final user-specified repo?
+    # for now just stick with the assumption that `make release` will eventually tag a hyperkube image on gcr.io
+    # and then the existing code can re-tag that for the user's repo and then push
+    if ! docker inspect "${user_image_tag}" ; then
+        if ! docker inspect "${official_image_tag}" ; then
+            REGISTRY="gcr.io/google_containers" \
+            VERSION="${KUBE_GIT_VERSION}" \
+            make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
+        fi
+
+        docker tag "${official_image_tag}" "${user_image_tag}"
+    fi
+
+    docker push "${user_image_tag}"
+
+    echo "${image}:${version} was pushed to ${repo}"
+    export AZURE_HYPERKUBE_SPEC="${user_image_tag}"
+}
+
 function azure-deploy(){
+    declare -a auth_params
+    declare -a docker_params
+    declare -a resource_group_params
+
     case "${AZURE_AUTH_METHOD}" in
         "client_secret")
-            auth_params1="--client-secret=${AZURE_CLIENT_SECRET}"
-            auth_params2="--client-id=${AZURE_CLIENT_ID}"
+            auth_params=("--client-id=${AZURE_CLIENT_ID}" "--client-secret=${AZURE_CLIENT_SECRET}")
             ;;
         "device")
-            auth_params1=()
-            auth_params2=()
+            auth_params=()
             ;;
     esac
+
+    if [[ ! -z "${AZURE_HTTPS_PROXY:-}" ]]; then
+        docker_params=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
+    fi
+
+    if [[ ! -z "${AZURE_RESOURCE_GROUP:-}" ]]; then
+        echo "Forcing use of resource group ${AZURE_RESOURCE_GROUP}"
+        resource_group_params=("--resource-group=${AZURE_RESOURCE_GROUP}")
+    fi
+
     docker run -it \
         --user "$(id -u)" \
+        "${docker_params[@]:+${docker_params[@]}}" \
         -v "${AZURE_OUTPUT_DIR}:/opt/azkube/${AZURE_OUTPUT_RELDIR}" \
         colemickens/azkube:v0.0.1 /opt/azkube/azkube deploy \
             --kubernetes-hyperkube-spec="${AZURE_HYPERKUBE_SPEC}" \
             --deployment-name="${AZURE_DEPLOY_ID}" \
             --location="${AZURE_LOCATION}" \
+            "${resource_group_params[@]:+${resource_group_params[@]}}" \
             --tenant-id="${AZURE_TENANT_ID}" \
             --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
-            --auth-method="${AZURE_AUTH_METHOD}" "${auth_params1}" "${auth_params2}" \
+            --auth-method="${AZURE_AUTH_METHOD}" "${auth_params[@]:+${auth_params[@]}}" \
             --master-size="${AZURE_MASTER_SIZE}" \
             --node-size="${AZURE_NODE_SIZE}" \
-            --node-count="${NODE_COUNT}" \
+            --node-count="${NUM_NODES}" \
             --username="${AZURE_USERNAME}" \
-            --output-directory="/opt/azkube/${AZURE_OUTPUT_RELDIR}"
+            --output-directory="/opt/azkube/${AZURE_OUTPUT_RELDIR}" \
+            --no-cloud-provider \
+            "${AZURE_AZKUBE_ARGS[@]:+${AZURE_AZKUBE_ARGS[@]}}"
 }
 
 function kube-up {
     date_start="$(date)"
-    echo "++> AZURE KUBE-UP STARTED: ${date_start}"
-
-    export AZURE_HYPERKUBE_SPEC="gcr.io/google_containers/hyperkube:v1.1.8"
+    startdate="$(date +%s)"
+    echo "++> AZURE KUBE-UP STARTED: $(date)"
 
     verify-prereqs
     azure-ensure-config
+
+    if [[ -z "${AZURE_HYPERKUBE_SPEC:-}" ]]; then
+        find-release-version
+        export KUBE_GIT_VERSION="${KUBE_GIT_VERSION//+/-}"
+
+        # this will export AZURE_HYPERKUBE_SPEC based on whether an official image was found
+        # or if it was uploaded to the user specified docker repository.
+        if ! ensure-hyperkube; then
+            echo "Failed to ensure hyperkube was available. Exitting."
+            return 1
+        fi
+    else
+        echo "Using user specified AZURE_HYPERKUBE_SPEC: ${AZURE_HYPERKUBE_SPEC}"
+        echo "Note: The existence of this is not verified! (It might only be pullable from your DC)"
+    fi
+
     azure-deploy
 
-    kubectl config set-cluster "${AZURE_DEPLOY_ID}" --server="https://${AZURE_DEPLOY_ID}.${AZURE_LOCATION}.cloudapp.azure.com:6443/" --certificate-authority="${AZURE_OUTPUT_DIR}/ca.crt" --api-version="v1"
+    kubectl config set-cluster "${AZURE_DEPLOY_ID}" --server="https://${AZURE_DEPLOY_ID}.${AZURE_LOCATION}.cloudapp.azure.com:6443" --certificate-authority="${AZURE_OUTPUT_DIR}/ca.crt" --api-version="v1"
     kubectl config set-credentials "${AZURE_DEPLOY_ID}_user" --client-certificate="${AZURE_OUTPUT_DIR}/client.crt" --client-key="${AZURE_OUTPUT_DIR}/client.key"
     kubectl config set-context "${AZURE_DEPLOY_ID}" --cluster="${AZURE_DEPLOY_ID}" --user="${AZURE_DEPLOY_ID}_user"
     kubectl config use-context "${AZURE_DEPLOY_ID}"
 
-    date_end="$(date)"
-    d1="$(date -d "${date_start}" +%s)"
-    d2="$(date -d "${date_end}" +%s)"
-    duration="$(( (d2 - d1) ))"
-    duration_secs="$(( (d2 - d1) )) seconds"
-    duration_mins="$(( ((d2 - d1)+60) / 60 )) minutes"
-    if [[ ! -z "$(which awk)" ]]; then
-        duration_mins=$(awk "BEGIN {printf \"%.2f\",${duration}/60}")
-    fi
+    enddate="$(date +%s)"
+    duration="$(( (startdate - enddate) ))"
 
-    echo "++> AZURE KUBE-UP FINISHED: ${date_end}"
-    echo "++> AZURE KUBE-UP TIME ELAPSED: ${duration_secs} (${duration_mins})"
+    echo "++> AZURE KUBE-UP FINISHED: $(date) (duration: ${duration} seconds)"
 }
 
 function kube-down {
@@ -162,6 +243,6 @@ function kube-down {
     echo
     echo "You must do this manually (for now)!"
     echo "This can be done with:"
-    echo "   azure_call group delete ${AZ_RESOURCE_GROUP}"
+    echo "   azure group delete ${AZ_RESOURCE_GROUP}"
 }
 
