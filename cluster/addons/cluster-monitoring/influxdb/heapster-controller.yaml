@@ -38,7 +38,7 @@ spec:
               memory: {{ heapster_memory }}
           command:
             - /heapster
-            - --source=kubernetes.summary_api:''
+            - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
             - --metric_resolution=60s
         - image: gcr.io/google_containers/heapster:v0.20.0-alpha8
