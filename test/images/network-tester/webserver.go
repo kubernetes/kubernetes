@@ -214,7 +214,7 @@ func main() {
 
 // Find all sibling pods in the service and post to their /write handler.
 func contactOthers(state *State) {
-	const waitTimeout = 2 * time.Minute
+	const waitTimeout = 5 * time.Minute
 	defer state.doneContactingPeers()
 	client, err := client.NewInCluster()
 	if err != nil {
@@ -232,7 +232,7 @@ func contactOthers(state *State) {
 		if eps.Len() >= *peerCount {
 			break
 		}
-		state.Logf("%v/%v has %v endpoints, which is less than %v as expected. Waiting for all endpoints to come up.", *namespace, *service, len(eps), *peerCount)
+		state.Logf("%v/%v has %v endpoints (%v), which is less than %v as expected. Waiting for all endpoints to come up.", *namespace, *service, len(eps), eps.List(), *peerCount)
 	}
 
 	// Do this repeatedly, in case there's some propagation delay with getting
