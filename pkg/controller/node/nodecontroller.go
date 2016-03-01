@@ -479,9 +479,26 @@ func (nc *NodeController) monitorNodeStatus() error {
 						continue
 					}
 					if remaining {
-						// queue eviction of the pods on the node
+						// Immediately evict pods (skip rate-limited evictor)
 						glog.V(2).Infof("Deleting node %s is delayed while pods are evicted", node.Name)
-						nc.evictPods(node.Name)
+						go func(nodeName string) {
+							nc.evictorLock.Lock()
+							defer nc.evictorLock.Unlock()
+							remaining, err := nc.deletePods(nodeName)
+							if err != nil {
+								glog.Errorf("Unable to evict pods from node %s: %v", nodeName, err)
+								nc.podEvictor.Add(nodeName)
+								return
+							}
+							if !remaining {
+								return
+							}
+							// Immediately terminate pods.
+							if _, _, err := nc.terminatePods(nodeName, time.Now()); err != nil {
+								glog.Errorf("Unable to terminate pods on node %s: %v", nodeName, err)
+								nc.terminationEvictor.Add(nodeName)
+							}
+						}(node.Name)
 						continue
 					}
 
