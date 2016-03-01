@@ -99,10 +99,6 @@ func New(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (*OIDCA
 
 	glog.Infof("Fetched provider config from %s: %#v", issuerURL, cfg)
 
-	if cfg.KeysEndpoint == "" {
-		return nil, fmt.Errorf("OIDC provider must provide 'jwks_uri' for public key discovery")
-	}
-
 	ccfg := oidc.ClientConfig{
 		HTTPClient:     hc,
 		Credentials:    oidc.ClientCredentials{ID: clientID},
