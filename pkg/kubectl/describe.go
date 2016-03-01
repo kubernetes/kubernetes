@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
@@ -95,7 +96,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		extensions.Kind("HorizontalPodAutoscaler"):  &HorizontalPodAutoscalerDescriber{c},
 		autoscaling.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):                &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):               &DeploymentDescriber{clientset.FromUnversionedClient(c)},
+		extensions.Kind("Deployment"):               &DeploymentDescriber{adapter.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                      &JobDescriber{c},
 		batch.Kind("Job"):                           &JobDescriber{c},
 		extensions.Kind("Ingress"):                  &IngressDescriber{c},
