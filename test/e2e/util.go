@@ -2296,7 +2296,62 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
 		logPodsOfReplicaSets(c, allRSs, minReadySeconds)
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("error waiting for deployment %s status to match expectation: %v", deploymentName, err)
+	}
+	return nil
+}
+
+// waitForDeploymentRollbackCleared waits for given deployment either started rolling back or doesn't need to rollback.
+// Note that rollback should be cleared shortly, so we only wait for 1 minute here to fail early.
+func waitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName string) error {
+	err := wait.Poll(poll, 1*time.Minute, func() (bool, error) {
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		// Rollback not set or is kicked off
+		if deployment.Spec.RollbackTo == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error waiting for deployment %s rollbackTo to be cleared: %v", deploymentName, err)
+	}
+	return nil
+}
+
+// waitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
+// Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.
+func waitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
+	var deployment *extensions.Deployment
+	var newRS *extensions.ReplicaSet
+	err := wait.Poll(poll, 1*time.Minute, func() (bool, error) {
+		var err error
+		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
+		if err != nil {
+			return false, err
+		}
+		// Check revision of this deployment, and of the new replica set of this deployment
+		if deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != revision ||
+			newRS.Annotations == nil || newRS.Annotations[deploymentutil.RevisionAnnotation] != revision ||
+			deployment.Spec.Template.Spec.Containers[0].Image != image || newRS.Spec.Template.Spec.Containers[0].Image != image {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		logReplicaSetsOfDeployment(deployment, nil, newRS)
+	}
+	if err != nil {
+		return fmt.Errorf("error waiting for deployment %s revision and image to match expectation: %v", deploymentName, err)
+	}
+	return nil
 }
 
 func waitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds int) error {
@@ -2384,22 +2439,6 @@ func waitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, 
 		}
 		eventsCount := len(events.Items)
 		if eventsCount >= atLeastEventsCount {
-			return true, nil
-		}
-		return false, nil
-	})
-}
-
-// waitForRollbackDone waits for the given deployment finishes rollback.
-func waitForRollbackDone(c *clientset.Clientset, deployment *extensions.Deployment) (err error) {
-	deployments := c.Extensions().Deployments(deployment.Namespace)
-	name := deployment.Name
-	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if deployment, err = deployments.Get(name); err != nil {
-			return false, err
-		}
-		// When deployment's RollbackTo is empty, the rollback is done.
-		if deployment.Spec.RollbackTo == nil {
 			return true, nil
 		}
 		return false, nil
