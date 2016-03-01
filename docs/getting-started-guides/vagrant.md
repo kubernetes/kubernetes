@@ -419,7 +419,7 @@ If you are behind a proxy, you need to install vagrant proxy plugin and set the 
 ```sh
 vagrant plugin install vagrant-proxyconf
 export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
-export KUBERNETES_HTTP_PROXY=https://username:password@proxyaddr:proxyport
+export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
 ```
 
 Optionally you can specify addresses to not proxy, for example
