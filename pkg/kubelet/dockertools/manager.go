@@ -79,13 +79,23 @@ const (
 	// networking). Must match the value returned by docker inspect -f
 	// '{{.HostConfig.NetworkMode}}'.
 	namespaceModeHost = "host"
+
+	// Remote API version for docker daemon version v1.10
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	dockerV110APIVersion = "1.22"
 )
 
-// DockerManager implements the Runtime interface.
-var _ kubecontainer.Runtime = &DockerManager{}
+var (
+	// DockerManager implements the Runtime interface.
+	_ kubecontainer.Runtime = &DockerManager{}
 
-// TODO: make this a TTL based pull (if image older than X policy, pull)
-var podInfraContainerImagePullPolicy = api.PullIfNotPresent
+	// TODO: make this a TTL based pull (if image older than X policy, pull)
+	podInfraContainerImagePullPolicy = api.PullIfNotPresent
+
+	// Default set of security options. Seccomp is disabled by default until
+	// github issue #20870 is resolved.
+	defaultSecurityOpt = []string{"seccomp:unconfined"}
+)
 
 type DockerManager struct {
 	client              DockerInterface
@@ -488,6 +498,11 @@ func (dm *DockerManager) runContainer(
 		ContainerName: container.Name,
 	}
 
+	securityOpts, err := dm.defaultSecurityOpt()
+	if err != nil {
+		return kubecontainer.ContainerID{}, err
+	}
+
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
 	// TODO: keep these labels up to date if the pod changes
@@ -551,9 +566,10 @@ func (dm *DockerManager) runContainer(
 		PidMode:        pidMode,
 		ReadonlyRootfs: readOnlyRootFilesystem(container),
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
-		Memory:     memoryLimit,
-		MemorySwap: -1,
-		CPUShares:  cpuShares,
+		Memory:      memoryLimit,
+		MemorySwap:  -1,
+		CPUShares:   cpuShares,
+		SecurityOpt: securityOpts,
 	}
 
 	if dm.cpuCFSQuota {
@@ -932,6 +948,22 @@ func (dm *DockerManager) nativeExecSupportExists() (bool, error) {
 		return true, err
 	}
 	return false, err
+}
+
+func (dm *DockerManager) defaultSecurityOpt() ([]string, error) {
+	version, err := dm.APIVersion()
+	if err != nil {
+		return nil, err
+	}
+	// seccomp is to be disabled on docker versions >= v1.10
+	result, err := version.Compare(dockerV110APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	if result >= 0 {
+		return defaultSecurityOpt, nil
+	}
+	return nil, nil
 }
 
 func (dm *DockerManager) getRunInContainerCommand(containerID kubecontainer.ContainerID, cmd []string) (*exec.Cmd, error) {
