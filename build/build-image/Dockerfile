@@ -15,10 +15,6 @@
 # This file creates a standard build environment for building Kubernetes
 FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 
-ENV http_proxy=KUBE_BUILD_HTTP_PROXY \
-  https_proxy=KUBE_BUILD_HTTPS_PROXY \
-  no_proxy=KUBE_BUILD_NO_PROXY
-
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
