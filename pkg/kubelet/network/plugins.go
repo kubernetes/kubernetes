@@ -37,8 +37,11 @@ const DefaultPluginName = "kubernetes.io/no-op"
 
 // Called when the node's Pod CIDR is known when using the
 // controller manager's --allocate-node-cidrs=true option
-const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
-const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+const (
+	NET_PLUGIN_EVENT_POD_CIDR_CHANGE             = "pod-cidr-change"
+	NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+	NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_PATH = "pod-cidr-config-path"
+)
 
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {

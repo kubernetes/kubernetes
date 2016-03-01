@@ -31,8 +31,11 @@ import (
 	"testing"
 	"time"
 
+	goruntime "runtime"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -48,10 +51,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -4461,6 +4466,41 @@ func TestGetPodsToSync(t *testing.T) {
 	} else {
 		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
 	}
+}
+
+func TestKubenetWithRkt(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("only run kubenet test on linux")
+	}
+
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	tmpdir, err := ioutil.TempDir("", "kubelet-test-rkt")
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(tmpdir)
+
+	conf, err := rkt.NewConfig("/bin/rkt", "", fmt.Sprintf("--local-config=%s", tmpdir))
+	assert.NoError(t, err)
+
+	kubelet.containerRuntime = rkt.NewFakeRuntime(conf)
+	kubenetPlugin := kubenet.NewPlugin()
+	plug, err := network.InitNetworkPlugin([]network.NetworkPlugin{kubenetPlugin}, "kubenet", &networkHost{kubelet})
+	assert.NoError(t, err)
+
+	kubelet.networkPlugin = plug
+	kubelet.updatePodCIDR("10.244.0.0/16")
+
+	// Check the result.
+	bytes, err := ioutil.ReadFile(path.Join(tmpdir, rkt.DefaultK8sNetConfigFile))
+	assert.NoError(t, err)
+
+	intf, err := kubenet.FindMinMTU()
+	assert.NoError(t, err)
+
+	expected := fmt.Sprintf(kubenet.NET_CONFIG_TEMPLATE, kubenet.BridgeName, intf.MTU, kubenet.DefaultInterfaceName, "10.244.0.0/16", "10.244.0.1")
+
+	assert.Equal(t, expected, string(bytes))
 }
 
 // TODO(random-liu): Add unit test for convertStatusToAPIStatus (issue #20478)

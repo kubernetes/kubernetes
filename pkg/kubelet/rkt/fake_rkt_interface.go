@@ -160,3 +160,7 @@ func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container 
 func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	return f.dnsServers, f.dnsSearches, f.err
 }
+
+func NewFakeRuntime(config *Config) *Runtime {
+	return &Runtime{apisvc: newFakeRktInterface(), systemd: newFakeSystemd(), config: config}
+}
