@@ -30,10 +30,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -577,7 +579,7 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
 	// Check if user specified the allow source range
-	sourceRanges, err := cloudprovider.GetSourceRangeAnnotations(annotations)
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
 	if err != nil {
 		return nil, err
 	}
@@ -740,7 +742,7 @@ func translateAffinityType(affinityType api.ServiceAffinity) string {
 	}
 }
 
-func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []*api.ServicePort, sourceRanges cloudprovider.IPNetSet) (exists bool, needsUpdate bool, err error) {
+func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []*api.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
 	fw, err := gce.service.Firewalls.Get(gce.projectID, makeFirewallName(name)).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -764,7 +766,7 @@ func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress st
 	}
 	// The service controller already verified that the protocol matches on all ports, no need to check.
 
-	actualSourceRanges, err := cloudprovider.ParseIPNetSet(fw.SourceRanges)
+	actualSourceRanges, err := netsets.ParseIPNets(fw.SourceRanges...)
 	if err != nil {
 		// This really shouldn't happen... GCE has returned something unexpected
 		glog.Warningf("Error parsing firewall SourceRanges: %v", fw.SourceRanges)
@@ -852,7 +854,7 @@ func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []
 	return nil
 }
 
-func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges cloudprovider.IPNetSet, ports []*api.ServicePort, hosts []*gceInstance) error {
+func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) error {
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -870,7 +872,7 @@ func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges clou
 	return nil
 }
 
-func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges cloudprovider.IPNetSet, ports []*api.ServicePort, hosts []*gceInstance) error {
+func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) error {
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -888,7 +890,7 @@ func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges clou
 	return nil
 }
 
-func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges cloudprovider.IPNetSet, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
@@ -1206,7 +1208,7 @@ func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
 }
 
 // CreateFirewall creates the given firewall rule.
-func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges cloudprovider.IPNetSet, ports []int64, hostNames []string) error {
+func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNet, ports []int64, hostNames []string) error {
 	region, err := GetGCERegion(gce.localZone)
 	if err != nil {
 		return err
@@ -1235,7 +1237,7 @@ func (gce *GCECloud) DeleteFirewall(name string) error {
 
 // UpdateFirewall applies the given firewall rule as an update to an existing
 // firewall rule with the same name.
-func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges cloudprovider.IPNetSet, ports []int64, hostNames []string) error {
+func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNet, ports []int64, hostNames []string) error {
 	region, err := GetGCERegion(gce.localZone)
 	if err != nil {
 		return err

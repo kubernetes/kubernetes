@@ -26,20 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
-const (
-	// The value of a LBAnnotationAllowSourceRange annotation determines
-	// the source IP ranges to allow to access a service exposed as
-	// type=LoadBalancer (when accesssed through the LoadBalancer created
-	// by the cloud provider).
-	//
-	// It should be a comma-separated list of CIDRs, e.g. `0.0.0.0/0` to
-	// allow full access (the default) or `18.0.0.0/8,56.0.0.0/8` to allow
-	// access only from the CIDRs currently allocated to MIT & the USPS.
-	//
-	// Not all cloud providers support this annotation, though AWS & GCE do.
-	LBAnnotationAllowSourceRange = "service.beta.kubernetes.io/load-balancer-source-ranges"
-)
-
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.

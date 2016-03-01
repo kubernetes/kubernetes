@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -1979,7 +1980,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
-	sourceRanges, err := cloudprovider.GetSourceRangeAnnotations(annotations)
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
 	if err != nil {
 		return nil, err
 	}
