@@ -49,7 +49,12 @@ func (c *Fake) DockerContainer(name string, req *cadvisorapi.ContainerInfoReques
 }
 
 func (c *Fake) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return new(cadvisorapi.MachineInfo), nil
+	// Simulate a matchin with 1 core and 3.75GB of memory.
+	// We set it to non-zero values to make non-zero-capacity machines in Kubemark.
+	return &cadvisorapi.MachineInfo{
+		NumCores:       1,
+		MemoryCapacity: 4026531840,
+	}, nil
 }
 
 func (c *Fake) VersionInfo() (*cadvisorapi.VersionInfo, error) {
