@@ -34,6 +34,102 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+func rs(name string, replicas int, selector map[string]string) *exp.ReplicaSet {
+	return &exp.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: exp.ReplicaSetSpec{
+			Replicas: replicas,
+			Selector: &unversioned.LabelSelector{MatchLabels: selector},
+			Template: &api.PodTemplateSpec{},
+		},
+	}
+}
+
+func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map[string]string) *exp.ReplicaSet {
+	rs := rs(name, specReplicas, selector)
+	rs.Status = exp.ReplicaSetStatus{
+		Replicas: statusReplicas,
+	}
+	return rs
+}
+
+func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString) exp.Deployment {
+	return exp.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: exp.DeploymentSpec{
+			Replicas: replicas,
+			Strategy: exp.DeploymentStrategy{
+				Type: exp.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &exp.RollingUpdateDeployment{
+					MaxSurge:       maxSurge,
+					MaxUnavailable: maxUnavailable,
+				},
+			},
+		},
+	}
+}
+
+var alwaysReady = func() bool { return true }
+
+func newDeployment(replicas int, revisionHistoryLimit *int) *exp.Deployment {
+	d := exp.Deployment{
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		ObjectMeta: api.ObjectMeta{
+			UID:             util.NewUUID(),
+			Name:            "foobar",
+			Namespace:       api.NamespaceDefault,
+			ResourceVersion: "18",
+		},
+		Spec: exp.DeploymentSpec{
+			Strategy: exp.DeploymentStrategy{
+				Type:          exp.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &exp.RollingUpdateDeployment{},
+			},
+			Replicas: replicas,
+			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: revisionHistoryLimit,
+		},
+	}
+	return &d
+}
+
+func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet {
+	return &exp.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: exp.ReplicaSetSpec{
+			Replicas: replicas,
+			Template: &d.Spec.Template,
+		},
+	}
+
+}
+
+func newListOptions() api.ListOptions {
+	return api.ListOptions{}
+}
+
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
@@ -510,25 +606,37 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 	}{
 		{
 			oldRSs: []*exp.ReplicaSet{
-				rs("foo-1", 0, selector),
-				rs("foo-2", 0, selector),
-				rs("foo-3", 0, selector),
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithStatus("foo-2", 0, 0, selector),
+				newRSWithStatus("foo-3", 0, 0, selector),
 			},
 			revisionHistoryLimit: 1,
 			expectedDeletions:    2,
 		},
 		{
+			// Only delete the replica set with Spec.Replicas = Status.Replicas = 0.
 			oldRSs: []*exp.ReplicaSet{
-				rs("foo-1", 0, selector),
-				rs("foo-2", 0, selector),
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithStatus("foo-2", 0, 1, selector),
+				newRSWithStatus("foo-3", 1, 0, selector),
+				newRSWithStatus("foo-4", 1, 1, selector),
+			},
+			revisionHistoryLimit: 0,
+			expectedDeletions:    1,
+		},
+
+		{
+			oldRSs: []*exp.ReplicaSet{
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithStatus("foo-2", 0, 0, selector),
 			},
 			revisionHistoryLimit: 0,
 			expectedDeletions:    2,
 		},
 		{
 			oldRSs: []*exp.ReplicaSet{
-				rs("foo-1", 1, selector),
-				rs("foo-2", 1, selector),
+				newRSWithStatus("foo-1", 1, 1, selector),
+				newRSWithStatus("foo-2", 1, 1, selector),
 			},
 			revisionHistoryLimit: 0,
 			expectedDeletions:    0,
@@ -562,76 +670,6 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 	}
 }
 
-func rs(name string, replicas int, selector map[string]string) *exp.ReplicaSet {
-	return &exp.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-		},
-		Spec: exp.ReplicaSetSpec{
-			Replicas: replicas,
-			Selector: &unversioned.LabelSelector{MatchLabels: selector},
-			Template: &api.PodTemplateSpec{},
-		},
-	}
-}
-
-func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString) exp.Deployment {
-	return exp.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-		},
-		Spec: exp.DeploymentSpec{
-			Replicas: replicas,
-			Strategy: exp.DeploymentStrategy{
-				Type: exp.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &exp.RollingUpdateDeployment{
-					MaxSurge:       maxSurge,
-					MaxUnavailable: maxUnavailable,
-				},
-			},
-		},
-	}
-}
-
-var alwaysReady = func() bool { return true }
-
-func newDeployment(replicas int, revisionHistoryLimit *int) *exp.Deployment {
-	d := exp.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
-		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
-			Name:            "foobar",
-			Namespace:       api.NamespaceDefault,
-			ResourceVersion: "18",
-		},
-		Spec: exp.DeploymentSpec{
-			Strategy: exp.DeploymentStrategy{
-				Type:          exp.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &exp.RollingUpdateDeployment{},
-			},
-			Replicas: replicas,
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{
-						"name": "foo",
-						"type": "production",
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Image: "foo/bar",
-						},
-					},
-				},
-			},
-			RevisionHistoryLimit: revisionHistoryLimit,
-		},
-	}
-	return &d
-}
-
 func getKey(d *exp.Deployment, t *testing.T) string {
 	if key, err := controller.KeyFunc(d); err != nil {
 		t.Errorf("Unexpected error getting key for deployment %v: %v", d.Name, err)
@@ -639,24 +677,6 @@ func getKey(d *exp.Deployment, t *testing.T) string {
 	} else {
 		return key
 	}
-}
-
-func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet {
-	return &exp.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: api.NamespaceDefault,
-		},
-		Spec: exp.ReplicaSetSpec{
-			Replicas: replicas,
-			Template: &d.Spec.Template,
-		},
-	}
-
-}
-
-func newListOptions() api.ListOptions {
-	return api.ListOptions{}
 }
 
 type fixture struct {

@@ -992,7 +992,7 @@ func (dc *DeploymentController) cleanupOldReplicaSets(oldRSs []*extensions.Repli
 	for i := 0; i < diff; i++ {
 		rs := oldRSs[i]
 		// Avoid delete replica set with non-zero replica counts
-		if rs.Spec.Replicas != 0 || rs.Generation > rs.Status.ObservedGeneration {
+		if rs.Status.Replicas != 0 || rs.Spec.Replicas != 0 || rs.Generation > rs.Status.ObservedGeneration {
 			continue
 		}
 		if err := dc.client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
