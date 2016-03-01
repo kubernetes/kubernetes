@@ -192,7 +192,7 @@ type WorkflowStepStatus struct {
 ```
 
 `JobTemplateSpec` is already introduced by
-ScheduledJob controller proposal](https://github.com/kubernetes/kubernete2s/pull/11980).
+ScheduledJob controller proposal](https://github.com/kubernetes/kubernetes/pull/11980).
 Reported for readability:
 
 ```go
