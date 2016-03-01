@@ -5,6 +5,7 @@ This document presents user stories and design for containerized volume clients.
 Many storage systems require specific software pakcages to connect.  The current volume architecture requires that volume client software (VCS) is installed on each host for kubelet to access the volumes.  Its a common mistake to forget to install packages on one or more hosts.  And on some platforms the volume client configuration is difficult or impossible.
 
 **Benefits:**
+
 1. No client installed on host.
 2. No client configuration on host.
 
@@ -105,6 +106,12 @@ The volume plugin will manage its containers state if necesarry.  If a container
 In many cases its as simple as creating a container with the entire VCS and executing the same mount command that would have been executed on host.  This allows a single mount command to work both on a host VCS or containerized VCS.
 
 With other scenarios it may be desirable to override the mount command or continue running.  Each in-tree plugin should handle this on a case-by-case basis.
+
+# Containerized Kubelet
+When the kubelet runs in a container, nsenter is used to escape the container mount namespace, and runs all mounts on the host.  With the addition of shared docker namespace we can remove the nsenter function in kubelet and modify mount.go
+
+1. Delete nsenter_mount.go (eventually, backward compatibility)
+2. Eliminate the distinction in the code with regard to mount operations of whether the kubelet is containerized or not
 
 # Limitations
 FUSE mount is not supported in the first pass (user story 12). 
