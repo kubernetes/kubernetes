@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 // newTestHost returns the temp directory and the VolumeHost created.
@@ -40,12 +41,12 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, testProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, testProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/somepath/fake", nil, ProbeVolumePlugins()))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost("/somepath/fake", nil, ProbeVolumePlugins()))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
 	if err != nil {
