@@ -575,7 +575,7 @@ func describeVolumes(volumes []api.Volume, out io.Writer) {
 		case volume.VolumeSource.RBD != nil:
 			printRBDVolumeSource(volume.VolumeSource.RBD, out)
 		default:
-			fmt.Fprintf(out, "  <Volume Type Not Found>\n")
+			fmt.Fprintf(out, "  <unknown>\n")
 		}
 	}
 }
@@ -952,7 +952,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		if controller.Spec.Template != nil {
 			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
 		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
+			fmt.Fprintf(out, "Image(s):\t%s\n", "<unset>")
 		}
 		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(controller.Labels))
@@ -971,7 +971,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 func DescribePodTemplate(template *api.PodTemplateSpec) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		if template == nil {
-			fmt.Fprintf(out, "<no template>")
+			fmt.Fprintf(out, "<unset>")
 			return nil
 		}
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(template.Labels))
@@ -1018,7 +1018,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		if rs.Spec.Template != nil {
 			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
 		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
+			fmt.Fprintf(out, "Image(s):\t%s\n", "<unset>")
 		}
 		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(rs.Labels))
@@ -1061,7 +1061,7 @@ func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 		if job.Spec.Completions != nil {
 			fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
 		} else {
-			fmt.Fprintf(out, "Completions:\tNot Set\n")
+			fmt.Fprintf(out, "Completions:\t<unset>\n")
 		}
 		if job.Status.StartTime != nil {
 			fmt.Fprintf(out, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
@@ -1320,7 +1320,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 
 			name := sp.Name
 			if name == "" {
-				name = "<unnamed>"
+				name = "<unset>"
 			}
 			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
 			if sp.NodePort != 0 {
@@ -1391,7 +1391,7 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 				for _, port := range subset.Ports {
 					name := port.Name
 					if len(name) == 0 {
-						name = "<unnamed>"
+						name = "<unset>"
 					}
 					fmt.Fprintf(out, "    %s\t%d\t%s\n", name, port.Port, port.Protocol)
 				}
@@ -1613,7 +1613,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
 				fmt.Fprintf(out, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
 			} else {
-				fmt.Fprintf(out, "<not available>\n")
+				fmt.Fprintf(out, "<unset>\n")
 			}
 		}
 		minReplicas := "<unset>"

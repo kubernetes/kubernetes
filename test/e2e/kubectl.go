@@ -613,7 +613,7 @@ var _ = Describe("Kubectl client", func() {
 				{"Selector:", "app=redis", "role=master"},
 				{"Type:", "ClusterIP"},
 				{"IP:"},
-				{"Port:", "<unnamed>", "6379/TCP"},
+				{"Port:", "<unset>", "6379/TCP"},
 				{"Endpoints:"},
 				{"Session Affinity:", "None"}}
 			checkOutput(output, requiredStrings)
