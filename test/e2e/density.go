@@ -232,6 +232,8 @@ var _ = Describe("Density", func() {
 				PollInterval:         itArg.interval,
 				PodStatusFile:        fileHndl,
 				Replicas:             totalPods,
+				CpuRequest:           20,       // 0.02 core
+				MemRequest:           52428800, // 50MB
 				MaxContainerFailures: &MaxContainerFailures,
 			}
 
