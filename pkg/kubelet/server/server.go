@@ -166,6 +166,7 @@ type HostInterface interface {
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
+	PLEGHealthCheck() (bool, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -223,6 +224,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
+		healthz.NamedCheck("pleg", s.plegHealthCheck),
 	)
 	var ws *restful.WebService
 	ws = new(restful.WebService)
@@ -381,6 +383,14 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	enterLoopTime := s.host.LatestLoopEntryTime()
 	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
 		return fmt.Errorf("Sync Loop took longer than expected.")
+	}
+	return nil
+}
+
+// Checks if pleg, which lists pods periodically, is healthy.
+func (s *Server) plegHealthCheck(req *http.Request) error {
+	if ok, err := s.host.PLEGHealthCheck(); !ok {
+		return fmt.Errorf("PLEG took longer than expected: %v", err)
 	}
 	return nil
 }
