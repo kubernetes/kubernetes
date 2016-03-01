@@ -14,19 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cadvisor
+package testing
 
 import (
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 // Fake cAdvisor implementation.
 type Fake struct {
 }
 
-var _ Interface = new(Fake)
+var _ cadvisor.Interface = new(Fake)
 
 func (c *Fake) Start() error {
 	return nil

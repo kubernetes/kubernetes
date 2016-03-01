@@ -23,7 +23,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 )
 
 func testPolicy() DiskSpacePolicy {
@@ -33,10 +33,10 @@ func testPolicy() DiskSpacePolicy {
 	}
 }
 
-func setUp(t *testing.T) (*assert.Assertions, DiskSpacePolicy, *cadvisor.Mock) {
+func setUp(t *testing.T) (*assert.Assertions, DiskSpacePolicy, *cadvisortest.Mock) {
 	assert := assert.New(t)
 	policy := testPolicy()
-	c := new(cadvisor.Mock)
+	c := new(cadvisortest.Mock)
 	return assert, policy, c
 }
 
@@ -240,7 +240,7 @@ func Test_getFsInfo(t *testing.T) {
 	assert.NoError(err)
 
 	// Threshold case
-	mockCadvisor = new(cadvisor.Mock)
+	mockCadvisor = new(cadvisortest.Mock)
 	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  100 * mb,
@@ -273,7 +273,7 @@ func Test_getFsInfo(t *testing.T) {
 	assert.NoError(err)
 
 	// Capacity error case
-	mockCadvisor = new(cadvisor.Mock)
+	mockCadvisor = new(cadvisortest.Mock)
 	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  0,

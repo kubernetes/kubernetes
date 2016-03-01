@@ -14,26 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package testing
 
 import (
-	"testing"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
-	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	"k8s.io/kubernetes/pkg/types"
 )
 
-func TestBasic(t *testing.T) {
-	fakeRecorder := &record.FakeRecorder{}
-	mockCadvisor := &cadvisortest.Fake{}
-	node := &api.ObjectReference{}
-	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder)
-	err := oomWatcher.Start(node)
-	if err != nil {
-		t.Errorf("Should not have failed: %v", err)
-	}
+type FakeManager struct{}
 
-	// TODO: Improve this test once cadvisor exports events.EventChannel as an interface
-	// and thereby allow using a mock version of cadvisor.
+// Unused methods.
+func (_ FakeManager) AddPod(_ *api.Pod)        {}
+func (_ FakeManager) RemovePod(_ *api.Pod)     {}
+func (_ FakeManager) CleanupPods(_ []*api.Pod) {}
+func (_ FakeManager) Start()                   {}
+
+func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *api.PodStatus) {
+	for i := range podStatus.ContainerStatuses {
+		podStatus.ContainerStatuses[i].Ready = true
+	}
 }
