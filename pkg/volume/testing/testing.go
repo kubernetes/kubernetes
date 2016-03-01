@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volume
+package testing
 
 import (
 	"fmt"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	. "k8s.io/kubernetes/pkg/volume"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
