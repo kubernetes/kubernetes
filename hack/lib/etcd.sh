@@ -16,6 +16,8 @@
 
 # A set of helpers for starting/running etcd for tests
 
+ETCD_VERSION=${ETCD_VERSION:-2.2.1}
+
 kube::etcd::start() {
   local host=${ETCD_HOST:-127.0.0.1}
   local port=${ETCD_PORT:-4001}
@@ -32,8 +34,9 @@ kube::etcd::start() {
   fi
 
   version=$(etcd -version | cut -d " " -f 3)
-  if [[ "${version}" < "2.0.0" ]]; then
-   kube::log::usage "etcd version 2.0.0 or greater required."
+  if [[ "${version}" < "${ETCD_VERSION}" ]]; then
+   kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
+   kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
    exit 1
   fi
 
@@ -60,4 +63,14 @@ kube::etcd::clean_etcd_dir() {
 kube::etcd::cleanup() {
   kube::etcd::stop
   kube::etcd::clean_etcd_dir
+}
+
+kube::etcd::install() {
+  (
+    cd "${KUBE_ROOT}/third_party"
+    curl -fsSL https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+    ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
+    kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
+    kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
+  )
 }
