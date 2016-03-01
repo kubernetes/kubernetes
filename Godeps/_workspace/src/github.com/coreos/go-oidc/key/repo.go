@@ -1,6 +1,9 @@
 package key
 
-import "errors"
+import (
+	"errors"
+	"sync"
+)
 
 var ErrorNoKeys = errors.New("no keys found")
 
@@ -22,6 +25,7 @@ func NewPrivateKeySetRepo() PrivateKeySetRepo {
 }
 
 type memPrivateKeySetRepo struct {
+	mu  sync.RWMutex
 	pks PrivateKeySet
 }
 
@@ -33,11 +37,17 @@ func (r *memPrivateKeySetRepo) Set(ks KeySet) error {
 		return errors.New("nil KeySet")
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.pks = *pks
 	return nil
 }
 
 func (r *memPrivateKeySetRepo) Get() (KeySet, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	if r.pks.keys == nil {
 		return nil, ErrorNoKeys
 	}
