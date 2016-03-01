@@ -276,7 +276,7 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume builder for %s: %v", spec.Name(), err)
 	}
-	glog.V(3).Infof("Used volume plugin %q to mount %s", plugin.Name(), spec.Name())
+	glog.V(10).Infof("Used volume plugin %q to mount %s", plugin.Name(), spec.Name())
 	return builder, nil
 }
 
@@ -313,7 +313,7 @@ func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s/%s: %v", podUID, kind, err)
 	}
-	glog.V(3).Infof("Used volume plugin %q to unmount %s/%s", plugin.Name(), podUID, kind)
+	glog.V(5).Infof("Used volume plugin %q to unmount %s/%s", plugin.Name(), podUID, kind)
 	return cleaner, nil
 }
 
