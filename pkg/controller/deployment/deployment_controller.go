@@ -114,23 +114,10 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		&extensions.Deployment{},
 		FullDeploymentResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				d := obj.(*extensions.Deployment)
-				glog.V(4).Infof("Adding deployment %s", d.Name)
-				dc.enqueueDeployment(d)
-			},
-			UpdateFunc: func(old, cur interface{}) {
-				oldD := old.(*extensions.Deployment)
-				glog.V(4).Infof("Updating deployment %s", oldD.Name)
-				// Resync on deployment object relist.
-				dc.enqueueDeployment(cur.(*extensions.Deployment))
-			},
+			AddFunc:    dc.addDeploymentNotification,
+			UpdateFunc: dc.updateDeploymentNotification,
 			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-			DeleteFunc: func(obj interface{}) {
-				d := obj.(*extensions.Deployment)
-				glog.V(4).Infof("Deleting deployment %s", d.Name)
-				dc.enqueueDeployment(d)
-			},
+			DeleteFunc: dc.deleteDeploymentNotification,
 		},
 	)
 
@@ -188,6 +175,37 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 	glog.Infof("Shutting down deployment controller")
 	dc.queue.ShutDown()
+}
+
+func (dc *DeploymentController) addDeploymentNotification(obj interface{}) {
+	d := obj.(*extensions.Deployment)
+	glog.V(4).Infof("Adding deployment %s", d.Name)
+	dc.enqueueDeployment(d)
+}
+
+func (dc *DeploymentController) updateDeploymentNotification(old, cur interface{}) {
+	oldD := old.(*extensions.Deployment)
+	glog.V(4).Infof("Updating deployment %s", oldD.Name)
+	// Resync on deployment object relist.
+	dc.enqueueDeployment(cur.(*extensions.Deployment))
+}
+
+func (dc *DeploymentController) deleteDeploymentNotification(obj interface{}) {
+	d, ok := obj.(*extensions.Deployment)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		d, ok = tombstone.Obj.(*extensions.Deployment)
+		if !ok {
+			glog.Errorf("Tombstone contained object that is not a Deployment %+v", obj)
+			return
+		}
+	}
+	glog.V(4).Infof("Deleting deployment %s", d.Name)
+	dc.enqueueDeployment(d)
 }
 
 // addReplicaSet enqueues the deployment that manages a ReplicaSet when the ReplicaSet is created.
