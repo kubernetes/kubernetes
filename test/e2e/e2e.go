@@ -187,6 +187,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			dumpAllNamespaceInfo(c, api.NamespaceSystem)
 		}
 		logFailedContainers(api.NamespaceSystem)
+		runKubernetesServiceTestContainer(testContext.RepoRoot, api.NamespaceDefault)
 		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
