@@ -93,9 +93,15 @@ type DaemonSetsController struct {
 
 	// Daemon sets that need to be synced.
 	queue *workqueue.Type
+
+	// Optional condition that must be satisfied before running a daemon pod on a node
+	shouldRun NodeShouldRunDaemonPod
 }
 
-func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *DaemonSetsController {
+// NodeShouldRunDaemonPod defines a condition that must return true before a daemon pod will be run a node
+type NodeShouldRunDaemonPod func(node *api.Node, ds *extensions.DaemonSet) (bool, error)
+
+func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, shouldRun NodeShouldRunDaemonPod) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -110,6 +116,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
 		queue:         workqueue.New(),
+		shouldRun:     shouldRun,
 	}
 	// Manage addition/update of daemon sets.
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
@@ -576,6 +583,18 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 }
 
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
+	// Check custom condition first, if given
+	if dsc.shouldRun != nil {
+		shouldRun, err := dsc.shouldRun(node, ds)
+		if err != nil {
+			glog.Error(err)
+			return false
+		}
+		if !shouldRun {
+			return false
+		}
+	}
+
 	// Check if the node satisfies the daemon set's node selector.
 	nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
 	if !nodeSelector.Matches(labels.Set(node.Labels)) {

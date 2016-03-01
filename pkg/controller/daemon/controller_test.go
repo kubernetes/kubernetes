@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -133,7 +134,7 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewDaemonSetsController(clientset, controller.NoResyncPeriodFunc)
+	manager := NewDaemonSetsController(clientset, controller.NoResyncPeriodFunc, nil)
 	manager.podStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}
 	manager.podControl = podControl
@@ -431,6 +432,24 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 	ds.Spec.Template.Spec.NodeName = "node-0"
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+// DaemonSet with custom ShouldRun condition that allows every node except node-0
+func TestCustomShouldRunCondition(t *testing.T) {
+	expectedCalls := map[string]bool{"node-0": true, "node-1": true, "node-2": true, "node-3": true, "node-4": true}
+	actualCalls := map[string]bool{}
+	manager, podControl := newTestController()
+	manager.shouldRun = func(node *api.Node, ds *extensions.DaemonSet) (bool, error) {
+		actualCalls[node.Name] = true
+		return (node.Name != "node-0"), nil
+	}
+	addNodes(manager.nodeStore.Store, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 4, 0)
+	if !reflect.DeepEqual(expectedCalls, actualCalls) {
+		t.Errorf("Expected\n%#v\ngot\n%#v", expectedCalls, actualCalls)
+	}
 }
 
 func TestDSManagerNotReady(t *testing.T) {
