@@ -2511,6 +2511,10 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
+func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
+	return kl.pleg.Healthy()
+}
+
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
 // of the container. The previous flag will only return the logs for the the last terminated container, otherwise, the current
 // running container is preferred over a previous termination. If info about the container is not available then a specific
