@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -211,7 +212,7 @@ func testNewDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
-	c := clientset.FromUnversionedClient(f.Client)
+	c := adapter.FromUnversionedClient(f.Client)
 
 	deploymentName := "test-new-deployment"
 	podLabels := map[string]string{"name": nginxImageName}
@@ -246,7 +247,7 @@ func testRollingUpdateDeployment(f *Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod"}
 	rsPodLabels := map[string]string{
@@ -296,7 +297,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-2"}
 	rsPodLabels := map[string]string{
@@ -358,7 +359,7 @@ func testRecreateDeployment(f *Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-3"}
 	rsPodLabels := map[string]string{
@@ -413,7 +414,7 @@ func testRecreateDeployment(f *Framework) {
 func testDeploymentCleanUpPolicy(f *Framework) {
 	ns := f.Namespace.Name
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "cleanup-pod"}
 	rsPodLabels := map[string]string{
@@ -488,7 +489,7 @@ func testRolloverDeployment(f *Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	podName := "rollover-pod"
 	deploymentPodLabels := map[string]string{"name": podName}
 	rsPodLabels := map[string]string{
@@ -562,7 +563,7 @@ func testPausedDeployment(f *Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	deploymentName := "test-paused-deployment"
 	podLabels := map[string]string{"name": nginxImageName}
 	d := newDeployment(deploymentName, 1, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
@@ -645,7 +646,7 @@ func testPausedDeployment(f *Framework) {
 func testRollbackDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	podName := "nginx"
 	deploymentPodLabels := map[string]string{"name": podName}
 
@@ -733,7 +734,7 @@ func testRollbackDeployment(f *Framework) {
 // TODO: When we finished reporting rollback status in deployment status, check the rollback status here in each case.
 func testRollbackDeploymentRSNoRevision(f *Framework) {
 	ns := f.Namespace.Name
-	c := clientset.FromUnversionedClient(f.Client)
+	c := adapter.FromUnversionedClient(f.Client)
 	podName := "nginx"
 	deploymentPodLabels := map[string]string{"name": podName}
 	rsPodLabels := map[string]string{
@@ -870,7 +871,7 @@ func testDeploymentLabelAdopted(f *Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := clientset.FromUnversionedClient(unversionedClient)
+	c := adapter.FromUnversionedClient(unversionedClient)
 	// Create nginx pods.
 	podName := "nginx"
 	podLabels := map[string]string{"name": podName}
