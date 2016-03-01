@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/system"
 
 	"github.com/golang/glog"
 )
@@ -51,11 +51,6 @@ type MetricsGrabber struct {
 	registeredMaster          bool
 }
 
-// TODO: find a better way of figuring out if given node is a registered master.
-func isMasterNode(node *api.Node) bool {
-	return strings.HasSuffix(node.Name, "master")
-}
-
 func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controllers bool, apiServer bool) (*MetricsGrabber, error) {
 	registeredMaster := false
 	masterName := ""
@@ -67,7 +62,7 @@ func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controll
 		glog.Warning("Can't find any Nodes in the API server to grab metrics from")
 	}
 	for _, node := range nodeList.Items {
-		if isMasterNode(&node) {
+		if system.IsMasterNode(&node) {
 			registeredMaster = true
 			masterName = node.Name
 			break
