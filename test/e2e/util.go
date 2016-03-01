@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -3394,4 +3395,91 @@ func checkPodHashLabel(pods *api.PodList) error {
 		return fmt.Errorf("%s", invalidPod)
 	}
 	return nil
+}
+
+// GetReadyNodes retrieves a list of schedulable nodes whose condition
+// is Ready.  An error will be returned if no such nodes are found.
+func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
+	nodes = ListSchedulableNodesOrDie(f.Client)
+	// previous tests may have cause failures of some nodes. Let's skip
+	// 'Not Ready' nodes, just in case (there is no need to fail the test).
+	filterNodes(nodes, func(node api.Node) bool {
+		return !node.Spec.Unschedulable && isNodeConditionSetAsExpected(&node, api.NodeReady, true)
+	})
+
+	if len(nodes.Items) == 0 {
+		return nil, errors.New("No Ready nodes found.")
+	}
+	return nodes, nil
+}
+
+// LaunchWebserverPod launches a pod serving http on port 8080 to act
+// as the target for networking connectivity checks.  The ip address
+// of the created pod will be returned if the pod is launched
+// successfully.
+func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
+	containerName := fmt.Sprintf("%s-container", podName)
+	port := 8080
+	pod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: podName,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  containerName,
+					Image: "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+					Env:   []api.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
+					Ports: []api.ContainerPort{{ContainerPort: port}},
+				},
+			},
+			NodeName:      nodeName,
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	podClient := f.Client.Pods(f.Namespace.Name)
+	_, err := podClient.Create(pod)
+	expectNoError(err)
+	expectNoError(f.WaitForPodRunning(podName))
+	createdPod, err := podClient.Get(podName)
+	expectNoError(err)
+	ip = fmt.Sprintf("%s:%d", createdPod.Status.PodIP, port)
+	Logf("Target pod IP:port is %s", ip)
+	return
+}
+
+// CheckConnectivityToHost launches a pod running wget on the
+// specified node to test connectivity to the specified host.  An
+// error will be returned if the host is not reachable from the pod.
+func CheckConnectivityToHost(f *Framework, nodeName, podName, host string) error {
+	contName := fmt.Sprintf("%s-container", podName)
+	pod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: podName,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    contName,
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"wget", "-s", host},
+				},
+			},
+			NodeName:      nodeName,
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	podClient := f.Client.Pods(f.Namespace.Name)
+	_, err := podClient.Create(pod)
+	if err != nil {
+		return err
+	}
+	defer podClient.Delete(podName, nil)
+	return waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
 }
