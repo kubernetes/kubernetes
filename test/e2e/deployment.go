@@ -866,17 +866,15 @@ func testDeploymentLabelAdopted(f *Framework) {
 	// New RS should contain pod-template-hash in its selector, label, and template label
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(len(newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
-	Expect(len(newRS.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
-	Expect(len(newRS.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
+	err = checkRSHashLabel(newRS)
+	Expect(err).NotTo(HaveOccurred())
 	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := api.ListOptions{LabelSelector: selector}
 	pods, err := c.Core().Pods(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
-	for _, pod := range pods.Items {
-		Expect(len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
-	}
+	err = checkPodHashLabel(pods)
+	Expect(err).NotTo(HaveOccurred())
 	Expect(len(pods.Items)).Should(Equal(replicas))
 }

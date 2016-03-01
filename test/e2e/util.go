@@ -2410,7 +2410,7 @@ func waitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		logReplicaSetsOfDeployment(deployment, nil, newRS)
 	}
 	if err != nil {
-		return fmt.Errorf("error waiting for deployment %s revision and image to match expectation: %v", deploymentName, err)
+		return fmt.Errorf("error waiting for deployment %s (got %s / %s) and new RS %s (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
 	}
 	return nil
 }
@@ -3352,4 +3352,29 @@ func isElementOf(podUID types.UID, pods *api.PodList) bool {
 		}
 	}
 	return false
+}
+
+func checkRSHashLabel(rs *extensions.ReplicaSet) error {
+	if len(rs.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 ||
+		len(rs.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 ||
+		len(rs.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+		return fmt.Errorf("unexpected RS missing required pod-hash-template: %+v, selector = %+v, template = %+v", rs, rs.Spec.Selector, rs.Spec.Template)
+	}
+	return nil
+}
+
+func checkPodHashLabel(pods *api.PodList) error {
+	invalidPod := ""
+	for _, pod := range pods.Items {
+		if len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+			if len(invalidPod) == 0 {
+				invalidPod = "unexpected pods missing required pod-hash-template:"
+			}
+			invalidPod = fmt.Sprintf("%s %+v;", invalidPod, pod)
+		}
+	}
+	if len(invalidPod) > 0 {
+		return fmt.Errorf("%s", invalidPod)
+	}
+	return nil
 }
