@@ -43,15 +43,17 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
+	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -90,16 +92,16 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 
 type TestKubelet struct {
 	kubelet          *Kubelet
-	fakeRuntime      *kubecontainer.FakeRuntime
-	fakeCadvisor     *cadvisor.Mock
+	fakeRuntime      *containertest.FakeRuntime
+	fakeCadvisor     *cadvisortest.Mock
 	fakeKubeClient   *fake.Clientset
-	fakeMirrorClient *kubepod.FakeMirrorClient
+	fakeMirrorClient *podtest.FakeMirrorClient
 	fakeClock        *util.FakeClock
 	mounter          mount.Interface
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
-	fakeRuntime := &kubecontainer.FakeRuntime{}
+	fakeRuntime := &containertest.FakeRuntime{}
 	fakeRuntime.VersionInfo = "1.15"
 	fakeRuntime.ImageList = []kubecontainer.Image{
 		{
@@ -117,12 +119,12 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
 	kubelet.kubeClient = fakeKubeClient
-	kubelet.os = kubecontainer.FakeOS{}
+	kubelet.os = containertest.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, func() error { return nil })
-	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {
@@ -141,9 +143,9 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
 	kubelet.daemonEndpoints = &api.NodeDaemonEndpoints{}
-	mockCadvisor := &cadvisor.Mock{}
+	mockCadvisor := &cadvisortest.Mock{}
 	kubelet.cadvisor = mockCadvisor
-	fakeMirrorClient := kubepod.NewFakeMirrorClient()
+	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
@@ -154,16 +156,16 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.diskSpaceManager = diskSpaceManager
 
 	kubelet.containerRuntime = fakeRuntime
-	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
+	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
-	kubelet.podCache = kubecontainer.NewFakeCache(kubelet.containerRuntime)
+	kubelet.podCache = containertest.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn: kubelet.syncPod,
 		cache:     kubelet.podCache,
 		t:         t,
 	}
 
-	kubelet.probeManager = prober.FakeManager{}
+	kubelet.probeManager = probetest.FakeManager{}
 	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.volumeManager = newVolumeManager()
@@ -2634,7 +2636,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 // with the mock FsInfo values added to Cadvisor should make the kubelet report that it has
 // sufficient disk space or it is out of disk, depending on the capacity, availability and
 // threshold values.
-func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisor.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
+func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
 	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
 	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
 	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
@@ -3506,7 +3508,7 @@ func TestCreateMirrorPod(t *testing.T) {
 		}
 		pods := []*api.Pod{pod}
 		kl.podManager.SetPods(pods)
-		err := kl.syncPod(pod, nil, &container.PodStatus{}, updateType)
+		err := kl.syncPod(pod, nil, &kubecontainer.PodStatus{}, updateType)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -3564,7 +3566,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, &container.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kl.syncPod(pod, mirrorPod, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3730,7 +3732,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3763,7 +3765,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3790,7 +3792,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3816,7 +3818,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}

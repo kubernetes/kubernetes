@@ -25,16 +25,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 var zero time.Time
 
-func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.FakeRuntime, *cadvisor.Mock) {
-	fakeRuntime := &container.FakeRuntime{}
-	mockCadvisor := new(cadvisor.Mock)
+func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *containertest.FakeRuntime, *cadvisortest.Mock) {
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockCadvisor := new(cadvisortest.Mock)
 	return &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
@@ -407,8 +408,8 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		LowThresholdPercent:  80,
 		MinAge:               time.Minute * 1,
 	}
-	fakeRuntime := &container.FakeRuntime{}
-	mockCadvisor := new(cadvisor.Mock)
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockCadvisor := new(cadvisortest.Mock)
 	manager := &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,

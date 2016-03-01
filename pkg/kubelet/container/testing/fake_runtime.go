@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package testing
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
@@ -68,6 +69,10 @@ func (fv *FakeVersion) Compare(other string) (int, error) {
 		result = -1
 	}
 	return result, nil
+}
+
+type podsGetter interface {
+	GetPods(bool) ([]*Pod, error)
 }
 
 type FakeRuntimeCache struct {
