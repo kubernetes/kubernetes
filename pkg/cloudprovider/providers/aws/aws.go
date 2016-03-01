@@ -1505,7 +1505,7 @@ func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup
 
 	groups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
 	if err != nil {
-		glog.Warning("Error retrieving security group", err)
+		glog.Warningf("Error retrieving security group: %q", err)
 		return nil, err
 	}
 
@@ -1514,7 +1514,7 @@ func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup
 	}
 	if len(groups) != 1 {
 		// This should not be possible - ids should be unique
-		return nil, fmt.Errorf("multiple security groups found with same id")
+		return nil, fmt.Errorf("multiple security groups found with same id %q", securityGroupId)
 	}
 	group := groups[0]
 	return group, nil
@@ -1672,7 +1672,7 @@ func (s *AWSCloud) setSecurityGroupIngress(securityGroupId string, permissions I
 func (s *AWSCloud) addSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
-		glog.Warning("Error retrieving security group", err)
+		glog.Warningf("Error retrieving security group: %v", err)
 		return false, err
 	}
 
@@ -1728,7 +1728,7 @@ func (s *AWSCloud) addSecurityGroupIngress(securityGroupId string, addPermission
 func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
-		glog.Warning("Error retrieving security group", err)
+		glog.Warningf("Error retrieving security group: %v", err)
 		return false, err
 	}
 
@@ -1770,7 +1770,7 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 	request.IpPermissions = changes
 	_, err = s.ec2.RevokeSecurityGroupIngress(request)
 	if err != nil {
-		glog.Warning("Error revoking security group ingress", err)
+		glog.Warningf("Error revoking security group ingress: %v", err)
 		return false, err
 	}
 
@@ -1835,7 +1835,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string) (string,
 
 		if len(securityGroups) >= 1 {
 			if len(securityGroups) > 1 {
-				glog.Warning("Found multiple security groups with name:", name)
+				glog.Warningf("Found multiple security groups with name: %q", name)
 			}
 			err := s.ensureClusterTags(aws.StringValue(securityGroups[0].GroupId), securityGroups[0].Tags)
 			if err != nil {
@@ -2033,7 +2033,7 @@ func (s *AWSCloud) findELBSubnets(internalELB bool) ([]string, error) {
 		}
 
 		// TODO: Should this be an error?
-		glog.Warning("Found multiple subnets in AZ %q; making arbitrary choice between subnets %q and %q", az, *existing.SubnetId, *subnet.SubnetId)
+		glog.Warningf("Found multiple subnets in AZ %q; making arbitrary choice between subnets %q and %q", az, *existing.SubnetId, *subnet.SubnetId)
 		continue
 	}
 
@@ -2223,7 +2223,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 
 	err = s.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
 	if err != nil {
-		glog.Warning("Error opening ingress rules for the load balancer to the instances: ", err)
+		glog.Warningf("Error opening ingress rules for the load balancer to the instances: %v", err)
 		return nil, err
 	}
 
@@ -2305,7 +2305,7 @@ func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups m
 	}
 
 	if best == nil {
-		glog.Warning("No security group found for instance ", instanceID)
+		glog.Warningf("No security group found for instance %q", instanceID)
 	}
 
 	return best, nil
@@ -2348,7 +2348,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		}
 		if loadBalancerSecurityGroupId != "" {
 			// We create LBs with one SG
-			glog.Warning("Multiple security groups for load balancer: ", orEmpty(lb.LoadBalancerName))
+			glog.Warningf("Multiple security groups for load balancer: %q", orEmpty(lb.LoadBalancerName))
 		}
 		loadBalancerSecurityGroupId = *securityGroup
 	}
