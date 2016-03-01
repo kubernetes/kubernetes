@@ -142,6 +142,8 @@
                 export KUBELET_TEST_LOG_LEVEL="--v=4"
                 # Increase resync period to simulate production
                 export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+                # Increase delete collection parallelism
+                export TEST_CLUSTER_DELETE_COLLECTION_WORKERS="--delete-collection-workers=16"
         - 'gce-examples':
             description: 'Run E2E examples test on GCE.'
             timeout: 90
@@ -149,15 +151,17 @@
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Example\]"
                 export PROJECT="k8s-jkns-e2e-examples"
         - 'gce-ubernetes-lite':
-            description: 'Run all non-flaky, non-slow tests on GCE, sequentially, and in a multi-zone (Ubernetes-lite) cluster.'
+            description: 'Run all non-flaky, non-slow, non-disruptive, non-feature tests on GCE, in parallel, and in a multi-zone (Ubernetes-lite) cluster.'
             timeout: 150
             emails: '$DEFAULT_RECIPIENTS, quinton@google.com, justin@fathomdb.com'
             test-owner: 'quinton'
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gce-ubelite"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
                 export MULTIZONE="true"
-                export KUBE_GCE_ZONE=""
-                export E2E_ZONES="us-central1-a us-central1-b us-central1-f"
+                export E2E_ZONES="us-central1-a us-central1-b us-central1-f" # Where the nodes reside.  Master is in the first one.
+                export KUBE_GCE_ZONE="us-central1-a" # Where the master resides - hangover due to legacy scripts.
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -363,7 +367,7 @@
                 # TODO: Move this into a different project. Currently, since this test
                 # shares resources with various other networking tests, it's easier to
                 # zero in on the source of a leak if it's run in isolation.
-                export PROJECT="kubernetes-flannel"
+                export PROJECT="kubernetes-ingress"
         - 'gce-ingress':
             description: 'Run [Feature:Ingress] tests on GCE.'
             timeout: 90
@@ -377,10 +381,12 @@
                 # TODO: Move this into a different project. Currently, since this test
                 # shares resources with various other networking tests, so it's easier
                 # to zero in on the source of a leak if it's run in isolation.
-                export PROJECT="kubernetes-flannel"
+                export PROJECT="kubernetes-ingress"
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
-            timeout: 90
+            # We don't really care to enforce a timeout for flannel tests. Any performance issues will show up in the other GCE builders.
+            # This suite is to continuously check that flannel + Kubernetes works.
+            timeout: 120
             emails: 'beeps@google.com'
             test-owner: 'beeps'
             provider-env: '{gce-provider-env}'
@@ -438,6 +444,8 @@
     test-owner: 'wonderfly@google.com'
     branch: 'release-1.1'
     emails: 'wonderfly@google.com,qzheng@google.com'
+    runner: '{old-runner-1-1}'
+    post-env: ''
     suffix:
         - 'head-release':
             description: 'Continuously test Trusty build against latest k8s release.'
@@ -501,6 +509,8 @@
         export TEST_CLUSTER_LOG_LEVEL="--v=1"
         # Increase resync period to simulate production
         export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+        # Increase delete collection parallelism
+        export TEST_CLUSTER_DELETE_COLLECTION_WORKERS="--delete-collection-workers=16"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 

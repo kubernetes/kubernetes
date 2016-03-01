@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -35,14 +36,14 @@ import (
 
 const (
 	exec_example = `# Get output from running 'date' from pod 123456-7890, using the first container by default
-$ kubectl exec 123456-7890 date
+kubectl exec 123456-7890 date
 	
 # Get output from running 'date' in ruby-container from pod 123456-7890
-$ kubectl exec 123456-7890 -c ruby-container date
+kubectl exec 123456-7890 -c ruby-container date
 
 # Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 # and sends stdout/stderr from 'bash' back to the client
-$ kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`
+kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`
 )
 
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -75,13 +76,13 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
 type RemoteExecutor interface {
-	Execute(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
 }
 
 // DefaultRemoteExecutor is the standard implementation of remote command execution
 type DefaultRemoteExecutor struct{}
 
-func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	exec, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -104,7 +105,7 @@ type ExecOptions struct {
 
 	Executor RemoteExecutor
 	Client   *client.Client
-	Config   *client.Config
+	Config   *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment

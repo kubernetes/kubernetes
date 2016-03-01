@@ -5,21 +5,17 @@
 {%- for p in params %}
 {%- set name = p["name"] %}
 {%- set url = p["url"] %}
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: jobexample-{{ name }}
+  labels:
+    jobgroup: jobexample
 spec:
-  selector:
-    matchLabels:
-      app: jobexample
-      item: {{ name }}
   template:
-    metadata:
       name: jobexample
       labels:
-        app: jobexample
-        item: {{ name }}
+        jobgroup: jobexample
     spec:
       containers:
       - name: c

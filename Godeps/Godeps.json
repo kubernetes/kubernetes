@@ -16,7 +16,7 @@
 		},
 		{
 			"ImportPath": "github.com/ClusterHQ/flocker-go",
-			"Rev": "3f33ece70f6571f0ec45bfae2f243ab11fab6c52"
+			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",

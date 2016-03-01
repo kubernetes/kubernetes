@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1beta1
 
-// This file contains a collection of methods that can be used from go-resful to
+// This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
 // information on the implementation: https://github.com/emicklei/go-restful/pull/215
 //
@@ -43,35 +43,6 @@ var map_CPUTargetUtilization = map[string]string{
 
 func (CPUTargetUtilization) SwaggerDoc() map[string]string {
 	return map_CPUTargetUtilization
-}
-
-var map_ClusterAutoscaler = map[string]string{
-	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata For now (experimental api) it is required that the name is set to \"ClusterAutoscaler\" and namespace is \"default\".",
-	"spec":     "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-}
-
-func (ClusterAutoscaler) SwaggerDoc() map[string]string {
-	return map_ClusterAutoscaler
-}
-
-var map_ClusterAutoscalerList = map[string]string{
-	"":         "There will be just one (or none) ClusterAutoscaler.",
-	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-}
-
-func (ClusterAutoscalerList) SwaggerDoc() map[string]string {
-	return map_ClusterAutoscalerList
-}
-
-var map_ClusterAutoscalerSpec = map[string]string{
-	"":         "Configuration of the Cluster Autoscaler",
-	"minNodes": "Minimum number of nodes that the cluster should have.",
-	"maxNodes": "Maximum number of nodes that the cluster should have.",
-	"target":   "Target average utilization of the cluster nodes. New nodes will be added if one of the targets is exceeded. Cluster size will be decreased if the current utilization is too low for all targets.",
-}
-
-func (ClusterAutoscalerSpec) SwaggerDoc() map[string]string {
-	return map_ClusterAutoscalerSpec
 }
 
 var map_CustomMetricCurrentStatus = map[string]string{
@@ -185,6 +156,7 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 
 var map_DeploymentStatus = map[string]string{
 	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
 	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
@@ -416,9 +388,10 @@ func (JobList) SwaggerDoc() map[string]string {
 var map_JobSpec = map[string]string{
 	"":                      "JobSpec describes how the job execution will look like.",
 	"parallelism":           "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md",
-	"completions":           "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job.",
+	"completions":           "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md",
 	"activeDeadlineSeconds": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer",
-	"selector":              "Selector is a label query over pods that should match the pod count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+	"selector":              "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+	"autoSelector":          "AutoSelector controls generation of pod labels and pod selectors. It was not present in the original extensions/v1beta1 Job definition, but exists to allow conversion from batch/v1 Jobs, where it corresponds to, but has the opposite meaning as, ManualSelector. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
 	"template":              "Template is the object that describes the pod that will be created when executing a job. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md",
 }
 
@@ -472,15 +445,6 @@ var map_ListOptions = map[string]string{
 
 func (ListOptions) SwaggerDoc() map[string]string {
 	return map_ListOptions
-}
-
-var map_NodeUtilization = map[string]string{
-	"":      "NodeUtilization describes what percentage of a particular resource is used on a node.",
-	"value": "The accepted values are from 0 to 1.",
-}
-
-func (NodeUtilization) SwaggerDoc() map[string]string {
-	return map_NodeUtilization
 }
 
 var map_PodSecurityPolicy = map[string]string{

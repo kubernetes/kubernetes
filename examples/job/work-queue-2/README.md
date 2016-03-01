@@ -217,20 +217,15 @@ Here is the job definition:
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: job-wq-2
 spec:
-  selector:
-    matchLabels:
-      app: job-wq-2
   parallelism: 2
   template:
     metadata:
       name: job-wq-2
-      labels:
-        app: job-wq-2
     spec:
       containers:
       - name: c

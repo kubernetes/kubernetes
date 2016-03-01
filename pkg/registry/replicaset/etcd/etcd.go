@@ -28,7 +28,6 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/replicaset"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
@@ -37,8 +36,8 @@ type ReplicaSetStorage struct {
 	Status     *StatusREST
 }
 
-func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator) ReplicaSetStorage {
-	replicaSetRest, replicaSetStatusRest := NewREST(s, storageDecorator)
+func NewStorage(opts generic.RESTOptions) ReplicaSetStorage {
+	replicaSetRest, replicaSetStatusRest := NewREST(opts)
 
 	return ReplicaSetStorage{
 		ReplicaSet: replicaSetRest,
@@ -51,12 +50,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/replicasets"
 
 	newListFunc := func() runtime.Object { return &extensions.ReplicaSetList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Replicasets), &extensions.ReplicaSet{}, prefix, replicaset.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Replicasets), &extensions.ReplicaSet{}, prefix, replicaset.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.ReplicaSet{} },
@@ -81,7 +80,8 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return replicaset.MatchReplicaSet(label, field)
 		},
-		QualifiedResource: api.Resource("replicasets"),
+		QualifiedResource:       api.Resource("replicasets"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate ReplicaSet creation
 		CreateStrategy: replicaset.Strategy,

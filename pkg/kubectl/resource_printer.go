@@ -396,14 +396,14 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-var replicationControllerColumns = []string{"CONTROLLER", "REPLICAS", "AGE"}
-var replicaSetColumns = []string{"CONTROLLER", "REPLICAS", "AGE"}
-var jobColumns = []string{"JOB", "SUCCESSFUL"}
+var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
+var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
+var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
-var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
+var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "STATUS", "AGE"}
-var daemonSetColumns = []string{"NAME", "NODE-SELECTOR"}
+var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR", "AGE"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
@@ -703,9 +703,13 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%s",
+
+	desiredReplicas := controller.Spec.Replicas
+	currentReplicas := controller.Status.Replicas
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
 		name,
-		controller.Spec.Replicas,
+		desiredReplicas,
+		currentReplicas,
 		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
 		return err
@@ -766,9 +770,13 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%s",
+
+	desiredReplicas := rs.Spec.Replicas
+	currentReplicas := rs.Status.Replicas
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
 		name,
-		rs.Spec.Replicas,
+		desiredReplicas,
+		currentReplicas,
 		translateTimestamp(rs.CreationTimestamp),
 	); err != nil {
 		return err
@@ -830,11 +838,24 @@ func printJob(job *extensions.Job, w io.Writer, options PrintOptions) error {
 	}
 
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-	_, err := fmt.Fprintf(w, "%s\t%d",
-		name,
-		job.Status.Succeeded)
-	if err != nil {
-		return err
+	if job.Spec.Completions != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
+			name,
+			*job.Spec.Completions,
+			job.Status.Succeeded,
+			translateTimestamp(job.CreationTimestamp),
+		); err != nil {
+			return err
+		}
+	} else {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s",
+			name,
+			"<none>",
+			job.Status.Succeeded,
+			translateTimestamp(job.CreationTimestamp),
+		); err != nil {
+			return err
+		}
 	}
 	if options.Wide {
 		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s",
@@ -983,11 +1004,13 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v",
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%s",
 		name,
 		"-",
 		backendStringer(ingress.Spec.Backend),
-		loadBalancerStatusStringer(ingress.Status.LoadBalancer)); err != nil {
+		loadBalancerStatusStringer(ingress.Status.LoadBalancer),
+		translateTimestamp(ingress.CreationTimestamp),
+	); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, appendLabels(ingress.Labels, options.ColumnLabels)); err != nil {
@@ -1051,14 +1074,20 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions)
 			return err
 		}
 	}
+
+	desiredScheduled := ds.Status.DesiredNumberScheduled
+	currentScheduled := ds.Status.CurrentNumberScheduled
 	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s\t%s",
 		name,
+		desiredScheduled,
+		currentScheduled,
 		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
+		translateTimestamp(ds.CreationTimestamp),
 	); err != nil {
 		return err
 	}

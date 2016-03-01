@@ -31,6 +31,9 @@ spec:
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    resources:
+      requests:
+        cpu: {{ cpurequest }}
     command:
     - /bin/sh
     - -c

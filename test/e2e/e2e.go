@@ -33,14 +33,13 @@ import (
 	"github.com/onsi/gomega"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -182,9 +181,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	if err := waitForPodsRunningReady(api.NamespaceSystem, testContext.MinStartupPods, podStartupTimeout); err != nil {
-		c, err := loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		dumpAllNamespaceInfo(c, api.NamespaceSystem)
+		if c, errClient := loadClient(); errClient != nil {
+			Logf("Unable to dump cluster information because: %v", errClient)
+		} else {
+			dumpAllNamespaceInfo(c, api.NamespaceSystem)
+		}
+		logFailedContainers(api.NamespaceSystem)
 		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 

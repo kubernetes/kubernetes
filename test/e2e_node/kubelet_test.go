@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
@@ -38,7 +40,7 @@ var _ = Describe("Kubelet", func() {
 	var cl *client.Client
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&client.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
 	})
 
 	Describe("pod scheduling", func() {
@@ -69,7 +71,8 @@ var _ = Describe("Kubelet", func() {
 
 			It("it should print the output to logs", func() {
 				Eventually(func() string {
-					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
+					sinceTime := unversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
+					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
 					if err != nil {
 						return ""
 					}
@@ -195,15 +198,16 @@ var _ = Describe("Kubelet", func() {
 				Expect(summary.Node.Fs.UsedBytes).NotTo(BeNil())
 				Expect(*summary.Node.Fs.UsedBytes).NotTo(BeZero())
 
-				By("Having resources for kubelet and runtime system containers")
-				sysContainers := map[string]stats.ContainerStats{}
-				sysContainersList := []string{}
-				for _, container := range summary.Node.SystemContainers {
-					sysContainers[container.Name] = container
-					sysContainersList = append(sysContainersList, container.Name)
-					ExpectContainerStatsNotEmpty(&container)
-				}
-				Expect(sysContainersList).To(ConsistOf("kubelet", "runtime"))
+				// TODO: Enable this test when #22198 is resolved.
+				//				By("Having resources for kubelet and runtime system containers")
+				//				sysContainers := map[string]stats.ContainerStats{}
+				//				sysContainersList := []string{}
+				//				for _, container := range summary.Node.SystemContainers {
+				//					sysContainers[container.Name] = container
+				//					sysContainersList = append(sysContainersList, container.Name)
+				//					ExpectContainerStatsNotEmpty(&container)
+				//				}
+				//				Expect(sysContainersList).To(ConsistOf("kubelet", "runtime"))
 
 				// Verify Pods Stats are present
 				podsList := []string{}
@@ -249,7 +253,7 @@ var _ = Describe("Kubelet", func() {
 					Expect(*container.Logs.UsedBytes).NotTo(BeZero(), spew.Sdump(container))
 
 				}
-				Expect(podsList).To(ConsistOf(podNames))
+				Expect(podsList).To(ConsistOf(podNames), spew.Sdump(summary))
 			})
 		})
 

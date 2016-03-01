@@ -72,6 +72,7 @@ const (
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
 	runJobTimeout            = 5 * time.Minute
+	nginxImage               = "gcr.io/google_containers/nginx:1.7.9"
 )
 
 var (
@@ -94,6 +95,12 @@ var (
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
 	jobsVersion = version.MustParse("v1.1.0")
+
+	// Deployments were introduced by default in v1.2, so we don't expect tests that rely on
+	// deployments to work on clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
+	deploymentsVersion = version.MustParse("v1.2.0-alpha.7.726")
 )
 
 var _ = Describe("Kubectl client", func() {
@@ -442,7 +449,7 @@ var _ = Describe("Kubectl client", func() {
 				execOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Extensions().Jobs(ns).Delete("run-test", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test", nil)).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
 			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -450,7 +457,7 @@ var _ = Describe("Kubectl client", func() {
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", nil)).To(BeNil())
 
 			By("executing a command with run and attach with stdin with open stdin should remain running")
 			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -480,7 +487,7 @@ var _ = Describe("Kubectl client", func() {
 			}
 			Expect(err).To(BeNil())
 
-			Expect(c.Extensions().Jobs(ns).Delete("run-test-3", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test-3", nil)).To(BeNil())
 		})
 
 		It("should support port-forward", func() {
@@ -868,18 +875,16 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create an rc from an image [Conformance]", func() {
-			image := "nginx"
-
-			By("running the image " + image)
-			runKubectlOrDie("run", rcName, "--image="+image, "--generator=run/v1", nsFlag)
+			By("running the image " + nginxImage)
+			runKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
 			rc, err := c.ReplicationControllers(ns).Get(rcName)
 			if err != nil {
 				Failf("Failed getting rc %s: %v", rcName, err)
 			}
 			containers := rc.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != image {
-				Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, image)
+			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+				Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
 			}
 
 			By("verifying the pod controlled by rc " + rcName + " was created")
@@ -889,9 +894,9 @@ var _ = Describe("Kubectl client", func() {
 				Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
 			}
 			pods := podlist.Items
-			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != nginxImage {
 				runKubectlOrDie("get", "pods", "-L", "run", nsFlag)
-				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
+				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", nginxImage, len(pods))
 			}
 		})
 
@@ -911,18 +916,18 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create a deployment from an image [Conformance]", func() {
-			image := "nginx"
+			SkipUnlessServerVersionGTE(deploymentsVersion, c)
 
-			By("running the image " + image)
-			runKubectlOrDie("run", dName, "--image="+image, nsFlag)
+			By("running the image " + nginxImage)
+			runKubectlOrDie("run", dName, "--image="+nginxImage, nsFlag)
 			By("verifying the deployment " + dName + " was created")
 			d, err := c.Extensions().Deployments(ns).Get(dName)
 			if err != nil {
 				Failf("Failed getting deployment %s: %v", dName, err)
 			}
 			containers := d.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != image {
-				Failf("Failed creating deployment %s for 1 pod with expected image %s", dName, image)
+			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+				Failf("Failed creating deployment %s for 1 pod with expected image %s", dName, nginxImage)
 			}
 
 			By("verifying the pod controlled by deployment " + dName + " was created")
@@ -932,9 +937,9 @@ var _ = Describe("Kubectl client", func() {
 				Failf("Failed getting pod controlled by deployment %s: %v", dName, err)
 			}
 			pods := podlist.Items
-			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != nginxImage {
 				runKubectlOrDie("get", "pods", "-L", "run", nsFlag)
-				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
+				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", nginxImage, len(pods))
 			}
 		})
 
@@ -956,18 +961,16 @@ var _ = Describe("Kubectl client", func() {
 		It("should create a job from an image when restart is OnFailure [Conformance]", func() {
 			SkipUnlessServerVersionGTE(jobsVersion, c)
 
-			image := "nginx"
-
-			By("running the image " + image)
-			runKubectlOrDie("run", jobName, "--restart=OnFailure", "--image="+image, nsFlag)
+			By("running the image " + nginxImage)
+			runKubectlOrDie("run", jobName, "--restart=OnFailure", "--image="+nginxImage, nsFlag)
 			By("verifying the job " + jobName + " was created")
 			job, err := c.Extensions().Jobs(ns).Get(jobName)
 			if err != nil {
 				Failf("Failed getting job %s: %v", jobName, err)
 			}
 			containers := job.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != image {
-				Failf("Failed creating job %s for 1 pod with expected image %s", jobName, image)
+			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+				Failf("Failed creating job %s for 1 pod with expected image %s", jobName, nginxImage)
 			}
 			if job.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
 				Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
@@ -977,18 +980,16 @@ var _ = Describe("Kubectl client", func() {
 		It("should create a job from an image when restart is Never [Conformance]", func() {
 			SkipUnlessServerVersionGTE(jobsVersion, c)
 
-			image := "nginx"
-
-			By("running the image " + image)
-			runKubectlOrDie("run", jobName, "--restart=Never", "--image="+image, nsFlag)
+			By("running the image " + nginxImage)
+			runKubectlOrDie("run", jobName, "--restart=Never", "--image="+nginxImage, nsFlag)
 			By("verifying the job " + jobName + " was created")
 			job, err := c.Extensions().Jobs(ns).Get(jobName)
 			if err != nil {
 				Failf("Failed getting job %s: %v", jobName, err)
 			}
 			containers := job.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != image {
-				Failf("Failed creating job %s for 1 pod with expected image %s", jobName, image)
+			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+				Failf("Failed creating job %s for 1 pod with expected image %s", jobName, nginxImage)
 			}
 			if job.Spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
 				Failf("Failed creating a job with correct restart policy for --restart=OnFailure")

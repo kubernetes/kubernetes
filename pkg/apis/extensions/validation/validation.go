@@ -329,9 +329,26 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path
 	return allErrs
 }
 
+// Validates given deployment status.
+func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fldPath.Child("updatedReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
+	return allErrs
+}
+
 func ValidateDeploymentUpdate(update, old *extensions.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
@@ -362,9 +379,62 @@ func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) fiel
 	return allErrs
 }
 
+// TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
+// move to new location.  Replace extensions.Job with an interface.
+//
+// ValidateGeneratedSelector validates that the generated selector on a controller object match the controller object
+// metadata, and the labels on the pod template are as generated.
+func ValidateGeneratedSelector(obj *extensions.Job) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if obj.Spec.ManualSelector != nil && *obj.Spec.ManualSelector {
+		return allErrs
+	}
+
+	if obj.Spec.Selector == nil {
+		return allErrs // This case should already have been checked in caller.  No need for more errors.
+	}
+
+	// If somehow uid was unset then we would get "controller-uid=" as the selector
+	// which is bad.
+	if obj.ObjectMeta.UID == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
+	}
+
+	// If somehow uid was unset then we would get "controller-uid=" as the selector
+	// which is bad.
+	if obj.ObjectMeta.UID == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
+	}
+
+	// If selector generation was requested, then expected labels must be
+	// present on pod template, and much match job's uid and name.  The
+	// generated (not-manual) selectors/labels ensure no overlap with other
+	// controllers.  The manual mode allows orphaning, adoption,
+	// backward-compatibility, and experimentation with new
+	// labeling/selection schemes.  Automatic selector generation should
+	// have placed certain labels on the pod, but this could have failed if
+	// the user added coflicting labels.  Validate that the expected
+	// generated ones are there.
+
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "controller-uid", string(obj.UID))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "job-name", string(obj.Name))...)
+	expectedLabels := make(map[string]string)
+	expectedLabels["controller-uid"] = string(obj.UID)
+	expectedLabels["job-name"] = string(obj.Name)
+	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
+	if selector, err := unversioned.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
+		if !selector.Matches(labels.Set(expectedLabels)) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("selector"), obj.Spec.Selector, "`selector` not auto-generated"))
+		}
+	}
+
+	return allErrs
+}
+
 func ValidateJob(job *extensions.Job) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateGeneratedSelector(job)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -387,6 +457,7 @@ func ValidateJobSpec(spec *extensions.JobSpec, fldPath *field.Path) field.ErrorL
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
 
+	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
 	if selector, err := unversioned.LabelSelectorAsSelector(spec.Selector); err == nil {
 		labels := labels.Set(spec.Template.Labels)
 		if !selector.Matches(labels) {
@@ -574,43 +645,6 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 	} else if !validation.IsValidPortNum(backend.ServicePort.IntValue()) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort, apivalidation.PortRangeErrorMsg))
 	}
-	return allErrs
-}
-
-func validateClusterAutoscalerSpec(spec extensions.ClusterAutoscalerSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if spec.MinNodes < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("minNodes"), spec.MinNodes, "must be greater than or equal to 0"))
-	}
-	if spec.MaxNodes < spec.MinNodes {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxNodes"), spec.MaxNodes, "must be greater than or equal to `minNodes`"))
-	}
-	if len(spec.TargetUtilization) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetUtilization"), ""))
-	}
-	for _, target := range spec.TargetUtilization {
-		if len(target.Resource) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("targetUtilization", "resource"), ""))
-		}
-		if target.Value <= 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetUtilization", "value"), target.Value, "must be greater than 0"))
-		}
-		if target.Value > 1 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetUtilization", "value"), target.Value, "must be less than or equal to 1"))
-		}
-	}
-	return allErrs
-}
-
-func ValidateClusterAutoscaler(autoscaler *extensions.ClusterAutoscaler) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if autoscaler.Name != "ClusterAutoscaler" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), autoscaler.Name, "must be 'ClusterAutoscaler'"))
-	}
-	if autoscaler.Namespace != api.NamespaceDefault {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "namespace"), autoscaler.Namespace, "must be 'default'"))
-	}
-	allErrs = append(allErrs, validateClusterAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 

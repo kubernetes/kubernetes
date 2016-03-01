@@ -23,6 +23,16 @@ import (
 	"strings"
 )
 
+// Marshaler converts an object to a query parameter string representation
+type Marshaler interface {
+	MarshalQueryParameter() (string, error)
+}
+
+// Unmarshaler converts a string representation to an object
+type Unmarshaler interface {
+	UnmarshalQueryParameter(string) error
+}
+
 func jsonTag(field reflect.StructField) (string, bool) {
 	structTag := field.Tag.Get("json")
 	if len(structTag) == 0 {
@@ -70,6 +80,31 @@ func isValueKind(kind reflect.Kind) bool {
 
 func zeroValue(value reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(value.Type()).Interface(), value.Interface())
+}
+
+func customMarshalValue(value reflect.Value) (reflect.Value, bool) {
+	// Return unless we implement a custom query marshaler
+	if !value.CanInterface() {
+		return reflect.Value{}, false
+	}
+
+	marshaler, ok := value.Interface().(Marshaler)
+	if !ok {
+		return reflect.Value{}, false
+	}
+
+	// Don't invoke functions on nil pointers
+	// If the type implements MarshalQueryParameter, AND the tag is not omitempty, AND the value is a nil pointer, "" seems like a reasonable response
+	if isPointerKind(value.Kind()) && zeroValue(value) {
+		return reflect.ValueOf(""), true
+	}
+
+	// Get the custom marshalled value
+	v, err := marshaler.MarshalQueryParameter()
+	if err != nil {
+		return reflect.Value{}, false
+	}
+	return reflect.ValueOf(v), true
 }
 
 func addParam(values url.Values, tag string, omitempty bool, value reflect.Value) {
@@ -128,7 +163,8 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 
 		kind := ft.Kind()
 		if isPointerKind(kind) {
-			kind = ft.Elem().Kind()
+			ft = ft.Elem()
+			kind = ft.Kind()
 			if !field.IsNil() {
 				field = reflect.Indirect(field)
 			}
@@ -142,7 +178,11 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 				addListOfParams(result, tag, omitempty, field)
 			}
 		case isStructKind(kind) && !(zeroValue(field) && omitempty):
-			convertStruct(result, ft, field)
+			if marshalValue, ok := customMarshalValue(field); ok {
+				addParam(result, tag, omitempty, marshalValue)
+			} else {
+				convertStruct(result, ft, field)
+			}
 		}
 	}
 }

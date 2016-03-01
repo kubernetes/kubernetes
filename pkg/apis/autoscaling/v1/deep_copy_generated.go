@@ -181,6 +181,33 @@ func deepCopy_v1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus,
 	return nil
 }
 
+func deepCopy_v1_Scale(in Scale, out *Scale, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ScaleSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ScaleStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_ScaleSpec(in ScaleSpec, out *ScaleSpec, c *conversion.Cloner) error {
+	out.Replicas = in.Replicas
+	return nil
+}
+
+func deepCopy_v1_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion.Cloner) error {
+	out.Replicas = in.Replicas
+	out.Selector = in.Selector
+	return nil
+}
+
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_unversioned_ListMeta,
@@ -192,6 +219,9 @@ func init() {
 		deepCopy_v1_HorizontalPodAutoscalerList,
 		deepCopy_v1_HorizontalPodAutoscalerSpec,
 		deepCopy_v1_HorizontalPodAutoscalerStatus,
+		deepCopy_v1_Scale,
+		deepCopy_v1_ScaleSpec,
+		deepCopy_v1_ScaleStatus,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

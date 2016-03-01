@@ -27,6 +27,7 @@ type Clock interface {
 	Now() time.Time
 	Since(time.Time) time.Duration
 	After(d time.Duration) <-chan time.Time
+	Sleep(d time.Duration)
 }
 
 var (
@@ -51,6 +52,10 @@ func (RealClock) Since(ts time.Time) time.Duration {
 // Same as time.After(d).
 func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
+}
+
+func (RealClock) Sleep(d time.Duration) {
+	time.Sleep(d)
 }
 
 // FakeClock implements Clock, but returns an arbitrary time.
@@ -137,6 +142,10 @@ func (f *FakeClock) HasWaiters() bool {
 	return len(f.waiters) > 0
 }
 
+func (f *FakeClock) Sleep(d time.Duration) {
+	f.Step(d)
+}
+
 // IntervalClock implements Clock, but each invocation of Now steps the clock forward the specified duration
 type IntervalClock struct {
 	Time     time.Time
@@ -158,4 +167,8 @@ func (i *IntervalClock) Since(ts time.Time) time.Duration {
 // TODO: make interval clock use FakeClock so this can be implemented.
 func (*IntervalClock) After(d time.Duration) <-chan time.Time {
 	panic("IntervalClock doesn't implement After")
+}
+
+func (*IntervalClock) Sleep(d time.Duration) {
+	panic("IntervalClock doesn't implement Sleep")
 }

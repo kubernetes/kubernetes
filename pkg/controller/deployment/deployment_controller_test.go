@@ -96,7 +96,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
+		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, &deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -271,7 +271,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			eventRecorder: &record.FakeRecorder{},
 		}
 
-		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment, false)
+		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, &deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -374,7 +374,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, test.maxCleanupCount)
+		cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, &deployment, test.maxCleanupCount)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -461,7 +461,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, &deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -547,7 +547,7 @@ func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 		}
 
 		d := newDeployment(1, &tests[i].revisionHistoryLimit)
-		controller.cleanupOldReplicaSets(test.oldRSs, *d)
+		controller.cleanupOldReplicaSets(test.oldRSs, d)
 
 		gotDeletions := 0
 		for _, action := range fake.Actions() {

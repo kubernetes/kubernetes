@@ -27,7 +27,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Proposed Design
+Design
 =============
 
 # Goals
@@ -110,18 +110,39 @@ No changes
 ## Kubectl
 
 No required changes.
-Suggest moving SELECTOR to wide output of `kubectl get jobs` since users don't write the selector.
+Suggest moving SELECTOR to wide output of `kubectl get jobs` since users do not write the selector.
 
 ## Docs
 
 Remove examples that use selector and remove labels from pod templates.
 Recommend `kubectl get jobs -l job-name=name` as the way to find pods of a job.
 
-# Cross Version Compat
+# Conversion
 
-`v1beta1` will not have a `job.spec.manualSelector` and will not provide a default selector.
+The following applies to Job, as well as to other types that adopt this pattern.
 
-Conversion from v1beta1 to v1 will use the user-provided selector and set `job.spec.manualSelector=true`.
+- Type `extensions/v1beta1` gets a field called `job.spec.autoSelector`.
+- Both the internal type and the `batch/v1` type will get `job.spec.manualSelector`.
+- The fields `manualSelector` and `autoSelector` have opposite meanings.
+- Each field defaults to false when unset, and so v1beta1 has a different default than v1 and internal.  This is intentional: we want new
+  uses to default to the less error-prone behavior, and we do not want to change the behavior
+  of v1beta1.
+
+*Note*: since the internal default is changing, client
+library consumers that create Jobs may need to add "job.spec.manualSelector=true" to keep working, or switch
+to auto selectors.
+
+Conversion is as follows:
+- `extensions/__internal` to `extensions/v1beta1`: the value of `__internal.Spec.ManualSelector` is defaulted to false if nil, negated, defaulted to nil if false, and written `v1beta1.Spec.AutoSelector`.
+- `extensions/v1beta1` to `extensions/__internal`: the value of `v1beta1.SpecAutoSelector` is defaulted to false if nil, negated, defaulted to nil if false, and written to `__internal.Spec.ManualSelector`.
+
+This conversion gives the following properties.
+
+1. Users that previously used v1beta1 do not start seeing a new field when they get back objects.
+2. Distinction between originally unset versus explicitly set to false is not preserved (would have been nice to do so, but requires more complicated
+   solution).
+3. Users who only created v1beta1 examples or v1 examples, will not ever see the existence of either field.
+4. Since v1beta1 are convertable to/from v1, the storage location (path in etcd) does not need to change, allowing scriptable rollforward/rollback.
 
 # Future Work
 

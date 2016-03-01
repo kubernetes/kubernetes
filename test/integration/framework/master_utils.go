@@ -30,10 +30,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -103,10 +105,10 @@ func NewMasterComponents(c *Config) *MasterComponents {
 		DeleteAllEtcdKeys()
 	}
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
-	clientset := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
+	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
-	controllerManager := replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, c.Burst)
+	controllerManager := replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, c.Burst, 4096)
 
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})
@@ -153,12 +155,15 @@ func NewMasterConfig() *master.Config {
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	autoscalingEtcdStorage := NewAutoscalingEtcdStorage(etcdClient)
 	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
+	batchEtcdStorage := NewBatchEtcdStorage(etcdClient)
+	storageVersions[batch.GroupName] = testapi.Batch.GroupVersion().String()
 	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
 
 	storageDestinations := genericapiserver.NewStorageDestinations()
 	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
 	storageDestinations.AddAPIGroup(autoscaling.GroupName, autoscalingEtcdStorage)
+	storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
 	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
 
 	return &master.Config{
@@ -267,7 +272,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	defer func() {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
-	hostField := fields.OneTermEqualSelector(client.PodHost, host)
+	hostField := fields.OneTermEqualSelector(api.PodHostField, host)
 	options := api.ListOptions{FieldSelector: hostField}
 	pods, err := restClient.Pods(TestNS).List(options)
 	if err != nil || len(pods.Items) == numPods {

@@ -17,17 +17,17 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/net"
 )
 
 // The ServiceExpansion interface allows manually adding extra methods to the ServiceInterface.
 type ServiceExpansion interface {
-	ProxyGet(scheme, name, port, path string, params map[string]string) unversioned.ResponseWrapper
+	ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper
 }
 
 // ProxyGet returns a response of the service by calling it through the proxy.
-func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) unversioned.ResponseWrapper {
+func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
 	request := c.client.Get().
 		Prefix("proxy").
 		Namespace(c.ns).

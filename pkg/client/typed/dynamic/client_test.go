@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -62,9 +62,9 @@ func getObject(version, kind, name string) *runtime.Unstructured {
 
 func getClientServer(gv *unversioned.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
-	cl, err := NewClient(&client.Config{
+	cl, err := NewClient(&restclient.Config{
 		Host:          srv.URL,
-		ContentConfig: client.ContentConfig{GroupVersion: gv},
+		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	})
 	if err != nil {
 		srv.Close()

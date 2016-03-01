@@ -51,7 +51,7 @@ type Framework struct {
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
-	gatherer containerResourceGatherer
+	gatherer *containerResourceGatherer
 	// Constraints that passed to a check which is executed after data is gathered to
 	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
 	// as expectations vary greatly. Constraints are groupped by the container names.
@@ -116,7 +116,12 @@ func (f *Framework) beforeEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.startGatheringData(c, resourceDataGatheringPeriodSeconds*time.Second)
+		f.gatherer, err = NewResourceUsageGatherer(c)
+		if err != nil {
+			Logf("Error while creating NewResourceUsageGatherer: %v", err)
+		} else {
+			go f.gatherer.startGatheringData()
+		}
 	}
 
 	if testContext.GatherLogsSizes {
@@ -170,7 +175,7 @@ func (f *Framework) afterEach() {
 	}
 
 	summaries := make([]TestDataSummary, 0)
-	if testContext.GatherKubeSystemResourceUsageData {
+	if testContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
 	}
@@ -225,6 +230,10 @@ func (f *Framework) afterEach() {
 }
 
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
+	createTestingNS := testContext.CreateTestingNS
+	if createTestingNS == nil {
+		createTestingNS = CreateTestingNS
+	}
 	ns, err := createTestingNS(baseName, f.Client, labels)
 	if err == nil {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
@@ -246,6 +255,12 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 // It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
 func (f *Framework) WaitForPodRunningSlow(podName string) error {
 	return waitForPodRunningInNamespaceSlow(f.Client, podName, f.Namespace.Name)
+}
+
+// WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
+// success or failure.
+func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
+	return waitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
 // Runs the given pod and verifies that the output of exact container matches the desired output.

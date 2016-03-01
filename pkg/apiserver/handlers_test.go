@@ -77,6 +77,7 @@ func TestMaxInFlight(t *testing.T) {
 	// notAccountedPathsRegexp specifies paths requests to which we don't account into
 	// requests in flight.
 	notAccountedPathsRegexp := regexp.MustCompile(".*\\/watch")
+	longRunningRequestCheck := BasicLongRunningRequestCheck(notAccountedPathsRegexp, map[string]string{"watch": "true"})
 
 	// Calls is used to wait until all server calls are received. We are sending
 	// AllowedInflightRequestsNo of 'long' not-accounted requests and the same number of
@@ -98,7 +99,7 @@ func TestMaxInFlight(t *testing.T) {
 	server := httptest.NewServer(
 		MaxInFlightLimit(
 			inflightRequestsChannel,
-			notAccountedPathsRegexp,
+			longRunningRequestCheck,
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// A short, accounted request that does not wait for block WaitGroup.
 				if strings.Contains(r.URL.Path, "dontwait") {
@@ -114,11 +115,11 @@ func TestMaxInFlight(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
 
-	// These should hang, but not affect accounting.
+	// These should hang, but not affect accounting.  use a query param match
 	for i := 0; i < AllowedInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK); err != nil {
+			if err := expectHTTP(server.URL+"/foo/bar?watch=true", http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -150,7 +151,7 @@ func TestMaxInFlight(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	// Validate that non-accounted URLs still work
+	// Validate that non-accounted URLs still work.  use a path regex match
 	if err := expectHTTP(server.URL+"/dontwait/watch", http.StatusOK); err != nil {
 		t.Error(err)
 	}

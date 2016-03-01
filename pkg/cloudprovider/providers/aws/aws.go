@@ -218,6 +218,15 @@ type AWSCloudConfig struct {
 		Zone string
 
 		KubernetesClusterTag string
+
+		//The aws provider creates an inbound rule per load balancer on the node security
+		//group. However, this can run into the AWS security group rule limit of 50 if
+		//many LoadBalancers are created.
+		//
+		//This flag disables the automatic ingress creation. It requires that the user
+		//has setup a rule that allows inbound traffic on kubelet ports from the
+		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
+		DisableSecurityGroupIngress bool
 	}
 }
 
@@ -772,7 +781,7 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if instance == nil || !isAlive(instance) {
+		if instance == nil {
 			return "", cloudprovider.InstanceNotFound
 		}
 		return orEmpty(instance.InstanceId), nil
@@ -817,28 +826,9 @@ func (aws *AWSCloud) InstanceType(name string) (string, error) {
 	}
 }
 
-// Check if the instance is alive (running or pending)
-// We typically ignore instances that are not alive
-func isAlive(instance *ec2.Instance) bool {
-	if instance.State == nil {
-		glog.Warning("Instance state was unexpectedly nil: ", instance)
-		return false
-	}
-	stateName := orEmpty(instance.State.Name)
-	switch stateName {
-	case "shutting-down", "terminated", "stopping", "stopped":
-		return false
-	case "pending", "running":
-		return true
-	default:
-		glog.Errorf("Unknown EC2 instance state: %s", stateName)
-		return false
-	}
-}
-
 // Return a list of instances matching regex string.
 func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
-	filters := []*ec2.Filter{}
+	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
 	filters = s.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
 		Filters: filters,
@@ -864,11 +854,6 @@ func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 
 	matchingInstances := []string{}
 	for _, instance := range instances {
-		// TODO: Push filtering down into EC2 API filter?
-		if !isAlive(instance) {
-			continue
-		}
-
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
 		if orEmpty(instance.State.Name) == "pending" {
@@ -1411,17 +1396,7 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 
 	// apply tags
 	if volumeOptions.Tags != nil {
-		tags := []*ec2.Tag{}
-		for k, v := range *volumeOptions.Tags {
-			tag := &ec2.Tag{}
-			tag.Key = aws.String(k)
-			tag.Value = aws.String(v)
-			tags = append(tags, tag)
-		}
-		tagRequest := &ec2.CreateTagsInput{}
-		tagRequest.Resources = []*string{&awsID}
-		tagRequest.Tags = tags
-		if _, err := s.createTags(tagRequest); err != nil {
+		if err := s.createTags(awsID, *volumeOptions.Tags); err != nil {
 			// delete the volume and hope it succeeds
 			_, delerr := s.DeleteDisk(volumeName)
 			if delerr != nil {
@@ -1726,6 +1701,36 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 	return true, nil
 }
 
+// Ensure that a resource has the correct tags
+// If it has no tags, we assume that this was a problem caused by an error in between creation and tagging,
+// and we add the tags.  If it has a different cluster's tags, that is an error.
+func (s *AWSCloud) ensureClusterTags(resourceID string, tags []*ec2.Tag) error {
+	actualTags := make(map[string]string)
+	for _, tag := range tags {
+		actualTags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
+	}
+
+	addTags := make(map[string]string)
+	for k, expected := range s.filterTags {
+		actual := actualTags[k]
+		if actual == expected {
+			continue
+		}
+		if actual == "" {
+			glog.Warningf("Resource %q was missing expected cluster tag %q.  Will add (with value %q)", resourceID, k, expected)
+			addTags[k] = expected
+		} else {
+			return fmt.Errorf("resource %q has tag belonging to another cluster: %q=%q (expected %q)", resourceID, k, actual, expected)
+		}
+	}
+
+	if err := s.createTags(resourceID, addTags); err != nil {
+		return fmt.Errorf("error adding missing tags to resource %q: %v", resourceID, err)
+	}
+
+	return nil
+}
+
 // Makes sure the security group exists
 // Returns the security group id or error
 func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID string) (string, error) {
@@ -1739,7 +1744,12 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 			newEc2Filter("group-name", name),
 			newEc2Filter("vpc-id", vpcID),
 		}
-		request.Filters = s.addFilters(filters)
+		// Note that we do _not_ add our tag filters; group-name + vpc-id is the EC2 primary key.
+		// However, we do check that it matches our tags.
+		// If it doesn't have any tags, we tag it; this is how we recover if we failed to tag before.
+		// If it has a different cluster's tags, that is an error.
+		// This shouldn't happen because name is expected to be globally unique (UUID derived)
+		request.Filters = filters
 
 		securityGroups, err := s.ec2.DescribeSecurityGroups(request)
 		if err != nil {
@@ -1750,7 +1760,12 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 			if len(securityGroups) > 1 {
 				glog.Warning("Found multiple security groups with name:", name)
 			}
-			return orEmpty(securityGroups[0].GroupId), nil
+			err := s.ensureClusterTags(aws.StringValue(securityGroups[0].GroupId), securityGroups[0].Tags)
+			if err != nil {
+				return "", err
+			}
+
+			return aws.StringValue(securityGroups[0].GroupId), nil
 		}
 
 		createRequest := &ec2.CreateSecurityGroupInput{}
@@ -1782,22 +1797,13 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		return "", fmt.Errorf("created security group, but id was not returned: %s", name)
 	}
 
-	tags := []*ec2.Tag{}
-	for k, v := range s.filterTags {
-		tag := &ec2.Tag{}
-		tag.Key = aws.String(k)
-		tag.Value = aws.String(v)
-		tags = append(tags, tag)
-	}
-
-	if len(tags) > 0 {
-		tagRequest := &ec2.CreateTagsInput{}
-		tagRequest.Resources = []*string{&groupID}
-		tagRequest.Tags = tags
-		if _, err := s.createTags(tagRequest); err != nil {
-			// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
-			return "", fmt.Errorf("error tagging security group: %v", err)
-		}
+	err := s.createTags(groupID, s.filterTags)
+	if err != nil {
+		// If we retry, ensureClusterTags will recover from this - it
+		// will add the missing tags.  We could delete the security
+		// group here, but that doesn't feel like the right thing, as
+		// the caller is likely to retry the create
+		return "", fmt.Errorf("error tagging security group: %v", err)
 	}
 	return groupID, nil
 }
@@ -1805,15 +1811,32 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 // createTags calls EC2 CreateTags, but adds retry-on-failure logic
 // We retry mainly because if we create an object, we cannot tag it until it is "fully created" (eventual consistency)
 // The error code varies though (depending on what we are tagging), so we simply retry on all errors
-func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+func (s *AWSCloud) createTags(resourceID string, tags map[string]string) error {
+	if tags == nil || len(tags) == 0 {
+		return nil
+	}
+
+	var awsTags []*ec2.Tag
+	for k, v := range tags {
+		tag := &ec2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+		awsTags = append(awsTags, tag)
+	}
+
+	request := &ec2.CreateTagsInput{}
+	request.Resources = []*string{&resourceID}
+	request.Tags = awsTags
+
 	// TODO: We really should do exponential backoff here
 	attempt := 0
 	maxAttempts := 60
 
 	for {
-		response, err := s.ec2.CreateTags(request)
+		_, err := s.ec2.CreateTags(request)
 		if err == nil {
-			return response, err
+			return nil
 		}
 
 		// We could check that the error is retryable, but the error code changes based on what we are tagging
@@ -1821,45 +1844,106 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 		attempt++
 		if attempt > maxAttempts {
 			glog.Warningf("Failed to create tags (too many attempts): %v", err)
-			return response, err
+			return err
 		}
 		glog.V(2).Infof("Failed to create tags; will retry.  Error was %v", err)
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
-
-	subnetIds := []string{}
-
-	request := &ec2.DescribeSubnetsInput{}
-	filters := []*ec2.Filter{}
-	filters = append(filters, newEc2Filter("vpc-id", vpcId))
-	// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
-	// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
-	// only the public subnet (where the ELB will go) is so tagged.
+func (s *AWSCloud) listPublicSubnetIDsinVPC(vpcId string) ([]string, error) {
+	sRequest := &ec2.DescribeSubnetsInput{}
+	vpcIdFilter := newEc2Filter("vpc-id", vpcId)
+	var filters []*ec2.Filter
+	filters = append(filters, vpcIdFilter)
 	filters = s.addFilters(filters)
-	request.Filters = filters
+	sRequest.Filters = filters
 
-	subnets, err := s.ec2.DescribeSubnets(request)
+	subnets, err := s.ec2.DescribeSubnets(sRequest)
 	if err != nil {
 		glog.Error("Error describing subnets: ", err)
 		return nil, err
 	}
 
+	rRequest := &ec2.DescribeRouteTablesInput{}
+	rRequest.Filters = []*ec2.Filter{vpcIdFilter}
+
+	rt, err := s.ec2.DescribeRouteTables(rRequest)
+	if err != nil {
+		glog.Error("error describing route tables: ", err)
+		return nil, err
+	}
+
+	var subnetIds []string
 	availabilityZones := sets.NewString()
 	for _, subnet := range subnets {
 		az := orEmpty(subnet.AvailabilityZone)
 		id := orEmpty(subnet.SubnetId)
+
+		isPublic, err := isSubnetPublic(rt, id)
+		if err != nil {
+			return nil, err
+		}
+		if !isPublic {
+			glog.V(2).Infof("Ignoring private subnet %q", id)
+			continue
+		}
+
 		if availabilityZones.Has(az) {
 			glog.Warning("Found multiple subnets per AZ '", az, "', ignoring subnet '", id, "'")
 			continue
 		}
+
 		subnetIds = append(subnetIds, id)
 		availabilityZones.Insert(az)
 	}
 
 	return subnetIds, nil
+}
+
+func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
+	var subnetTable *ec2.RouteTable
+	for _, table := range rt {
+		for _, assoc := range table.Associations {
+			if aws.StringValue(assoc.SubnetId) == subnetID {
+				subnetTable = table
+				break
+			}
+		}
+	}
+
+	if subnetTable == nil {
+		// If there is no explicit association, the subnet will be implicitly
+		// associated with the VPC's main routing table.
+		for _, table := range rt {
+			for _, assoc := range table.Associations {
+				if aws.BoolValue(assoc.Main) == true {
+					glog.V(4).Infof("Assuming implicit use of main routing table %s for %s",
+						aws.StringValue(table.RouteTableId), subnetID)
+					subnetTable = table
+					break
+				}
+			}
+		}
+	}
+
+	if subnetTable == nil {
+		return false, fmt.Errorf("Could not locate routing table for subnet %s", subnetID)
+	}
+
+	for _, route := range subnetTable.Routes {
+		// There is no direct way in the AWS API to determine if a subnet is public or private.
+		// A public subnet is one which has an internet gateway route
+		// we look for the gatewayId and make sure it has the prefix of igw to differentiate
+		// from the default in-subnet route which is called "local"
+		// or other virtual gateway (starting with vgv)
+		// or vpc peering connections (starting with pcx).
+		if strings.HasPrefix(aws.StringValue(route.GatewayId), "igw") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
@@ -1902,9 +1986,9 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Construct list of configured subnets
-	subnetIDs, err := s.listSubnetIDsinVPC(vpcId)
+	subnetIDs, err := s.listPublicSubnetIDsinVPC(vpcId)
 	if err != nil {
-		glog.Error("Error listing subnets in VPC", err)
+		glog.Error("Error listing subnets in VPC: ", err)
 		return nil, err
 	}
 
@@ -2052,6 +2136,10 @@ func findSecurityGroupForInstance(instance *ec2.Instance) *string {
 // Open security group ingress rules on the instances so that the load balancer can talk to them
 // Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
 func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, allInstances []*ec2.Instance) error {
+	if s.cfg.Global.DisableSecurityGroupIngress {
+		return nil
+	}
+
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupId := ""
 	for _, securityGroup := range lb.SecurityGroups {
@@ -2327,52 +2415,37 @@ func (a *AWSCloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Ins
 }
 
 // Fetches instances by node names; returns an error if any cannot be found.
-// This is currently implemented by fetching all the instances, because this is currently called for all nodes (i.e. the majority)
-// In practice, the breakeven vs looping through and calling getInstanceByNodeName is probably around N=2.
+// This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
 func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
-	allInstances, err := a.getAllInstances()
-	if err != nil {
-		return nil, err
+	names := aws.StringSlice(nodeNames)
+
+	nodeNameFilter := &ec2.Filter{
+		Name:   aws.String("private-dns-name"),
+		Values: names,
 	}
 
-	nodeNamesMap := make(map[string]int, len(nodeNames))
-	for i, nodeName := range nodeNames {
-		nodeNamesMap[nodeName] = i
+	filters := []*ec2.Filter{
+		nodeNameFilter,
+		newEc2Filter("instance-state-name", "running"),
 	}
 
-	instances := make([]*ec2.Instance, len(nodeNames))
-	for _, instance := range allInstances {
-		nodeName := aws.StringValue(instance.PrivateDnsName)
-		if nodeName == "" {
-			glog.V(2).Infof("ignoring ec2 instance with no PrivateDnsName: %q", aws.StringValue(instance.InstanceId))
-			continue
-		}
-		i, found := nodeNamesMap[nodeName]
-		if !found {
-			continue
-		}
-		instances[i] = instance
-	}
-
-	for i, instance := range instances {
-		if instance == nil {
-			nodeName := nodeNames[i]
-			return nil, fmt.Errorf("unable to find instance %q", nodeName)
-		}
-	}
-
-	return instances, nil
-}
-
-// Returns all instances that are tagged as being in this cluster.
-func (a *AWSCloud) getAllInstances() ([]*ec2.Instance, error) {
-	filters := []*ec2.Filter{}
 	filters = a.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
 		Filters: filters,
 	}
 
-	return a.ec2.DescribeInstances(request)
+	instances, err := a.ec2.DescribeInstances(request)
+	if err != nil {
+		glog.V(2).Infof("Failed to describe instances %v", nodeNames)
+		return nil, err
+	}
+
+	if len(instances) == 0 {
+		glog.V(3).Infof("Failed to find any instances %v", nodeNames)
+		return nil, nil
+	}
+
+	return instances, nil
 }
 
 // Returns the instance with the specified node name
@@ -2380,6 +2453,7 @@ func (a *AWSCloud) getAllInstances() ([]*ec2.Instance, error) {
 func (a *AWSCloud) findInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
 	filters := []*ec2.Filter{
 		newEc2Filter("private-dns-name", nodeName),
+		newEc2Filter("instance-state-name", "running"),
 	}
 	filters = a.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{

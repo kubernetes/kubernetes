@@ -27,7 +27,6 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for ThirdPartyResourceDatas against etcd
@@ -37,11 +36,11 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store ThirdPartyResourceData in the given helper
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, group, kind string) *REST {
+func NewREST(opts generic.RESTOptions, group, kind string) *REST {
 	prefix := "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
 
 	// We explicitly do NOT do any decoration here yet.
-	storageInterface := s
+	storageInterface := opts.Storage
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResourceData{} },
@@ -58,9 +57,10 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, gro
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return thirdpartyresourcedata.Matcher(label, field)
 		},
-		QualifiedResource: extensions.Resource("thirdpartyresourcedatas"),
-		CreateStrategy:    thirdpartyresourcedata.Strategy,
-		UpdateStrategy:    thirdpartyresourcedata.Strategy,
+		QualifiedResource:       extensions.Resource("thirdpartyresourcedatas"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		CreateStrategy:          thirdpartyresourcedata.Strategy,
+		UpdateStrategy:          thirdpartyresourcedata.Strategy,
 
 		Storage: storageInterface,
 	}

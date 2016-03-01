@@ -48,7 +48,12 @@ const (
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
 
-var _ = Describe("Daemon set", func() {
+// This test must be run in serial because it assumes the Daemon Set pods will
+// always get scheduled.  If we run other tests in parallel, this may not
+// happen.  In the future, running in parallel may work if we have an eviction
+// model which lets the DS controller kick out other pods to make room.
+// See http://issues.k8s.io/21767 for more details
+var _ = Describe("Daemon set [Serial]", func() {
 	var f *Framework
 
 	AfterEach(func() {

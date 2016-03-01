@@ -18,7 +18,7 @@ bridge-utils:
     - mode: 644
     - makedirs: true
 
-{% if grains.os == 'Fedora' and grains.osrelease_info[0] >= 22 %}
+{% if (grains.os == 'Fedora' and grains.osrelease_info[0] >= 22) or (grains.os == 'CentOS' and grains.osrelease_info[0] >= 7) %}
 
 docker:
   pkg:
@@ -207,25 +207,48 @@ net.ipv4.ip_forward:
 {% set override_deb='' %}
 {% set override_deb_sha1='' %}
 {% set override_docker_ver='' %}
+
+{% elif grains.get('cloud', '') == 'aws'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'jessie' -%}
+# TODO: Get from google storage?
+{% set docker_pkg_name='docker-engine' %}
+{% set override_docker_ver='1.9.1-0~jessie' %}
+{% set override_deb='docker-engine_1.9.1-0~jessie_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~jessie_amd64.deb' %}
+{% set override_deb_sha1='c58c39008fd6399177f6b2491222e4438f518d78' %}
+
 # Ubuntu presents as os_family=Debian, osfullname=Ubuntu
+{% elif grains.get('cloud', '') == 'aws'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'trusty' -%}
+# TODO: Get from google storage?
+{% set docker_pkg_name='docker-engine' %}
+{% set override_docker_ver='1.9.1-0~trusty' %}
+{% set override_deb='docker-engine_1.9.1-0~trusty_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~trusty_amd64.deb' %}
+{% set override_deb_sha1='ce728172ab29f9fdacfffffe2e2f88a144f23875' %}
+
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'vivid' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.8.3-0~vivid' %}
-{% set override_deb='docker-engine_1.8.3-0~vivid_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.8.3-0~vivid_amd64.deb' %}
-{% set override_deb_sha1='f0259b1f04635977325c0cfa7c0006e1e5de1341' %}
+{% set override_docker_ver='1.9.1-0~vivid' %}
+{% set override_deb='docker-engine_1.9.1-0~vivid_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~vivid_amd64.deb' %}
+{% set override_deb_sha1='81741f6f16630632de53762c5554238d57b3b9cb' %}
+
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'wily' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.8.3-0~wily' %}
-{% set override_deb='docker-engine_1.8.3-0~wily_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.8.3-0~wily_amd64.deb' %}
-{% set override_deb_sha1='aa00313498e0e8e73d9eedb39cbdff33b1474c16' %}
+{% set override_docker_ver='1.9.1-0~wily' %}
+{% set override_deb='docker-engine_1.9.1-0~wily_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~wily_amd64.deb' %}
+{% set override_deb_sha1='a505fd49372cf836f5b9ed953053c50b3381dbfd' %}
+
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
 {% set override_docker_ver='1.7.1' %}

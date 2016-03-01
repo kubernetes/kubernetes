@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	uclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,9 +39,9 @@ func TestDynamicClient(t *testing.T) {
 
 	framework.DeleteAllEtcdKeys()
 	gv := testapi.Default.GroupVersion()
-	config := &uclient.Config{
+	config := &restclient.Config{
 		Host:          s.URL,
-		ContentConfig: uclient.ContentConfig{GroupVersion: gv},
+		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	}
 
 	client := uclient.NewOrDie(config)

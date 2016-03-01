@@ -18,8 +18,8 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func (c *FakePods) Bind(binding *v1.Binding) error {
@@ -33,7 +33,7 @@ func (c *FakePods) Bind(binding *v1.Binding) error {
 	return err
 }
 
-func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *client.Request {
+func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
 	action := core.GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.ns
@@ -42,5 +42,5 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *client.Request 
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
-	return &client.Request{}
+	return &restclient.Request{}
 }

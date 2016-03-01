@@ -36,6 +36,15 @@ type Backoff struct {
 	perItemBackoff  map[string]*backoffEntry
 }
 
+func NewFakeBackOff(initial, max time.Duration, tc *FakeClock) *Backoff {
+	return &Backoff{
+		perItemBackoff:  map[string]*backoffEntry{},
+		Clock:           tc,
+		defaultDuration: initial,
+		maxDuration:     max,
+	}
+}
+
 func NewBackOff(initial, max time.Duration) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
@@ -118,6 +127,12 @@ func (p *Backoff) GC() {
 			delete(p.perItemBackoff, id)
 		}
 	}
+}
+
+func (p *Backoff) DeleteEntry(id string) {
+	p.Lock()
+	defer p.Unlock()
+	delete(p.perItemBackoff, id)
 }
 
 // Take a lock on *Backoff, before calling initEntryUnsafe

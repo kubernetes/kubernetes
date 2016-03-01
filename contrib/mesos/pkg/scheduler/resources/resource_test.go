@@ -22,7 +22,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/controller/resourcequota"
 )
 
 type resources struct {
@@ -81,7 +80,6 @@ func TestResources(tst *testing.T) {
 		}
 
 		tst.Logf("Testing resource computation for %v => request=%v limit=%v", t, pod.Spec.Containers[0].Resources.Requests, pod.Spec.Containers[0].Resources.Limits)
-		tst.Logf("hasRequests: cpu => %v, mem => %v", resourcequota.PodHasRequests(pod, api.ResourceCPU), resourcequota.PodHasRequests(pod, api.ResourceMemory))
 
 		beforeCpuR, beforeCpuL, _, err := LimitedCPUForPod(pod, DefaultDefaultContainerCPULimit)
 		assert.NoError(err, "CPUForPod should not return an error")

@@ -121,6 +121,7 @@ func (c Client) getURL(path string) string {
 }
 
 type configurationPayload struct {
+	Deleted     bool            `json:"deleted"`
 	Primary     string          `json:"primary"`
 	DatasetID   string          `json:"dataset_id,omitempty"`
 	MaximumSize json.Number     `json:"maximum_size,omitempty"`
@@ -313,7 +314,7 @@ func (c Client) GetDatasetID(metaName string) (datasetID string, err error) {
 	var configurations []configurationPayload
 	if err = json.NewDecoder(resp.Body).Decode(&configurations); err == nil {
 		for _, c := range configurations {
-			if c.Metadata.Name == metaName {
+			if c.Metadata.Name == metaName && c.Deleted == false {
 				return c.DatasetID, nil
 			}
 		}

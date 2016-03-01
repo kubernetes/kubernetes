@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Implements RESTScope interface
@@ -330,23 +329,8 @@ func (m *DefaultRESTMapper) KindFor(resource unversioned.GroupVersionResource) (
 	if err != nil {
 		return unversioned.GroupVersionKind{}, err
 	}
-
-	// TODO for each group, choose the most preferred (first) version.  This keeps us consistent with code today.
-	// eventually, we'll need a RESTMapper that is aware of what's available server-side and deconflicts that with
-	// user preferences
-	oneKindPerGroup := []unversioned.GroupVersionKind{}
-	groupsAdded := sets.String{}
-	for _, kind := range kinds {
-		if groupsAdded.Has(kind.Group) {
-			continue
-		}
-
-		oneKindPerGroup = append(oneKindPerGroup, kind)
-		groupsAdded.Insert(kind.Group)
-	}
-
-	if len(oneKindPerGroup) == 1 {
-		return oneKindPerGroup[0], nil
+	if len(kinds) == 1 {
+		return kinds[0], nil
 	}
 
 	return unversioned.GroupVersionKind{}, &AmbiguousResourceError{PartialResource: resource, MatchingKinds: kinds}

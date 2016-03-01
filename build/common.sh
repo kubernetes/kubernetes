@@ -577,6 +577,11 @@ function kube::build::run_build_command() {
     docker_run_opts+=(-e "KUBERNETES_CONTRIB=${KUBERNETES_CONTRIB}")
   fi
 
+  docker_run_opts+=(
+    --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
+    --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
+  )
+
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up
   # running in a daemon-ish mode.  So if we don't have a stdin, we explicitly
@@ -662,6 +667,13 @@ function kube::release::clean_cruft() {
   find ${RELEASE_STAGE} -name '*~' -exec rm {} \;
   find ${RELEASE_STAGE} -name '#*#' -exec rm {} \;
   find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
+}
+
+function kube::release::package_hyperkube() {
+  # If we have these variables set then we want to build all docker images.
+  if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+    REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" make -C cluster/images/hyperkube/ build
+  fi
 }
 
 function kube::release::package_tarballs() {

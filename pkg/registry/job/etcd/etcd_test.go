@@ -34,7 +34,8 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
-	jobStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	jobStorage, statusStorage := NewREST(restOptions)
 	return jobStorage, statusStorage, server
 }
 
@@ -52,6 +53,7 @@ func validNewJob() *extensions.Job {
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
+			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -164,3 +166,9 @@ func TestWatch(t *testing.T) {
 }
 
 // TODO: test update /status
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
+}

@@ -58,7 +58,7 @@ KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Lists of API Versions of each groups that should be tested, groups are
 # separated by comma, lists are separated by semicolon. e.g.,
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1,metrics/v1alpha1;v1,autoscaling/v1,extensions/v1beta1,metrics/v1alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1,metrics/v1alpha1;v1,autoscaling/v1,batch/v1,extensions/v1beta1,metrics/v1alpha1"}
 # once we have multiple group supports
 # Run tests with the standard (registry) and a custom etcd prefix
 # (kubernetes.io/registry).
@@ -303,6 +303,17 @@ reportCoverageToCoveralls() {
   fi
 }
 
+checkFDs() {
+  # several unittests panic when httptest cannot open more sockets
+  # due to the low default files limit on OS X.  Warn about low limit.
+  local fileslimit="$(ulimit -n)"
+  if [[ $fileslimit -lt 1000 ]]; then
+    echo "WARNING: ulimit -n (files) should be at least 1000, is $fileslimit, may cause test failure";
+  fi
+}
+
+checkFDs
+
 # Convert the CSVs to arrays.
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
@@ -315,7 +326,7 @@ for (( i=0, j=0; ; )); do
   # KUBE_TEST_API sets the version of each group to be tested. KUBE_API_VERSIONS
   # register the groups/versions as supported by k8s. So KUBE_API_VERSIONS
   # needs to be the superset of KUBE_TEST_API.
-  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1,autoscaling/v1,extensions/v1beta1,componentconfig/v1alpha1,metrics/v1alpha1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1,componentconfig/v1alpha1,metrics/v1alpha1,authorization.k8s.io/v1beta1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then

@@ -204,8 +204,9 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 			Name: name,
 		},
 		Spec: extensions.JobSpec{
-			Parallelism: &parallelism,
-			Completions: &completions,
+			Parallelism:    &parallelism,
+			Completions:    &completions,
+			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
@@ -264,7 +265,7 @@ func createJob(c *client.Client, ns string, job *extensions.Job) (*extensions.Jo
 }
 
 func deleteJob(c *client.Client, ns, name string) error {
-	return c.Extensions().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
+	return c.Extensions().Jobs(ns).Delete(name, nil)
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
@@ -311,4 +312,10 @@ func waitForJobFail(c *client.Client, ns, jobName string) error {
 		}
 		return false, nil
 	})
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }

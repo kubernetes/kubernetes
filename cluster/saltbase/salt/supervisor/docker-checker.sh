@@ -19,10 +19,20 @@
 # which in turn restarts docker.
 
 /etc/init.d/docker stop
+# Make sure docker gracefully terminated before start again
+while pidof docker > /dev/null; do
+    echo "waiting clean shutdown"
+    sleep 10
+done
+
+# cleanup docker network checkpoint to avoid running into known issue
+# of docker (https://github.com/docker/docker/issues/18283)
+rm -rf /var/lib/docker/network
+
 /etc/init.d/docker start
 
-echo "waiting a minute for startup"
-sleep 60
+echo "waiting 30s for startup"
+sleep 30
 
 while true; do
   if ! sudo timeout 10 docker version > /dev/null; then

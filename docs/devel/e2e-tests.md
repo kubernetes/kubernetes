@@ -42,6 +42,8 @@ The e2e tests in kubernetes are built atop of [Ginkgo](http://onsi.github.io/gin
 
 The purpose of *this* document is to serve as a primer for developers who are looking to execute or add tests using a local development environment.
 
+Before writing new tests or making substantive changes to existing tests, you should also read [Writing Good e2e Tests](writing-good-e2e-tests.md)
+
 ## Building and Running the Tests
 
 There are a variety of ways to run e2e tests, but we aim to decrease the number of ways to run e2e tests to a canonical way: `hack/e2e.go`.

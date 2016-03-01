@@ -30,7 +30,8 @@ var testTTL uint64 = 60
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	return NewREST(etcdStorage, generic.UndecoratedStorage, testTTL), server
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	return NewREST(restOptions, testTTL), server
 }
 
 func validNewEvent(namespace string) *api.Event {

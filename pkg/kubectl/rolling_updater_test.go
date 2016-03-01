@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -430,20 +431,21 @@ Scaling foo-v1 down to 0
 Scaling foo-v2 up to 10
 `,
 		}, {
-			name:        "1->1 10/0 fast readiness",
+			name:        "1->1 25/25 maintain minimum availability",
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 1),
 			newRcExists: false,
-			maxUnavail:  intstr.FromString("10%"),
-			maxSurge:    intstr.FromString("0%"),
+			maxUnavail:  intstr.FromString("25%"),
+			maxSurge:    intstr.FromString("25%"),
 			expected: []interface{}{
-				down{oldReady: 1, newReady: 0, to: 0},
 				up{1},
+				down{oldReady: 1, newReady: 0, noop: true},
+				down{oldReady: 1, newReady: 1, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 1 pods)
-Scaling foo-v1 down to 0
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
 Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
 `,
 		}, {
 			name:        "1->1 0/10 delayed readiness",
@@ -475,7 +477,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 1, newReady: 1, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 2 pods)
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
 Scaling foo-v2 up to 1
 Scaling foo-v1 down to 0
 `,
@@ -636,6 +638,44 @@ Scaling foo-v2 up to 2
 Scaling foo-v1 down to 0
 `,
 		},
+		{
+			name:        "2->2 1/0 blocked oldRc",
+			oldRc:       oldRc(2, 2),
+			newRc:       newRc(0, 2),
+			newRcExists: false,
+			maxUnavail:  intstr.FromInt(1),
+			maxSurge:    intstr.FromInt(0),
+			expected: []interface{}{
+				down{oldReady: 1, newReady: 0, to: 1},
+				up{1},
+				down{oldReady: 1, newReady: 1, to: 0},
+				up{2},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 2 to 0 (keep 1 pods available, don't exceed 2 pods)
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 2
+`,
+		},
+		{
+			name:        "1->1 100%/0 allow maxUnavailability",
+			oldRc:       oldRc(1, 1),
+			newRc:       newRc(0, 1),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("100%"),
+			maxSurge:    intstr.FromInt(0),
+			expected: []interface{}{
+				down{oldReady: 1, newReady: 0, to: 0},
+				up{1},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 1 pods)
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 1
+`,
+		},
 	}
 
 	for i, test := range tests {
@@ -685,10 +725,10 @@ Scaling foo-v1 down to 0
 				expected := -1
 				switch {
 				case rc == test.newRc:
-					t.Logf("scaling up %s:%d", rc.Name, rc.Spec.Replicas)
+					t.Logf("scaling up %s to %d", rc.Name, rc.Spec.Replicas)
 					expected = next(&upTo)
 				case rc == test.oldRc:
-					t.Logf("scaling down %s:%d", rc.Name, rc.Spec.Replicas)
+					t.Logf("scaling down %s to %d", rc.Name, rc.Spec.Replicas)
 					expected = next(&downTo)
 				}
 				if expected == -1 {
@@ -709,13 +749,13 @@ Scaling foo-v1 down to 0
 			},
 		}
 		// Set up a mock readiness check which handles the test assertions.
-		updater.waitForReadyPods = func(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
+		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int, int, error) {
 			// Return simulated readiness, and throw an error if this call has no
 			// expectations defined.
 			oldReady := next(&oldReady)
 			newReady := next(&newReady)
 			if oldReady == -1 || newReady == -1 {
-				t.Fatalf("unexpected waitForReadyPods call for:\noldRc: %+v\nnewRc: %+v", oldRc, newRc)
+				t.Fatalf("unexpected getReadyPods call for:\noldRc: %+v\nnewRc: %+v", oldRc, newRc)
 			}
 			return oldReady, newReady, nil
 		}
@@ -759,7 +799,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 			return nil
 		},
 	}
-	updater.waitForReadyPods = func(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
+	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int, int, error) {
 		// Coerce a timeout by pods never becoming ready.
 		return 0, 0, nil
 	}
@@ -812,7 +852,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
 			return nil
 		},
-		waitForReadyPods: func(interval, timeout time.Duration, oldRc, newRc *api.ReplicationController) (int, int, error) {
+		getReadyPods: func(oldRc, newRc *api.ReplicationController) (int, int, error) {
 			return 1, 1, nil
 		},
 	}
@@ -1328,7 +1368,7 @@ func TestUpdateWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	clientConfig := &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
@@ -1425,7 +1465,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	clientConfig := &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
@@ -1442,7 +1482,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	}
 }
 
-func TestRollingUpdater_pollForReadyPods(t *testing.T) {
+func TestRollingUpdater_readyPods(t *testing.T) {
 	mkpod := func(owner *api.ReplicationController, ready bool) *api.Pod {
 		labels := map[string]string{}
 		for k, v := range owner.Spec.Selector {
@@ -1538,7 +1578,7 @@ func TestRollingUpdater_pollForReadyPods(t *testing.T) {
 			ns: "default",
 			c:  client,
 		}
-		oldReady, newReady, err := updater.pollForReadyPods(time.Millisecond, time.Second, test.oldRc, test.newRc)
+		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1547,76 +1587,6 @@ func TestRollingUpdater_pollForReadyPods(t *testing.T) {
 		}
 		if e, a := test.newReady, newReady; e != a {
 			t.Errorf("expected new ready %d, got %d", e, a)
-		}
-	}
-}
-
-func TestRollingUpdater_extractMaxValue(t *testing.T) {
-	tests := []struct {
-		field    intstr.IntOrString
-		original int
-		expected int
-		valid    bool
-	}{
-		{
-			field:    intstr.FromInt(1),
-			original: 100,
-			expected: 1,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromInt(0),
-			original: 100,
-			expected: 0,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromInt(-1),
-			original: 100,
-			valid:    false,
-		},
-		{
-			field:    intstr.FromString("10%"),
-			original: 100,
-			expected: 10,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("100%"),
-			original: 100,
-			expected: 100,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("200%"),
-			original: 100,
-			expected: 200,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("0%"),
-			original: 100,
-			expected: 0,
-			valid:    true,
-		},
-		{
-			field:    intstr.FromString("-1%"),
-			original: 100,
-			valid:    false,
-		},
-	}
-
-	for i, test := range tests {
-		t.Logf("evaluating test %d", i)
-		max, err := extractMaxValue(test.field, "field", test.original)
-		if test.valid && err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !test.valid && err == nil {
-			t.Fatalf("expected an error")
-		}
-		if e, a := test.expected, max; e != a {
-			t.Fatalf("expected max %d, got %d", e, a)
 		}
 	}
 }

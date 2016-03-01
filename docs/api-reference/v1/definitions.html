@@ -982,7 +982,7 @@ Examples:<br>
 <p>Represents a Persistent Disk resource in Google Compute Engine.</p>
 </div>
 <div class="paragraph">
-<p>A GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once. GCE PDs support ownership management and SELinux relabeling.</p>
+<p>A GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1062,6 +1062,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Hard is the set of desired hard limits for each named resource. More info: <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">scopes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcequotascope">v1.ResourceQuotaScope</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1854,7 +1861,7 @@ Populated by the system. Read-only. Value must be treated as opaque by clients a
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">generation</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5513,7 +5520,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">targetPort</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod&#8217;s container ports. If this is not specified, the value of Port is used (an identity map). Defaults to the service port. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service">http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod&#8217;s container ports. If this is not specified, the value of the <em>port</em> field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the <em>port</em> field. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service">http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6013,7 +6020,7 @@ The resulting set of endpoints can be viewed as:<br>
 <p>Represents a Persistent Disk resource in AWS.</p>
 </div>
 <div class="paragraph">
-<p>An AWS EBS disk must exist and be formatted before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.</p>
+<p>An AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6187,6 +6194,10 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_resourcequotascope">v1.ResourceQuotaScope</h3>
 
 </div>
 <div class="sect2">
@@ -7477,7 +7488,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-02-16 23:43:33 UTC
+Last updated 2016-02-27 01:28:28 UTC
 </div>
 </div>
 </body>

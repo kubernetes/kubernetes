@@ -175,7 +175,9 @@ if [[ ${docker_storage} == "btrfs" ]]; then
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
   # Install aufs kernel module
   # Fix issue #14162 with extra-virtual
-  apt-get-install linux-image-extra-$(uname -r) linux-image-extra-virtual
+  if [[ `lsb_release -i -s` == 'Ubuntu' ]]; then
+    apt-get-install linux-image-extra-$(uname -r) linux-image-extra-virtual
+  fi
 
   # Install aufs tools
   apt-get-install aufs-tools
@@ -188,6 +190,9 @@ else
 fi
 
 if [[ -n "${move_docker}" ]]; then
+  # Stop docker if it is running, so we can move its files
+  systemctl stop docker || true
+
   # Move docker to e.g. /mnt
   # but only if it is a directory, not a symlink left over from a previous run
   if [[ -d /var/lib/docker ]]; then

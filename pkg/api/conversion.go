@@ -41,6 +41,7 @@ func init() {
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_unversioned_Time_To_unversioned_Time,
+		Convert_string_slice_To_unversioned_Time,
 		Convert_string_To_labels_Selector,
 		Convert_string_To_fields_Selector,
 		Convert_bool_ref_To_bool,
@@ -116,6 +117,16 @@ func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unv
 	*out = *in
 	return nil
 }
+
+// Convert_string_slice_To_unversioned_Time allows converting a URL query parameter value
+func Convert_string_slice_To_unversioned_Time(input *[]string, out *unversioned.Time, s conversion.Scope) error {
+	str := ""
+	if len(*input) > 0 {
+		str = (*input)[0]
+	}
+	return out.UnmarshalQueryParameter(str)
+}
+
 func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
 	selector, err := labels.Parse(*in)
 	if err != nil {

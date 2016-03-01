@@ -44,7 +44,7 @@ var _ = Describe("PersistentVolumes [Feature:Volumes]", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",
-			serverImage: "gcr.io/google_containers/volume-nfs",
+			serverImage: "gcr.io/google_containers/volume-nfs:0.4",
 			serverPorts: []int{2049},
 		}
 

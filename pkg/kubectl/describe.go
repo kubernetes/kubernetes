@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -89,12 +91,14 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
-		extensions.Kind("ReplicaSet"):              &ReplicaSetDescriber{c},
-		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
-		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
-		extensions.Kind("Job"):                     &JobDescriber{c},
-		extensions.Kind("Ingress"):                 &IngressDescriber{c},
+		extensions.Kind("ReplicaSet"):               &ReplicaSetDescriber{c},
+		extensions.Kind("HorizontalPodAutoscaler"):  &HorizontalPodAutoscalerDescriber{c},
+		autoscaling.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("DaemonSet"):                &DaemonSetDescriber{c},
+		extensions.Kind("Deployment"):               &DeploymentDescriber{clientset.FromUnversionedClient(c)},
+		extensions.Kind("Job"):                      &JobDescriber{c},
+		batch.Kind("Job"):                           &JobDescriber{c},
+		extensions.Kind("Ingress"):                  &IngressDescriber{c},
 	}
 
 	return m
@@ -258,35 +262,40 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 		fmt.Fprint(w, "No resource quota.\n")
 		return
 	}
-	resources := []api.ResourceName{}
-	hard := map[api.ResourceName]resource.Quantity{}
-	used := map[api.ResourceName]resource.Quantity{}
+	sort.Sort(SortableResourceQuotas(quotas.Items))
+
+	fmt.Fprint(w, "Resource Quotas")
 	for _, q := range quotas.Items {
+		fmt.Fprintf(w, "\n Name:\t%s\n", q.Name)
+		if len(q.Spec.Scopes) > 0 {
+			scopes := []string{}
+			for _, scope := range q.Spec.Scopes {
+				scopes = append(scopes, string(scope))
+			}
+			sort.Strings(scopes)
+			fmt.Fprintf(w, " Scopes:\t%s\n", strings.Join(scopes, ", "))
+			for _, scope := range scopes {
+				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
+				if len(helpText) > 0 {
+					fmt.Fprintf(w, "  * %s\n", helpText)
+				}
+			}
+		}
+
+		fmt.Fprintf(w, " Resource\tUsed\tHard\n")
+		fmt.Fprint(w, " --------\t---\t---\n")
+
+		resources := []api.ResourceName{}
 		for resource := range q.Status.Hard {
 			resources = append(resources, resource)
+		}
+		sort.Sort(SortableResourceNames(resources))
+
+		for _, resource := range resources {
 			hardQuantity := q.Status.Hard[resource]
 			usedQuantity := q.Status.Used[resource]
-
-			// if for some reason there are multiple quota documents, we take least permissive
-			prevQuantity, ok := hard[resource]
-			if ok {
-				if hardQuantity.Value() < prevQuantity.Value() {
-					hard[resource] = hardQuantity
-				}
-			} else {
-				hard[resource] = hardQuantity
-			}
-			used[resource] = usedQuantity
+			fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
 		}
-	}
-
-	sort.Sort(SortableResourceNames(resources))
-	fmt.Fprint(w, "Resource Quotas\n Resource\tUsed\tHard\n")
-	fmt.Fprint(w, " ---\t---\t---\n")
-	for _, resource := range resources {
-		hardQuantity := hard[resource]
-		usedQuantity := used[resource]
-		fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
 	}
 }
 
@@ -393,10 +402,38 @@ func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error
 	return describeQuota(resourceQuota)
 }
 
+func helpTextForResourceQuotaScope(scope api.ResourceQuotaScope) string {
+	switch scope {
+	case api.ResourceQuotaScopeTerminating:
+		return "Matches all pods that have an active deadline."
+	case api.ResourceQuotaScopeNotTerminating:
+		return "Matches all pods that do not have an active deadline."
+	case api.ResourceQuotaScopeBestEffort:
+		return "Matches all pods that have best effort quality of service."
+	case api.ResourceQuotaScopeNotBestEffort:
+		return "Matches all pods that do not have best effort quality of service."
+	default:
+		return ""
+	}
+}
 func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", resourceQuota.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", resourceQuota.Namespace)
+		if len(resourceQuota.Spec.Scopes) > 0 {
+			scopes := []string{}
+			for _, scope := range resourceQuota.Spec.Scopes {
+				scopes = append(scopes, string(scope))
+			}
+			sort.Strings(scopes)
+			fmt.Fprintf(out, "Scopes:\t%s\n", strings.Join(scopes, ", "))
+			for _, scope := range scopes {
+				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
+				if len(helpText) > 0 {
+					fmt.Fprintf(out, " * %s\n", helpText)
+				}
+			}
+		}
 		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
 		fmt.Fprintf(out, "--------\t----\t----\n")
 
@@ -525,6 +562,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer) {
 			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, out)
 		case volume.VolumeSource.Secret != nil:
 			printSecretVolumeSource(volume.VolumeSource.Secret, out)
+		case volume.VolumeSource.ConfigMap != nil:
+			printConfigMapVolumeSource(volume.VolumeSource.ConfigMap, out)
 		case volume.VolumeSource.NFS != nil:
 			printNFSVolumeSource(volume.VolumeSource.NFS, out)
 		case volume.VolumeSource.ISCSI != nil:
@@ -577,8 +616,13 @@ func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, out io.Writer) {
 }
 
 func printSecretVolumeSource(secret *api.SecretVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tSecret (a secret that should populate this volume)\n"+
+	fmt.Fprintf(out, "    Type:\tSecret (a volume populated by a Secret)\n"+
 		"    SecretName:\t%v\n", secret.SecretName)
+}
+
+func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
+		"    Name:\t%v\n", configMap.Name)
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, out io.Writer) {
@@ -720,13 +764,16 @@ func DescribeContainers(containers []api.Container, containerStatuses []api.Cont
 	}
 
 	for _, container := range containers {
-		status := statuses[container.Name]
-		state := status.State
+		status, ok := statuses[container.Name]
 
 		fmt.Fprintf(out, "  %v:\n", container.Name)
-		fmt.Fprintf(out, "    Container ID:\t%s\n", status.ContainerID)
+		if ok {
+			fmt.Fprintf(out, "    Container ID:\t%s\n", status.ContainerID)
+		}
 		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
-		fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
+		if ok {
+			fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
+		}
 
 		if len(container.Command) > 0 {
 			fmt.Fprintf(out, "    Command:\n")
@@ -763,12 +810,14 @@ func DescribeContainers(containers []api.Container, containerStatuses []api.Cont
 			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
 		}
 
-		describeStatus("State", state, out)
-		if status.LastTerminationState.Terminated != nil {
-			describeStatus("Last State", status.LastTerminationState, out)
+		if ok {
+			describeStatus("State", status.State, out)
+			if status.LastTerminationState.Terminated != nil {
+				describeStatus("Last State", status.LastTerminationState, out)
+			}
+			fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
+			fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
 		}
-		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
-		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
 
 		if container.LivenessProbe != nil {
 			probe := DescribeProbe(container.LivenessProbe)
@@ -1372,7 +1421,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, erro
 
 	tokens := []api.Secret{}
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	options := api.ListOptions{FieldSelector: tokenSelector}
 	secrets, err := d.Secrets(namespace).List(options)
 	if err == nil {
@@ -1552,6 +1601,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 		fmt.Fprintf(out, "Name:\t%s\n", hpa.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", hpa.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(hpa.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(hpa.Annotations))
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Reference:\t%s/%s/%s\n",
 			hpa.Spec.ScaleRef.Kind,
@@ -1582,6 +1632,11 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 			} else {
 				fmt.Fprintf(out, "failed to check Replication Controller\n")
 			}
+		}
+
+		events, _ := d.client.Events(namespace).Search(hpa)
+		if events != nil {
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -1710,11 +1765,11 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
-		oldRSs, _, err := deploymentutil.GetOldReplicaSets(*d, dd)
+		oldRSs, _, err := deploymentutil.GetOldReplicaSets(d, dd)
 		if err == nil {
 			fmt.Fprintf(out, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
 		}
-		newRS, err := deploymentutil.GetNewReplicaSet(*d, dd)
+		newRS, err := deploymentutil.GetNewReplicaSet(d, dd)
 		if err == nil {
 			var newRSs []*extensions.ReplicaSet
 			if newRS != nil {

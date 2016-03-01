@@ -42,6 +42,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
 		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
+		Convert_extensions_JobSpec_To_v1beta1_JobSpec,
+		Convert_v1beta1_JobSpec_To_extensions_JobSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -274,6 +276,110 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 		}
 	} else {
 		out.Template = nil
+	}
+	return nil
+}
+
+func Convert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.JobSpec))(in)
+	}
+	if in.Parallelism != nil {
+		out.Parallelism = new(int32)
+		*out.Parallelism = int32(*in.Parallelism)
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int32)
+		*out.Completions = int32(*in.Completions)
+	} else {
+		out.Completions = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
+	if in.Selector != nil {
+		out.Selector = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+
+	// BEGIN non-standard conversion
+	// autoSelector has opposite meaning as manualSelector.
+	// in both cases, unset means false, and unset is always preferred to false.
+	// unset vs set-false distinction is not preserved.
+	manualSelector := in.ManualSelector != nil && *in.ManualSelector
+	autoSelector := !manualSelector
+	if autoSelector {
+		out.AutoSelector = new(bool)
+		*out.AutoSelector = true
+	} else {
+		out.AutoSelector = nil
+	}
+	// END non-standard conversion
+
+	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobSpec))(in)
+	}
+	if in.Parallelism != nil {
+		out.Parallelism = new(int)
+		*out.Parallelism = int(*in.Parallelism)
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int)
+		*out.Completions = int(*in.Completions)
+	} else {
+		out.Completions = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
+	if in.Selector != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+
+	// BEGIN non-standard conversion
+	// autoSelector has opposite meaning as manualSelector.
+	// in both cases, unset means false, and unset is always preferred to false.
+	// unset vs set-false distinction is not preserved.
+	autoSelector := bool(in.AutoSelector != nil && *in.AutoSelector)
+	manualSelector := !autoSelector
+	if manualSelector {
+		out.ManualSelector = new(bool)
+		*out.ManualSelector = true
+	} else {
+		out.ManualSelector = nil
+	}
+	// END non-standard conversion
+
+	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	return nil
 }

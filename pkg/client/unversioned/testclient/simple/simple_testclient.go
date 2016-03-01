@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -81,23 +82,27 @@ func (c *Client) Setup(t *testing.T) *Client {
 	}
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
-		c.Client = client.NewOrDie(&client.Config{
+		c.Client = client.NewOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 		// We will fix this by supporting multiple group versions in Config
-		c.AutoscalingClient = client.NewAutoscalingOrDie(&client.Config{
+		c.AutoscalingClient = client.NewAutoscalingOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: client.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
 		})
-		c.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{
+		c.BatchClient = client.NewBatchOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Batch.GroupVersion()},
+		})
+		c.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{
+			Host:          c.server.URL,
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
 		})
 
-		c.Clientset = clientset.NewForConfigOrDie(&client.Config{Host: c.server.URL})
+		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Host: c.server.URL})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
 	return c

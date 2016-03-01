@@ -2700,76 +2700,6 @@ func Convert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in 
 	return autoConvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in, out, s)
 }
 
-func autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ClusterAutoscaler))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
-	return autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in, out, s)
-}
-
-func autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *extensions.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ClusterAutoscalerList))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ClusterAutoscaler, len(in.Items))
-		for i := range in.Items {
-			if err := Convert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *extensions.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
-	return autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in, out, s)
-}
-
-func autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *extensions.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ClusterAutoscalerSpec))(in)
-	}
-	out.MinNodes = int32(in.MinNodes)
-	out.MaxNodes = int32(in.MaxNodes)
-	if in.TargetUtilization != nil {
-		out.TargetUtilization = make([]NodeUtilization, len(in.TargetUtilization))
-		for i := range in.TargetUtilization {
-			if err := Convert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.TargetUtilization = nil
-	}
-	return nil
-}
-
-func Convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *extensions.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
-	return autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in, out, s)
-}
-
 func autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet, out *DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DaemonSet))(in)
@@ -2979,6 +2909,7 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DeploymentStatus))(in)
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = int32(in.Replicas)
 	out.UpdatedReplicas = int32(in.UpdatedReplicas)
 	out.AvailableReplicas = int32(in.AvailableReplicas)
@@ -3459,14 +3390,11 @@ func autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, o
 	} else {
 		out.Selector = nil
 	}
+	// in.ManualSelector has no peer in out
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-func Convert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *JobSpec, s conversion.Scope) error {
-	return autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in, out, s)
 }
 
 func autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
@@ -3509,19 +3437,6 @@ func autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobSta
 
 func Convert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in, out, s)
-}
-
-func autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.NodeUtilization))(in)
-	}
-	out.Resource = NodeResource(in.Resource)
-	out.Value = in.Value
-	return nil
-}
-
-func Convert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
-	return autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in, out, s)
 }
 
 func autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *extensions.PodSecurityPolicy, out *PodSecurityPolicy, s conversion.Scope) error {
@@ -3988,76 +3903,6 @@ func Convert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in 
 	return autoConvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in, out, s)
 }
 
-func autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ClusterAutoscaler))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
-	return autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in, out, s)
-}
-
-func autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *extensions.ClusterAutoscalerList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ClusterAutoscalerList))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]extensions.ClusterAutoscaler, len(in.Items))
-		for i := range in.Items {
-			if err := Convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *extensions.ClusterAutoscalerList, s conversion.Scope) error {
-	return autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in, out, s)
-}
-
-func autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *extensions.ClusterAutoscalerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ClusterAutoscalerSpec))(in)
-	}
-	out.MinNodes = int(in.MinNodes)
-	out.MaxNodes = int(in.MaxNodes)
-	if in.TargetUtilization != nil {
-		out.TargetUtilization = make([]extensions.NodeUtilization, len(in.TargetUtilization))
-		for i := range in.TargetUtilization {
-			if err := Convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.TargetUtilization = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *extensions.ClusterAutoscalerSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in, out, s)
-}
-
 func autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSet))(in)
@@ -4265,6 +4110,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStatus))(in)
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = int(in.Replicas)
 	out.UpdatedReplicas = int(in.UpdatedReplicas)
 	out.AvailableReplicas = int(in.AvailableReplicas)
@@ -4728,14 +4574,11 @@ func autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensi
 	} else {
 		out.Selector = nil
 	}
+	// in.AutoSelector has no peer in out
 	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-func Convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.JobSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *extensions.JobStatus, s conversion.Scope) error {
@@ -4856,19 +4699,6 @@ func autoConvert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *ap
 
 func Convert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
 	return autoConvert_v1beta1_ListOptions_To_api_ListOptions(in, out, s)
-}
-
-func autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*NodeUtilization))(in)
-	}
-	out.Resource = extensions.NodeResource(in.Resource)
-	out.Value = in.Value
-	return nil
-}
-
-func Convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in, out, s)
 }
 
 func autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
@@ -5357,9 +5187,6 @@ func init() {
 		autoConvert_api_Volume_To_v1_Volume,
 		autoConvert_extensions_APIVersion_To_v1beta1_APIVersion,
 		autoConvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization,
-		autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList,
-		autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec,
-		autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler,
 		autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList,
 		autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
 		autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
@@ -5391,7 +5218,6 @@ func init() {
 		autoConvert_extensions_JobSpec_To_v1beta1_JobSpec,
 		autoConvert_extensions_JobStatus_To_v1beta1_JobStatus,
 		autoConvert_extensions_Job_To_v1beta1_Job,
-		autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization,
 		autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList,
 		autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
 		autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
@@ -5464,9 +5290,6 @@ func init() {
 		autoConvert_v1_Volume_To_api_Volume,
 		autoConvert_v1beta1_APIVersion_To_extensions_APIVersion,
 		autoConvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization,
-		autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList,
-		autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec,
-		autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler,
 		autoConvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList,
 		autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,
@@ -5500,7 +5323,6 @@ func init() {
 		autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector,
 		autoConvert_v1beta1_ListOptions_To_api_ListOptions,
-		autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization,
 		autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList,
 		autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec,
 		autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy,

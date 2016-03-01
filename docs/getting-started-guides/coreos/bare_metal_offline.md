@@ -557,7 +557,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
             EnvironmentFile=-/etc/default/docker
             EnvironmentFile=/run/flannel/subnet.env
             ExecStartPre=/bin/mount --make-rprivate /
-            ExecStart=/usr/bin/docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=overlay -H fd:// ${DOCKER_EXTRA_OPTS}
+            ExecStart=/usr/bin/docker daemon --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=overlay -H fd:// ${DOCKER_EXTRA_OPTS}
             [Install]
             WantedBy=multi-user.target
         - name: setup-network-environment.service

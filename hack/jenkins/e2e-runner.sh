@@ -140,11 +140,11 @@ fi
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 if [[ ! -z "${CLOUDSDK_BUCKET:-}" ]]; then
-    gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
+    gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~
     rm -rf ~/repo ~/cloudsdk
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
-    tar zvxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
+    tar zxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
     export CLOUDSDK_CORE_DISABLE_PROMPTS=1
     export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
     ~/cloudsdk/google-cloud-sdk/install.sh --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
@@ -191,8 +191,18 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${KUBEMARK_NUM_NODES:-$NUM_NODES}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
-  ./test/kubemark/start-kubemark.sh
-  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false"
+  # If start-kubemark fails, we trigger empty set of tests that would trigger storing logs from the base cluster.
+  ./test/kubemark/start-kubemark.sh && kubemark_started="$?" || kubemark_started="$?"
+  if [[ "${kubemark_started}" != "0" ]]; then
+    go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
+    exit 1
+  fi
+  # Similarly, if tests fail, we trigger empty set of tests that would trigger storing logs from the base cluster.
+  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" --gather-resource-usage="false" && kubemark_succeeded="$?" || kubemark_succeeded="$?"
+  if [[ "${kubemark_succeeded}" != "0" ]]; then
+    go run ./hack/e2e.go -v --test --test_args="--ginkgo.focus=DO\sNOT\sMATCH\sANYTHING"
+    exit 1
+  fi
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}

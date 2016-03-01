@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
@@ -41,7 +43,7 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 	}
 
 	fakeClient := &Fake{}
-	fakeClient.AddReactor("*", "*", ObjectReaction(o, api.RESTMapper))
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, registered.RESTMapper()))
 
 	fakeClient.AddWatchReactor("*", DefaultWatchReactor(watch.NewFake(), nil))
 
@@ -85,7 +87,7 @@ type ProxyReactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
 	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
-	React(action Action) (handled bool, ret client.ResponseWrapper, err error)
+	React(action Action) (handled bool, ret restclient.ResponseWrapper, err error)
 }
 
 // ReactionFunc is a function that returns an object or error for a given Action.  If "handled" is false,
@@ -98,7 +100,7 @@ type WatchReactionFunc func(action Action) (handled bool, ret watch.Interface, e
 
 // ProxyReactionFunc is a function that returns a ResponseWrapper interface for a given Action.  If "handled" is false,
 // then the test client will continue ignore the results and continue to the next ProxyReactionFunc
-type ProxyReactionFunc func(action Action) (handled bool, ret client.ResponseWrapper, err error)
+type ProxyReactionFunc func(action Action) (handled bool, ret restclient.ResponseWrapper, err error)
 
 // AddReactor appends a reactor to the end of the chain
 func (c *Fake) AddReactor(verb, resource string, reaction ReactionFunc) {
@@ -176,7 +178,7 @@ func (c *Fake) InvokesWatch(action Action) (watch.Interface, error) {
 }
 
 // InvokesProxy records the provided Action and then invokes the ReactFn (if provided).
-func (c *Fake) InvokesProxy(action Action) client.ResponseWrapper {
+func (c *Fake) InvokesProxy(action Action) restclient.ResponseWrapper {
 	c.Lock()
 	defer c.Unlock()
 
@@ -278,6 +280,10 @@ func (c *Fake) Autoscaling() client.AutoscalingInterface {
 	return &FakeAutoscaling{c}
 }
 
+func (c *Fake) Batch() client.BatchInterface {
+	return &FakeBatch{c}
+}
+
 func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
@@ -319,6 +325,19 @@ type FakeAutoscaling struct {
 
 func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
 	return &FakeHorizontalPodAutoscalersV1{Fake: c, Namespace: namespace}
+}
+
+// NewSimpleFakeBatch returns a client that will respond with the provided objects
+func NewSimpleFakeBatch(objects ...runtime.Object) *FakeBatch {
+	return &FakeBatch{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeBatch struct {
+	*Fake
+}
+
+func (c *FakeBatch) Jobs(namespace string) client.JobInterface {
+	return &FakeJobsV1{Fake: c, Namespace: namespace}
 }
 
 // NewSimpleFakeExp returns a client that will respond with the provided objects

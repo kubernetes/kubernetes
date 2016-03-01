@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -40,8 +41,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/metrics"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -64,7 +68,6 @@ const (
 type Factory struct {
 	clients *ClientCache
 	flags   *pflag.FlagSet
-	cmd     string
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -77,7 +80,7 @@ type Factory struct {
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
-	ClientConfig func() (*client.Config, error)
+	ClientConfig func() (*restclient.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -104,7 +107,7 @@ type Factory struct {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
-	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
 	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
 	PauseObject func(object runtime.Object) (bool, error)
 	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
@@ -192,7 +195,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	return &Factory{
 		clients: clients,
 		flags:   flags,
-		cmd:     recordCommand(os.Args),
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -202,12 +204,29 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				cmdApiVersion = *cfg.GroupVersion
 			}
 
-			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}, api.Scheme
+			outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
+
+			// eventually this should allow me choose a group priority based on the order of the discovery doc, for now hardcode a given order
+			priorityRESTMapper := meta.PriorityRESTMapper{
+				Delegate: outputRESTMapper,
+				ResourcePriority: []unversioned.GroupVersionResource{
+					{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: metrics.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+				},
+				KindPriority: []unversioned.GroupVersionKind{
+					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+				},
+			}
+
+			return priorityRESTMapper, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func() (*restclient.Config, error) {
 			return clients.ClientConfigForVersion(nil)
 		},
 		ClientForMapping: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -221,6 +240,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return client.RESTClient, nil
 			case autoscaling.GroupName:
 				return client.AutoscalingClient.RESTClient, nil
+			case batch.GroupName:
+				return client.BatchClient.RESTClient, nil
 			case extensions.GroupName:
 				return client.ExtensionsClient.RESTClient, nil
 			}
@@ -345,7 +366,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
 			return meta.NewAccessor().Labels(object)
 		},
-		LogsForObject: func(object, options runtime.Object) (*client.Request, error) {
+		LogsForObject: func(object, options runtime.Object) (*restclient.Request, error) {
 			c, err := clients.ClientForVersion(nil)
 			if err != nil {
 				return nil, err
@@ -551,22 +572,20 @@ func GetFirstPod(client *client.Client, namespace string, selector labels.Select
 	return pod, nil
 }
 
-func recordCommand(args []string) string {
-	if len(args) > 0 {
-		args[0] = "kubectl"
-	}
-	return strings.Join(args, " ")
-}
-
+// Command will stringify and return all environment arguments ie. a command run by a client
+// using the factory.
+// TODO: We need to filter out stuff like secrets.
 func (f *Factory) Command() string {
-	return f.cmd
+	if len(os.Args) == 0 {
+		return ""
+	}
+	base := filepath.Base(os.Args[0])
+	args := append([]string{base}, os.Args[1:]...)
+	return strings.Join(args, " ")
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
-	// any flags defined by external projects (not part of pflags)
-	flags.AddGoFlagSet(flag.CommandLine)
-
 	// Merge factory's flags
 	flags.AddFlagSet(f.flags)
 
@@ -579,6 +598,12 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+}
+
+// BindCommonFlags adds any flags defined by external projects (not part of pflags)
+func (f *Factory) BindExternalFlags(flags *pflag.FlagSet) {
+	// any flags defined by external projects (not part of pflags)
+	flags.AddGoFlagSet(flag.CommandLine)
 }
 
 func getPorts(spec api.PodSpec) []string {
@@ -609,7 +634,7 @@ type clientSwaggerSchema struct {
 const schemaFileName = "schema.json"
 
 type schemaClient interface {
-	Get() *client.Request
+	Get() *restclient.Request
 }
 
 func recursiveSplit(dir string) []string {
@@ -709,6 +734,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no autoscaling client")
 		}
 		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+	}
+	if gvk.Group == batch.GroupName {
+		if c.c.BatchClient == nil {
+			return errors.New("unable to validate: no batch client")
+		}
+		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
 	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {

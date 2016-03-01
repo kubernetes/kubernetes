@@ -749,6 +749,7 @@ func TestGenerateJob(t *testing.T) {
 					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar", "baz": "blah"},
 					},
+					ManualSelector: newBool(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
