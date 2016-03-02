@@ -37,10 +37,12 @@ const (
 type TestGenericPLEG struct {
 	pleg    *GenericPLEG
 	runtime *containertest.FakeRuntime
+	clock   *util.FakeClock
 }
 
 func newTestGenericPLEG() *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
+	clock := util.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
@@ -48,8 +50,9 @@ func newTestGenericPLEG() *TestGenericPLEG {
 		runtime:      fakeRuntime,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
 		podRecords:   make(podRecords),
+		clock:        clock,
 	}
-	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime}
+	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
 
 func getEventsFromChannel(ch <-chan *PodLifecycleEvent) []*PodLifecycleEvent {
@@ -222,6 +225,7 @@ func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *containertest.Mock) {
 		eventChannel: make(chan *PodLifecycleEvent, 100),
 		podRecords:   make(podRecords),
 		cache:        kubecontainer.NewCache(),
+		clock:        util.RealClock{},
 	}
 	return pleg, runtimeMock
 }
@@ -317,4 +321,23 @@ func TestRemoveCacheEntry(t *testing.T) {
 	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
 	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
 	assert.Equal(t, nil, actualErr)
+}
+
+func TestHealthy(t *testing.T) {
+	testPleg := newTestGenericPLEG()
+	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
+	ok, _ := pleg.Healthy()
+	assert.True(t, ok, "pleg should be healthy")
+
+	// Advance the clock without any relisting.
+	clock.Step(time.Minute * 10)
+	ok, _ = pleg.Healthy()
+	assert.False(t, ok, "pleg should be unhealthy")
+
+	// Relist and than advance the time by 1 minute. pleg should be healthy
+	// because this is within the allowed limit.
+	pleg.relist()
+	clock.Step(time.Minute * 1)
+	ok, _ = pleg.Healthy()
+	assert.True(t, ok, "pleg should be healthy")
 }

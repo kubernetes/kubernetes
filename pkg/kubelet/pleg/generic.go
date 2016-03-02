@@ -24,6 +24,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/atomic"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -57,6 +58,8 @@ type GenericPLEG struct {
 	relistTime atomic.Value
 	// Cache for storing the runtime states required for syncing pods.
 	cache kubecontainer.Cache
+	// For testability.
+	clock util.Clock
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -92,13 +95,14 @@ type podRecord struct {
 type podRecords map[types.UID]*podRecord
 
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
-	relistPeriod time.Duration, cache kubecontainer.Cache) PodLifecycleEventGenerator {
+	relistPeriod time.Duration, cache kubecontainer.Cache, clock util.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
 		relistPeriod: relistPeriod,
 		runtime:      runtime,
 		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
 		podRecords:   make(podRecords),
 		cache:        cache,
+		clock:        clock,
 	}
 }
 
@@ -121,7 +125,7 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	// relisting time, which can vary significantly. Set a conservative
 	// threshold so that we don't cause kubelet to be restarted unnecessarily.
 	threshold := 2 * time.Minute
-	if time.Since(relistTime) > threshold {
+	if g.clock.Since(relistTime) > threshold {
 		return false, fmt.Errorf("pleg was last seen active at %v", relistTime)
 	}
 	return true, nil
@@ -178,7 +182,7 @@ func (g *GenericPLEG) relist() {
 		metrics.PLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
 	}
 
-	timestamp := time.Now()
+	timestamp := g.clock.Now()
 	// Update the relist time.
 	g.updateRelisTime(timestamp)
 	defer func() {
@@ -287,7 +291,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 		g.cache.Delete(pid)
 		return nil
 	}
-	timestamp := time.Now()
+	timestamp := g.clock.Now()
 	// TODO: Consider adding a new runtime method
 	// GetPodStatus(pod *kubecontainer.Pod) so that Docker can avoid listing
 	// all containers again.
