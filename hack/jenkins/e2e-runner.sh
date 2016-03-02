@@ -193,7 +193,15 @@ if [[ "${gcp_list_resources}" == "true" ]]; then
   ${gcp_list_resources_script} > "${gcp_resources_before}"
 fi
 if [[ "${E2E_UP,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT:-} -v --up
+    # We want to try to gather logs even if kube-up fails, so collect the
+    # result here and fail after dumping logs if it's nonzero.
+    go run ./hack/e2e.go ${E2E_OPT:-} -v --up && up_result="$?" || up_result="$?"
+    if [[ "${up_result}" -ne 0 ]]; then
+        if [[ -x "cluster/log-dump.sh"  ]]; then
+            ./cluster/log-dump.sh "${ARTIFACTS}"
+        fi
+        exit "${up_result}"
+    fi
     go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
     if [[ "${gcp_list_resources}" == "true" ]]; then
       ${gcp_list_resources_script} > "${gcp_resources_cluster_up}"
