@@ -21,3 +21,17 @@ pkg-core:
 {% if grains['os'] == 'Ubuntu' %}
       - git
 {% endif %}
+
+/usr/local/share/doc/kubernetes:
+  file.directory:
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True
+
+/usr/local/share/doc/kubernetes/LICENSES:
+  file.managed:
+    - source: salt://kube-docs/LICENSES
+    - user: root
+    - group: root
+    - mode: 644
