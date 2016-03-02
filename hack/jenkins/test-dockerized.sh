@@ -42,7 +42,7 @@ export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
 
 ./hack/build-go.sh
-godep go install ./...
+#godep go install ./...
 ./hack/install-etcd.sh
 
 ./hack/verify-all.sh -v

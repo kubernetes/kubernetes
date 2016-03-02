@@ -1,1 +1,0 @@
-foo.[baz[*].not_there || baz[*].bar, qux[0]]
