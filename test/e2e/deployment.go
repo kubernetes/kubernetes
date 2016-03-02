@@ -208,14 +208,14 @@ func testNewDeployment(f *Framework) {
 	podLabels := map[string]string{"name": "nginx"}
 	replicas := 1
 	Logf("Creating simple deployment %s", deploymentName)
-	d := newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
+	d := newDeployment(deploymentName, replicas, podLabels, "nginx", "gcr.io/google_containers/nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
 	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", kubectl.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
 	_, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
 	// Wait for it to be updated to revision 1
-	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "nginx")
+	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "gcr.io/google_containers/nginx")
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
@@ -247,7 +247,7 @@ func testRollingUpdateDeployment(f *Framework) {
 
 	rsName := "test-rolling-update-controller"
 	replicas := 3
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "nginx"))
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "gcr.io/google_containers/nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, "sample-pod", false, 3)
@@ -259,12 +259,12 @@ func testRollingUpdateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-rolling-update-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, nil))
+	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "gcr.io/google_containers/redis", extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
 	// Wait for it to be updated to revision 1
-	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "redis")
+	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "gcr.io/google_containers/redis")
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
@@ -300,7 +300,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	rsRevision := "3546343826724305832"
 	annotations := make(map[string]string)
 	annotations[deploymentutil.RevisionAnnotation] = rsRevision
-	rs := newRS(rsName, replicas, rsPodLabels, "nginx", "nginx")
+	rs := newRS(rsName, replicas, rsPodLabels, "nginx", "gcr.io/google_containers/nginx")
 	rs.Annotations = annotations
 
 	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
@@ -315,12 +315,12 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-rolling-scale-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, nil))
+	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "gcr.io/google_containers/redis", extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
 	// Wait for it to be updated to revision 3546343826724305833
-	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", "redis")
+	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", "gcr.io/google_containers/redis")
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
@@ -359,7 +359,7 @@ func testRecreateDeployment(f *Framework) {
 
 	rsName := "test-recreate-controller"
 	replicas := 3
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "nginx"))
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "gcr.io/google_containers/nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, "sample-pod-3", false, 3)
@@ -371,12 +371,12 @@ func testRecreateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-recreate-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RecreateDeploymentStrategyType, nil))
+	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "gcr.io/google_containers/redis", extensions.RecreateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
 	// Wait for it to be updated to revision 1
-	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "redis")
+	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "gcr.io/google_containers/redis")
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, 0, replicas, 0)
@@ -414,7 +414,7 @@ func testDeploymentCleanUpPolicy(f *Framework) {
 	rsName := "test-cleanup-controller"
 	replicas := 1
 	revisionHistoryLimit := util.IntPtr(0)
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "nginx"))
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, "nginx", "gcr.io/google_containers/nginx"))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
@@ -427,7 +427,7 @@ func testDeploymentCleanUpPolicy(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-cleanup-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, revisionHistoryLimit))
+	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "gcr.io/google_containers/redis", extensions.RollingUpdateDeploymentStrategyType, revisionHistoryLimit))
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
@@ -452,7 +452,7 @@ func testRolloverDeployment(f *Framework) {
 
 	rsName := "test-rollover-controller"
 	rsReplicas := 4
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, "nginx", "nginx"))
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, "nginx", "gcr.io/google_containers/nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, podName, false, rsReplicas)
@@ -492,9 +492,9 @@ func testRolloverDeployment(f *Framework) {
 	// Before the deployment finishes, update the deployment to rollover the above 2 ReplicaSets and bring up redis pods.
 	// If the deployment already finished here, the test would fail. When this happens, increase its minReadySeconds or replicas to prevent it.
 	Expect(newRS.Spec.Replicas).Should(BeNumerically("<", deploymentReplicas))
-	updatedDeploymentImage := "redis"
+	updatedDeploymentImageName, updatedDeploymentImage := "redis", "gcr.io/google_containers/redis"
 	deployment, err = updateDeploymentWithRetries(c, ns, newDeployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImage
+		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
 		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
 	})
 	Expect(err).NotTo(HaveOccurred())
@@ -519,7 +519,7 @@ func testPausedDeployment(f *Framework) {
 	c := clientset.FromUnversionedClient(unversionedClient)
 	deploymentName := "test-paused-deployment"
 	podLabels := map[string]string{"name": "nginx"}
-	d := newDeployment(deploymentName, 1, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
+	d := newDeployment(deploymentName, 1, podLabels, "nginx", "gcr.io/google_containers/nginx", extensions.RollingUpdateDeploymentStrategyType, nil)
 	d.Spec.Paused = true
 	Logf("Creating paused deployment %s", deploymentName)
 	_, err := c.Extensions().Deployments(ns).Create(d)
@@ -606,7 +606,7 @@ func testRollbackDeployment(f *Framework) {
 	// 1. Create a deployment to create nginx pods.
 	deploymentName, deploymentImageName := "test-rollback-deployment", "nginx"
 	deploymentReplicas := 1
-	deploymentImage := "nginx"
+	deploymentImage := "gcr.io/google_containers/nginx"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	Logf("Creating deployment %s", deploymentName)
 	d := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
@@ -622,7 +622,7 @@ func testRollbackDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// 2. Update the deployment to create redis pods.
-	updatedDeploymentImage := "redis"
+	updatedDeploymentImage := "gcr.io/google_containers/redis"
 	updatedDeploymentImageName := "redis"
 	deployment, err := updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
@@ -698,7 +698,7 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 	// Create an old RS without revision
 	rsName := "test-rollback-no-revision-controller"
 	rsReplicas := 0
-	rs := newRS(rsName, rsReplicas, rsPodLabels, "nginx", "nginx")
+	rs := newRS(rsName, rsReplicas, rsPodLabels, "nginx", "gcr.io/google_containers/nginx")
 	rs.Annotations = make(map[string]string)
 	rs.Annotations["make"] = "difference"
 	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
@@ -707,7 +707,7 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 	// 1. Create a deployment to create nginx pods, which have different template than the replica set created above.
 	deploymentName, deploymentImageName := "test-rollback-no-revision-deployment", "nginx"
 	deploymentReplicas := 1
-	deploymentImage := "nginx"
+	deploymentImage := "gcr.io/google_containers/nginx"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	Logf("Creating deployment %s", deploymentName)
 	d := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
@@ -745,7 +745,7 @@ func testRollbackDeploymentRSNoRevision(f *Framework) {
 	checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
 
 	// 3. Update the deployment to create redis pods.
-	updatedDeploymentImage := "redis"
+	updatedDeploymentImage := "gcr.io/google_containers/redis"
 	updatedDeploymentImageName := "redis"
 	deployment, err := updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
@@ -831,7 +831,8 @@ func testDeploymentLabelAdopted(f *Framework) {
 
 	rsName := "test-adopted-controller"
 	replicas := 3
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, podName))
+	image := "gcr.io/google_containers/nginx"
+	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = verifyPods(unversionedClient, ns, podName, false, 3)
@@ -843,12 +844,12 @@ func testDeploymentLabelAdopted(f *Framework) {
 	// Create a nginx deployment to adopt the old rs.
 	deploymentName := "test-adopted-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, podName, podName, extensions.RollingUpdateDeploymentStrategyType, nil))
+	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, podName, image, extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
 	// Wait for it to be updated to revision 1
-	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", "nginx")
+	err = waitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", image)
 	Expect(err).NotTo(HaveOccurred())
 
 	// The RS and pods should be relabeled before the status is updated by syncRollingUpdateDeployment
