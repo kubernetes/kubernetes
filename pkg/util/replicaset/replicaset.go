@@ -30,10 +30,11 @@ import (
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
 type updateRSFunc func(rs *extensions.ReplicaSet)
+type preconditionFunc func(rs *extensions.ReplicaSet) bool
 
-// UpdateRSWithRetries updates a RS with given applyUpdate function. Note that RS not found error is ignored.
+// UpdateRSWithRetries updates a RS with given applyUpdate function, when the given precondition holds. Note that RS not found error is ignored.
 // The returned bool value can be used to tell if the RS is actually updated.
-func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, applyUpdate updateRSFunc) (*extensions.ReplicaSet, bool, error) {
+func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, preconditionHold preconditionFunc, applyUpdate updateRSFunc) (*extensions.ReplicaSet, bool, error) {
 	var err error
 	var rsUpdated bool
 	oldRs := rs
@@ -42,8 +43,11 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 		if err != nil {
 			return false, err
 		}
+		if !preconditionHold(rs) {
+			glog.V(4).Infof("rs %s precondition doesn't hold, skip updating it.", rs.Name)
+			return true, nil
+		}
 		// Apply the update, then attempt to push it to the apiserver.
-		// TODO: add precondition for update
 		applyUpdate(rs)
 		if rs, err = rsClient.Update(rs); err == nil {
 			// Update successful.
