@@ -57,6 +57,7 @@
             timeout: 160
             cron-string: '@hourly'
             job-env: |
+                export E2E_NAME="kubemark-high-density-100"
                 export PROJECT="k8s-jenkins-kubemark"
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
