@@ -49,6 +49,10 @@ type HollowNodeConfig struct {
 	ServerPort          int
 }
 
+const (
+	maxPods = 110
+)
+
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
 func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
@@ -110,6 +114,7 @@ func main() {
 			config.KubeletPort,
 			config.KubeletReadOnlyPort,
 			containerManager,
+			maxPods,
 		)
 		hollowKubelet.Run()
 	}
