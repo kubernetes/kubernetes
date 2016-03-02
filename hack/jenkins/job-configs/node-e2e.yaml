@@ -103,6 +103,7 @@
                 GOROOT=/usr/local/go
                 GOPATH=$WORKSPACE/go
                 PATH=$PATH:$GOROOT/bin:$WORKSPACE/go/bin
+        - workspace-cleanup
 
 - project:
     name: node-docker-canary-build
@@ -120,6 +121,8 @@
             owner: 'pszczesniak@google.com'
     jobs:
         - '{gitproject}-dockercanarybuild-ci'
+    wrappers:
+        - workspace-cleanup
 
 - project:
     name: node-gce-e2e
