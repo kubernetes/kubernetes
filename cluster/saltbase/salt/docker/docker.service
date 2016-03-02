@@ -1,10 +1,11 @@
 [Unit]
 Description=Docker Application Container Engine
-Documentation=http://docs.docker.com
+Documentation=https://docs.docker.com
 After=network.target docker.socket
 Requires=docker.socket
 
 [Service]
+Type=notify
 EnvironmentFile={{ environment_file }}
 ExecStart=/usr/bin/docker daemon -H fd:// "$DOCKER_OPTS"
 MountFlags=slave
@@ -17,4 +18,3 @@ StartLimitInterval=0
 
 [Install]
 WantedBy=multi-user.target
-
