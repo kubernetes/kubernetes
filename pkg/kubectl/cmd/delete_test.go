@@ -125,33 +125,95 @@ func TestDeleteObject(t *testing.T) {
 	}
 }
 
+type fakeResponseFunc func(req *http.Request) (*http.Response, error)
+
 func TestDeleteObjectNotFound(t *testing.T) {
+	_, _, rc := testData()
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdDelete(f, buf)
-	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml"},
+	notFoundError := &errors.NewNotFound(api.Resource("replicationcontrollers"), "redis-master").(*errors.StatusError).ErrStatus
+
+	tests := []struct {
+		Name             string
+		Func             fakeResponseFunc
+		ExpectNotFound   bool
+		ExpectOtherError bool
+	}{
+		{
+			"GET succeeds, DELETE fails with 400 BadRequest error",
+			func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+					return &http.Response{StatusCode: 400, Body: stringBody("this is a bad request")}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			},
+			false,
+			true,
+		},
+		{
+			"GET succeeds, DELETE fails with a 404 NotFound error",
+			func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+					return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			},
+			false,
+			false,
+		},
+		{
+			"GET fails with a 404 NotFound error, DELETE shouldn't matter",
+			func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+					return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+					return &http.Response{StatusCode: 200, Body: stringBody("this shoudn't matter")}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			},
+			true,
+			false,
+		},
 	}
-	cmd.Flags().Set("cascade", "false")
-	cmd.Flags().Set("output", "name")
-	err := RunDelete(f, buf, cmd, []string{}, options)
-	if err == nil || !errors.IsNotFound(err) {
-		t.Errorf("unexpected error: expected NotFound, got %v", err)
+
+	for _, test := range tests {
+		tf.Client = &fake.RESTClient{
+			Codec:  codec,
+			Client: fake.CreateHTTPClient(test.Func),
+		}
+		buf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdDelete(f, buf)
+		options := &DeleteOptions{
+			Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml"},
+		}
+		cmd.Flags().Set("cascade", "false")
+		cmd.Flags().Set("output", "name")
+		err := RunDelete(f, buf, cmd, []string{}, options)
+		if test.ExpectNotFound && (err == nil || !strings.Contains(err.Error(), "not found")) {
+			t.Errorf("case: %q, expect error NotFound, got %v", test.Name, err)
+		}
+		if test.ExpectOtherError && (err == nil || errors.IsNotFound(err)) {
+			t.Errorf("case: %q, expect an error that is not NotFound, got: %v", test.Name, err)
+		}
+		if !test.ExpectNotFound && !test.ExpectOtherError && err != nil {
+			t.Errorf("case: %q, unexpected error: %v", test.Name, err)
+		}
 	}
 }
 
