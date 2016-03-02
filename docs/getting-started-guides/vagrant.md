@@ -288,7 +288,6 @@ NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR     
 
 $ ./cluster/kubectl.sh get replicationcontrollers
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR       REPLICAS   AGE
-my-nginx     my-nginx       nginx      run=my-nginx   3          1m
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
