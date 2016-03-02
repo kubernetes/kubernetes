@@ -33,9 +33,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 
 	heapster "k8s.io/heapster/api/v1/types"
 
+	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -215,11 +218,11 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
-		tc.statusUpdated = true
 		if tc.verifyCPUCurrent {
 			assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage)
 			assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage)
 		}
+		tc.statusUpdated = true
 		return true, obj, nil
 	})
 
@@ -232,6 +235,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.eventCreated = true
 		return true, obj, nil
 	})
+
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient
 }
@@ -247,13 +253,19 @@ func (tc *testCase) verifyResults(t *testing.T) {
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
-	hpaController := NewHorizontalController(testClient.Core(), testClient.Extensions(), testClient.Extensions(), metricsClient)
-	err := hpaController.reconcileAutoscalers()
-	assert.Equal(t, nil, err)
+	hpaController := NewHorizontalController(testClient.Core(), testClient.Extensions(), testClient.Extensions(), metricsClient, 0)
+	stop := make(chan struct{})
+	defer close(stop)
+	go hpaController.Run(stop)
 	if tc.verifyEvents {
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
 		time.Sleep(12 * time.Second)
 	}
+	// Each iteration for an HPA object ends with updating status.
+	wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		glog.Infof("Status value: ", tc.statusUpdated)
+		return tc.statusUpdated, nil
+	})
 	tc.verifyResults(t)
 }
 
