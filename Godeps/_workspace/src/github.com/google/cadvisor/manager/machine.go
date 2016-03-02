@@ -96,6 +96,7 @@ func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (
 	realCloudInfo := cloudinfo.NewRealCloudInfo()
 	cloudProvider := realCloudInfo.GetCloudProvider()
 	instanceType := realCloudInfo.GetInstanceType()
+	instanceID := realCloudInfo.GetInstanceID()
 
 	machineInfo := &info.MachineInfo{
 		NumCores:       numCores,
@@ -109,10 +110,11 @@ func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (
 		BootID:         getInfoFromFiles(filepath.Join(rootFs, *bootIdFilePath)),
 		CloudProvider:  cloudProvider,
 		InstanceType:   instanceType,
+		InstanceID:     instanceID,
 	}
 
 	for _, fs := range filesystems {
-		machineInfo.Filesystems = append(machineInfo.Filesystems, info.FsInfo{Device: fs.Device, Capacity: fs.Capacity})
+		machineInfo.Filesystems = append(machineInfo.Filesystems, info.FsInfo{Device: fs.Device, Type: fs.Type.String(), Capacity: fs.Capacity, Inodes: fs.Inodes})
 	}
 
 	return machineInfo, nil

@@ -16,6 +16,7 @@ package collector
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -38,10 +39,14 @@ type PrometheusCollector struct {
 
 	// the metrics to gather (uses a map as a set)
 	metricsSet map[string]bool
+
+	// Limit for the number of scaped metrics. If the count is higher,
+	// no metrics will be returned.
+	metricCountLimit int
 }
 
 //Returns a new collector using the information extracted from the configfile
-func NewPrometheusCollector(collectorName string, configFile []byte) (*PrometheusCollector, error) {
+func NewPrometheusCollector(collectorName string, configFile []byte, metricCountLimit int) (*PrometheusCollector, error) {
 	var configInJSON Prometheus
 	err := json.Unmarshal(configFile, &configInJSON)
 	if err != nil {
@@ -57,6 +62,10 @@ func NewPrometheusCollector(collectorName string, configFile []byte) (*Prometheu
 		minPollingFrequency = minSupportedFrequency
 	}
 
+	if metricCountLimit < 0 {
+		return nil, fmt.Errorf("Metric count limit must be greater than 0")
+	}
+
 	var metricsSet map[string]bool
 	if len(configInJSON.MetricsConfig) > 0 {
 		metricsSet = make(map[string]bool, len(configInJSON.MetricsConfig))
@@ -65,12 +74,17 @@ func NewPrometheusCollector(collectorName string, configFile []byte) (*Prometheu
 		}
 	}
 
+	if len(configInJSON.MetricsConfig) > metricCountLimit {
+		return nil, fmt.Errorf("Too many metrics defined: %d limit %d", len(configInJSON.MetricsConfig), metricCountLimit)
+	}
+
 	//TODO : Add checks for validity of config file (eg : Accurate JSON fields)
 	return &PrometheusCollector{
 		name:             collectorName,
 		pollingFrequency: minPollingFrequency,
 		configFile:       configInJSON,
 		metricsSet:       metricsSet,
+		metricCountLimit: metricCountLimit,
 	}, nil
 }
 
@@ -148,6 +162,8 @@ func (collector *PrometheusCollector) Collect(metrics map[string][]v1.MetricVal)
 	var errorSlice []error
 	lines := strings.Split(string(pageContent), "\n")
 
+	newMetrics := make(map[string][]v1.MetricVal)
+
 	for _, line := range lines {
 		if line == "" {
 			break
@@ -182,8 +198,15 @@ func (collector *PrometheusCollector) Collect(metrics map[string][]v1.MetricVal)
 				FloatValue: metVal,
 				Timestamp:  currentTime,
 			}
-			metrics[metName] = append(metrics[metName], metric)
+			newMetrics[metName] = append(newMetrics[metName], metric)
+			if len(newMetrics) > collector.metricCountLimit {
+				return nextCollectionTime, nil, fmt.Errorf("too many metrics to collect")
+			}
 		}
 	}
+	for key, val := range newMetrics {
+		metrics[key] = append(metrics[key], val...)
+	}
+
 	return nextCollectionTime, metrics, compileErrors(errorSlice)
 }

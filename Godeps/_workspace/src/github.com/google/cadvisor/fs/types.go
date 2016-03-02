@@ -14,18 +14,35 @@
 
 package fs
 
+import "time"
+
 type DeviceInfo struct {
 	Device string
 	Major  uint
 	Minor  uint
 }
 
+type FsType string
+
+func (ft FsType) String() string {
+	return string(ft)
+}
+
+const (
+	ZFS          FsType = "zfs"
+	DeviceMapper FsType = "devicemapper"
+	VFS          FsType = "vfs"
+)
+
 type Fs struct {
 	DeviceInfo
-	Capacity  uint64
-	Free      uint64
-	Available uint64
-	DiskStats DiskStats
+	Type       FsType
+	Capacity   uint64
+	Free       uint64
+	Available  uint64
+	Inodes     uint64
+	InodesFree uint64
+	DiskStats  DiskStats
 }
 
 type DiskStats struct {
@@ -50,7 +67,7 @@ type FsInfo interface {
 	GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error)
 
 	// Returns number of bytes occupied by 'dir'.
-	GetDirUsage(dir string) (uint64, error)
+	GetDirUsage(dir string, timeout time.Duration) (uint64, error)
 
 	// Returns the block device info of the filesystem on which 'dir' resides.
 	GetDirFsDevice(dir string) (*DeviceInfo, error)
