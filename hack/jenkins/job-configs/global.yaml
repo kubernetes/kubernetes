@@ -11,9 +11,9 @@
 - publisher:
     name: gcs-uploader
     publishers:
-        # Use our script for build artifacts, since it's more flexible.
         - postbuildscript:
             builders:
+                # Use our script for build artifacts, since it's more flexible.
                 - shell: |
                     if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
                       ./hack/jenkins/upload-to-gcs.sh

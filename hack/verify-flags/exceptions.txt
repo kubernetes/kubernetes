@@ -5,7 +5,6 @@ cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to th
 cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
-cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
@@ -50,6 +49,10 @@ cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k i
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    if api_servers:
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
+cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
+cluster/log-dump.sh:    local -r node_name="${1}"
+cluster/log-dump.sh:    local -r node_name="${1}"
+cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
 cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
@@ -81,7 +84,6 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  re
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
-docs/getting-started-guides/docker-multinode/skydns-rc.yaml.in:        - -kube_master_url=http://{kube_server_url}:8080
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/vitess/env.sh:    node_ip=$(get_node_ip)
 hack/jenkins/job-builder-image/Dockerfile:# JJB configuration lives in /etc/jenkins_jobs/jenkins_jobs.ini
@@ -91,11 +93,10 @@ hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credent
 hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
+pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
 pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
 pkg/kubelet/qos/memory_policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
-pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to read oom_score_adj: %v", readErr)
-pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to set oom_score_adj to %d: %v", oomScoreAdj, writeErr)
 pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
 pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
@@ -110,4 +111,3 @@ test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
-pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
