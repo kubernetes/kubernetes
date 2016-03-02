@@ -127,6 +127,10 @@
     name: global
     emails: '$DEFAULT_RECIPIENTS'
     cron-string: 'H/30 * * * *'
+    # How long to wait after sending TERM to send KILL (minutes)
+    kill-timeout: 15
+    # Just to be safe, use the Jenkins timeout after a long time.
+    jenkins-timeout: 600
     branch: 'master'
     job-env: ''
     runner: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -

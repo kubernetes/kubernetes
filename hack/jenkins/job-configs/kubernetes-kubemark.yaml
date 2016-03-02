@@ -8,7 +8,7 @@
             {provider-env}
             {job-env}
             {post-env}
-            {runner}
+            timeout -k {kill-timeout}m {timeout}m {runner}
     properties:
         - mail-watcher
     publishers:
@@ -27,7 +27,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: '{timeout}'
+            timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
         - workspace-cleanup
