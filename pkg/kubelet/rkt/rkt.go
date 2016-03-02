@@ -54,11 +54,11 @@ import (
 const (
 	RktType = "rkt"
 
-	minimumAppcVersion       = "0.7.4"
-	minimumRktBinVersion     = "0.13.0"
-	recommendedRktBinVersion = "0.13.0"
-	minimumRktApiVersion     = "1.0.0-alpha"
-	minimumSystemdVersion    = "219"
+	MinimumAppcVersion       = "0.7.4"
+	MinimumRktBinVersion     = "0.13.0"
+	RecommendedRktBinVersion = "0.13.0"
+	MinimumRktApiVersion     = "1.0.0-alpha"
+	MinimumSystemdVersion    = "219"
 
 	systemdServiceDir = "/run/systemd/system"
 	rktDataDir        = "/var/lib/rkt"
@@ -182,14 +182,6 @@ func New(config *Config,
 		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
 	} else {
 		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
-	}
-
-	if err := rkt.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion); err != nil {
-		// TODO(yifan): Latest go-systemd version have the ability to close the
-		// dbus connection. However the 'docker/libcontainer' package is using
-		// the older go-systemd version, so we can't update the go-systemd version.
-		rkt.apisvcConn.Close()
-		return nil, err
 	}
 	return rkt, nil
 }
@@ -1061,7 +1053,7 @@ func (r *Runtime) Version() (kubecontainer.Version, error) {
 }
 
 func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
-	return r.binVersion, nil
+	return r.apiVersion, nil
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.

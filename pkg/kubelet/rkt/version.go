@@ -54,9 +54,9 @@ func (r rktVersion) Compare(other string) (int, error) {
 	return 0, nil
 }
 
-// checkVersion tests whether the rkt/systemd/rkt-api-service that meet the version requirement.
+// CheckVersion tests whether the rkt/systemd/rkt-api-service that meet the version requirement.
 // If all version requirements are met, it returns nil.
-func (r *Runtime) checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion string) error {
+func (r *Runtime) CheckVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion string) error {
 	// Check systemd version.
 	var err error
 	r.systemdVersion, err = r.systemd.Version()
