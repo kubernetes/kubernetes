@@ -751,32 +751,39 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 
 // setNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
-func setNewReplicaSetAnnotations(deployment *extensions.Deployment, rs *extensions.ReplicaSet, newRevision string) bool {
+func setNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *extensions.ReplicaSet, newRevision string) bool {
 	// First, copy deployment's annotations
-	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, rs)
+	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, newRS)
 	// Then, update replica set's revision annotation
-	if rs.Annotations == nil {
-		rs.Annotations = make(map[string]string)
+	if newRS.Annotations == nil {
+		newRS.Annotations = make(map[string]string)
 	}
-	if rs.Annotations[deploymentutil.RevisionAnnotation] < newRevision {
-		rs.Annotations[deploymentutil.RevisionAnnotation] = newRevision
+	// The newRS's revision should be the greatest among all RSes. Usually, its revision number is newRevision (the max revision number
+	// of all old RSes + 1). However, it's possible that some of the old RSes are deleted after the newRS revision being updated, and
+	// newRevision becomes smaller than newRS's revision. We should only update newRS revision when it's smaller than newRevision.
+	if newRS.Annotations[deploymentutil.RevisionAnnotation] < newRevision {
+		newRS.Annotations[deploymentutil.RevisionAnnotation] = newRevision
 		annotationChanged = true
-		glog.V(4).Infof("updating replica set %q's revision to %s - %+v\n", rs.Name, newRevision, rs)
+		glog.V(4).Infof("updating replica set %q's revision to %s - %+v\n", newRS.Name, newRevision, newRS)
 	}
 	return annotationChanged
 }
 
 // copyDeploymentAnnotationsToReplicaSet copies deployment's annotations to replica set's annotations,
-// and returns true if replica set's annotation is changed
+// and returns true if replica set's annotation is changed.
+// Note that apply and revision annotations are not copied.
 func copyDeploymentAnnotationsToReplicaSet(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
 	rsAnnotationsChanged := false
 	if rs.Annotations == nil {
 		rs.Annotations = make(map[string]string)
 	}
 	for k, v := range deployment.Annotations {
-		// Skip apply annotations and revision annotations
 		// TODO: How to decide which annotations should / should not be copied?
 		// See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
+		// Skip apply annotations and revision annotations.
+		// newRS revision is updated automatically in getNewReplicaSet, and the deployment's revision number is then updated
+		// by copying its newRS revision number. We should not copy deployment's revision to its newRS, since the update of
+		// deployment revision number may fail (revision becomes stale) and the revision number in newRS is more reliable.
 		if k == kubectl.LastAppliedConfigAnnotation || k == deploymentutil.RevisionAnnotation || rs.Annotations[k] == v {
 			continue
 		}
