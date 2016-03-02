@@ -158,6 +158,11 @@ type DockerManager struct {
 	configureHairpinMode bool
 }
 
+// A subset of the pod.Manager interface extracted for testing purposes.
+type podGetter interface {
+	GetPodByUID(types.UID) (*api.Pod, bool)
+}
+
 func PodInfraContainerEnv(env map[string]string) kubecontainer.Option {
 	return func(rt kubecontainer.Runtime) {
 		dm := rt.(*DockerManager)
@@ -175,6 +180,7 @@ func NewDockerManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
+	podGetter podGetter,
 	machineInfo *cadvisorapi.MachineInfo,
 	podInfraContainerImage string,
 	qps float32,
@@ -232,7 +238,7 @@ func NewDockerManager(
 	} else {
 		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
 	}
-	dm.containerGC = NewContainerGC(client, containerLogsDir)
+	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 
 	// apply optional settings..
 	for _, optf := range options {
