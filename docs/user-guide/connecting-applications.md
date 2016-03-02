@@ -175,7 +175,7 @@ KUBERNETES_SERVICE_HOST=10.0.0.1
 KUBERNETES_SERVICE_PORT=443
 ```
 
-Note there’s no mention of your Service. This is because you created the replicas before the Service. Another disadvantage of doing this is that the scheduler might put both pods on the same machine, which will take your entire Service down if it dies. We can do this the right way by killing the 2 pods and waiting for the replication controller to recreate them. This time around the Service exists *before* the replicas. This will given you scheduler level Service spreading of your pods (provided all your nodes have equal capacity), as well as the right environment variables:
+Note there’s no mention of your Service. This is because you created the replicas before the Service. Another disadvantage of doing this is that the scheduler might put both pods on the same machine, which will take your entire Service down if it dies. We can do this the right way by killing the 2 pods and waiting for the replication controller to recreate them. This time around the Service exists *before* the replicas. This will give you scheduler level Service spreading of your pods (provided all your nodes have equal capacity), as well as the right environment variables:
 
 ```console
 $ kubectl scale rc my-nginx --replicas=0; kubectl scale rc my-nginx --replicas=2;
