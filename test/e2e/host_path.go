@@ -61,7 +61,8 @@ var _ = Describe("hostPath", func() {
 			namespace.Name)
 	})
 
-	It("should support r/w [Conformance]", func() {
+	// This test requires mounting a folder into a container with write privileges.
+	It("should support r/w", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
