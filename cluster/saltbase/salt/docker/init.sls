@@ -51,6 +51,13 @@ docker:
 
 {% if pillar.get('is_systemd') %}
 
+/opt/kubernetes/helpers/docker-prestart:
+  file.managed:
+    - source: salt://docker/docker-prestart
+    - user: root
+    - group: root
+    - mode: 755
+
 {{ pillar.get('systemd_system_path') }}/docker.service:
   file.managed:
     - source: salt://docker/docker.service
@@ -60,6 +67,8 @@ docker:
     - mode: 644
     - defaults:
         environment_file: {{ environment_file }}
+    - require:
+      - file: /opt/kubernetes/helpers/docker-prestart
 
 # The docker service.running block below doesn't work reliably
 # Instead we run our script which e.g. does a systemd daemon-reload
@@ -292,9 +301,16 @@ docker-upgrade:
       - file: /var/cache/docker-install/{{ override_deb }}
 {% endif %} # end override_docker_ver != ''
 
-# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
 {% if pillar.get('is_systemd') %}
 
+/opt/kubernetes/helpers/docker-prestart:
+  file.managed:
+    - source: salt://docker/docker-prestart
+    - user: root
+    - group: root
+    - mode: 755
+
+# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
 {{ pillar.get('systemd_system_path') }}/docker.service:
   file.managed:
     - source: salt://docker/docker.service
@@ -304,6 +320,8 @@ docker-upgrade:
     - mode: 644
     - defaults:
         environment_file: {{ environment_file }}
+    - require:
+      - file: /opt/kubernetes/helpers/docker-prestart
 
 # The docker service.running block below doesn't work reliably
 # Instead we run our script which e.g. does a systemd daemon-reload

@@ -15,6 +15,7 @@ LimitCORE=infinity
 Restart=always
 RestartSec=2s
 StartLimitInterval=0
+ExecStartPre=/opt/kubernetes/helpers/docker-prestart
 
 [Install]
 WantedBy=multi-user.target
