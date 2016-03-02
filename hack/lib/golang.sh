@@ -498,6 +498,7 @@ kube::golang::build_binaries() {
   (
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
+    echo "Go version: $(go version)"
 
     local host_platform
     host_platform=$(kube::golang::host_platform)
