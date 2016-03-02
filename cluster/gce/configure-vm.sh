@@ -240,7 +240,7 @@ install-salt() {
 
   for deb in "${DEBS[@]}"; do
     if [ ! -e "${deb}" ]; then
-      download-or-bust "${URL_BASE}/${deb}"
+      download-or-bust "" "${URL_BASE}/${deb}"
     fi
   done
 
