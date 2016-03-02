@@ -265,10 +265,17 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 		},
 		Network: &v2.NetworkStats{
 			Interfaces: []v1.InterfaceStats{{
+				Name:     "eth0",
 				RxBytes:  uint64(seed + offsetNetRxBytes),
 				RxErrors: uint64(seed + offsetNetRxErrors),
 				TxBytes:  uint64(seed + offsetNetTxBytes),
 				TxErrors: uint64(seed + offsetNetTxErrors),
+			}, {
+				Name:     "cbr0",
+				RxBytes:  100,
+				RxErrors: 100,
+				TxBytes:  100,
+				TxErrors: 100,
 			}},
 		},
 		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
