@@ -136,6 +136,7 @@
                 export NODE_SIZE="n1-standard-2"
                 export NODE_DISK_SIZE="50GB"
                 export NUM_NODES="100"
+                export REGISTER_MASTER="true"
                 # Reduce logs verbosity
                 export TEST_CLUSTER_LOG_LEVEL="--v=2"
                 # TODO: Remove when we figure out the reason for occasional failures #19048
