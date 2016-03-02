@@ -772,6 +772,8 @@ function kube::release::package_server_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
+    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+
     kube::release::clean_cruft
 
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
