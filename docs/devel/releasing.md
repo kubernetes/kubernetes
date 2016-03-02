@@ -213,10 +213,6 @@ release](https://github.com/kubernetes/kubernetes/releases/new):
    notes draft), and attach it to the release; and
 1. publish!
 
-Finally, from a clone of upstream/master, *make sure* you still have
-`RELEASE_VERSION` set correctly, and run `./build/mark-stable-release.sh
-${RELEASE_VERSION}`.
-
 ### Manual tasks for new release series
 
 *TODO(#20946) Burn this list down.*
