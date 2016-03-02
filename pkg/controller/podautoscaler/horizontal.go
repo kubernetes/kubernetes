@@ -91,6 +91,11 @@ func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNa
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				hpa := obj.(*extensions.HorizontalPodAutoscaler)
+				hasCPUPolicy := hpa.Spec.CPUUtilization != nil
+				_, hasCustomMetricsPolicy := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]
+				if !hasCPUPolicy && !hasCustomMetricsPolicy {
+					controller.eventRecorder.Event(hpa, api.EventTypeNormal, "DefaultPolicy", "No scaling policy specified - will use default one. See documentation for details")
+				}
 				err := controller.reconcileAutoscaler(hpa)
 				if err != nil {
 					glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
@@ -129,7 +134,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
 		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetMetrics", err.Error())
-		return 0, nil, time.Time{}, fmt.Errorf("failed to get cpu utilization: %v", err)
+		return 0, nil, time.Time{}, fmt.Errorf("failed to get CPU utilization: %v", err)
 	}
 
 	usageRatio := float64(*currentUtilization) / float64(targetUtilization)
@@ -142,25 +147,29 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.
 
 // Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
 // extensions.CustomMetricsTargetList.
-// Returns number of replicas, status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
+// Returns number of replicas, metric which required highest number of replicas,
+// status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
 // last timestamp of the metrics involved in computations or error, if occurred.
 func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.HorizontalPodAutoscaler, scale *extensions.Scale,
-	cmAnnotation string) (int, string, time.Time, error) {
+	cmAnnotation string) (replicas int, metric string, status string, timestamp time.Time, err error) {
 
 	currentReplicas := scale.Status.Replicas
-	replicas := 0
-	timestamp := time.Time{}
+	replicas = 0
+	metric = ""
+	status = ""
+	timestamp = time.Time{}
+	err = nil
 
 	if cmAnnotation == "" {
-		return 0, "", time.Time{}, nil
+		return
 	}
 
 	var targetList extensions.CustomMetricTargetList
 	if err := json.Unmarshal([]byte(cmAnnotation), &targetList); err != nil {
-		return 0, "", time.Time{}, fmt.Errorf("failed to parse custom metrics annotation: %v", err)
+		return 0, "", "", time.Time{}, fmt.Errorf("failed to parse custom metrics annotation: %v", err)
 	}
 	if len(targetList.Items) == 0 {
-		return 0, "", time.Time{}, fmt.Errorf("no custom metrics in annotation")
+		return 0, "", "", time.Time{}, fmt.Errorf("no custom metrics in annotation")
 	}
 
 	statusList := extensions.CustomMetricCurrentStatusList{
@@ -172,7 +181,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
 			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetCustomMetrics", err.Error())
-			return 0, "", time.Time{}, fmt.Errorf("failed to get custom metric value: %v", err)
+			return 0, "", "", time.Time{}, fmt.Errorf("failed to get custom metric value: %v", err)
 		}
 		floatTarget := float64(customMetricTarget.TargetValue.MilliValue()) / 1000.0
 		usageRatio := *value / floatTarget
@@ -186,10 +195,11 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 		if replicaCountProposal > replicas {
 			timestamp = currentTimestamp
 			replicas = replicaCountProposal
+			metric = fmt.Sprintf("Custom metric %s", customMetricTarget.Name)
 		}
 		quantity, err := resource.ParseQuantity(fmt.Sprintf("%.3f", *value))
 		if err != nil {
-			return 0, "", time.Time{}, fmt.Errorf("failed to set custom metric value: %v", err)
+			return 0, "", "", time.Time{}, fmt.Errorf("failed to set custom metric value: %v", err)
 		}
 		statusList.Items = append(statusList.Items, extensions.CustomMetricCurrentStatus{
 			Name:         customMetricTarget.Name,
@@ -198,10 +208,10 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 	}
 	byteStatusList, err := json.Marshal(statusList)
 	if err != nil {
-		return 0, "", time.Time{}, fmt.Errorf("failed to serialize custom metric status: %v", err)
+		return 0, "", "", time.Time{}, fmt.Errorf("failed to serialize custom metric status: %v", err)
 	}
 
-	return replicas, string(byteStatusList), timestamp, nil
+	return replicas, metric, string(byteStatusList), timestamp, nil
 }
 
 func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPodAutoscaler) error {
@@ -219,17 +229,22 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 	cpuTimestamp := time.Time{}
 
 	cmDesiredReplicas := 0
+	cmMetric := ""
 	cmStatus := ""
 	cmTimestamp := time.Time{}
 
 	desiredReplicas := 0
+	rescaleReason := ""
 	timestamp := time.Now()
 
 	if currentReplicas > hpa.Spec.MaxReplicas {
+		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
 	} else if hpa.Spec.MinReplicas != nil && currentReplicas < *hpa.Spec.MinReplicas {
+		rescaleReason = "Current number of replicas below Spec.MinReplicas"
 		desiredReplicas = *hpa.Spec.MinReplicas
 	} else if currentReplicas == 0 {
+		rescaleReason = "Current number of replicas must be greater than 0"
 		desiredReplicas = 1
 	} else {
 		// All basic scenarios covered, the state should be sane, lets use metrics.
@@ -245,7 +260,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 		}
 
 		if cmAnnotationFound {
-			cmDesiredReplicas, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
+			cmDesiredReplicas, cmMetric, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
 				a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
@@ -253,13 +268,21 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 			}
 		}
 
+		rescaleMetric := ""
 		if cpuDesiredReplicas > desiredReplicas {
 			desiredReplicas = cpuDesiredReplicas
 			timestamp = cpuTimestamp
+			rescaleMetric = "CPU utilization"
 		}
 		if cmDesiredReplicas > desiredReplicas {
 			desiredReplicas = cmDesiredReplicas
 			timestamp = cmTimestamp
+			rescaleMetric = cmMetric
+		}
+		if desiredReplicas > currentReplicas {
+			rescaleReason = fmt.Sprintf("%s above target", rescaleMetric)
+		} else if desiredReplicas < currentReplicas {
+			rescaleReason = "All metrics below target"
 		}
 
 		if hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas {
@@ -281,12 +304,12 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 		scale.Spec.Replicas = desiredReplicas
 		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
 		if err != nil {
-			a.eventRecorder.Eventf(hpa, api.EventTypeWarning, "FailedRescale", "New size: %d; error: %v", desiredReplicas, err.Error())
+			a.eventRecorder.Eventf(hpa, api.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
-		a.eventRecorder.Eventf(hpa, api.EventTypeNormal, "SuccessfulRescale", "New size: %d", desiredReplicas)
-		glog.Infof("Successfull rescale of %s, old size: %d, new size: %d",
-			hpa.Name, currentReplicas, desiredReplicas)
+		a.eventRecorder.Eventf(hpa, api.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
+		glog.Infof("Successfull rescale of %s, old size: %d, new size: %d, reason: %s",
+			hpa.Name, currentReplicas, desiredReplicas, rescaleReason)
 	} else {
 		desiredReplicas = currentReplicas
 	}
