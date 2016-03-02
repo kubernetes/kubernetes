@@ -65,9 +65,6 @@ go run hack/e2e.go -v --build
 # Create a fresh cluster.  Deletes a cluster first, if it exists
 go run hack/e2e.go -v --up
 
-# Create a fresh cluster at a specific release version.
-go run hack/e2e.go -v --up --version=0.7.0
-
 # Test if a cluster is up.
 go run hack/e2e.go -v --isup
 

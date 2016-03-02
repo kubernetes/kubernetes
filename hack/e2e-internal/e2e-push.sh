@@ -20,15 +20,14 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:=${KUBE_VERSION_ROOT}/cluster/kubectl.sh}
+: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
-"${KUBE_VERSION_ROOT}/cluster/kube-push.sh" $@
+"${KUBE_ROOT}/cluster/kube-push.sh" $@
