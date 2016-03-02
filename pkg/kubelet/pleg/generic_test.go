@@ -150,7 +150,17 @@ func TestRelisting(t *testing.T) {
 	verifyEvents(t, expected, actual)
 }
 
-func TestReportMissingContainers(t *testing.T) {
+func TestDetectingContainerDeaths(t *testing.T) {
+	// Vary the number of relists after the container started and before the
+	// container died to account for the changes in pleg's internal states.
+	testReportMissingContainers(t, 1)
+	testReportMissingPods(t, 1)
+
+	testReportMissingContainers(t, 3)
+	testReportMissingPods(t, 3)
+}
+
+func testReportMissingContainers(t *testing.T, numRelists int) {
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
@@ -164,9 +174,11 @@ func TestReportMissingContainers(t *testing.T) {
 			},
 		},
 	}
-	// Drain the events from the channel
-	pleg.relist()
-	getEventsFromChannel(ch)
+	// Relist and drain the events from the channel.
+	for i := 0; i < numRelists; i++ {
+		pleg.relist()
+		getEventsFromChannel(ch)
+	}
 
 	// Container c2 was stopped and removed between relists. We should report
 	// the event. The exited container c3 was garbage collected (i.e., removed)
@@ -187,7 +199,7 @@ func TestReportMissingContainers(t *testing.T) {
 	verifyEvents(t, expected, actual)
 }
 
-func TestReportMissingPods(t *testing.T) {
+func testReportMissingPods(t *testing.T, numRelists int) {
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
@@ -199,9 +211,11 @@ func TestReportMissingPods(t *testing.T) {
 			},
 		},
 	}
-	// Drain the events from the channel
-	pleg.relist()
-	getEventsFromChannel(ch)
+	// Relist and drain the events from the channel.
+	for i := 0; i < numRelists; i++ {
+		pleg.relist()
+		getEventsFromChannel(ch)
+	}
 
 	// Container c2 was stopped and removed between relists. We should report
 	// the event.
