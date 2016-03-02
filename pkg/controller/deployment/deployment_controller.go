@@ -774,10 +774,10 @@ func copyDeploymentAnnotationsToReplicaSet(deployment *extensions.Deployment, rs
 		rs.Annotations = make(map[string]string)
 	}
 	for k, v := range deployment.Annotations {
-		// Skip apply annotations
+		// Skip apply annotations and revision annotations
 		// TODO: How to decide which annotations should / should not be copied?
 		// See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
-		if k == kubectl.LastAppliedConfigAnnotation || rs.Annotations[k] == v {
+		if k == kubectl.LastAppliedConfigAnnotation || k == deploymentutil.RevisionAnnotation || rs.Annotations[k] == v {
 			continue
 		}
 		rs.Annotations[k] = v
