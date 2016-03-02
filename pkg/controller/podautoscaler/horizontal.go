@@ -81,6 +81,8 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 		// Since we always take maximum number of replicas from all policies it is safe
 		// to just return 0.
 		return 0, nil, time.Time{}, nil
+	} else if hpa.Spec.CPUUtilization.TargetPercentage >= 100 {
+		glog.Errorf("CPUUtilization is too high, %v, high demand scenarios will not breach utilization threshold, and thus, they won't scale", hpa.Spec.CPUUtilization.TargetPercentage)
 	}
 	currentReplicas := scale.Status.Replicas
 	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
