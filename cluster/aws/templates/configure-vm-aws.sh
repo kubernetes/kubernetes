@@ -29,7 +29,7 @@ ensure-packages() {
   # TODO: Where to get safe_format_and_mount?
   mkdir -p /usr/share/google
   cd /usr/share/google
-  download-or-bust https://raw.githubusercontent.com/GoogleCloudPlatform/compute-image-packages/82b75f314528b90485d5239ab5d5495cc22d775f/google-startup-scripts/usr/share/google/safe_format_and_mount
+  download-or-bust "dc96f40fdc9a0815f099a51738587ef5a976f1da" https://raw.githubusercontent.com/GoogleCloudPlatform/compute-image-packages/82b75f314528b90485d5239ab5d5495cc22d775f/google-startup-scripts/usr/share/google/safe_format_and_mount
   chmod +x safe_format_and_mount
 }
 
