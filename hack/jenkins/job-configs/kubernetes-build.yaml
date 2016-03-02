@@ -6,7 +6,7 @@
         numToKeep: 200
     builders:
         - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
-        - shell: './hack/jenkins/build.sh'
+        - shell: 'timeout -k {kill-timeout}m 30m ./hack/jenkins/build.sh'
     properties:
         - mail-watcher
     publishers:
@@ -35,8 +35,8 @@
             cron: 'H/2 * * * *'
     wrappers:
         - timeout:
-            timeout: 30
-            abort: true
+            timeout: '{jenkins-timeout}'
+            fail: true
         - timestamps
 
 - project:

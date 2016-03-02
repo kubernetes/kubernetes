@@ -9,7 +9,7 @@
             {soak-deploy}
             {job-env}
             {post-env}
-            {runner}
+            timeout -k {kill-timeout}m 90m {runner}
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -24,7 +24,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: 90
+            timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
         - workspace-cleanup
@@ -41,7 +41,7 @@
             {soak-continuous}
             {job-env}
             {post-env}
-            {runner}
+            timeout -k {kill-timeout}m 360m {runner}
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -60,7 +60,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: 360
+            timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
 
