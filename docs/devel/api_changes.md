@@ -452,12 +452,11 @@ Also note that you can (and for efficiency reasons should) use auto-generated
 conversion functions when writing your conversion functions.
 
 Once all the necessary manually written conversions are added, you need to
-regenerate auto-generated ones. To regenerate them:
-   - run
+regenerate auto-generated ones. To regenerate them, run:
 
-```sh
-hack/update-generated-conversions.sh
-```
+   ```sh
+   hack/update-generated-conversions.sh
+   ```
 
 If running the above script is impossible due to compile errors, the easiest
 workaround is to comment out the code causing errors and let the script to
@@ -478,12 +477,11 @@ The deep copy code resides with each versioned API:
    - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
    - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
 
-To regenerate them:
-   - run
+To regenerate them, run:
 
-```sh
-hack/update-generated-deep-copies.sh
-```
+    ```sh
+    hack/update-generated-deep-copies.sh
+    ```
 
 ## Edit json (un)marshaling code
 
@@ -494,12 +492,11 @@ The auto-generated code resides with each versioned API:
    - `pkg/api/<version>/types.generated.go`
    - `pkg/apis/extensions/<version>/types.generated.go`
 
-To regenerate them:
-   - run
+To regenerate them, run:
 
-```sh
-hack/update-codecgen.sh
-```
+    ```sh
+    hack/update-codecgen.sh
+    ```
 
 ## Making a new API Group
 
