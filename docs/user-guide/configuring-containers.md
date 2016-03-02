@@ -94,21 +94,15 @@ pods/hello-world
 
 ## Validating configuration
 
-If you’re not sure you specified the resource correctly, you can ask `kubectl` to validate it for you:
-
-```console
-$ kubectl create -f ./hello-world.yaml --validate
-```
+We enable validation by default in `kubectl` since v1.1.
 
 Let’s say you specified `entrypoint` instead of `command`. You’d see output as follows:
 
 ```console
-I0709 06:33:05.600829   14160 schema.go:126] unknown field: entrypoint
-I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see http://issue.k8s.io/6842
-pods/hello-world
+error validating "./hello-world.yaml": error validating data: found invalid field Entrypoint for v1.Container; if you choose to ignore these errors, turn validation off with --validate=false
 ```
 
-`kubectl create --validate` currently warns about problems it detects, but creates the resource anyway, unless a required field is absent or a field value is invalid. Unknown API fields are ignored, so be careful. This pod was created, but with no `command`, which is an optional field, since the image may specify an `Entrypoint`.
+Using `kubectl create --validate=false` to turn validation off, it creates the resource anyway, unless a required field is absent or a field value is invalid. Unknown API fields are ignored, so be careful. This pod was created, but with no `command`, which is an optional field, since the image may specify an `Entrypoint`.
 View the [Pod API
 object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html#_v1_pod)
 to see the list of valid fields.
