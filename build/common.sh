@@ -1035,7 +1035,7 @@ function kube::release::package_full_tarball() {
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
-  cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
+  cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
   mkdir -p "${release_stage}/contrib/completions/bash"
   cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
