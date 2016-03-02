@@ -18,6 +18,7 @@
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
+RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-2}
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}

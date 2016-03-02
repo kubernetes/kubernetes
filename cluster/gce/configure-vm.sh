@@ -140,15 +140,32 @@ function remove-docker-artifacts() {
   echo "== Finished deleting docker0 =="
 }
 
-# Retry a download until we get it.
+# Retry a download until we get it. Takes a hash and a set of URLs.
 #
-# $1 is the URL to download
+# $1 is the sha1 of the URL. Can be "" if the sha1 is unknown.
+# $2+ are the URLs to download.
 download-or-bust() {
-  local -r url="$1"
-  local -r file="${url##*/}"
-  rm -f "$file"
-  until curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "${url}"; do
-    echo "Failed to download file (${url}). Retrying."
+  local -r hash="$1"
+  shift 1
+
+  urls=( $* )
+  while true; do
+    for url in "${urls[@]}"; do
+      local file="${url##*/}"
+      rm -f "${file}"
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --retry 6 --retry-delay 10 "${url}"; then
+        echo "== Failed to download ${url}. Retrying. =="
+      elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
+        echo "== Hash validation of ${url} failed. Retrying. =="
+      else
+        if [[ -n "${hash}" ]]; then
+          echo "== Downloaded ${url} (SHA1 = ${hash}) =="
+        else
+          echo "== Downloaded ${url} =="
+        fi
+        return
+      fi
+    done
   done
 }
 
@@ -603,39 +620,43 @@ EOF
   fi
 }
 
+function split-commas() {
+  echo $1 | tr "," "\n"
+}
+
 function try-download-release() {
   # TODO(zmerlynn): Now we REALLy have no excuse not to do the reboot
   # optimization.
 
-  # TODO(zmerlynn): This may not be set yet by everyone (GKE).
-  if [[ -z "${SERVER_BINARY_TAR_HASH:-}" ]]; then
+  local -r server_binary_tar_urls=( $(split-commas "${SERVER_BINARY_TAR_URL}") )
+  local -r server_binary_tar="${server_binary_tar_urls[0]##*/}"
+  if [[ -n "${SERVER_BINARY_TAR_HASH:-}" ]]; then
+    local -r server_binary_tar_hash="${SERVER_BINARY_TAR_HASH}"
+  else
     echo "Downloading binary release sha1 (not found in env)"
-    download-or-bust "${SERVER_BINARY_TAR_URL}.sha1"
-    SERVER_BINARY_TAR_HASH=$(cat "${SERVER_BINARY_TAR_URL##*/}.sha1")
+    download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha1}"
+    local -r server_binary_tar_hash=$(cat "${server_binary_tar}.sha1")
   fi
 
-  echo "Downloading binary release tar (${SERVER_BINARY_TAR_URL})"
-  download-or-bust "${SERVER_BINARY_TAR_URL}"
+  echo "Downloading binary release tar (${server_binary_tar_urls[@]})"
+  download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
 
-  validate-hash "${SERVER_BINARY_TAR_URL##*/}" "${SERVER_BINARY_TAR_HASH}"
-  echo "Validated ${SERVER_BINARY_TAR_URL} SHA1 = ${SERVER_BINARY_TAR_HASH}"
-
-  # TODO(zmerlynn): This may not be set yet by everyone (GKE).
-  if [[ -z "${SALT_TAR_HASH:-}" ]]; then
+  local -r salt_tar_urls=( $(split-commas "${SALT_TAR_URL}") )
+  local -r salt_tar="${salt_tar_urls[0]##*/}"
+  if [[ -n "${SALT_TAR_HASH:-}" ]]; then
+    local -r salt_tar_hash="${SALT_TAR_HASH}"
+  else
     echo "Downloading Salt tar sha1 (not found in env)"
-    download-or-bust "${SALT_TAR_URL}.sha1"
-    SALT_TAR_HASH=$(cat "${SALT_TAR_URL##*/}.sha1")
+    download-or-bust "" "${salt_tar_urls[@]/.tar.gz/.tar.gz.sha1}"
+    local -r salt_tar_hash=$(cat "${salt_tar}.sha1")
   fi
 
-  echo "Downloading Salt tar ($SALT_TAR_URL)"
-  download-or-bust "$SALT_TAR_URL"
-
-  validate-hash "${SALT_TAR_URL##*/}" "${SALT_TAR_HASH}"
-  echo "Validated ${SALT_TAR_URL} SHA1 = ${SALT_TAR_HASH}"
+  echo "Downloading Salt tar (${salt_tar_urls[@]})"
+  download-or-bust "${salt_tar_hash}" "${salt_tar_urls[@]}"
 
   echo "Unpacking Salt tree and checking integrity of binary release tar"
   rm -rf kubernetes
-  tar xzf "${SALT_TAR_URL##*/}" && tar tzf "${SERVER_BINARY_TAR_URL##*/}" > /dev/null
+  tar xzf "${salt_tar}" && tar tzf "${server_binary_tar}" > /dev/null
 }
 
 function download-release() {
