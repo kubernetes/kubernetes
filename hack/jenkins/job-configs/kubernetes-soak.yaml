@@ -32,7 +32,7 @@
 - job-template:
     name: 'kubernetes-soak-continuous-e2e-{suffix}'
     description: '{e2e-description} Test Owner: {test-owner}'
-    workspace: 'kubernetes-soak-weekly-deploy-{suffix}'
+    workspace: '/var/lib/jenkins/jobs/kubernetes-soak-weekly-deploy-{suffix}/workspace'
     logrotate:
         daysToKeep: 7
     builders:
