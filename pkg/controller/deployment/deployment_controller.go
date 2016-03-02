@@ -758,7 +758,7 @@ func setNewReplicaSetAnnotations(deployment *extensions.Deployment, rs *extensio
 	if rs.Annotations == nil {
 		rs.Annotations = make(map[string]string)
 	}
-	if rs.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
+	if rs.Annotations[deploymentutil.RevisionAnnotation] < newRevision {
 		rs.Annotations[deploymentutil.RevisionAnnotation] = newRevision
 		annotationChanged = true
 		glog.V(4).Infof("updating replica set %q's revision to %s - %+v\n", rs.Name, newRevision, rs)
