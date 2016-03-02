@@ -1,0 +1,68 @@
+sudo: false
+
+language: go
+
+matrix:
+  include:
+    - go: 1.5.3
+      env:
+        - KUBE_TEST_API_VERSIONS=v1,extensions/v1beta1 KUBE_TEST_ETCD_PREFIXES=registry
+        - KUBE_JUNIT_REPORT_DIR="${SHIPPABLE_REPO_DIR}/shippable/testresults"
+        - CI_NAME="shippable"
+        - CI_BUILD_NUMBER="$BUILD_NUMBER"
+        - CI_BUILD_URL="$BUILD_URL"
+        - CI_BRANCH="$BRANCH"
+        - CI_PULL_REQUEST="$PULL_REQUEST"
+        # Set COVERALLS_REPO_TOKEN
+        - secure: hfh1Kwl2XYUlJCn4dtKSG0C9yXl5TtksVOY74OeqolvDAdVj4sc+GJD3Bywsp91CJe8YMEnkt9rN0WGI+gPVMcjTmZ9tMUxKiNNBP8m5oLRFbdgKOkNuXjpjpFHHWGAnNhMmh9vjI+ehADo+QIpU1fGxd3yO4tmIJ1qoK3QqvUrOZ1RwUubRXoeVn3xy3LK5yg4vP5ruitbNeWMw/RZZ7D6czvqvEfCgV6b4mdNDRMiqlUJNkaTRc3em1APXr30yagDV3a7hXLq3HdlyFwvF+9pmB4AKhQctyjPN4zvvPd0/gJXq3ZHXSlZXOZBMPXHlSS5pizfSInNszyZyrP3+/w==
+    - go: 1.4
+      env:
+        - KUBE_TEST_API_VERSIONS=v1,extensions/v1beta1 KUBE_TEST_ETCD_PREFIXES=kubernetes.io/registry
+        - KUBE_JUNIT_REPORT_DIR="${SHIPPABLE_REPO_DIR}/shippable/testresults"
+        - CI_NAME="shippable"
+        - CI_BUILD_NUMBER="$BUILD_NUMBER"
+        - CI_BUILD_URL="$BUILD_URL"
+        - CI_BRANCH="$BRANCH"
+        - CI_PULL_REQUEST="$PULL_REQUEST"
+        # Set COVERALLS_REPO_TOKEN
+        - secure: hfh1Kwl2XYUlJCn4dtKSG0C9yXl5TtksVOY74OeqolvDAdVj4sc+GJD3Bywsp91CJe8YMEnkt9rN0WGI+gPVMcjTmZ9tMUxKiNNBP8m5oLRFbdgKOkNuXjpjpFHHWGAnNhMmh9vjI+ehADo+QIpU1fGxd3yO4tmIJ1qoK3QqvUrOZ1RwUubRXoeVn3xy3LK5yg4vP5ruitbNeWMw/RZZ7D6czvqvEfCgV6b4mdNDRMiqlUJNkaTRc3em1APXr30yagDV3a7hXLq3HdlyFwvF+9pmB4AKhQctyjPN4zvvPd0/gJXq3ZHXSlZXOZBMPXHlSS5pizfSInNszyZyrP3+/w==
+
+before_install:
+  - curl -sL -o /usr/local/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/cf746e6308ba2ff8def44bc5eddc107257139349/gimme; chmod +x /usr/local/bin/gimme
+  - gimme $SHIPPABLE_GO_VERSION
+  - source ~/.gimme/envs/go$SHIPPABLE_GO_VERSION.env
+  - ./hack/install-etcd.sh
+  - export GOPATH=$SHIPPABLE_GOPATH
+  - mkdir -p /root/workspace/src/k8s.io; mv /root/workspace/src/github.com/kubernetes/kubernetes /root/workspace/src/k8s.io/kubernetes
+  - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
+
+install:
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/mattn/goveralls
+  - go get github.com/tools/godep
+  - go get github.com/jstemmer/go-junit-report
+  - ./hack/build-go.sh
+  - godep go install ./...
+  - ./hack/install-etcd.sh
+  - ./hack/verify-gofmt.sh
+  - ./hack/verify-boilerplate.sh
+  - ./hack/verify-description.sh
+  - ./hack/verify-flags-underscore.py
+  - ./hack/verify-godeps.sh ${BASE_BRANCH}
+  - ./hack/verify-godep-licenses.sh ${BASE_BRANCH}
+  - ./hack/travis/install-std-race.sh
+  - ./hack/verify-generated-conversions.sh
+  - ./hack/verify-generated-deep-copies.sh
+  - ./hack/verify-generated-docs.sh
+  - ./hack/verify-generated-swagger-docs.sh
+  - ./hack/verify-swagger-spec.sh
+
+script:
+  # Disable coverage collection on pull requests
+  - KUBE_RACE="-race" KUBE_COVER=$([[ "$PULL_REQUEST" =~ ^[0-9]+$ ]] && echo "n" || echo "y") KUBE_GOVERALLS_BIN="$GOPATH/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 KUBE_TEST_ETCD_PREFIXES="${KUBE_TEST_ETCD_PREFIXES}" KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" ./hack/test-go.sh -- -p=2
+  - ./hack/test-cmd.sh
+  - KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
+  - ./hack/test-update-storage-objects.sh
+
+notifications:
+  irc: "chat.freenode.net#kubernetes-dev"

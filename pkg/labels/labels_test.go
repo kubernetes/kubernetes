@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,23 @@ func TestSetString(t *testing.T) {
 
 	// TODO: Make our label representation robust enough to handle labels
 	// with ",=!" characters in their names.
+}
+
+func TestLabelHas(t *testing.T) {
+	labelHasTests := []struct {
+		Ls  Labels
+		Key string
+		Has bool
+	}{
+		{Set{"x": "y"}, "x", true},
+		{Set{"x": ""}, "x", true},
+		{Set{"x": "y"}, "foo", false},
+	}
+	for _, lh := range labelHasTests {
+		if has := lh.Ls.Has(lh.Key); has != lh.Has {
+			t.Errorf("%#v.Has(%#v) => %v, expected %v", lh.Ls, lh.Key, has, lh.Has)
+		}
+	}
 }
 
 func TestLabelGet(t *testing.T) {

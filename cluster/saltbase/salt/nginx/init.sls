@@ -1,23 +1,6 @@
 nginx:
   pkg:
     - installed
-  service:
-    - running
-    - watch:
-      - pkg: nginx
-      - file: /etc/nginx/nginx.conf
-      - file: /etc/nginx/sites-enabled/default
-      - file: /usr/share/nginx/htpasswd
-      - cmd: /usr/share/nginx/server.cert
-
-/usr/share/nginx/server.cert:
-  cmd.script:
-    - source: salt://nginx/make-cert.sh
-    - cwd: /
-    - user: root
-    - group: root
-    - shell: /bin/bash
-    - stateful: True
 
 /etc/nginx/nginx.conf:
   file:
@@ -45,10 +28,37 @@ nginx:
     - group: root
     - mode: 644
 
-/usr/share/nginx/make-cert.sh:
+{% if grains.cloud is defined and grains.cloud in ['gce'] %}
+/etc/kubernetes/manifests/nginx.json:
   file:
     - managed
-    - source: salt://nginx/make-cert.sh
+    - source: salt://nginx/nginx.json
     - user: root
     - group: root
-    - mode: 755
+    - mode: 644
+    - require:
+      - file: /etc/nginx/nginx.conf
+      - file: /etc/nginx/sites-enabled/default
+      - file: /usr/share/nginx/htpasswd
+      - cmd: kubernetes-cert      
+
+
+#stop legacy nginx_service 
+stop_nginx-service:
+  service.dead:
+    - name: nginx
+    - enable: None
+
+{% else %}
+nginx-service:
+  service:
+    - running
+    - name: nginx
+    - watch:
+      - pkg: nginx
+      - file: /etc/nginx/nginx.conf
+      - file: /etc/nginx/sites-enabled/default
+      - file: /usr/share/nginx/htpasswd
+      - cmd: kubernetes-cert
+{% endif %}
+

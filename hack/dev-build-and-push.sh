@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,18 @@
 
 # This script will build a dev release and push it to an existing cluster.
 
-# First build a release
-$(dirname $0)/../release/release.sh
+set -o errexit
+set -o nounset
+set -o pipefail
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+# Build a release
+"${KUBE_ROOT}/build/release.sh"
+if [ "$?" != "0" ]; then
+        echo "Building a release failed!"
+        exit 1
+fi
 
 # Now push this out to the cluster
-$(dirname $0)/../cluster/kube-push.sh
+"${KUBE_ROOT}/cluster/kube-push.sh"

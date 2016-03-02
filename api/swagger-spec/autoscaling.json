@@ -1,0 +1,30 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "",
+  "basePath": "https://10.10.10.10:443",
+  "resourcePath": "/apis/autoscaling",
+  "apis": [
+   {
+    "path": "/apis/autoscaling",
+    "description": "get information of a group",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "get information of a group",
+      "nickname": "getAPIGroup",
+      "parameters": [],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "application/json",
+       "application/yaml"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {}
+ }

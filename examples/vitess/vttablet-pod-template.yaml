@@ -1,0 +1,128 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: vttablet-{{uid}}
+  labels:
+    component: vttablet
+    keyspace: "{{keyspace}}"
+    shard: "{{shard_label}}"
+    tablet: "{{alias}}"
+    app: vitess
+spec:
+  containers:
+    - name: vttablet
+      image: vitess/lite:v2.0.0-alpha5
+      volumeMounts:
+        - name: syslog
+          mountPath: /dev/log
+        - name: vtdataroot
+          mountPath: /vt/vtdataroot
+        - name: certs
+          readOnly: true
+          mountPath: /etc/ssl/certs
+      resources:
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+      command:
+        - bash
+        - "-c"
+        - >-
+          set -e
+
+          mysql_socket="$VTDATAROOT/{{tablet_subdir}}/mysql.sock"
+
+          mkdir -p $VTDATAROOT/tmp
+
+          chown -R vitess /vt
+
+          while [ ! -e $mysql_socket ]; do
+          echo "[$(date)] waiting for $mysql_socket" ;
+          sleep 1 ;
+          done
+
+          su -p -s /bin/bash -c "mysql -u vt_dba -S $mysql_socket
+          -e 'CREATE DATABASE IF NOT EXISTS vt_{{keyspace}}'" vitess
+
+          su -p -s /bin/bash -c "/vt/bin/vttablet
+          -topo_implementation etcd
+          -etcd_global_addrs http://$ETCD_GLOBAL_SERVICE_HOST:$ETCD_GLOBAL_SERVICE_PORT
+          -log_dir $VTDATAROOT/tmp
+          -alsologtostderr
+          -port {{port}}
+          -grpc_port {{grpc_port}}
+          -service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream'
+          -binlog_player_protocol grpc
+          -tablet-path {{alias}}
+          -tablet_hostname $(hostname -i)
+          -init_keyspace {{keyspace}}
+          -init_shard {{shard}}
+          -target_tablet_type {{tablet_type}}
+          -mysqlctl_socket $VTDATAROOT/mysqlctl.sock
+          -db-config-app-uname vt_app
+          -db-config-app-dbname vt_{{keyspace}}
+          -db-config-app-charset utf8
+          -db-config-dba-uname vt_dba
+          -db-config-dba-dbname vt_{{keyspace}}
+          -db-config-dba-charset utf8
+          -db-config-repl-uname vt_repl
+          -db-config-repl-dbname vt_{{keyspace}}
+          -db-config-repl-charset utf8
+          -db-config-filtered-uname vt_filtered
+          -db-config-filtered-dbname vt_{{keyspace}}
+          -db-config-filtered-charset utf8
+          -enable-rowcache
+          -rowcache-bin /usr/bin/memcached
+          -rowcache-socket $VTDATAROOT/{{tablet_subdir}}/memcache.sock
+          -health_check_interval 5s
+          -restore_from_backup {{backup_flags}}" vitess
+    - name: mysql
+      image: vitess/lite:v2.0.0-alpha5
+      volumeMounts:
+        - name: syslog
+          mountPath: /dev/log
+        - name: vtdataroot
+          mountPath: /vt/vtdataroot
+      resources:
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+      command:
+        - sh
+        - "-c"
+        - >-
+          mkdir -p $VTDATAROOT/tmp &&
+          chown -R vitess /vt
+
+          su -p -c "/vt/bin/mysqlctld
+          -log_dir $VTDATAROOT/tmp
+          -alsologtostderr
+          -tablet_uid {{uid}}
+          -socket_file $VTDATAROOT/mysqlctl.sock
+          -db-config-app-uname vt_app
+          -db-config-app-dbname vt_{{keyspace}}
+          -db-config-app-charset utf8
+          -db-config-dba-uname vt_dba
+          -db-config-dba-dbname vt_{{keyspace}}
+          -db-config-dba-charset utf8
+          -db-config-repl-uname vt_repl
+          -db-config-repl-dbname vt_{{keyspace}}
+          -db-config-repl-charset utf8
+          -db-config-filtered-uname vt_filtered
+          -db-config-filtered-dbname vt_{{keyspace}}
+          -db-config-filtered-charset utf8
+          -bootstrap_archive mysql-db-dir_10.0.13-MariaDB.tbz" vitess
+        # The bootstrap archive above contains an empty mysql data dir
+        # with user permissions set up as required by Vitess. The archive is
+        # included in the Docker image.
+      env:
+        - name: EXTRA_MY_CNF
+          value: /vt/config/mycnf/master_mariadb.cnf
+  volumes:
+    - name: syslog
+      hostPath: {path: /dev/log}
+    - name: vtdataroot
+      emptyDir: {}
+    - name: certs
+      hostPath: {path: /etc/ssl/certs}
+

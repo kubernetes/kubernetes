@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,33 +17,44 @@ limitations under the License.
 package config
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"os"
-	"reflect"
-	"sort"
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"gopkg.in/v1/yaml"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := SourceFile{"/some/fake/file", ch}
+	c := sourceFile{"/some/fake/file", "localhost", ch}
 	err := c.extractFromPath()
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 }
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
 	ch := make(chan interface{})
-	NewSourceFile("random_non_existent_path", time.Millisecond, ch)
+	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
-		t.Errorf("Expected no update, Got %#v", got)
-	case <-time.After(2 * time.Millisecond):
+		update := got.(kubetypes.PodUpdate)
+		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
+		if !api.Semantic.DeepDerivative(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("Expected update, timeout instead")
 	}
 }
 
@@ -59,31 +70,94 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 	return file
 }
 
-func TestReadFromFile(t *testing.T) {
-	file := writeTestFile(t, os.TempDir(), "test_pod_config", "version: v1beta1\nid: test\ncontainers:\n- image: test/image")
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{
-			Name: "test",
-			Manifest: api.ContainerManifest{
-				ID:      "test",
-				Version: "v1beta1",
-				Containers: []api.Container{api.Container{
-					Image: "test/image"},
+func TestReadPodsFromFile(t *testing.T) {
+	hostname := "random-test-hostname"
+	grace := int64(30)
+	var testCases = []struct {
+		desc     string
+		pod      runtime.Object
+		expected kubetypes.PodUpdate
+	}{
+		{
+			desc: "Simple pod",
+			pod: &api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test",
+					UID:       "12345",
+					Namespace: "mynamespace",
+				},
+				Spec: api.PodSpec{
+					Containers:      []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &api.PodSecurityContext{},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
 				},
 			},
-		})
-		if !reflect.DeepEqual(expected, update) {
-			t.Errorf("Expected %#v, Got %#v", expected, update)
-		}
+			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:        "test-" + hostname,
+					UID:         "12345",
+					Namespace:   "mynamespace",
+					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+					SelfLink:    getSelfLink("test-"+hostname, "mynamespace"),
+				},
+				Spec: api.PodSpec{
+					NodeName:                      hostname,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "Always",
+						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &api.PodSecurityContext{},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			}),
+		},
+	}
 
-	case <-time.After(2 * time.Millisecond):
-		t.Errorf("Expected update, timeout instead")
+	for _, testCase := range testCases {
+		func() {
+			var versionedPod runtime.Object
+			err := testapi.Default.Converter().Convert(&testCase.pod, &versionedPod)
+			if err != nil {
+				t.Fatalf("%s: error in versioning the pod: %v", testCase.desc, err)
+			}
+			fileContents, err := runtime.Encode(testapi.Default.Codec(), versionedPod)
+			if err != nil {
+				t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
+			}
+
+			file := writeTestFile(t, os.TempDir(), "test_pod_config", string(fileContents))
+			defer os.Remove(file.Name())
+
+			ch := make(chan interface{})
+			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
+			select {
+			case got := <-ch:
+				update := got.(kubetypes.PodUpdate)
+				for _, pod := range update.Pods {
+					if errs := validation.ValidatePod(pod); len(errs) > 0 {
+						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
+					}
+				}
+				if !api.Semantic.DeepEqual(testCase.expected, update) {
+					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
+			}
+		}()
 	}
 }
 
@@ -92,120 +166,31 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{}, 1)
-	c := SourceFile{file.Name(), ch}
+	c := sourceFile{file.Name(), "localhost", ch}
 	err := c.extractFromPath()
-	expectError(t, err)
+	if err == nil {
+		t.Fatalf("Expected error")
+	}
 	expectEmptyChannel(t, ch)
 }
 
-func TestExtractFromValidDataFile(t *testing.T) {
-	manifest := api.ContainerManifest{ID: ""}
-
-	text, err := json.Marshal(manifest)
-	expectNoError(t, err)
-	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{}, 1)
-	c := SourceFile{file.Name(), ch}
-	err = c.extractFromPath()
-	expectNoError(t, err)
-
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: simpleSubdomainSafeHash(file.Name()), Manifest: manifest})
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
-}
-
 func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := ioutil.TempDir("", "foo")
-	expectNoError(t, err)
+	dirName, err := utiltesting.MkTmpdir("file-test")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := SourceFile{dirName, ch}
+	c := sourceFile{dirName, "localhost", ch}
 	err = c.extractFromPath()
-	expectNoError(t, err)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET)
-	if !reflect.DeepEqual(expected, update) {
+	update := (<-ch).(kubetypes.PodUpdate)
+	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
+	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
-}
-
-func TestExtractFromDir(t *testing.T) {
-	manifests := []api.ContainerManifest{
-		{ID: "", Containers: []api.Container{{Image: "foo"}}},
-		{ID: "", Containers: []api.Container{{Image: "bar"}}},
-	}
-	files := make([]*os.File, len(manifests))
-
-	dirName, err := ioutil.TempDir("", "foo")
-	expectNoError(t, err)
-
-	for i, manifest := range manifests {
-		data, err := json.Marshal(manifest)
-		expectNoError(t, err)
-		file, err := ioutil.TempFile(dirName, manifest.ID)
-		expectNoError(t, err)
-		name := file.Name()
-		expectNoError(t, file.Close())
-		ioutil.WriteFile(name, data, 0755)
-		files[i] = file
-	}
-
-	ch := make(chan interface{}, 1)
-	c := SourceFile{dirName, ch}
-	err = c.extractFromPath()
-	expectNoError(t, err)
-
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(
-		kubelet.SET,
-		kubelet.Pod{Name: simpleSubdomainSafeHash(files[0].Name()), Manifest: manifests[0]},
-		kubelet.Pod{Name: simpleSubdomainSafeHash(files[1].Name()), Manifest: manifests[1]},
-	)
-	sort.Sort(sortedPods(update.Pods))
-	sort.Sort(sortedPods(expected.Pods))
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
-}
-
-// These are used for testing extract json (below)
-type TestData struct {
-	Value  string
-	Number int
-}
-
-type TestObject struct {
-	Name string
-	Data TestData
-}
-
-func verifyStringEquals(t *testing.T, actual, expected string) {
-	if actual != expected {
-		t.Errorf("Verification failed.  Expected: %s, Found %s", expected, actual)
-	}
-}
-
-func verifyIntEquals(t *testing.T, actual, expected int) {
-	if actual != expected {
-		t.Errorf("Verification failed.  Expected: %d, Found %d", expected, actual)
-	}
-}
-
-func TestExtractJSON(t *testing.T) {
-	obj := TestObject{}
-	data := `{ "name": "foo", "data": { "value": "bar", "number": 10 } }`
-
-	if err := yaml.Unmarshal([]byte(data), &obj); err != nil {
-		t.Fatalf("Could not unmarshal JSON: %v", err)
-	}
-
-	verifyStringEquals(t, obj.Name, "foo")
-	verifyStringEquals(t, obj.Data.Value, "bar")
-	verifyIntEquals(t, obj.Data.Number, 10)
 }

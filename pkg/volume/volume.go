@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,102 +17,134 @@ limitations under the License.
 package volume
 
 import (
-	"errors"
+	"io/ioutil"
 	"os"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-// All volume types are expected to implement this interface
-type Interface interface {
-	// Prepares and mounts/unpacks the volume to a directory path.
-	// This procedure must be idempotent.
-	// TODO(jonesdl) SetUp should return an error if it fails.
-	SetUp() error
-	// Returns the directory path the volume is mounted to.
+// Volume represents a directory used by pods or hosts on a node.
+// All method implementations of methods in the volume interface must be idempotent.
+type Volume interface {
+	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
-	// Unmounts the volume and removes traces of the SetUp procedure.
-	// This procedure must be idempotent.
+
+	// MetricsProvider embeds methods for exposing metrics (e.g. used,available space).
+	MetricsProvider
+}
+
+// MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.
+type MetricsProvider interface {
+	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for some implementations.
+	GetMetrics() (*Metrics, error)
+}
+
+// Metrics represents the used and available bytes of the Volume.
+type Metrics struct {
+	// Used represents the total bytes used by the Volume.
+	// Note: For block devices this maybe more than the total size of the files.
+	Used *resource.Quantity
+
+	// Capacity represents the total capacity (bytes) of the volume's underlying storage.
+	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath) this is the size
+	// of the underlying storage, and will not equal Used + Available as the fs is shared.
+	Capacity *resource.Quantity
+
+	// Available represents the storage space available (bytes) for the Volume.
+	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath), this is the available
+	// space on the underlying storage, and is shared with host processes and other Volumes.
+	Available *resource.Quantity
+}
+
+// Attributes represents the attributes of this builder.
+type Attributes struct {
+	ReadOnly        bool
+	Managed         bool
+	SupportsSELinux bool
+}
+
+// Builder interface provides methods to set up/mount the volume.
+type Builder interface {
+	// Uses Interface to provide the path for Docker binds.
+	Volume
+	// SetUp prepares and mounts/unpacks the volume to a
+	// self-determined directory path. The mount point and its
+	// content should be owned by 'fsGroup' so that it can be
+	// accessed by the pod. This may be called more than once, so
+	// implementations must be idempotent.
+	SetUp(fsGroup *int64) error
+	// SetUpAt prepares and mounts/unpacks the volume to the
+	// specified directory path, which may or may not exist yet.
+	// The mount point and its content should be owned by
+	// 'fsGroup' so that it can be accessed by the pod. This may
+	// be called more than once, so implementations must be
+	// idempotent.
+	SetUpAt(dir string, fsGroup *int64) error
+	// GetAttributes returns the attributes of the builder.
+	GetAttributes() Attributes
+}
+
+// Cleaner interface provides methods to cleanup/unmount the volumes.
+type Cleaner interface {
+	Volume
+	// TearDown unmounts the volume from a self-determined directory and
+	// removes traces of the SetUp procedure.
 	TearDown() error
+	// TearDown unmounts the volume from the specified directory and
+	// removes traces of the SetUp procedure.
+	TearDownAt(dir string) error
 }
 
-// Host Directory volumes represent a bare host directory mount.
-// The directory in Path will be directly exposed to the container.
-type HostDirectory struct {
-	Path string
+// Recycler provides methods to reclaim the volume resource.
+type Recycler interface {
+	Volume
+	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
+	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
+	Recycle() error
 }
 
-// Host directory mounts require no setup or cleanup, but still
-// need to fulfill the interface definitions.
-func (hostVol *HostDirectory) SetUp() error {
-	return nil
+// Provisioner is an interface that creates templates for PersistentVolumes and can create the volume
+// as a new resource in the infrastructure provider.
+type Provisioner interface {
+	// Provision creates the resource by allocating the underlying volume in a storage system.
+	// This method should block until completion.
+	Provision(*api.PersistentVolume) error
+	// NewPersistentVolumeTemplate creates a new PersistentVolume to be used as a template before saving.
+	// The provisioner will want to tweak its properties, assign correct annotations, etc.
+	// This func should *NOT* persist the PV in the API.  That is left to the caller.
+	NewPersistentVolumeTemplate() (*api.PersistentVolume, error)
 }
 
-func (hostVol *HostDirectory) TearDown() error {
-	return nil
+// Deleter removes the resource from the underlying storage provider.  Calls to this method should block until
+// the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
+// A nil return indicates success.
+type Deleter interface {
+	Volume
+	// This method should block until completion.
+	Delete() error
 }
 
-func (hostVol *HostDirectory) GetPath() string {
-	return hostVol.Path
+// Attacher can attach a volume to a node.
+type Attacher interface {
+	Volume
+	Attach() error
 }
 
-// EmptyDirectory volumes are temporary directories exposed to the pod.
-// These do not persist beyond the lifetime of a pod.
-type EmptyDirectory struct {
-	Name    string
-	PodID   string
-	RootDir string
+// Detacher can detach a volume from a node.
+type Detacher interface {
+	Detach() error
 }
 
-// SetUp creates the new directory.
-func (emptyDir *EmptyDirectory) SetUp() error {
-	path := emptyDir.GetPath()
-	err := os.MkdirAll(path, 0750)
+func RenameDirectory(oldPath, newName string) (string, error) {
+	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
-}
-
-// TODO(jonesdl) when we can properly invoke TearDown(), we should delete
-// the directory created by SetUp.
-func (emptyDir *EmptyDirectory) TearDown() error {
-	return nil
-}
-
-func (emptyDir *EmptyDirectory) GetPath() string {
-	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
-}
-
-// Interprets API volume as a HostDirectory
-func createHostDirectory(volume *api.Volume) *HostDirectory {
-	return &HostDirectory{volume.Source.HostDirectory.Path}
-}
-
-// Interprets API volume as an EmptyDirectory
-func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
-	return &EmptyDirectory{volume.Name, podID, rootDir}
-}
-
-// CreateVolume returns an Interface capable of mounting a volume described by an
-// *api.Volume and whether or not it is mounted, or an error.
-func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, error) {
-	source := volume.Source
-	// TODO(jonesdl) We will want to throw an error here when we no longer
-	// support the default behavior.
-	if source == nil {
-		return nil, nil
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		return "", err
 	}
-	var vol Interface
-	// TODO(jonesdl) We should probably not check every pointer and directly
-	// resolve these types instead.
-	if source.HostDirectory != nil {
-		vol = createHostDirectory(volume)
-	} else if source.EmptyDirectory != nil {
-		vol = createEmptyDirectory(volume, podID, rootDir)
-	} else {
-		return nil, errors.New("Unsupported volume type.")
-	}
-	return vol, nil
+	return newPath, nil
 }

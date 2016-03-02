@@ -17,11 +17,11 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="The Kubernetes container manager"
 NAME=kubelet
 DAEMON=/usr/local/bin/kubelet
-DAEMON_ARGS=" -config /etc/kubelet/data/`hostname`"
+DAEMON_ARGS=""
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-DAEMON_USER=kubelet
+DAEMON_USER=root
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
@@ -39,6 +39,13 @@ DAEMON_USER=kubelet
 #
 do_start()
 {
+        # Avoid a potential race at boot time when both monit and init.d start
+        # the same service
+        PIDS=$(pidof $DAEMON)
+        for PID in ${PIDS}; do
+            kill -9 $PID
+	done
+
         # Return
         #   0 if daemon has been started
         #   1 if daemon was already running
@@ -79,7 +86,7 @@ case "$1" in
         do_start
         case "$?" in
                 0|1) log_end_msg 0 || exit 0 ;;
-                2) verblog_end_msg 1 || exit 1 ;;
+                2) log_end_msg 1 || exit 1 ;;
         esac
         ;;
   stop)

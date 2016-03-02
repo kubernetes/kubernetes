@@ -1,0 +1,32 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: spark-master-controller
+  labels:
+    component: spark-master
+spec:
+  replicas: 1
+  selector:
+    component: spark-master
+  template:
+    metadata:
+      labels:
+        component: spark-master
+    spec:
+      containers:
+        - name: spark-master
+          image: gcr.io/google_containers/spark-master:1.5.1_v2
+          ports:
+            - containerPort: 7077
+          volumeMounts:
+            - mountPath: /mnt/glusterfs
+              name: glusterfsvol
+          resources:
+            requests:
+              cpu: 100m
+      volumes:
+        - name: glusterfsvol
+          glusterfs:
+            endpoints: glusterfs-cluster
+            path: MyVolume
+            readOnly: false

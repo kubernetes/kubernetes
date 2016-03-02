@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,19 +16,12 @@
 
 # This script sets up a go workspace locally and builds all go components.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-# Update the version.
-$(dirname $0)/version-gen.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-source $(dirname $0)/config-go.sh
-
-cd "${KUBE_TARGET}"
-
-BINARIES="cmd/proxy cmd/integration cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg"
-
-if [ $# -gt 0 ]; then
-  BINARIES="$@"
-fi
-
-go build $(for b in $BINARIES; do echo "${KUBE_GO_PACKAGE}"/${b}; done)
+kube::golang::build_binaries "$@"
+kube::golang::place_bins

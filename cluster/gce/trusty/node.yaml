@@ -1,0 +1,284 @@
+From nobody Tue Feb 1 11:33:00 2016
+Content-Type: multipart/mixed; boundary="===================================="
+MIME-Version: 1.0
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-env.conf"
+
+#upstart-job
+
+description "Prepare kube node environment"
+
+start on cloud-config
+
+script
+	set -o errexit
+	set -o nounset
+
+	# Fetch the script for configuring the instance.
+	curl --fail --silent --show-error \
+		-H "X-Google-Metadata-Request: True" \
+		-o /etc/kube-configure.sh \
+		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+	. /etc/kube-configure.sh
+
+	echo "Configuring hostname"
+	config_hostname
+	echo "Configuring IP firewall rules"
+	config_ip_firewall
+	echo "Downloading kube-env file"
+	download_kube_env
+	echo "Creating required directories"
+	. /etc/kube-env
+	create_dirs
+	echo "Creating kubelet kubeconfig file"
+	create_kubelet_kubeconfig
+	echo "Creating kube-proxy kubeconfig file"
+	create_kubeproxy_kubeconfig
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-packages.conf"
+
+#upstart-job
+
+description "Install packages needed to run kubernetes"
+
+start on stopped kube-env
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	install_critical_packages
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-additional-packages.conf"
+
+#upstart-job
+
+description "Install additional packages used by kubernetes"
+
+start on stopped kube-install-packages
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	install_additional_packages
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-minion.conf"
+
+#upstart-job
+
+description "Download and install k8s binaries and configurations"
+
+start on stopped kube-env
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	install_kube_binary_config
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kubelet.conf"
+
+#upstart-job
+
+description "Run kubelet service"
+
+start on stopped kube-install-minion and stopped kube-install-packages
+
+respawn
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-env
+	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+		ARGS="${KUBELET_TEST_LOG_LEVEL}"
+	fi
+	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+		ARGS="${ARGS} ${KUBELET_TEST_ARGS}"
+	fi
+	BINARY_PATH="/usr/bin/kubelet"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/kubelet"
+	fi
+	${BINARY_PATH} \
+		--api-servers=https://${KUBERNETES_MASTER_NAME} \
+		--enable-debugging-handlers=true \
+		--cloud-provider=gce \
+		--config=/etc/kubernetes/manifests \
+		--allow-privileged=true \
+		--cluster-dns=${DNS_SERVER_IP} \
+		--cluster-domain=${DNS_DOMAIN} \
+		--configure-cbr0=true \
+		--cgroup-root=/ \
+		--system-cgroups=/system \
+		--runtime-cgroups=/docker-daemon \
+		--kubelet-cgroups=/kubelet \
+		--nosystemd=true \
+		${ARGS} 1>>/var/log/kubelet.log 2>&1
+end script
+
+# Wait for 10s to start kubelet again.
+post-stop exec sleep 10
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-docker.conf"
+
+#upstart-job
+
+description "Restart docker daemon"
+
+# The condition "stopped kube-install-additional-packages" is to avoid
+# breaking nsenter installation, which is through a docker container.
+# It can be removed if we find a better way to install nsenter.
+start on started kubelet and stopped kube-install-additional-packages
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	restart_docker_daemon
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-proxy.conf"
+
+#upstart-job
+
+description "Start kube-proxy static pod"
+
+start on stopped kube-docker
+
+script
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	prepare_log_file "/var/log/kube-proxy.log"
+	# Load the docker image from file /run/kube-docker-files/kube-proxy.tar.
+	echo "Try to load docker image file kube-proxy.tar"
+	timeout 30 docker load -i /run/kube-docker-files/kube-proxy.tar
+	# Copy the manifest to /tmp to manipulate
+	tmp_file="/tmp/kube-proxy.manifest"
+	cp -f /run/kube-manifests/kubernetes/kube-proxy.manifest ${tmp_file}
+	# Remove the lines of salt configuration and replace variables with values.
+	# NOTE: Changes to variable names in cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
+	# may break this upstart job.
+	sed -i "/^ *{%/d" ${tmp_file}
+	kubeconfig="--kubeconfig=\/var\/lib\/kube-proxy\/kubeconfig"
+	kube_docker_registry="gcr.io\/google_containers"
+	if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
+		kube_docker_registry=${KUBE_DOCKER_REGISTRY}
+	fi
+	kube_proxy_docker_tag=$(cat /run/kube-docker-files/kube-proxy.docker_tag)
+	test_args=""
+	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
+		test_args="${KUBEPROXY_TEST_ARGS}"
+	fi
+	log_level="--v=2"
+	if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
+		log_level="${KUBEPROXY_TEST_LOG_LEVEL}"
+	fi
+	api_servers="--master=https:\/\/${KUBERNETES_MASTER_NAME}"
+	sed -i -e "s/{{kubeconfig}}/${kubeconfig}/g" ${tmp_file}
+	sed -i -e "s/{{pillar\['kube_docker_registry'\]}}/${kube_docker_registry}/g" ${tmp_file}
+	sed -i -e "s/{{pillar\['kube-proxy_docker_tag'\]}}/${kube_proxy_docker_tag}/g" ${tmp_file}
+	sed -i -e "s/{{test_args}}/${test_args}/g" ${tmp_file}
+	sed -i -e "s/{{log_level}}/${log_level}/g" ${tmp_file}
+	sed -i -e "s/{{api_servers_with_port}}/${api_servers}/g" ${tmp_file}
+
+	mv -f ${tmp_file} /etc/kubernetes/manifests/
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-addons.conf"
+
+#upstart-job
+
+description "Install kubelet add-on manifest files"
+
+start on stopped kube-docker
+
+script
+	set -o errexit
+	set -o nounset
+
+	# Kube-system pod manifest files are located at /run/kube-manifests/kubernetes.
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	# Fluentd
+	start_fluentd
+	# Kube-registry-proxy
+	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
+		cp /run/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
+	fi
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-node-health-monitoring.conf"
+
+description "Kubenetes node health monitoring"
+
+# The termination of kube-proxy upstart job indicates that kubelet and docker are ready.
+start on stopped kube-proxy
+
+respawn
+
+script
+	set -o nounset
+
+	# Wait for a minute to let docker, kubelet, and kube-proxy processes finish initialization.
+	# TODO(andyzheng0831): replace it with a more reliable method if possible.
+	sleep 60
+
+	. /etc/kube-configure.sh
+	. /etc/kube-env
+	health_monitoring
+end script
+
+--====================================--

@@ -1,6 +1,6 @@
-#! /bin/bash
+#!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,10 +18,13 @@
 #
 # This container will have a snapshot of the current sources.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-source $(dirname $0)/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
-verify-prereqs
-build-image
-run-build-command bash
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command bash || true

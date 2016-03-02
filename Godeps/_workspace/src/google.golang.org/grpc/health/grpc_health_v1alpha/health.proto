@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package grpc.health.v1alpha;
+
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+ 	UNKNOWN = 0;
+	SERVING = 1;
+	NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+}
+
+service Health{
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+} 

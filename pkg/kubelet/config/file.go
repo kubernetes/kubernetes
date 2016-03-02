@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -9,17 +9,15 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or sied.
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files
+// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -27,57 +25,65 @@ import (
 	"sort"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/wait"
+
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
-type SourceFile struct {
-	path    string
-	updates chan<- interface{}
+type sourceFile struct {
+	path     string
+	nodeName string
+	updates  chan<- interface{}
 }
 
-func NewSourceFile(path string, period time.Duration, updates chan<- interface{}) *SourceFile {
-	config := &SourceFile{
-		path:    path,
-		updates: updates,
+func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
+	config := &sourceFile{
+		path:     path,
+		nodeName: nodeName,
+		updates:  updates,
 	}
-	glog.Infof("Watching file %s", path)
-	go util.Forever(config.run, period)
-	return config
+	glog.V(1).Infof("Watching path %q", path)
+	go wait.Until(config.run, period, wait.NeverStop)
 }
 
-func (s *SourceFile) run() {
+func (s *sourceFile) run() {
 	if err := s.extractFromPath(); err != nil {
-		glog.Errorf("Unable to read config file: %s", err)
+		glog.Errorf("Unable to read config path %q: %v", s.path, err)
 	}
 }
 
-func (s *SourceFile) extractFromPath() error {
+func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
+	return applyDefaults(pod, source, true, s.nodeName)
+}
+
+func (s *sourceFile) extractFromPath() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("unable to access path: %s", err)
+			return err
 		}
-		return fmt.Errorf("path does not exist: %s", path)
+		// Emit an update with an empty PodList to allow FileSource to be marked as seen
+		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		return fmt.Errorf("path does not exist, ignoring")
 	}
 
 	switch {
 	case statInfo.Mode().IsDir():
-		pods, err := extractFromDir(path)
+		pods, err := s.extractFromDir(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
+		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
 
 	case statInfo.Mode().IsRegular():
-		pod, err := extractFromFile(path)
+		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]kubelet.Pod{pod}, kubelet.SET}
+		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -86,30 +92,48 @@ func (s *SourceFile) extractFromPath() error {
 	return nil
 }
 
-func extractFromDir(name string) ([]kubelet.Pod, error) {
-	pods := []kubelet.Pod{}
-
-	files, err := filepath.Glob(filepath.Join(name, "[^.]*"))
+// Get as many pod configs as we can from a directory. Return an error if and only if something
+// prevented us from reading anything at all. Do not return an error if only some files
+// were problematic.
+func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
+	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
-		return pods, err
+		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	sort.Strings(files)
+	pods := make([]*api.Pod, 0)
+	if len(dirents) == 0 {
+		return pods, nil
+	}
 
-	for _, file := range files {
-		pod, err := extractFromFile(file)
+	sort.Strings(dirents)
+	for _, path := range dirents {
+		statInfo, err := os.Stat(path)
 		if err != nil {
-			return []kubelet.Pod{}, err
+			glog.V(1).Infof("Can't get metadata for %q: %v", path, err)
+			continue
 		}
-		pods = append(pods, pod)
+
+		switch {
+		case statInfo.Mode().IsDir():
+			glog.V(1).Infof("Not recursing into config path %q", path)
+		case statInfo.Mode().IsRegular():
+			pod, err := s.extractFromFile(path)
+			if err != nil {
+				glog.V(1).Infof("Can't process config file %q: %v", path, err)
+			} else {
+				pods = append(pods, pod)
+			}
+		default:
+			glog.V(1).Infof("Config path %q is not a directory or file: %v", path, statInfo.Mode())
+		}
 	}
 	return pods, nil
 }
 
-func extractFromFile(name string) (kubelet.Pod, error) {
-	var pod kubelet.Pod
-
-	file, err := os.Open(name)
+func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) {
+	glog.V(3).Infof("Reading config file %q", filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		return pod, err
 	}
@@ -117,33 +141,21 @@ func extractFromFile(name string) (kubelet.Pod, error) {
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		glog.Errorf("Couldn't read from file: %v", err)
 		return pod, err
 	}
 
-	if err := yaml.Unmarshal(data, &pod.Manifest); err != nil {
-		return pod, fmt.Errorf("could not unmarshal manifest: %v", err)
+	defaultFn := func(pod *api.Pod) error {
+		return s.applyDefaults(pod, filename)
 	}
 
-	podName := pod.Manifest.ID
-	if podName == "" {
-		podName = simpleSubdomainSafeHash(name)
+	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)
+	if parsed {
+		if podErr != nil {
+			return pod, podErr
+		}
+		return pod, nil
 	}
-	pod.Name = podName
 
-	return pod, nil
-}
-
-var simpleSubdomainSafeEncoding = base64.NewEncoding("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678900")
-
-// simpleSubdomainSafeHash generates a compact hash of the input that uses characters
-// only in the range a-zA-Z0-9, making it suitable for DNS subdomain labels
-func simpleSubdomainSafeHash(s string) string {
-	hasher := sha1.New()
-	hasher.Write([]byte(s))
-	sha := simpleSubdomainSafeEncoding.EncodeToString(hasher.Sum(nil))
-	if len(sha) > 20 {
-		sha = sha[:20]
-	}
-	return sha
+	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as pod(%v).\n",
+		filename, string(data), podErr)
 }

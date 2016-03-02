@@ -1,4 +1,8 @@
 base:
   '*':
     - mine
-    - common
+    - cluster-params
+    - logging
+    - docker-images
+    - privilege
+    - systemd

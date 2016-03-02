@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -97,24 +97,24 @@ func TestSimultaneousMerge(t *testing.T) {
 	<-ch
 }
 
-func TestWatcher(t *testing.T) {
-	watch := NewWatcher()
-	watch.Notify(struct{}{})
+func TestBroadcaster(t *testing.T) {
+	b := NewBroadcaster()
+	b.Notify(struct{}{})
 
 	ch := make(chan bool, 2)
-	watch.Add(ListenerFunc(func(object interface{}) {
+	b.Add(ListenerFunc(func(object interface{}) {
 		if object != "test" {
 			t.Errorf("Expected %s, Got %s", "test", object)
 		}
 		ch <- true
 	}))
-	watch.Add(ListenerFunc(func(object interface{}) {
+	b.Add(ListenerFunc(func(object interface{}) {
 		if object != "test" {
 			t.Errorf("Expected %s, Got %s", "test", object)
 		}
 		ch <- true
 	}))
-	watch.Notify("test")
+	b.Notify("test")
 	<-ch
 	<-ch
 }

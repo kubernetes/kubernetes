@@ -1,0 +1,8 @@
+{% set docker_opts = "" -%}
+{% if grains.docker_opts is defined and grains.docker_opts -%}
+  {% set docker_opts = grains.docker_opts -%}
+{% endif -%}
+
+DOCKER_OPTS='{{docker_opts}}'
+OPTIONS='{{docker_opts}}'
+DOCKER_CERT_PATH=/etc/docker

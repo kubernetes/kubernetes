@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,31 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REPO_ROOT="$(realpath "$(dirname $0)/..")"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-result=0
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+boiler="${KUBE_ROOT}/hack/boilerplate/boilerplate.py"
 
-dirs=("pkg" "cmd")
+files_need_boilerplate=($(${boiler} "$@"))
 
-for dir in ${dirs[@]}; do
-  for file in $(grep -r -l "" "${REPO_ROOT}/${dir}/" | grep "[.]go"); do
-    if [[ "$(${REPO_ROOT}/hooks/boilerplate.sh "${file}")" -eq "0" ]]; then
-      echo "Boilerplate header is wrong for: ${file}"
-      result=1
-    fi
+if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
+  for file in "${files_need_boilerplate[@]}"; do
+    echo "Boilerplate header is wrong for: ${file}"
   done
-done
 
-dirs=("cluster" "hack" "hooks")
-
-for dir in ${dirs[@]}; do
-  for file in $(grep -r -l "" "${REPO_ROOT}/${dir}/" | grep "[.]sh"); do
-    if [[ "$(${REPO_ROOT}/hooks/boilerplate.sh "${file}")" -eq "0" ]]; then
-      echo "Boilerplate header is wrong for: ${file}"
-      result=1
-    fi
-  done
-done
-
-
-exit ${result}
+  exit 1
+fi

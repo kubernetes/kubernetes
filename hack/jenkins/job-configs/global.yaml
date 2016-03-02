@@ -1,0 +1,182 @@
+# Mail Watcher Plugin alerts the specified address whenever a job config is updated or deleted.
+- property:
+    name: mail-watcher
+    properties:
+        - raw:
+            xml: |
+                <org.jenkinsci.plugins.mailwatcher.WatcherJobProperty plugin="mail-watcher-plugin@1.13">
+                    <watcherAddresses>cloud-kubernetes-team@google.com</watcherAddresses>
+                </org.jenkinsci.plugins.mailwatcher.WatcherJobProperty>
+
+- publisher:
+    name: gcs-uploader
+    publishers:
+        # Use our script for build artifacts, since it's more flexible.
+        - postbuildscript:
+            builders:
+                - shell: |
+                    if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
+                      ./hack/jenkins/upload-to-gcs.sh
+                    else
+                      curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
+                    fi
+                - shell: |
+                    curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-finished.sh" > upload-finished.sh
+                    chmod +x upload-finished.sh
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: SUCCESS
+                    condition-best: SUCCESS
+                    steps:
+                        - shell: './upload-finished.sh SUCCESS'
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: UNSTABLE
+                    condition-best: UNSTABLE
+                    steps:
+                        - shell: './upload-finished.sh UNSTABLE'
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: FAILURE
+                    condition-best: FAILURE
+                    steps:
+                        - shell: './upload-finished.sh FAILURE'
+                - conditional-step:
+                    condition-kind: current-status
+                    condition-worst: ABORTED
+                    condition-best: ABORTED
+                    steps:
+                        - shell: './upload-finished.sh ABORTED'
+            script-only-if-succeeded: False
+            script-only-if-failed: False
+        # Use the plugin for the build log, since it isn't available on Jenkins slaves.
+        - google-cloud-storage:
+            credentials-id: kubernetes-jenkins
+            uploads:
+                - build-log:
+                    log-name: build-log.txt
+                    storage-location: gs://kubernetes-jenkins/logs/$JOB_NAME/$BUILD_NUMBER
+                    share-publicly: true
+                    upload-for-failed-jobs: true
+
+# Default log parser rules.
+- publisher:
+    name: log-parser
+    publishers:
+        - logparser:
+            parse-rules: /jenkins-master-data/log_parser_rules.txt
+            unstable-on-warning: false
+            fail-on-error: false
+
+# There is a junit JJB tag, but it doesn't handle the flaky-test-handler plugin.
+- publisher:
+    name: junit-publisher
+    publishers:
+        - raw:
+            xml: |
+                <hudson.tasks.junit.JUnitResultArchiver plugin="junit@1.9">
+                    <testResults>_artifacts/junit*.xml</testResults>
+                    <keepLongStdio>true</keepLongStdio>
+                    <testDataPublishers>
+                        <de.esailors.jenkins.teststability.StabilityTestDataPublisher plugin="test-stability@1.0"/>
+                        <com.google.jenkins.flakyTestHandler.plugin.JUnitFlakyTestDataPublisher plugin="flaky-test-handler@1.0.1"/>
+                        <hudson.plugins.claim.ClaimTestDataPublisher plugin="claim@2.7"/>
+                    </testDataPublishers>
+                    <healthScaleFactor>100.0</healthScaleFactor>
+                </hudson.tasks.junit.JUnitResultArchiver>
+
+# Implements Docker Build and Publish Plugin
+# https://wiki.jenkins-ci.org/display/JENKINS/CloudBees+Docker+Build+and+Publish+plugin
+# From the docs: 'This plugin provides the ability to build projects with a Dockerfile, and publish the resultant
+# tagged image (repo) to the docker registry.'
+#
+# repoName: docker registry repo name to publish the image
+# dockerfilePath: workspace relative path to the 'Dockerfile' to build
+# tag: Tag to apply to the built image
+# credentialsId: Jenkins 'Username with password' credentials ID (hex string) to authenticate to docker registry.
+#                Found under http:<jenkinsurl>/credentials -> "Advanced"
+- builder:
+    name: docker-build-publish
+    builders:
+        - raw:
+            xml: |
+               <com.cloudbees.dockerpublish.DockerBuilder plugin="docker-build-publish@1.1">
+                   <server plugin="docker-commons@1.2"/>
+                   <registry plugin="docker-commons@1.2">
+                       <credentialsId>{credentialsId}</credentialsId>
+                   </registry>
+                   <repoName>{repoName}</repoName>
+                   <noCache>true</noCache>
+                   <forcePull>true</forcePull>
+                   <dockerfilePath>{dockerfilePath}</dockerfilePath>
+                   <skipBuild>false</skipBuild>
+                   <skipDecorate>false</skipDecorate>
+                   <repoTag>{tag}</repoTag>
+                   <skipPush>false</skipPush>
+                   <createFingerprint>true</createFingerprint>
+                   <skipTagLatest>true</skipTagLatest>
+               </com.cloudbees.dockerpublish.DockerBuilder>
+        - shell: |
+           #!/bin/bash
+           set -e
+           set -x
+           docker rmi -f {repoName}:{tag}
+
+# Default email recipients are set in Jenkins global config
+- defaults:
+    name: global
+    emails: '$DEFAULT_RECIPIENTS'
+    cron-string: 'H/30 * * * *'
+    branch: 'master'
+    job-env: ''
+    runner: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
+    old-runner-1-1: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
+    old-runner-1-0: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh" | bash -
+    provider-env: ''
+    gce-provider-env: |
+        export KUBERNETES_PROVIDER="gce"
+        export E2E_MIN_STARTUP_PODS="1"
+        export KUBE_GCE_ZONE="us-central1-f"
+        export FAIL_ON_GCP_RESOURCE_LEAK="true"
+    gke-provider-env: |
+        export KUBERNETES_PROVIDER="gke"
+        export ZONE="us-central1-f"
+        # By default, GKE tests run against the GKE test endpoint using CI Cloud SDK.
+        # Release jobs (e.g. prod, staging, and test) override these two variables.
+        export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/staging"
+        export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://test-container.sandbox.googleapis.com/"
+        export FAIL_ON_GCP_RESOURCE_LEAK="true"
+    aws-provider-env: |
+        export KUBERNETES_PROVIDER="aws"
+        export E2E_MIN_STARTUP_PODS="1"
+        export KUBE_AWS_ZONE="us-west-2a"
+        export MASTER_SIZE="m3.medium"
+        export NODE_SIZE="m3.medium"
+        export NUM_NODES="3"
+    post-env: |
+        # Nothing should want Jenkins $HOME
+        export HOME=${{WORKSPACE}}
+
+        # Assume we're upping, testing, and downing a cluster
+        export E2E_UP="${{E2E_UP:-true}}"
+        export E2E_TEST="${{E2E_TEST:-true}}"
+        export E2E_DOWN="${{E2E_DOWN:-true}}"
+
+        # Skip gcloud update checking
+        export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+
+        # AWS variables
+        export KUBE_AWS_INSTANCE_PREFIX="${{E2E_NAME:-jenkins-e2e}}"
+
+        # GCE variables
+        export INSTANCE_PREFIX="${{E2E_NAME:-jenkins-e2e}}"
+        export KUBE_GCE_NETWORK="${{E2E_NAME:-jenkins-e2e}}"
+        export KUBE_GCE_INSTANCE_PREFIX="${{E2E_NAME:-jenkins-e2e}}"
+        export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
+
+        # GKE variables
+        export CLUSTER_NAME="${{E2E_NAME:-jenkins-e2e}}"
+        export KUBE_GKE_NETWORK="${{E2E_NAME:-jenkins-e2e}}"
+
+        # Get golang into our PATH so we can run e2e.go
+        export PATH="${{PATH}}:/usr/local/go/bin"

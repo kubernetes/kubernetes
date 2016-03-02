@@ -1,9 +1,0 @@
-{
-  "id": "redismaster",
-  "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 10000,
-  "selector": {
-    "name": "redis-master"
-  }
-}

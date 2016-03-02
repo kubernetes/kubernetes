@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: dns-backend
+  labels:
+    name: dns-backend
+spec:
+  replicas: 1
+  selector:
+    name: dns-backend
+  template:
+    metadata:
+      labels:
+        name: dns-backend
+    spec:
+      containers:
+        - name: dns-backend
+          image: gcr.io/google_containers/example-dns-backend:v1
+          ports:
+            - name: backend-port
+              containerPort: 8000

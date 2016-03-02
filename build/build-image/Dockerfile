@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,46 +13,23 @@
 # limitations under the License.
 
 # This file creates a standard build environment for building Kubernetes
+FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 
-FROM  google/debian:wheezy
-MAINTAINER  Joe Beda <jbeda@google.com>
-
-RUN apt-get update -y && apt-get install --no-install-recommends -y -q \
-  curl \
-  build-essential \
-  ca-certificates \
-  git \
-  mercurial \
-  rsync
-
-# Install Go
-# TODO(jbeda) -- we need to verify this against the hash
-RUN curl -s https://storage.googleapis.com/golang/go1.2.2.src.tar.gz | tar -C /usr/local -xz
-ENV PATH  /usr/local/go/bin:$PATH
-RUN cd /usr/local/go/src && ./make.bash --no-clean 2>&1
-
-# Compile Go for cross compilation
-ENV KUBE_CROSSPLATFORMS \
-  linux/386 linux/arm \
-  darwin/amd64 darwin/386
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
-RUN cd /usr/local/go/src && \
-  bash -xc 'for platform in $KUBE_CROSSPLATFORMS; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean 2>&1; done'
-
-# Set up Go Environment
-ENV PATH    /go/bin:$PATH
-ENV GOPATH  /go:/go/src/github.com/GoogleCloudPlatform/kubernetes/third_party
-ENV GOOS    linux
-ENV GOARCH  amd64
-
-# Get the code coverage tool and etcd for integration tests
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/coreos/etcd
+ENV http_proxy=KUBE_BUILD_HTTP_PROXY \
+  https_proxy=KUBE_BUILD_HTTPS_PROXY \
+  no_proxy=KUBE_BUILD_NO_PROXY
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+WORKDIR /go/src/k8s.io/kubernetes
 
-# Upload Kubernetes
-ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes
+# Propagate the git tree version into the build image
+ADD kube-version-defs /kube-version-defs
+ENV KUBE_GIT_VERSION_FILE /kube-version-defs
+
+# Make output from the dockerized build go someplace else
+ENV KUBE_OUTPUT_SUBPATH _output/dockerized
+
+# Upload Kubernetes source
+ADD kube-source.tar.gz /go/src/k8s.io/kubernetes/

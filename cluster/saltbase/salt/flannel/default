@@ -1,0 +1,6 @@
+{% if grains.api_servers is defined -%}
+  {% set daemon_args = "-remote " + grains.api_servers + ":10253" -%}
+{% else -%}
+  {% set daemon_args = "-remote 127.0.0.1:10253" -%}
+{% endif -%}
+DAEMON_ARGS="{{daemon_args}}"

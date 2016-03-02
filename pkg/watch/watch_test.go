@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,19 +18,26 @@ package watch
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
+
+type testType string
+
+func (obj testType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func TestFake(t *testing.T) {
 	f := NewFake()
 
 	table := []struct {
 		t EventType
-		s string
+		s testType
 	}{
-		{Added, "foo"},
-		{Modified, "qux"},
-		{Modified, "bar"},
-		{Deleted, "bar"},
+		{Added, testType("foo")},
+		{Modified, testType("qux")},
+		{Modified, testType("bar")},
+		{Deleted, testType("bar")},
+		{Error, testType("error: blah")},
 	}
 
 	// Prove that f implements Interface by phrasing this as a function.
@@ -43,7 +50,7 @@ func TestFake(t *testing.T) {
 			if e, a := expect.t, got.Type; e != a {
 				t.Fatalf("Expected %v, got %v", e, a)
 			}
-			if a, ok := got.Object.(string); !ok || a != expect.s {
+			if a, ok := got.Object.(testType); !ok || a != expect.s {
 				t.Fatalf("Expected %v, got %v", expect.s, a)
 			}
 		}
@@ -54,13 +61,27 @@ func TestFake(t *testing.T) {
 	}
 
 	sender := func() {
-		f.Add("foo")
-		f.Action(Modified, "qux")
-		f.Modify("bar")
-		f.Delete("bar")
+		f.Add(testType("foo"))
+		f.Action(Modified, testType("qux"))
+		f.Modify(testType("bar"))
+		f.Delete(testType("bar"))
+		f.Error(testType("error: blah"))
 		f.Stop()
 	}
 
 	go sender()
 	consumer(f)
+}
+
+func TestEmpty(t *testing.T) {
+	w := NewEmptyWatch()
+	_, ok := <-w.ResultChan()
+	if ok {
+		t.Errorf("unexpected result channel result")
+	}
+	w.Stop()
+	_, ok = <-w.ResultChan()
+	if ok {
+		t.Errorf("unexpected result channel result")
+	}
 }

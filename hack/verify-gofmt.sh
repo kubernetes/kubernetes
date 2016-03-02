@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,17 +16,39 @@
 
 # GoFmt apparently is changing @ head...
 
-GO_VERSION=($(go version))
-echo "Detected go version: $(go version)"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3" ]]; then
-  echo "Unknown go version, skipping gofmt."
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+GO_VERSION=($(go version))
+
+if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.4|go1.5') ]]; then
+  echo "Unsupported go version '${GO_VERSION}', skipping gofmt."
   exit 0
 fi
 
+cd "${KUBE_ROOT}"
 
-bad=$(gofmt -s -l pkg/ cmd/)
-if [ "$?" != "0" ]; then
-  echo "$bad"
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './_gopath' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+GOFMT="gofmt -s"
+bad_files=$(find_files | xargs $GOFMT -l)
+if [[ -n "${bad_files}" ]]; then
+  echo "!!! '$GOFMT' needs to be run on the following files: "
+  echo "${bad_files}"
   exit 1
 fi

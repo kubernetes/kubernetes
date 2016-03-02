@@ -1,1 +1,11 @@
-DOCKER_OPTS="--bridge cbr0 --iptables=false"
+{% set grains_opts = grains.get('docker_opts', '') -%}
+{% set e2e_opts = '' -%}
+{% if pillar.get('e2e_storage_test_environment', '').lower() == 'true' -%}
+{% set e2e_opts = '-s devicemapper' -%}
+{% endif -%}
+{% set bridge_opts = "--bridge=cbr0" %}
+{% if pillar.get('network_provider', '').lower() == 'kubenet' %}
+  {% set bridge_opts = "" %}
+{% endif -%}
+DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} {{bridge_opts}} --iptables=false --ip-masq=false --log-level=warn"
+DOCKER_NOFILE=1000000

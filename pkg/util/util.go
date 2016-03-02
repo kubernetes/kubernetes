@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,118 +17,116 @@ limitations under the License.
 package util
 
 import (
-	"encoding/json"
 	"fmt"
-	"runtime"
-	"time"
-
-	"github.com/golang/glog"
+	"os"
+	"reflect"
+	"regexp"
 )
 
-// For testing, bypass HandleCrash.
-var ReallyCrash bool
-
-// HandleCrash simply catches a crash and logs an error. Meant to be called via defer.
-func HandleCrash() {
-	if ReallyCrash {
-		return
-	}
-
-	r := recover()
-	if r != nil {
-		callers := ""
-		for i := 0; true; i++ {
-			_, file, line, ok := runtime.Caller(i)
-			if !ok {
-				break
-			}
-			callers = callers + fmt.Sprintf("%v:%v\n", file, line)
+// Takes a list of strings and compiles them into a list of regular expressions
+func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
+	regexps := []*regexp.Regexp{}
+	for _, regexpStr := range regexpStrings {
+		r, err := regexp.Compile(regexpStr)
+		if err != nil {
+			return []*regexp.Regexp{}, err
 		}
-		glog.Infof("Recovered from panic: %#v (%v)\n%v", r, r, callers)
+		regexps = append(regexps, r)
 	}
+	return regexps, nil
 }
 
-// Forever loops forever running f every d.  Catches any panics, and keeps going.
-func Forever(f func(), period time.Duration) {
-	for {
-		func() {
-			defer HandleCrash()
-			f()
-		}()
-		time.Sleep(period)
-	}
-}
-
-// MakeJSONString returns obj marshalled as a JSON string, ignoring any errors.
-func MakeJSONString(obj interface{}) string {
-	data, _ := json.Marshal(obj)
-	return string(data)
-}
-
-// IntOrString is a type that can hold an int or a string.  When used in
-// JSON or YAML marshalling and unmarshalling, it produces or consumes the
-// inner type.  This allows you to have, for example, a JSON field that can
-// accept a name or number.
-type IntOrString struct {
-	Kind   IntstrKind
-	IntVal int
-	StrVal string
-}
-
-// IntstrKind represents the stored type of IntOrString.
-type IntstrKind int
-
-const (
-	IntstrInt    IntstrKind = iota // The IntOrString holds an int.
-	IntstrString                   // The IntOrString holds a string.
-)
-
-// SetYAML implements the yaml.Setter interface.
-func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
-	switch v := value.(type) {
-	case int:
-		intstr.Kind = IntstrInt
-		intstr.IntVal = v
-		return true
-	case string:
-		intstr.Kind = IntstrString
-		intstr.StrVal = v
+// Detects if using systemd as the init system
+// Please note that simply reading /proc/1/cmdline can be misleading because
+// some installation of various init programs can automatically make /sbin/init
+// a symlink or even a renamed version of their main program.
+// TODO(dchen1107): realiably detects the init system using on the system:
+// systemd, upstart, initd, etc.
+func UsingSystemdInitSystem() bool {
+	if _, err := os.Stat("/run/systemd/system"); err == nil {
 		return true
 	}
+
 	return false
 }
 
-// GetYAML implements the yaml.Getter interface.
-func (intstr IntOrString) GetYAML() (tag string, value interface{}) {
-	switch intstr.Kind {
-	case IntstrInt:
-		value = intstr.IntVal
-	case IntstrString:
-		value = intstr.StrVal
-	default:
-		panic("impossible IntOrString.Kind")
+// Tests whether all pointer fields in a struct are nil.  This is useful when,
+// for example, an API struct is handled by plugins which need to distinguish
+// "no plugin accepted this spec" from "this spec is empty".
+//
+// This function is only valid for structs and pointers to structs.  Any other
+// type will cause a panic.  Passing a typed nil pointer will return true.
+func AllPtrFieldsNil(obj interface{}) bool {
+	v := reflect.ValueOf(obj)
+	if !v.IsValid() {
+		panic(fmt.Sprintf("reflect.ValueOf() produced a non-valid Value for %#v", obj))
 	}
-	return
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return true
+		}
+		v = v.Elem()
+	}
+	for i := 0; i < v.NumField(); i++ {
+		if v.Field(i).Kind() == reflect.Ptr && !v.Field(i).IsNil() {
+			return false
+		}
+	}
+	return true
 }
 
-// UnmarshalJSON implements the json.Unmarshaller interface.
-func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
-	if value[0] == '"' {
-		intstr.Kind = IntstrString
-		return json.Unmarshal(value, &intstr.StrVal)
+func FileExists(filename string) (bool, error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
 	}
-	intstr.Kind = IntstrInt
-	return json.Unmarshal(value, &intstr.IntVal)
+	return true, nil
 }
 
-// MarshalJSON implements the json.Marshaller interface.
-func (intstr IntOrString) MarshalJSON() ([]byte, error) {
-	switch intstr.Kind {
-	case IntstrInt:
-		return json.Marshal(intstr.IntVal)
-	case IntstrString:
-		return json.Marshal(intstr.StrVal)
-	default:
-		return []byte{}, fmt.Errorf("impossible IntOrString.Kind")
+// borrowed from ioutil.ReadDir
+// ReadDir reads the directory named by dirname and returns
+// a list of directory entries, minus those with lstat errors
+func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
+	if dirname == "" {
+		dirname = "."
 	}
+
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	names, err := f.Readdirnames(-1)
+	list := make([]os.FileInfo, 0, len(names))
+	errs := make([]error, 0, len(names))
+	for _, filename := range names {
+		fip, lerr := os.Lstat(dirname + "/" + filename)
+		if os.IsNotExist(lerr) {
+			// File disappeared between readdir + stat.
+			// Just treat it as if it didn't exist.
+			continue
+		}
+
+		list = append(list, fip)
+		errs = append(errs, lerr)
+	}
+
+	return list, errs, nil
+}
+
+// IntPtr returns a pointer to an int
+func IntPtr(i int) *int {
+	o := i
+	return &o
+}
+
+// IntPtrDerefOr dereference the int ptr and returns it i not nil,
+// else returns def.
+func IntPtrDerefOr(ptr *int, def int) int {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
 }

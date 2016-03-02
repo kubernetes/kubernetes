@@ -1,0 +1,24 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+     "name": "nginx-controller",
+     "labels": {"name": "nginx"}
+  },
+  "spec": {
+    "replicas": 2,
+    "selector": {"name": "nginx"},
+    "template": {
+       "metadata": {
+          "labels": {"name": "nginx"}
+       },
+       "spec": {
+           "containers": [{
+             "name": "nginx",
+             "image": "nginx",
+             "ports": [{"containerPort": 80}]
+           }]
+       }
+    }
+  }
+}

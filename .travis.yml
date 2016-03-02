@@ -1,21 +1,27 @@
+sudo: required
+
+# trusty required for docker
+# https://github.com/travis-ci/travis-ci/issues/5448
+dist: trusty
+
+services:
+  - docker
+
 language: go
 
-go:
-  - 1.3
-  - 1.2
-  - tip
+matrix:
+  include:
+    - go: 1.5.3
 
-install: 
-  - go get code.google.com/p/go.tools/cmd/cover
-  - go get github.com/coreos/etcd
-  - ./hack/verify-gofmt.sh
-  - ./hack/verify-boilerplate.sh
-  - ./hack/install-std-race.sh
+install:
+  - go get github.com/tools/godep
+  - ./hack/install-etcd.sh
   - ./hack/build-go.sh
+  - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
 
 script:
-  - ./hack/test-go.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/integration-test.sh
+  - make verify BRANCH=$TRAVIS_BRANCH
 
 notifications:
-  irc: "chat.freenode.net#google-containers"
+  irc: "chat.freenode.net#kubernetes-dev"
+  slack: kubernetes:PHPPkljtEsHXED6xl9IfOvKe

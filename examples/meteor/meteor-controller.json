@@ -1,0 +1,34 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "meteor-controller",
+    "labels": {
+      "name": "meteor"
+    }
+  },
+  "spec": {
+    "replicas": 2,
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "meteor"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "meteor",
+            "image": "chees/meteor-gke-example:latest",
+            "ports": [
+              {
+                "name": "http-server",
+                "containerPort": 8080
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

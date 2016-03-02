@@ -1,6 +1,6 @@
-#! /bin/bash
+#!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,10 +20,12 @@
 # Kubernetes into a tar file and put it in the right place in the output
 # directory.  It will then copy over the Dockerfile and build the kube-build
 # image.
+set -o errexit
+set -o nounset
+set -o pipefail
 
-set -e
+KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
+source "$KUBE_ROOT/build/common.sh"
 
-source $(dirname $0)/common.sh
-
-verify-prereqs
-build-image
+kube::build::verify_prereqs
+kube::build::build_image

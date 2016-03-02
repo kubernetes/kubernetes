@@ -1,0 +1,3 @@
+
+# TYPE metric summary
+metric{quantile="bla"} 3.14

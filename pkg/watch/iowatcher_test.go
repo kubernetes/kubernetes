@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,13 +20,15 @@ import (
 	"io"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type fakeDecoder struct {
 	items chan Event
 }
 
-func (f fakeDecoder) Decode() (action EventType, object interface{}, err error) {
+func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err error) {
 	item, open := <-f.items
 	if !open {
 		return action, nil, io.EOF
@@ -40,7 +42,7 @@ func (f fakeDecoder) Close() {
 
 func TestStreamWatcher(t *testing.T) {
 	table := []Event{
-		{Added, "foo"},
+		{Added, testType("foo")},
 	}
 
 	fd := fakeDecoder{make(chan Event, 5)}

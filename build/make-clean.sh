@@ -1,6 +1,6 @@
-#! /bin/bash
+#!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
 # limitations under the License.
 
 # Clean out the output directory on the docker host.
+set -o errexit
+set -o nounset
+set -o pipefail
 
-set -e
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
-source $(dirname $0)/common.sh
-
-verify-prereqs
-build-image
-run-build-command rm -rf output/build/*
+kube::build::verify_prereqs
+kube::build::clean_output
+kube::build::clean_images

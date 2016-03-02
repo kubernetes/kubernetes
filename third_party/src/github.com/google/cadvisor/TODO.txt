@@ -1,2 +1,0 @@
-- Allow us to have different tracking policies: only top-level, only specified, all containers
-- Add ability to checkpoint state (and plugable medium for this)

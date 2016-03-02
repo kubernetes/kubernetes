@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context

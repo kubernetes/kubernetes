@@ -1,0 +1,3 @@
+language: go
+install:
+      - go get github.com/vishvananda/netns

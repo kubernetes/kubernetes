@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package watch
 
 import (
 	"sync"
+
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Interface can be implemented by anything that knows how to watch and report changes.
@@ -39,15 +41,39 @@ const (
 	Added    EventType = "ADDED"
 	Modified EventType = "MODIFIED"
 	Deleted  EventType = "DELETED"
+	Error    EventType = "ERROR"
 )
 
 // Event represents a single event to a watched resource.
 type Event struct {
 	Type EventType
 
-	// If Type == Deleted, then this is the state of the object
-	// immediately before deletion.
-	Object interface{}
+	// Object is:
+	//  * If Type is Added or Modified: the new state of the object.
+	//  * If Type is Deleted: the state of the object immediately before deletion.
+	//  * If Type is Error: *api.Status is recommended; other types may make sense
+	//    depending on context.
+	Object runtime.Object
+}
+
+type emptyWatch chan Event
+
+// NewEmptyWatch returns a watch interface that returns no results and is closed.
+// May be used in certain error conditions where no information is available but
+// an error is not warranted.
+func NewEmptyWatch() Interface {
+	ch := make(chan Event)
+	close(ch)
+	return emptyWatch(ch)
+}
+
+// Stop implements Interface
+func (w emptyWatch) Stop() {
+}
+
+// ResultChan implements Interface
+func (w emptyWatch) ResultChan() <-chan Event {
+	return chan Event(w)
 }
 
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
@@ -78,21 +104,26 @@ func (f *FakeWatcher) ResultChan() <-chan Event {
 }
 
 // Add sends an add event.
-func (f *FakeWatcher) Add(obj interface{}) {
+func (f *FakeWatcher) Add(obj runtime.Object) {
 	f.result <- Event{Added, obj}
 }
 
 // Modify sends a modify event.
-func (f *FakeWatcher) Modify(obj interface{}) {
+func (f *FakeWatcher) Modify(obj runtime.Object) {
 	f.result <- Event{Modified, obj}
 }
 
 // Delete sends a delete event.
-func (f *FakeWatcher) Delete(lastValue interface{}) {
+func (f *FakeWatcher) Delete(lastValue runtime.Object) {
 	f.result <- Event{Deleted, lastValue}
 }
 
+// Error sends an Error event.
+func (f *FakeWatcher) Error(errValue runtime.Object) {
+	f.result <- Event{Error, errValue}
+}
+
 // Action sends an event of the requested type, for table-based testing.
-func (f *FakeWatcher) Action(action EventType, obj interface{}) {
+func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
 	f.result <- Event{action, obj}
 }

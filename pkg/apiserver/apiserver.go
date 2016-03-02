@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,376 +20,450 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"path"
-	"runtime/debug"
+	rt "runtime"
 	"strings"
 	"time"
 
-	"code.google.com/p/go.net/html"
-	"code.google.com/p/go.net/html/atom"
-	"code.google.com/p/go.net/websocket"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apiserver/metrics"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/flushwriter"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wsstream"
+	"k8s.io/kubernetes/pkg/version"
+
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
-// errNotFound is an error which indicates that a specified resource is not found.
-type errNotFound string
-
-// Error returns a string representation of the err.
-func (err errNotFound) Error() string {
-	return string(err)
+func init() {
+	metrics.Register()
 }
 
-// IsNotFound determines if the err is an error which indicates that a specified resource was not found.
-func IsNotFound(err error) bool {
-	_, ok := err.(errNotFound)
-	return ok
+// mux is an object that can register http handlers.
+type Mux interface {
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// NewNotFoundErr returns a new error which indicates that the resource of the kind and the name was not found.
-func NewNotFoundErr(kind, name string) error {
-	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
-}
-
-// RESTStorage is a generic interface for RESTful storage services
-// Resources whicih are exported to the RESTful API of apiserver need to implement this interface.
-type RESTStorage interface {
-	// List selects resources in the storage which match to the selector.
-	List(labels.Selector) (interface{}, error)
-
-	// Get finds a resource in the storage by id and returns it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
-	Get(id string) (interface{}, error)
-
-	// Delete finds a resource in the storage and deletes it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
-	Delete(id string) (<-chan interface{}, error)
-
-	Extract(body []byte) (interface{}, error)
-	Create(interface{}) (<-chan interface{}, error)
-	Update(interface{}) (<-chan interface{}, error)
-}
-
-// ResourceWatcher should be implemented by all RESTStorage objects that
-// want to offer the ability to watch for changes through the watch api.
-type ResourceWatcher interface {
-	WatchAll() (watch.Interface, error)
-	WatchSingle(id string) (watch.Interface, error)
-}
-
-// WorkFunc is used to perform any time consuming work for an api call, after
-// the input has been validated. Pass one of these to MakeAsync to create an
-// appropriate return value for the Update, Delete, and Create methods.
-type WorkFunc func() (result interface{}, err error)
-
-// MakeAsync takes a function and executes it, delivering the result in the way required
-// by RESTStorage's Update, Delete, and Create methods.
-func MakeAsync(fn WorkFunc) <-chan interface{} {
-	channel := make(chan interface{})
-	go func() {
-		defer util.HandleCrash()
-		obj, err := fn()
-		if err != nil {
-			status := http.StatusInternalServerError
-			switch {
-			case tools.IsEtcdConflict(err):
-				status = http.StatusConflict
-			}
-			channel <- &api.Status{
-				Status:  api.StatusFailure,
-				Details: err.Error(),
-				Code:    status,
-			}
-		} else {
-			channel <- obj
-		}
-		// 'close' is used to signal that no further values will
-		// be written to the channel. Not strictly necessary, but
-		// also won't hurt.
-		close(channel)
-	}()
-	return channel
-}
-
-// APIServer is an HTTPHandler that delegates to RESTStorage objects.
+// APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful
 // It handles URLs of the form:
-// ${prefix}/${storage_key}[/${object_name}]
-// Where 'prefix' is an arbitrary string, and 'storage_key' points to a RESTStorage object stored in storage.
-//
-// TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
-type APIServer struct {
-	prefix  string
-	storage map[string]RESTStorage
-	ops     *Operations
-	mux     *http.ServeMux
+// /${storage_key}[/${object_name}]
+// Where 'storage_key' points to a rest.Storage object stored in storage.
+// This object should contain all parameterization necessary for running a particular API version
+type APIGroupVersion struct {
+	Storage map[string]rest.Storage
+
+	Root string
+
+	// GroupVersion is the external group version
+	GroupVersion unversioned.GroupVersion
+
+	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
+	// TODO: refactor proxy handler to use sub resources
+	RequestInfoResolver *RequestInfoResolver
+
+	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
+	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
+	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
+	// empty, defaults to GroupVersion.
+	OptionsExternalVersion *unversioned.GroupVersion
+
+	Mapper meta.RESTMapper
+
+	Serializer     runtime.NegotiatedSerializer
+	ParameterCodec runtime.ParameterCodec
+
+	Typer     runtime.ObjectTyper
+	Creater   runtime.ObjectCreater
+	Convertor runtime.ObjectConvertor
+	Linker    runtime.SelfLinker
+
+	Admit   admission.Interface
+	Context api.RequestContextMapper
+
+	MinRequestTimeout time.Duration
 }
 
-// New creates a new APIServer object.
-// 'storage' contains a map of handlers.
-// 'prefix' is the hosting path prefix.
-func New(storage map[string]RESTStorage, prefix string) *APIServer {
-	s := &APIServer{
-		storage: storage,
-		prefix:  strings.TrimRight(prefix, "/"),
-		ops:     NewOperations(),
-		mux:     http.NewServeMux(),
-	}
+type ProxyDialerFunc func(network, addr string) (net.Conn, error)
 
-	s.mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
-	s.mux.HandleFunc(s.prefix+"/", s.ServeREST)
-	healthz.InstallHandler(s.mux)
+// TODO: Pipe these in through the apiserver cmd line
+const (
+	// Minimum duration before timing out read/write requests
+	MinTimeoutSecs = 300
+	// Maximum duration before timing out read/write requests
+	MaxTimeoutSecs = 600
+)
 
-	s.mux.HandleFunc("/", s.handleIndex)
-
-	// Handle both operations and operations/* with the same handler
-	s.mux.HandleFunc(s.operationPrefix(), s.handleOperationRequest)
-	s.mux.HandleFunc(s.operationPrefix()+"/", s.handleOperationRequest)
-
-	s.mux.HandleFunc(s.watchPrefix()+"/", s.handleWatch)
-
-	s.mux.HandleFunc("/proxy/minion/", s.handleMinionReq)
-
-	return s
+// InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
+// It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
+// in a slash.
+func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+	installer := g.newInstaller()
+	ws := installer.NewWebService()
+	apiResources, registrationErrors := installer.Install(ws)
+	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
+	container.Add(ws)
+	return utilerrors.NewAggregate(registrationErrors)
 }
 
-func (s *APIServer) operationPrefix() string {
-	return path.Join(s.prefix, "operations")
-}
+// UpdateREST registers the REST handlers for this APIGroupVersion to an existing web service
+// in the restful Container.  It will use the prefix (root/version) to find the existing
+// web service.  If a web service does not exist within the container to support the prefix
+// this method will return an error.
+func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
+	installer := g.newInstaller()
+	var ws *restful.WebService = nil
 
-func (s *APIServer) watchPrefix() string {
-	return path.Join(s.prefix, "watch")
-}
-
-func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/" && req.URL.Path != "/index.html" {
-		server.notFound(w, req)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	// TODO: serve this out of a file?
-	data := "<html><body>Welcome to Kubernetes</body></html>"
-	fmt.Fprint(w, data)
-}
-
-func (server *APIServer) handleMinionReq(w http.ResponseWriter, req *http.Request) {
-	minionPrefix := "/proxy/minion/"
-	if !strings.HasPrefix(req.URL.Path, minionPrefix) {
-		server.notFound(w, req)
-		return
-	}
-
-	path := req.URL.Path[len(minionPrefix):]
-	rawQuery := req.URL.RawQuery
-
-	// Expect path as: ${minion}/${query_to_minion}
-	// and query_to_minion can be any query that kubelet will accept.
-	//
-	// For example:
-	// To query stats of a minion or a pod or a container,
-	// path string can be ${minion}/stats/<podid>/<containerName> or
-	// ${minion}/podInfo?podID=<podid>
-	//
-	// To query logs on a minion, path string can be:
-	// ${minion}/logs/
-	idx := strings.Index(path, "/")
-	minionHost := path[:idx]
-	_, port, _ := net.SplitHostPort(minionHost)
-	if port == "" {
-		// Couldn't retrieve port information
-		// TODO: Retrieve port info from a common object
-		minionHost += ":10250"
-	}
-	minionPath := path[idx:]
-
-	minionURL := &url.URL{
-		Scheme: "http",
-		Host:   minionHost,
-	}
-	newReq, err := http.NewRequest("GET", minionPath+"?"+rawQuery, nil)
-	if err != nil {
-		glog.Errorf("Failed to create request: %s", err)
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(minionURL)
-	proxy.Transport = &minionTransport{}
-	proxy.ServeHTTP(w, newReq)
-}
-
-type minionTransport struct{}
-
-func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	resp, err := http.DefaultTransport.RoundTrip(req)
-
-	if strings.Contains(resp.Header.Get("Content-Type"), "text/plain") {
-		// Do nothing, simply pass through
-		return resp, err
-	}
-
-	resp, err = t.ProcessResponse(req, resp)
-	return resp, err
-}
-
-func (t *minionTransport) ProcessResponse(req *http.Request, resp *http.Response) (*http.Response, error) {
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		// copying the response body did not work
-		return nil, err
-	}
-
-	bodyNode := &html.Node{
-		Type:     html.ElementNode,
-		Data:     "body",
-		DataAtom: atom.Body,
-	}
-	nodes, err := html.ParseFragment(bytes.NewBuffer(body), bodyNode)
-	if err != nil {
-		glog.Errorf("Failed to found <body> node: %v", err)
-		return resp, err
-	}
-
-	// Define the method to traverse the doc tree and update href node to
-	// point to correct minion
-	var updateHRef func(*html.Node)
-	updateHRef = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "a" {
-			for i, attr := range n.Attr {
-				if attr.Key == "href" {
-					Url := &url.URL{
-						Path: "/proxy/minion/" + req.URL.Host + req.URL.Path + attr.Val,
-					}
-					n.Attr[i].Val = Url.String()
-					break
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			updateHRef(c)
+	for i, s := range container.RegisteredWebServices() {
+		if s.RootPath() == installer.prefix {
+			ws = container.RegisteredWebServices()[i]
+			break
 		}
 	}
 
-	newContent := &bytes.Buffer{}
-	for _, n := range nodes {
-		updateHRef(n)
-		err = html.Render(newContent, n)
+	if ws == nil {
+		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
+	}
+	apiResources, registrationErrors := installer.Install(ws)
+	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
+	return utilerrors.NewAggregate(registrationErrors)
+}
+
+// newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
+func (g *APIGroupVersion) newInstaller() *APIInstaller {
+	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
+	installer := &APIInstaller{
+		group:             g,
+		info:              g.RequestInfoResolver,
+		prefix:            prefix,
+		minRequestTimeout: g.MinRequestTimeout,
+	}
+	return installer
+}
+
+// TODO: document all handlers
+// InstallSupport registers the APIServer support functions
+func InstallSupport(mux Mux, ws *restful.WebService, checks ...healthz.HealthzChecker) {
+	// TODO: convert healthz and metrics to restful and remove container arg
+	healthz.InstallHandler(mux, checks...)
+	mux.Handle("/metrics", prometheus.Handler())
+
+	// Set up a service to return the git code version.
+	ws.Path("/version")
+	ws.Doc("git code version from which this is built")
+	ws.Route(
+		ws.GET("/").To(handleVersion).
+			Doc("get the code version").
+			Operation("getCodeVersion").
+			Produces(restful.MIME_JSON).
+			Consumes(restful.MIME_JSON))
+}
+
+// InstallLogsSupport registers the APIServer log support function into a mux.
+func InstallLogsSupport(mux Mux) {
+	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
+	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
+	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+}
+
+// TODO: needs to perform response type negotiation, this is probably the wrong way to recover panics
+func InstallRecoverHandler(s runtime.NegotiatedSerializer, container *restful.Container) {
+	container.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
+		logStackOnRecover(s, panicReason, httpWriter)
+	})
+}
+
+//TODO: Unify with RecoverPanics?
+func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, w http.ResponseWriter) {
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
+	for i := 2; ; i += 1 {
+		_, file, line, ok := rt.Caller(i)
+		if !ok {
+			break
+		}
+		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
+	}
+	glog.Errorln(buffer.String())
+
+	headers := http.Header{}
+	if ct := w.Header().Get("Content-Type"); len(ct) > 0 {
+		headers.Set("Accept", ct)
+	}
+	errorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, w, &http.Request{Header: headers})
+}
+
+func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
+	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+		serviceErrorHandler(s, requestResolver, apiVersions, serviceErr, request, response)
+	})
+}
+
+func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+	errorNegotiated(apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, response.ResponseWriter, request.Request)
+}
+
+// Adds a service to return the supported api versions at the legacy /api.
+func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) {
+	// TODO: InstallREST should register each version automatically
+
+	// Because in release 1.1, /api returns response with empty APIVersion, we
+	// use StripVersionNegotiatedSerializer to keep the response backwards
+	// compatible.
+	ss := StripVersionNegotiatedSerializer{s}
+	versionHandler := APIVersionHandler(ss, getAPIVersionsFunc)
+	ws := new(restful.WebService)
+	ws.Path(apiPrefix)
+	ws.Doc("get available API versions")
+	ws.Route(ws.GET("/").To(versionHandler).
+		Doc("get available API versions").
+		Operation("getAPIVersions").
+		Produces(s.SupportedMediaTypes()...).
+		Consumes(s.SupportedMediaTypes()...))
+	container.Add(ws)
+}
+
+// stripVersionEncoder strips APIVersion field from the encoding output. It's
+// used to keep the responses at the discovery endpoints backward compatible
+// with release-1.1, when the responses have empty APIVersion.
+type stripVersionEncoder struct {
+	encoder    runtime.Encoder
+	serializer runtime.Serializer
+}
+
+func (c stripVersionEncoder) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+	buf := bytes.NewBuffer([]byte{})
+	err := c.encoder.EncodeToStream(obj, buf, overrides...)
+	if err != nil {
+		return err
+	}
+	roundTrippedObj, gvk, err := c.serializer.Decode(buf.Bytes(), nil, nil)
+	if err != nil {
+		return err
+	}
+	gvk.Group = ""
+	gvk.Version = ""
+	roundTrippedObj.GetObjectKind().SetGroupVersionKind(gvk)
+	return c.serializer.EncodeToStream(roundTrippedObj, w)
+}
+
+// StripVersionNegotiatedSerializer will return stripVersionEncoder when
+// EncoderForVersion is called. See comments for stripVersionEncoder.
+type StripVersionNegotiatedSerializer struct {
+	runtime.NegotiatedSerializer
+}
+
+func (n StripVersionNegotiatedSerializer) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
+	encoder := n.NegotiatedSerializer.EncoderForVersion(serializer, gv)
+	return stripVersionEncoder{encoder, serializer}
+}
+
+func keepUnversioned(group string) bool {
+	return group == "" || group == "extensions"
+}
+
+// Adds a service to return the supported api versions at /apis.
+func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, f func(req *restful.Request) []unversioned.APIGroup) {
+	// Because in release 1.1, /apis returns response with empty APIVersion, we
+	// use StripVersionNegotiatedSerializer to keep the response backwards
+	// compatible.
+	ss := StripVersionNegotiatedSerializer{s}
+	rootAPIHandler := RootAPIHandler(ss, f)
+	ws := new(restful.WebService)
+	ws.Path(apiPrefix)
+	ws.Doc("get available API versions")
+	ws.Route(ws.GET("/").To(rootAPIHandler).
+		Doc("get available API versions").
+		Operation("getAPIVersions").
+		Produces(s.SupportedMediaTypes()...).
+		Consumes(s.SupportedMediaTypes()...))
+	container.Add(ws)
+}
+
+// Adds a service to return the supported versions, preferred version, and name
+// of a group. E.g., a such web service will be registered at /apis/extensions.
+func AddGroupWebService(s runtime.NegotiatedSerializer, container *restful.Container, path string, group unversioned.APIGroup) {
+	ss := s
+	if keepUnversioned(group.Name) {
+		// Because in release 1.1, /apis/extensions returns response with empty
+		// APIVersion, we use StripVersionNegotiatedSerializer to keep the
+		// response backwards compatible.
+		ss = StripVersionNegotiatedSerializer{s}
+	}
+	groupHandler := GroupHandler(ss, group)
+	ws := new(restful.WebService)
+	ws.Path(path)
+	ws.Doc("get information of a group")
+	ws.Route(ws.GET("/").To(groupHandler).
+		Doc("get information of a group").
+		Operation("getAPIGroup").
+		Produces(s.SupportedMediaTypes()...).
+		Consumes(s.SupportedMediaTypes()...))
+	container.Add(ws)
+}
+
+// Adds a service to return the supported resources, E.g., a such web service
+// will be registered at /apis/extensions/v1.
+func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful.WebService, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) {
+	ss := s
+	if keepUnversioned(groupVersion.Group) {
+		// Because in release 1.1, /apis/extensions/v1beta1 returns response
+		// with empty APIVersion, we use StripVersionNegotiatedSerializer to
+		// keep the response backwards compatible.
+		ss = StripVersionNegotiatedSerializer{s}
+	}
+	resourceHandler := SupportedResourcesHandler(ss, groupVersion, apiResources)
+	ws.Route(ws.GET("/").To(resourceHandler).
+		Doc("get available resources").
+		Operation("getAPIResources").
+		Produces(s.SupportedMediaTypes()...).
+		Consumes(s.SupportedMediaTypes()...))
+}
+
+// handleVersion writes the server's version information.
+func handleVersion(req *restful.Request, resp *restful.Response) {
+	writeRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
+}
+
+// APIVersionHandler returns a handler which will list the provided versions as available.
+func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, getAPIVersionsFunc(req))
+	}
+}
+
+// RootAPIHandler returns a handler which will list the provided groups and versions as available.
+func RootAPIHandler(s runtime.NegotiatedSerializer, f func(req *restful.Request) []unversioned.APIGroup) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: f(req)})
+	}
+}
+
+// GroupHandler returns a handler which will return the api.GroupAndVersion of
+// the group.
+func GroupHandler(s runtime.NegotiatedSerializer, group unversioned.APIGroup) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &group)
+	}
+}
+
+// SupportedResourcesHandler returns a handler which will list the provided resources as available.
+func SupportedResourcesHandler(s runtime.NegotiatedSerializer, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources})
+	}
+}
+
+// write renders a returned runtime.Object to the response as a stream or an encoded object. If the object
+// returned by the response implements rest.ResourceStreamer that interface will be used to render the
+// response. The Accept header and current API version will be passed in, and the output will be copied
+// directly to the response body. If content type is returned it is used, otherwise the content type will
+// be "application/octet-stream". All other objects are sent to standard JSON serialization.
+func write(statusCode int, gv unversioned.GroupVersion, s runtime.NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+	if stream, ok := object.(rest.ResourceStreamer); ok {
+		out, flush, contentType, err := stream.InputStream(gv.String(), req.Header.Get("Accept"))
 		if err != nil {
-			glog.Errorf("Failed to render: %v", err)
+			errorNegotiated(err, s, gv, w, req)
+			return
 		}
-	}
-
-	resp.Body = ioutil.NopCloser(newContent)
-	// Update header node with new content-length
-	// TODO: Remove any hash/signature headers here?
-	resp.Header.Del("Content-Length")
-	resp.ContentLength = int64(newContent.Len())
-
-	return resp, err
-}
-
-// HTTP Handler interface
-func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if x := recover(); x != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "apiserver panic. Look in log for details.")
-			glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
+		if out == nil {
+			// No output provided - return StatusNoContent
+			w.WriteHeader(http.StatusNoContent)
+			return
 		}
-	}()
-	defer httplog.MakeLogged(req, &w).StacktraceWhen(
-		httplog.StatusIsNot(
-			http.StatusOK,
-			http.StatusAccepted,
-			http.StatusConflict,
-			http.StatusNotFound,
-		),
-	).Log()
+		defer out.Close()
 
-	// Dispatch via our mux.
-	server.mux.ServeHTTP(w, req)
-}
+		if wsstream.IsWebSocketRequest(req) {
+			r := wsstream.NewReader(out, true)
+			if err := r.Copy(w, req); err != nil {
+				utilruntime.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
+			}
+			return
+		}
 
-// ServeREST handles requests to all our RESTStorage objects.
-func (server *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
-	if !strings.HasPrefix(req.URL.Path, server.prefix) {
-		server.notFound(w, req)
+		if len(contentType) == 0 {
+			contentType = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(statusCode)
+		writer := w.(io.Writer)
+		if flush {
+			writer = flushwriter.Wrap(w)
+		}
+		io.Copy(writer, out)
 		return
 	}
-	requestParts := strings.Split(req.URL.Path[len(server.prefix):], "/")[1:]
-	if len(requestParts) < 1 {
-		server.notFound(w, req)
-		return
-	}
-	storage := server.storage[requestParts[0]]
-	if storage == nil {
-		httplog.LogOf(w).Addf("'%v' has no storage object", requestParts[0])
-		server.notFound(w, req)
-		return
-	}
-
-	server.handleREST(requestParts, req, w, storage)
+	writeNegotiated(s, gv, w, req, statusCode, object)
 }
 
-func (server *APIServer) notFound(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, "Not Found: %#v", req)
+// writeNegotiated renders an object in the content type negotiated by the client
+func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	serializer, contentType, err := negotiateOutputSerializer(req, s)
+	if err != nil {
+		status := errToAPIStatus(err)
+		writeRawJSON(int(status.Code), status, w)
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(statusCode)
+
+	encoder := s.EncoderForVersion(serializer, gv)
+	if err := encoder.EncodeToStream(object, w); err != nil {
+		errorJSONFatal(err, encoder, w)
+	}
 }
 
-func (server *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
+// errorNegotiated renders an error to the response. Returns the HTTP status code of the error.
+func errorNegotiated(err error, s runtime.NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request) int {
+	status := errToAPIStatus(err)
+	code := int(status.Code)
+	writeNegotiated(s, gv, w, req, code, status)
+	return code
+}
+
+// errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
+// Returns the HTTP status code of the error.
+func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int {
+	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	status := errToAPIStatus(err)
+	code := int(status.Code)
+	output, err := runtime.Encode(codec, status)
+	if err != nil {
+		w.WriteHeader(code)
+		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)
+		return code
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	w.Write(output)
+	return code
+}
+
+// writeRawJSON writes a non-API object in JSON.
+func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
+	output, err := json.MarshalIndent(object, "", "  ")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	output, err := api.Encode(object)
-	if err != nil {
-		server.error(err, w)
-		return
-	}
 	w.Write(output)
-}
-
-func (server *APIServer) error(err error, w http.ResponseWriter) {
-	w.WriteHeader(500)
-	fmt.Fprintf(w, "Internal Error: %#v", err)
-}
-
-func (server *APIServer) readBody(req *http.Request) ([]byte, error) {
-	defer req.Body.Close()
-	return ioutil.ReadAll(req.Body)
-}
-
-// finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
-// Operation to recieve the result and returning its ID down the writer.
-func (server *APIServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
-	op := server.ops.NewOperation(out)
-	if sync {
-		op.WaitFor(timeout)
-	}
-	obj, complete := op.StatusOrResult()
-	if complete {
-		status := http.StatusOK
-		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		case *api.Status:
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		}
-		server.write(status, obj, w)
-	} else {
-		server.write(http.StatusAccepted, obj, w)
-	}
 }
 
 func parseTimeout(str string) time.Duration {
@@ -398,294 +472,21 @@ func parseTimeout(str string) time.Duration {
 		if err == nil {
 			return timeout
 		}
-		glog.Errorf("Failed to parse: %#v '%s'", err, str)
+		glog.Errorf("Failed to parse %q: %v", str, err)
 	}
 	return 30 * time.Second
 }
 
-// handleREST is the main dispatcher for the server.  It switches on the HTTP method, and then
-// on path length, according to the following table:
-//   Method     Path          Action
-//   GET        /foo          list
-//   GET        /foo/bar      get 'bar'
-//   POST       /foo          create
-//   PUT        /foo/bar      update 'bar'
-//   DELETE     /foo/bar      delete 'bar'
-// Returns 404 if the method/pattern doesn't match one of these entries
-// The server accepts several query parameters:
-//    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
-//    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
-//    labels=<label-selector> Used for filtering list operations
-func (server *APIServer) handleREST(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	sync := req.URL.Query().Get("sync") == "true"
-	timeout := parseTimeout(req.URL.Query().Get("timeout"))
-	switch req.Method {
-	case "GET":
-		switch len(parts) {
-		case 1:
-			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
-			if err != nil {
-				server.error(err, w)
-				return
-			}
-			list, err := storage.List(selector)
-			if err != nil {
-				server.error(err, w)
-				return
-			}
-			server.write(http.StatusOK, list, w)
-		case 2:
-			item, err := storage.Get(parts[1])
-			if IsNotFound(err) {
-				server.notFound(w, req)
-				return
-			}
-			if err != nil {
-				server.error(err, w)
-				return
-			}
-			server.write(http.StatusOK, item, w)
-		default:
-			server.notFound(w, req)
-		}
-	case "POST":
-		if len(parts) != 1 {
-			server.notFound(w, req)
-			return
-		}
-		body, err := server.readBody(req)
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		obj, err := storage.Extract(body)
-		if IsNotFound(err) {
-			server.notFound(w, req)
-			return
-		}
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		out, err := storage.Create(obj)
-		if IsNotFound(err) {
-			server.notFound(w, req)
-			return
-		}
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		server.finishReq(out, sync, timeout, w)
-	case "DELETE":
-		if len(parts) != 2 {
-			server.notFound(w, req)
-			return
-		}
-		out, err := storage.Delete(parts[1])
-		if IsNotFound(err) {
-			server.notFound(w, req)
-			return
-		}
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		server.finishReq(out, sync, timeout, w)
-	case "PUT":
-		if len(parts) != 2 {
-			server.notFound(w, req)
-			return
-		}
-		body, err := server.readBody(req)
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		obj, err := storage.Extract(body)
-		if IsNotFound(err) {
-			server.notFound(w, req)
-			return
-		}
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		out, err := storage.Update(obj)
-		if IsNotFound(err) {
-			server.notFound(w, req)
-			return
-		}
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-		server.finishReq(out, sync, timeout, w)
-	default:
-		server.notFound(w, req)
-	}
+func readBody(req *http.Request) ([]byte, error) {
+	defer req.Body.Close()
+	return ioutil.ReadAll(req.Body)
 }
 
-func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Request) {
-	opPrefix := server.operationPrefix()
-	if !strings.HasPrefix(req.URL.Path, opPrefix) {
-		server.notFound(w, req)
-		return
+// splitPath returns the segments for a URL path.
+func splitPath(path string) []string {
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return []string{}
 	}
-	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) > 1 {
-		server.notFound(w, req)
-		return
-	}
-	if req.Method != "GET" {
-		server.notFound(w, req)
-		return
-	}
-	if len(parts) == 0 {
-		// List outstanding operations.
-		list := server.ops.List()
-		server.write(http.StatusOK, list, w)
-		return
-	}
-
-	op := server.ops.Get(parts[0])
-	if op == nil {
-		server.notFound(w, req)
-		return
-	}
-
-	obj, complete := op.StatusOrResult()
-	if complete {
-		server.write(http.StatusOK, obj, w)
-	} else {
-		server.write(http.StatusAccepted, obj, w)
-	}
-}
-
-func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
-	prefix := server.watchPrefix()
-	if !strings.HasPrefix(req.URL.Path, prefix) {
-		server.notFound(w, req)
-		return
-	}
-	parts := strings.Split(req.URL.Path[len(prefix):], "/")[1:]
-	if req.Method != "GET" || len(parts) < 1 {
-		server.notFound(w, req)
-	}
-	storage := server.storage[parts[0]]
-	if storage == nil {
-		server.notFound(w, req)
-	}
-	if watcher, ok := storage.(ResourceWatcher); ok {
-		var watching watch.Interface
-		var err error
-		if id := req.URL.Query().Get("id"); id != "" {
-			watching, err = watcher.WatchSingle(id)
-		} else {
-			watching, err = watcher.WatchAll()
-		}
-		if err != nil {
-			server.error(err, w)
-			return
-		}
-
-		// TODO: This is one watch per connection. We want to multiplex, so that
-		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching}
-		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
-			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
-		} else {
-			watchServer.ServeHTTP(w, req)
-		}
-		return
-	}
-
-	server.notFound(w, req)
-}
-
-// WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
-type WatchServer struct {
-	watching watch.Interface
-}
-
-// HandleWS implements a websocket handler.
-func (w *WatchServer) HandleWS(ws *websocket.Conn) {
-	done := make(chan struct{})
-	go func() {
-		var unused interface{}
-		// Expect this to block until the connection is closed. Client should not
-		// send anything.
-		websocket.JSON.Receive(ws, &unused)
-		close(done)
-	}()
-	for {
-		select {
-		case <-done:
-			w.watching.Stop()
-			return
-		case event, ok := <-w.watching.ResultChan():
-			if !ok {
-				// End of results.
-				return
-			}
-			err := websocket.JSON.Send(ws, &api.WatchEvent{
-				Type:   event.Type,
-				Object: api.APIObject{event.Object},
-			})
-			if err != nil {
-				// Client disconnect.
-				w.watching.Stop()
-				return
-			}
-		}
-	}
-}
-
-// ServeHTTP serves a series of JSON encoded events via straight HTTP with
-// Transfer-Encoding: chunked.
-func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	loggedW := httplog.LogOf(w)
-	w = httplog.Unlogged(w)
-
-	cn, ok := w.(http.CloseNotifier)
-	if !ok {
-		loggedW.Addf("unable to get CloseNotifier")
-		http.NotFound(loggedW, req)
-		return
-	}
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		loggedW.Addf("unable to get Flusher")
-		http.NotFound(loggedW, req)
-		return
-	}
-
-	loggedW.Header().Set("Transfer-Encoding", "chunked")
-	loggedW.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	encoder := json.NewEncoder(w)
-	for {
-		select {
-		case <-cn.CloseNotify():
-			self.watching.Stop()
-			return
-		case event, ok := <-self.watching.ResultChan():
-			if !ok {
-				// End of results.
-				return
-			}
-			err := encoder.Encode(&api.WatchEvent{
-				Type:   event.Type,
-				Object: api.APIObject{event.Object},
-			})
-			if err != nil {
-				// Client disconnect.
-				self.watching.Stop()
-				return
-			}
-			flusher.Flush()
-		}
-	}
+	return strings.Split(path, "/")
 }

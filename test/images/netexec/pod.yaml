@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netexec
+  labels:
+    app: netexec
+spec:
+  containers:
+  - name: netexec
+    image: gcr.io/google_containers/netexec:1.4
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+    - containerPort: 8081
+      protocol: UDP

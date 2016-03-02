@@ -1,87 +1,83 @@
-etcd-install:
-  git.latest:
-    - target: /var/src/etcd
-    - name: git://github.com/coreos/etcd
-  cmd.wait:
-    - cwd: /var/src/etcd
-    - names:
-      - ./build
-    - env:
-      - PATH: {{ grains['path'] }}:/usr/local/bin
-    - watch:
-      - git: etcd-install
-  file.symlink:
-    - name: /usr/local/bin/etcd
-    - target: /var/src/etcd/bin/etcd
-    - watch:
-      - cmd: etcd-install
+# Early configurations of Kubernetes ran etcd on the host and as part of a migration step, we began to delete the host etcd
+# It's possible though that the host has configured a separate etcd to configure other services like Flannel
+# In that case, we do not want Salt to remove or stop the host service
+# Note: its imperative that the host installed etcd not conflict with the Kubernetes managed etcd
+{% if grains['keep_host_etcd'] is not defined %}
 
-etcd:
-  group.present:
-    - system: True
-  user.present:
-    - system: True
-    - gid_from_name: True
-    - shell: /sbin/nologin
-    - home: /var/etcd
-    - require:
-      - group: etcd
+delete_etc_etcd_dir:
+  file.absent:
+    - name: /etc/etcd
 
-/etc/etcd:
-  file.directory:
-    - user: root
-    - group: root
-    - dir_mode: 755
+delete_etcd_conf:
+  file.absent:
+    - name: /etc/etcd/etcd.conf
 
-/etc/etcd/etcd.conf:
-  file.managed:
-    - source: salt://etcd/etcd.conf
-    - user: root
-    - group: root
-    - mode: 644
+delete_etcd_default:
+  file.absent:
+    - name: /etc/default/etcd
+
+{% if pillar.get('is_systemd') %}
+delete_etcd_service_file:
+  file.absent:
+    - name: {{ pillar.get('systemd_system_path') }}/etcd.service
+{% endif %}
+
+delete_etcd_initd:
+  file.absent:
+    - name: /etc/init.d/etcd
+
+#stop legacy etcd_service
+stop_etcd-service:
+  service.dead:
+    - name: etcd
+    - enable: None
+
+{% endif %}
+
+touch /var/log/etcd.log:
+  cmd.run:
+    - creates: /var/log/etcd.log
+
+touch /var/log/etcd-events.log:
+  cmd.run:
+    - creates: /var/log/etcd-events.log
 
 /var/etcd:
   file.directory:
-    - user: etcd
-    - group: etcd
+    - user: root
+    - group: root
     - dir_mode: 700
+    - recurse:
+      - user
+      - group
+      - mode
 
-{% if grains['os_family'] == 'RedHat' %}
-
-/etc/default/etcd:
+/etc/kubernetes/manifests/etcd.manifest:
   file.managed:
-    - source: salt://etcd/default
+    - source: salt://etcd/etcd.manifest
     - template: jinja
     - user: root
     - group: root
     - mode: 644
+    - makedirs: true
+    - dir_mode: 755
+    - context:
+        suffix: ""
+        port: 4001
+        server_port: 2380
+        cpulimit: '"200m"'
 
-/usr/lib/systemd/system/etcd.service:
+/etc/kubernetes/manifests/etcd-events.manifest:
   file.managed:
-    - source: salt://etcd/etcd.service
+    - source: salt://etcd/etcd.manifest
+    - template: jinja
     - user: root
     - group: root
-
-{% else %}
-
-/etc/init.d/etcd:
-  file.managed:
-    - source: salt://etcd/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-{% endif %}
-
-etcd-service:
-  service.running:
-    - name: etcd
-    - enable: True
-    - watch:
-      - file: /etc/etcd/etcd.conf
-      {% if grains['os_family'] == 'RedHat' %}
-      - file: /usr/lib/systemd/system/etcd.service
-      - file: /etc/default/etcd
-      {% endif %}
-      - cmd: etcd-install
-
+    - mode: 644
+    - makedirs: true
+    - dir_mode: 755
+    - context:
+        suffix: "-events"
+        port: 4002
+        server_port: 2381
+        cpulimit: '"100m"'

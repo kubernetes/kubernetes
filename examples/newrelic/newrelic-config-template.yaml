@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: newrelic-config
+type: Opaque
+data:
+  config: {{config_data}}

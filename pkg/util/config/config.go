@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -9,7 +9,7 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or cied.
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
@@ -19,7 +19,7 @@ package config
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type Merger interface {
@@ -74,7 +74,7 @@ func (m *Mux) Channel(source string) chan interface{} {
 	}
 	newChannel := make(chan interface{})
 	m.sources[source] = newChannel
-	go util.Forever(func() { m.listen(source, newChannel) }, 0)
+	go wait.Until(func() { m.listen(source, newChannel) }, 0, wait.NeverStop)
 	return newChannel
 }
 
@@ -91,7 +91,7 @@ type Accessor interface {
 	MergedState() interface{}
 }
 
-// AccessorFunc implements the Accessor interface
+// AccessorFunc implements the Accessor interface.
 type AccessorFunc func() interface{}
 
 func (f AccessorFunc) MergedState() interface{} {
@@ -110,30 +110,30 @@ func (f ListenerFunc) OnUpdate(instance interface{}) {
 	f(instance)
 }
 
-type Watcher struct {
+type Broadcaster struct {
 	// Listeners for changes and their lock.
 	listenerLock sync.RWMutex
 	listeners    []Listener
 }
 
-// Register a set of listeners that support the Listener interface and
-// notify them on changes.
-func NewWatcher() *Watcher {
-	return &Watcher{}
+// NewBroadcaster registers a set of listeners that support the Listener interface
+// and notifies them all on changes.
+func NewBroadcaster() *Broadcaster {
+	return &Broadcaster{}
 }
 
-// Register Listener to receive updates of changes.
-func (m *Watcher) Add(listener Listener) {
-	m.listenerLock.Lock()
-	defer m.listenerLock.Unlock()
-	m.listeners = append(m.listeners, listener)
+// Add registers listener to receive updates of changes.
+func (b *Broadcaster) Add(listener Listener) {
+	b.listenerLock.Lock()
+	defer b.listenerLock.Unlock()
+	b.listeners = append(b.listeners, listener)
 }
 
-// Notify all listeners
-func (m *Watcher) Notify(instance interface{}) {
-	m.listenerLock.RLock()
-	listeners := m.listeners
-	m.listenerLock.RUnlock()
+// Notify notifies all listeners.
+func (b *Broadcaster) Notify(instance interface{}) {
+	b.listenerLock.RLock()
+	listeners := b.listeners
+	b.listenerLock.RUnlock()
 	for _, listener := range listeners {
 		listener.OnUpdate(instance)
 	}

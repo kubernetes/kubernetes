@@ -1,0 +1,9 @@
+[Unit]
+Description=Kubernetes Node Unpacker
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+ExecStart=/etc/kubernetes/kube-node-unpacker.sh
+
+[Install]
+WantedBy=multi-user.target

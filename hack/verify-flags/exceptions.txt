@@ -1,0 +1,113 @@
+Vagrantfile:      node_ip = $node_ips[n]
+cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
+cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
+cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
+cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
+cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
+cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
+cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
+cluster/centos/util.sh:  local node_ip=${node#*@}
+cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
+cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
+cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
+cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
+cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
+cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
+cluster/juju/charms/trusty/kubernetes-master/files/scheduler.upstart.tmpl:     --address=%(bind_address)s \
+cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    if api_servers:
+cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
+cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
+cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
+cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
+cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
+cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
+cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
+cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+cluster/saltbase/salt/supervisor/kubelet-checker.sh:	{% set kubelet_port = pillar['kubelet_port'] -%}
+cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
+cluster/ubuntu/util.sh:  local node_ip=${1}
+cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:  var cloud_config = cloud_config_creator(x, conf);
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:    return cloud_config.generate_environment_file_entry_from_object(util.hostname(n, 'kube'), {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
+docs/getting-started-guides/docker-multinode/skydns-rc.yaml.in:        - -kube_master_url=http://{kube_server_url}:8080
+examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
+examples/vitess/env.sh:    node_ip=$(get_node_ip)
+hack/jenkins/job-builder-image/Dockerfile:# JJB configuration lives in /etc/jenkins_jobs/jenkins_jobs.ini
+hack/jenkins/update-jobs.sh:    docker cp jenkins_jobs.ini job-builder:/etc/jenkins_jobs
+hack/jenkins/update-jobs.sh:    echo "jenkins_jobs.ini not found in workspace" >&2
+hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credentials for Jenkins.
+hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
+hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
+hack/local-up-cluster.sh:    runtime_config=""
+pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
+pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
+pkg/kubelet/qos/memory_policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
+pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to read oom_score_adj: %v", readErr)
+pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to set oom_score_adj to %d: %v", oomScoreAdj, writeErr)
+pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
+pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
+pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
+pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
+test/e2e/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
+test/e2e/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+test/e2e/es_cluster_logging.go:		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
+test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
+test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
+test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
+test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
+test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
+test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
+pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"

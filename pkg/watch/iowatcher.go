@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,13 @@ limitations under the License.
 package watch
 
 import (
+	"io"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/net"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -27,7 +31,7 @@ type Decoder interface {
 	// Decode should return the type of event, the decoded object, or an error.
 	// An error will cause StreamWatcher to call Close(). Decode should block until
 	// it has data or an error occurs.
-	Decode() (action EventType, object interface{}, err error)
+	Decode() (action EventType, object runtime.Object, err error)
 
 	// Close should close the underlying io.Reader, signalling to the source of
 	// the stream that it is no longer being watched. Close() must cause any
@@ -73,14 +77,38 @@ func (sw *StreamWatcher) Stop() {
 	}
 }
 
-// In a loop, read a result from the decoder and send down the result channel.
+// stopping returns true if Stop() was called previously.
+func (sw *StreamWatcher) stopping() bool {
+	sw.Lock()
+	defer sw.Unlock()
+	return sw.stopped
+}
+
+// receive reads result from the decoder in a loop and sends down the result channel.
 func (sw *StreamWatcher) receive() {
 	defer close(sw.result)
 	defer sw.Stop()
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {
+			// Ignore expected error.
+			if sw.stopping() {
+				return
+			}
+			switch err {
+			case io.EOF:
+				// watch closed normally
+			case io.ErrUnexpectedEOF:
+				glog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
+			default:
+				msg := "Unable to decode an event from the watch stream: %v"
+				if net.IsProbableEOF(err) {
+					glog.V(5).Infof(msg, err)
+				} else {
+					glog.Errorf(msg, err)
+				}
+			}
 			return
 		}
 		sw.result <- Event{
