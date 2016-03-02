@@ -152,7 +152,7 @@
                 export E2E_OPT="--check_version_skew=false"
                 export E2E_UP="false"
                 export E2E_DOWN="false"
-                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-master"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\]"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step4-e2e-old'
             runner: '{runner-old}'
@@ -169,7 +169,7 @@
                 export E2E_OPT="--check_version_skew=false"
                 export E2E_UP="false"
                 export E2E_DOWN="false"
-                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Upgrade\].*upgrade-cluster"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:NodeUpgrade\]"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step6-e2e-old'
             runner: '{runner-old}'
