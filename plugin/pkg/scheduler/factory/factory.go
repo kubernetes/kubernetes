@@ -42,7 +42,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -75,7 +74,7 @@ type ConfigFactory struct {
 	StopEverything chan struct{}
 
 	scheduledPodPopulator *framework.Controller
-	schedulerCache        schedulercache.Cache
+	modeler               scheduler.SystemModeler
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's annotation key:
@@ -85,9 +84,6 @@ type ConfigFactory struct {
 
 // Initializes the factory.
 func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactory {
-	stopEverything := make(chan struct{})
-	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
-
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
@@ -99,12 +95,12 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ReplicaSetLister: &cache.StoreToReplicaSetLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		schedulerCache:   schedulerCache,
-		StopEverything:   stopEverything,
+		StopEverything:   make(chan struct{}),
 		SchedulerName:    schedulerName,
 	}
-
-	c.PodLister = schedulerCache
+	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{Store: c.PodQueue}, c.ScheduledPodLister)
+	c.modeler = modeler
+	c.PodLister = modeler.PodLister()
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
@@ -116,49 +112,21 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		0,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				pod, ok := obj.(*api.Pod)
-				if !ok {
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				if err := schedulerCache.AddPod(pod); err != nil {
-					glog.Errorf("scheduler cache AddPod failed: %v", err)
-				}
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				oldPod, ok := oldObj.(*api.Pod)
-				if !ok {
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				newPod, ok := newObj.(*api.Pod)
-				if !ok {
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				if err := schedulerCache.UpdatePod(oldPod, newPod); err != nil {
-					glog.Errorf("scheduler cache UpdatePod failed: %v", err)
+				if pod, ok := obj.(*api.Pod); ok {
+					c.modeler.LockedAction(func() {
+						c.modeler.ForgetPod(pod)
+					})
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				var pod *api.Pod
-				switch t := obj.(type) {
-				case *api.Pod:
-					pod = t
-				case cache.DeletedFinalStateUnknown:
-					var ok bool
-					pod, ok = t.Obj.(*api.Pod)
-					if !ok {
-						glog.Errorf("cannot convert to *api.Pod")
-						return
+				c.modeler.LockedAction(func() {
+					switch t := obj.(type) {
+					case *api.Pod:
+						c.modeler.ForgetPod(t)
+					case cache.DeletedFinalStateUnknown:
+						c.modeler.ForgetPodByKey(t.Key)
 					}
-				default:
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				if err := schedulerCache.RemovePod(pod); err != nil {
-					glog.Errorf("scheduler cache RemovePod failed: %v", err)
-				}
+				})
 			},
 		},
 	)
@@ -273,7 +241,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := scheduler.NewGenericScheduler(f.schedulerCache, predicateFuncs, priorityConfigs, extenders, r)
+	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, extenders, f.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
@@ -284,7 +252,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	return &scheduler.Config{
-		SchedulerCache: f.schedulerCache,
+		Modeler: f.modeler,
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		Algorithm:  algo,

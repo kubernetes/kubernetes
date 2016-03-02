@@ -140,6 +140,7 @@ func TestZeroRequest(t *testing.T) {
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
 			nodeNameToInfo,
+			algorithm.FakePodLister(test.pods),
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
