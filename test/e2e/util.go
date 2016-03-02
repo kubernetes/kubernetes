@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -3542,4 +3543,15 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string) error
 	}
 	defer podClient.Delete(podName, nil)
 	return waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+}
+
+// CoreDump SSHs to the master and all nodes and dumps their logs into dir.
+// It shells out to cluster/log-dump.sh to accomplish this.
+func CoreDump(dir string) {
+	cmd := exec.Command(path.Join(testContext.RepoRoot, "cluster", "log-dump.sh"), dir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		Logf("Error running cluster/log-dump.sh: %v", err)
+	}
 }
