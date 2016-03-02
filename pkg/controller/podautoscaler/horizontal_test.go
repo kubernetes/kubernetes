@@ -33,12 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	heapster "k8s.io/heapster/api/v1/types"
 
-	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -74,6 +72,8 @@ type testCase struct {
 	statusUpdated       bool
 	eventCreated        bool
 	verifyEvents        bool
+	// Channel with names of HPA objects which we have reconciled.
+	processed chan string
 }
 
 func (tc *testCase) computeCPUCurrent() {
@@ -100,6 +100,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	tc.scaleUpdated = false
 	tc.statusUpdated = false
 	tc.eventCreated = false
+	tc.processed = make(chan string, 100)
 	tc.computeCPUCurrent()
 
 	fakeClient := &fake.Clientset{}
@@ -223,6 +224,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage)
 		}
 		tc.statusUpdated = true
+		// Every time we reconcile HPA object we are updating status.
+		tc.processed <- obj.Name
 		return true, obj, nil
 	})
 
@@ -230,7 +233,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := action.(testclient.CreateAction).GetObject().(*api.Event)
 		if tc.verifyEvents {
 			assert.Equal(t, "SuccessfulRescale", obj.Reason)
-			assert.Equal(t, fmt.Sprintf("New size: %d", tc.desiredReplicas), obj.Message)
+			assert.Equal(t, fmt.Sprintf("New size: %d; reason: CPU utilization above target", tc.desiredReplicas), obj.Message)
 		}
 		tc.eventCreated = true
 		return true, obj, nil
@@ -261,11 +264,8 @@ func (tc *testCase) runTest(t *testing.T) {
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
 		time.Sleep(12 * time.Second)
 	}
-	// Each iteration for an HPA object ends with updating status.
-	wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
-		glog.Infof("Status value: ", tc.statusUpdated)
-		return tc.statusUpdated, nil
-	})
+	// Wait for HPA to be processed.
+	<-tc.processed
 	tc.verifyResults(t)
 }
 
