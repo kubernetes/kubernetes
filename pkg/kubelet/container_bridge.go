@@ -29,7 +29,7 @@ import (
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
 
-func createCBR0(wantCIDR *net.IPNet) error {
+func createCBR0(wantCIDR *net.IPNet, babysitDaemons bool) error {
 	// recreate cbr0 with wantCIDR
 	if err := exec.Command("brctl", "addbr", "cbr0").Run(); err != nil {
 		glog.Error(err)
@@ -43,10 +43,19 @@ func createCBR0(wantCIDR *net.IPNet) error {
 		glog.Error(err)
 		return err
 	}
-	// restart docker
+	// Stop docker so that babysitter process can restart it again with proper configurations and
+	// checkpoint file (https://github.com/docker/docker/issues/18283). It is safe to kill docker
+	// process here since CIDR can be changed only once for a given node object, and node is marked
+	// as NotReady until the docker daemon is restarted with the newly configured custom bridge.
+	// TODO (dawnchen): Remove this once corrupted checkpoint issue is fixed.
+	//
 	// For now just log the error. The containerRuntime check will catch docker failures.
 	// TODO (dawnchen) figure out what we should do for rkt here.
-	if util.UsingSystemdInitSystem() {
+	if babysitDaemons {
+		if err := exec.Command("pkill", "-KILL", "docker").Run(); err != nil {
+			glog.Error(err)
+		}
+	} else if util.UsingSystemdInitSystem() {
 		if err := exec.Command("systemctl", "restart", "docker").Run(); err != nil {
 			glog.Error(err)
 		}
@@ -59,14 +68,14 @@ func createCBR0(wantCIDR *net.IPNet) error {
 	return nil
 }
 
-func ensureCbr0(wantCIDR *net.IPNet, promiscuous bool) error {
+func ensureCbr0(wantCIDR *net.IPNet, promiscuous, babysitDaemons bool) error {
 	exists, err := cbr0Exists()
 	if err != nil {
 		return err
 	}
 	if !exists {
 		glog.V(2).Infof("CBR0 doesn't exist, attempting to create it with range: %s", wantCIDR)
-		return createCBR0(wantCIDR)
+		return createCBR0(wantCIDR, babysitDaemons)
 	}
 	if !cbr0CidrCorrect(wantCIDR) {
 		glog.V(2).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
@@ -80,7 +89,7 @@ func ensureCbr0(wantCIDR *net.IPNet, promiscuous bool) error {
 			glog.Error(err)
 			return err
 		}
-		if err := createCBR0(wantCIDR); err != nil {
+		if err := createCBR0(wantCIDR, babysitDaemons); err != nil {
 			glog.Error(err)
 			return err
 		}
