@@ -197,6 +197,17 @@ End-to-end testing, as described above, is for [development distributions](writi
 
 The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not require support for up/push/down and other operations.  To run a conformance test, you need to know the IP of the master for your cluster and the authorization arguments to use.  The conformance test is intended to run against a cluster at a specific binary release of Kubernetes.  See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
 
+### Defining what Conformance means
+
+It is impossible to define the entire space of Conformance tests without knowing the future, so instead, we define the compliment of conformance tests, below.
+
+Please update this with companion PRs as necessary.
+
+ - A conformance test cannot test cloud provider specific features (i.e. GCE monitoring, S3 Bucketing, ...)
+ - A conformance test cannot rely on any particular non-standard file system permissions granted to containers or users (i.e. sharing writable host /tmp with a container)
+ - A conformance test cannot rely on any binaries that are not required for the linux kernel or for a kubelet to run (i.e. git)
+ - A conformance test cannot test a feature which obviously cannot be supported on a broad range of platforms (i.e. testing of multiple disk mounts, GPUs, high density)
+
 ## Continuous Integration
 
 A quick overview of how we run e2e CI on Kubernetes.
