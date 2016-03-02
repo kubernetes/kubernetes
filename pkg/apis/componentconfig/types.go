@@ -280,6 +280,8 @@ type KubeletConfiguration struct {
 	// one must set --hairpin-mode=veth-flag, because bridge assumes the
 	// existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
+	// The node has babysitter process monitoring docker and kubelet.
+	BabysitDaemons bool `json:"babysitDaemons"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int `json:"maxPods"`
 	// dockerExecHandlerName is the handler to use when executing a command

@@ -22,6 +22,7 @@ authorization-mode
 authorization-policy-file
 authorization-webhook-config-file
 basic-auth-file
+babysit-daemons
 bench-pods
 bench-quiet
 bench-tasks
