@@ -99,7 +99,7 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("%s", rm.FormatResourceUsage(usageSummary))
-	verifyMemoryLimits(expectedMemory, usageSummary)
+	verifyMemoryLimits(framework.Client, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	Logf("%s", rm.FormatCPUSummary(cpuSummary))
@@ -109,7 +109,7 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
 }
 
-func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsagePerNode) {
+func verifyMemoryLimits(c *client.Client, expected resourceUsagePerContainer, actual resourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -132,10 +132,16 @@ func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsage
 		}
 		if len(nodeErrs) > 0 {
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
+			heapStats, err := getKubeletHeapStats(c, nodeName)
+			if err != nil {
+				Logf("Unable to get heap stats from %q", nodeName)
+			} else {
+				Logf("Heap stats on %q\n:%v", nodeName, heapStats)
+			}
 		}
 	}
 	if len(errList) > 0 {
-		Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
