@@ -12,6 +12,8 @@ spec:
     image: gcr.io/google_containers/fluentd-gcp:1.16
     resources:
       limits:
+        memory: 200Mi
+      requests:
         cpu: 100m
         memory: 200Mi
     env:
