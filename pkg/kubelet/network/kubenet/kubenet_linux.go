@@ -35,10 +35,9 @@ import (
 )
 
 const (
-	KubenetPluginName    = "kubenet"
-	BridgeName           = "cbr0"
-	DefaultCNIDir        = "/opt/cni/bin"
-	DefaultInterfaceName = "eth0"
+	KubenetPluginName = "kubenet"
+	BridgeName        = "cbr0"
+	DefaultCNIDir     = "/opt/cni/bin"
 )
 
 type kubenetNetworkPlugin struct {
@@ -139,7 +138,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 		// Set bridge address to first address in IPNet
 		cidr.IP.To4()[3] += 1
 
-		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.MTU, DefaultInterfaceName, podCIDR, cidr.IP.String())
+		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.MTU, network.DefaultInterfaceName, podCIDR, cidr.IP.String())
 		plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 		if err == nil {
 			glog.V(5).Infof("CNI network config:\n%s", json)
@@ -282,6 +281,6 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 	return &libcni.RuntimeConf{
 		ContainerID: podInfraContainerID.ID,
 		NetNS:       podNetnsPath,
-		IfName:      DefaultInterfaceName,
+		IfName:      network.DefaultInterfaceName,
 	}
 }
