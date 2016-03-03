@@ -26,7 +26,11 @@ ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 NET_PLUGIN=${NET_PLUGIN:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
+# We disable cluster DNS by default because this script uses docker0 (or whatever
+# container bridge docker is currently using) and we don't know the IP of the
+# DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
+# and change DNS_SERVER_IP to the appropriate IP.
+ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-false}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 DNS_REPLICAS=${KUBE_DNS_REPLICAS:-1}
@@ -310,7 +314,10 @@ function start_kubelet {
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
          dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
       else
-         dns_args="--cluster-dns=127.0.0.1"
+         # To start a private DNS server set ENABLE_CLUSTER_DNS and
+         # DNS_SERVER_IP/DOMAIN. This will at least provide a working
+         # DNS server for real world hostnames.
+         dns_args="--cluster-dns=8.8.8.8"
       fi
 
       net_plugin_args=""
@@ -392,7 +399,7 @@ EOF
 
         ${KUBECTL} create -f namespace.yaml
         # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
+        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
         ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
         echo "Kube-dns rc and service successfully deployed."
     fi
