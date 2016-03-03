@@ -169,6 +169,12 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 
 		err = waitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, podReadyBeforeTimeout)
 		Expect(err).NotTo(HaveOccurred())
+
+		for _, node := range nodeList.Items {
+			Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			PrintAllKubeletPods(c, node.Name)
+		}
+
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
