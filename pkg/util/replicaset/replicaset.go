@@ -14,47 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pod
+package replicaset
 
 import (
 	"fmt"
-	"hash/adler32"
 	"time"
 
 	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := adler32.New()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
-}
-
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
-type updatePodFunc func(pod *api.Pod)
+type updateRSFunc func(rs *extensions.ReplicaSet)
 
-// UpdatePodWithRetries updates a pod with given applyUpdate function. Note that pod not found error is ignored.
-// The returned bool value can be used to tell if the pod is actually updated.
-func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, applyUpdate updatePodFunc) (*api.Pod, bool, error) {
+// UpdateRSWithRetries updates a RS with given applyUpdate function. Note that RS not found error is ignored.
+// The returned bool value can be used to tell if the RS is actually updated.
+func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, applyUpdate updateRSFunc) (*extensions.ReplicaSet, bool, error) {
 	var err error
-	var podUpdated bool
-	oldPod := pod
+	var rsUpdated bool
+	oldRs := rs
 	if err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		pod, err = podClient.Get(oldPod.Name)
+		rs, err = rsClient.Get(oldRs.Name)
 		if err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		// TODO: add precondition for update
-		applyUpdate(pod)
-		if pod, err = podClient.Update(pod); err == nil {
+		applyUpdate(rs)
+		if rs, err = rsClient.Update(rs); err == nil {
 			// Update successful.
 			return true, nil
 		}
@@ -62,16 +53,19 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 		// Update could have failed due to conflict error. Try again.
 		return false, nil
 	}); err == nil {
-		// When there's no error, we've updated this pod.
-		podUpdated = true
+		// When there's no error, we've updated this RS.
+		rsUpdated = true
 	}
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("timed out trying to update pod: %+v", oldPod)
+		err = fmt.Errorf("timed out trying to update RS: %+v", oldRs)
 	}
+	// Ignore the RS not found error, but the RS isn't updated.
 	if errors.IsNotFound(err) {
-		glog.V(4).Infof("%s %s/%s is not found, skip updating it.", oldPod.Kind, oldPod.Namespace, oldPod.Name)
+		glog.V(4).Infof("%s %s/%s is not found, skip updating it.", oldRs.Kind, oldRs.Namespace, oldRs.Name)
 		err = nil
 	}
-	return pod, podUpdated, err
+	// If the error is non-nil the returned controller cannot be trusted, if it is nil, the returned
+	// controller contains the applied update.
+	return rs, rsUpdated, err
 }
