@@ -257,6 +257,7 @@ no-headers
 no-suggestions
 node-instance-group
 node-ip
+node-label
 node-labels
 node-monitor-grace-period
 node-monitor-period
