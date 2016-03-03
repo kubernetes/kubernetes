@@ -126,9 +126,8 @@ func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder
 func (b *Builder) URL(urls ...*url.URL) *Builder {
 	for _, u := range urls {
 		b.paths = append(b.paths, &URLVisitor{
-			Mapper: b.mapper,
-			URL:    u,
-			Schema: b.schema,
+			URL:           u,
+			StreamVisitor: NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
 		})
 	}
 	return b

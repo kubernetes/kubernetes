@@ -1502,6 +1502,29 @@ __EOF__
     kubectl delete -f "${file}" "${kube_flags[@]}"
   done
 
+  #############################
+  # Multiple Resources via URL#
+  #############################
+
+  # Pre-condition: no service (other than default kubernetes services) or replication controller exists
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Command
+  kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/testdata/multi-resource-yaml.yaml "${kube_flags[@]}"
+
+  # Post-condition: service(mock) and rc(mock) exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:mock:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'mock:'
+
+  # Clean up
+  kubectl delete -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/testdata/multi-resource-yaml.yaml "${kube_flags[@]}"
+
+  # Post-condition: no service (other than default kubernetes services) or replication controller exists
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+
+
   ######################
   # Persistent Volumes #
   ######################
