@@ -68,6 +68,26 @@ func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClien
 	}
 }
 
+func (f *FakeDockerClient) InjectError(fn string, err error) {
+	f.Lock()
+	defer f.Unlock()
+	f.Errors[fn] = err
+}
+
+func (f *FakeDockerClient) InjectErrors(errs map[string]error) {
+	f.Lock()
+	defer f.Unlock()
+	for fn, err := range errs {
+		f.Errors[fn] = err
+	}
+}
+
+func (f *FakeDockerClient) ClearErrors() {
+	f.Lock()
+	defer f.Unlock()
+	f.Errors = map[string]error{}
+}
+
 func (f *FakeDockerClient) ClearCalls() {
 	f.Lock()
 	defer f.Unlock()
@@ -382,7 +402,7 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 }
 
 func (f *FakeDockerClient) Version() (*docker.Env, error) {
-	return &f.VersionInfo, nil
+	return &f.VersionInfo, f.popError("version")
 }
 
 func (f *FakeDockerClient) Info() (*docker.Env, error) {

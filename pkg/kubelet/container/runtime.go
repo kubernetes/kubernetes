@@ -57,7 +57,10 @@ type Runtime interface {
 	Version() (Version, error)
 	// APIVersion returns the API version information of the container
 	// runtime. This may be different from the runtime engine's version.
+	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
+	// Status returns error if the runtime is unhealthy; nil otherwise.
+	Status() error
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
