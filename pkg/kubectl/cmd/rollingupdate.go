@@ -332,7 +332,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		Interval:       interval,
 		Timeout:        timeout,
 		CleanupPolicy:  updateCleanupPolicy,
-		MaxUnavailable: intstr.FromInt(1),
+		MaxUnavailable: intstr.FromInt(0),
 		MaxSurge:       intstr.FromInt(1),
 	}
 	if rollback {
