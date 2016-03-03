@@ -133,7 +133,8 @@ func (s *KubeletExecutorServer) runExecutor(
 	}
 	if s.containerID != "" {
 		// tag static pods with annotation that reflects the executor container UUID and the
-		// birth-time of the executor. useful for GC.
+		// birth-time of the executor. useful for GC. it's important that this same UUID;ts
+		// is applied to ALL pods created by this executor. see contrib/mesos/pkg/controller/node
 		timestamp := time.Now().UTC().Format(time.RFC3339)
 		uuidAnnotator := podutil.FilterFunc(func(pod *api.Pod) (bool, error) {
 			podutil.Annotate(&pod.ObjectMeta, map[string]string{

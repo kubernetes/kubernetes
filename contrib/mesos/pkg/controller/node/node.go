@@ -125,9 +125,63 @@ func NewController(client *clientset.Clientset, relistPeriod time.Duration, opti
 func (c *Controller) Run(terminate <-chan struct{}) {
 	go c.nodeController.Run(terminate)
 	for _, m := range c.monitors {
-		go runtime.Until(func() { m.worker() }, m.heartbeatPeriod, terminate)
+		if m.worker != nil {
+			go runtime.Until(func() { m.worker() }, m.heartbeatPeriod, terminate)
+		}
 	}
 	<-terminate
+}
+
+// watch for changes to RunningExecutorCondition
+type mesosContainerController struct {
+	store       cache.Store
+	gracePeriod time.Duration // nodes w/ RunningExecutorCondition updates older than lastHeartbeat+gracePeriod are considered stale
+}
+
+func (c *Controller) newMesosContainerController() *mesosContainerController {
+	controller := &mesosContainerController{
+		store: c.nodeStore.Store,
+	}
+}
+
+func (mcc *mesosContainerController) checkCondition() {
+	// it's possible that some number of nodes are no longer part of the cluster. in this
+	// case k8s should take care of pod state cleanup in apiserver, so we don't worry about
+	// that here.
+	// we're primarily interested in cleaning up stale pod records from apiserver:
+	// - after a pod is bound, kubelet becomes the source of truth re: pod state
+	// - kubelet isn't guanteed to shut down cleanly
+	//   - may leave lingering docker containers (solved by mesos orphan CT GC?)
+	//   - may leave lingering pod records in apiserver (want to solve this here!)
+	// - our slaveStatusController simulates NodeReady condition for **all** known slaves
+	//   - this prevents k8s pod GC/cleanup from properly identifying stale pod state for
+	//     nodes that exist but aren't running kubelet
+	nodes := ssc.store.List()
+	for _, obj := range nodes {
+		n := obj.(*api.Node)
+		cond := getCondition(&n.Status, node.RunningExecutorCondition)
+		if cond != nil {
+			// 1) heartbeat is current --> uuid is possibly stale
+			//   ?? kubelet cycled but we haven't observed a status update yet
+			//   a) delete all pods on the node, except non-matching latest newer UUID;timestamp within grace period or else matching UUID's
+			// 2) heartbeat != current --> uuid is stale
+			//   ?? kubelet is busy/deadlocked
+			//   ?? kubelet is network-partitioned
+			//   ?? kubelet died "uncleanly"
+			//   ?? new kubelet launched (cycled/upgraded) but we haven't observed a status update yet
+			//   a) delete all pods on the node, except non-matching latest newer UUID;timestamp within grace period
+		} else {
+			// 1) new slave on old node (node bounced)? start evicting pods
+			//   ?? node bounced/cycled?
+			//     .. if it was gone long enough k8s may have removed it
+			//     .. it could come back before all pods assigned to it were deleted
+			//   ?? kubelet launched but we haven't observed a status update yet
+			//   a) delete all pods on the node, except newest UUID;timestamp within grace period
+			// 2) new slave on new node? .. no garbage, no kubelet
+			//   ?? kubelet launched but we haven't observed a status update yet
+			//   a) delete all pods on the node, except newest UUID;timestamp within grace period
+		}
+	}
 }
 
 type slaveStatusController struct {
