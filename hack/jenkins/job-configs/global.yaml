@@ -131,6 +131,15 @@
     kill-timeout: 15
     # Just to be safe, use the Jenkins timeout after a long time.
     jenkins-timeout: 600
+    # report-rc assumes that $rc is set to the exit status of the runner.
+    report-rc: |
+        if [[ ${{rc}} -eq 124 || ${{rc}} -eq 137 ]]; then
+            echo "Build timed out" >&2
+        elif [[ ${{rc}} -ne 0 ]]; then
+            echo "Build failed" >&2
+        fi
+        echo "Exiting with code: ${{rc}}"
+        exit ${{rc}}
     branch: 'master'
     job-env: ''
     runner: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -

@@ -70,7 +70,8 @@
             # per-step variables, such as whether to run tests
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m 60m {runner}
+            timeout -k {kill-timeout}m 60m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - mail-watcher
     publishers:
@@ -105,7 +106,8 @@
             # per-step variables, such as whether to run tests
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m 300m {runner}
+            timeout -k {kill-timeout}m 300m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - mail-watcher
     publishers:
