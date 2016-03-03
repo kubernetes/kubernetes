@@ -30,10 +30,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -62,33 +64,11 @@ const (
 	operationPollInterval        = 3 * time.Second
 	operationPollTimeoutDuration = 30 * time.Minute
 
-	defaultLBSourceRange = "0.0.0.0/0"
-
-	//Expected annotations for GCE
-	gceLBAllowSourceRange = "net.beta.kubernetes.io/gce-source-ranges"
-
 	// Each page can have 500 results, but we cap how many pages
 	// are iterated through to prevent infinite loops if the API
 	// were to continuously return a nextPageToken.
 	maxPages = 25
 )
-
-//validateAllowSourceRange validates annotation of allow source ranges
-func validateSourceRangeAnnotation(annotation cloudprovider.ServiceAnnotation) error {
-	val := annotation[gceLBAllowSourceRange]
-	errMsg := fmt.Errorf("Service annotation %s:%s is not valid. Expecting source IP ranges. Comma Seperated. For example, 0.0.0.0/0,192.168.2.0/24", gceLBAllowSourceRange, val)
-	ranges := strings.Split(val, ",")
-	if len(ranges) <= 0 {
-		return errMsg
-	}
-	for _, subnet := range ranges {
-		_, _, err := net.ParseCIDR(subnet)
-		if err != nil {
-			return errMsg
-		}
-	}
-	return nil
-}
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
@@ -474,7 +454,7 @@ func isHTTPErrorCode(err error, code int) bool {
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP, ports []*api.ServicePort, hostNames []string, svc types.NamespacedName, affinityType api.ServiceAffinity, annotations cloudprovider.ServiceAnnotation) (*api.LoadBalancerStatus, error) {
+func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP, ports []*api.ServicePort, hostNames []string, svc types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	portStr := []string{}
 	for _, p := range ports {
 		portStr = append(portStr, fmt.Sprintf("%s/%d", p.Protocol, p.Port))
@@ -599,13 +579,9 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
 	// Check if user specified the allow source range
-	sourceRanges := []string{defaultLBSourceRange}
-	val, ok := annotations.GetValue(gceLBAllowSourceRange)
-	if ok {
-		if err := validateSourceRangeAnnotation(annotations); err != nil {
-			return nil, err
-		}
-		sourceRanges = strings.Split(val, ",")
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
+	if err != nil {
+		return nil, err
 	}
 
 	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(name, serviceName, region, ipAddress, ports, sourceRanges)
@@ -766,7 +742,7 @@ func translateAffinityType(affinityType api.ServiceAffinity) string {
 	}
 }
 
-func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []*api.ServicePort, sourceRanges []string) (exists bool, needsUpdate bool, err error) {
+func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []*api.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
 	fw, err := gce.service.Firewalls.Get(gce.projectID, makeFirewallName(name)).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -790,7 +766,15 @@ func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress st
 	}
 	// The service controller already verified that the protocol matches on all ports, no need to check.
 
-	if !slicesEqual(fw.SourceRanges, sourceRanges) {
+	actualSourceRanges, err := netsets.ParseIPNets(fw.SourceRanges...)
+	if err != nil {
+		// This really shouldn't happen... GCE has returned something unexpected
+		glog.Warningf("Error parsing firewall SourceRanges: %v", fw.SourceRanges)
+		// We don't return the error, because we can hopefully recover from this by reconfiguring the firewall
+		return true, true, nil
+	}
+
+	if !sourceRanges.Equal(actualSourceRanges) {
 		return true, true, nil
 	}
 	return true, false, nil
@@ -870,7 +854,7 @@ func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []
 	return nil
 }
 
-func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges []string, ports []*api.ServicePort, hosts []*gceInstance) error {
+func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) error {
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -888,7 +872,7 @@ func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges []st
 	return nil
 }
 
-func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges []string, ports []*api.ServicePort, hosts []*gceInstance) error {
+func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) error {
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -906,7 +890,7 @@ func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges []st
 	return nil
 }
 
-func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges []string, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges netsets.IPNet, ports []*api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
@@ -919,7 +903,7 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges []st
 		Name:         makeFirewallName(name),
 		Description:  desc,
 		Network:      gce.networkURL,
-		SourceRanges: sourceRanges,
+		SourceRanges: sourceRanges.StringSlice(),
 		TargetTags:   hostTags,
 		Allowed: []*compute.FirewallAllowed{
 			{
@@ -1224,7 +1208,7 @@ func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
 }
 
 // CreateFirewall creates the given firewall rule.
-func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges []string, ports []int64, hostNames []string) error {
+func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNet, ports []int64, hostNames []string) error {
 	region, err := GetGCERegion(gce.localZone)
 	if err != nil {
 		return err
@@ -1253,7 +1237,7 @@ func (gce *GCECloud) DeleteFirewall(name string) error {
 
 // UpdateFirewall applies the given firewall rule as an update to an existing
 // firewall rule with the same name.
-func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges []string, ports []int64, hostNames []string) error {
+func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNet, ports []int64, hostNames []string) error {
 	region, err := GetGCERegion(gce.localZone)
 	if err != nil {
 		return err

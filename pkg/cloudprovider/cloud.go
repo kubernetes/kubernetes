@@ -84,7 +84,7 @@ type LoadBalancer interface {
 	// if so, what its status is.
 	GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations ServiceAnnotation) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	UpdateLoadBalancer(name, region string, hosts []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
@@ -159,11 +159,4 @@ type Zone struct {
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 	GetZone() (Zone, error)
-}
-
-type ServiceAnnotation map[string]string
-
-func (s ServiceAnnotation) GetValue(key string) (string, bool) {
-	val, ok := s[key]
-	return val, ok
 }
