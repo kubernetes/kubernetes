@@ -457,7 +457,7 @@ func NewMainKubelet(
 	}
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, util.RealClock{})
-	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0, klet.isContainerRuntimeVersionCompatible)
+	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0)
 	klet.updatePodCIDR(podCIDR)
 
 	// setup containerGC
@@ -2659,7 +2659,7 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 }
 
 func (kl *Kubelet) updateRuntimeUp() {
-	if _, err := kl.containerRuntime.Version(); err != nil {
+	if err := kl.containerRuntime.Status(); err != nil {
 		glog.Errorf("Container runtime sanity check failed: %v", err)
 		return
 	}
@@ -3074,26 +3074,6 @@ func SetNodeStatus(f func(*api.Node) error) Option {
 	return func(k *Kubelet) {
 		k.setNodeStatusFuncs = append(k.setNodeStatusFuncs, f)
 	}
-}
-
-// FIXME: Why not combine this with container runtime health check?
-func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
-	switch kl.GetRuntime().Type() {
-	case "docker":
-		version, err := kl.GetRuntime().APIVersion()
-		if err != nil {
-			return nil
-		}
-		// Verify the docker version.
-		result, err := version.Compare(dockertools.MinimumDockerAPIVersion)
-		if err != nil {
-			return fmt.Errorf("failed to compare current docker version %v with minimum support Docker version %q - %v", version, dockertools.MinimumDockerAPIVersion, err)
-		}
-		if result < 0 {
-			return fmt.Errorf("container runtime version is older than %s", dockertools.MinimumDockerAPIVersion)
-		}
-	}
-	return nil
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0

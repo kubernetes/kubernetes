@@ -546,7 +546,7 @@ func TestKillContainerInPodWithError(t *testing.T) {
 		},
 	}
 	fakeDocker.SetFakeRunningContainers(containers)
-	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
+	fakeDocker.InjectError("stop", fmt.Errorf("sample error"))
 
 	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with error."); err == nil {
 		t.Errorf("expected error, found nil")
@@ -1744,7 +1744,7 @@ func TestSyncPodWithFailure(t *testing.T) {
 			ID:   "9876",
 			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0",
 		}})
-		fakeDocker.Errors = test.dockerError
+		fakeDocker.InjectErrors(test.dockerError)
 		puller.ErrorsToInject = test.pullerError
 		pod.Spec.Containers = []api.Container{test.container}
 		result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
@@ -1864,4 +1864,45 @@ func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	assert.NotContains(t, newContainer.HostConfig.SecurityOpt, "seccomp:unconfined", "Pods with Docker versions < 1.10 must not have seccomp disabled by default")
+}
+
+func TestCheckVersionCompatibility(t *testing.T) {
+	apiVersion, err := docker.NewAPIVersion(minimumDockerAPIVersion)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	type test struct {
+		version    string
+		compatible bool
+	}
+	tests := []test{
+		// Minimum apiversion
+		{minimumDockerAPIVersion, true},
+		// Invalid apiversion
+		{"invalid_api_version", false},
+	}
+	for i := range apiVersion {
+		apiVersion[i]++
+		// Newer apiversion
+		tests = append(tests, test{apiVersion.String(), true})
+		apiVersion[i] -= 2
+		// Older apiversion
+		if apiVersion[i] >= 0 {
+			tests = append(tests, test{apiVersion.String(), false})
+		}
+		apiVersion[i]++
+	}
+
+	for i, tt := range tests {
+		testCase := fmt.Sprintf("test case #%d test version %q", i, tt.version)
+		dm, fakeDocker := newTestDockerManagerWithHTTPClientWithVersion(&fakeHTTP{}, "", tt.version)
+		err := dm.checkVersionCompatibility()
+		assert.Equal(t, tt.compatible, err == nil, testCase)
+		if tt.compatible == true {
+			// Get docker version error
+			fakeDocker.InjectError("version", fmt.Errorf("injected version error"))
+			err := dm.checkVersionCompatibility()
+			assert.NotNil(t, err, testCase+" version error check")
+		}
+	}
 }

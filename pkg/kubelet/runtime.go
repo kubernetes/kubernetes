@@ -30,7 +30,6 @@ type runtimeState struct {
 	internalError            error
 	cidr                     string
 	initError                error
-	runtimeCompatibility     func() error
 }
 
 func (s *runtimeState) setRuntimeSync(t time.Time) {
@@ -85,16 +84,12 @@ func (s *runtimeState) errors() []string {
 	if s.internalError != nil {
 		ret = append(ret, s.internalError.Error())
 	}
-	if err := s.runtimeCompatibility(); err != nil {
-		ret = append(ret, err.Error())
-	}
 	return ret
 }
 
 func newRuntimeState(
 	runtimeSyncThreshold time.Duration,
 	configureNetwork bool,
-	runtimeCompatibility func() error,
 ) *runtimeState {
 	var networkError error = nil
 	if configureNetwork {
@@ -105,6 +100,5 @@ func newRuntimeState(
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
 		networkError:             networkError,
 		internalError:            nil,
-		runtimeCompatibility:     runtimeCompatibility,
 	}
 }

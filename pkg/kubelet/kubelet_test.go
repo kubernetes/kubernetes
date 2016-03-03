@@ -102,7 +102,8 @@ type TestKubelet struct {
 
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeRuntime := &containertest.FakeRuntime{}
-	fakeRuntime.VersionInfo = "1.15"
+	fakeRuntime.RuntimeType = "test"
+	fakeRuntime.VersionInfo = "1.5.0"
 	fakeRuntime.ImageList = []kubecontainer.Image{
 		{
 			ID:       "abc",
@@ -123,7 +124,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname
-	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, func() error { return nil })
+	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false)
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -2654,9 +2655,6 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, ro
 func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
@@ -2710,7 +2708,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
+				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
@@ -2852,197 +2850,9 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	}
 }
 
-func TestDockerRuntimeVersion(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.10.0-rc1-fc24"
-	fakeRuntime.APIVersionInfo = "1.22"
-	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
-		{
-			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-			Spec:       api.NodeSpec{},
-			Status: api.NodeStatus{
-				Conditions: []api.NodeCondition{
-					{
-						Type:               api.NodeOutOfDisk,
-						Status:             api.ConditionFalse,
-						Reason:             "KubeletHasSufficientDisk",
-						Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					},
-					{
-						Type:               api.NodeReady,
-						Status:             api.ConditionTrue,
-						Reason:             "KubeletReady",
-						Message:            fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
-					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-				},
-				Allocatable: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(2800, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
-					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-				},
-			},
-		},
-	}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("Start").Return(nil)
-	machineInfo := &cadvisorapi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 20E9,
-	}
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	// Make kubelet report that it has sufficient disk space.
-	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
-		t.Fatalf("can't update disk space manager: %v", err)
-	}
-
-	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:               api.NodeOutOfDisk,
-					Status:             api.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-			},
-			NodeInfo: api.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.10.0-rc1-fc24",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
-			},
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-			},
-			Allocatable: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
-			},
-			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
-			},
-			Images: []api.ContainerImage{
-				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					SizeBytes: 123,
-				},
-				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
-					SizeBytes: 456,
-				},
-			},
-		},
-	}
-
-	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, kubelet.isContainerRuntimeVersionCompatible)
-	kubelet.updateRuntimeUp()
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	actions := kubeClient.Actions()
-	if len(actions) != 2 {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
-	if !ok {
-		t.Errorf("unexpected object type")
-	}
-	for i, cond := range updatedNode.Status.Conditions {
-		if cond.LastHeartbeatTime.IsZero() {
-			t.Errorf("unexpected zero last probe timestamp")
-		}
-		if cond.LastTransitionTime.IsZero() {
-			t.Errorf("unexpected zero last transition timestamp")
-		}
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
-	}
-
-	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
-		t.Errorf("unexpected node condition order. NodeReady should be last.")
-	}
-
-	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
-	}
-
-	// Downgrade docker version, node should be NotReady
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
-	fakeRuntime.APIVersionInfo = "1.17"
-	kubelet.updateRuntimeUp()
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	actions = kubeClient.Actions()
-	if len(actions) != 4 {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	updatedNode, ok = actions[3].(testclient.UpdateAction).GetObject().(*api.Node)
-	if !ok {
-		t.Errorf("unexpected object type")
-	}
-	if updatedNode.Status.Conditions[1].Reason != "KubeletNotReady" &&
-		!strings.Contains(updatedNode.Status.Conditions[1].Message, "container runtime version is older than") {
-		t.Errorf("unexpect NodeStatus due to container runtime version")
-	}
-}
-
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{
@@ -3129,7 +2939,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
+				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
@@ -3350,13 +3160,11 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 	}
 }
 
-func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
+func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
@@ -3394,14 +3202,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionFalse,
-					Reason:             "KubeletNotReady",
-					Message:            fmt.Sprintf("container runtime is down"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
+				{}, //placeholder
 			},
 			NodeInfo: api.NodeSystemInfo{
 				MachineID:               "123",
@@ -3409,7 +3210,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
+				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
@@ -3439,42 +3240,77 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			},
 		},
 	}
-	kubelet.runtimeState = newRuntimeState(time.Duration(0), false, func() error { return nil })
+
+	checkNodeStatus := func(status api.ConditionStatus, reason, message string) {
+		kubeClient.ClearActions()
+		if err := kubelet.updateNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		actions := kubeClient.Actions()
+		if len(actions) != 2 {
+			t.Fatalf("unexpected actions: %v", actions)
+		}
+		if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
+			t.Fatalf("unexpected actions: %v", actions)
+		}
+		updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
+		if !ok {
+			t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
+		}
+
+		for i, cond := range updatedNode.Status.Conditions {
+			if cond.LastHeartbeatTime.IsZero() {
+				t.Errorf("unexpected zero last probe timestamp")
+			}
+			if cond.LastTransitionTime.IsZero() {
+				t.Errorf("unexpected zero last transition timestamp")
+			}
+			updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
+			updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+		}
+
+		// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+		if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+			t.Errorf("unexpected node condition order. NodeReady should be last.")
+		}
+		expectedNode.Status.Conditions[1] = api.NodeCondition{
+			Type:               api.NodeReady,
+			Status:             status,
+			Reason:             reason,
+			Message:            message,
+			LastHeartbeatTime:  unversioned.Time{},
+			LastTransitionTime: unversioned.Time{},
+		}
+		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+			t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+		}
+	}
+
+	readyMessage := "kubelet is posting ready status"
+	downMessage := "container runtime is down"
+
+	// Should report kubelet not ready if the runtime check is out of date
+	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
 	kubelet.updateRuntimeUp()
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	actions := kubeClient.Actions()
-	if len(actions) != 2 {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
-		t.Fatalf("unexpected actions: %v", actions)
-	}
-	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
-	if !ok {
-		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
-	}
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
 
-	for i, cond := range updatedNode.Status.Conditions {
-		if cond.LastHeartbeatTime.IsZero() {
-			t.Errorf("unexpected zero last probe timestamp")
-		}
-		if cond.LastTransitionTime.IsZero() {
-			t.Errorf("unexpected zero last transition timestamp")
-		}
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
-	}
+	// Should report kubelet ready if the runtime check is updated
+	clock.SetTime(time.Now())
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionTrue, "KubeletReady", readyMessage)
 
-	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
-		t.Errorf("unexpected node condition order. NodeReady should be last.")
-	}
+	// Should report kubelet not ready if the runtime check is out of date
+	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
 
-	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
-	}
+	// Should report kubelet not ready if the runtime check failed
+	fakeRuntime := testKubelet.fakeRuntime
+	// Inject error into fake runtime status check, node should be NotReady
+	fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
+	clock.SetTime(time.Now())
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {
