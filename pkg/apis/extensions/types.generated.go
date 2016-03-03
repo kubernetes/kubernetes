@@ -15629,7 +15629,7 @@ func (x *PodSecurityPolicySpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[7] {
-					yy25 := &x.SELinuxContext
+					yy25 := &x.SELinux
 					yy25.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
@@ -15637,9 +15637,9 @@ func (x *PodSecurityPolicySpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[7] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("seLinuxContext"))
+					r.EncodeString(codecSelferC_UTF81234, string("seLinux"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy27 := &x.SELinuxContext
+					yy27 := &x.SELinux
 					yy27.CodecEncodeSelf(e)
 				}
 			}
@@ -15781,11 +15781,11 @@ func (x *PodSecurityPolicySpec) codecDecodeSelfFromMap(l int, d *codec1978.Decod
 			} else {
 				x.HostIPC = bool(r.DecodeBool())
 			}
-		case "seLinuxContext":
+		case "seLinux":
 			if r.TryDecodeAsNil() {
-				x.SELinuxContext = SELinuxContextStrategyOptions{}
+				x.SELinux = SELinuxStrategyOptions{}
 			} else {
-				yyv14 := &x.SELinuxContext
+				yyv14 := &x.SELinux
 				yyv14.CodecDecodeSelf(d)
 			}
 		case "runAsUser":
@@ -15951,9 +15951,9 @@ func (x *PodSecurityPolicySpec) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.SELinuxContext = SELinuxContextStrategyOptions{}
+		x.SELinux = SELinuxStrategyOptions{}
 	} else {
-		yyv27 := &x.SELinuxContext
+		yyv27 := &x.SELinux
 		yyv27.CodecDecodeSelf(d)
 	}
 	yyj16++
@@ -16218,7 +16218,7 @@ func (x *FSType) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *SELinuxContextStrategyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *SELinuxStrategyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -16251,12 +16251,12 @@ func (x *SELinuxContextStrategyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				x.Type.CodecEncodeSelf(e)
+				x.Rule.CodecEncodeSelf(e)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("type"))
+				r.EncodeString(codecSelferC_UTF81234, string("rule"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				x.Type.CodecEncodeSelf(e)
+				x.Rule.CodecEncodeSelf(e)
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
@@ -16290,7 +16290,7 @@ func (x *SELinuxContextStrategyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *SELinuxContextStrategyOptions) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *SELinuxStrategyOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -16320,7 +16320,7 @@ func (x *SELinuxContextStrategyOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *SELinuxContextStrategyOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *SELinuxStrategyOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -16342,11 +16342,11 @@ func (x *SELinuxContextStrategyOptions) codecDecodeSelfFromMap(l int, d *codec19
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "type":
+		case "rule":
 			if r.TryDecodeAsNil() {
-				x.Type = ""
+				x.Rule = ""
 			} else {
-				x.Type = SELinuxContextStrategy(r.DecodeString())
+				x.Rule = SELinuxStrategy(r.DecodeString())
 			}
 		case "seLinuxOptions":
 			if r.TryDecodeAsNil() {
@@ -16366,7 +16366,7 @@ func (x *SELinuxContextStrategyOptions) codecDecodeSelfFromMap(l int, d *codec19
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *SELinuxContextStrategyOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *SELinuxStrategyOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -16385,9 +16385,9 @@ func (x *SELinuxContextStrategyOptions) codecDecodeSelfFromArray(l int, d *codec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Type = ""
+		x.Rule = ""
 	} else {
-		x.Type = SELinuxContextStrategy(r.DecodeString())
+		x.Rule = SELinuxStrategy(r.DecodeString())
 	}
 	yyj6++
 	if yyhl6 {
@@ -16426,7 +16426,7 @@ func (x *SELinuxContextStrategyOptions) codecDecodeSelfFromArray(l int, d *codec
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x SELinuxContextStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x SELinuxStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -16439,7 +16439,7 @@ func (x SELinuxContextStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *SELinuxContextStrategy) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *SELinuxStrategy) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -16485,12 +16485,12 @@ func (x *RunAsUserStrategyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				x.Type.CodecEncodeSelf(e)
+				x.Rule.CodecEncodeSelf(e)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("type"))
+				r.EncodeString(codecSelferC_UTF81234, string("rule"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				x.Type.CodecEncodeSelf(e)
+				x.Rule.CodecEncodeSelf(e)
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
@@ -16586,11 +16586,11 @@ func (x *RunAsUserStrategyOptions) codecDecodeSelfFromMap(l int, d *codec1978.De
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "type":
+		case "rule":
 			if r.TryDecodeAsNil() {
-				x.Type = ""
+				x.Rule = ""
 			} else {
-				x.Type = RunAsUserStrategy(r.DecodeString())
+				x.Rule = RunAsUserStrategy(r.DecodeString())
 			}
 		case "ranges":
 			if r.TryDecodeAsNil() {
@@ -16630,9 +16630,9 @@ func (x *RunAsUserStrategyOptions) codecDecodeSelfFromArray(l int, d *codec1978.
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Type = ""
+		x.Rule = ""
 	} else {
-		x.Type = RunAsUserStrategy(r.DecodeString())
+		x.Rule = RunAsUserStrategy(r.DecodeString())
 	}
 	yyj7++
 	if yyhl7 {

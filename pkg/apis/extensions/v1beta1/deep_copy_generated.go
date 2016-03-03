@@ -1678,7 +1678,7 @@ func deepCopy_v1beta1_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *PodSe
 	}
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
-	if err := deepCopy_v1beta1_SELinuxContextStrategyOptions(in.SELinuxContext, &out.SELinuxContext, c); err != nil {
+	if err := deepCopy_v1beta1_SELinuxStrategyOptions(in.SELinux, &out.SELinux, c); err != nil {
 		return err
 	}
 	if err := deepCopy_v1beta1_RunAsUserStrategyOptions(in.RunAsUser, &out.RunAsUser, c); err != nil {
@@ -1788,7 +1788,7 @@ func deepCopy_v1beta1_RollingUpdateDeployment(in RollingUpdateDeployment, out *R
 }
 
 func deepCopy_v1beta1_RunAsUserStrategyOptions(in RunAsUserStrategyOptions, out *RunAsUserStrategyOptions, c *conversion.Cloner) error {
-	out.Type = in.Type
+	out.Rule = in.Rule
 	if in.Ranges != nil {
 		out.Ranges = make([]IDRange, len(in.Ranges))
 		for i := range in.Ranges {
@@ -1802,8 +1802,8 @@ func deepCopy_v1beta1_RunAsUserStrategyOptions(in RunAsUserStrategyOptions, out 
 	return nil
 }
 
-func deepCopy_v1beta1_SELinuxContextStrategyOptions(in SELinuxContextStrategyOptions, out *SELinuxContextStrategyOptions, c *conversion.Cloner) error {
-	out.Type = in.Type
+func deepCopy_v1beta1_SELinuxStrategyOptions(in SELinuxStrategyOptions, out *SELinuxStrategyOptions, c *conversion.Cloner) error {
+	out.Rule = in.Rule
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(v1.SELinuxOptions)
 		if err := deepCopy_v1_SELinuxOptions(*in.SELinuxOptions, out.SELinuxOptions, c); err != nil {
@@ -2045,7 +2045,7 @@ func init() {
 		deepCopy_v1beta1_RollbackConfig,
 		deepCopy_v1beta1_RollingUpdateDeployment,
 		deepCopy_v1beta1_RunAsUserStrategyOptions,
-		deepCopy_v1beta1_SELinuxContextStrategyOptions,
+		deepCopy_v1beta1_SELinuxStrategyOptions,
 		deepCopy_v1beta1_Scale,
 		deepCopy_v1beta1_ScaleSpec,
 		deepCopy_v1beta1_ScaleStatus,

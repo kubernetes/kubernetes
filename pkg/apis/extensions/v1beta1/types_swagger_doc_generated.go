@@ -468,16 +468,16 @@ func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySpec = map[string]string{
-	"":               "Pod Security Policy Spec defines the policy enforced.",
-	"privileged":     "privileged determines if a pod can request to be run as privileged.",
-	"capabilities":   "capabilities is a list of capabilities that can be added.",
-	"volumes":        "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
-	"hostNetwork":    "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
-	"hostPorts":      "hostPorts determines which host port ranges are allowed to be exposed.",
-	"hostPID":        "hostPID determines if the policy allows the use of HostPID in the pod spec.",
-	"hostIPC":        "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
-	"seLinuxContext": "seLinuxContext is the strategy that will dictate the allowable labels that may be set.",
-	"runAsUser":      "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"":             "Pod Security Policy Spec defines the policy enforced.",
+	"privileged":   "privileged determines if a pod can request to be run as privileged.",
+	"capabilities": "capabilities is a list of capabilities that can be added.",
+	"volumes":      "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+	"hostNetwork":  "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+	"hostPorts":    "hostPorts determines which host port ranges are allowed to be exposed.",
+	"hostPID":      "hostPID determines if the policy allows the use of HostPID in the pod spec.",
+	"hostIPC":      "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
+	"seLinux":      "seLinux is the strategy that will dictate the allowable labels that may be set.",
+	"runAsUser":    "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -554,7 +554,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 
 var map_RunAsUserStrategyOptions = map[string]string{
 	"":       "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
-	"type":   "type is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"rule":   "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
 	"ranges": "Ranges are the allowed ranges of uids that may be used.",
 }
 
@@ -562,14 +562,14 @@ func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 	return map_RunAsUserStrategyOptions
 }
 
-var map_SELinuxContextStrategyOptions = map[string]string{
-	"":               "SELinux Context Strategy Options defines the strategy type and any options used to create the strategy.",
-	"type":           "type is the strategy that will dictate the allowable labels that may be set.",
+var map_SELinuxStrategyOptions = map[string]string{
+	"":               "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+	"rule":           "type is the strategy that will dictate the allowable labels that may be set.",
 	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context",
 }
 
-func (SELinuxContextStrategyOptions) SwaggerDoc() map[string]string {
-	return map_SELinuxContextStrategyOptions
+func (SELinuxStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SELinuxStrategyOptions
 }
 
 var map_Scale = map[string]string{
