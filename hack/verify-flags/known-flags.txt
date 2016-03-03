@@ -179,6 +179,7 @@ kube-reserved
 kubecfg-file
 kubectl-path
 kubelet-address
+kubelet-api-servers
 kubelet-cadvisor-port
 kubelet-certificate-authority
 kubelet-cgroups

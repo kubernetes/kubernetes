@@ -162,6 +162,7 @@ type SchedulerServer struct {
 	kmPath                         string
 	clusterDNS                     net.IP
 	clusterDomain                  string
+	kubeletApiServerList           []string
 	kubeletRootDirectory           string
 	kubeletDockerEndpoint          string
 	kubeletPodInfraContainerImage  string
@@ -315,6 +316,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.minionLogMaxAgeInDays, "minion-max-log-age", s.minionLogMaxAgeInDays, "Maximum log file age of the executor and proxy in days")
 	fs.IntVar(&s.minionLogMaxBackups, "minion-max-log-backups", s.minionLogMaxBackups, "Maximum log file backups of the executor and proxy to keep after rotation")
 
+	fs.StringSliceVar(&s.kubeletApiServerList, "kubelet-api-servers", s.kubeletApiServerList, "List of Kubernetes API servers kubelet will use. (ip:port), comma separated. If unspecified it defaults to the value of --api-servers.")
 	fs.StringVar(&s.kubeletRootDirectory, "kubelet-root-dir", s.kubeletRootDirectory, "Directory path for managing kubelet files (volume mounts,etc). Defaults to executor sandbox.")
 	fs.StringVar(&s.kubeletDockerEndpoint, "kubelet-docker-endpoint", s.kubeletDockerEndpoint, "If non-empty, kubelet will use this for the docker endpoint to communicate with.")
 	fs.StringVar(&s.kubeletPodInfraContainerImage, "kubelet-pod-infra-container-image", s.kubeletPodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
@@ -428,7 +430,12 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	//TODO(jdef): provide some way (env var?) for users to customize executor config
 	//TODO(jdef): set -address to 127.0.0.1 if `address` is 127.0.0.1
 
-	apiServerArgs := strings.Join(s.apiServerList, ",")
+	var apiServerArgs string
+	if len(s.kubeletApiServerList) > 0 {
+		apiServerArgs = strings.Join(s.kubeletApiServerList, ",")
+	} else {
+		apiServerArgs = strings.Join(s.apiServerList, ",")
+	}
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--api-servers=%s", apiServerArgs))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--v=%d", s.executorLogV)) // this also applies to the minion
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--allow-privileged=%t", s.allowPrivileged))
@@ -923,7 +930,7 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 	// signals, so we'll need to restart if we want to really stop everything
 
 	// run the same command that we were launched with
-	//TODO(jdef) assumption here is that the sheduler is the only service running in this process, we should probably validate that somehow
+	//TODO(jdef) assumption here is that the scheduler is the only service running in this process, we should probably validate that somehow
 	args := []string{}
 	flags := pflag.CommandLine
 	if hks != nil {
@@ -931,7 +938,7 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 		flags = hks.Flags()
 	}
 	flags.Visit(func(flag *pflag.Flag) {
-		if flag.Name != "api-servers" && flag.Name != "etcd-servers" {
+		if flag.Name != "api-servers" && flag.Name != "etcd-servers" && flag.Name != "kubelet-api-servers" {
 			args = append(args, fmt.Sprintf("--%s=%s", flag.Name, flag.Value.String()))
 		}
 	})
@@ -943,6 +950,9 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 	}
 	if len(s.etcdServerList) > 0 {
 		args = append(args, "--etcd-servers="+strings.Join(s.etcdServerList, ","))
+	}
+	if len(s.kubeletApiServerList) > 0 {
+		args = append(args, "--kubelet-api-servers="+strings.Join(s.kubeletApiServerList, ","))
 	}
 	args = append(args, flags.Args()...)
 
