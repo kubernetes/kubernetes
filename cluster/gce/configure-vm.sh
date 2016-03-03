@@ -104,6 +104,8 @@ You can download the build image for this release at:
 It is based on the Kubernetes source at:
   https://github.com/kubernetes/kubernetes/tree/${gitref}
 ${devel}
+For Kubernetes copyright and licensing information, see:
+  /usr/local/share/doc/kubernetes/LICENSES
 EOF
 }
 
