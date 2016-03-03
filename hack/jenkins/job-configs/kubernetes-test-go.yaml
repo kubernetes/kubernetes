@@ -8,7 +8,9 @@
     node: unittest
     builders:
         - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
-        - shell: 'timeout -k {kill-timeout}m {timeout}m ./hack/jenkins/gotest-dockerized.sh'
+        - shell: |
+            timeout -k {kill-timeout}m {timeout}m ./hack/jenkins/gotest-dockerized.sh && rc=$? || rc=$?
+            {report-rc}
     publishers:
         - claim-build
         - gcs-uploader

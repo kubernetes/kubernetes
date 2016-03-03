@@ -9,7 +9,8 @@
             {soak-deploy}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m 90m {runner}
+            timeout -k {kill-timeout}m 90m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - build-blocker:
             use-build-blocker: true
@@ -41,7 +42,8 @@
             {soak-continuous}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m 360m {runner}
+            timeout -k {kill-timeout}m 360m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - build-blocker:
             use-build-blocker: true

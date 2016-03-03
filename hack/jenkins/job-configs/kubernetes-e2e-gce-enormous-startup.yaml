@@ -30,7 +30,8 @@
             export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
             {post-env}
             export KUBE_GCE_NETWORK="e2e-enormous-cluster"
-            timeout -k {kill-timeout}m 480m {runner}
+            timeout -k {kill-timeout}m 480m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - mail-watcher
     publishers:
