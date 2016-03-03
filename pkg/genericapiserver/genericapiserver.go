@@ -192,6 +192,12 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
+
+	// SubresourceGroupVersionKind contains the GroupVersionKind overrides for each subresource that is
+	// accessible from this API group version. The GroupVersionKind is that of the external version of
+	// the subresource. The key of this map should be the path of the subresource. The keys here should
+	// match the keys in the Storage map above for subresources.
+	SubresourceGroupVersionKind map[string]unversioned.GroupVersionKind
 }
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -838,6 +844,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	version.Creater = apiGroupInfo.Scheme
 	version.Convertor = apiGroupInfo.Scheme
 	version.Typer = apiGroupInfo.Scheme
+	version.SubresourceGroupVersionKind = apiGroupInfo.SubresourceGroupVersionKind
 	return version, err
 }
 

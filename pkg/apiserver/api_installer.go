@@ -110,6 +110,63 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	return ws
 }
 
+// getResourceKind returns the external group version kind registered for the given storage
+// object. If the storage object is a subresource and has an override supplied for it, it returns
+// the group version kind supplied in the override.
+func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unversioned.GroupVersionKind, error) {
+	if fqKindToRegister, ok := a.group.SubresourceGroupVersionKind[path]; ok {
+		return fqKindToRegister, nil
+	}
+
+	object := storage.New()
+	fqKinds, err := a.group.Typer.ObjectKinds(object)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
+	}
+
+	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+	// we're trying to register here
+	fqKindToRegister := unversioned.GroupVersionKind{}
+	for _, fqKind := range fqKinds {
+		if fqKind.Group == a.group.GroupVersion.Group {
+			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
+			break
+		}
+
+		// TODO This keeps it doing what it was doing before, but it doesn't feel right.
+		if fqKind.Group == extensions.GroupName && fqKind.Kind == "ThirdPartyResourceData" {
+			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
+		}
+	}
+	if fqKindToRegister.IsEmpty() {
+		return unversioned.GroupVersionKind{}, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+	}
+	return fqKindToRegister, nil
+}
+
+// restMapping returns rest mapper for the resource.
+// Example REST paths that this mapper maps.
+// 1. Resource only, no subresource:
+//      Resource Type:    batch/v1.Job (input args: resource = "jobs")
+//      REST path:        /apis/batch/v1/namespaces/{namespace}/job/{name}
+// 2. Subresource and its parent belong to different API groups and/or versions:
+//      Resource Type:    extensions/v1beta1.ReplicaSet (input args: resource = "replicasets")
+//      Subresource Type: autoscaling/v1.Scale
+//      REST path:        /apis/extensions/v1beta1/namespaces/{namespace}/replicaset/{name}/scale
+func (a *APIInstaller) restMapping(resource string) (*meta.RESTMapping, error) {
+	// subresources must have parent resources, and follow the namespacing rules of their parent.
+	// So get the storage of the resource (which is the parent resource in case of subresources)
+	storage, ok := a.group.Storage[resource]
+	if !ok {
+		return nil, fmt.Errorf("unable to locate the storage object for resource: %s", resource)
+	}
+	fqKindToRegister, err := a.getResourceKind(resource, storage)
+	if err != nil {
+		return nil, fmt.Errorf("unable to locate fully qualified kind for mapper resource %s: %v", resource, err)
+	}
+	return a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), fqKindToRegister.Version)
+}
+
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
 	admit := a.group.Admit
 	context := a.group.Context
@@ -119,88 +176,28 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		optionsExternalVersion = *a.group.OptionsExternalVersion
 	}
 
-	var resource, subresource string
-	switch parts := strings.Split(path, "/"); len(parts) {
-	case 2:
-		resource, subresource = parts[0], parts[1]
-	case 1:
-		resource = parts[0]
-	default:
-		// TODO: support deeper paths
-		return nil, fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
-	}
-	hasSubresource := len(subresource) > 0
-
-	object := storage.New()
-	fqKinds, err := a.group.Typer.ObjectKinds(object)
+	resource, subresource, err := splitSubresource(path)
 	if err != nil {
 		return nil, err
 	}
-	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
-	// we're trying to register here
-	fqKindToRegister := unversioned.GroupVersionKind{}
-	for _, fqKind := range fqKinds {
-		if fqKind.Group == a.group.GroupVersion.Group {
-			fqKindToRegister = fqKind
-			break
-		}
 
-		// TODO This keeps it doing what it was doing before, but it doesn't feel right.
-		if fqKind.Group == extensions.GroupName && fqKind.Kind == "ThirdPartyResourceData" {
-			fqKindToRegister = fqKind
-			fqKindToRegister.Group = a.group.GroupVersion.Group
-			fqKindToRegister.Version = a.group.GroupVersion.Version
-		}
+	mapping, err := a.restMapping(resource)
+	if err != nil {
+		return nil, err
 	}
 
-	kind := fqKindToRegister.Kind
-
-	if fqKindToRegister.IsEmpty() {
-		return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+	fqKindToRegister, err := a.getResourceKind(path, storage)
+	if err != nil {
+		return nil, err
 	}
 
-	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(kind))
+	versionedPtr, err := a.group.Creater.New(fqKindToRegister)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
-
-	mapping, err := a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), a.group.GroupVersion.Version)
-	if err != nil {
-		return nil, err
-	}
-
-	// subresources must have parent resources, and follow the namespacing rules of their parent
-	if hasSubresource {
-		parentStorage, ok := a.group.Storage[resource]
-		if !ok {
-			return nil, fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
-		}
-		parentObject := parentStorage.New()
-
-		parentFQKinds, err := a.group.Typer.ObjectKinds(parentObject)
-		if err != nil {
-			return nil, err
-		}
-		// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
-		// we're trying to register here
-		parentFQKindToRegister := unversioned.GroupVersionKind{}
-		for _, fqKind := range parentFQKinds {
-			if fqKind.Group == a.group.GroupVersion.Group {
-				parentFQKindToRegister = fqKind
-				break
-			}
-		}
-		if parentFQKindToRegister.IsEmpty() {
-			return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
-		}
-
-		parentMapping, err := a.group.Mapper.RESTMapping(parentFQKindToRegister.GroupKind(), a.group.GroupVersion.Version)
-		if err != nil {
-			return nil, err
-		}
-		mapping.Scope = parentMapping.Scope
-	}
+	kind := fqKindToRegister.Kind
+	hasSubresource := len(subresource) > 0
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	creater, isCreater := storage.(rest.Creater)
@@ -329,7 +326,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if ok {
 		resourceKind = kindProvider.Kind()
 	} else {
-		resourceKind = fqKindToRegister.Kind
+		resourceKind = kind
 	}
 
 	var apiResource unversioned.APIResource
@@ -451,9 +448,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:        a.group.Creater,
 		Convertor:      a.group.Convertor,
 
+		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
 		Subresource: subresource,
-		Kind:        a.group.GroupVersion.WithKind(kind),
+		Kind:        fqKindToRegister,
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
@@ -947,4 +945,20 @@ var _ rest.StorageMetadata = defaultStorageMetadata{}
 
 func (defaultStorageMetadata) ProducesMIMETypes(verb string) []string {
 	return nil
+}
+
+// splitSubresource checks if the given storage path is the path of a subresource and returns
+// the resource and subresource components.
+func splitSubresource(path string) (string, string, error) {
+	var resource, subresource string
+	switch parts := strings.Split(path, "/"); len(parts) {
+	case 2:
+		resource, subresource = parts[0], parts[1]
+	case 1:
+		resource = parts[0]
+	default:
+		// TODO: support deeper paths
+		return "", "", fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
+	}
+	return resource, subresource, nil
 }
