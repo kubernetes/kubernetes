@@ -1858,7 +1858,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			return
 		}
 		if !usesHostNetwork(pod) && dm.configureHairpinMode {
-			if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
+			if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, network.DefaultInterfaceName); err != nil {
 				glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
 			}
 		}
