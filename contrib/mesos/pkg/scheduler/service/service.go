@@ -169,6 +169,7 @@ type SchedulerServer struct {
 	kubeletHostNetworkSources      string
 	kubeletSyncFrequency           time.Duration
 	kubeletNetworkPluginName       string
+	kubeletKubeconfig              string
 	staticPodsConfigPath           string
 	dockerCfgPath                  string
 	containPodResources            bool
@@ -258,7 +259,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.address, "address", s.address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.enableProfiling, "profiling", s.enableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.apiServerList, "api-servers", s.apiServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
-	fs.StringVar(&s.kubeconfig, "kubeconfig", s.kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&s.kubeconfig, "kubeconfig", s.kubeconfig, "Path to kubeconfig file with authorization and master location information used by the scheduler.")
 	fs.Float32Var(&s.kubeAPIQPS, "kube-api-qps", s.kubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.kubeAPIBurst, "kube-api-burst", s.kubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
@@ -323,6 +324,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.kubeletSyncFrequency, "kubelet-sync-frequency", s.kubeletSyncFrequency, "Max period between synchronizing running containers and config")
 	fs.StringVar(&s.kubeletNetworkPluginName, "kubelet-network-plugin", s.kubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.BoolVar(&s.kubeletEnableDebuggingHandlers, "kubelet-enable-debugging-handlers", s.kubeletEnableDebuggingHandlers, "Enables kubelet endpoints for log collection and local running of containers and commands")
+	fs.StringVar(&s.kubeletKubeconfig, "kubelet-kubeconfig", s.kubeletKubeconfig, "Path to kubeconfig file with authorization and master location information used by the kubelet.")
 	fs.IntVar(&s.conntrackMax, "conntrack-max", s.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
 	fs.IntVar(&s.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 
@@ -448,9 +450,9 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.containPodResources))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
 
-	if s.kubeconfig != "" {
+	if s.kubeletKubeconfig != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
-		uri, basename := s.serveFrameworkArtifact(s.kubeconfig)
+		uri, basename := s.serveFrameworkArtifact(s.kubeletKubeconfig)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--kubeconfig=%s", basename))
 	}
