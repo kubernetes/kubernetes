@@ -452,7 +452,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 // Updates the status of a paused deployment
 func (dc *DeploymentController) syncPausedDeploymentStatus(deployment *extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, false)
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
 	if err != nil {
 		return err
 	}
@@ -464,7 +464,7 @@ func (dc *DeploymentController) syncPausedDeploymentStatus(deployment *extension
 
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
 func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRevision *int64) (*extensions.Deployment, error) {
-	newRS, allOldRSs, err := dc.getAllReplicaSets(deployment, true)
+	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, true)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +517,7 @@ func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(deployment *e
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment *extensions.Deployment) error {
 	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, false)
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
 	if err != nil {
 		return err
 	}
@@ -536,7 +536,7 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment *extensions.De
 	// If we need to create a new RS, create it now
 	// TODO: Create a new RS without re-listing all RSs.
 	if newRS == nil {
-		newRS, oldRSs, err = dc.getAllReplicaSets(deployment, true)
+		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(deployment, true)
 		if err != nil {
 			return err
 		}
@@ -563,7 +563,7 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment *extensions.De
 }
 
 func (dc *DeploymentController) syncRollingUpdateDeployment(deployment *extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSets(deployment, true)
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, true)
 	if err != nil {
 		return err
 	}
@@ -610,13 +610,18 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 	return nil
 }
 
-// getAllReplicaSets returns all the replica sets for the provided deployment (new and all old).
-func (dc *DeploymentController) getAllReplicaSets(deployment *extensions.Deployment, createIfNotExisted bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+// getAllReplicaSetsAndSyncRevision returns all the replica sets for the provided deployment (new and all old), with new RS's and deployment's revision updated.
+// 1. Get all old RSes this deployment targets, and calculate the max revision number among them (maxOldV).
+// 2. Get new RS this deployment targets (whose pod template matches deployment's), and update new RS's revision number to (maxOldV + 1),
+//    only if its revision number is smaller than (maxOldV + 1). If this step failed, we'll update it in the next deployment sync loop.
+// 3. Copy new RS's revision number to deployment (update deployment's revision). If this step failed, we'll update it in the next deployment sync loop.
+func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *extensions.Deployment, createIfNotExisted bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	_, allOldRSs, err := dc.getOldReplicaSets(deployment)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// Calculate the max revision number among all old RSes
 	maxOldV := maxRevision(allOldRSs)
 
 	// Get new replica set with the updated revision number
@@ -680,8 +685,9 @@ func (dc *DeploymentController) getOldReplicaSets(deployment *extensions.Deploym
 }
 
 // Returns a replica set that matches the intent of the given deployment.
-// It creates a new replica set if required.
-// The revision of the new replica set will be updated to maxOldRevision + 1
+// 1. Get existing new RS (the RS that the given deployment targets, whose pod template is the same as deployment's).
+// 2. If there's existing new RS, update its revision number if it's smaller than (maxOldRevision + 1), where maxOldRevision is the max revision number among all old RSes.
+// 3. If there's no existing new RS and createIfNotExisted is true, create one with appropriate revision number (maxOldRevision + 1) and replicas.
 func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployment, maxOldRevision int64, oldRSs []*extensions.ReplicaSet, createIfNotExisted bool) (*extensions.ReplicaSet, error) {
 	// Calculate revision number for this new replica set
 	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
@@ -752,7 +758,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 // setNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
 func setNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *extensions.ReplicaSet, newRevision string) bool {
-	// First, copy deployment's annotations
+	// First, copy deployment's annotations (except for apply and revision annotations)
 	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, newRS)
 	// Then, update replica set's revision annotation
 	if newRS.Annotations == nil {
