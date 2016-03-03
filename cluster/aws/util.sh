@@ -999,6 +999,7 @@ function start-master() {
 
     echo "cat > kube_env.yaml << __EOF_MASTER_KUBE_ENV_YAML"
     cat ${KUBE_TEMP}/master-kube-env.yaml
+    echo "AUTO_UPGRADE: 'true'"
     # TODO: get rid of these exceptions / harmonize with common or GCE
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
     echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
@@ -1093,6 +1094,7 @@ function start-minions() {
     echo "cd /var/cache/kubernetes-install"
     echo "cat > kube_env.yaml << __EOF_KUBE_ENV_YAML"
     cat ${KUBE_TEMP}/node-kube-env.yaml
+    echo "AUTO_UPGRADE: 'true'"
     # TODO: get rid of these exceptions / harmonize with common or GCE
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
     echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
