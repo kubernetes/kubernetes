@@ -370,7 +370,7 @@ func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) error {
 	var zero int64
 	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &zero})
 	if err == nil {
-		glog.V(2).Infof("forceful deletion of %s succeeded", pod.Name)
+		glog.Infof("forceful deletion of %s succeeded", pod.Name)
 	}
 	return err
 }
