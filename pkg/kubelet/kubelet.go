@@ -131,6 +131,11 @@ const (
 	// error. It is also used as the base period for the exponential backoff
 	// container restarts and image pulls.
 	backOffPeriod = time.Second * 10
+
+	// Period for performing container garbage collection.
+	ContainerGCPeriod = time.Minute
+	// Period for performing image garbage collection.
+	ImageGCPeriod = 5 * time.Minute
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -363,6 +368,7 @@ func NewMainKubelet(
 	klet.livenessManager = proberesults.NewManager()
 
 	klet.podCache = kubecontainer.NewCache()
+	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
 	// The hairpin mode setting doesn't matter if:
 	// - We're not using a bridge network. This is hard to check because we might
@@ -405,6 +411,7 @@ func NewMainKubelet(
 			kubecontainer.FilterEventRecorder(recorder),
 			klet.livenessManager,
 			containerRefManager,
+			klet.podManager,
 			machineInfo,
 			podInfraContainerImage,
 			pullQPS,
@@ -468,7 +475,6 @@ func NewMainKubelet(
 	klet.imageManager = imageManager
 
 	klet.runner = klet.containerRuntime
-	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
@@ -934,13 +940,13 @@ func (kl *Kubelet) StartGarbageCollection() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, time.Minute, wait.NeverStop)
+	}, ContainerGCPeriod, wait.NeverStop)
 
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
-	}, 5*time.Minute, wait.NeverStop)
+	}, ImageGCPeriod, wait.NeverStop)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
