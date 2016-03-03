@@ -3092,6 +3092,8 @@ func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
 		if result < 0 {
 			return fmt.Errorf("container runtime version is older than %s", dockertools.MinimumDockerAPIVersion)
 		}
+	case "rkt":
+		return kl.GetRuntime().(*rkt.Runtime).CheckVersion(rkt.MinimumRktBinVersion, rkt.RecommendedRktBinVersion, rkt.MinimumAppcVersion, rkt.MinimumRktApiVersion, rkt.MinimumSystemdVersion)
 	}
 	return nil
 }
