@@ -402,6 +402,8 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if pendingGraceful {
 		return e.finalizeDelete(obj, false)
 	}
+	var ignoreNotFound bool = false
+	var lastExisting runtime.Object = nil
 	if graceful {
 		out := e.NewFunc()
 		lastGraceful := int64(0)
@@ -419,6 +421,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 					return nil, errDeleteNow
 				}
 				lastGraceful = *options.GracePeriodSeconds
+				lastExisting = existing
 				return existing, nil
 			}),
 		)
@@ -427,7 +430,15 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 			if lastGraceful > 0 {
 				return out, nil
 			}
-			// fall through and delete immediately
+			// If we are here, the registry supports grace period mechanism and
+			// we are intentionally delete gracelessly. In this case, we may
+			// enter a race with other k8s components. If other component wins
+			// the race, the object will not be found, and we should tolerate
+			// the NotFound error. See
+			// https://github.com/kubernetes/kubernetes/issues/19403 for
+			// details.
+			ignoreNotFound = true
+			// exit the switch and delete immediately
 		case errDeleteNow:
 			// we've updated the object to have a zero grace period, or it's already at 0, so
 			// we should fall through and truly delete the object.
@@ -441,6 +452,13 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out); err != nil {
+		// Please refer to the place where we set ignoreNotFound for the reason
+		// why we ignore the NotFound error .
+		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
+			// The lastExisting object may not be the last state of the object
+			// before its deletion, but it's the best approximation.
+			return e.finalizeDelete(lastExisting, true)
+		}
 		return nil, etcderr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	return e.finalizeDelete(out, true)
