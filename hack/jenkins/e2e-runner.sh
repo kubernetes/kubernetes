@@ -208,6 +208,9 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
     fi
 fi
 
+# DO NOT MERGE: This tests that PR Jenkins times out properly with logs.
+sleep 1600
+
 ### Run tests ###
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
