@@ -59,6 +59,12 @@ else
   RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
 fi
 
+if [[ "$KUBE_RELEASE_VERSION" =~ alpha|beta ]]; then
+  KUBE_RELEASE_TYPE="latest"
+else
+  KUBE_RELEASE_TYPE="stable"
+fi
+
 declare -r KUBE_BUILD_DIR=$(mktemp -d "/tmp/kubernetes-build-release-${KUBE_RELEASE_VERSION}-XXXXXXX")
 
 # Set the default umask for the release. This ensures consistency
@@ -107,7 +113,7 @@ cat <<- EOM
 Success!  You must now do the following (you may want to cut and paste these
 instructions elsewhere):
 
-  1) pushd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION}
+  1) pushd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION} ${KUBE_RELEASE_TYPE}
 
   2) Release notes draft, to be published when the release is announced:
 
