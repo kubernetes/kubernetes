@@ -74,7 +74,10 @@ var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 		c = framework.Client
 
 		nodelist := ListSchedulableNodesOrDie(c)
-		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
+
+		// Skip this test on small clusters.  No need to fail since it is not a use
+		// case that any cluster of small size needs to support.
+		SkipUnlessNodeCountIsAtLeast(2)
 
 		unfilledNodeName = nodelist.Items[0].Name
 		for _, node := range nodelist.Items[1:] {
