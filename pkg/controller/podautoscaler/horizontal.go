@@ -39,6 +39,8 @@ const (
 	// TODO: make it a flag or HPA spec element.
 	tolerance = 0.1
 
+	defaultTargetCPUUtilizationPercentage = 80
+
 	HpaCustomMetricsTargetAnnotationName = "alpha/target.custom-metrics.podautoscaler.kubernetes.io"
 	HpaCustomMetricsStatusAnnotationName = "alpha/status.custom-metrics.podautoscaler.kubernetes.io"
 )
@@ -76,11 +78,9 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 }
 
 func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
-	if hpa.Spec.CPUUtilization == nil {
-		// If CPUTarget is not specified than we should return some default values.
-		// Since we always take maximum number of replicas from all policies it is safe
-		// to just return 0.
-		return 0, nil, time.Time{}, nil
+	targetUtilization := defaultTargetCPUUtilizationPercentage
+	if hpa.Spec.CPUUtilization != nil {
+		targetUtilization = hpa.Spec.CPUUtilization.TargetPercentage
 	}
 	currentReplicas := scale.Status.Replicas
 	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
@@ -91,7 +91,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 		return 0, nil, time.Time{}, fmt.Errorf("failed to get cpu utilization: %v", err)
 	}
 
-	usageRatio := float64(*currentUtilization) / float64(hpa.Spec.CPUUtilization.TargetPercentage)
+	usageRatio := float64(*currentUtilization) / float64(targetUtilization)
 	if math.Abs(1.0-usageRatio) > tolerance {
 		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, timestamp, nil
 	} else {
@@ -192,8 +192,9 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		desiredReplicas = 1
 	} else {
 		// All basic scenarios covered, the state should be sane, lets use metrics.
+		cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]
 
-		if hpa.Spec.CPUUtilization != nil {
+		if hpa.Spec.CPUUtilization != nil || !cmAnnotationFound {
 			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
@@ -202,7 +203,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 			}
 		}
 
-		if cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]; cmAnnotationFound {
+		if cmAnnotationFound {
 			cmDesiredReplicas, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
