@@ -256,6 +256,11 @@ func Run(s *options.APIServer) error {
 
 	clientConfig := &restclient.Config{
 		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
 	}
 	if len(s.DeprecatedStorageVersion) != 0 {
 		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
