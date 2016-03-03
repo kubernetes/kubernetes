@@ -333,19 +333,27 @@ function create-static-ip {
   local attempt=0
   local REGION="$2"
   while true; do
-    if ! gcloud compute addresses create "$1" \
+    if gcloud compute addresses create "$1" \
       --project "${PROJECT}" \
       --region "${REGION}" -q > /dev/null; then
-      if (( attempt > 4 )); then
-        echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
-        exit 2
-      fi
-      attempt=$(($attempt+1)) 
-      echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
-      sleep $(($attempt * 5))
-    else
+      # successful operation
       break
     fi
+
+    if cloud compute addresses describe "$1" \
+      --project "${PROJECT}" \
+      --region "${REGION}" >/dev/null 2>&1; then
+      # it exists - postcondition satisfied
+      break
+    fi
+
+    if (( attempt > 4 )); then
+      echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
+      exit 2
+    fi
+    attempt=$(($attempt+1))
+    echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
+    sleep $(($attempt * 5))
   done
 }
 
