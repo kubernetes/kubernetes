@@ -44,12 +44,14 @@ var _ = Describe("Kubelet", func() {
 	})
 
 	Describe("pod scheduling", func() {
+		namespace := "pod-scheduling"
 		Context("when scheduling a busybox command in a pod", func() {
+			podName := "busybox-scheduling"
 			It("it should return succes", func() {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						Name:      "busybox",
-						Namespace: api.NamespaceDefault,
+						Name:      podName,
+						Namespace: namespace,
 					},
 					Spec: api.PodSpec{
 						// Force the Pod to schedule to the node without a scheduler running
@@ -59,20 +61,20 @@ var _ = Describe("Kubelet", func() {
 						Containers: []api.Container{
 							{
 								Image:   "gcr.io/google_containers/busybox",
-								Name:    "busybox",
+								Name:    podName,
 								Command: []string{"echo", "'Hello World'"},
 							},
 						},
 					},
 				}
-				_, err := cl.Pods(api.NamespaceDefault).Create(pod)
+				_, err := cl.Pods(namespace).Create(pod)
 				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
 			})
 
 			It("it should print the output to logs", func() {
 				Eventually(func() string {
 					sinceTime := unversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
+					rc, err := cl.Pods(namespace).GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
 					if err != nil {
 						return ""
 					}
@@ -84,18 +86,19 @@ var _ = Describe("Kubelet", func() {
 			})
 
 			It("it should be possible to delete", func() {
-				err := cl.Pods(api.NamespaceDefault).Delete("busybox", &api.DeleteOptions{})
-				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+				err := cl.Pods(namespace).Delete(podName, &api.DeleteOptions{})
+				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 			})
 		})
 
 		Context("when scheduling a read only busybox container", func() {
+			podName := "busybox-readonly-fs"
 			It("it should return success", func() {
 				isReadOnly := true
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						Name:      "busybox",
-						Namespace: api.NamespaceDefault,
+						Name:      podName,
+						Namespace: namespace,
 					},
 					Spec: api.PodSpec{
 						// Force the Pod to schedule to the node without a scheduler running
@@ -105,7 +108,7 @@ var _ = Describe("Kubelet", func() {
 						Containers: []api.Container{
 							{
 								Image:   "gcr.io/google_containers/busybox",
-								Name:    "busybox",
+								Name:    podName,
 								Command: []string{"sh", "-c", "echo test > /file"},
 								SecurityContext: &api.SecurityContext{
 									ReadOnlyRootFilesystem: &isReadOnly,
@@ -114,13 +117,13 @@ var _ = Describe("Kubelet", func() {
 						},
 					},
 				}
-				_, err := cl.Pods(api.NamespaceDefault).Create(pod)
+				_, err := cl.Pods(namespace).Create(pod)
 				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
 			})
 
 			It("it should not write to the root filesystem", func() {
 				Eventually(func() string {
-					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
+					rc, err := cl.Pods(namespace).GetLogs(podName, &api.PodLogOptions{}).Stream()
 					if err != nil {
 						return ""
 					}
@@ -132,13 +135,14 @@ var _ = Describe("Kubelet", func() {
 			})
 
 			It("it should be possible to delete", func() {
-				err := cl.Pods(api.NamespaceDefault).Delete("busybox", &api.DeleteOptions{})
+				err := cl.Pods(namespace).Delete(podName, &api.DeleteOptions{})
 				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
 			})
 		})
 	})
 
 	Describe("metrics api", func() {
+		namespace := "kubelet-metrics-api"
 		statsPrefix := "stats-busybox-"
 		podNames := []string{}
 		podCount := 2
@@ -147,7 +151,7 @@ var _ = Describe("Kubelet", func() {
 		}
 		BeforeEach(func() {
 			for _, podName := range podNames {
-				createPod(cl, podName, []api.Container{
+				createPod(cl, podName, namespace, []api.Container{
 					{
 						Image:   "gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c", "echo 'Hello World' | tee ~/file | tee /test-empty-dir-mnt | sleep 60"},
@@ -259,7 +263,7 @@ var _ = Describe("Kubelet", func() {
 
 		AfterEach(func() {
 			for _, podName := range podNames {
-				err := cl.Pods(api.NamespaceDefault).Delete(podName, &api.DeleteOptions{})
+				err := cl.Pods(namespace).Delete(podName, &api.DeleteOptions{})
 				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", podName))
 			}
 		})
@@ -284,11 +288,11 @@ const (
 	containerSuffix = "-c"
 )
 
-func createPod(cl *client.Client, podName string, containers []api.Container, volumes []api.Volume) {
+func createPod(cl *client.Client, podName string, namespace string, containers []api.Container, volumes []api.Volume) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
-			Namespace: api.NamespaceDefault,
+			Namespace: namespace,
 		},
 		Spec: api.PodSpec{
 			// Force the Pod to schedule to the node without a scheduler running
@@ -299,6 +303,6 @@ func createPod(cl *client.Client, podName string, containers []api.Container, vo
 			Volumes:       volumes,
 		},
 	}
-	_, err := cl.Pods(api.NamespaceDefault).Create(pod)
+	_, err := cl.Pods(namespace).Create(pod)
 	Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
 }
