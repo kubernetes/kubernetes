@@ -845,8 +845,8 @@ type PodSecurityPolicySpec struct {
 	HostPID bool `json:"hostPID,omitempty"`
 	// HostIPC determines if the policy allows the use of HostIPC in the pod spec.
 	HostIPC bool `json:"hostIPC,omitempty"`
-	// SELinuxContext is the strategy that will dictate the allowable labels that may be set.
-	SELinuxContext SELinuxContextStrategyOptions `json:"seLinuxContext,omitempty"`
+	// SELinux is the strategy that will dictate the allowable labels that may be set.
+	SELinux SELinuxStrategyOptions `json:"seLinux,omitempty"`
 	// RunAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions `json:"runAsUser,omitempty"`
 }
@@ -881,30 +881,30 @@ var (
 	FC                    FSType = "fc"
 )
 
-// SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.
-type SELinuxContextStrategyOptions struct {
-	// Type is the strategy that will dictate the allowable labels that may be set.
-	Type SELinuxContextStrategy `json:"type"`
+// SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
+type SELinuxStrategyOptions struct {
+	// Rule is the strategy that will dictate the allowable labels that may be set.
+	Rule SELinuxStrategy `json:"rule"`
 	// seLinuxOptions required to run as; required for MustRunAs
 	// More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context
 	SELinuxOptions *api.SELinuxOptions `json:"seLinuxOptions,omitempty"`
 }
 
-// SELinuxContextStrategyType denotes strategy types for generating SELinux options for a
-// SecurityContext.
-type SELinuxContextStrategy string
+// SELinuxStrategy denotes strategy types for generating SELinux options for a
+// Security.
+type SELinuxStrategy string
 
 const (
 	// container must have SELinux labels of X applied.
-	SELinuxStrategyMustRunAs SELinuxContextStrategy = "MustRunAs"
+	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
 	// container may make requests for any SELinux context labels.
-	SELinuxStrategyRunAsAny SELinuxContextStrategy = "RunAsAny"
+	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
 type RunAsUserStrategyOptions struct {
-	// Type is the strategy that will dictate the allowable RunAsUser values that may be set.
-	Type RunAsUserStrategy `json:"type"`
+	// Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+	Rule RunAsUserStrategy `json:"rule"`
 	// Ranges are the allowed ranges of uids that may be used.
 	Ranges []IDRange `json:"ranges,omitempty"`
 }
@@ -917,7 +917,7 @@ type IDRange struct {
 	Max int64 `json:"max"`
 }
 
-// RunAsUserStrategyType denotes strategy types for generating RunAsUser values for a
+// RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
 // SecurityContext.
 type RunAsUserStrategy string
 

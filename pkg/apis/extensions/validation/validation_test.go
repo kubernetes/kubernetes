@@ -1898,27 +1898,27 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		return &extensions.PodSecurityPolicy{
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: extensions.PodSecurityPolicySpec{
-				SELinuxContext: extensions.SELinuxContextStrategyOptions{
-					Type: extensions.SELinuxStrategyRunAsAny,
+				SELinux: extensions.SELinuxStrategyOptions{
+					Rule: extensions.SELinuxStrategyRunAsAny,
 				},
 				RunAsUser: extensions.RunAsUserStrategyOptions{
-					Type: extensions.RunAsUserStrategyRunAsAny,
+					Rule: extensions.RunAsUserStrategyRunAsAny,
 				},
 			},
 		}
 	}
 
 	noUserOptions := validSCC()
-	noUserOptions.Spec.RunAsUser.Type = ""
+	noUserOptions.Spec.RunAsUser.Rule = ""
 
 	noSELinuxOptions := validSCC()
-	noSELinuxOptions.Spec.SELinuxContext.Type = ""
+	noSELinuxOptions.Spec.SELinux.Rule = ""
 
-	invalidUserStratType := validSCC()
-	invalidUserStratType.Spec.RunAsUser.Type = "invalid"
+	invalidUserStratRule := validSCC()
+	invalidUserStratRule.Spec.RunAsUser.Rule = "invalid"
 
-	invalidSELinuxStratType := validSCC()
-	invalidSELinuxStratType.Spec.SELinuxContext.Type = "invalid"
+	invalidSELinuxStratRule := validSCC()
+	invalidSELinuxStratRule.Spec.SELinux.Rule = "invalid"
 
 	missingObjectMetaName := validSCC()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -1950,12 +1950,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			scc:         noSELinuxOptions,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
 		},
-		"invalid user strategy type": {
-			scc:         invalidUserStratType,
+		"invalid user strategy rule": {
+			scc:         invalidUserStratRule,
 			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
 		},
-		"invalid selinux strategy type": {
-			scc:         invalidSELinuxStratType,
+		"invalid selinux strategy rule": {
+			scc:         invalidSELinuxStratRule,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
 		},
 		"missing object meta name": {
@@ -1983,17 +1983,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	mustRunAs := validSCC()
-	mustRunAs.Spec.RunAsUser.Type = extensions.RunAsUserStrategyMustRunAs
+	mustRunAs.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Ranges = []extensions.IDRange{
 		{
 			Min: 1,
 			Max: 1,
 		},
 	}
-	mustRunAs.Spec.SELinuxContext.Type = extensions.SELinuxStrategyMustRunAs
+	mustRunAs.Spec.SELinux.Rule = extensions.SELinuxStrategyMustRunAs
 
 	runAsNonRoot := validSCC()
-	runAsNonRoot.Spec.RunAsUser.Type = extensions.RunAsUserStrategyMustRunAsNonRoot
+	runAsNonRoot.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAsNonRoot
 
 	successCases := map[string]struct {
 		scc *extensions.PodSecurityPolicy
