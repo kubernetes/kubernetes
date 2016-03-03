@@ -329,7 +329,7 @@ docker-upgrade:
 # TODO: Fix this
 fix-service-docker:
   cmd.wait:
-    - name: /opt/kubernetes/helpers/services bounce docker
+    - name: /opt/kubernetes/helpers/services enable docker
     - watch:
       - file: {{ pillar.get('systemd_system_path') }}/docker.service
       - file: {{ environment_file }}
@@ -380,27 +380,35 @@ fix-systemd-docker-healthcheck-service:
 {% endif %}
 
 docker:
-  service.running:
 # Starting Docker is racy on aws for some reason.  To be honest, since Monit
 # is managing Docker restart we should probably just delete this whole thing
 # but the kubernetes components use salt 'require' to set up a dag, and that
 # complicated and scary to unwind.
+# On AWS, we use a trick now... we don't start the docker service through Salt.
+# Kubelet or our health checker will start it.  But we use service.enabled,
+# so we still have a `service: docker` node for our DAG.
 {% if grains.cloud is defined and grains.cloud == 'aws' %}
-    - enable: False
+  service.enabled:
 {% else %}
+  service.running:
     - enable: True
 {% endif %}
+# If we put a watch on this, salt will try to start the service.
+# We put the watch on the fixer instead
+{% if not pillar.get('is_systemd') %}
     - watch:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
       - cmd: docker-upgrade
 {% endif %}
-{% if pillar.get('is_systemd') %}
-      - file: {{ pillar.get('systemd_system_path') }}/docker.service
 {% endif %}
-{% if override_docker_ver != '' %}
     - require:
+      - file: {{ environment_file }}
+{% if override_docker_ver != '' %}
       - cmd: docker-upgrade
+{% endif %}
+{% if pillar.get('is_systemd') %}
+      - cmd: fix-service-docker
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'
 
