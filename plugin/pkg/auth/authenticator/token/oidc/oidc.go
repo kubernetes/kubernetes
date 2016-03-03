@@ -31,22 +31,45 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
 )
 
+const (
+	PathExchangeRefreshToken = "/oidc-exchange-refresh-token"
+	PathAuthenticate         = "/oidc-authenticate"
+	PathAuthCallback         = "/oidc-auth-callback"
+	PathExchangeCode         = "/oidc-exchange-auth-code"
+)
+
 var (
 	maxRetries   = 5
 	retryBackoff = time.Second * 3
+
+	empty           = struct{}{}
+	bypassAuthPaths = map[string]struct{}{
+		PathExchangeRefreshToken: empty,
+		PathAuthenticate:         empty,
+		PathAuthCallback:         empty,
+		PathExchangeCode:         empty,
+	}
+
+	UserUnauthenticated = &user.DefaultInfo{
+		Name: "oidc:unauthenticated_user",
+		UID:  "oidc:unauthenticated_user",
+	}
 )
 
 type OIDCAuthenticator struct {
-	clientConfig     oidc.ClientConfig
-	client           *oidc.Client
-	usernameClaim    string
-	groupsClaim      string
-	stopSyncProvider chan struct{}
+	clientConfig        oidc.ClientConfig
+	client              *oidc.Client
+	usernameClaim       string
+	groupsClaim         string
+	stopSyncProvider    chan struct{}
+	bearerAuthenticator authenticator.Request
+	handlersAttached    bool
 }
 
 type OIDCHTTPHandler struct {
@@ -131,7 +154,24 @@ func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim s
 	// and maximum threshold.
 	stop := client.SyncProviderConfig(issuerURL)
 
-	return &OIDCAuthenticator{ccfg, client, usernameClaim, groupsClaim, stop}, nil
+	return &OIDCAuthenticator{
+		clientConfig:     ccfg,
+		client:           client,
+		usernameClaim:    usernameClaim,
+		groupsClaim:      groupsClaim,
+		stopSyncProvider: stop,
+	}, nil
+}
+
+// SetHandlersAttached tells the authenticator that the OIDC related HTTP handlers are in use and have been attached.
+//
+// When this is set to true, requests to the following paths will not require
+// authentication:
+//
+// PathExchangeRefreshToken, PathAuthenticate, PathAuthCallback,
+// PathExchangeCode
+func (a *OIDCAuthenticator) SetHandlersAttached(attached bool) {
+	a.handlersAttached = attached
 }
 
 // NewOIDCHTTPHandler creates an http.Handler which provides additional endpoints useful for OIDC-related authentication.
@@ -145,6 +185,15 @@ func (a *OIDCAuthenticator) NewOIDCHTTPHandler() (*OIDCHTTPHandler, error) {
 	return &OIDCHTTPHandler{
 		client: a.client,
 	}, nil
+
+}
+func (a *OIDCAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	if a.handlersAttached {
+		if _, ok := bypassAuthPaths[req.URL.Path]; ok {
+			return UserUnauthenticated, true, nil
+		}
+	}
+	return a.bearerAuthenticator.AuthenticateRequest(req)
 }
 
 // AuthenticateToken decodes and verifies a JWT using the OIDC client, if the verification succeeds,
@@ -208,5 +257,73 @@ func (a *OIDCAuthenticator) Close() {
 }
 
 func (t *OIDCHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case PathExchangeRefreshToken:
+		t.handleExchangeRefreshToken(w, r)
+		return
+	case PathAuthenticate:
+		t.handleAuth(w, r)
+		return
+	case PathAuthCallback:
+		t.handleAuthCallback(w, r)
+		return
+	case PathExchangeCode:
+		t.handleExchangeCode(w, r)
+		return
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+}
 
+// handleExchangeRefreshToken exchanges a refresh token, passed through the "refresh_token" parameter, for an ID Token, which can be used for authentication.
+func (t *OIDCHTTPHandler) handleExchangeRefreshToken(w http.ResponseWriter, r *http.Request) {
+	// Only post is allowed
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		glog.Errorf("Could not parse form: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rt := r.PostForm.Get("refresh_token")
+	if rt == "" {
+		glog.Errorf("Missing 'refresh_token' parameter")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Get the JWT
+	jwt, err := t.client.RefreshToken(rt)
+	if err != nil {
+		glog.Errorf("Could not get refresh token: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	v := url.Values{}
+	v.Set("id_token", jwt.Encode())
+	_, err = w.Write([]byte(v.Encode()))
+	if err != nil {
+		glog.Errorf("Could not write response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+func (t *OIDCHTTPHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
+}
+
+func (t *OIDCHTTPHandler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+}
+
+func (t *OIDCHTTPHandler) handleExchangeCode(w http.ResponseWriter, r *http.Request) {
 }

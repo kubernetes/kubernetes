@@ -73,8 +73,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	}
 
 	if config.OIDCAuthenticator != nil {
-		oidcAuth := bearertoken.New(config.OIDCAuthenticator)
-		authenticators = append(authenticators, oidcAuth)
+		authenticators = append(authenticators, config.OIDCAuthenticator)
 	}
 
 	if len(config.ServiceAccountKeyFile) > 0 {

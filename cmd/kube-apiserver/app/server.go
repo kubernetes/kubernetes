@@ -506,7 +506,11 @@ func Run(s *options.APIServer) error {
 		if err != nil {
 			return err
 		}
-		m.MuxHelper.Handle("oidc-get-tokens", oidcHandler)
+		m.MuxHelper.Handle(oidc.PathExchangeRefreshToken, oidcHandler)
+		m.MuxHelper.Handle(oidc.PathAuthenticate, oidcHandler)
+		m.MuxHelper.Handle(oidc.PathAuthCallback, oidcHandler)
+		m.MuxHelper.Handle(oidc.PathExchangeCode, oidcHandler)
+		oAuth.SetHandlersAttached(true)
 	}
 
 	m.Run(s.ServerRunOptions)
