@@ -227,7 +227,7 @@ type Parameter struct {
     // $((Name)) expression during the Template to Config transformation.
     Value string
 
-    // Optional: Indicates the parameter must have a value.  Defaults to false.
+    // Optional: Indicates the parameter must have a non-empty value either provided by the user or provided by a default.  Defaults to false.
     Required bool
 
     // Optional: Type-value of the parameter (one of string, int, bool, or base64)
@@ -309,7 +309,7 @@ pod template.
       "kind": "ReplicationController",
       "apiVersion": "v1",
       "metadata": {
-        "name": "$(DATABASE_SERVICE_NAME)",
+        "name": "$(DATABASE_SERVICE_NAME)"
       },
       "spec": {
         "replicas": "$((REPLICA_COUNT))",
@@ -365,7 +365,7 @@ pod template.
     {
       "name": "MONGODB_USER",
       "description": "Username for MongoDB user that will be used for accessing the database",
-      "value": "password"
+      "value": "username",
       "required": true
     },
     {
