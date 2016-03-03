@@ -1134,6 +1134,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty name":      {{Name: "", MountPath: "/foo"}},
 		"name not found":  {{Name: "", MountPath: "/foo"}},
 		"empty mountpath": {{Name: "abc", MountPath: ""}},
+		"colon mountpath": {{Name: "abc", MountPath: "foo:bar"}},
 	}
 	for k, v := range errorCases {
 		if errs := validateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
