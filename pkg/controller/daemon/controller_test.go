@@ -284,6 +284,36 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager.podStore.Add(&api.Pod{
 		Spec: podSpec,
 	})
+
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+// Test that if the node is already scheduled with a pod using a host port
+// but belonging to the same daemonset, we don't delete that pod
+//
+// Issue: https://github.com/kubernetes/kubernetes/issues/22309
+func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
+	podSpec := api.PodSpec{
+		NodeName: "port-conflict",
+		Containers: []api.Container{{
+			Ports: []api.ContainerPort{{
+				HostPort: 666,
+			}},
+		}},
+	}
+	manager, podControl := newTestController()
+	node := newNode("port-conflict", nil)
+	manager.nodeStore.Add(node)
+	manager.podStore.Add(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels:    simpleDaemonSetLabel,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: podSpec,
+	})
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec = podSpec
 	manager.dsStore.Add(ds)

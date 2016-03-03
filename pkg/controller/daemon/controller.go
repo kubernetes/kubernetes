@@ -601,6 +601,11 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 		if pod.Spec.NodeName != node.Name {
 			continue
 		}
+		// ignore pods that belong to the daemonset when taking into account wheter
+		// a daemonset should bind to a node.
+		if pds := dsc.getPodDaemonSet(pod); pds != nil && ds.Name == pds.Name {
+			continue
+		}
 		pods = append(pods, pod)
 	}
 	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, node.Status.Allocatable)
