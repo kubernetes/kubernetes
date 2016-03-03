@@ -66,8 +66,10 @@ echo "+++ Install binaries from tar: $1"
 tar -xz -C "${KUBE_TEMP}" -f "$1"
 mkdir -p /srv/salt-new/salt/kube-bins
 mkdir -p /srv/salt-new/salt/kube-addons-images
+mkdir -p /srv/salt-new/salt/kube-docs
 cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
 cp -v "${KUBE_TEMP}/kubernetes/addons/"* /srv/salt-new/salt/kube-addons-images/
+cp -v "${KUBE_TEMP}/kubernetes/LICENSES" /srv/salt-new/salt/kube-docs/
 
 kube_bin_dir="/srv/salt-new/salt/kube-bins";
 docker_images_sls_file="/srv/salt-new/pillar/docker-images.sls";
