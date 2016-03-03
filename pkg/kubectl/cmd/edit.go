@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	gruntime "runtime"
 	"strings"
 
@@ -199,7 +200,7 @@ outter:
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", os.Args[0]), ext, buf)
+			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", path.Base(os.Args[0])), ext, buf)
 			if err != nil {
 				return preservedFile(err, results.file, out)
 			}
