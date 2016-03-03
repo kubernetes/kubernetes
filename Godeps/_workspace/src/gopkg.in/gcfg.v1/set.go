@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/scalingdata/gcfg/types"
+	"gopkg.in/gcfg.v1/types"
 )
 
 type tag struct {
@@ -224,6 +224,11 @@ func set(cfg interface{}, sect, sub, name string, blank bool, value string) erro
 	} else if sub != "" {
 		return fmt.Errorf("invalid subsection: "+
 			"section %q subsection %q", sect, sub)
+	}
+	// Empty name is a special value, meaning that only the
+	// section/subsection object is to be created, with no values set.
+	if name == "" {
+		return nil
 	}
 	vVar, t := fieldFold(vSect, name)
 	if !vVar.IsValid() {

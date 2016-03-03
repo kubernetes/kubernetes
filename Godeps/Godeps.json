@@ -885,8 +885,8 @@
 			"Rev": "177002e16a0061912f02377e2dd8951a8b3551bc"
 		},
 		{
-			"ImportPath": "github.com/scalingdata/gcfg",
-			"Rev": "37aabad69cfd3d20b8390d902a8b10e245c615ff"
+			"ImportPath": "gopkg.in/gcfg.v1",
+			"Rev": "a3bc0742e3bbfd16123e6cee742cadec9a3301d2"
 		},
 		{
 			"ImportPath": "github.com/seccomp/libseccomp-golang",
