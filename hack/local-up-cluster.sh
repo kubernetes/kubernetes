@@ -386,7 +386,7 @@ kind: Namespace
 metadata:
   name: kube-system
 EOF
-        ${KUBECTL} config set-cluster local --server=http://127.0.0.1:8080 --insecure-skip-tls-verify=true
+        ${KUBECTL} config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true
         ${KUBECTL} config set-context local --cluster=local
         ${KUBECTL} config use-context local
 
