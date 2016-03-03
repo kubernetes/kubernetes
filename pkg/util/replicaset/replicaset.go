@@ -24,17 +24,17 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
-type updateRSFunc func(rs *extensions.ReplicaSet)
-type preconditionFunc func(rs *extensions.ReplicaSet) bool
+type updateRSFunc func(rs *extensions.ReplicaSet) error
 
-// UpdateRSWithRetries updates a RS with given applyUpdate function, when the given precondition holds. Note that RS not found error is ignored.
+// UpdateRSWithRetries updates a RS with given applyUpdate function. Note that RS not found error is ignored.
 // The returned bool value can be used to tell if the RS is actually updated.
-func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, preconditionHold preconditionFunc, applyUpdate updateRSFunc) (*extensions.ReplicaSet, bool, error) {
+func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, applyUpdate updateRSFunc) (*extensions.ReplicaSet, bool, error) {
 	var err error
 	var rsUpdated bool
 	oldRs := rs
@@ -43,12 +43,10 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 		if err != nil {
 			return false, err
 		}
-		if !preconditionHold(rs) {
-			glog.V(4).Infof("rs %s precondition doesn't hold, skip updating it.", rs.Name)
-			return true, nil
-		}
 		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(rs)
+		if err = applyUpdate(rs); err != nil {
+			return false, err
+		}
 		if rs, err = rsClient.Update(rs); err == nil {
 			// Update successful.
 			return true, nil
@@ -61,6 +59,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 		rsUpdated = true
 	}
 
+	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("timed out trying to update RS: %+v", oldRs)
 	}
@@ -69,7 +68,13 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 		glog.V(4).Infof("%s %s/%s is not found, skip updating it.", oldRs.Kind, oldRs.Namespace, oldRs.Name)
 		err = nil
 	}
-	// If the error is non-nil the returned controller cannot be trusted, if it is nil, the returned
-	// controller contains the applied update.
+	// Ignore the precondition violated error, but the RS isn't updated.
+	if err == errorsutil.ErrPreconditionViolated {
+		glog.V(4).Infof("%s %s/%s precondition doesn't hold, skip updating it.", oldRs.Kind, oldRs.Namespace, oldRs.Name)
+		err = nil
+	}
+
+	// If the error is non-nil the returned RS cannot be trusted; if rsUpdated is false, the contoller isn't updated;
+	// if the error is nil and rsUpdated is true, the returned RS contains the applied update.
 	return rs, rsUpdated, err
 }

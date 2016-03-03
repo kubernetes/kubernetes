@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -188,11 +189,13 @@ func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interf
 	rsUpdated := false
 	// 1. Add hash template label to the rs. This ensures that any newly created pods will have the new label.
 	updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS,
-		func(updated *extensions.ReplicaSet) bool {
-			return updated.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash
-		},
-		func(updated *extensions.ReplicaSet) {
+		func(updated *extensions.ReplicaSet) error {
+			// Precondition: the RS doesn't contain the new hash in its pod template label.
+			if updated.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
+				return errors.ErrPreconditionViolated
+			}
 			updated.Spec.Template.Labels = labelsutil.AddLabel(updated.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
+			return nil
 		})
 	if err != nil {
 		return nil, fmt.Errorf("error updating %s %s/%s pod template label with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
@@ -235,12 +238,14 @@ func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interf
 	// 3. Update rs label and selector to include the new hash label
 	// Copy the old selector, so that we can scrub out any orphaned pods
 	if updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS,
-		func(updated *extensions.ReplicaSet) bool {
-			return updated.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash || updated.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey] != hash
-		},
-		func(updated *extensions.ReplicaSet) {
+		func(updated *extensions.ReplicaSet) error {
+			// Precondition: the RS doesn't contain the new hash in its label or selector.
+			if updated.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash && updated.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
+				return errors.ErrPreconditionViolated
+			}
 			updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 			updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
+			return nil
 		}); err != nil {
 		return nil, fmt.Errorf("error updating %s %s/%s label and selector with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
 	}
@@ -272,17 +277,19 @@ func labelPodsWithHash(podList *api.PodList, rs *extensions.ReplicaSet, c client
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
 			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), &pod,
-				func(podToUpdate *api.Pod) bool {
-					return podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash
-				},
-				func(podToUpdate *api.Pod) {
+				func(podToUpdate *api.Pod) error {
+					// Precondition: the pod doesn't contain the new hash in its label.
+					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
+						return errors.ErrPreconditionViolated
+					}
 					podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
+					return nil
 				}); err != nil {
 				return false, fmt.Errorf("error in adding template hash label %s to pod %+v: %s", hash, pod, err)
 			} else if podUpdated {
 				glog.V(4).Infof("Labeled %s %s/%s of %s %s/%s with hash %s.", pod.Kind, pod.Namespace, pod.Name, rs.Kind, rs.Namespace, rs.Name, hash)
 			} else {
-				// If the pod wasn't updated but didn't return error when we try to update it, we've hit a pod not found error.
+				// If the pod wasn't updated but didn't return error when we try to update it, we've hit "pod not found" or "precondition violated" error.
 				// Then we can't say all pods are labeled
 				allPodsLabeled = false
 			}
