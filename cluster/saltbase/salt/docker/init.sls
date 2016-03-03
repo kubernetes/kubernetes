@@ -338,6 +338,45 @@ fix-service-docker:
       - cmd: docker-upgrade
 {% endif %}
 
+/opt/kubernetes/helpers/docker-healthcheck:
+  file.managed:
+    - source: salt://docker/docker-healthcheck
+    - user: root
+    - group: root
+    - mode: 755
+
+{{ pillar.get('systemd_system_path') }}/docker-healthcheck.service:
+  file.managed:
+    - source: salt://docker/docker-healthcheck.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+
+{{ pillar.get('systemd_system_path') }}/docker-healthcheck.timer:
+  file.managed:
+    - source: salt://docker/docker-healthcheck.timer
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+
+# Tell systemd to load the timer
+fix-systemd-docker-healthcheck-timer:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker-healthcheck.timer
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker-healthcheck.timer
+
+# Trigger a first run of docker-healthcheck; needed because the timer fires 10s after the previous run.
+fix-systemd-docker-healthcheck-service:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker-healthcheck.service
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker-healthcheck.service
+    - require:
+      - cmd: fix-service-docker
+
 {% endif %}
 
 docker:
