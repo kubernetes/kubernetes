@@ -21,14 +21,21 @@
             {provider-env}
             {job-env}
             {post-env}
-            {runner}
+            timeout -k {kill-timeout}m {timeout}m {runner} && rc=$? || rc=$?
+            if [[ ${{rc}} -ne 0 ]]; then
+                if [[ -x kubernetes/cluster/log-dump.sh && -d _artifacts ]]; then
+                    echo "Dumping logs for any remaining nodes"
+                    ./kubernetes/cluster/log-dump.sh _artifacts
+                fi
+            fi
+            {report-rc}
     properties:
         - mail-watcher
     wrappers:
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: '{timeout}'
+            timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
         - workspace-cleanup

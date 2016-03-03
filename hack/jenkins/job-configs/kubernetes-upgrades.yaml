@@ -70,7 +70,8 @@
             # per-step variables, such as whether to run tests
             {job-env}
             {post-env}
-            {runner}
+            timeout -k {kill-timeout}m 60m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - mail-watcher
     publishers:
@@ -84,7 +85,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: 60
+            timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
         - workspace-cleanup
@@ -105,7 +106,8 @@
             # per-step variables, such as whether to run tests
             {job-env}
             {post-env}
-            {runner}
+            timeout -k {kill-timeout}m 300m {runner} && rc=$? || rc=$?
+            {report-rc}
     properties:
         - mail-watcher
     publishers:
@@ -119,8 +121,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: 300
-            abort: true
+            timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
         # Don't clean the workspace; we want to keep configs intact across steps in the multijob
