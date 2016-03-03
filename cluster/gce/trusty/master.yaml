@@ -1,4 +1,4 @@
-From nobody Tue Feb 1 11:33:00 2016
+From nobody Thu Mar 3 15:33:00 2016
 Content-Type: multipart/mixed; boundary="===================================="
 MIME-Version: 1.0
 
@@ -122,30 +122,15 @@ script
 	set -o nounset
 
 	echo "Start kubelet upstart job"
-
+	. /etc/kube-configure.sh
 	. /etc/kube-env
 	BINARY_PATH="/usr/bin/kubelet"
 	if [ "${TEST_CLUSTER:-}" = "true" ]; then
 		BINARY_PATH="/usr/local/bin/kubelet"
 	fi
-	# Assemble command line flags based on env variables.
-	ARGS="--v=2"
-	if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-		ARGS="${KUBELET_TEST_LOG_LEVEL}"
-	fi
-	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-		ARGS="${ARGS} ${KUBELET_TEST_ARGS}"
-	fi
-	if [ ! -z "${KUBELET_APISERVER:-}" ] && [ ! -z "${KUBELET_CERT:-}" ] && [ ! -z "${KUBELET_KEY:-}" ]; then
-		ARGS="${ARGS} --api-servers=https://${KUBELET_APISERVER}"
-		ARGS="${ARGS} --register-schedulable=false --reconcile-cidr=false"
-		ARGS="${ARGS} --pod-cidr=10.123.45.0/30"
-	else
-		ARGS="${ARGS} --pod-cidr=${MASTER_IP_RANGE}"
-	fi
-	if [ "${ENABLE_MANIFEST_URL:-}" = "true" ]; then
-		ARGS="${ARGS} --manifest-url=${MANIFEST_URL} --manifest-url-header=${MANIFEST_URL_HEADER}"
-	fi
+	# Assemble command line flags based on env variables, which will put the string
+	# of flags in variable KUBELET_CMD_FLAGS
+	assemble_kubelet_flags
 	
 	${BINARY_PATH} \
 		--enable-debugging-handlers=false \
@@ -159,8 +144,8 @@ script
 		--system-cgroups=/system \
 		--runtime-cgroups=/docker-daemon \
 		--kubelet-cgroups=/kubelet \
-		--nosystemd=true \
-		${ARGS} 1>>/var/log/kubelet.log 2>&1
+		--babysit-daemons=true \
+		${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
 # Wait for 10s to start kubelet again.
@@ -236,7 +221,6 @@ script
 	set -o nounset
 
 	. /etc/kube-env
-
 	export HOME="/root"
 	if [ "${TEST_CLUSTER:-}" = "true" ]; then
 		export KUBECTL_BIN="/usr/local/bin/kubectl"
@@ -265,6 +249,8 @@ description "Kubenetes master health monitoring"
 
 start on stopped kube-docker
 
+respawn
+
 script
 	set -o errexit
 	set -o nounset
@@ -273,5 +259,8 @@ script
 	. /etc/kube-env
 	health_monitoring
 end script
+
+# Wait for 10s to start it again.
+post-stop exec sleep 10
 
 --====================================--
