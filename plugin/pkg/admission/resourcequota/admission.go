@@ -128,6 +128,11 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 	if len(items) == 0 {
 		lruItemObj, ok := q.liveLookupCache.Get(a.GetNamespace())
 		if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
+			// TODO: If there are multiple operations at the same time and cache has just expired,
+			// this may cause multiple List operations being issued at the same time.
+			// If there is already in-flight List() for a given namespace, we should wait until
+			// it is finished and cache is updated instead of doing the same, also to avoid
+			// throttling - see #22422 for details.
 			liveList, err := q.client.Core().ResourceQuotas(namespace).List(api.ListOptions{})
 			if err != nil {
 				return admission.NewForbidden(a, err)
