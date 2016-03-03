@@ -5,11 +5,13 @@ cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to th
 cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
+cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
+cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
