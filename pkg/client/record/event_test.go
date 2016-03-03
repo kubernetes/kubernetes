@@ -33,11 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
-func init() {
-	// Don't bother sleeping between retries.
-	sleepDuration = 0
-}
-
 type testEventSink struct {
 	OnCreate func(e *api.Event) (*api.Event, error)
 	OnUpdate func(e *api.Event) (*api.Event, error)
@@ -346,7 +341,7 @@ func TestEventf(t *testing.T) {
 		},
 		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
-	eventBroadcaster := NewBroadcaster()
+	eventBroadcaster := NewBroadcasterForTests(0)
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
 	clock := util.NewFakeClock(time.Now())
@@ -431,7 +426,7 @@ func TestWriteEventError(t *testing.T) {
 			},
 		}
 		ev := &api.Event{}
-		recordToSink(sink, ev, eventCorrelator, randGen)
+		recordToSink(sink, ev, eventCorrelator, randGen, 0)
 		if attempts != ent.attemptsWanted {
 			t.Errorf("case %v: wanted %d, got %d attempts", caseName, ent.attemptsWanted, attempts)
 		}
@@ -460,7 +455,7 @@ func TestLotsOfEvents(t *testing.T) {
 		},
 	}
 
-	eventBroadcaster := NewBroadcaster()
+	eventBroadcaster := NewBroadcasterForTests(0)
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 		loggerCalled <- struct{}{}
@@ -557,7 +552,7 @@ func TestEventfNoNamespace(t *testing.T) {
 		},
 		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
-	eventBroadcaster := NewBroadcaster()
+	eventBroadcaster := NewBroadcasterForTests(0)
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
 	clock := util.NewFakeClock(time.Now())
@@ -846,7 +841,7 @@ func TestMultiSinkCache(t *testing.T) {
 		OnPatch: OnPatchFactory(testCache2, patchEvent2),
 	}
 
-	eventBroadcaster := NewBroadcaster()
+	eventBroadcaster := NewBroadcasterForTests(0)
 	clock := util.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
