@@ -730,7 +730,9 @@ __EOF__
   # Post-Condition: hpa "frontend" has configuration annotation
   [[ "$(kubectl get hpa.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up
-  kubectl delete rc,hpa frontend "${kube_flags[@]}"
+  # Note that we should delete hpa first, otherwise it may fight with the rc reaper.
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  kubectl delete rc  frontend "${kube_flags[@]}"
 
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
@@ -1243,6 +1245,7 @@ __EOF__
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
   kube::test::get_object_assert 'hpa.extensions nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   # Clean up
+  # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
   kubectl delete deployment.extensions nginx-deployment "${kube_flags[@]}"
 
