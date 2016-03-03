@@ -73,6 +73,7 @@ default-container-cpu-limit
 default-container-mem-limit
 delay-shutdown
 delete-collection-workers
+delete-interval
 delete-namespace
 deleting-pods-burst
 deleting-pods-qps
@@ -309,6 +310,7 @@ really-crash-for-testing
 reconcile-cidr
 reconcile-cooldown
 reconcile-interval
+recreate-interval
 register-node
 register-retry-count
 register-schedulable
