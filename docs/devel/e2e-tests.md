@@ -148,6 +148,26 @@ As mentioned earlier there are a host of other options that are available, but t
 - `rm -rf /var/run/kubernetes`, clear kube generated credentials, sometimes stale permissions can cause problems.
 - `sudo iptables -F`, clear ip tables rules left by the kube-proxy.
 
+### Debugging clusters
+
+If a cluster fails to initialize, or you'd like to better understand cluster
+state to debug a failed e2e test, you can use the `cluster/log-dump.sh` script
+to gather logs.
+
+This script requires that the cluster provider supports ssh. Assuming it does,
+running
+
+```
+cluster/log-dump.sh <directory>
+````
+
+will ssh to the master and all nodes
+and download a variety of useful logs to the provided directory (which should
+already exist).
+
+The Google-run Jenkins builds automatically collected these logs for every
+build, saving them in the `artifacts` directory uploaded to GCS.
+
 ### Local clusters
 
 It can be much faster to iterate on a local cluster instead of a cloud-based one.  To start a local cluster, you can run:
