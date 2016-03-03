@@ -80,7 +80,7 @@ Import this VMDK into your vSphere datastore:
 
 ```sh
 export GOVC_URL='hostname' # hostname of the vc
-export GOVC_USER='username' # username for logging into the vsphere.
+export GOVC_USERNAME='username' # username for logging into the vsphere.
 export GOVC_PASSWORD='password' # password for the above username
 export GOVC_NETWORK='Network Name' # Name of the network the vms should join. Many times it could be "VM Network"
 export GOVC_INSECURE=1 # If the host above uses a self-signed cert
@@ -104,10 +104,19 @@ parameters. The guest login for the image that you imported is `kube:kube`.
 Now, let's continue with deploying Kubernetes.
 This process takes about ~20-30 minutes depending on your network.
 
+#### From extracted binary release
+
 ```sh
-cd kubernetes # Extracted binary release OR repository root
-export KUBERNETES_PROVIDER=vsphere
-cluster/kube-up.sh
+cd kubernetes
+KUBERNETES_PROVIDER=vsphere cluster/kube-up.sh
+```
+
+#### Build from source
+
+```sh
+cd kubernetes
+make release
+KUBERNETES_PROVIDER=vsphere cluster/kube-up.sh
 ```
 
 Refer to the top level README and the getting started guide for Google Compute
