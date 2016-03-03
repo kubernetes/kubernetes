@@ -45,6 +45,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -660,7 +661,7 @@ func (lb *LoadBalancer) GetLoadBalancer(name, region string) (*api.LoadBalancerS
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations cloudprovider.ServiceAnnotation) (*api.LoadBalancerStatus, error) {
+func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, serviceName, annotations)
 
 	if len(ports) > 1 {
@@ -683,6 +684,15 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
 	default:
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
+	}
+
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
+	if err != nil {
+		return nil, err
+	}
+
+	if !service.IsAllowAll(sourceRanges) {
+		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
 	}
 
 	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", name)

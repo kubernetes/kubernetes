@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -1736,6 +1737,12 @@ func ValidateService(service *api.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Duplicate(portPath.Child("nodePort"), port.NodePort))
 		}
 		nodePorts[key] = true
+	}
+
+	_, err := apiservice.GetLoadBalancerSourceRanges(service.Annotations)
+	if err != nil {
+		v := service.Annotations[apiservice.AnnotationLoadBalancerSourceRangesKey]
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(apiservice.AnnotationLoadBalancerSourceRangesKey), v, "must be a comma separated list of CIDRs e.g. 192.168.0.0/16,10.0.0.0/8"))
 	}
 
 	return allErrs

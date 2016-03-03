@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -2875,6 +2876,34 @@ func TestValidateService(t *testing.T) {
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid LoadBalancer source range annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "empty LoadBalancer source range annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = ""
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid LoadBalancer source range annotation (hostname)",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid LoadBalancer source range annotation (invalid CIDR)",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 			},
 			numErrs: 1,
 		},
