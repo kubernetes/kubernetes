@@ -214,18 +214,6 @@ func (dsc *DaemonSetsController) worker() {
 	}
 }
 
-func (dsc *DaemonSetsController) enqueueAllDaemonSets() {
-	glog.V(4).Infof("Enqueueing all daemon sets")
-	ds, err := dsc.dsStore.List()
-	if err != nil {
-		glog.Errorf("Error enqueueing daemon sets: %v", err)
-		return
-	}
-	for i := range ds.Items {
-		dsc.enqueueDaemonSet(&ds.Items[i])
-	}
-}
-
 func (dsc *DaemonSetsController) enqueueDaemonSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
