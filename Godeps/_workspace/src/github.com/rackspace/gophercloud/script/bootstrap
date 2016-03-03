@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This script helps new contributors set up their local workstation for
 # gophercloud development and contributions.
@@ -15,7 +15,7 @@ git checkout master
 # Write out the env.sh convenience file.
 cd $GOPATH
 cat <<EOF >env.sh
-#!/bin/bash
+#!/usr/bin/env bash
 export GOPATH=$(pwd)
 export GOPHERCLOUD=$GOPATH/src/github.com/rackspace/gophercloud
 EOF

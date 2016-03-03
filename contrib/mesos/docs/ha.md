@@ -150,7 +150,7 @@ COPY kubernetes/_output/dockerized/bin/linux/amd64/ /opt/kubernetes
 ENTRYPOINT ["/opt/kubernetes/km"]
 EOF
 $ cat <<EOF >build.sh
-#!/bin/bash
+#!/usr/bin/env bash
 K8SM_IMAGE_NAME=haih/k8sm
 git clone https://github.com/mesosphere/kubernetes
 cd kubernetes

@@ -72,7 +72,7 @@ func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkCon
 	pluginExec := path.Join(vendorCNIDir, vendorName)
 	f, err = os.Create(pluginExec)
 
-	const execScriptTempl = `#!/bin/bash
+	const execScriptTempl = `#!/usr/bin/env bash
 read ignore
 env > {{.OutputEnv}}
 echo "%@" >> {{.OutputEnv}}

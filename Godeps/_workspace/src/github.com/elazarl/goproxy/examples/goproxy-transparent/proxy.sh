@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 # goproxy IP
 GOPROXY_SERVER="10.10.10.1"
 # goproxy port

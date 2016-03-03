@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # _needgen is a helper function to tell if we need to generate files for msgp, codecgen.
 _needgen() {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors All rights reserved.
 #
@@ -302,7 +302,7 @@ install-salt() {
   # add a package that needs a daemon started, add it to a different
   # list.)
   cat > /usr/sbin/policy-rc.d <<EOF
-#!/bin/sh
+#!/usr/bin/env sh
 echo "Salt shall not start." >&2
 exit 101
 EOF

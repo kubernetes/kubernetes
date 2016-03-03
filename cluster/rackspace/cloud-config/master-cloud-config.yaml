@@ -15,14 +15,14 @@ write_files:
   - path: /opt/bin/git-kubernetes-nginx.sh
     permissions: 0755
     content: |
-      #!/bin/bash
+      #!/usr/bin/env bash
       git clone https://github.com/thommay/kubernetes_nginx /opt/kubernetes_nginx
       /usr/bin/cp /opt/.kubernetes_auth /opt/kubernetes_nginx/.kubernetes_auth
       /opt/kubernetes_nginx/git-kubernetes-nginx.sh
   - path: /opt/bin/download-release.sh
     permissions: 0755
     content: |
-      #!/bin/bash
+      #!/usr/bin/env bash
       # This temp URL is only good for the length of time specified at cluster creation time.
       # Afterward, it will result in a 403.
       OBJECT_URL="CLOUD_FILES_URL"

@@ -7,7 +7,7 @@ write_files:
     permissions: '0755'
     owner: root
     content: |
-      #!/bin/sh -x
+      #!/usr/bin/env sh -x
       until curl $@
       do sleep 1
       done

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors All rights reserved.
 #
@@ -993,7 +993,7 @@ function start-master() {
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
-    echo "#! /bin/bash"
+    echo "#!/usr/bin/env bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
 
@@ -1011,7 +1011,7 @@ function start-master() {
     echo "mv kube_env.yaml /etc/kubernetes"
     echo "mv bootstrap /etc/kubernetes/"
     echo "cat > /etc/rc.local << EOF_RC_LOCAL"
-    echo "#!/bin/sh -e"
+    echo "#!/usr/bin/env sh -e"
     # We want to be sure that we don't pass an argument to bootstrap
     echo "/etc/kubernetes/bootstrap"
     echo "exit 0"
@@ -1089,7 +1089,7 @@ function start-minions() {
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
-    echo "#! /bin/bash"
+    echo "#!/usr/bin/env bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
     echo "cat > kube_env.yaml << __EOF_KUBE_ENV_YAML"
@@ -1106,7 +1106,7 @@ function start-minions() {
     echo "mv kube_env.yaml /etc/kubernetes"
     echo "mv bootstrap /etc/kubernetes/"
     echo "cat > /etc/rc.local << EOF_RC_LOCAL"
-    echo "#!/bin/sh -e"
+    echo "#!/usr/bin/env sh -e"
     # We want to be sure that we don't pass an argument to bootstrap
     echo "/etc/kubernetes/bootstrap"
     echo "exit 0"
@@ -1425,7 +1425,7 @@ function kube-push {
   upload-server-tars
 
   (
-    echo "#! /bin/bash"
+    echo "#!/usr/bin/env bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"

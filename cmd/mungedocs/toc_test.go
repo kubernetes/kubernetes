@@ -34,7 +34,7 @@ func Test_buildTOC(t *testing.T) {
 			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n",
 		},
 		{
-			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n```bash\n#!/bin/sh\n```",
+			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n```bash\n#!/usr/bin/env sh\n```",
 			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n",
 		},
 		{

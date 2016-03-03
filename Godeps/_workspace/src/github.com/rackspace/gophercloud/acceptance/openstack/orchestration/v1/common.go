@@ -23,7 +23,7 @@ var template = fmt.Sprintf(`
 			"properties": {
 				"flavor": "%s",
 				"image": "%s",
-				"user_data": "#!/bin/bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n"
+				"user_data": "#!/usr/bin/env bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n"
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors All rights reserved.
 #
@@ -119,7 +119,7 @@ function create-provision-scripts {
   ensure-temp-dir
 
   (
-    echo "#! /bin/bash"
+    echo "#!/usr/bin/env bash"
     echo-kube-env
     echo "NODE_IP='${MASTER_IP}'"
     echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
@@ -131,7 +131,7 @@ function create-provision-scripts {
 
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     (
-      echo "#! /bin/bash"
+      echo "#!/usr/bin/env bash"
       echo-kube-env
       echo "NODE_NAME=(${NODE_NAMES[$i]})"
       echo "NODE_IP='${NODE_IPS[$i]}'"

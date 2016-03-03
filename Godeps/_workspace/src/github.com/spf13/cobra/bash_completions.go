@@ -17,7 +17,7 @@ const (
 )
 
 func preamble(out *bytes.Buffer) {
-	fmt.Fprintf(out, `#!/bin/bash
+	fmt.Fprintf(out, `#!/usr/bin/env bash
 
 __debug()
 {
