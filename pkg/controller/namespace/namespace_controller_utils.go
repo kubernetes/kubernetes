@@ -224,7 +224,7 @@ func deleteEachItem(
 	gvr unversioned.GroupVersionResource,
 	namespace string,
 ) error {
-	glog.V(4).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
+	glog.V(4).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
 
 	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
 	if err != nil {
