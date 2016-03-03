@@ -227,6 +227,47 @@ install_kube_binary_config() {
   rm "/run/kube-manifests/${manifests_tar}"
 }
 
+# Assembles kubelet command line flags.
+# It should be called by master and nodes before running kubelet process. The caller
+# needs to source the config file /etc/kube-env. This function sets the following
+# variable that will be used in kubelet command line.
+#   KUBELET_CMD_FLAGS
+assemble_kubelet_flags() {
+  KUBELET_CMD_FLAGS="--v=2"
+  if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_TEST_LOG_LEVEL}"
+  fi
+  if [ -n "${KUBELET_PORT:-}" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --port=${KUBELET_PORT}"
+  fi
+  if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} ${KUBELET_TEST_ARGS}"
+  fi
+  if [ ! -z "${KUBELET_APISERVER:-}" ] && [ ! -z "${KUBELET_CERT:-}" ] && [ ! -z "${KUBELET_KEY:-}" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER}"
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --register-schedulable=false --reconcile-cidr=false"
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=10.123.45.0/30"
+  else
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=${MASTER_IP_RANGE}"
+  fi
+  if [ "${ENABLE_MANIFEST_URL:-}" = "true" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --manifest-url=${MANIFEST_URL} --manifest-url-header=${MANIFEST_URL_HEADER}"
+  fi
+  if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --hairpin-mode=none"
+  elif [ "${HAIRPIN_MODE:-}" = "promiscuous-bridge" ] || \
+       [ "${HAIRPIN_MODE:-}" = "hairpin-veth" ] || \
+       [ "${HAIRPIN_MODE:-}" = "none" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --hairpin-mode=${HAIRPIN_MODE}"
+  fi
+  if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
+  fi
+  if [ -n "${NODE_LABELS:-}" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --node-labels=${NODE_LABELS}"
+  fi
+}
+
 restart_docker_daemon() {
   # Assemble docker deamon options
   DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
@@ -317,7 +358,7 @@ mount_master_pd() {
 # $2: token file
 add_token_entry() {
   current_token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  echo "${tcurrent_token},$1,$1" >> $2
+  echo "${current_token},$1,$1" >> $2
 }
 
 # After the first boot and on upgrade, these files exists on the master-pd
@@ -388,7 +429,7 @@ create_master_kubelet_auth() {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 prepare_etcd_manifest() {
-  readonly etcd_temp_file="/tmp/$5"
+  etcd_temp_file="/tmp/$5"
   cp /run/kube-manifests/kubernetes/trusty/etcd.manifest "${etcd_temp_file}"
   sed -i -e "s@{{ *suffix *}}@$1@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *port *}}@$2@g" "${etcd_temp_file}"
@@ -418,11 +459,8 @@ start_etcd_servers() {
   prepare_log_file /var/log/etcd.log
   prepare_etcd_manifest "" "4001" "2380" "200m" "etcd.manifest"
 
-  # Switch on the second etcd instance if there are more than 50 nodes.
-  if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 50 ]; then
-    prepare_log_file /var/log/etcd-events.log
-    prepare_etcd_manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
-  fi
+  prepare_log_file /var/log/etcd-events.log
+  prepare_etcd_manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -459,9 +497,7 @@ start_kube_apiserver() {
 
   # Calculate variables and assemble the command line.
   params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true"
-  if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 50 ]; then
-    params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
-  fi
+  params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi

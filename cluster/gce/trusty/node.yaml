@@ -1,4 +1,4 @@
-From nobody Tue Feb 1 11:33:00 2016
+From nobody Thu Mar 3 15:33:00 2016
 Content-Type: multipart/mixed; boundary="===================================="
 MIME-Version: 1.0
 
@@ -119,18 +119,17 @@ script
 	set -o errexit
 	set -o nounset
 
+	echo "Start kubelet upstart job"
+	. /etc/kube-configure.sh
 	. /etc/kube-env
-	ARGS="--v=2"
-	if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-		ARGS="${KUBELET_TEST_LOG_LEVEL}"
-	fi
-	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-		ARGS="${ARGS} ${KUBELET_TEST_ARGS}"
-	fi
 	BINARY_PATH="/usr/bin/kubelet"
 	if [ "${TEST_CLUSTER:-}" = "true" ]; then
 		BINARY_PATH="/usr/local/bin/kubelet"
 	fi
+	# Assemble command line flags based on env variables, which will put the string
+	# of flags in variable KUBELET_CMD_FLAGS.
+	assemble_kubelet_flags
+
 	${BINARY_PATH} \
 		--api-servers=https://${KUBERNETES_MASTER_NAME} \
 		--enable-debugging-handlers=true \
@@ -144,8 +143,8 @@ script
 		--system-cgroups=/system \
 		--runtime-cgroups=/docker-daemon \
 		--kubelet-cgroups=/kubelet \
-		--nosystemd=true \
-		${ARGS} 1>>/var/log/kubelet.log 2>&1
+		--babysit-daemons=true \
+		${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
 # Wait for 10s to start kubelet again.
@@ -272,14 +271,17 @@ respawn
 
 script
 	set -o nounset
+	set -o errexit
 
 	# Wait for a minute to let docker, kubelet, and kube-proxy processes finish initialization.
 	# TODO(andyzheng0831): replace it with a more reliable method if possible.
 	sleep 60
-
 	. /etc/kube-configure.sh
 	. /etc/kube-env
 	health_monitoring
 end script
+
+# Wait for 10s to start it again.
+post-stop exec sleep 10
 
 --====================================--
