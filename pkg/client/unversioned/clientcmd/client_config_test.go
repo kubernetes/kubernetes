@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/imdario/mergo"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -52,8 +51,7 @@ func createValidTestConfig() *clientcmdapi.Config {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:     server,
-		APIVersion: testapi.Default.GroupVersion().String(),
+		Server: server,
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Token: token,
@@ -107,8 +105,7 @@ func TestCertificateData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:                   "https://localhost:8443",
-		APIVersion:               testapi.Default.GroupVersion().String(),
+		Server: "https://localhost:8443",
 		CertificateAuthorityData: caData,
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -140,8 +137,7 @@ func TestBasicAuthData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:     "https://localhost:8443",
-		APIVersion: testapi.Default.GroupVersion().String(),
+		Server: "https://localhost:8443",
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Username: username,
@@ -176,7 +172,6 @@ func TestCreateClean(t *testing.T) {
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
 	matchStringArg("", clientConfig.APIPath, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.GroupVersion.String(), t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -229,7 +224,6 @@ func TestCreateCleanDefault(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.GroupVersion.String(), t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }

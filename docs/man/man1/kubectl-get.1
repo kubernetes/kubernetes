@@ -56,7 +56,7 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
 
 .PP
 \fB\-l\fP, \fB\-\-selector\fP=""
@@ -95,7 +95,7 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -203,7 +203,7 @@ kubectl get \-o json pod web\-pod\-13je7
 kubectl get \-f pod.yaml \-o json
 
 # Return only the phase value of the specified pod.
-kubectl get \-o template pod/web\-pod\-13je7 \-\-template={{.status.phase}} \-\-api\-version=v1
+kubectl get \-o template pod/web\-pod\-13je7 \-\-template={{.status.phase}}
 
 # List all replication controllers and services together in ps output format.
 kubectl get rc,services

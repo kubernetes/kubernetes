@@ -57,7 +57,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=apiversion] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagAPIVersion, clientcmd.FlagInsecure),
+		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
 		Short:   "Sets a cluster entry in kubeconfig",
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
@@ -119,9 +119,6 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
-	}
-	if o.apiVersion.Provided() {
-		modifiedCluster.APIVersion = o.apiVersion.Value()
 	}
 	if o.insecureSkipTLSVerify.Provided() {
 		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()
