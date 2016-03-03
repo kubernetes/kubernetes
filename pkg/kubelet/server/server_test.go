@@ -67,6 +67,7 @@ type fakeKubelet struct {
 	hostnameFunc                       func() string
 	resyncInterval                     time.Duration
 	loopEntryTime                      time.Time
+	plegHealth                         bool
 }
 
 func (fk *fakeKubelet) ResyncInterval() time.Duration {
@@ -133,6 +134,8 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return fk.streamingConnectionIdleTimeoutFunc()
 }
 
+func (fk *fakeKubelet) PLEGHealthCheck() (bool, error) { return fk.plegHealth, nil }
+
 // Unused functions
 func (_ *fakeKubelet) GetContainerInfoV2(_ string, _ cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return nil, nil
@@ -190,6 +193,7 @@ func newServerTest() *serverTestFramework {
 				},
 			}, true
 		},
+		plegHealth: true,
 	}
 	fw.fakeAuth = &fakeAuth{
 		authenticateFunc: func(req *http.Request) (user.Info, bool, error) {
@@ -532,7 +536,7 @@ func TestHealthCheck(t *testing.T) {
 	// Test with correct hostname, Docker version
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 
-	//Test with incorrect hostname
+	// Test with incorrect hostname
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "fake"
 	}
@@ -735,6 +739,17 @@ func TestSyncLoopCheck(t *testing.T) {
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 
 	fw.fakeKubelet.loopEntryTime = time.Now().Add(time.Minute * -10)
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
+}
+
+func TestPLEGHealthCheck(t *testing.T) {
+	fw := newServerTest()
+	fw.fakeKubelet.hostnameFunc = func() string {
+		return "127.0.0.1"
+	}
+
+	// Test with failed pleg health check.
+	fw.fakeKubelet.plegHealth = false
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
 }
 

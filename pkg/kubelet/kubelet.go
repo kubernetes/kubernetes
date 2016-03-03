@@ -449,7 +449,7 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache)
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, util.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0, klet.isContainerRuntimeVersionCompatible)
 	klet.updatePodCIDR(podCIDR)
 
@@ -2514,6 +2514,10 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 		return time.Time{}
 	}
 	return val.(time.Time)
+}
+
+func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
+	return kl.pleg.Healthy()
 }
 
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
