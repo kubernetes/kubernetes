@@ -125,9 +125,14 @@ cbr0:
     - require:
       - cmd: 'apt-update'
 
+# restricting docker version to 1.9. with older version of docker we are facing
+# issue https://github.com/docker/docker/issues/18793.
+# newer version of docker 1.10.0 is not well tested yet.
+# full comments: https://github.com/kubernetes/kubernetes/pull/20851
 docker-engine:
    pkg:
      - installed
+     - version: 1.9.*
      - require:
        - file: /etc/apt/sources.list.d/docker.list
 docker:
