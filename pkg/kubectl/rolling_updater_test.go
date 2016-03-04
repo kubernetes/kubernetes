@@ -662,11 +662,11 @@ Scaling foo-v2 up to 2
 `,
 		},
 		{
-			name:        "1->1 100%/0 allow maxUnavailability",
+			name:        "1->1 1/0 allow maxUnavailability",
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 1),
 			newRcExists: false,
-			maxUnavail:  intstr.FromString("100%"),
+			maxUnavail:  intstr.FromString("1%"),
 			maxSurge:    intstr.FromInt(0),
 			expected: []interface{}{
 				down{oldReady: 1, newReady: 0, to: 0},
@@ -693,6 +693,48 @@ Scaling foo-v2 up to 1
 Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 1 to 0 (keep 2 pods available, don't exceed 3 pods)
 Scaling foo-v2 up to 2
 Scaling foo-v1 down to 0
+`,
+		},
+		{
+			name:        "2->2 25/1 maxSurge trumps maxUnavailable",
+			oldRc:       oldRc(2, 2),
+			newRc:       newRc(0, 2),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("25%"),
+			maxSurge:    intstr.FromString("1%"),
+			expected: []interface{}{
+				up{1},
+				down{oldReady: 2, newReady: 1, to: 1},
+				up{2},
+				down{oldReady: 1, newReady: 2, to: 0},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 2 to 0 (keep 2 pods available, don't exceed 3 pods)
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
+`,
+		},
+		{
+			name:        "2->2 25/0 maxUnavailable resolves to zero, then one",
+			oldRc:       oldRc(2, 2),
+			newRc:       newRc(0, 2),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("25%"),
+			maxSurge:    intstr.FromString("0%"),
+			expected: []interface{}{
+				down{oldReady: 2, newReady: 0, to: 1},
+				up{1},
+				down{oldReady: 1, newReady: 1, to: 0},
+				up{2},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 2 to 0 (keep 1 pods available, don't exceed 2 pods)
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 2
 `,
 		},
 	}

@@ -466,3 +466,33 @@ func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment,
 		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
 	})
 }
+
+// ResolveFenceposts resolves both maxSurge and maxUnavailable. This needs to happen in one
+// step. For example:
+//
+// 2 desired, max unavailable 1%, surge 0% - should scale old(-1), then new(+1), then old(-1), then new(+1)
+// 1 desired, max unavailable 1%, surge 0% - should scale old(-1), then new(+1)
+// 2 desired, max unavailable 25%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
+// 1 desired, max unavailable 25%, surge 1% - should scale new(+1), then old(-1)
+// 2 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
+// 1 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1)
+func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired int) (int, int, error) {
+	surge, err := intstrutil.GetValueFromIntOrPercent(maxSurge, desired, true)
+	if err != nil {
+		return 0, 0, err
+	}
+	unavailable, err := intstrutil.GetValueFromIntOrPercent(maxUnavailable, desired, false)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if surge == 0 && unavailable == 0 {
+		// Validation should never allow the user to explicitly use zero values for both maxSurge
+		// maxUnavailable. Due to rounding down maxUnavailable though, it may resolve to zero.
+		// If both fenceposts resolve to zero, then we should set maxUnavailable to 1 on the
+		// theory that surge might not work due to quota.
+		unavailable = 1
+	}
+
+	return surge, unavailable, nil
+}
