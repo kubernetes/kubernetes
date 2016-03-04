@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/service"
@@ -58,6 +57,17 @@ const TagNameKubernetesCluster = "KubernetesCluster"
 
 // The tag name we use to differentiate multiple services. Used currently for ELBs only.
 const TagNameKubernetesService = "kubernetes.io/service-name"
+
+// The tag name used on a subnet to designate that it should be used for internal ELBs
+const TagNameSubnetInternalELB = "kubernetes.io/role/internal-elb"
+
+// The tag name used on a subnet to designate that it should be used for internet ELBs
+const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
+
+// Annotation used on the service to indicate that we want an internal ELB.
+// Currently we accept only the value "0.0.0.0/0" - other values are an error.
+// This lets us define more advanced semantics in future.
+const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
 
 // We sometimes read to see if something exists; then try to create it if we didn't find it
 // This can fail once in a consistent system if done in parallel
@@ -1918,54 +1928,121 @@ func (s *AWSCloud) createTags(resourceID string, tags map[string]string) error {
 	}
 }
 
-func (s *AWSCloud) listPublicSubnetIDsinVPC() ([]string, error) {
-	sRequest := &ec2.DescribeSubnetsInput{}
-	vpcIdFilter := newEc2Filter("vpc-id", s.vpcID)
-	var filters []*ec2.Filter
-	filters = append(filters, vpcIdFilter)
-	filters = s.addFilters(filters)
-	sRequest.Filters = filters
+// Finds the value for a given tag.
+func findTag(tags []*ec2.Tag, key string) (string, bool) {
+	for _, tag := range tags {
+		if aws.StringValue(tag.Key) == key {
+			return aws.StringValue(tag.Value), true
+		}
+	}
+	return "", false
+}
 
-	subnets, err := s.ec2.DescribeSubnets(sRequest)
+// Finds the subnets associated with the cluster, by matching tags.
+// For maximal backwards compatability, if no subnets are tagged, it will fall-back to the current subnet.
+// However, in future this will likely be treated as an error.
+func (c *AWSCloud) findSubnets() ([]*ec2.Subnet, error) {
+	request := &ec2.DescribeSubnetsInput{}
+	vpcIDFilter := newEc2Filter("vpc-id", c.vpcID)
+	filters := []*ec2.Filter{vpcIDFilter}
+	filters = c.addFilters(filters)
+	request.Filters = filters
+
+	subnets, err := c.ec2.DescribeSubnets(request)
 	if err != nil {
-		glog.Error("Error describing subnets: ", err)
+		return nil, fmt.Errorf("error describing subnets: %v", err)
+	}
+
+	if len(subnets) != 0 {
+		return subnets, nil
+	}
+
+	// Fall back to the current instance subnets, if nothing is tagged
+	glog.Warningf("No tagged subnets found; will fall-back to the current subnet only.  This is likely to be an error in a future version of k8s.")
+
+	request = &ec2.DescribeSubnetsInput{}
+	filters = []*ec2.Filter{newEc2Filter("subnet-id", c.selfAWSInstance.subnetID)}
+	request.Filters = filters
+
+	subnets, err = c.ec2.DescribeSubnets(request)
+	if err != nil {
+		return nil, fmt.Errorf("error describing subnets: %v", err)
+	}
+
+	return subnets, nil
+}
+
+// Finds the subnets to use for an ELB we are creating.
+// Normal (Internet-facing) ELBs must use public subnets, so we skip private subnets.
+// Internal ELBs can use public or private subnets, but if we have a private subnet we should prefer that.
+func (s *AWSCloud) findELBSubnets(internalELB bool) ([]string, error) {
+	vpcIDFilter := newEc2Filter("vpc-id", s.vpcID)
+
+	subnets, err := s.findSubnets()
+	if err != nil {
 		return nil, err
 	}
 
 	rRequest := &ec2.DescribeRouteTablesInput{}
-	rRequest.Filters = []*ec2.Filter{vpcIdFilter}
-
+	rRequest.Filters = []*ec2.Filter{vpcIDFilter}
 	rt, err := s.ec2.DescribeRouteTables(rRequest)
 	if err != nil {
-		glog.Error("error describing route tables: ", err)
-		return nil, err
+		return nil, fmt.Errorf("error describe route table: %v", err)
 	}
 
-	var subnetIds []string
-	availabilityZones := sets.NewString()
+	subnetsByAZ := make(map[string]*ec2.Subnet)
 	for _, subnet := range subnets {
-		az := orEmpty(subnet.AvailabilityZone)
-		id := orEmpty(subnet.SubnetId)
+		az := aws.StringValue(subnet.AvailabilityZone)
+		id := aws.StringValue(subnet.SubnetId)
+		if az == "" || id == "" {
+			glog.Warningf("Ignoring subnet with empty az/id: %v", subnet)
+			continue
+		}
 
 		isPublic, err := isSubnetPublic(rt, id)
 		if err != nil {
 			return nil, err
 		}
-		if !isPublic {
-			glog.V(2).Infof("Ignoring private subnet %q", id)
+		if !internalELB && !isPublic {
+			glog.V(2).Infof("Ignoring private subnet for public ELB %q", id)
 			continue
 		}
 
-		if availabilityZones.Has(az) {
-			glog.Warning("Found multiple subnets per AZ '", az, "', ignoring subnet '", id, "'")
+		existing := subnetsByAZ[az]
+		if existing == nil {
+			subnetsByAZ[az] = subnet
 			continue
 		}
 
-		subnetIds = append(subnetIds, id)
-		availabilityZones.Insert(az)
+		// Try to break the tie using a tag
+		var tagName string
+		if internalELB {
+			tagName = TagNameSubnetInternalELB
+		} else {
+			tagName = TagNameSubnetPublicELB
+		}
+
+		_, existingHasTag := findTag(existing.Tags, tagName)
+		_, subnetHasTag := findTag(subnet.Tags, tagName)
+
+		if existingHasTag != subnetHasTag {
+			if subnetHasTag {
+				subnetsByAZ[az] = subnet
+			}
+			continue
+		}
+
+		// TODO: Should this be an error?
+		glog.Warning("Found multiple subnets in AZ %q; making arbitrary choice between subnets %q and %q", az, *existing.SubnetId, *subnet.SubnetId)
+		continue
 	}
 
-	return subnetIds, nil
+	var subnetIDs []string
+	for _, subnet := range subnetsByAZ {
+		subnetIDs = append(subnetIDs, aws.StringValue(subnet.SubnetId))
+	}
+
+	return subnetIDs, nil
 }
 
 func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
@@ -2051,8 +2128,22 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
-	// Construct list of configured subnets
-	subnetIDs, err := s.listPublicSubnetIDsinVPC()
+	// Determine if this is tagged as an Internal ELB
+	internalELB := false
+	internalAnnotation := annotations[ServiceAnnotationLoadBalancerInternal]
+	if internalAnnotation != "" {
+		if internalAnnotation != "0.0.0.0/0" {
+			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is 0.0.0.0/0", ServiceAnnotationLoadBalancerInternal, internalAnnotation)
+		}
+		if !service.IsAllowAll(sourceRanges) {
+			// TODO: Unify the two annotations
+			return nil, fmt.Errorf("source-range annotation cannot be combined with the internal-elb annotation")
+		}
+		internalELB = true
+	}
+
+	// Find the subnets that the ELB will live in
+	subnetIDs, err := s.findELBSubnets(internalELB)
 	if err != nil {
 		glog.Error("Error listing subnets in VPC: ", err)
 		return nil, err
@@ -2115,7 +2206,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Build the load balancer itself
-	loadBalancer, err := s.ensureLoadBalancer(serviceName, name, listeners, subnetIDs, securityGroupIDs)
+	loadBalancer, err := s.ensureLoadBalancer(serviceName, name, listeners, subnetIDs, securityGroupIDs, internalELB)
 	if err != nil {
 		return nil, err
 	}
