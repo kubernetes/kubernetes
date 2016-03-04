@@ -760,10 +760,18 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
-			node := obj.(*api.Node)
 			if eiRegistry != nil {
-				log.V(2).Infof("deleting node %q from registry", node.Name)
-				eiRegistry.Invalidate(node.Name)
+				// TODO(jdef) use controllerfw.DeletionHandlingMetaNamespaceKeyFunc at some point?
+				nodeName := ""
+				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					nodeName = tombstone.Key
+				} else if node, ok := obj.(*api.Node); ok {
+					nodeName = node.Name
+				}
+				if nodeName != "" {
+					log.V(2).Infof("deleting node %q from registry", nodeName)
+					eiRegistry.Invalidate(nodeName)
+				}
 			}
 		},
 	})
