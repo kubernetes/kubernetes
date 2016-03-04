@@ -270,6 +270,11 @@ type RCConfig struct {
 
 	// Ports to declare in the container (map of name to containerPort).
 	Ports map[string]int
+	// Ports to declare in the container as host and container ports.
+	HostPorts map[string]int
+
+	Volumes      []api.Volume
+	VolumeMounts []api.VolumeMount
 
 	// Pointer to a list of pods; if non-nil, will be set to a list of pods
 	// created by this RC by RunRC.
@@ -1780,6 +1785,12 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
 		}
 	}
+	if config.HostPorts != nil {
+		for k, v := range config.HostPorts {
+			c := &template.Spec.Containers[0]
+			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v, HostPort: v})
+		}
+	}
 	if config.CpuLimit > 0 || config.MemLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits = api.ResourceList{}
 	}
@@ -1797,6 +1808,12 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 	}
 	if config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
+	}
+	if len(config.Volumes) > 0 {
+		template.Spec.Volumes = config.Volumes
+	}
+	if len(config.VolumeMounts) > 0 {
+		template.Spec.Containers[0].VolumeMounts = config.VolumeMounts
 	}
 }
 
