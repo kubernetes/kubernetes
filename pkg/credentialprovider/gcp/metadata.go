@@ -77,7 +77,7 @@ func init() {
 	credentialprovider.RegisterCredentialProvider("google-dockercfg",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &dockerConfigKeyProvider{
-				metadataProvider{Client: &http.Client{Timeout: 10 * time.Second}},
+				metadataProvider{Client: http.DefaultClient},
 			},
 			Lifetime: 60 * time.Second,
 		})
@@ -85,7 +85,7 @@ func init() {
 	credentialprovider.RegisterCredentialProvider("google-dockercfg-url",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &dockerConfigUrlKeyProvider{
-				metadataProvider{Client: &http.Client{Timeout: 10 * time.Second}},
+				metadataProvider{Client: http.DefaultClient},
 			},
 			Lifetime: 60 * time.Second,
 		})
@@ -94,7 +94,7 @@ func init() {
 		// Never cache this.  The access token is already
 		// cached by the metadata service.
 		&containerRegistryProvider{
-			metadataProvider{Client: &http.Client{Timeout: 10 * time.Second}},
+			metadataProvider{Client: http.DefaultClient},
 		})
 }
 
