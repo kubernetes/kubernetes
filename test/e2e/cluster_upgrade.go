@@ -215,7 +215,7 @@ var _ = Describe("Skipped", func() {
 			})
 		})
 
-		Describe("upgrade-master", func() {
+		Describe("[Feature:MasterUpgrade] upgrade-master", func() {
 			BeforeEach(func() {
 				SkipUnlessProviderIs("gce", "gke")
 			})
@@ -232,7 +232,7 @@ var _ = Describe("Skipped", func() {
 			})
 		})
 
-		Describe("upgrade-cluster", func() {
+		Describe("[Feature:NodeUpgrade] upgrade-cluster", func() {
 			var tmplBefore, tmplAfter string
 			BeforeEach(func() {
 				if providerIs("gce") {
