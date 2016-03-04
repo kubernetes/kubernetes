@@ -300,6 +300,7 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
+		glog.V(4).Infof("Add for pod %v with deletion timestamp %+v, counted as new deletion for rc %v", pod.Name, pod.DeletionTimestamp, rcKey)
 		rm.expectations.DeletionObserved(rcKey)
 	} else {
 		rm.expectations.CreationObserved(rcKey)
@@ -333,7 +334,10 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		// for modification of the deletion timestamp and expect an rc to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rc never initiates a phase change, and so is never asleep waiting for the same.
+		glog.V(4).Infof("Update to pod %v with deletion timestamp %+v counted as delete for rc %v", curPod.Name, curPod.DeletionTimestamp, rcKey)
 		rm.expectations.DeletionObserved(rcKey)
+	} else {
+		glog.V(4).Infof("Update to pod %v with deletion timestamp %+v. Not counting it as a new deletion for rc %v.", curPod.Name, curPod.DeletionTimestamp, rcKey)
 	}
 
 	rm.enqueueController(rc)
@@ -377,7 +381,10 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 		// This method only manages expectations for the case where a pod is
 		// deleted without a grace period.
 		if pod.DeletionTimestamp == nil {
+			glog.V(4).Infof("Received new delete for rc %v, pod %v", rcKey, pod.Name)
 			rm.expectations.DeletionObserved(rcKey)
+		} else {
+			glog.V(4).Infof("Received delete for rc %v pod %v with non nil deletion timestamp %+v. Not counting it as a new deletion.", rcKey, pod.Name, pod.DeletionTimestamp)
 		}
 		rm.enqueueController(rc)
 	}
