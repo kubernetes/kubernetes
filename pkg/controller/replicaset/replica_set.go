@@ -289,6 +289,7 @@ func isReplicaSetMatch(pod *api.Pod, rs *extensions.ReplicaSet) bool {
 // When a pod is created, enqueue the replica set that manages it and update it's expectations.
 func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
+	glog.V(4).Infof("Pod %s created: %+v.", pod.Name, pod)
 
 	rs := rsc.getPodReplicaSet(pod)
 	if rs == nil {
@@ -319,6 +320,8 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		return
 	}
 	curPod := cur.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	glog.V(4).Infof("Pod %s updated %+v -> %+v.", curPod.Name, oldPod, curPod)
 	rs := rsc.getPodReplicaSet(curPod)
 	if rs == nil {
 		return
@@ -328,7 +331,6 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		glog.Errorf("Couldn't get key for replication controller %#v: %v", rs, err)
 		return
 	}
-	oldPod := old.(*api.Pod)
 
 	if curPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
@@ -373,6 +375,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 			return
 		}
 	}
+	glog.V(4).Infof("Pod %s deleted: %+v.", pod.Name, pod)
 	if rs := rsc.getPodReplicaSet(pod); rs != nil {
 		rsKey, err := controller.KeyFunc(rs)
 		if err != nil {
