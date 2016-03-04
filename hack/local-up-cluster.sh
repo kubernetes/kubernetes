@@ -378,9 +378,9 @@ function start_kubedns {
 
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
-        sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
-        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
-        cat <<EOF >namespace.yaml
+        sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| /tmp/skydns-rc.yaml
+        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| /tmp/skydns-svc.yaml
+        cat <<EOF >/tmp/namespace.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -390,10 +390,10 @@ EOF
         ${KUBECTL} config set-context local --cluster=local
         ${KUBECTL} config use-context local
 
-        ${KUBECTL} create -f namespace.yaml
+        ${KUBECTL} create -f /tmp/namespace.yaml
         # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
-        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+        ${KUBECTL} --namespace=kube-system create -f /tmp/skydns-rc.yaml 
+        ${KUBECTL} --namespace=kube-system create -f /tmp/skydns-svc.yaml
         echo "Kube-dns rc and service successfully deployed."
     fi
 
