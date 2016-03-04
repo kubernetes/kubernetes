@@ -37,6 +37,7 @@ import (
 	skymsg "github.com/skynetservices/skydns/msg"
 	flag "github.com/spf13/pflag"
 	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -46,6 +47,7 @@ import (
 	kselector "k8s.io/kubernetes/pkg/fields"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -159,14 +161,28 @@ func getSkyMsg(ip string, port int) *skymsg.Service {
 }
 
 func (ks *kube2sky) generateRecordsForHeadlessService(subdomain string, e *kapi.Endpoints, svc *kapi.Service) error {
+	glog.V(4).Infof("Endpoints Annotations: %v", e.Annotations)
 	for idx := range e.Subsets {
 		for subIdx := range e.Subsets[idx].Addresses {
-			b, err := json.Marshal(getSkyMsg(e.Subsets[idx].Addresses[subIdx].IP, 0))
+			endpointIP := e.Subsets[idx].Addresses[subIdx].IP
+			b, err := json.Marshal(getSkyMsg(endpointIP, 0))
 			if err != nil {
 				return err
 			}
 			recordValue := string(b)
 			recordLabel := getHash(recordValue)
+			if serializedPodHostnames := e.Annotations[endpoints.PodHostnamesAnnotation]; len(serializedPodHostnames) > 0 {
+				podHostnames := map[string]endpoints.HostRecord{}
+				err := json.Unmarshal([]byte(serializedPodHostnames), &podHostnames)
+				if err != nil {
+					return err
+				}
+				if hostRecord, exists := podHostnames[string(endpointIP)]; exists {
+					if validation.IsDNS1123Label(hostRecord.HostName) {
+						recordLabel = hostRecord.HostName
+					}
+				}
+			}
 			recordKey := buildDNSNameString(subdomain, recordLabel)
 
 			glog.V(2).Infof("Setting DNS record: %v -> %q\n", recordKey, recordValue)

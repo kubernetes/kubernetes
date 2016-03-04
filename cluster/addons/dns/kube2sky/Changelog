@@ -1,3 +1,7 @@
+## Version 1.14 (Mar 4 2016 Abhishek Shah <abshah@google.com>)
+- If Endpoint has hostnames-map annotation (endpoints.net.beta.kubernetes.io/hostnames-map),
+  the hostnames supplied via the annotation will be used to generate A Records for Headless Service.
+
 ## Version 1.13 (Mar 1 2016 Prashanth.B <beeps@google.com>)
 - Synchronously wait for the Kubernetes service at startup.
 - Add a SIGTERM/SIGINT handler.
