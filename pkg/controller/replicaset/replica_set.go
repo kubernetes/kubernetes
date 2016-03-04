@@ -302,6 +302,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
+		glog.V(4).Infof("Add for pod %v with deletion timestamp %+v, counted as new deletion for rs %v", pod.Name, pod.DeletionTimestamp, rsKey)
 		rsc.expectations.DeletionObserved(rsKey)
 	} else {
 		rsc.expectations.CreationObserved(rsKey)
@@ -332,10 +333,13 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	if curPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an rc to create more replicas asap, not wait
+		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
-		// an rc never initiates a phase change, and so is never asleep waiting for the same.
+		// an rs never initiates a phase change, and so is never asleep waiting for the same.
+		glog.V(4).Infof("Update to pod %v with deletion timestamp %+v counted as delete for rs %v", curPod.Name, curPod.DeletionTimestamp, rsKey)
 		rsc.expectations.DeletionObserved(rsKey)
+	} else {
+		glog.V(4).Infof("Update to pod %v with deletion timestamp %+v. Not counting it as a new deletion for rs %v", curPod.Name, curPod.DeletionTimestamp, rsKey)
 	}
 
 	rsc.enqueueReplicaSet(rs)
@@ -378,7 +382,10 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		// This method only manages expectations for the case where a pod is
 		// deleted without a grace period.
 		if pod.DeletionTimestamp == nil {
+			glog.V(4).Infof("Received new delete for rs %v, pod %v", rsKey, pod.Name)
 			rsc.expectations.DeletionObserved(rsKey)
+		} else {
+			glog.V(4).Infof("Received delete for rs %v pod %v with non nil deletion timestamp %+v. Not counting it as a new deletion.", rsKey, pod.Name, pod.DeletionTimestamp)
 		}
 		rsc.enqueueReplicaSet(rs)
 	}
