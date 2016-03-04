@@ -104,7 +104,7 @@ detect_lsb() {
 # TODO: do not start docker-bootstrap if it's already running
 bootstrap_daemon() {
     # Detecting docker version so we could run proper docker_daemon command
-    [[ $(eval "docker --version") =~ ([0-9][.][0-9][.][0-9]*) ]] && version="${BASH_REMATCH[1]}"
+    [[ $(eval "docker --version") =~ ([0-9][.][0-9]+[.][0-9]*) ]] && version="${BASH_REMATCH[1]}"
     local got=$(echo -e "${version}\n1.8.0" | sed '/^$/d' | sort -nr | head -1)
     if [[ "${got}" = "${version}" ]]; then
         docker_daemon="docker -d"
