@@ -48,12 +48,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
-const (
-	containerPollTime = 1 * time.Second
-	lostPodPollTime   = 1 * time.Minute
-	podRelistPeriod   = 5 * time.Minute
-)
-
 type stateType int32
 
 const (
