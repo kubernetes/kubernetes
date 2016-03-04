@@ -2369,6 +2369,7 @@ func autoConvert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus
 	} else {
 		out.ContainerStatuses = nil
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -5609,6 +5610,7 @@ func autoConvert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus
 	} else {
 		out.ContainerStatuses = nil
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 

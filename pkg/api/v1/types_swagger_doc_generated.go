@@ -1182,15 +1182,16 @@ func (PodSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodStatus = map[string]string{
-	"":                  "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
-	"phase":             "Current condition of the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-phase",
-	"conditions":        "Current service state of pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions",
-	"message":           "A human readable message indicating details about why the pod is in this condition.",
-	"reason":            "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
-	"hostIP":            "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
-	"podIP":             "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
-	"startTime":         "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
-	"containerStatuses": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses",
+	"":                   "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+	"phase":              "Current condition of the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-phase",
+	"conditions":         "Current service state of pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions",
+	"message":            "A human readable message indicating details about why the pod is in this condition.",
+	"reason":             "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
+	"hostIP":             "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
+	"podIP":              "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"startTime":          "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
+	"containerStatuses":  "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses",
+	"observedGeneration": "ObservedGeneration is the last generation of the pod that the kubelet has synced. The kubelet that the pod is bound to is considered the main observer. Other secondary observers (e.g. the scheduler) should not update this field.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {

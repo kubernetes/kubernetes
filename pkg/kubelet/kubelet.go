@@ -1690,7 +1690,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 		!firstSeenTime.IsZero() {
 		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 	}
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	defer kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pods we can't run.
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {

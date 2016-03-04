@@ -17258,6 +17258,9 @@
    "v1.PodStatus": {
     "id": "v1.PodStatus",
     "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+    "required": [
+     "observedGeneration"
+    ],
     "properties": {
      "phase": {
       "type": "string",
@@ -17296,6 +17299,11 @@
        "$ref": "v1.ContainerStatus"
       },
       "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses"
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ObservedGeneration is the last generation of the pod that the kubelet has synced. The kubelet that the pod is bound to is considered the main observer. Other secondary observers (e.g. the scheduler) should not update this field."
      }
     }
    },
