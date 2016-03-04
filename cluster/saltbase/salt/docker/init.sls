@@ -286,9 +286,8 @@ purge-old-docker-package:
     - makedirs: true
 
 docker-upgrade:
-  pkg.installed:
-    - sources:
-      - {{ docker_pkg_name }}: /var/cache/docker-install/{{ override_deb }}
+  cmd.run:
+    - name: /opt/kubernetes/helpers/pkg install-no-start {{ docker_pkg_name }} {{ override_docker_ver }} /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
 {% endif %} # end override_docker_ver != ''
@@ -318,7 +317,7 @@ fix-service-docker:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
     - require:
-      - pkg: docker-upgrade
+      - cmd: docker-upgrade
 {% endif %}
 
 {% endif %}
@@ -337,14 +336,14 @@ docker:
     - watch:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
-      - pkg: docker-upgrade
+      - cmd: docker-upgrade
 {% endif %}
 {% if pillar.get('is_systemd') %}
       - file: {{ pillar.get('systemd_system_path') }}/docker.service
 {% endif %}
 {% if override_docker_ver != '' %}
     - require:
-      - pkg: docker-upgrade
+      - cmd: docker-upgrade
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'
 
