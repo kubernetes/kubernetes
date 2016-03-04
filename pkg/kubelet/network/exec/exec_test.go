@@ -84,7 +84,7 @@ func installPluginUnderTest(t *testing.T, vendorName, testPluginPath, plugName s
 	if err != nil {
 		t.Errorf("Failed to set exec perms on plugin %q: %v", pluginExec, err)
 	}
-	const execScriptTempl = `#!/bin/bash
+	const execScriptTempl = `#!/usr/bin/env bash
 
 # If status hook is called print the expected json to stdout
 if [ "$1" == "status" ]; then

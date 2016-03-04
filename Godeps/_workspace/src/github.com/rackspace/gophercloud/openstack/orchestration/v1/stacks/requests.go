@@ -54,7 +54,7 @@ type CreateOpts struct {
 	Environment string
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
-	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
+	// Files: `{"myfile": "#!/usr/bin/env bash\necho 'Hello world' > /root/testfile.txt"}`
 	Files map[string]interface{}
 	// (OPTIONAL) User-defined parameters to pass to the template.
 	Parameters map[string]string
@@ -155,7 +155,7 @@ type AdoptOpts struct {
 	Environment string
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
-	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
+	// Files: `{"myfile": "#!/usr/bin/env bash\necho 'Hello world' > /root/testfile.txt"}`
 	Files map[string]interface{}
 	// (OPTIONAL) User-defined parameters to pass to the template.
 	Parameters map[string]string
@@ -323,7 +323,7 @@ type UpdateOpts struct {
 	Environment string
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
-	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
+	// Files: `{"myfile": "#!/usr/bin/env bash\necho 'Hello world' > /root/testfile.txt"}`
 	Files map[string]interface{}
 	// (OPTIONAL) User-defined parameters to pass to the template.
 	Parameters map[string]string
@@ -419,7 +419,7 @@ type PreviewOpts struct {
 	Environment string
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
-	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
+	// Files: `{"myfile": "#!/usr/bin/env bash\necho 'Hello world' > /root/testfile.txt"}`
 	Files map[string]interface{}
 	// (OPTIONAL) User-defined parameters to pass to the template.
 	Parameters map[string]string

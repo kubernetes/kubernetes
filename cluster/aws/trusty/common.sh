@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors All rights reserved.
 #
@@ -26,7 +26,7 @@ function detect-minion-image() {
 
 function generate-minion-user-data {
   # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
-  echo "#! /bin/bash"
+  echo "#!/usr/bin/env bash"
   echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
   echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
   echo "readonly NON_MASQUERADE_CIDR='${NON_MASQUERADE_CIDR:-}'"

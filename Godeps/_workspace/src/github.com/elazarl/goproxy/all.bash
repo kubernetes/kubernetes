@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 go test || exit
 for action in $@; do go $action; done

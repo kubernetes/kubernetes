@@ -300,7 +300,7 @@ var AbandonExpected = &AbandonedStack{
 						"get_param": "flavor",
 					},
 					"image":     "ad091b52-742f-469e-8f3c-fd81cadf0743",
-					"user_data": "#!/bin/bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n",
+					"user_data": "#!/usr/bin/env bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n",
 				},
 			},
 		},
@@ -341,7 +341,7 @@ const AbandonOutput = `
             "get_param": "flavor"
           },
           "image": "ad091b52-742f-469e-8f3c-fd81cadf0743",
-          "user_data": "#!/bin/bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n"
+          "user_data": "#!/usr/bin/env bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n"
         }
       }
     }

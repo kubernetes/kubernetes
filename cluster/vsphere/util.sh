@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors All rights reserved.
 #
@@ -326,7 +326,7 @@ function kube-up {
   echo "Starting master VM (this can take a minute)..."
 
   (
-    echo "#! /bin/bash"
+    echo "#!/usr/bin/env bash"
     echo "readonly MY_NAME=${MASTER_NAME}"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/hostname.sh"
     echo "cd /home/kube/cache/kubernetes-install"
@@ -360,7 +360,7 @@ function kube-up {
   echo "Starting node VMs (this can take a minute)..."
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     (
-      echo "#! /bin/bash"
+      echo "#!/usr/bin/env bash"
       echo "readonly MY_NAME=${NODE_NAMES[$i]}"
       grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/hostname.sh"
       echo "KUBE_MASTER=${KUBE_MASTER}"
@@ -493,7 +493,7 @@ function kube-push {
   upload-server-tars
 
   (
-    echo "#! /bin/bash"
+    echo "#!/usr/bin/env bash"
     echo "cd /home/kube/cache/kubernetes-install"
     echo "readonly SERVER_BINARY_TAR='${SERVER_BINARY_TAR##*/}'"
     echo "readonly SALT_TAR='${SALT_TAR##*/}'"

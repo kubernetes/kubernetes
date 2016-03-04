@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ROOT=$(dirname "${BASH_SOURCE}")/..
 GOLINT=${GOLINT:-"golint"}

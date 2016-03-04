@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
-set -x
+# Verifies that api reference docs are up to date.
 
-ARCH=$1
+set -o errexit
+set -o nounset
+set -o pipefail
 
-# Build the binary.
-CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} godep go build -a -installsuffix cgo -ldflags '-w' ./pause.go
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Run goupx to shrink binary size.
-go get github.com/pwaller/goupx
-goupx pause
+(
+  cd "${KUBE_ROOT}"
+  badfiles=$(grep -irclP -I '^#!(?!\/usr\/bin\/env).*' --exclude-dir="_output" --exclude-dir="Godeps")
+  if [[ ! -z "${badfiles}" ]]; then
+    echo "The following files have shebangs that do not use /usr/bin/env. Please fix them. ${badfiles[@]}"
+  fi
+)
+
+# ex: ts=2 sw=2 et filetype=sh

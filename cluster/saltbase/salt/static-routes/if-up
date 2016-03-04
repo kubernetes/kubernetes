@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 [ "$IFACE" == "eth0" ] || exit 0
 

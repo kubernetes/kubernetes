@@ -4,7 +4,7 @@ write_files:
   - path: /opt/bin/regen-apiserver-list.sh
     permissions: 0755
     content: |
-      #!/bin/sh
+      #!/usr/bin/env sh
       m=$(echo $(etcdctl ls --recursive /corekube/apiservers | cut -d/ -f4 | sort) | tr ' ' ,)
       mkdir -p /run/kubelet
       echo "APISERVER_IPS=$m" > /run/kubelet/apiservers.env
@@ -12,7 +12,7 @@ write_files:
   - path: /opt/bin/download-release.sh
     permissions: 0755
     content: |
-      #!/bin/bash
+      #!/usr/bin/env bash
       # This temp URL is only good for the length of time specified at cluster creation time.
       # Afterward, it will result in a 403.
       OBJECT_URL="CLOUD_FILES_URL"
@@ -29,7 +29,7 @@ write_files:
   - path: /run/config-kubelet.sh
     permissions: 0755
     content: |
-      #!/bin/bash -e
+      #!/usr/bin/env bash -e
       set -x
       /usr/bin/mkdir -p /var/lib/kubelet
       cat > /var/lib/kubelet/kubeconfig << EOF
@@ -53,7 +53,7 @@ write_files:
   - path: /run/config-kube-proxy.sh
     permissions: 0755
     content: |
-      #!/bin/bash -e
+      #!/usr/bin/env bash -e
       set -x
       /usr/bin/mkdir -p /var/lib/kube-proxy
       cat > /var/lib/kube-proxy/kubeconfig << EOF

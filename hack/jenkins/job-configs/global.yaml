@@ -117,7 +117,7 @@
                    <skipTagLatest>true</skipTagLatest>
                </com.cloudbees.dockerpublish.DockerBuilder>
         - shell: |
-           #!/bin/bash
+           #!/usr/bin/env bash
            set -e
            set -x
            docker rmi -f {repoName}:{tag}

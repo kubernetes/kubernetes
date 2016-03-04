@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Run all the different permutations of all the tests.
 # This helps ensure that nothing gets broken.

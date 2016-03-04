@@ -130,7 +130,7 @@ write_files:
   - path: /run/setup-hostname-override.sh
     permissions: "0755"
     content: |
-      #!/bin/bash
+      #!/usr/bin/env bash
       set -x
       source /etc/kube-env
       if [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
@@ -143,7 +143,7 @@ write_files:
   - path: /run/setup-auth.sh
     permissions: "0755"
     content: |
-      #!/bin/bash -e
+      #!/usr/bin/env bash -e
       set -x
       source /etc/kube-env
 
@@ -152,7 +152,7 @@ write_files:
   - path: /run/config-kube-proxy.sh
     permissions: "0755"
     content: |
-      #!/bin/bash -e
+      #!/usr/bin/env bash -e
       set -x
       source /etc/kube-env
 
