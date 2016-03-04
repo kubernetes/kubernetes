@@ -690,6 +690,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 
 func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string) (err error) {
 	var schemaData []byte
+	var firstSeen bool
 	fullDir, err := substituteUserHome(cacheDir)
 	if err != nil {
 		return err
@@ -702,24 +703,50 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 		}
 	}
 	if schemaData == nil {
-		schemaData, err = c.Get().
-			AbsPath("/swaggerapi", prefix, groupVersion).
-			Do().
-			Raw()
+		firstSeen = true
+		schemaData, err = downloadSchemaAndStore(c, cacheDir, fullDir, cacheFile, prefix, groupVersion)
 		if err != nil {
 			return err
-		}
-		if len(cacheDir) != 0 {
-			if err := writeSchemaFile(schemaData, fullDir, cacheFile, prefix, groupVersion); err != nil {
-				return err
-			}
 		}
 	}
 	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
 	if err != nil {
 		return err
 	}
-	return schema.ValidateBytes(data)
+	err = schema.ValidateBytes(data)
+	if _, ok := err.(validation.TypeNotFoundError); ok && !firstSeen {
+		// As a temporay hack, kubectl would re-get the schema if validation
+		// fails for type not found reason.
+		// TODO: runtime-config settings needs to make into the file's name
+		schemaData, err = downloadSchemaAndStore(c, cacheDir, fullDir, cacheFile, prefix, groupVersion)
+		if err != nil {
+			return err
+		}
+		schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
+		if err != nil {
+			return err
+		}
+		return schema.ValidateBytes(data)
+	}
+
+	return err
+}
+
+// Download swagger schema from apiserver and store it to file.
+func downloadSchemaAndStore(c schemaClient, cacheDir, fullDir, cacheFile, prefix, groupVersion string) (schemaData []byte, err error) {
+	schemaData, err = c.Get().
+		AbsPath("/swaggerapi", prefix, groupVersion).
+		Do().
+		Raw()
+	if err != nil {
+		return
+	}
+	if len(cacheDir) != 0 {
+		if err = writeSchemaFile(schemaData, fullDir, cacheFile, prefix, groupVersion); err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
