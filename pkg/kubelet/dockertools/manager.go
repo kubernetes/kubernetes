@@ -539,7 +539,6 @@ func (dm *DockerManager) runContainer(
 		// of CPU shares.
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
-
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
 	// The reason we create and mount the log file in here (not in kubelet) is because
@@ -646,14 +645,7 @@ func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecont
 	dockerOpts.HostConfig.PortBindings = portBindings
 
 	if netMode != namespaceModeHost {
-		// TODO(vmarmol): Handle better.
-		// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
-		const hostnameMaxLen = 63
-		containerHostname := pod.Name
-		if len(containerHostname) > hostnameMaxLen {
-			containerHostname = containerHostname[:hostnameMaxLen]
-		}
-		dockerOpts.Config.Hostname = containerHostname
+		dockerOpts.Config.Hostname = opts.Hostname
 		if len(opts.DNS) > 0 {
 			dockerOpts.HostConfig.DNS = opts.DNS
 		}
