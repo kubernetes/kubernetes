@@ -27,6 +27,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -41,11 +42,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -100,6 +104,9 @@ const (
 	// TODO(yifan): Import them from docker2aci. See https://github.com/appc/docker2aci/issues/133.
 	appcDockerEntrypoint = "appc.io/docker/entrypoint"
 	appcDockerCmd        = "appc.io/docker/cmd"
+
+	// TODO(yifan): Reuse this const with Docker runtime.
+	minimumGracePeriodInSeconds = 2
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
@@ -120,6 +127,7 @@ type Runtime struct {
 	livenessManager     proberesults.Manager
 	volumeGetter        volumeGetter
 	imagePuller         kubecontainer.ImagePuller
+	runner              kubecontainer.HandlerRunner
 
 	versions versions
 }
@@ -142,6 +150,7 @@ func New(
 	containerRefManager *kubecontainer.RefManager,
 	livenessManager proberesults.Manager,
 	volumeGetter volumeGetter,
+	httpClient kubetypes.HttpGetter,
 	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
 ) (*Runtime, error) {
@@ -184,6 +193,8 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
 	}
+
+	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
 
 	if serializeImagePulls {
 		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
@@ -944,8 +955,42 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	}
 
 	r.generateEvents(runtimePod, "Started", nil)
-
 	return nil
+}
+
+func (r *Runtime) runPreStopHook(pod *api.Pod, runtimePod *kubecontainer.Pod) error {
+	var wg sync.WaitGroup
+	var errlist []error
+	errCh := make(chan error, len(pod.Spec.Containers))
+
+	wg.Add(len(pod.Spec.Containers))
+
+	for i, c := range pod.Spec.Containers {
+		if c.Lifecycle == nil || c.Lifecycle.PreStop == nil {
+			wg.Done()
+			continue
+		}
+
+		hook := c.Lifecycle.PreStop
+		containerID := runtimePod.Containers[i].ID
+		container := &pod.Spec.Containers[i]
+
+		go func() {
+			if err := r.runner.Run(containerID, pod, container, hook); err != nil {
+				glog.Errorf("rkt: Failed to run pre-stop hook for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
+				errCh <- err
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		errlist = append(errlist, err)
+	}
+	return errors.NewAggregate(errlist)
 }
 
 // convertRktPod will convert a rktapi.Pod to a kubecontainer.Pod
@@ -1066,10 +1111,47 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return result, nil
 }
 
+func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) {
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		gracePeriod = *pod.DeletionGracePeriodSeconds
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := r.runPreStopHook(pod, runningPod); err != nil {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	select {
+	case <-time.After(time.Duration(gracePeriod) * time.Second):
+		glog.V(2).Infof("rkt: Some pre-stop hooks did not complete in %d seconds for pod %v", gracePeriod, format.Pod(pod))
+	case err := <-errCh:
+		if err != nil {
+			glog.Errorf("rkt: Some pre-stop hooks failed for pod %v: %v", format.Pod(pod), err)
+		} else {
+			glog.V(4).Infof("rkt: pre-stop hooks for pod %v completed", format.Pod(pod))
+		}
+	}
+}
+
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
-// TODO(yifan): Handle network plugin.
 func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", runningPod.Name)
+
+	if len(runningPod.Containers) == 0 {
+		glog.V(4).Infof("rkt: Pod %q is already being killed, no action will be taken", runningPod.Name)
+		return nil
+	}
+
+	if pod != nil {
+		r.waitPreStopHooks(pod, &runningPod)
+	}
 
 	serviceName := makePodServiceFileName(runningPod.ID)
 	r.generateEvents(&runningPod, "Killing", nil)
