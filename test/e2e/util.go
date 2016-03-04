@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -341,7 +342,7 @@ func providerIs(providers ...string) bool {
 	return false
 }
 
-func SkipUnlessServerVersionGTE(v semver.Version, c client.ServerVersionInterface) {
+func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) {
 	gte, err := serverVersionGTE(v, c)
 	if err != nil {
 		Failf("Failed to get server version: %v", err)
@@ -1141,7 +1142,7 @@ func (r podProxyResponseChecker) checkAllResponses() (done bool, err error) {
 // version.
 //
 // TODO(18726): This should be incorporated into client.VersionInterface.
-func serverVersionGTE(v semver.Version, c client.ServerVersionInterface) (bool, error) {
+func serverVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
 		return false, fmt.Errorf("Unable to get server version: %v", err)

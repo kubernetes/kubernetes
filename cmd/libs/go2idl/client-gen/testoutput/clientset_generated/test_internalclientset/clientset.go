@@ -20,18 +20,18 @@ import (
 	"github.com/golang/glog"
 	unversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
+	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 )
 
 type Interface interface {
-	Discovery() unversioned.DiscoveryInterface
+	Discovery() discovery.DiscoveryInterface
 	Testgroup() unversionedtestgroup.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
-	*unversioned.DiscoveryClient
+	*discovery.DiscoveryClient
 	*unversionedtestgroup.TestgroupClient
 }
 
@@ -41,7 +41,7 @@ func (c *Clientset) Testgroup() unversionedtestgroup.TestgroupInterface {
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
 }
 
@@ -54,7 +54,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 		return &clientset, err
 	}
 
-	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(c)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
@@ -67,7 +67,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = unversionedtestgroup.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
+	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
@@ -76,6 +76,6 @@ func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.TestgroupClient = unversionedtestgroup.New(c)
 
-	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
+	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset
 }
