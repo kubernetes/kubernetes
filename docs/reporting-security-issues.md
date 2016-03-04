@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -51,6 +54,13 @@ To report an issue, please:
   - Environment setup (e.g.  which "Getting Started Guide" you followed, if any; what node operating system used; what service or software creates your virtual machines, if any)
 
 An online submission will have the fastest response; however, if you prefer email, please send mail to security@google.com. If you feel the need, please use the [PGP public key](https://services.google.com/corporate/publickey.txt) to encrypt communications.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -236,6 +239,13 @@ $ kubectl delete pvc myclaim-1
 The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.
 
 Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

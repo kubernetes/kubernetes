@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,12 +30,14 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 # Getting Kubernetes Builds
 
-You can use [hack/get-build.sh](http://releases.k8s.io/HEAD/hack/get-build.sh) to or use as a reference on how to get the most recent builds with curl. With `get-build.sh` you can grab the most recent stable build, the most recent release candidate, or the most recent build to pass our ci and gce e2e tests (essentially a nightly build).
+You can use [hack/get-build.sh](http://releases.k8s.io/release-1.2/hack/get-build.sh) to or use as a reference on how to get the most recent builds with curl. With `get-build.sh` you can grab the most recent stable build, the most recent release candidate, or the most recent build to pass our ci and gce e2e tests (essentially a nightly build).
 
 Run `./hack/get-build.sh -h` for its usage.
 
@@ -64,6 +67,13 @@ gsutil cat gs://kubernetes-release/ci/latest-green.txt    # output the latest ci
 gsutil ls gs://kubernetes-release/ci/v0.20.0-29-g29a55cc/ # list the contents of a ci release
 gsutil ls gs://kubernetes-release/release                 # list all official releases and rcs
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

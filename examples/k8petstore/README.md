@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -165,6 +168,13 @@ as well as for scale and functionality testing.
 For questions on running this app, you can ask on [Slack](../../docs/troubleshooting.md#slack).
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()

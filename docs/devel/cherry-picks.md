@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -91,14 +94,25 @@ particular, they may be self-merged by the release branch owner without fanfare,
 in the case the release branch owner knows the cherry pick was already
 requested - this should not be the norm, but it may happen.
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 ## Searching for Cherry Picks
 
 See the [cherrypick queue dashboard](http://cherrypick.k8s.io/#/queue) for
 status of PRs labeled as `cherrypick-candidate`.
 
 [Contributor License Agreements](http://releases.k8s.io/HEAD/CONTRIBUTING.md) is considered implicit
+=======
+[Contributor License Agreements](http://releases.k8s.io/release-1.2/CONTRIBUTING.md) is considered implicit
+>>>>>>> Versioning docs and examples for release-1.2.
 for all code within cherry-pick pull requests, ***unless there is a large
 conflict***.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

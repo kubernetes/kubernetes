@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -102,11 +105,11 @@ type PolicyAction struct {
 type MetadataPolicy struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the metadata policy that should be enforced.
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Spec MetadataPolicySpec `json:"spec,omitempty"`
 }
 
@@ -114,11 +117,11 @@ type MetadataPolicy struct {
 type MetadataPolicyList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of MetadataPolicy objects.
-	// More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
+	// More info: http://releases.k8s.io/release-1.2/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
 	Items []MetadataPolicy `json:"items"`
 }
 ```
@@ -158,6 +161,13 @@ Issue #17324 proposes to create a generalized API for matching
 "claims" to "service classes"; matching a pod to a scheduler would be one use for such an API.
 
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -223,6 +226,7 @@ Conformance tests are designed to be run with no cloud provider configured.  Con
 export KUBECONFIG=/path/to/kubeconfig
 export KUBERNETES_CONFORMANCE_TEST=y
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 # run all conformance tests
 go run hack/e2e.go -v --test_args="--ginkgo.focus=\[Conformance\]"
 
@@ -231,6 +235,9 @@ GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Co
 # ... and finish up with remaining tests in serial
 go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Serial\].*\[Conformance\]"
 ```
+=======
+The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not require support for up/push/down and other operations.  To run a conformance test, you need to know the IP of the master for your cluster and the authorization arguments to use.  The conformance test is intended to run against a cluster at a specific binary release of Kubernetes.  See [conformance-test.sh](http://releases.k8s.io/release-1.2/hack/conformance-test.sh).
+>>>>>>> Versioning docs and examples for release-1.2.
 
 ### Defining Conformance Subset
 
@@ -320,6 +327,13 @@ Once prometheus is scraping the kubernetes endpoints, that data can then be plot
 
 **HAPPY TESTING!**
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,39 +1,28 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.2/docs/user-guide/simple-yaml.md).
+=======
+### This document has been subsumed by [deploying-applications.md](deploying-applications.md)
+>>>>>>> Versioning docs and examples for release-1.2.
 
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
 
-<!-- END STRIP_FOR_RELEASE -->
 
-<!-- END MUNGE: UNVERSIONED_WARNING -->
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 This file has moved to: http://kubernetes.github.io/docs/user-guide/simple-yaml/
 
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/simple-yaml.md?pixel)]()

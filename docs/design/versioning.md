@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -118,6 +121,13 @@ Dependencies, such as Docker or Etcd, should also not be changed unless absolute
   * For example, if a user is at Kube 1.x, we may require them to upgrade to Kube 1.x+y before upgrading to Kube 2.x. In others words, an upgrade across major versions (e.g. Kube 1.x to Kube 2.x) should effectively be a no-op and as graceful as an upgrade from Kube 1.x to Kube 1.x+1. But you can require someone to go from 1.x to 1.x+y before they go to 2.x.
 
 There is a separate question of how to track the capabilities of a kubelet to facilitate rolling upgrades. That is not addressed here.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

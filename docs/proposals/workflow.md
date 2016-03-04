@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -84,13 +87,13 @@ type Workflow struct {
   unversioned.TypeMeta `json:",inline"`
 
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata.
   api.ObjectMeta `json:"metadata,omitempty"`
 
-  // Spec defines the expected behavior of a Workflow. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // Spec defines the expected behavior of a Workflow. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status.
   Spec WorkflowSpec `json:"spec,omitempty"`
 
-  // Status represents the current status of the Workflow. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // Status represents the current status of the Workflow. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status.
   Status WorkflowStatus `json:"status,omitempty"`
 }
 
@@ -99,7 +102,7 @@ type WorkflowList struct {
   unversioned.TypeMeta `json:",inline"`
 
   // Standard list metadata
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
   unversioned.ListMeta `json:"metadata,omitempty"`
 
   // Items is the list of Workflow
@@ -109,7 +112,7 @@ type WorkflowList struct {
 // WorkflowSpec contains Workflow specification
 type WorkflowSpec struct {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
   api.ObjectMeta `json:"metadata,omitempty"`
 
   //ActiveDealineSeconds contains
@@ -203,11 +206,11 @@ Reported for readability:
 ```go
 type JobTemplateSpec struct {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
   api.ObjectMeta
 
   // Spec is a structure defining the expected behavior of a job.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
   Spec JobSpec
 }
 ```
@@ -293,6 +296,13 @@ another whole `Workflow`) we have chosen the more generic word `Step`.
 
 
 <sup>2</sup>A very common feature in industrial strength workflow tools.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

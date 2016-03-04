@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -596,6 +599,13 @@ Openshift handles template processing via a server endpoint which consumes a tem
 produced by processing the template.  It is also possible to handle the entire template processing flow via the client, but this was deemed
 undesirable as it would force each client tool to reimplement template processing (eg the standard CLI tool, an eclipse plugin, a plugin for a CI system like Jenkins, etc).  The assumption in this proposal is that server side template processing is the preferred implementation approach for
 this reason.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

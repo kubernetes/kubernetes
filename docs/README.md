@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,10 +30,12 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Documentation: releases.k8s.io/HEAD
+# Kubernetes Documentation: releases.k8s.io/release-1.2
 
 * The [User's guide](user-guide/README.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
@@ -59,6 +62,13 @@ Documentation for other releases can be found at
 You should also check the [known issues for the release](../CHANGELOG.md) you're using.
 
 * To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

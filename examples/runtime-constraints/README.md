@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -313,6 +316,13 @@ You see that our BestEffort pod goes in a restart cycle, but the pods with great
 
 As you can see, we rely on the Kernel to react to system OOM events.  Depending on how your host operating
 system was configured, and which process the Kernel ultimately decides to kill on your Node, you may experience unstable results.  In addition, during an OOM event, while the kernel is cleaning up processes, the system may experience significant periods of slow down or appear unresponsive.  As a result, while the system allows you to overcommit on memory, we recommend to not induce a Kernel sys OOM.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/runtime-constraints/README.md?pixel)]()

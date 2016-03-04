@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -46,7 +49,7 @@ branch, but release branches of Kubernetes should not change.
 
 ## Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If you want to build go code locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/release-1.2/build/README.md).  You can do simple builds and development with just a local Docker installation.  If you want to build go code locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -258,6 +261,13 @@ See the [testing guide](testing.md) for additional information and scenarios.
 ```sh
 hack/update-generated-docs.sh
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

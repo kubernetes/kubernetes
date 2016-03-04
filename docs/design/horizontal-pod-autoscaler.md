@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -29,6 +30,8 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+=======
+>>>>>>> Versioning docs and examples for release-1.2.
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -41,7 +44,7 @@ The autoscaler (implemented as a Kubernetes API resource and controller) is resp
 the number of replicas of some collection (e.g. the pods of a ReplicationController) to meet some objective(s),
 for example a target per-pod CPU utilization.
 
-This design supersedes [autoscaling.md](http://releases.k8s.io/release-1.0/docs/proposals/autoscaling.md).
+This design supersedes [autoscaling.md](http://releases.k8s.io/release-1.2/docs/proposals/autoscaling.md).
 
 ## Overview
 
@@ -266,6 +269,13 @@ Our design is in general compatible with them.
   Discussed in [#4301](https://github.com/kubernetes/kubernetes/issues/4301).
 
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
