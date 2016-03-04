@@ -237,6 +237,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		api.Kind("ReplicationController"),
 		api.Kind("PersistentVolumeClaim"),
 		api.Kind("Secret"),
+		api.Kind("ConfigMap"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		KubeClient:            resourceQuotaControllerClient,
