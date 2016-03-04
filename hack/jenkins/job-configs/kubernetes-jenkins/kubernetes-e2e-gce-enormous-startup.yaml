@@ -18,7 +18,7 @@
             # Temporarily switch of Heapster, as this will not schedule anywhere.
             # TODO: Think of a solution to enable it.
             export KUBE_ENABLE_CLUSTER_MONITORING="none"
-            export KUBE_GCE_ZONE="us-east1-d"
+            export KUBE_GCE_ZONE="us-central1-c"
             export MASTER_SIZE="n1-standard-32"
             export NODE_SIZE="n1-standard-1"
             export NODE_DISK_SIZE="50GB"
