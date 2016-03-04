@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/util/errors"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -817,6 +819,12 @@ func sortAppFields(app *appctypes.App) {
 	sort.Sort(isolatorsByName(app.Isolators))
 }
 
+type sortedStringList []string
+
+func (s sortedStringList) Len() int           { return len(s) }
+func (s sortedStringList) Less(i, j int) bool { return s[i] < s[j] }
+func (s sortedStringList) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 func TestSetApp(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("rkt_test")
 	if err != nil {
@@ -1147,5 +1155,131 @@ func TestGenerateRunCommand(t *testing.T) {
 		result, err := rkt.generateRunCommand(tt.pod, tt.uuid)
 		assert.Equal(t, tt.err, err, testCaseHint)
 		assert.Equal(t, tt.expect, result, testCaseHint)
+	}
+}
+
+func TestPreStopHooks(t *testing.T) {
+	runner := lifecycle.NewFakeHandlerRunner()
+	fr := newFakeRktInterface()
+	fs := newFakeSystemd()
+
+	rkt := &Runtime{
+		runner:              runner,
+		apisvc:              fr,
+		systemd:             fs,
+		containerRefManager: kubecontainer.NewRefManager(),
+	}
+
+	tests := []struct {
+		pod         *api.Pod
+		runtimePod  *kubecontainer.Pod
+		preStopRuns []string
+		err         error
+	}{
+		{
+			// Case 0, container without any hooks.
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+					UID:       "uid-1",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container-name-1"},
+					},
+				},
+			},
+			&kubecontainer.Pod{
+				Containers: []*kubecontainer.Container{
+					{ID: kubecontainer.BuildContainerID("rkt", "id-1")},
+				},
+			},
+			[]string{},
+			nil,
+		},
+		{
+			// Case 1, containers with pre-stop hook.
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+					UID:       "uid-1",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container-name-1",
+							Lifecycle: &api.Lifecycle{
+								PreStop: &api.Handler{
+									Exec: &api.ExecAction{},
+								},
+							},
+						},
+						{
+							Name: "container-name-2",
+							Lifecycle: &api.Lifecycle{
+								PreStop: &api.Handler{
+									HTTPGet: &api.HTTPGetAction{},
+								},
+							},
+						},
+					},
+				},
+			},
+			&kubecontainer.Pod{
+				Containers: []*kubecontainer.Container{
+					{ID: kubecontainer.BuildContainerID("rkt", "id-1")},
+					{ID: kubecontainer.BuildContainerID("rkt", "id-2")},
+				},
+			},
+			[]string{
+				"exec on pod: pod-1_ns-1(uid-1), container: container-name-1: rkt://id-1",
+				"http-get on pod: pod-1_ns-1(uid-1), container: container-name-2: rkt://id-2",
+			},
+			nil,
+		},
+		{
+			// Case 2, one container with invalid hooks.
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+					UID:       "uid-1",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container-name-1",
+							Lifecycle: &api.Lifecycle{
+								PreStop: &api.Handler{},
+							},
+						},
+					},
+				},
+			},
+			&kubecontainer.Pod{
+				Containers: []*kubecontainer.Container{
+					{ID: kubecontainer.BuildContainerID("rkt", "id-1")},
+				},
+			},
+			[]string{},
+			errors.NewAggregate([]error{fmt.Errorf("Invalid handler: %v", &api.Handler{})}),
+		},
+	}
+
+	for i, tt := range tests {
+		testCaseHint := fmt.Sprintf("test case #%d", i)
+
+		// Run pre-stop hooks.
+		err := rkt.runPreStopHook(tt.pod, tt.runtimePod)
+		assert.Equal(t, tt.err, err, testCaseHint)
+
+		sort.Sort(sortedStringList(tt.preStopRuns))
+		sort.Sort(sortedStringList(runner.HandlerRuns))
+
+		assert.Equal(t, tt.preStopRuns, runner.HandlerRuns, testCaseHint)
+
+		runner.Reset()
 	}
 }
