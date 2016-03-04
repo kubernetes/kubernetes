@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
@@ -63,11 +63,11 @@ type LookupFunc func(hostName string) *api.Node
 
 type clientRegistrator struct {
 	lookupNode LookupFunc
-	client     *clientset.Clientset
+	client     unversionedcore.NodesGetter
 	queue      *queue.HistoricalFIFO
 }
 
-func NewRegistrator(client *clientset.Clientset, lookupNode LookupFunc) *clientRegistrator {
+func NewRegistrator(client unversionedcore.NodesGetter, lookupNode LookupFunc) *clientRegistrator {
 	return &clientRegistrator{
 		lookupNode: lookupNode,
 		client:     client,
@@ -80,6 +80,7 @@ func (r *clientRegistrator) Run(terminate <-chan struct{}) error {
 	RegistrationLoop:
 		for {
 			obj := r.queue.Pop(terminate)
+			log.V(3).Infof("registration event observed")
 			if obj == nil {
 				break RegistrationLoop
 			}
@@ -92,6 +93,7 @@ func (r *clientRegistrator) Run(terminate <-chan struct{}) error {
 			rg := obj.(*registration)
 			n, needsUpdate := r.updateNecessary(rg.hostName, rg.labels)
 			if !needsUpdate {
+				log.V(2).Infof("no update needed, skipping for %s: %v", rg.hostName, rg.labels)
 				continue
 			}
 
