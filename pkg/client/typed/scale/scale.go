@@ -18,13 +18,13 @@ package scale
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	unversionedclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -39,11 +39,12 @@ type ScaleInterface interface {
 	Selector() (string, error)
 }
 
-func NewClient(c *unversionedclient.Config) (*Client, error) {
-	dc, err := dynamic.NewClient(c)
+func NewClient(conf *restclient.Config) (*Client, error) {
+	dc, err := dynamic.NewClient(conf)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Client{
 		dc: dc,
 	}, nil
@@ -51,12 +52,27 @@ func NewClient(c *unversionedclient.Config) (*Client, error) {
 
 // NewForConfigOrDie creates a new dynamic client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversionedclient.Config) *Client {
-	cl, err := NewClient(c)
+func NewForConfigOrDie(conf *restclient.Config) *Client {
+	cl, err := NewClient(conf)
 	if err != nil {
 		panic(err)
 	}
 	return cl
+}
+
+// TODO(madhusudancs): Implement this as a codec decoder.
+func (c *Client) decode(res *runtime.Unstructured) (ScaleInterface, error) {
+	if res.TypeMeta.Kind != "Scale" {
+		return nil, fmt.Errorf("object should be of Kind `Scale`, got `%s`", res.TypeMeta.Kind)
+	}
+	switch res.TypeMeta.APIVersion {
+	case "extensions/v1beta1":
+		return &extScale{scale{c, res}}, nil
+	case "autoscaling/v1":
+		return &asScale{scale{c, res}}, nil
+	default:
+		return nil, fmt.Errorf("unknown APIVersion `%s` for `Scale`", res.TypeMeta.APIVersion)
+	}
 }
 
 func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string) (ScaleInterface, error) {
@@ -75,11 +91,7 @@ func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch resource %s(%s): %v", scaleRef.Name, scaleRef.Kind, err)
 	}
-	if res.TypeMeta.Kind == "ReplicationController" && res.TypeMeta.APIVersion == "extensions/v1beta" {
-		return &extScale{scale{c, res}}, nil
-	} else {
-		return &asScale{scale{c, res}}, nil
-	}
+	return c.decode(res)
 }
 
 func (c *Client) Update(scaleRef extensions.SubresourceReference, namespace string, obj ScaleInterface) (ScaleInterface, error) {
@@ -106,20 +118,22 @@ func (c *Client) Update(scaleRef extensions.SubresourceReference, namespace stri
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch resource %s(%s): %v", scaleRef.Name, scaleRef.Kind, err)
 	}
-
-	if res.TypeMeta.Kind == "ReplicationController" && res.TypeMeta.APIVersion == "extensions/v1beta" {
-		return &extScale{scale{c, res}}, nil
-	} else {
-		return &asScale{scale{c, res}}, nil
-	}
+	return c.decode(res)
 }
 
-func field(obj map[string]interface{}, name string) (interface{}, error) {
-	val, ok := obj[name]
-	if !ok {
-		return nil, fmt.Errorf("`%s` field doesn't exist in the `Scale` object", name)
+func field(obj map[string]interface{}, keyChain ...string) (interface{}, error) {
+	res := reflect.ValueOf(obj).Interface()
+	for _, key := range keyChain {
+		resVal, ok := res.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("%v should be of type map[string]interface{} to be able to proceed", res)
+		}
+		res, ok = resVal[key]
+		if !ok {
+			return nil, fmt.Errorf("key(`%s`) doesn't exist in the `Scale` object", key)
+		}
 	}
-	return val, nil
+	return res, nil
 }
 
 type scale struct {
@@ -131,70 +145,66 @@ func (s *scale) getScale() *runtime.Unstructured {
 	return s.obj
 }
 
-type extScale struct {
-	scale
-}
-
-func (s *extScale) Replicas() (int, error) {
-	statusVal, err := field(s.obj.Object, "Status")
+func (s *scale) Replicas() (int, error) {
+	ri, err := field(s.obj.Object, "status", "replicas")
 	if err != nil {
 		return 0, err
 	}
-	status, ok := statusVal.(*extensions.ScaleStatus)
+
+	// Note: JSON only has a number type whose equivalent is float64 in Go. So we type-assert
+	// to float64 here and then cast the value to int before returning.
+	r, ok := ri.(float64)
 	if !ok {
-		return 0, fmt.Errorf("`Status` isn't of expected type")
+		fmt.Printf("ri type: %T\n", ri)
+		return 0, fmt.Errorf("`Replicas` field isn't of expected type")
 	}
-	return status.Replicas, nil
+	return int(r), nil
 }
 
 // TODO: Implementing this as a Get-Update cycle for now, but it should really be
 // implemented as a Patch.
-func (s *extScale) SetReplicas(replicas int) {
-	s.obj.Object["Spec"] = &extensions.ScaleSpec{replicas}
+func (s *scale) SetReplicas(replicas int) {
+	// Note: JSON only has a number type whose equivalent is float64 in Go. So we cast
+	// replicas to float64 before updating.
+	s.obj.Object["spec"] = map[string]float64{
+		"replicas": float64(replicas),
+	}
+}
+
+type extScale struct {
+	scale
 }
 
 func (s *extScale) Selector() (string, error) {
-	statusVal, err := field(s.obj.Object, "Status")
+	seli, err := field(s.obj.Object, "status", "selector")
 	if err != nil {
 		return "", err
 	}
-	status, ok := statusVal.(*extensions.ScaleStatus)
+	selMap, ok := seli.(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("`Status` isn't of expected type")
+		return "", fmt.Errorf("`Selector` isn't of expected type")
 	}
-	return labels.SelectorFromSet(status.Selector).String(), nil
+
+	selector := make(map[string]string)
+	for key, val := range selMap {
+		selector[key] = val.(string)
+	}
+
+	return labels.SelectorFromSet(selector).String(), nil
 }
 
 type asScale struct {
 	scale
 }
 
-func (s *asScale) Replicas() (int, error) {
-	statusVal, err := field(s.obj.Object, "Status")
-	if err != nil {
-		return 0, err
-	}
-	status, ok := statusVal.(*autoscaling.ScaleStatus)
-	if !ok {
-		return 0, fmt.Errorf("`Status` isn't of expected type")
-	}
-	return status.Replicas, nil
-}
-
-// TODO: Implementing this as a Get-Update cycle for now, but it should really be
-// implemented as a Patch.
-func (s *asScale) SetReplicas(replicas int) {
-	s.obj.Object["Spec"] = &extensions.ScaleSpec{replicas}
-}
-
 func (s *asScale) Selector() (string, error) {
-	statusVal, err := field(s.obj.Object, "Status")
+	seli, err := field(s.obj.Object, "status", "selector")
 	if err != nil {
 		return "", err
 	}
-	status, ok := statusVal.(*autoscaling.ScaleStatus)
+	selector, ok := seli.(string)
 	if !ok {
-		return "", fmt.Errorf("`Status` isn't of expected type")
+		return "", fmt.Errorf("`Selector` isn't of expected type")
 	}
-	return status.Selector, nil
+	return selector, nil
 }

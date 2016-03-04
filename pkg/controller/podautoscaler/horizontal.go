@@ -226,9 +226,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
+
 	currentReplicas, err := scale.Replicas()
 	if err != nil {
-		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedGetScaleReplicas", err.Error())
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetScaleReplicas", err.Error())
 		return fmt.Errorf("failed to obtain replicas from scale subresource for %s: %v", reference, err)
 	}
 
@@ -260,7 +261,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 
 		selector, err := scale.Selector()
 		if err != nil {
-			a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedGetScaleSelector", err.Error())
+			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetScaleSelector", err.Error())
 			return fmt.Errorf("failed to obtain selector from scale subresource for %s: %v", reference, err)
 		}
 		if hpa.Spec.CPUUtilization != nil || !cmAnnotationFound {

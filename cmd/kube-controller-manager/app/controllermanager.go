@@ -288,7 +288,14 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
-			scaleClient := scaleclient.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
+			// Make a copy of conf for scale client so that we don't accidentally set group version for other clients.
+			scaleConf := *(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
+			gv, err := unversioned.ParseGroupVersion(groupVersion)
+			if err != nil {
+				glog.Fatalf("Failed to parse group version %s: %v", groupVersion, err)
+			}
+			scaleConf.GroupVersion = &gv
+			scaleClient := scaleclient.NewForConfigOrDie(&scaleConf)
 			hpaClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
 			metricsClient := metrics.NewHeapsterMetricsClient(
 				hpaClient,

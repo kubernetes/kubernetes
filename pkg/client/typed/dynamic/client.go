@@ -126,6 +126,12 @@ func (rc *ResourceClient) List(opts v1.ListOptions) (*runtime.UnstructuredList, 
 	return result, err
 }
 
+func (rc *ResourceClient) get(name string) *restclient.Request {
+	return rc.namespace(rc.cl.Get()).
+		Resource(rc.resource.Name).
+		Name(name)
+}
+
 // Get gets the resource with the specified name.
 func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
@@ -164,6 +170,17 @@ func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructur
 		Do().
 		Into(result)
 	return result, err
+}
+
+// update provides the request object to update the provided resource.
+func (rc *ResourceClient) update(obj *runtime.Unstructured) (*restclient.Request, error) {
+	if len(obj.Name) == 0 {
+		return nil, errors.New("object missing name")
+	}
+	return rc.namespace(rc.cl.Put()).
+		Resource(rc.resource.Name).
+		Name(obj.Name).
+		Body(obj), nil
 }
 
 // Update updates the provided resource.
@@ -208,23 +225,6 @@ func (src *SubresourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstru
 		Do().
 		Into(result)
 	return result, err
-}
-
-func (rc *ResourceClient) get(name string) *client.Request {
-	return rc.namespace(rc.cl.Get()).
-		Resource(rc.resource.Name).
-		Name(name)
-}
-
-// Update updates the provided resource.
-func (rc *ResourceClient) update(obj *runtime.Unstructured) (*client.Request, error) {
-	if len(obj.Name) == 0 {
-		return nil, errors.New("object missing name")
-	}
-	return rc.namespace(rc.cl.Put()).
-		Resource(rc.resource.Name).
-		Name(obj.Name).
-		Body(obj), nil
 }
 
 // dynamicCodec is a codec that wraps the standard unstructured codec
