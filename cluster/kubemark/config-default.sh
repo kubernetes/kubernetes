@@ -50,6 +50,9 @@ CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL} ${TEST_CLUSTER_RESYNC_PE
 SCHEDULER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 
+# Extra docker options for nodes.
+EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
+
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
@@ -60,7 +63,7 @@ ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-false}"
 ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-false}"
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
-  EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+  EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry 10.0.0.0/8"
 fi
 
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-false}"
