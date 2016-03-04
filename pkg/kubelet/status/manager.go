@@ -247,6 +247,9 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 		oldStatus = pod.Status
 	}
 
+	// update observed generation
+	status.ObservedGeneration = pod.ObjectMeta.Generation
+
 	// Set ReadyCondition.LastTransitionTime.
 	if readyCondition := api.GetPodReadyCondition(status); readyCondition != nil {
 		// Need to set LastTransitionTime.

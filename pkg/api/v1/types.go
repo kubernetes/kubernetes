@@ -1560,6 +1560,10 @@ type PodStatus struct {
 	// of `docker inspect`.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
+	// ObservedGeneration is the last generation of the pod that the kubelet has synced. The
+	// kubelet that the pod is bound to is considered the main observer. Other secondary
+	// observers (e.g. the scheduler) should not update this field.
+	ObservedGeneration int64 `json:"observedGeneration"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

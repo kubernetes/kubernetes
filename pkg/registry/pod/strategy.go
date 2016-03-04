@@ -55,6 +55,7 @@ func (podStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	pod := obj.(*api.Pod)
+	pod.ObjectMeta.Generation = 0
 	pod.Status = api.PodStatus{
 		Phase: api.PodPending,
 	}
@@ -64,6 +65,7 @@ func (podStrategy) PrepareForCreate(obj runtime.Object) {
 func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
+	newPod.ObjectMeta.Generation = oldPod.ObjectMeta.Generation + 1
 	newPod.Status = oldPod.Status
 }
 

@@ -1299,6 +1299,10 @@ type PodStatus struct {
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
+	// ObservedGeneration is the last generation of the pod that the kubelet has synced. The
+	// kubelet that the pod is bound to is considered the main observer. Other secondary
+	// observers (e.g. the scheduler) should not update this field.
+	ObservedGeneration int64 `json:"observedGeneration"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
