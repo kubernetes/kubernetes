@@ -164,7 +164,7 @@ func (ms *MinionServer) launchProxyServer() {
 // executor doesn't support failover right now, the right thing to do is to fail completely since all
 // pods will be lost upon restart and we want mesos to recover the resources from them.
 func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{} {
-	allArgs := os.Args[1:]
+	allArgs := os.Args[2:]
 
 	// filter out minion flags, leaving those for the executor
 	executorFlags := pflag.NewFlagSet("executor", pflag.ContinueOnError)
