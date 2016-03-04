@@ -392,11 +392,15 @@ EOF
 
         ${KUBECTL} create -f namespace.yaml
         # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
-        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
-        echo "Kube-dns rc and service successfully deployed."
+        echo "Starting kube DNS RC and service..."
+        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml && \
+            ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+        if [ $? -eq 0 ]; then
+            echo "SUCCESS"
+        else
+            echo "FAILURE"
+        fi
     fi
-
 }
 
 function print_success {
