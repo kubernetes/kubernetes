@@ -201,43 +201,6 @@ function get-addon-nsnames-from-server() {
     "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
 }
 
-# returns the characters after the last separator (including)
-# If the separator is empty or if it doesn't appear in the string,
-# an empty string is printed
-# $1 input string
-# $2 separator (must be single character, or empty)
-function get-suffix() {
-    # prints to stdout, so log cannot be used
-    local -r input_string=$1
-    local -r separator=$2
-    local suffix
-
-    if [[ "${separator}" == "" ]]; then
-        echo ""
-        return
-    fi
-
-    if  [[ "${input_string}" == *"${separator}"* ]]; then
-        suffix=$(echo "${input_string}" | rev | cut -d "${separator}" -f1 | rev)
-        echo "${separator}${suffix}"
-    else
-        echo ""
-    fi
-}
-
-# returns the characters up to the last '-' (without it)
-# $1 input string
-# $2 separator
-function get-basename() {
-    # prints to stdout, so log cannot be used
-    local -r input_string=$1
-    local -r separator=$2
-    local suffix
-    suffix="$(get-suffix ${input_string} ${separator})"
-    # this will strip the suffix (if matches)
-    echo ${input_string%$suffix}
-}
-
 function stop-object() {
     local -r obj_type=$1
     local -r namespace=$2
@@ -263,16 +226,6 @@ function create-object() {
     # this will keep on failing if the ${file_path} disappeared in the meantime.
     # Do not use too many retries.
     run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
-}
-
-function update-object() {
-    local -r obj_type=$1
-    local -r namespace=$2
-    local -r obj_name=$3
-    local -r file_path=$4
-    log INFO "updating the ${obj_type} ${namespace}/${obj_name} with the new definition ${file_path}"
-    stop-object ${obj_type} ${namespace} ${obj_name}
-    create-object ${obj_type} ${file_path}
 }
 
 # deletes the objects from the server
@@ -329,23 +282,17 @@ function update-objects() {
 
 # Global variables set by function match-objects.
 nsnames_for_delete=""   # a list of object nsnames to be deleted
-for_update=""           # a list of pairs <nsname>;<filePath> for objects that should be updated
-nsnames_for_ignore=""   # a list of object nsnames that will be ignored
 new_files=""            # a list of file paths that weren't matched by any existing objects (these objects must be created now)
 
 
 # $1 path to files with objects
 # $2 object type in the API (ReplicationController or Service)
-# $3 name separator (single character or empty)
 function match-objects() {
     local -r addon_dir=$1
     local -r obj_type=$2
-    local -r separator=$3
 
     # output variables (globals)
     nsnames_for_delete=""
-    for_update=""
-    nsnames_for_ignore=""
     new_files=""
 
     addon_nsnames_on_server=$(get-addon-nsnames-from-server "${obj_type}")
@@ -362,11 +309,8 @@ function match-objects() {
 
     local matched_files=""
 
-    local basensname_on_server=""
     local nsname_on_server=""
-    local suffix_on_server=""
     local nsname_from_file=""
-    local suffix_from_file=""
     local found=0
     local addon_path=""
 
@@ -375,10 +319,6 @@ function match-objects() {
     # like different objects and not updated but deleted and created again
     # (in the current version update is also delete+create, so it does not matter)
     for nsname_on_server in ${addon_nsnames_on_server}; do
-        basensname_on_server=$(get-basename ${nsname_on_server} ${separator})
-        suffix_on_server="$(get-suffix ${nsname_on_server} ${separator})"
-
-        log DB3 "Found existing addon ${nsname_on_server}, basename=${basensname_on_server}"
 
         # check if the addon is present in the directory and decide
         # what to do with it
@@ -393,18 +333,12 @@ function match-objects() {
             else
                 log DB2 "Found object name '${nsname_from_file}' in file ${addon_path}"
             fi
-            suffix_from_file="$(get-suffix ${nsname_from_file} ${separator})"
 
-            log DB3 "matching: ${basensname_on_server}${suffix_from_file} == ${nsname_from_file}"
-            if [[ "${basensname_on_server}${suffix_from_file}" == "${nsname_from_file}" ]]; then
-                log DB3 "matched existing ${obj_type} ${nsname_on_server} to file ${addon_path}; suffix_on_server=${suffix_on_server}, suffix_from_file=${suffix_from_file}"
+            log DB3 "matching: ${nsname_on_server} == ${nsname_from_file}"
+            if [[ "${nsname_on_server}" == "${nsname_from_file}" ]]; then
+                log DB3 "matched existing ${obj_type} ${nsname_on_server} to file ${addon_path}"
                 found=1
                 matched_files="${matched_files} ${addon_path}"
-                if [[ "${suffix_on_server}" == "${suffix_from_file}" ]]; then
-                    nsnames_for_ignore="${nsnames_for_ignore} ${nsname_from_file}"
-                else
-                    for_update="${for_update} ${nsname_on_server};${addon_path}"
-                fi
                 break
             fi
         done
@@ -434,17 +368,14 @@ function match-objects() {
 function reconcile-objects() {
     local -r addon_path=$1
     local -r obj_type=$2
-    local -r separator=$3    # name separator
-    match-objects ${addon_path} ${obj_type} ${separator}
+    match-objects ${addon_path} ${obj_type}
 
     log DBG "${obj_type}: nsnames_for_delete=${nsnames_for_delete}"
-    log DBG "${obj_type}: for_update=${for_update}"
-    log DBG "${obj_type}: nsnames_for_ignore=${nsnames_for_ignore}"
     log DBG "${obj_type}: new_files=${new_files}"
 
     stop-objects "${obj_type}" "${nsnames_for_delete}"
     # wait for jobs below is a protection against changing the basename
-    # of a replication controllerm without changing the selector.
+    # of a replication controller without changing the selector.
     # If we don't wait, the new rc may be created before the old one is deleted
     # In such case the old one will wait for all its pods to be gone, but the pods
     # are created by the new replication controller.
@@ -454,12 +385,6 @@ function reconcile-objects() {
     stopResult=$?
 
     create-objects "${obj_type}" "${new_files}"
-    update-objects "${obj_type}" "${for_update}"
-
-    local nsname
-    for nsname in ${nsnames_for_ignore}; do
-        log DB2 "The ${obj_type} ${nsname} is already up to date"
-    done
 
     wait-for-jobs
     createUpdateResult=$?
