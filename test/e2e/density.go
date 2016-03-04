@@ -113,6 +113,9 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 // So by default it is added to the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
+// IMPORTANT: This test is designed to work on large (>= 100 Nodes) clusters. For smaller ones
+// results will not be representative for control-plane performance as we'll start hitting
+// limits on Docker's concurrent container startup.
 var _ = Describe("Density", func() {
 	var c *client.Client
 	var nodeCount int
