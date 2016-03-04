@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/admin/high-availability.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -112,7 +83,7 @@ choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 
 If you are extending from a standard Kubernetes installation, the `kubelet` binary should already be present on your system.  You can run
 `which kubelet` to determine if the binary is in fact installed.  If it is not installed,
 you should install the [kubelet binary](https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet), the
-[kubelet init file](http://releases.k8s.io/HEAD/cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
+[kubelet init file](http://releases.k8s.io/release-1.2/cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
 scripts.
 
 If you are using monit, you should also install the monit daemon (`apt-get install monit`) and the [high-availability/monit-kubelet](high-availability/monit-kubelet) and
@@ -278,6 +249,13 @@ restarting the kubelets on each node.
 
 If you are turning up a fresh cluster, you will need to install the kubelet and kube-proxy on each worker node, and
 set the `--apiserver` flag to your replicated endpoint.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/high-availability.md?pixel)]()

@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/admin/cluster-components.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -123,7 +94,7 @@ selects a node for them to run on.
 Addons are pods and services that implement cluster features. They don't run on
 the master VM, but currently the default setup scripts that make the API calls
 to create these pods and services does run on the master VM. See:
-[kube-master-addons](http://releases.k8s.io/HEAD/cluster/saltbase/salt/kube-master-addons/kube-master-addons.sh)
+[kube-master-addons](http://releases.k8s.io/release-1.2/cluster/saltbase/salt/kube-master-addons/kube-master-addons.sh)
 
 Addon objects are created in the "kube-system" namespace.
 
@@ -199,6 +170,13 @@ running.
 ### fluentd
 
 `fluentd` is a daemon which helps provide [cluster-level logging](#cluster-level-logging).
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-components.md?pixel)]()

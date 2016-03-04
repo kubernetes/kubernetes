@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/admin/cluster-large.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -47,7 +18,7 @@ At v1.2, Kubernetes supports clusters with up to 1000 nodes. More specifically, 
 
 A cluster is a set of nodes (physical or virtual machines) running Kubernetes agents, managed by a "master" (the cluster-level control plane).
 
-Normally the number of nodes in a cluster is controlled by the the value `NUM_NODES` in the platform-specific `config-default.sh` file (for example, see [GCE's `config-default.sh`](http://releases.k8s.io/HEAD/cluster/gce/config-default.sh)).
+Normally the number of nodes in a cluster is controlled by the the value `NUM_NODES` in the platform-specific `config-default.sh` file (for example, see [GCE's `config-default.sh`](http://releases.k8s.io/release-1.2/cluster/gce/config-default.sh)).
 
 Simply changing that value to something very large, however, may cause the setup script to fail for many cloud providers. A GCE deployment, for example, will run in to quota issues and fail to bring the cluster up.
 
@@ -96,14 +67,14 @@ Except for Heapster, these limits are static and are based on data we collected 
 
 To avoid running into cluster addon resource issues, when creating a cluster with many nodes, consider the following:
 * Scale memory and CPU limits for each of the following addons, if used, as you scale up the size of cluster (there is one replica of each handling the entire cluster so memory and CPU usage tends to grow proportionally with size/load on cluster):
-  * [InfluxDB and Grafana](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml)
-  * [skydns, kube2sky, and dns etcd](http://releases.k8s.io/HEAD/cluster/addons/dns/skydns-rc.yaml.in)
-  * [Kibana](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml)
+  * [InfluxDB and Grafana](http://releases.k8s.io/release-1.2/cluster/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml)
+  * [skydns, kube2sky, and dns etcd](http://releases.k8s.io/release-1.2/cluster/addons/dns/skydns-rc.yaml.in)
+  * [Kibana](http://releases.k8s.io/release-1.2/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml)
 * Scale number of replicas for the following addons, if used, along with the size of cluster (there are multiple replicas of each so increasing replicas should help handle increased load, but, since load per replica also increases slightly, also consider increasing CPU/memory limits):
-  * [elasticsearch](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/es-controller.yaml)
+  * [elasticsearch](http://releases.k8s.io/release-1.2/cluster/addons/fluentd-elasticsearch/es-controller.yaml)
 * Increase memory and CPU limits slightly for each of the following addons, if used, along with the size of cluster (there is one replica per node but CPU/memory usage increases slightly along with cluster load/size as well):
-  * [FluentD with ElasticSearch Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-es/fluentd-es.yaml)
-  * [FluentD with GCP Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
+  * [FluentD with ElasticSearch Plugin](http://releases.k8s.io/release-1.2/cluster/saltbase/salt/fluentd-es/fluentd-es.yaml)
+  * [FluentD with GCP Plugin](http://releases.k8s.io/release-1.2/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 
 Heapster's resource limits are set dynamically based on the initial size of your cluster (see [#16185](http://issue.k8s.io/16185) and [#21258](http://issue.k8s.io/21258)). If you find that Heapster is running
 out of resources, you should adjust the formulas that compute heapster memory request (see those PRs for details).
@@ -122,6 +93,13 @@ running `kube-up.sh` set the environment variable `ALLOWED_NOTREADY_NODES` to wh
 with. This will allow `kube-up.sh` to succeed with fewer than `NUM_NODES` coming up. Depending on the
 reason for the failure, those additional nodes may join later or the cluster may remain at a size of
 `NUM_NODES - ALLOWED_NOTREADY_NODES`.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-large.md?pixel)]()

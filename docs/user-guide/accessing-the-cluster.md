@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/user-guide/accessing-the-cluster.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -149,7 +120,7 @@ with future high-availability support.
 
 There are [client libraries](../devel/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
-[Go](http://releases.k8s.io/HEAD/pkg/client/)
+[Go](http://releases.k8s.io/release-1.2/pkg/client/)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
 as the kubectl CLI does to locate and authenticate to the apiserver.
 
@@ -324,6 +295,13 @@ There are several different proxies you may encounter when using Kubernetes:
 
 Kubernetes users will typically not need to worry about anything other than the first two types.  The cluster admin
 will typically ensure that the latter types are setup correctly.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

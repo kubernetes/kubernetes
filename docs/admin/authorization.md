@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/admin/authorization.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -145,7 +116,7 @@ To inspect the HTTP calls involved in a specific kubectl operation you can turn 
  4. Bob can just read pods in namespace "projectCaribou":    `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "bob", "namespace": "projectCaribou", "resource": "pods", "readonly": true}}`
  5. Anyone can make read-only requests to all non-API paths: `{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user": "*", "readonly": true, "nonResourcePath": "*"}}`
 
-[Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
+[Complete file example](http://releases.k8s.io/release-1.2/pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
 ### A quick note on service accounts
 
@@ -295,6 +266,13 @@ to a remote authorization service.  Authorization modules can implement
 their own caching to reduce the cost of repeated authorization calls with the
 same or similar arguments.  Developers should then consider the interaction between
 caching and revocation of permissions.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

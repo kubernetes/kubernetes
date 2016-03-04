@@ -24,13 +24,13 @@ import (
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata.
 	api.ObjectMeta `json:"metadata,omitempty"`
 
-	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status.
 	Spec ScaleSpec `json:"spec,omitempty"`
 
-	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status. Read-only.
 	Status ScaleStatus `json:"status,omitempty"`
 }
 
@@ -48,6 +48,6 @@ type ScaleStatus struct {
 	// label query over pods that should match the replicas count. This is same
 	// as the label selector but in the string format to avoid introspection
 	// by clients. The string will be in the same format as the query-param syntax.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector string `json:"selector,omitempty"`
 }

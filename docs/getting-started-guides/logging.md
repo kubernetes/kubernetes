@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/logging.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -252,6 +223,13 @@ $ cat 21\:00\:00_21\:59\:59_S0.json | jq '.structPayload.log'
 This page has touched briefly on the underlying mechanisms that support gathering cluster level logs on a Kubernetes deployment. The approach here only works for gathering the standard output and standard error output of the processes running in the pod’s containers. To gather other logs that are stored in files one can use a sidecar container to gather the required files as described at the page [Collecting log files within containers with Fluentd](https://github.com/kubernetes/contrib/tree/master/logging/fluentd-sidecar-gcp) and sending them to the Google Cloud Logging service.
 
 Some of the material in this section also appears in the blog article [Cluster Level Logging with Kubernetes](http://blog.kubernetes.io/2015/06/cluster-level-logging-with-kubernetes.html).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/design/admission_control_limit_range.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -90,11 +61,11 @@ type LimitRangeSpec struct {
 type LimitRange struct {
   TypeMeta `json:",inline"`
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
   ObjectMeta `json:"metadata,omitempty"`
 
   // Spec defines the limits enforced.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
   Spec LimitRangeSpec `json:"spec,omitempty"`
 }
 
@@ -102,11 +73,11 @@ type LimitRange struct {
 type LimitRangeList struct {
   TypeMeta `json:",inline"`
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#types-kinds
   ListMeta `json:"metadata,omitempty"`
 
   // Items is a list of LimitRange objects.
-  // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
+  // More info: http://releases.k8s.io/release-1.2/docs/design/admission_control_limit_range.md
   Items []LimitRange `json:"items"`
 }
 ```
@@ -220,6 +191,13 @@ the following would happen.
 1. The incoming container cpu would request 250m with a limit of 500m.
 2. The incoming container memory would request 250Mi with a limit of 500Mi
 3. If the container is later resized, it's cpu would be constrained to between .1 and 1 and the ratio of limit to request could not exceed 4.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()

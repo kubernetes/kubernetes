@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/design/event_compression.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -58,7 +29,7 @@ Event compression should be best effort (not guaranteed). Meaning, in the worst 
 
 ## Design
 
-Instead of a single Timestamp, each event object [contains](http://releases.k8s.io/HEAD/pkg/api/types.go#L1111) the following fields:
+Instead of a single Timestamp, each event object [contains](http://releases.k8s.io/release-1.2/pkg/api/types.go#L1111) the following fields:
  * `FirstTimestamp unversioned.Time`
    * The date/time of the first occurrence of the event.
  * `LastTimestamp unversioned.Time`
@@ -100,7 +71,7 @@ Each binary that generates events:
      * `event.Reason`
      * `event.Message`
    * The LRU cache is capped at 4096 events for both `EventAggregator` and `EventLogger`. That means if a component (e.g. kubelet) runs for a long period of time and generates tons of unique events, the previously generated events cache will not grow unchecked in memory. Instead, after 4096 unique events are generated, the oldest events are evicted from the cache.
- * When an event is generated, the previously generated events cache is checked (see [`pkg/client/unversioned/record/event.go`](http://releases.k8s.io/HEAD/pkg/client/record/event.go)).
+ * When an event is generated, the previously generated events cache is checked (see [`pkg/client/unversioned/record/event.go`](http://releases.k8s.io/release-1.2/pkg/client/record/event.go)).
    * If the key for the new event matches the key for a previously generated event (meaning all of the above fields match between the new event and some previously generated event), then the event is considered to be a duplicate and the existing event entry is updated in etcd:
      * The new PUT (update) event API is called to update the existing event entry in etcd with the new last seen timestamp and count.
      * The event is also updated in the previously generated events cache with an incremented count, updated last seen timestamp, name, and new resource version (all required to issue a future event update).
@@ -142,6 +113,13 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
  * PR [#4206](http://issue.k8s.io/4206): Modify Event struct to allow compressing multiple recurring events in to a single event
  * PR [#4306](http://issue.k8s.io/4306): Compress recurring events in to a single event to optimize etcd storage
  * PR [#4444](http://pr.k8s.io/4444): Switch events history to use LRU cache instead of map
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -34,7 +34,7 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int32 `json:"replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
@@ -43,13 +43,13 @@ type ScaleStatus struct {
 // represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata.
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status.
 	Spec ScaleSpec `json:"spec,omitempty"`
 
-	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status. Read-only.
 	Status ScaleStatus `json:"status,omitempty"`
 }
 
@@ -60,9 +60,9 @@ type ReplicationControllerDummy struct {
 
 // SubresourceReference contains enough information to let you inspect or modify the referred subresource.
 type SubresourceReference struct {
-	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#types-kinds"
 	Kind string `json:"kind,omitempty"`
-	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// Name of the referent; More info: http://releases.k8s.io/release-1.2/docs/user-guide/identifiers.md#names
 	Name string `json:"name,omitempty"`
 	// API version of the referent
 	APIVersion string `json:"apiVersion,omitempty"`
@@ -138,10 +138,10 @@ type HorizontalPodAutoscalerStatus struct {
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	unversioned.TypeMeta `json:",inline"`
-	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// Standard object metadata. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// behaviour of autoscaler. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status.
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
 
 	// current information about the autoscaler.
@@ -405,14 +405,14 @@ type DaemonSetSpec struct {
 	// Selector is a label query over pods that are managed by the daemon set.
 	// Must match in order to be controlled.
 	// If empty, defaulted to labels on Pod template.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created.
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#pod-template
 	Template v1.PodTemplateSpec `json:"template"`
 
 	// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
@@ -442,17 +442,17 @@ const (
 type DaemonSetStatus struct {
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
-	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
+	// More info: http://releases.k8s.io/release-1.2/docs/admin/daemons.md
 	CurrentNumberScheduled int32 `json:"currentNumberScheduled"`
 
 	// NumberMisscheduled is the number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
-	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
+	// More info: http://releases.k8s.io/release-1.2/docs/admin/daemons.md
 	NumberMisscheduled int32 `json:"numberMisscheduled"`
 
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
-	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
+	// More info: http://releases.k8s.io/release-1.2/docs/admin/daemons.md
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
 }
 
@@ -462,18 +462,18 @@ type DaemonSetStatus struct {
 type DaemonSet struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired behavior of this daemon set.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Spec DaemonSetSpec `json:"spec,omitempty"`
 
 	// Status is the current status of this daemon set. This data may be
 	// out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Status DaemonSetStatus `json:"status,omitempty"`
 }
 
@@ -481,7 +481,7 @@ type DaemonSet struct {
 type DaemonSetList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of daemon sets.
@@ -492,7 +492,7 @@ type DaemonSetList struct {
 type ThirdPartyResourceDataList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of ThirdpartyResourceData.
@@ -505,15 +505,15 @@ type ThirdPartyResourceDataList struct {
 type Job struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is a structure defining the expected behavior of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Spec JobSpec `json:"spec,omitempty"`
 
 	// Status is a structure describing current status of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Status JobStatus `json:"status,omitempty"`
 }
 
@@ -521,7 +521,7 @@ type Job struct {
 type JobList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Job.
@@ -535,7 +535,7 @@ type JobSpec struct {
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/jobs.md
 	Parallelism *int32 `json:"parallelism,omitempty"`
 
 	// Completions specifies the desired number of successfully finished pods the
@@ -543,7 +543,7 @@ type JobSpec struct {
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/jobs.md
 	Completions *int32 `json:"completions,omitempty"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
@@ -552,19 +552,19 @@ type JobSpec struct {
 
 	// Selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// AutoSelector controls generation of pod labels and pod selectors.
 	// It was not present in the original extensions/v1beta1 Job definition, but exists
 	// to allow conversion from batch/v1 Jobs, where it corresponds to, but has the opposite
 	// meaning as, ManualSelector.
-	// More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md
+	// More info: http://releases.k8s.io/release-1.2/docs/design/selector-generation.md
 	AutoSelector *bool `json:"autoSelector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/jobs.md
 	Template v1.PodTemplateSpec `json:"template"`
 }
 
@@ -572,7 +572,7 @@ type JobSpec struct {
 type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/jobs.md
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
@@ -630,15 +630,15 @@ type JobCondition struct {
 type Ingress struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the Ingress.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Spec IngressSpec `json:"spec,omitempty"`
 
 	// Status is the current state of the Ingress.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Status IngressStatus `json:"status,omitempty"`
 }
 
@@ -646,7 +646,7 @@ type Ingress struct {
 type IngressList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Ingress.
@@ -846,18 +846,18 @@ type ReplicaSet struct {
 
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
-	// Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// Standard object's metadata. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the specification of the desired behavior of the ReplicaSet.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Spec ReplicaSetSpec `json:"spec,omitempty"`
 
 	// Status is the most recently observed status of the ReplicaSet.
 	// This data may be out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status
 	Status ReplicaSetStatus `json:"status,omitempty"`
 }
 
@@ -865,11 +865,11 @@ type ReplicaSet struct {
 type ReplicaSetList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of ReplicaSets.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md
 	Items []ReplicaSet `json:"items"`
 }
 
@@ -878,25 +878,25 @@ type ReplicaSetSpec struct {
 	// Replicas is the number of desired replicas.
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the replica count.
 	// If the selector is empty, it is defaulted to the labels present on the pod template.
 	// Label keys and values that must match in order to be controlled by this replica set.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#pod-template
 	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
 	// Replicas is the most recently oberved number of replicas.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas int32 `json:"replicas"`
 
 	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
@@ -908,7 +908,7 @@ type ReplicaSetStatus struct {
 type PodSecurityPolicy struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec defines the policy enforced.
@@ -973,7 +973,7 @@ type SELinuxContextStrategyOptions struct {
 	// type is the strategy that will dictate the allowable labels that may be set.
 	Type SELinuxContextStrategy `json:"type"`
 	// seLinuxOptions required to run as; required for MustRunAs
-	// More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context
+	// More info: http://releases.k8s.io/release-1.2/docs/design/security_context.md#security-context
 	SELinuxOptions *v1.SELinuxOptions `json:"seLinuxOptions,omitempty"`
 }
 
@@ -1021,7 +1021,7 @@ const (
 type PodSecurityPolicyList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of schema objects.

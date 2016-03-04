@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/devel/development.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -46,7 +17,7 @@ branch, but release branches of Kubernetes should not change.
 
 ## Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If you want to build go code locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/release-1.2/build/README.md).  You can do simple builds and development with just a local Docker installation.  If you want to build go code locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -313,6 +284,13 @@ See `go test -h` for more instructions on generating profiles from benchmarks.
 ```sh
 hack/update-generated-docs.sh
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

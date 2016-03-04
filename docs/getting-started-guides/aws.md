@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/aws.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 Getting started on AWS EC2
@@ -71,16 +42,16 @@ export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 export KUBERNETES_PROVIDER=aws; curl -sS https://get.k8s.io | bash
 ```
 
-NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/HEAD/cluster/kube-up.sh)
-which in turn calls [cluster/aws/util.sh](http://releases.k8s.io/HEAD/cluster/aws/util.sh)
-using [cluster/aws/config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/config-default.sh).
+NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/release-1.2/cluster/kube-up.sh)
+which in turn calls [cluster/aws/util.sh](http://releases.k8s.io/release-1.2/cluster/aws/util.sh)
+using [cluster/aws/config-default.sh](http://releases.k8s.io/release-1.2/cluster/aws/config-default.sh).
 
 This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
 as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
 tokens are written in `~/.kube/config`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
 By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with EC2 instances running on Ubuntu.
-You can override the variables defined in [config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/config-default.sh) to change this behavior as follows:
+You can override the variables defined in [config-default.sh](http://releases.k8s.io/release-1.2/cluster/aws/config-default.sh) to change this behavior as follows:
 
 ```bash
 export KUBE_AWS_ZONE=eu-west-1c
@@ -183,6 +154,13 @@ cluster/kube-down.sh
 
 Please see the [Kubernetes docs](../../docs/) for more details on administering
 and using a Kubernetes cluster.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

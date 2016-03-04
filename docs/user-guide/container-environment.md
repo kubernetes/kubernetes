@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/user-guide/container-environment.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -86,7 +57,7 @@ FOO_SERVICE_HOST=<the host the service is running on>
 FOO_SERVICE_PORT=<the port the service is running on>
 ```
 
-Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/HEAD/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
+Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/release-1.2/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
 
 ## Container Hooks
 
@@ -128,6 +99,13 @@ Hook handlers are the way that hooks are surfaced to containers.  Containers ca
    * HTTP - Executes an HTTP request against a specific endpoint on the container.
 
 [1]: http://man7.org/linux/man-pages/man2/gethostname.2.html
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

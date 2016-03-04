@@ -1,40 +1,11 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/admin/dns.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 # DNS Integration with Kubernetes
 
-As of Kubernetes 0.8, DNS is offered as a [cluster add-on](http://releases.k8s.io/HEAD/cluster/addons/README.md).
+As of Kubernetes 0.8, DNS is offered as a [cluster add-on](http://releases.k8s.io/release-1.2/cluster/addons/README.md).
 If enabled, a DNS Pod and Service will be scheduled on the cluster, and the kubelets will be
 configured to tell individual containers to use the DNS Service's IP to resolve DNS names.
 
@@ -69,7 +40,14 @@ time.
 
 ## For more information
 
-See [the docs for the DNS cluster addon](http://releases.k8s.io/HEAD/cluster/addons/dns/README.md).
+See [the docs for the DNS cluster addon](http://releases.k8s.io/release-1.2/cluster/addons/dns/README.md).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
