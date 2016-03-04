@@ -2757,7 +2757,7 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 func (kl *Kubelet) setNodeStatusGPUInfo(node *api.Node) {
 	glog.Infof("Hans: setNodeStatusGPUInfo: gpuPlugins:%+v", kl.gpuPlugins)
 	totalGpuNum := 0
-	AvailableGpuNum := 0
+	availableGpuNum := 0
 	for _, gpuPlugin := range kl.gpuPlugins {
 		gpuDevices, err := gpuPlugin.Detect()
 		if err == nil {
@@ -2766,14 +2766,17 @@ func (kl *Kubelet) setNodeStatusGPUInfo(node *api.Node) {
 
 		availableGPUIdxes, err := gpuPlugin.GetAvailableGPUs()
 		if err == nil {
-			AvailableGpuNum += len(availableGPUIdxes)
+			availableGpuNum += len(availableGPUIdxes)
 		}
 	}
 
 	if node.Status.Capacity != nil && node.Status.Allocatable != nil {
 		node.Status.Capacity[api.ResourceDevices] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
-		node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(AvailableGpuNum*1000), resource.DecimalSI)
+		//node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(availableGpuNum*1000), resource.DecimalSI)
+		node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
 	}
+
+	glog.Errorf("Hans:setNodeStatusGPUInfo(): Available GPU num: %d", availableGpuNum)
 
 }
 
