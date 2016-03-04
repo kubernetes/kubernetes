@@ -191,11 +191,6 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		}
 		oldRc = updated
 	}
-	original, err := strconv.Atoi(oldRc.Annotations[originalReplicasAnnotation])
-	if err != nil {
-		return fmt.Errorf("Unable to parse annotation for %s: %s=%s\n",
-			oldRc.Name, originalReplicasAnnotation, oldRc.Annotations[originalReplicasAnnotation])
-	}
 	// The maximum pods which can go unavailable during the update.
 	maxUnavailable, err := intstr.GetValueFromIntOrPercent(&config.MaxUnavailable, desired, false)
 	if err != nil {
@@ -217,12 +212,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	// the effective scale of the old RC regardless of the configuration
 	// (equivalent to 100% maxUnavailable).
 	if desired == 0 {
-		maxUnavailable = original
+		maxUnavailable = oldRc.Spec.Replicas
 		minAvailable = 0
 	}
 
 	fmt.Fprintf(out, "Scaling up %s from %d to %d, scaling down %s from %d to 0 (keep %d pods available, don't exceed %d pods)\n",
-		newRc.Name, newRc.Spec.Replicas, desired, oldRc.Name, oldRc.Spec.Replicas, minAvailable, original+maxSurge)
+		newRc.Name, newRc.Spec.Replicas, desired, oldRc.Name, oldRc.Spec.Replicas, minAvailable, desired+maxSurge)
 
 	// Scale newRc and oldRc until newRc has the desired number of replicas and
 	// oldRc has 0 replicas.
@@ -233,7 +228,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		oldReplicas := oldRc.Spec.Replicas
 
 		// Scale up as much as possible.
-		scaledRc, err := r.scaleUp(newRc, oldRc, original, desired, maxSurge, maxUnavailable, scaleRetryParams, config)
+		scaledRc, err := r.scaleUp(newRc, oldRc, desired, maxSurge, maxUnavailable, scaleRetryParams, config)
 		if err != nil {
 			return err
 		}
@@ -266,14 +261,14 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 // scaleUp scales up newRc to desired by whatever increment is possible given
 // the configured surge threshold. scaleUp will safely no-op as necessary when
 // it detects redundancy or other relevant conditions.
-func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, original, desired, maxSurge, maxUnavailable int, scaleRetryParams *RetryParams, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
+func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, desired, maxSurge, maxUnavailable int, scaleRetryParams *RetryParams, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
 	// If we're already at the desired, do nothing.
 	if newRc.Spec.Replicas == desired {
 		return newRc, nil
 	}
 
 	// Scale up as far as we can based on the surge limit.
-	increment := (original + maxSurge) - (oldRc.Spec.Replicas + newRc.Spec.Replicas)
+	increment := (desired + maxSurge) - (oldRc.Spec.Replicas + newRc.Spec.Replicas)
 	// If the old is already scaled down, go ahead and scale all the way up.
 	if oldRc.Spec.Replicas == 0 {
 		increment = desired - newRc.Spec.Replicas
