@@ -324,28 +324,29 @@ func (cm *containerManagerImpl) Start() error {
 			numEnsureStateFuncs++
 		}
 	}
-	if numEnsureStateFuncs == 0 {
-		return nil
+	if numEnsureStateFuncs >= 0 {
+		go wait.Until(func() {
+			for _, cont := range cm.systemContainers {
+				if cont.ensureStateFunc != nil {
+					if err := cont.ensureStateFunc(cont.manager); err != nil {
+						glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+					}
+				}
+			}
+		}, time.Minute, wait.NeverStop)
+
 	}
 
 	// Run ensure state functions every minute.
-	go wait.Until(func() {
-		for _, cont := range cm.systemContainers {
-			if cont.ensureStateFunc != nil {
-				if err := cont.ensureStateFunc(cont.manager); err != nil {
-					glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+	if len(cm.periodicTasks) > 0 {
+		go wait.Until(func() {
+			for _, task := range cm.periodicTasks {
+				if task != nil {
+					task()
 				}
 			}
-		}
-	}, time.Minute, wait.NeverStop)
-
-	go wait.Until(func() {
-		for _, task := range cm.periodicTasks {
-			if task != nil {
-				task()
-			}
-		}
-	}, 5*time.Minute, wait.NeverStop)
+		}, 5*time.Minute, wait.NeverStop)
+	}
 
 	return nil
 }

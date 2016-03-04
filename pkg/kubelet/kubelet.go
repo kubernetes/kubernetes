@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -929,7 +928,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
-		return nil, errors.New("no node entry for kubelet in standalone mode")
+		return kl.initialNodeStatus()
 	}
 	return kl.nodeInfo.GetNodeInfo(kl.nodeName)
 }
