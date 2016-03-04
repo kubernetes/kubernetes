@@ -1,3 +1,7 @@
+## Version 1.13 (Mar 1 2016 Prashanth.B <beeps@google.com>)
+- Synchronously wait for the Kubernetes service at startup.
+- Add a SIGTERM/SIGINT handler.
+
 ## Version 1.12 (Dec 15 2015 Abhishek Shah <abshah@google.com>)
 - Gave pods their own cache store. (034ecbd)
 - Allow pods to have dns. (717660a)

@@ -26,8 +26,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	etcd "github.com/coreos/go-etcd/etcd"
@@ -47,12 +49,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+// The name of the "master" Kubernetes Service.
+const kubernetesSvcName = "kubernetes"
+
 var (
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
 	argEtcdMutationTimeout = flag.Duration("etcd-mutation-timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	argKubecfgFile         = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service; --kube-master-url overrides the URL part of this; if neither this nor --kube-master-url are provided, defaults to service account tokens")
 	argKubeMasterURL       = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
+	healthzPort            = flag.Int("healthz-port", 8081, "port on which to serve a kube2sky HTTP readiness probe.")
 )
 
 const (
@@ -410,7 +416,11 @@ func (ks *kube2sky) removeService(obj interface{}) {
 }
 
 func (ks *kube2sky) updateService(oldObj, newObj interface{}) {
-	// TODO: Avoid unwanted updates.
+	// TODO: We shouldn't leave etcd in a state where it doesn't have a
+	// record for a Service. This removal is needed to completely clean
+	// the directory of a Service, which has SRV records and A records
+	// that are hashed according to oldObj. Unfortunately, this is the
+	// easiest way to purge the directory.
 	ks.removeService(oldObj)
 	ks.newService(newObj)
 }
@@ -562,10 +572,56 @@ func getHash(text string) string {
 	return fmt.Sprintf("%x", h.Sum32())
 }
 
+// waitForKubernetesService waits for the "Kuberntes" master service.
+// Since the health probe on the kube2sky container is essentially an nslookup
+// of this service, we cannot serve any DNS records if it doesn't show up.
+// Once the Service is found, we start replying on this containers readiness
+// probe endpoint.
+func waitForKubernetesService(client *kclient.Client) (svc *kapi.Service) {
+	name := fmt.Sprintf("%v/%v", kapi.NamespaceDefault, kubernetesSvcName)
+	glog.Infof("Waiting for service: %v", name)
+	var err error
+	servicePollInterval := 1 * time.Second
+	for {
+		svc, err = client.Services(kapi.NamespaceDefault).Get(kubernetesSvcName)
+		if err != nil || svc == nil {
+			glog.Infof("Ignoring error while waiting for service %v: %v. Sleeping %v before retrying.", name, err, servicePollInterval)
+			time.Sleep(servicePollInterval)
+			continue
+		}
+		break
+	}
+	return
+}
+
+// setupSignalHandlers runs a goroutine that waits on SIGINT or SIGTERM and logs it
+// before exiting.
+func setupSignalHandlers() {
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// This program should always exit gracefully logging that it received
+	// either a SIGINT or SIGTERM. Since kube2sky is run in a container
+	// without a liveness probe as part of the kube-dns pod, it shouldn't
+	// restart unless the pod is deleted. If it restarts without logging
+	// anything it means something is seriously wrong.
+	// TODO: Remove once #22290 is fixed.
+	go func() {
+		glog.Fatalf("Received signal %s", <-sigChan)
+	}()
+}
+
+// setupHealthzHandlers sets up a readiness and liveness endpoint for kube2sky.
+func setupHealthzHandlers(ks *kube2sky) {
+	http.HandleFunc("/readiness", func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(w, "ok\n")
+	})
+}
+
 func main() {
 	flag.CommandLine.SetNormalizeFunc(util.WarnWordSepNormalizeFunc)
 	flag.Parse()
 	var err error
+	setupSignalHandlers()
 	// TODO: Validate input flags.
 	domain := *argDomain
 	if !strings.HasSuffix(domain, ".") {
@@ -583,10 +639,20 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
+	// Wait synchronously for the Kubernetes service and add a DNS record for it.
+	ks.newService(waitForKubernetesService(kubeClient))
+	glog.Infof("Successfully added DNS record for Kubernetes service.")
 
 	ks.endpointsStore = watchEndpoints(kubeClient, &ks)
 	ks.servicesStore = watchForServices(kubeClient, &ks)
 	ks.podsStore = watchPods(kubeClient, &ks)
 
-	select {}
+	// We declare kube2sky ready when:
+	// 1. It has retrieved the Kubernetes master service from the apiserver. If this
+	//    doesn't happen skydns will fail its liveness probe assuming that it can't
+	//    perform any cluster local DNS lookups.
+	// 2. It has setup the 3 watches above.
+	// Once ready this container never flips to not-ready.
+	setupHealthzHandlers(&ks)
+	glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *healthzPort), nil))
 }
