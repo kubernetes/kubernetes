@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"github.com/coreos/etcd/pkg/transport"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
@@ -59,6 +60,7 @@ type APIServer struct {
 	EnableWatchCache           bool
 	EtcdPathPrefix             string
 	EtcdServerList             []string
+	EtcdTls                    transport.TLSInfo
 	EtcdServersOverrides       []string
 	EventTTL                   time.Duration
 	ExternalHost               string
@@ -259,4 +261,9 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
 	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", true, "If true, server will do its best to fix the update request to pass the validation, e.g., setting empty UID in update request to its existing value. This flag can be turned off after we fix all the clients that send malformed updates.")
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, "List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. The individual override format: resource#size, where size is a number. It takes effect when watch-cache is enabled.")
+
+	// TLS INFO for ETCD
+	fs.StringVar(&s.EtcdTls.CertFile, "etcd-client-certificate", s.EtcdTls.CertFile, "Path to client cert file for ETCD TLS.")
+	fs.StringVar(&s.EtcdTls.KeyFile, "etcd-client-key", s.EtcdTls.KeyFile, "Path to client key file for ETCD TLS.")
+	fs.StringVar(&s.EtcdTls.CAFile, "etcd-client-certificate-authority", s.EtcdTls.CAFile, "Path to a cert. file for the certificate authority for ETCD.")
 }

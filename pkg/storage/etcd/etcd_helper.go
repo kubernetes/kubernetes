@@ -26,6 +26,10 @@ import (
 	"strings"
 	"time"
 
+	etcd "github.com/coreos/etcd/client"
+	"github.com/coreos/etcd/pkg/transport"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -35,18 +39,16 @@ import (
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
-
-	etcd "github.com/coreos/etcd/client"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
+//Added TLSInfo
 // storage.Config object for etcd.
 type EtcdConfig struct {
 	ServerList []string
 	Codec      runtime.Codec
 	Prefix     string
 	Quorum     bool
+	Tls        transport.TLSInfo
 }
 
 // implements storage.Config
@@ -56,6 +58,11 @@ func (c *EtcdConfig) GetType() string {
 
 // implements storage.Config
 func (c *EtcdConfig) NewStorage() (storage.Interface, error) {
+	tlscfg, err := c.Tls.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := etcd.Config{
 		Endpoints: c.ServerList,
 		// TODO: Determine if transport needs optimization
@@ -65,6 +72,7 @@ func (c *EtcdConfig) NewStorage() (storage.Interface, error) {
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).Dial,
+			TLSClientConfig:     tlscfg,
 			TLSHandshakeTimeout: 10 * time.Second,
 			MaxIdleConnsPerHost: 500,
 		},

@@ -32,6 +32,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/coreos/etcd/pkg/transport"
+
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -88,9 +90,9 @@ func verifyClusterIPFlags(s *options.APIServer) {
 }
 
 // For testing.
-type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string, string, bool) (storage.Interface, error)
+type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string, string, bool, transport.TLSInfo) (storage.Interface, error)
 
-func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, memoryGroupVersionString, pathPrefix string, quorum bool) (etcdStorage storage.Interface, err error) {
+func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, memoryGroupVersionString, pathPrefix string, quorum bool, tls transport.TLSInfo) (etcdStorage storage.Interface, err error) {
 	if storageGroupVersionString == "" {
 		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
 	}
@@ -123,12 +125,13 @@ func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGr
 			return nil, fmt.Errorf("error setting up decoder for %v: %v", storageGroupVersionString, err)
 		}
 	}
+	storageConfig.Tls = tls
 	storageConfig.Codec = runtime.NewCodec(encoder, decoder)
 	return storageConfig.NewStorage()
 }
 
 // parse the value of --etcd-servers-overrides and update given storageDestinations.
-func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, quorum bool, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc) {
+func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, quorum bool, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc, tls transport.TLSInfo) {
 	if len(overrides) == 0 {
 		return
 	}
@@ -161,7 +164,7 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		// autoscalers, but they shouldn't be using the override
 		// storage.
 		internalGV := apigroup.GroupVersion.Group + "/__internal"
-		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], internalGV, prefix, quorum)
+		etcdOverrideStorage, err := newEtcdFn(servers, api.Codecs, storageVersions[apigroup.GroupVersion.Group], internalGV, prefix, quorum, tls)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -286,7 +289,7 @@ func Run(s *options.APIServer) error {
 	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
 		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], "/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+	etcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], "/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead, s.EtcdTls)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -301,7 +304,7 @@ func Run(s *options.APIServer) error {
 		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+		expEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageVersions[expGroup.GroupVersion.Group], "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead, s.EtcdTls)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
@@ -337,7 +340,7 @@ func Run(s *options.APIServer) error {
 			glog.Fatalf("The storage version for autoscaling must be either 'autoscaling/v1' or 'extensions/v1beta1'")
 		}
 		glog.Infof("Using %v for autoscaling group storage version", storageGroupVersion)
-		autoscalingEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+		autoscalingEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead, s.EtcdTls)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
@@ -364,14 +367,14 @@ func Run(s *options.APIServer) error {
 			glog.Fatalf("The storage version for batch must be either 'batch/v1' or 'extensions/v1beta1'")
 		}
 		glog.Infof("Using %v for batch group storage version", storageGroupVersion)
-		batchEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+		batchEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "extensions/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead, s.EtcdTls)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
 	}
 
-	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd)
+	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, s.EtcdQuorumRead, &storageDestinations, newEtcd, s.EtcdTls)
 
 	n := s.ServiceClusterIPRange
 
