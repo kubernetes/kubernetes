@@ -42,6 +42,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const (
+	// timeout for proxy requests.
+	proxyTimeout = 2 * time.Minute
+)
+
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
 // TODO: Get some more structure around the metrics and this type
 type KubeletMetric struct {
@@ -339,28 +344,39 @@ type usageDataPerContainer struct {
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
 func nodeProxyRequest(c *client.Client, node, endpoint string) (restclient.Result, error) {
+	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
+	// This will leak a goroutine if proxy hangs. #22165
 	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
 	if err != nil {
 		return restclient.Result{}, err
 	}
 	var result restclient.Result
-	if subResourceProxyAvailable {
-		result = c.Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-			Suffix(endpoint).
-			Do()
+	finished := make(chan struct{})
+	go func() {
+		if subResourceProxyAvailable {
+			result = c.Get().
+				Resource("nodes").
+				SubResource("proxy").
+				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+				Suffix(endpoint).
+				Do()
 
-	} else {
-		result = c.Get().
-			Prefix("proxy").
-			Resource("nodes").
-			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-			Suffix(endpoint).
-			Do()
+		} else {
+			result = c.Get().
+				Prefix("proxy").
+				Resource("nodes").
+				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+				Suffix(endpoint).
+				Do()
+		}
+		finished <- struct{}{}
+	}()
+	select {
+	case <-finished:
+		return result, nil
+	case <-time.After(proxyTimeout):
+		return restclient.Result{}, nil
 	}
-	return result, nil
 }
 
 // Retrieve metrics from the kubelet server of the given node.
