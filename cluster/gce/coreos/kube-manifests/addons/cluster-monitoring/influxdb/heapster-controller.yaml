@@ -28,7 +28,7 @@ spec:
               memory: 300Mi
           command:
             - /heapster
-            - --source=kubernetes:''
+            - --source=kubernetes.summary_api:''
             - --sink=influxdb:http://monitoring-influxdb:8086
             - --stats_resolution=30s
             - --sink_frequency=1m
