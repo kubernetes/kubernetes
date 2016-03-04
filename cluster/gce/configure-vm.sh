@@ -466,11 +466,6 @@ EOF
 kubelet_test_log_level: '$(echo "$KUBELET_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-docker_test_log_level: '$(echo "$DOCKER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
-EOF
-    fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'
