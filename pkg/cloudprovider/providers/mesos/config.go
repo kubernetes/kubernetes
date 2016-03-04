@@ -20,7 +20,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/scalingdata/gcfg"
+	"gopkg.in/gcfg.v1"
 )
 
 const (

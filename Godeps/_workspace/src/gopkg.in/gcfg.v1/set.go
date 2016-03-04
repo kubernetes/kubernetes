@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/scalingdata/gcfg/types"
+	"gopkg.in/gcfg.v1/types"
 )
 
 type tag struct {
@@ -225,6 +225,11 @@ func set(cfg interface{}, sect, sub, name string, blank bool, value string) erro
 		return fmt.Errorf("invalid subsection: "+
 			"section %q subsection %q", sect, sub)
 	}
+	// Empty name is a special value, meaning that only the
+	// section/subsection object is to be created, with no values set.
+	if name == "" {
+		return nil
+	}
 	vVar, t := fieldFold(vSect, name)
 	if !vVar.IsValid() {
 		return fmt.Errorf("invalid variable: "+
@@ -233,7 +238,14 @@ func set(cfg interface{}, sect, sub, name string, blank bool, value string) erro
 	// vVal is either single-valued var, or newly allocated value within multi-valued var
 	var vVal reflect.Value
 	// multi-value if unnamed slice type
-	isMulti := vVar.Type().Name() == "" && vVar.Kind() == reflect.Slice
+	isMulti := vVar.Type().Name() == "" && vVar.Kind() == reflect.Slice ||
+		vVar.Type().Name() == "" && vVar.Kind() == reflect.Ptr && vVar.Type().Elem().Name() == "" && vVar.Type().Elem().Kind() == reflect.Slice
+	if isMulti && vVar.Kind() == reflect.Ptr {
+		if vVar.IsNil() {
+			vVar.Set(reflect.New(vVar.Type().Elem()))
+		}
+		vVar = vVar.Elem()
+	}
 	if isMulti && blank {
 		vVar.Set(reflect.Zero(vVar.Type()))
 		return nil
