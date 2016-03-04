@@ -45,7 +45,7 @@ import (
 const (
 	NodeStartupThreshold       = 4 * time.Second
 	MinSaturationThreshold     = 2 * time.Minute
-	MinPodsPerSecondThroughput = 10
+	MinPodsPerSecondThroughput = 8
 )
 
 // Maximum container failures this test tolerates before failing.
@@ -127,6 +127,11 @@ var _ = Describe("Density", func() {
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
+		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
+		if saturationThreshold < MinSaturationThreshold {
+			saturationThreshold = MinSaturationThreshold
+		}
+		Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
 		saturationData := SaturationTime{
 			TimeToSaturate: e2eStartupTime,
 			NumberOfNodes:  nodeCount,
@@ -550,12 +555,6 @@ var _ = Describe("Density", func() {
 				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 				c.Pods(ns).Delete(name, nil)
 			}
-
-			saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
-			if saturationThreshold < MinSaturationThreshold {
-				saturationThreshold = MinSaturationThreshold
-			}
-			Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
 		})
 	}
 })
