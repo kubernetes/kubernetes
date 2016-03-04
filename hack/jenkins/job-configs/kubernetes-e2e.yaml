@@ -146,8 +146,6 @@
                 export REGISTER_MASTER="true"
                 # Reduce logs verbosity
                 export TEST_CLUSTER_LOG_LEVEL="--v=2"
-                # TODO: Remove when we figure out #22166 and other docker potential slowness
-                export DOCKER_TEST_LOG_LEVEL="--log-level=info"
                 # TODO: Remove when we figure out the reason for occasional failures #19048
                 export KUBELET_TEST_LOG_LEVEL="--v=4"
                 # Increase resync period to simulate production

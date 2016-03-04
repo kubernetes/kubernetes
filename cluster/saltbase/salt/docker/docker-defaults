@@ -7,9 +7,5 @@
 {% if pillar.get('network_provider', '').lower() == 'kubenet' %}
   {% set bridge_opts = "" %}
 {% endif -%}
-{% set log_level = pillar['log_level'] -%}
-{% if pillar['docker_test_log_level'] is defined -%}
-  {% set log_level = pillar['docker_test_log_level'] -%}
-{% endif -%}
-DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} {{bridge_opts}} --iptables=false --ip-masq=false {{log_level}}"
+DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} {{bridge_opts}} --iptables=false --ip-masq=false --log-level=warn"
 DOCKER_NOFILE=1000000
