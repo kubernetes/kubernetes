@@ -17,7 +17,6 @@ limitations under the License.
 package release_1_2
 
 import (
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/unversioned"
@@ -40,9 +39,9 @@ func FromUnversionedClient(c *unversioned.Client) *Clientset {
 	}
 
 	if c != nil && c.DiscoveryClient != nil {
-		clientset.DiscoveryClient = discovery.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
+		clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
 	} else {
-		clientset.DiscoveryClient = discovery.NewDiscoveryClient(nil)
+		clientset.DiscoveryClient = unversioned.NewDiscoveryClient(nil)
 	}
 
 	return &clientset

@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -47,7 +46,7 @@ type Interface interface {
 	Autoscaling() AutoscalingInterface
 	Batch() BatchInterface
 	Extensions() ExtensionsInterface
-	Discovery() discovery.DiscoveryInterface
+	Discovery() DiscoveryInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -119,7 +118,16 @@ type Client struct {
 	*AutoscalingClient
 	*BatchClient
 	*ExtensionsClient
-	*discovery.DiscoveryClient
+	*DiscoveryClient
+}
+
+func stringDoesntExistIn(str string, slice []string) bool {
+	for _, s := range slice {
+		if s == str {
+			return false
+		}
+	}
+	return true
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.
@@ -156,6 +164,6 @@ func (c *Client) Extensions() ExtensionsInterface {
 	return c.ExtensionsClient
 }
 
-func (c *Client) Discovery() discovery.DiscoveryInterface {
+func (c *Client) Discovery() DiscoveryInterface {
 	return c.DiscoveryClient
 }
