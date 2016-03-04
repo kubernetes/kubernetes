@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -79,24 +81,35 @@ type containerManagerImpl struct {
 	cadvisorInterface cadvisor.Interface
 	mountUtil         mount.Interface
 	NodeConfig
+	status Status
 	// External containers being managed.
 	systemContainers []*systemContainer
 	periodicTasks    []func()
+}
+
+type features struct {
+	cpuHardcapping bool
 }
 
 var _ ContainerManager = &containerManagerImpl{}
 
 // checks if the required cgroups subsystems are mounted.
 // As of now, only 'cpu' and 'memory' are required.
-func validateSystemRequirements(mountUtil mount.Interface) error {
+// cpu quota is a soft requirement.
+func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	const (
 		cgroupMountType = "cgroup"
 		localErr        = "system validation failed"
 	)
+	var (
+		cpuMountPoint string
+		f             features
+	)
 	mountPoints, err := mountUtil.List()
 	if err != nil {
-		return fmt.Errorf("%s - %v", localErr, err)
+		return f, fmt.Errorf("%s - %v", localErr, err)
 	}
+
 	expectedCgroups := sets.NewString("cpu", "cpuacct", "cpuset", "memory")
 	for _, mountPoint := range mountPoints {
 		if mountPoint.Type == cgroupMountType {
@@ -104,14 +117,31 @@ func validateSystemRequirements(mountUtil mount.Interface) error {
 				if expectedCgroups.Has(opt) {
 					expectedCgroups.Delete(opt)
 				}
+				if opt == "cpu" {
+					cpuMountPoint = mountPoint.Path
+				}
 			}
 		}
 	}
 
 	if expectedCgroups.Len() > 0 {
-		return fmt.Errorf("%s - Following Cgroup subsystem not mounted: %v", localErr, expectedCgroups.List())
+		return f, fmt.Errorf("%s - Following Cgroup subsystem not mounted: %v", localErr, expectedCgroups.List())
 	}
-	return nil
+
+	// Check if cpu quota is available.
+	// CPU cgroup is required and so it expected to be mounted at this point.
+	periodExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
+	if err != nil {
+		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
+	}
+	quotaExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
+	if err != nil {
+		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
+	}
+	if quotaExists && periodExists {
+		f.cpuHardcapping = true
+	}
+	return f, nil
 }
 
 // TODO(vmarmol): Add limits to the system containers.
@@ -185,10 +215,13 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 }
 
 func (cm *containerManagerImpl) setupNode() error {
-	if err := validateSystemRequirements(cm.mountUtil); err != nil {
+	f, err := validateSystemRequirements(cm.mountUtil)
+	if err != nil {
 		return err
 	}
-
+	if !f.cpuHardcapping {
+		cm.status.SoftRequirements = fmt.Errorf("CPU hardcapping unsupported")
+	}
 	// TODO: plumb kernel tunable options into container manager, right now, we modify by default
 	if err := setupKernelTunables(KernelTunableModify); err != nil {
 		return err
@@ -310,6 +343,12 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 	cm.RLock()
 	defer cm.RUnlock()
 	return cm.NodeConfig
+}
+
+func (cm *containerManagerImpl) Status() Status {
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.status
 }
 
 func (cm *containerManagerImpl) Start() error {
