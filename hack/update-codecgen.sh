@@ -32,12 +32,21 @@ generated_files=($(
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
+        -o -wholename '*/codecgen-*-1234.generated.go' \
       \) -prune \
     \) -name '*.generated.go'))
 
-# Build codecgen binary from Godeps.
+# Register function to be called on EXIT to remove codecgen
+# binary and also to touch the files that should be regenerated
+# since they are first removed.
+# This is necessary to make the script work after previous failure.
 function cleanup {
   rm -f "${CODECGEN:-}"
+  pushd "${KUBE_ROOT}" > /dev/null
+  for (( i=0; i < number; i++ )); do
+    touch "${generated_files[${i}]}" || true
+  done
+  popd > /dev/null
 }
 trap cleanup EXIT
 
