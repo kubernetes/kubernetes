@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
+func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return nil, err
@@ -41,6 +41,10 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, name 
 		createRequest.LoadBalancerName = aws.String(name)
 
 		createRequest.Listeners = listeners
+
+		if internalELB {
+			createRequest.Scheme = aws.String("internal")
+		}
 
 		// We are supposed to specify one subnet per AZ.
 		// TODO: What happens if we have more than one subnet per AZ?
@@ -60,6 +64,8 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, name 
 		}
 		dirty = true
 	} else {
+		// TODO: Sync internal vs non-internal
+
 		{
 			// Sync subnets
 			expected := sets.NewString(subnetIDs...)
