@@ -43,6 +43,10 @@ func (unsupportedContainerManager) GetNodeConfig() NodeConfig {
 	return NodeConfig{}
 }
 
+func (cm *unsupportedContainerManager) Status() Status {
+	return Status{}
+}
+
 func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }
