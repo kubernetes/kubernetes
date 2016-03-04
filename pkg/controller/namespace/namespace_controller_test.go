@@ -18,7 +18,11 @@ package namespace
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"strings"
+	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,7 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -56,7 +62,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 			Finalizers: []api.FinalizerName{"kubernetes", "other"},
 		},
 	}
-	finalizeNamespaceFunc(mockClient, testNamespace)
+	finalizeNamespace(mockClient, testNamespace, api.FinalizerKubernetes)
 	actions := mockClient.Actions()
 	if len(actions) != 1 {
 		t.Errorf("Expected 1 mock client action, but got %v", len(actions))
@@ -75,9 +81,10 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 
 func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIVersions) {
 	now := unversioned.Now()
+	namespaceName := "test"
 	testNamespacePendingFinalize := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
-			Name:              "test",
+			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
 		},
@@ -90,7 +97,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	}
 	testNamespaceFinalizeComplete := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
-			Name:              "test",
+			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
 		},
@@ -100,78 +107,77 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		},
 	}
 
-	// TODO: Reuse the constants for all these strings from testclient
-	pendingActionSet := sets.NewString(
-		strings.Join([]string{"get", "namespaces", ""}, "-"),
-		strings.Join([]string{"delete-collection", "replicationcontrollers", ""}, "-"),
-		strings.Join([]string{"list", "services", ""}, "-"),
-		strings.Join([]string{"list", "pods", ""}, "-"),
-		strings.Join([]string{"delete-collection", "resourcequotas", ""}, "-"),
-		strings.Join([]string{"delete-collection", "secrets", ""}, "-"),
-		strings.Join([]string{"delete-collection", "configmaps", ""}, "-"),
-		strings.Join([]string{"delete-collection", "limitranges", ""}, "-"),
-		strings.Join([]string{"delete-collection", "events", ""}, "-"),
-		strings.Join([]string{"delete-collection", "serviceaccounts", ""}, "-"),
-		strings.Join([]string{"delete-collection", "persistentvolumeclaims", ""}, "-"),
-		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
-	)
-
-	if containsVersion(versions, "extensions/v1beta1") {
-		pendingActionSet.Insert(
-			strings.Join([]string{"delete-collection", "daemonsets", ""}, "-"),
-			strings.Join([]string{"delete-collection", "deployments", ""}, "-"),
-			strings.Join([]string{"delete-collection", "replicasets", ""}, "-"),
-			strings.Join([]string{"delete-collection", "jobs", ""}, "-"),
-			strings.Join([]string{"delete-collection", "horizontalpodautoscalers", ""}, "-"),
-			strings.Join([]string{"delete-collection", "ingresses", ""}, "-"),
-			strings.Join([]string{"get", "resource", ""}, "-"),
-		)
+	// when doing a delete all of content, we will do a GET of a collection, and DELETE of a collection by default
+	dynamicClientActionSet := sets.NewString()
+	groupVersionResources := testGroupVersionResources()
+	for _, groupVersionResource := range groupVersionResources {
+		urlPath := path.Join([]string{
+			dynamic.LegacyAPIPathResolverFunc(groupVersionResource.GroupVersion()),
+			groupVersionResource.Group,
+			groupVersionResource.Version,
+			"namespaces",
+			namespaceName,
+			groupVersionResource.Resource,
+		}...)
+		dynamicClientActionSet.Insert((&fakeAction{method: "GET", path: urlPath}).String())
+		dynamicClientActionSet.Insert((&fakeAction{method: "DELETE", path: urlPath}).String())
 	}
 
 	scenarios := map[string]struct {
-		testNamespace     *api.Namespace
-		expectedActionSet sets.String
+		testNamespace          *api.Namespace
+		kubeClientActionSet    sets.String
+		dynamicClientActionSet sets.String
 	}{
 		"pending-finalize": {
-			testNamespace:     testNamespacePendingFinalize,
-			expectedActionSet: pendingActionSet,
+			testNamespace: testNamespacePendingFinalize,
+			kubeClientActionSet: sets.NewString(
+				strings.Join([]string{"get", "namespaces", ""}, "-"),
+				strings.Join([]string{"list", "pods", ""}, "-"),
+				strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
+			),
+			dynamicClientActionSet: dynamicClientActionSet,
 		},
 		"complete-finalize": {
 			testNamespace: testNamespaceFinalizeComplete,
-			expectedActionSet: sets.NewString(
+			kubeClientActionSet: sets.NewString(
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
+			dynamicClientActionSet: sets.NewString(),
 		},
 	}
 
 	for scenario, testInput := range scenarios {
+		testHandler := &fakeActionHandler{statusCode: 200}
+		srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+		defer srv.Close()
+
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		if containsVersion(versions, "extensions/v1beta1") {
-			resources := []unversioned.APIResource{}
-			for _, resource := range []string{"daemonsets", "deployments", "replicasets", "jobs", "horizontalpodautoscalers", "ingresses"} {
-				resources = append(resources, unversioned.APIResource{Name: resource})
-			}
-			mockClient.Resources = map[string]*unversioned.APIResourceList{
-				"extensions/v1beta1": {
-					GroupVersion: "extensions/v1beta1",
-					APIResources: resources,
-				},
-			}
-		}
-		err := syncNamespace(mockClient, versions, testInput.testNamespace)
+		clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+
+		err := syncNamespace(mockClient, clientPool, operationNotSupportedCache{}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
+
+		// validate traffic from kube client
 		actionSet := sets.NewString()
 		for _, action := range mockClient.Actions() {
 			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
 		}
-		if !actionSet.HasAll(testInput.expectedActionSet.List()...) {
-			t.Errorf("scenario %s - Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario, testInput.expectedActionSet, actionSet, testInput.expectedActionSet.Difference(actionSet))
+		if !actionSet.Equal(testInput.kubeClientActionSet) {
+			t.Errorf("scenario %s - mock client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
+				testInput.kubeClientActionSet, actionSet, testInput.kubeClientActionSet.Difference(actionSet))
 		}
-		if !testInput.expectedActionSet.HasAll(actionSet.List()...) {
-			t.Errorf("scenario %s - Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario, testInput.expectedActionSet, actionSet, actionSet.Difference(testInput.expectedActionSet))
+
+		// validate traffic from dynamic client
+		actionSet = sets.NewString()
+		for _, action := range testHandler.actions {
+			actionSet.Insert(action.String())
+		}
+		if !actionSet.Equal(testInput.dynamicClientActionSet) {
+			t.Errorf("scenario %s - dynamic client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
+				testInput.dynamicClientActionSet, actionSet, testInput.dynamicClientActionSet.Difference(actionSet))
 		}
 	}
 }
@@ -218,11 +224,59 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	err := syncNamespace(mockClient, &unversioned.APIVersions{}, testNamespace)
+	err := syncNamespace(mockClient, nil, operationNotSupportedCache{}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
 	if len(mockClient.Actions()) != 0 {
 		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())
 	}
+}
+
+// testServerAndClientConfig returns a server that listens and a config that can reference it
+func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request)) (*httptest.Server, *restclient.Config) {
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	config := &restclient.Config{
+		Host: srv.URL,
+	}
+	return srv, config
+}
+
+// fakeAction records information about requests to aid in testing.
+type fakeAction struct {
+	method string
+	path   string
+}
+
+// String returns method=path to aid in testing
+func (f *fakeAction) String() string {
+	return strings.Join([]string{f.method, f.path}, "=")
+}
+
+// fakeActionHandler holds a list of fakeActions received
+type fakeActionHandler struct {
+	// statusCode returned by this handler
+	statusCode int
+
+	lock    sync.Mutex
+	actions []fakeAction
+}
+
+// ServeHTTP logs the action that occurred and always returns the associated status code
+func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
+	response.WriteHeader(f.statusCode)
+	response.Write([]byte("{\"kind\": \"List\"}"))
+}
+
+// testGroupVersionResources returns a mocked up set of resources across different api groups for testing namespace controller.
+func testGroupVersionResources() []unversioned.GroupVersionResource {
+	results := []unversioned.GroupVersionResource{}
+	results = append(results, unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
+	results = append(results, unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "services"})
+	results = append(results, unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
+	return results
 }

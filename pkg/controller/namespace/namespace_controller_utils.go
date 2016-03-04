@@ -18,12 +18,17 @@ package namespace
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -36,6 +41,29 @@ type contentRemainingError struct {
 
 func (e *contentRemainingError) Error() string {
 	return fmt.Sprintf("some content remains in the namespace, estimate %d seconds before it is removed", e.Estimate)
+}
+
+// operation is used for caching if an operation is supported on a dynamic client.
+type operation string
+
+const (
+	operationDeleteCollection operation = "deleteCollection"
+	operationList             operation = "list"
+)
+
+// operationKey is an entry in a cache.
+type operationKey struct {
+	op  operation
+	gvr unversioned.GroupVersionResource
+}
+
+// operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
+// if the operationKey maps to true, it means the operation is not supported.
+type operationNotSupportedCache map[operationKey]bool
+
+// isSupported returns true if the operation is supported
+func (o operationNotSupportedCache) isSupported(key operationKey) bool {
+	return !o[key]
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
@@ -58,7 +86,6 @@ func retryOnConflictError(kubeClient clientset.Interface, namespace *api.Namespa
 			return nil, err
 		}
 	}
-	return
 }
 
 // updateNamespaceStatusFunc will verify that the status of the namespace is correct
@@ -78,14 +105,21 @@ func finalized(namespace *api.Namespace) bool {
 	return len(namespace.Spec.Finalizers) == 0
 }
 
-// finalizeNamespaceFunc removes the kubernetes token and finalizes the namespace
-func finalizeNamespaceFunc(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+// finalizeNamespaceFunc returns a function that knows how to finalize a namespace for specified token.
+func finalizeNamespaceFunc(finalizerToken api.FinalizerName) updateNamespaceFunc {
+	return func(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+		return finalizeNamespace(kubeClient, namespace, finalizerToken)
+	}
+}
+
+// finalizeNamespace removes the specified finalizerToken and finalizes the namespace
+func finalizeNamespace(kubeClient clientset.Interface, namespace *api.Namespace, finalizerToken api.FinalizerName) (*api.Namespace, error) {
 	namespaceFinalize := api.Namespace{}
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
 	finalizerSet := sets.NewString()
 	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] != api.FinalizerKubernetes {
+		if namespace.Spec.Finalizers[i] != finalizerToken {
 			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
 		}
 	}
@@ -103,99 +137,207 @@ func finalizeNamespaceFunc(kubeClient clientset.Interface, namespace *api.Namesp
 	return namespace, err
 }
 
-// deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
-// of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
-// are guaranteed to be gone.
-// TODO: this should use discovery to delete arbitrary namespace content
-func deleteAllContent(kubeClient clientset.Interface, versions *unversioned.APIVersions, namespace string, before unversioned.Time) (estimate int64, err error) {
-	err = deleteServiceAccounts(kubeClient, namespace)
+// deleteCollection is a helper function that will delete the collection of resources
+// it returns true if the operation was supported on the server.
+// it returns an error if the operation was supported on the server but was unable to complete.
+func deleteCollection(
+	dynamicClient *dynamic.Client,
+	opCache operationNotSupportedCache,
+	gvr unversioned.GroupVersionResource,
+	namespace string,
+) (bool, error) {
+	glog.V(4).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
+
+	key := operationKey{op: operationDeleteCollection, gvr: gvr}
+	if !opCache.isSupported(key) {
+		glog.V(4).Infof("namespace controller - deleteCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
+		return false, nil
+	}
+
+	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(nil, v1.ListOptions{})
+
+	if err == nil {
+		return true, nil
+	}
+
+	// this is strange, but we need to special case for both MethodNotSupported and NotFound errors
+	// TODO: https://github.com/kubernetes/kubernetes/issues/22413
+	// we have a resource returned in the discovery API that supports no top-level verbs:
+	//  /apis/extensions/v1beta1/namespaces/default/replicationcontrollers
+	// when working with this resource type, we will get a literal not found error rather than expected method not supported
+	// remember next time that this resource does not support delete collection...
+	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
+		glog.V(4).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
+		opCache[key] = true
+		return false, nil
+	}
+
+	glog.V(4).Infof("namespace controller - deleteCollection unexpected error - namespace: %s, gvr: %v, error: %v", namespace, gvr, err)
+	return true, err
+}
+
+// listCollection will list the items in the specified namespace
+// it returns the following:
+//  the list of items in the collection (if found)
+//  a boolean if the operation is supported
+//  an error if the operation is supported but could not be completed.
+func listCollection(
+	dynamicClient *dynamic.Client,
+	opCache operationNotSupportedCache,
+	gvr unversioned.GroupVersionResource,
+	namespace string,
+) (*runtime.UnstructuredList, bool, error) {
+	glog.V(4).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
+
+	key := operationKey{op: operationList, gvr: gvr}
+	if !opCache.isSupported(key) {
+		glog.V(4).Infof("namespace controller - listCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
+		return nil, false, nil
+	}
+
+	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	unstructuredList, err := dynamicClient.Resource(&apiResource, namespace).List(v1.ListOptions{})
+	if err == nil {
+		return unstructuredList, true, nil
+	}
+
+	// this is strange, but we need to special case for both MethodNotSupported and NotFound errors
+	// TODO: https://github.com/kubernetes/kubernetes/issues/22413
+	// we have a resource returned in the discovery API that supports no top-level verbs:
+	//  /apis/extensions/v1beta1/namespaces/default/replicationcontrollers
+	// when working with this resource type, we will get a literal not found error rather than expected method not supported
+	// remember next time that this resource does not support delete collection...
+	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
+		glog.V(4).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
+		opCache[key] = true
+		return nil, false, nil
+	}
+
+	return nil, true, err
+}
+
+// deleteEachItem is a helper function that will list the collection of resources and delete each item 1 by 1.
+func deleteEachItem(
+	dynamicClient *dynamic.Client,
+	opCache operationNotSupportedCache,
+	gvr unversioned.GroupVersionResource,
+	namespace string,
+) error {
+	glog.V(4).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
+
+	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
+	if err != nil {
+		return err
+	}
+	if !listSupported {
+		return nil
+	}
+	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	for _, item := range unstructuredList.Items {
+		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.Name, nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// deleteAllContentForGroupVersionResource will use the dynamic client to delete each resource identified in gvr.
+// It returns an estimate of the time remaining before the remaing resources are deleted.
+// If estimate > 0, not all resources are guaranteed to be gone.
+func deleteAllContentForGroupVersionResource(
+	kubeClient clientset.Interface,
+	clientPool dynamic.ClientPool,
+	opCache operationNotSupportedCache,
+	gvr unversioned.GroupVersionResource,
+	namespace string,
+	namespaceDeletedAt unversioned.Time,
+) (int64, error) {
+	glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
+
+	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
+	estimate, err := estimateGracefulTermination(kubeClient, gvr, namespace, namespaceDeletedAt)
+	if err != nil {
+		glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - unable to estimate - namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
+		return estimate, err
+	}
+	glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - estimate - namespace: %s, gvr: %v, estimate: %v", namespace, gvr, estimate)
+
+	// get a client for this group version...
+	dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+	if err != nil {
+		glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - unable to get client - namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
+		return estimate, err
+	}
+
+	// first try to delete the entire collection
+	deleteCollectionSupported, err := deleteCollection(dynamicClient, opCache, gvr, namespace)
 	if err != nil {
 		return estimate, err
 	}
-	err = deleteServices(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteReplicationControllers(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	estimate, err = deletePods(kubeClient, namespace, before)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteSecrets(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteConfigMaps(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deletePersistentVolumeClaims(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteLimitRanges(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteResourceQuotas(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteEvents(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	// If experimental mode, delete all experimental resources for the namespace.
-	if containsVersion(versions, "extensions/v1beta1") {
-		resources, err := kubeClient.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
+
+	// delete collection was not supported, so we list and delete each item...
+	if !deleteCollectionSupported {
+		err = deleteEachItem(dynamicClient, opCache, gvr, namespace)
 		if err != nil {
 			return estimate, err
 		}
-		if containsResource(resources, "horizontalpodautoscalers") {
-			err = deleteHorizontalPodAutoscalers(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
-		}
-		if containsResource(resources, "ingresses") {
-			err = deleteIngress(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
-		}
-		if containsResource(resources, "daemonsets") {
-			err = deleteDaemonSets(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
-		}
-		if containsResource(resources, "jobs") {
-			err = deleteJobs(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
-		}
-		if containsResource(resources, "deployments") {
-			err = deleteDeployments(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
-		}
-		if containsResource(resources, "replicasets") {
-			err = deleteReplicaSets(kubeClient.Extensions(), namespace)
-			if err != nil {
-				return estimate, err
-			}
-		}
+	}
+
+	// verify there are no more remaining items
+	// it is not an error condition for there to be remaining items if local estimate is non-zero
+	glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - checking for no more items in namespace: %s, gvr: %v", namespace, gvr)
+	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
+	if err != nil {
+		glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - error verifying no items in namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
+		return estimate, err
+	}
+	if !listSupported {
+		return estimate, nil
+	}
+	glog.V(4).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining - namespace: %s, gvr: %v, items: %v", namespace, gvr, len(unstructuredList.Items))
+	if len(unstructuredList.Items) != 0 && estimate == int64(0) {
+		return estimate, fmt.Errorf("unexpected items still remain in namespace: %s for gvr: %v", namespace, gvr)
 	}
 	return estimate, nil
 }
 
+// deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
+// It returns an estimate of the time remaining before the remaing resources are deleted.
+// If estimate > 0, not all resources are guaranteed to be gone.
+func deleteAllContent(
+	kubeClient clientset.Interface,
+	clientPool dynamic.ClientPool,
+	opCache operationNotSupportedCache,
+	groupVersionResources []unversioned.GroupVersionResource,
+	namespace string,
+	namespaceDeletedAt unversioned.Time,
+) (int64, error) {
+	estimate := int64(0)
+	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
+	// iterate over each group version, and attempt to delete all of its resources
+	for _, gvr := range groupVersionResources {
+		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt)
+		if err != nil {
+			return estimate, err
+		}
+		if gvrEstimate > estimate {
+			estimate = gvrEstimate
+		}
+	}
+	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
+	return estimate, nil
+}
+
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) error {
+func syncNamespace(
+	kubeClient clientset.Interface,
+	clientPool dynamic.ClientPool,
+	opCache operationNotSupportedCache,
+	groupVersionResources []unversioned.GroupVersionResource,
+	namespace *api.Namespace,
+	finalizerToken api.FinalizerName,
+) error {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -211,7 +353,7 @@ func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVers
 		return err
 	}
 
-	glog.V(4).Infof("Syncing namespace %s", namespace.Name)
+	glog.V(4).Infof("namespace controller - syncNamespace - namespace: %s, finalizerToken: %s", namespace.Name, finalizerToken)
 
 	// ensure that the status is up to date on the namespace
 	// if we get a not found error, we assume the namespace is truly gone
@@ -233,7 +375,7 @@ func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVers
 	}
 
 	// there may still be content for us to remove
-	estimate, err := deleteAllContent(kubeClient, versions, namespace.Name, *namespace.DeletionTimestamp)
+	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp)
 	if err != nil {
 		return err
 	}
@@ -242,7 +384,7 @@ func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVers
 	}
 
 	// we have removed content, so mark it finalized by us
-	result, err := retryOnConflictError(kubeClient, namespace, finalizeNamespaceFunc)
+	result, err := retryOnConflictError(kubeClient, namespace, finalizeNamespaceFunc(finalizerToken))
 	if err != nil {
 		// in normal practice, this should not be possible, but if a deployment is running
 		// two controllers to do namespace deletion that share a common finalizer token it's
@@ -264,125 +406,75 @@ func syncNamespace(kubeClient clientset.Interface, versions *unversioned.APIVers
 	return nil
 }
 
-func deleteLimitRanges(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().LimitRanges(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteResourceQuotas(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().ResourceQuotas(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteServiceAccounts(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().ServiceAccounts(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteServices(kubeClient clientset.Interface, ns string) error {
-	items, err := kubeClient.Core().Services(ns).List(api.ListOptions{})
+// estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
+func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionResource unversioned.GroupVersionResource, ns string, namespaceDeletedAt unversioned.Time) (int64, error) {
+	groupResource := groupVersionResource.GroupResource()
+	glog.V(4).Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)
+	estimate := int64(0)
+	var err error
+	switch groupResource {
+	case unversioned.GroupResource{Group: "", Resource: "pods"}:
+		estimate, err = estimateGracefulTerminationForPods(kubeClient, ns)
+	}
 	if err != nil {
-		return err
+		return estimate, err
 	}
-	for i := range items.Items {
-		err := kubeClient.Core().Services(ns).Delete(items.Items[i].Name, nil)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
+	// determine if the estimate is greater than the deletion timestamp
+	duration := time.Since(namespaceDeletedAt.Time)
+	allowedEstimate := time.Duration(estimate) * time.Second
+	if duration >= allowedEstimate {
+		estimate = int64(0)
 	}
-	return nil
+	return estimate, nil
 }
 
-func deleteReplicationControllers(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().ReplicationControllers(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deletePods(kubeClient clientset.Interface, ns string, before unversioned.Time) (int64, error) {
+// estimateGracefulTerminationForPods determines the graceful termination period for pods in the namespace
+func estimateGracefulTerminationForPods(kubeClient clientset.Interface, ns string) (int64, error) {
+	glog.V(4).Infof("namespace controller - estimateGracefulTerminationForPods - namespace %s", ns)
+	estimate := int64(0)
 	items, err := kubeClient.Core().Pods(ns).List(api.ListOptions{})
 	if err != nil {
-		return 0, err
+		return estimate, err
 	}
-	expired := unversioned.Now().After(before.Time)
-	var deleteOptions *api.DeleteOptions
-	if expired {
-		deleteOptions = api.NewDeleteOptions(0)
-	}
-	estimate := int64(0)
 	for i := range items.Items {
+		// filter out terminal pods
+		phase := items.Items[i].Status.Phase
+		if api.PodSucceeded == phase || api.PodFailed == phase {
+			continue
+		}
 		if items.Items[i].Spec.TerminationGracePeriodSeconds != nil {
 			grace := *items.Items[i].Spec.TerminationGracePeriodSeconds
 			if grace > estimate {
 				estimate = grace
 			}
 		}
-		err := kubeClient.Core().Pods(ns).Delete(items.Items[i].Name, deleteOptions)
-		if err != nil && !errors.IsNotFound(err) {
-			return 0, err
-		}
-	}
-	if expired {
-		estimate = 0
 	}
 	return estimate, nil
 }
 
-func deleteEvents(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().Events(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteSecrets(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().Secrets(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteConfigMaps(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().ConfigMaps(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deletePersistentVolumeClaims(kubeClient clientset.Interface, ns string) error {
-	return kubeClient.Core().PersistentVolumeClaims(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteHorizontalPodAutoscalers(expClient unversionedextensions.ExtensionsInterface, ns string) error {
-	return expClient.HorizontalPodAutoscalers(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteDaemonSets(expClient unversionedextensions.ExtensionsInterface, ns string) error {
-	return expClient.DaemonSets(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteJobs(expClient unversionedextensions.ExtensionsInterface, ns string) error {
-	return expClient.Jobs(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteDeployments(expClient unversionedextensions.ExtensionsInterface, ns string) error {
-	return expClient.Deployments(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteReplicaSets(expClient unversionedextensions.ExtensionsInterface, ns string) error {
-	return expClient.ReplicaSets(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-func deleteIngress(expClient unversionedextensions.ExtensionsInterface, ns string) error {
-	return expClient.Ingresses(ns).DeleteCollection(nil, api.ListOptions{})
-}
-
-// TODO: this is duplicated logic.  Move it somewhere central?
-func containsVersion(versions *unversioned.APIVersions, version string) bool {
-	for ix := range versions.Versions {
-		if versions.Versions[ix] == version {
-			return true
+// ServerPreferredNamespacedGroupVersionResources uses the specified client to discover the set of preferred groupVersionResources that are namespaced
+func ServerPreferredNamespacedGroupVersionResources(discoveryClient client.DiscoveryInterface) ([]unversioned.GroupVersionResource, error) {
+	results := []unversioned.GroupVersionResource{}
+	serverGroupList, err := discoveryClient.ServerGroups()
+	if err != nil {
+		return results, err
+	}
+	for _, apiGroup := range serverGroupList.Groups {
+		preferredVersion := apiGroup.PreferredVersion
+		apiResourceList, err := discoveryClient.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
+		if err != nil {
+			return results, err
+		}
+		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
+		for _, apiResource := range apiResourceList.APIResources {
+			if !apiResource.Namespaced {
+				continue
+			}
+			if strings.Contains(apiResource.Name, "/") {
+				continue
+			}
+			results = append(results, groupVersion.WithResource(apiResource.Name))
 		}
 	}
-	return false
-}
-
-// TODO: this is duplicated logic.  Move it somewhere central?
-func containsResource(resources *unversioned.APIResourceList, resourceName string) bool {
-	if resources == nil {
-		return false
-	}
-	for ix := range resources.APIResources {
-		resource := resources.APIResources[ix]
-		if resource.Name == resourceName {
-			return true
-		}
-	}
-	return false
+	return results, nil
 }

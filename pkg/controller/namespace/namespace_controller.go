@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,23 +39,37 @@ import (
 type NamespaceController struct {
 	// client that purges namespace content, must have list/delete privileges on all content
 	kubeClient clientset.Interface
+	// clientPool manages a pool of dynamic clients
+	clientPool dynamic.ClientPool
 	// store that holds the namespaces
 	store cache.Store
 	// controller that observes the namespaces
 	controller *framework.Controller
 	// namespaces that have been queued up for processing by workers
 	queue *workqueue.Type
-	// list of versions to process
-	versions *unversioned.APIVersions
+	// list of preferred group versions and their corresponding resource set for namespace deletion
+	groupVersionResources []unversioned.GroupVersionResource
+	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
+	opCache operationNotSupportedCache
+	// finalizerToken is the finalizer token managed by this controller
+	finalizerToken api.FinalizerName
 }
 
 // NewNamespaceController creates a new NamespaceController
-func NewNamespaceController(kubeClient clientset.Interface, versions *unversioned.APIVersions, resyncPeriod time.Duration) *NamespaceController {
+func NewNamespaceController(
+	kubeClient clientset.Interface,
+	clientPool dynamic.ClientPool,
+	groupVersionResources []unversioned.GroupVersionResource,
+	resyncPeriod time.Duration,
+	finalizerToken api.FinalizerName) *NamespaceController {
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		kubeClient: kubeClient,
-		versions:   versions,
+		clientPool: clientPool,
 		queue:      workqueue.New(),
+		groupVersionResources: groupVersionResources,
+		opCache:               operationNotSupportedCache{},
+		finalizerToken:        finalizerToken,
 	}
 
 	// configure the backing store/controller
@@ -144,7 +159,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*api.Namespace)
-	return syncNamespace(nm.kubeClient, nm.versions, namespace)
+	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResources, namespace, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.
