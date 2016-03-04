@@ -83,12 +83,26 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 	}
 }
 
+func (c *Client) Subresource(resource *unversioned.APIResource, subresource string, namespace string) *SubresourceClient {
+	return &SubresourceClient{
+		ResourceClient: c.Resource(resource, namespace),
+		subresource:    subresource,
+	}
+}
+
 // ResourceClient is an API interface to a specific resource under a
 // dynamic client.
 type ResourceClient struct {
 	cl       *restclient.RESTClient
 	resource *unversioned.APIResource
 	ns       string
+}
+
+// SubresourceClient is an API interface to a specific subresource of a resource under a
+// dynamic client.
+type SubresourceClient struct {
+	*ResourceClient
+	subresource string
 }
 
 // namespace applies a namespace to the request if the configured
@@ -115,9 +129,7 @@ func (rc *ResourceClient) List(opts v1.ListOptions) (*runtime.UnstructuredList, 
 // Get gets the resource with the specified name.
 func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	err := rc.namespace(rc.cl.Get()).
-		Resource(rc.resource.Name).
-		Name(name).
+	err := rc.get(name).
 		Do().
 		Into(result)
 	return result, err
@@ -157,13 +169,11 @@ func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructur
 // Update updates the provided resource.
 func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	if len(obj.Name) == 0 {
-		return result, errors.New("object missing name")
+	req, err := rc.update(obj)
+	if err != nil {
+		return result, err
 	}
-	err := rc.namespace(rc.cl.Put()).
-		Resource(rc.resource.Name).
-		Name(obj.Name).
-		Body(obj).
+	err = req.
 		Do().
 		Into(result)
 	return result, err
@@ -175,6 +185,46 @@ func (rc *ResourceClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource(rc.resource.Name).
 		VersionedParams(&opts, parameterEncoder).
 		Watch()
+}
+
+// Get gets the resource with the specified name.
+func (src *SubresourceClient) Get(name string) (*runtime.Unstructured, error) {
+	result := new(runtime.Unstructured)
+	err := src.get(name).
+		SubResource(src.subresource).
+		Do().
+		Into(result)
+	return result, err
+}
+
+// Update updates the provided subresource.
+func (src *SubresourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
+	result := new(runtime.Unstructured)
+	req, err := src.update(obj)
+	if err != nil {
+		return result, err
+	}
+	err = req.SubResource(src.subresource).
+		Do().
+		Into(result)
+	return result, err
+}
+
+func (rc *ResourceClient) get(name string) *client.Request {
+	return rc.namespace(rc.cl.Get()).
+		Resource(rc.resource.Name).
+		Name(name)
+}
+
+// Update updates the provided resource.
+func (rc *ResourceClient) update(obj *runtime.Unstructured) (*client.Request, error) {
+	if len(obj.Name) == 0 {
+		return nil, errors.New("object missing name")
+	}
+	return rc.namespace(rc.cl.Put()).
+		Resource(rc.resource.Name).
+		Name(obj.Name).
+		Body(obj), nil
 }
 
 // dynamicCodec is a codec that wraps the standard unstructured codec

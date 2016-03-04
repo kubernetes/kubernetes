@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -328,8 +330,37 @@ func (tc *testCase) verifyResults(t *testing.T) {
 	}
 }
 
+func getScaleClientServer(handler func(http.ResponseWriter, *http.Request)) (*scaleclient.Client, *httptest.Server, error) {
+	gv := &unversioned.GroupVersion{Group: "testgroup", Version: "testversion"}
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	cl, err := scaleclient.NewClient(&client.Config{
+		Host:          srv.URL,
+		ContentConfig: client.ContentConfig{GroupVersion: gv},
+	})
+	if err != nil {
+		srv.Close()
+		return nil, nil, err
+	}
+	return cl, srv, nil
+}
+
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
+
+	scaleClient, scaleSrvr, err := getScaleClientServer(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("List(%q) got HTTP method %s. wanted GET", tc.name, r.Method)
+		}
+
+		if r.URL.Path != tc.path {
+			t.Errorf("List(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
+		}
+
+		w.Write(tc.resp)
+	})
+	defer scaleSrvr.Close()
+	assert.Equal(t, nil, err)
+
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
 	broadcaster := record.NewBroadcasterForTests(0)
