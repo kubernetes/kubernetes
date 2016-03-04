@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Update all Jenkins jobs in a folder. If no folder is provided in $1,
-# defaults to hack/jenkins/job-configs.
+# Update all Jenkins jobs in a folder specified in $1. It can be the union of
+# multiple folders separated with a colon, like with the PATH variable.
 
 if [[ $# -eq 1 ]]; then
   config_dir=$1
 else
-  config_dir="hack/jenkins/job-configs"
+  echo "Usage: $0 <dir>" >&2
+  exit 1
 fi
 
 # Run the container if it isn't present.
