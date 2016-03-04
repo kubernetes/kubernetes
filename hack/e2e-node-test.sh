@@ -14,8 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+kube::golang::setup_env
+
+ginkgo=$(kube::util::find-binary "ginkgo")
+if [[ -z "${ginkgo}" ]]; then
+  echo "You do not appear to have ginkgo built. Try 'hack/build-go.sh github.com/onsi/ginkgo/ginkgo'"
+  exit 1
+fi
+
 # Provided for backwards compatibility
 sudo -v
-ginkgo "$(dirname $0)/../test/e2e_node/" -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true --start-services=true --stop-services=true
+"${ginkgo}" "${KUBE_ROOT}/test/e2e_node/" -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true --start-services=true --stop-services=true
 
 exit $?
