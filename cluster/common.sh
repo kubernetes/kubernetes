@@ -427,6 +427,15 @@ function build-runtime-config() {
   :
 }
 
+# Writes the cluster name into a temporary file.
+# Assumed vars
+#   CLUSTER_NAME
+function write-cluster-name {
+  cat >"${KUBE_TEMP}/cluster-name.txt" << EOF
+${CLUSTER_NAME}
+EOF
+}
+
 function write-master-env {
   # If the user requested that the master be part of the cluster, set the
   # environment variable to program the master kubelet to register itself.
