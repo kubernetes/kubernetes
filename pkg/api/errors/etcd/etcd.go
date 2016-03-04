@@ -69,6 +69,8 @@ func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource
 		return errors.NewConflict(qualifiedResource, name, err)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "update", 2) // TODO: make configurable or handled at a higher level
+	case storage.IsNotFound(err):
+		return errors.NewNotFound(qualifiedResource, name)
 	default:
 		return err
 	}
