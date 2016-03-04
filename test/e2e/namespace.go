@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -74,6 +75,57 @@ func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds in
 		}))
 }
 
+func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *Framework) {
+	var err error
+
+	By("Creating a test namespace")
+	namespace, err := f.CreateNamespace("nsdeletetest", nil)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Waiting for a default service account to be provisioned in namespace")
+	err = waitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Creating a pod in the namespace")
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "test-pod",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "nginx",
+					Image: "gcr.io/google_containers/pause:2.0",
+				},
+			},
+		},
+	}
+	pod, err = f.Client.Pods(namespace.Name).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Waiting for the pod to have running status")
+	expectNoError(waitForPodRunningInNamespace(f.Client, pod.Name, pod.Namespace))
+
+	By("Deleting the namespace")
+	err = f.Client.Namespaces().Delete(namespace.Name)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Waiting for the namespace to be removed")
+	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
+	expectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
+		func() (bool, error) {
+			_, err = f.Client.Namespaces().Get(namespace.Name)
+			if err != nil && errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}))
+
+	By("Verifying there is no pod in the namespace")
+	_, err = f.Client.Pods(namespace.Name).Get(pod.Name)
+	Expect(err).To(HaveOccurred())
+}
+
 // This test must run [Serial] due to the impact of running other parallel
 // tests can have on its performance.  Each test that follows the common
 // test framework follows this pattern:
@@ -112,4 +164,8 @@ var _ = Describe("Namespaces [Serial]", func() {
 	// On hold until etcd3; see #7372
 	It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
 		func() { extinguish(f, 100, 0, 150) })
+
+	It("should ensure that all pods are removed when a namespace is deleted.",
+		func() { ensurePodsAreRemovedWhenNamespaceIsDeleted(f) })
+
 })
