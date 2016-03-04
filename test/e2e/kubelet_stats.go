@@ -406,6 +406,27 @@ func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
 	return result, nil
 }
 
+func PrintAllKubeletPods(c *client.Client, nodeName string) {
+	result, err := nodeProxyRequest(c, nodeName, "pods")
+	if err != nil {
+		Logf("Unable to retrieve kubelet pods for node %v", nodeName)
+		return
+	}
+	podList := &api.PodList{}
+	err = result.Into(podList)
+	if err != nil {
+		Logf("Unable to cast result to pods for node %v", nodeName)
+		return
+	}
+	for _, p := range podList.Items {
+		Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
+		for _, c := range p.Status.ContainerStatuses {
+			Logf("\tContainer %v ready: %v, restart count %v",
+				c.Name, c.Ready, c.RestartCount)
+		}
+	}
+}
+
 func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapi.ContainerStats) *containerResourceUsage {
 	return &containerResourceUsage{
 		Name:                    name,
