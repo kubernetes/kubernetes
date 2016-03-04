@@ -248,6 +248,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			ParameterCodec:         api.ParameterCodec,
 			NegotiatedSerializer:   api.Codecs,
 		}
+		if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
+			apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
+				"deployments/scale": autoscalingGroupVersion.WithKind("Scale"),
+				"replicasets/scale": autoscalingGroupVersion.WithKind("Scale"),
+			}
+		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
 		extensionsGVForDiscovery := unversioned.GroupVersionForDiscovery{
@@ -716,9 +722,11 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
-		// TODO(madhusudancs): Install scale when Scale group issues are fixed (see issue #18528).
-		// storage["deployments/scale"] = deploymentStorage.Scale
 		storage["deployments/rollback"] = deploymentStorage.Rollback
+
+		if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+			storage["deployments/scale"] = deploymentStorage.Scale
+		}
 	}
 	if isEnabled("jobs") {
 		m.constructJobResources(c, storage)
@@ -736,6 +744,9 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
+		if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+			storage["replicasets/scale"] = replicaSetStorage.Scale
+		}
 	}
 
 	return storage
