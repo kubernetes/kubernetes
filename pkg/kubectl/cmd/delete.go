@@ -116,6 +116,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		SelectAllParam(deleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
+		Latest().
 		Do()
 	err = r.Err()
 	if err != nil {
@@ -123,17 +124,6 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	ignoreNotFound := cmdutil.GetFlagBool(cmd, "ignore-not-found")
-	if deleteAll {
-		f := cmd.Flags().Lookup("ignore-not-found")
-		// The flag should never be missing
-		if f == nil {
-			return fmt.Errorf("missing --ignore-not-found flag")
-		}
-		// If the user didn't explicitly set the option, default to ignoring NotFound errors when used with --all
-		if !f.Changed {
-			ignoreNotFound = true
-		}
-	}
 
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	// By default use a reaper to delete all related resources.
@@ -166,6 +156,14 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 			options = api.NewDeleteOptions(int64(gracePeriod))
 		}
 		if err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
+			// We intentionally ignore the NotFound error. Because if we reach
+			// here, we must have already validated the existence of the target
+			// object with RetrieveLatest(). If we get a NotFound error here,
+			// it's caused by a race between nodecontroller and apiserver. See
+			// issue #19403.
+			if errors.IsNotFound(err) {
+				return nil
+			}
 			return cmdutil.AddSourceToErr("stopping", info.Source, err)
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "deleted")
@@ -203,6 +201,14 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 
 func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
 	if err := resource.NewHelper(info.Client, info.Mapping).Delete(info.Namespace, info.Name); err != nil {
+		// We intentionally ignore the NotFound error. Because if we reach
+		// here, we must have already validated the existence of the target
+		// object with RetrieveLatest(). If we get a NotFound error here,
+		// it's caused by a race between nodecontroller and apiserver. See
+		// issue #19403.
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "deleted")

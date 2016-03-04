@@ -102,6 +102,8 @@ func TestDeleteObject(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
@@ -125,45 +127,109 @@ func TestDeleteObject(t *testing.T) {
 	}
 }
 
+type fakeResponseFunc func(req *http.Request) (*http.Response, error)
+
 func TestDeleteObjectNotFound(t *testing.T) {
+	_, _, rc := testData()
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdDelete(f, buf)
-	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml"},
+	notFoundError := &errors.NewNotFound(api.Resource("replicationcontrollers"), "redis-master").(*errors.StatusError).ErrStatus
+
+	tests := []struct {
+		Name             string
+		Func             fakeResponseFunc
+		ExpectNotFound   bool
+		ExpectOtherError bool
+	}{
+		{
+			"GET succeeds, DELETE fails with 400 BadRequest error",
+			func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+					return &http.Response{StatusCode: 400, Body: stringBody("this is a bad request")}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			},
+			false,
+			true,
+		},
+		{
+			"GET succeeds, DELETE fails with a 404 NotFound error",
+			func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+					return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			},
+			false,
+			false,
+		},
+		{
+			"GET fails with a 404 NotFound error, DELETE shouldn't matter",
+			func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+					return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+				case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+					return &http.Response{StatusCode: 200, Body: stringBody("this shoudn't matter")}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			},
+			true,
+			false,
+		},
 	}
-	cmd.Flags().Set("cascade", "false")
-	cmd.Flags().Set("output", "name")
-	err := RunDelete(f, buf, cmd, []string{}, options)
-	if err == nil || !errors.IsNotFound(err) {
-		t.Errorf("unexpected error: expected NotFound, got %v", err)
+
+	for _, test := range tests {
+		tf.Client = &fake.RESTClient{
+			Codec:  codec,
+			Client: fake.CreateHTTPClient(test.Func),
+		}
+		buf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdDelete(f, buf)
+		options := &DeleteOptions{
+			Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml"},
+		}
+		cmd.Flags().Set("cascade", "false")
+		cmd.Flags().Set("output", "name")
+		err := RunDelete(f, buf, cmd, []string{}, options)
+		if test.ExpectNotFound && (err == nil || !strings.Contains(err.Error(), "not found")) {
+			t.Errorf("case: %q, expect error NotFound, got %v", test.Name, err)
+		}
+		if test.ExpectOtherError && (err == nil || errors.IsNotFound(err)) {
+			t.Errorf("case: %q, expect an error that is not NotFound, got: %v", test.Name, err)
+		}
+		if !test.ExpectNotFound && !test.ExpectOtherError && err != nil {
+			t.Errorf("case: %q, unexpected error: %v", test.Name, err)
+		}
 	}
 }
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
+	notFoundError := &errors.NewNotFound(api.Resource("replicationcontrollers"), "redis-master").(*errors.StatusError).ErrStatus
+
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -180,12 +246,12 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "" {
+	if buf.String() != "No resources found\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
-func TestDeleteAllNotFound(t *testing.T) {
+func TestDeleteAllAlwaysIgnoreNotFound(t *testing.T) {
 	_, svc, _ := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -217,51 +283,23 @@ func TestDeleteAllNotFound(t *testing.T) {
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("all", "true")
 	cmd.Flags().Set("cascade", "false")
-	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
-	cmd.Flags().Set("ignore-not-found", "false")
 	cmd.Flags().Set("output", "name")
-
 	err := RunDelete(f, buf, cmd, []string{"services"}, &DeleteOptions{})
-	if err == nil || !errors.IsNotFound(err) {
+	if err != nil {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
-}
-
-func TestDeleteAllIgnoreNotFound(t *testing.T) {
-	_, svc, _ := testData()
-
-	f, tf, codec := NewAPIFactory()
-
-	// Add an item to the list which will result in a 404 on delete
-	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
-	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").(*errors.StatusError).ErrStatus
-
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/services" && m == "GET":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
-			case p == "/namespaces/test/services/foo" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
-			case p == "/namespaces/test/services/baz" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
+	if buf.String() != "service/baz\n" {
+		t.Errorf("unexpected output: %s", buf.String())
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("all", "true")
-	cmd.Flags().Set("cascade", "false")
-	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{"services"})
-
+	// With --all, even if the --ignore-not-found is explicitly set to false,
+	// NotFound errors are ignored.
+	buf.Reset()
+	cmd.Flags().Set("ignore-not-found", "false")
+	err = RunDelete(f, buf, cmd, []string{"services"}, &DeleteOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: expected NotFound, got %v", err)
+	}
 	if buf.String() != "service/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
@@ -276,9 +314,9 @@ func TestDeleteMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/services/frontend" && m == "DELETE":
+			case p == "/namespaces/test/services/frontend" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -303,6 +341,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 
 func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	_, svc, _ := testData()
+	notFoundError := &errors.NewNotFound(api.Resource("replicationcontrollers"), "redis-master").(*errors.StatusError).ErrStatus
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -310,9 +349,9 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
-			case p == "/namespaces/test/services/frontend" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+			case p == "/namespaces/test/services/frontend" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -330,7 +369,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	err := RunDelete(f, buf, cmd, []string{}, options)
-	if err == nil || !errors.IsNotFound(err) {
+	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
 
@@ -383,9 +422,9 @@ func TestDeleteDirectory(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/namespaces/test/services/") && m == "DELETE":
+			case strings.HasPrefix(p, "/namespaces/test/services/") && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == "DELETE":
+			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -409,6 +448,7 @@ func TestDeleteDirectory(t *testing.T) {
 
 func TestDeleteMultipleSelector(t *testing.T) {
 	pods, svc, _ := testData()
+	notFoundError := &errors.NewNotFound(api.Resource("pods"), "bar").(*errors.StatusError).ErrStatus
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -426,8 +466,12 @@ func TestDeleteMultipleSelector(t *testing.T) {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
-			case strings.HasPrefix(p, "/namespaces/test/pods/") && m == "DELETE":
+			case strings.HasPrefix(p, "/namespaces/test/pods/foo") && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+			case strings.HasPrefix(p, "/namespaces/test/pods/bar") && m == "DELETE":
+				// When using a label selector to delete pods, NotFound error
+				// during delete should be ignored.
+				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
 			case strings.HasPrefix(p, "/namespaces/test/services/") && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
@@ -445,7 +489,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	if buf.String() != "pod/foo\npod/bar\nservice/baz\n" {
+	if buf.String() != "pod/foo\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
