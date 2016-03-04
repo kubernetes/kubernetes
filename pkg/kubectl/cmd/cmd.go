@@ -115,6 +115,7 @@ __custom_func() {
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	valid_resources = `Valid resource types include:
    * componentstatuses (aka 'cs')
+   * configmaps
    * daemonsets (aka 'ds')
    * deployments
    * events (aka 'ev')
