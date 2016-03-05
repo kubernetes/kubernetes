@@ -70,6 +70,13 @@ First, you need to install some of the dependencies with
 npm install
 ```
 
+If you want to choose your location run:
+
+``` sh
+# https://azure.microsoft.com/en-us/regions/
+export AZ_LOCATION=<desired_location_value>
+```
+
 Now, all you need to do is:
 
 ```sh
