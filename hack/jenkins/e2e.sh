@@ -39,9 +39,24 @@ function join_regex_no_empty() {
     fi
 }
 
+# Print an error message and exit with status 1.
+function error_exit() {
+  echo "$1" 1>&2
+  exit 1
+}
+
 # GCP Project to fetch Trusty images.
 function get_trusty_image_project() {
-  gsutil cat "gs://trusty-images/image-project.txt"
+  local project=""
+  # Retry the gsutil command a couple times to mitigate the effect of
+  # transient server errors.
+  for n in $(seq 3); do
+    project="$(gsutil cat "gs://trusty-images/image-project.txt")" && break || sleep 1
+  done
+  if [[ -z "${project}" ]]; then
+    error_exit "Failed to find the image project for Trusty images."
+  fi
+  echo "${project}"
   # Clean up gsutil artifacts otherwise the later test stage will complain.
   rm -rf .config &> /dev/null
   rm -rf .gsutil &> /dev/null
@@ -60,7 +75,17 @@ function get_latest_trusty_image() {
     elif [[ "${image_type}" == stable ]]; then
       image_index="trusty-stable"
     fi
-    gsutil cat "gs://${TRUSTY_IMAGE_PROJECT}/image-indices/latest-test-image-${image_index}"
+
+    local image=""
+    # Retry the gsutil command a couple times to mitigate the effect of
+    # transient server errors.
+    for n in $(seq 3); do
+      image="$(gsutil cat "gs://${TRUSTY_IMAGE_PROJECT}/image-indices/latest-test-image-${image_index}")" && break || sleep 1
+    done
+    if [[ -z "${image}" ]]; then
+      error_exit "Failed to find Trusty image for ${image_type}"
+    fi
+    echo "${image}"
     # Clean up gsutil artifacts otherwise the later test stage will complain.
     rm -rf .config &> /dev/null
     rm -rf .gsutil &> /dev/null
@@ -102,8 +127,7 @@ function configure_upgrade_step() {
   local -r project="$4"
 
   [[ "${JOB_NAME}" =~ .*-(step[1-7])-.* ]] || {
-    echo "JOB_NAME ${JOB_NAME} is not a valid upgrade job name, could not parse"
-    exit 1
+    error_exit "JOB_NAME ${JOB_NAME} is not a valid upgrade job name, could not parse"
   }
   local -r step="${BASH_REMATCH[1]}"
 
