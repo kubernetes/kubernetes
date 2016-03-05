@@ -31,7 +31,7 @@ ENV DO_NOT_INSTALL_CATCH_ALL_CONFIG true
 RUN apt-get -q update && \
     apt-get install -y curl && \
     apt-get clean && \
-    curl -s https://storage.googleapis.com/signals-agents/logging/google-fluentd-install.sh | sudo bash
+    curl -s https://dl.google.com/cloudagents/install-logging-agent.sh | bash
 
 # Install the record reformer plugin.
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer
