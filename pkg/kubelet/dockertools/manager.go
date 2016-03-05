@@ -345,6 +345,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		Hash:         hash,
 	}
 	if iResult.State.Running {
+		// Container that are running, restarting and paused
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = iResult.State.StartedAt
 		if containerName == PodInfraContainerName {
@@ -355,6 +356,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 	// Find containers that have exited or failed to start.
 	if !iResult.State.FinishedAt.IsZero() || iResult.State.ExitCode != 0 {
+		// Containers that are exited, dead or created (docker failed to start container)
 		// When a container fails to start State.ExitCode is non-zero, FinishedAt and StartedAt are both zero
 		reason := ""
 		message := iResult.State.Error
@@ -394,8 +396,8 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.StartedAt = startedAt
 		status.FinishedAt = finishedAt
 	} else {
-		// Non-running containers that are not terminatd could be pasued, or created (but not yet
-		// started), etc. Kubelet doesn't handle these scenarios yet.
+		// Non-running containers that are created (not yet started or kubelet failed before calling
+		// start container function etc.) Kubelet doesn't handle these scenarios yet.
 		status.State = kubecontainer.ContainerStateUnknown
 	}
 	return &status, "", nil
