@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/integer"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
@@ -346,6 +347,9 @@ func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 }
 
 func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
+	if !controller.IsPodActive(*pod) {
+		return false
+	}
 	// Check if we've passed minReadySeconds since LastTransitionTime
 	// If so, this pod is ready
 	for _, c := range pod.Status.Conditions {
