@@ -16,7 +16,10 @@ limitations under the License.
 
 package errors
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Aggregate represents an object that contains multiple errors, but does not
 // necessarily have singular semantic meaning.
@@ -148,3 +151,6 @@ func AggregateGoroutines(funcs ...func() error) Aggregate {
 	}
 	return NewAggregate(errs)
 }
+
+// ErrPreconditionViolated is returned when the precondition is violated
+var ErrPreconditionViolated = errors.New("precondition is violated")

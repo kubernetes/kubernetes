@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -188,27 +189,32 @@ func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interf
 	}))
 	rsUpdated := false
 	// 1. Add hash template label to the rs. This ensures that any newly created pods will have the new label.
-	if len(updatedRS.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
-		updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
-			updated.Spec.Template.Labels = labelsutil.AddLabel(updated.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("error updating %s %s/%s pod template label with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
-		}
-		if rsUpdated {
-			// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
-			if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
-				if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
-					return nil, fmt.Errorf("error waiting for %s %s/%s generation %d observed by controller: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, updatedRS.Generation, err)
-				}
+	updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS,
+		func(updated *extensions.ReplicaSet) error {
+			// Precondition: the RS doesn't contain the new hash in its pod template label.
+			if updated.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
+				return errors.ErrPreconditionViolated
 			}
-			glog.V(4).Infof("Observed the update of %s %s/%s's pod template with hash %s.", rs.Kind, rs.Namespace, rs.Name, hash)
-		} else {
-			// If RS wasn't updated but didn't return error in step 1, we've hit a RS not found error.
-			// Return here and retry in the next sync loop.
-			return &rs, nil
-		}
+			updated.Spec.Template.Labels = labelsutil.AddLabel(updated.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
+			return nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("error updating %s %s/%s pod template label with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
 	}
+	if rsUpdated {
+		// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
+		if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
+			if err = waitForReplicaSetUpdated(c, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
+				return nil, fmt.Errorf("error waiting for %s %s/%s generation %d observed by controller: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, updatedRS.Generation, err)
+			}
+		}
+		glog.V(4).Infof("Observed the update of %s %s/%s's pod template with hash %s.", rs.Kind, rs.Namespace, rs.Name, hash)
+	} else {
+		// If RS wasn't updated but didn't return error in step 1, we've hit a RS not found error.
+		// Return here and retry in the next sync loop.
+		return &rs, nil
+	}
+	glog.V(4).Infof("Observed the update of rs %s's pod template with hash %s.", rs.Name, hash)
 
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
 	selector, err := unversioned.LabelSelectorAsSelector(updatedRS.Spec.Selector)
@@ -232,10 +238,16 @@ func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interf
 
 	// 3. Update rs label and selector to include the new hash label
 	// Copy the old selector, so that we can scrub out any orphaned pods
-	if updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS, func(updated *extensions.ReplicaSet) {
-		updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
-		updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
-	}); err != nil {
+	if updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS,
+		func(updated *extensions.ReplicaSet) error {
+			// Precondition: the RS doesn't contain the new hash in its label or selector.
+			if updated.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash && updated.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
+				return errors.ErrPreconditionViolated
+			}
+			updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
+			updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
+			return nil
+		}); err != nil {
 		return nil, fmt.Errorf("error updating %s %s/%s label and selector with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
 	}
 	if rsUpdated {
@@ -265,14 +277,20 @@ func labelPodsWithHash(podList *api.PodList, rs *extensions.ReplicaSet, c client
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), &pod, func(podToUpdate *api.Pod) {
-				podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
-			}); err != nil {
+			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), &pod,
+				func(podToUpdate *api.Pod) error {
+					// Precondition: the pod doesn't contain the new hash in its label.
+					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
+						return errors.ErrPreconditionViolated
+					}
+					podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
+					return nil
+				}); err != nil {
 				return false, fmt.Errorf("error in adding template hash label %s to pod %+v: %s", hash, pod, err)
 			} else if podUpdated {
 				glog.V(4).Infof("Labeled %s %s/%s of %s %s/%s with hash %s.", pod.Kind, pod.Namespace, pod.Name, rs.Kind, rs.Namespace, rs.Name, hash)
 			} else {
-				// If the pod wasn't updated but didn't return error when we try to update it, we've hit a pod not found error.
+				// If the pod wasn't updated but didn't return error when we try to update it, we've hit "pod not found" or "precondition violated" error.
 				// Then we can't say all pods are labeled
 				allPodsLabeled = false
 			}
