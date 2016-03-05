@@ -44,7 +44,7 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0}
+	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0, http.DefaultClient}
 	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
@@ -114,7 +114,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		// TODO: Uncomment when fix #19254
 		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0}
+		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0, http.DefaultClient}
 		if err := c.extractFromURL(); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
@@ -293,7 +293,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		// TODO: Uncomment when fix #19254
 		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0}
+		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0, http.DefaultClient}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
@@ -341,7 +341,7 @@ func TestURLWithHeader(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")
-	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0}
+	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0, http.DefaultClient}
 	if err := c.extractFromURL(); err != nil {
 		t.Fatalf("Unexpected error extracting from URL: %v", err)
 	}
