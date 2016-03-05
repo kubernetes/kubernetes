@@ -1,16 +1,18 @@
-package scheduler
+package mock
 
 import (
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/mock"
+
+	. "github.com/mesos/mesos-go/scheduler"
 )
 
 type MockScheduler struct {
 	mock.Mock
 }
 
-func NewMockScheduler() *MockScheduler {
+func New() *MockScheduler {
 	return &MockScheduler{}
 }
 
