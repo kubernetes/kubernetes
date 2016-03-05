@@ -200,29 +200,29 @@ If you see your node as `NotReady` it's possible that your OS does not have memc
 1. Your kernel should support memory and swap accounting. Ensure that the
 following configs are turned on in your linux kernel:
 
-    ```console
-    CONFIG_RESOURCE_COUNTERS=y
-    CONFIG_MEMCG=y
-    CONFIG_MEMCG_SWAP=y
-    CONFIG_MEMCG_SWAP_ENABLED=y
-    CONFIG_MEMCG_KMEM=y
-    ```
+```console
+CONFIG_RESOURCE_COUNTERS=y
+CONFIG_MEMCG=y
+CONFIG_MEMCG_SWAP=y
+CONFIG_MEMCG_SWAP_ENABLED=y
+CONFIG_MEMCG_KMEM=y
+```
 
 2. Enable the memory and swap accounting in the kernel, at boot, as command line
 parameters as follows:
 
-    ```console
-    GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
-    ```
+```console
+GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
+```
 
     NOTE: The above is specifically for GRUB2.
     You can check the command line parameters passed to your kernel by looking at the
     output of /proc/cmdline:
 
-    ```console
-    $ cat /proc/cmdline
-    BOOT_IMAGE=/boot/vmlinuz-3.18.4-aufs root=/dev/sda5 ro cgroup_enable=memory swapaccount=1
-    ```
+```console
+$ cat /proc/cmdline
+BOOT_IMAGE=/boot/vmlinuz-3.18.4-aufs root=/dev/sda5 ro cgroup_enable=memory swapaccount=1
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()
