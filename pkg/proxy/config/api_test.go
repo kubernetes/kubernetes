@@ -61,7 +61,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	ch := make(chan ServiceUpdate)
 
-	newServicesSourceApiFromLW(lw, 30*time.Second, ch)
+	cache.NewReflector(lw, &api.Service{}, NewServiceStore(nil, ch), 30*time.Second).Run()
 
 	got, ok := <-ch
 	if !ok {
@@ -172,7 +172,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	ch := make(chan EndpointsUpdate)
 
-	newEndpointsSourceApiFromLW(lw, 30*time.Second, ch)
+	cache.NewReflector(lw, &api.Endpoints{}, NewEndpointsStore(nil, ch), 30*time.Second).Run()
 
 	got, ok := <-ch
 	if !ok {
