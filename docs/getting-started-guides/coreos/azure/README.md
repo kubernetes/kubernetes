@@ -77,6 +77,21 @@ Now, all you need to do is:
 ./create-kubernetes-cluster.js
 ```
 
+If a location error is returned after running
+'./create-kubernetes-cluster.js', return a list of available locations
+by running:
+
+```sh
+azure vm location list
+```
+
+Choose a suitable location, and then set the location variable by
+running:
+
+```sh
+export AZ_LOCATION='<your-location>'
+```
+
 This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes: 1 kubernetes master and 2 kubernetes nodes. The `kube-00` VM will be the master, your work loads are only to be deployed on the nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
 If you need to pass Azure specific options for the creation script you can do this via additional environment variables e.g.
 
