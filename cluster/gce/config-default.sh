@@ -22,6 +22,7 @@ source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
+REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}

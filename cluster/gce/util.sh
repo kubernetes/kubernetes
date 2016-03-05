@@ -133,10 +133,12 @@ function copy-to-staging() {
 # give us an API for this, so we hardcode it.
 #
 # Assumed vars:
-#   REGIONAL_RELEASE
+#   RELEASE_REGION_FALLBACK
+#   REGIONAL_KUBE_ADDONS
 #   ZONE
 # Vars set:
 #   PREFERRED_REGION
+#   KUBE_ADDON_REGISTRY
 function set-preferred-region() {
   case ${ZONE} in
     asia-*)
@@ -149,9 +151,19 @@ function set-preferred-region() {
       PREFERRED_REGION=("us" "eu" "asia")
       ;;
   esac
+  local -r preferred="${PREFERRED_REGION[0]}"
 
   if [[ "${RELEASE_REGION_FALLBACK}" != "true" ]]; then
-    PREFERRED_REGION=( "${PREFERRED_REGION[0]}" )
+    PREFERRED_REGION=( "${preferred}" )
+  fi
+
+  # If we're using regional GCR, and we're outside the US, go to the
+  # regional registry. The gcr.io/google_containers registry is
+  # appropriate for US (for now).
+  if [[ "${REGIONAL_KUBE_ADDONS}" == "true" ]] && [[ "${preferred}" != "us" ]]; then
+    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
+  else
+    KUBE_ADDON_REGISTRY="gcr.io/google_containers"
   fi
 }
 
