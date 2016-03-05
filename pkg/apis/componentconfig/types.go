@@ -417,7 +417,7 @@ type KubeControllerManagerConfiguration struct {
 	// but more CPU (and network) load.
 	ConcurrentDeploymentSyncs int `json:"concurrentDeploymentSyncs"`
 	// concurrentDaemonSetSyncs is the number of daemonset objects that are
-	// allowed to sync concurrently. Larger number = more responsive DaemonSet,
+	// allowed to sync concurrently. Larger number = more responsive daemonset,
 	// but more CPU (and network) load.
 	ConcurrentDaemonSetSyncs int `json:"concurrentDaemonSetSyncs"`
 	// concurrentJobSyncs is the number of job objects that are
@@ -427,12 +427,15 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentNamespaceSyncs is the number of namespace objects that are
 	// allowed to sync concurrently.
 	ConcurrentNamespaceSyncs int `json:"concurrentNamespaceSyncs"`
-	// LookupCacheSizeForRC is the size of lookup cache for replication controllers.
+	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
 	LookupCacheSizeForRC int `json:"lookupCacheSizeForRC"`
-	// LookupCacheSizeForRS is the size of lookup cache for replicatsets.
+	// lookupCacheSizeForRS is the size of lookup cache for replicatsets.
 	// Larger number = more responsive replica management, but more MEM load.
 	LookupCacheSizeForRS int `json:"lookupCacheSizeForRS"`
+	// lookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
+	// Larger number = more responsive daemonset, but more MEM load.
+	LookupCacheSizeForDaemonSet int `json:"lookupCacheSizeForDaemonSet"`
 	// serviceSyncPeriod is the period for syncing services with their external
 	// load balancers.
 	ServiceSyncPeriod unversioned.Duration `json:"serviceSyncPeriod"`
