@@ -539,6 +539,11 @@ EOF
 KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
 EOF
   fi
+  if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
+EOF
+  fi
   if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
     cat >>$file <<EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
