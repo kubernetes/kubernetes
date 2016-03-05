@@ -64,7 +64,7 @@ Guide](../admin/README.md).
 * **Hunting flaky tests** ([flaky-tests.md](flaky-tests.md)): We have a goal of 99.9% flake free tests.
   Here's how to run your tests many times.
 
-* **Logging Conventions** ([logging.md](logging.md)]: Glog levels.
+* **Logging Conventions** ([logging.md](logging.md)): Glog levels.
 
 * **Profiling Kubernetes** ([profiling.md](profiling.md)): How to plug in go pprof profiler to Kubernetes.
 
