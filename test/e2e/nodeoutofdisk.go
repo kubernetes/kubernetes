@@ -51,7 +51,7 @@ const (
 
 // Plan:
 // 1. Fill disk space on all nodes except one. One node is left out so that we can schedule pods
-//    on that node. Arbitrarily choose that node to be node with index 0.
+//    on that node. Arbitrarily choose that node to be node with index 0.  This makes this a disruptive test.
 // 2. Get the CPU capacity on unfilled node.
 // 3. Divide the available CPU into one less than the number of pods we want to schedule. We want
 //    to schedule 3 pods, so divide CPU capacity by 2.
@@ -64,7 +64,7 @@ const (
 // 7. Observe that the pod in pending status schedules on that node.
 //
 // Flaky issue #20015.  We have no clear path for how to test this functionality in a non-flaky way.
-var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
+var _ = Describe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", func() {
 	var c *client.Client
 	var unfilledNodeName, recoveredNodeName string
 	framework := NewDefaultFramework("node-outofdisk")
