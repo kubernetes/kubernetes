@@ -156,7 +156,7 @@
         export ZONE="us-central1-f"
         # By default, GKE tests run against the GKE test endpoint using CI Cloud SDK.
         # Release jobs (e.g. prod, staging, and test) override these two variables.
-        export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/staging"
+        export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/ci/staging"
         export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://test-container.sandbox.googleapis.com/"
         export FAIL_ON_GCP_RESOURCE_LEAK="true"
     aws-provider-env: |
