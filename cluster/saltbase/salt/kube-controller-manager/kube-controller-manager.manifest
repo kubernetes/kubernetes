@@ -27,6 +27,9 @@
 {% set cloud_config = "" -%}
 {% set cloud_config_mount = "" -%}
 {% set cloud_config_volume = "" -%}
+{% set additional_cloud_config_mount = "{\"name\": \"usrsharessl\",\"mountPath\": \"/usr/share/ssl\", \"readOnly\": true}, {\"name\": \"usrssl\",\"mountPath\": \"/usr/ssl\", \"readOnly\": true}, {\"name\": \"usrlibssl\",\"mountPath\": \"/usr/lib/ssl\", \"readOnly\": true}, {\"name\": \"usrlocalopenssl\",\"mountPath\": \"/usr/local/openssl\", \"readOnly\": true}," -%}
+{% set additional_cloud_config_volume = "{\"name\": \"usrsharessl\",\"hostPath\": {\"path\": \"/usr/share/ssl\"}}, {\"name\": \"usrssl\",\"hostPath\": {\"path\": \"/usr/ssl\"}}, {\"name\": \"usrlibssl\",\"hostPath\": {\"path\": \"/usr/lib/ssl\"}}, {\"name\": \"usrlocalopenssl\",\"hostPath\": {\"path\": \"/usr/local/openssl\"}}," -%}
+{% set srv_kube_path = "/srv/kubernetes" -%}
 
 {% if grains.cloud is defined -%}
   {% if grains.cloud not in ['vagrant', 'vsphere'] -%}
@@ -94,8 +97,9 @@
     },
     "volumeMounts": [
         {{cloud_config_mount}}
+        {{additional_cloud_config_mount}}
         { "name": "srvkube",
-        "mountPath": "/srv/kubernetes",
+        "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
         { "name": "logfile",
         "mountPath": "/var/log/kube-controller-manager.log",
@@ -103,20 +107,8 @@
         { "name": "etcssl",
         "mountPath": "/etc/ssl",
         "readOnly": true},
-        { "name": "usrsharessl",
-        "mountPath": "/usr/share/ssl",
-        "readOnly": true},
         { "name": "varssl",
         "mountPath": "/var/ssl",
-        "readOnly": true},
-        { "name": "usrssl",
-        "mountPath": "/usr/ssl",
-        "readOnly": true},
-        { "name": "usrlibssl",
-        "mountPath": "/usr/lib/ssl",
-        "readOnly": true},
-        { "name": "usrlocalopenssl",
-        "mountPath": "/usr/local/openssl",
         "readOnly": true},
         { "name": "etcopenssl",
         "mountPath": "/etc/openssl",
@@ -129,9 +121,10 @@
 ],
 "volumes":[
   {{cloud_config_volume}}
+  {{additional_cloud_config_volume}}
   { "name": "srvkube",
     "hostPath": {
-        "path": "/srv/kubernetes"}
+        "path": "{{srv_kube_path}}"}
   },
   { "name": "logfile",
     "hostPath": {
@@ -141,25 +134,9 @@
     "hostPath": {
         "path": "/etc/ssl"}
   },
-  { "name": "usrsharessl",
-    "hostPath": {
-        "path": "/usr/share/ssl"}
-  },
   { "name": "varssl",
     "hostPath": {
         "path": "/var/ssl"}
-  },
-  { "name": "usrssl",
-    "hostPath": {
-        "path": "/usr/ssl"}
-  },
-  { "name": "usrlibssl",
-    "hostPath": {
-        "path": "/usr/lib/ssl"}
-  },
-  { "name": "usrlocalopenssl",
-    "hostPath": {
-        "path": "/usr/local/openssl"}
   },
   { "name": "etcopenssl",
     "hostPath": {

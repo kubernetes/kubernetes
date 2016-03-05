@@ -23,7 +23,7 @@
 config_hostname() {
   # Set the hostname to the short version.
   short_hostname=$(hostname -s)
-  hostname $short_hostname
+  hostname "${short_hostname}"
 }
 
 config_ip_firewall() {
@@ -54,7 +54,7 @@ create_dirs() {
 download_kube_env() {
   # Fetch kube-env from GCE metadata server.
   readonly tmp_install_dir="/var/cache/kubernetes-install"
-  mkdir -p ${tmp_install_dir}
+  mkdir -p "${tmp_install_dir}"
   curl --fail --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
     -o "${tmp_install_dir}/kube_env.yaml" \
@@ -78,12 +78,12 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    client-certificate-data: "${KUBELET_CERT}"
+    client-key-data: "${KUBELET_KEY}"
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    certificate-authority-data: "${KUBELET_CA_CERT}"
 contexts:
 - context:
     cluster: local
@@ -101,11 +101,11 @@ kind: Config
 users:
 - name: kube-proxy
   user:
-    token: ${KUBE_PROXY_TOKEN}
+    token: "${KUBE_PROXY_TOKEN}"
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority-data: "${CA_CERT}"
 contexts:
 - context:
     cluster: local
@@ -171,7 +171,7 @@ install_kube_binary_config() {
   echo "Downloading k8s tar file ${k8s_tar}"
   download_or_bust "${k8s_tar}" "${SERVER_BINARY_TAR_URL}"
   # Validate hash.
-  actual=$(sha1sum ${k8s_tar} | awk '{ print $1 }') || true
+  actual=$(sha1sum "${k8s_tar}" | awk '{ print $1 }') || true
   if [ "${actual}" != "${SERVER_BINARY_TAR_HASH}" ]; then
     echo "== ${k8s_tar} corrupted, sha1 ${actual} doesn't match expected ${SERVER_BINARY_TAR_HASH} =="
   else
@@ -198,8 +198,8 @@ install_kube_binary_config() {
     BINARY_PATH="/usr/local/bin/"
   fi
   if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null || [ "${TEST_CLUSTER:-}" = "true" ]; then
-    cp /tmp/kubernetes/server/bin/kubelet ${BINARY_PATH}
-    cp /tmp/kubernetes/server/bin/kubectl ${BINARY_PATH}
+    cp /tmp/kubernetes/server/bin/kubelet "${BINARY_PATH}"
+    cp /tmp/kubernetes/server/bin/kubectl "${BINARY_PATH}"
   fi
   # Clean up.
   rm -rf "/tmp/kubernetes"
@@ -216,7 +216,7 @@ install_kube_binary_config() {
   echo "Downloading kube-manifest tar file ${manifests_tar}"
   download_or_bust "${manifests_tar}" "${KUBE_MANIFESTS_TAR_URL}"
   # Validate hash.
-  actual=$(sha1sum ${manifests_tar} | awk '{ print $1 }') || true
+  actual=$(sha1sum "${manifests_tar}" | awk '{ print $1 }') || true
   if [ "${actual}" != "${KUBE_MANIFESTS_TAR_HASH}" ]; then
     echo "== ${manifests_tar} corrupted, sha1 ${actual} doesn't match expected ${KUBE_MANIFESTS_TAR_HASH} =="
   else
@@ -306,12 +306,11 @@ health_monitoring() {
       echo "Docker daemon failed!"
       pkill docker
     fi
-    if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
+    if ! curl --insecure -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
       echo "Kubelet is unhealthy!"
       pkill kubelet
     fi
-    # TODO(andyzheng0831): Add master side health monitoring.
-    sleep ${sleep_seconds}
+    sleep "${sleep_seconds}"
   done
 }
 
@@ -327,29 +326,29 @@ mount_master_pd() {
   readonly mount_point="/mnt/disks/master-pd"
 
   # TODO(zmerlynn): GKE is still lagging in master-pd creation
-  if [ ! -e ${pd_path} ]; then
+  if [ ! -e "${pd_path}" ]; then
     return
   fi
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
-  mkdir -p ${mount_point}
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" ${pd_path} ${mount_point} >/var/log/master-pd-mount.log || \
+  mkdir -p "${mount_point}"
+  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${pd_path}" "${mount_point}" >/var/log/master-pd-mount.log || \
     { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
   # Contains all the data stored in etcd
   mkdir -m 700 -p "${mount_point}/var/etcd"
   # Contains the dynamically generated apiserver auth certs and keys
   mkdir -p "${mount_point}/etc/srv/kubernetes"
   # Directory for kube-apiserver to store SSH key (if necessary)
-  mkdir -p /"${mount_point}/etc/srv/sshproxy"
+  mkdir -p "${mount_point}/etc/srv/sshproxy"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
   mkdir -p /etc/srv
-  ln -s -f /"${mount_point}/etc/srv/kubernetes" /etc/srv/kubernetes
-  ln -s -f /"${mount_point}/etc/srv/sshproxy" /etc/srv/sshproxy
+  ln -s -f "${mount_point}/etc/srv/kubernetes" /etc/srv/kubernetes
+  ln -s -f "${mount_point}/etc/srv/sshproxy" /etc/srv/sshproxy
 
   if ! id etcd &>/dev/null; then
     useradd -s /sbin/nologin -d /var/etcd etcd
   fi
-  chown -R etcd /"${mount_point}/var/etcd"
+  chown -R etcd "${mount_point}/var/etcd"
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
@@ -393,20 +392,20 @@ create_master_auth() {
     # NB: If this list ever changes, this script actually has to
     # change to detect the existence of this file, kill any deleted
     # old tokens and add any new tokens (to handle the upgrade case).
-    add_token_entry "system:scheduler" ${known_tokens_csv}
-    add_token_entry "system:controller_manager" ${known_tokens_csv}
-    add_token_entry "system:logging" ${known_tokens_csv}
-    add_token_entry "system:monitoring" ${known_tokens_csv}
-    add_token_entry "system:dns" ${known_tokens_csv}
+    add_token_entry "system:scheduler" "${known_tokens_csv}"
+    add_token_entry "system:controller_manager" "${known_tokens_csv}"
+    add_token_entry "system:logging" "${known_tokens_csv}"
+    add_token_entry "system:monitoring" "${known_tokens_csv}"
+    add_token_entry "system:dns" "${known_tokens_csv}"
   fi
 
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
     cat <<EOF >/etc/gce.conf
 [global]
-token-url = ${TOKEN_URL}
-token-body = ${TOKEN_BODY}
-project-id = ${PROJECT_ID}
-network-name = ${NODE_NETWORK}
+token-url = "${TOKEN_URL}"
+token-body = "${TOKEN_BODY}"
+project-id = "${PROJECT_ID}"
+network-name = "${NODE_NETWORK}"
 EOF
   fi
 }
@@ -477,8 +476,18 @@ compute_master_manifest_variables() {
   fi
   DOCKER_REGISTRY="gcr.io/google_containers"
   if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
-    DOCKER_REGISTRY=${KUBE_DOCKER_REGISTRY}
+    DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
+}
+
+# A helper function for removing salt configuration and comments from a file.
+# This is mainly for preparing a manifest file.
+# $1: Full path of the file to manipulate
+remove_salt_config_comments() {
+  # Remove salt configuration
+  sed -i "/^[ |\t]*{[#|%]/d" $1
+  # Remove comments
+  sed -i "/^[ |\t]*#/d" $1
 }
 
 # Starts k8s apiserver.
@@ -526,12 +535,21 @@ start_kube_apiserver() {
   readonly kube_apiserver_docker_tag=$(cat /run/kube-docker-files/kube-apiserver.docker_tag)
 
   src_file="/run/kube-manifests/kubernetes/trusty/kube-apiserver.manifest"
-  sed -i -e "s@{{params}}@${params}@g" ${src_file}
-  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" ${src_file}
-  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" ${src_file}
-  sed -i -e "s@{{kube_docker_registry}}@${DOCKER_REGISTRY}@g" ${src_file}
-  sed -i -e "s@{{kube-apiserver_docker_tag}}@${kube_apiserver_docker_tag}@g" ${src_file}
-  cp ${src_file} /etc/kubernetes/manifests
+  remove_salt_config_comments "${src_file}"
+  # Evaluate variables
+  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
+  sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube-apiserver_docker_tag'\]}}@${kube_apiserver_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+  sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
+  sed -i -e "s@{{secure_port}}@8080@g" "${src_file}"
+  sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
+  sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
 }
 
 # Starts k8s controller manager.
@@ -550,6 +568,9 @@ start_kube_controller_manager() {
 
   # Calculate variables and assemble the command line.
   params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+    params="${params} --cloud-config=/etc/gce.conf"
+  fi
   if [ -n "${INSTANCE_PREFIX:-}" ]; then
     params="${params} --cluster-name=${INSTANCE_PREFIX}"
   fi
@@ -573,15 +594,20 @@ start_kube_controller_manager() {
   readonly kube_rc_docker_tag=$(cat /run/kube-docker-files/kube-controller-manager.docker_tag)
 
   src_file="/run/kube-manifests/kubernetes/trusty/kube-controller-manager.manifest"
-  sed -i -e "s@{{params}}@${params}@g" ${src_file}
-  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" ${src_file}
-  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" ${src_file}
-  sed -i -e "s@{{kube_docker_registry}}@${DOCKER_REGISTRY}@g" ${src_file}
-  sed -i -e "s@{{kube-controller-manager_docker_tag}}@${kube_rc_docker_tag}@g" ${src_file}
-  cp ${src_file} /etc/kubernetes/manifests
+  remove_salt_config_comments "${src_file}"
+  # Evaluate variables
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
+  sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
+  sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
 }
 
-# Start k8s scheduler.
+# Starts k8s scheduler.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
@@ -607,14 +633,14 @@ start_kube_scheduler() {
 
   # Remove salt comments and replace variables with values
   src_file="/run/kube-manifests/kubernetes/trusty/kube-scheduler.manifest"
-  sed -i "/^ *{%/d" ${src_file}
-  sed -i -e "s@{{params}}@${params}@g" ${src_file}
-  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" ${src_file}
-  sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" ${src_file}
-  cp ${src_file} /etc/kubernetes/manifests
+  remove_salt_config_comments "${src_file}"
+  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
 }
 
-# Start a fluentd static pod for logging.
+# Starts a fluentd static pod for logging.
 start_fluentd() {
   if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
     if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
@@ -652,7 +678,7 @@ setup_addon_manifests() {
   chmod 644 "${dst_dir}"/*
 }
 
-# Start k8s addons static pods.
+# Prepares the manifests of k8s addons static pods.
 prepare_kube_addons() {
   addon_src_dir="/run/kube-manifests/kubernetes/trusty"
   addon_dst_dir="/etc/kubernetes/addons"
@@ -674,7 +700,7 @@ prepare_kube_addons() {
     else
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
-    sed -i "/^ *{%/d" "${controller_yaml}"
+    remove_salt_config_comments "${controller_yaml}"
     sed -i -e "s@{{ *heapster_memory *}}@${heapster_memory}@g" "${controller_yaml}"
   fi
   cp "${addon_src_dir}/namespace.yaml" "${addon_dst_dir}"
@@ -699,7 +725,7 @@ prepare_kube_addons() {
     mv "${addon_dst_dir}/registry/registry-pv.yaml.in" "${registry_pv_file}"
     mv "${addon_dst_dir}/registry/registry-pvc.yaml.in" "${registry_pvc_file}"
     # Replace the salt configurations with variable values.
-    sed -i "/^ *{%/d" "${registry_pv_file}"
+    remove_salt_config_comments "${controller_yaml}"
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pv_file}"
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pvc_file}"
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_name'\] *}}@${CLUSTER_REGISTRY_DISK}@g" "${registry_pvc_file}"
