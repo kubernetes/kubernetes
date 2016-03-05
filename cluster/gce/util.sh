@@ -325,6 +325,19 @@ function detect-master () {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
+# Reads kube-env metadata from master
+#
+# Assumed vars:
+#   KUBE_MASTER
+#   PROJECT
+#   ZONE
+function get-master-env() {
+  # TODO(zmerlynn): Make this more reliable with retries.
+  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${KUBE_MASTER} --command \
+    "curl --fail --silent -H 'Metadata-Flavor: Google' \
+      'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
+}
+
 # Robustly try to create a static ip.
 # $1: The name of the ip to create
 # $2: The name of the region to create the ip in.
@@ -523,6 +536,7 @@ function kube-up {
   set_num_migs
 
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
+    parse-master-env
     create-nodes
     create-autoscaler
   else
