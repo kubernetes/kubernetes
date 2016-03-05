@@ -758,6 +758,9 @@ type VolumeMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// Required. Must not contain ':'.
 	MountPath string `json:"mountPath"`
+	// Path within the volume from which the container's volume should be mounted.
+	// Defaults to "" (volume's root).
+	SubPath string `json:"subPath,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.
