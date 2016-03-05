@@ -296,7 +296,7 @@ var (
 // determineContainerIP determines the IP address of the given container.  It is expected
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
-func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *docker.Container) string {
+func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *docker.Container) (string, error) {
 	result := ""
 
 	if container.NetworkSettings != nil {
@@ -307,12 +307,13 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 		netStatus, err := dm.networkPlugin.Status(podNamespace, podName, kubecontainer.DockerID(container.ID))
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
+			return result, err
 		} else if netStatus != nil {
 			result = netStatus.IP.String()
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 func (dm *DockerManager) inspectContainer(id string, podName, podNamespace string) (*kubecontainer.ContainerStatus, string, error) {
@@ -348,9 +349,9 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = iResult.State.StartedAt
 		if containerName == PodInfraContainerName {
-			ip = dm.determineContainerIP(podNamespace, podName, iResult)
+			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
 		}
-		return &status, ip, nil
+		return &status, ip, err
 	}
 
 	// Find containers that have exited or failed to start.
@@ -1857,7 +1858,10 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 		// Find the pod IP after starting the infra container in order to expose
 		// it safely via the downward API without a race and be able to use podIP in kubelet-managed /etc/hosts file.
-		pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		pod.Status.PodIP, err = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Start everything
