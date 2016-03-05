@@ -1185,7 +1185,7 @@ func TestGetVolumeLabels(t *testing.T) {
 	awsServices.ec2.On("DescribeVolumes", expectedVolumeRequest).Return([]*ec2.Volume{
 		{
 			VolumeId:         volumeId,
-			AvailabilityZone: &awsServices.availabilityZone,
+			AvailabilityZone: aws.String("us-east-1a"),
 		},
 	})
 
