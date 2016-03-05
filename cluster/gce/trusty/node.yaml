@@ -264,8 +264,7 @@ Content-Disposition: attachment; filename="kube-node-health-monitoring.conf"
 
 description "Kubenetes node health monitoring"
 
-# The termination of kube-proxy upstart job indicates that kubelet and docker are ready.
-start on stopped kube-proxy
+start on stopped kube-docker
 
 respawn
 
