@@ -32,9 +32,8 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Resource Quota
-========================================
-This page has been moved to [here](../../admin/resourcequota/README.md)
+This file has moved to: http://kubernetes.github.io/docs/user-guide/resourcequota/README/
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/resourcequota/README.md?pixel)]()
