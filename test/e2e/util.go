@@ -2619,7 +2619,7 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 	return hosts
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this exludes master node.
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this excludes master node.
 // It returns an error if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
 func NodeSSHHosts(c *client.Client) ([]string, error) {
