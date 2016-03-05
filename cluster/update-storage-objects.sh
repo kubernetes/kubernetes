@@ -46,6 +46,8 @@ declare -a resources=(
     "resourcequotas"
     "secrets"
     "services"
+    "jobs"
+    "horizontalpodautoscalers"
 )
 
 # Find all the namespaces.
@@ -55,11 +57,25 @@ then
   echo "Unexpected: No namespace found. Nothing to do."
   exit 1
 fi
+
+all_failed=1
+
 for resource in "${resources[@]}"
 do
   for namespace in "${namespaces[@]}"
   do
+    # If get fails, assume it's because the resource hasn't been installed in the apiserver.
+    # TODO hopefully we can remove this once we use dynamic discovery of gettable/updateable
+    # resources.
+    set +e
     instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
+    result=$?
+    set -e
+
+    if [[ "${all_failed}" -eq 1 && "${result}" -eq 0 ]]; then
+      all_failed=0
+    fi
+
     # Nothing to do if there is no instance of that resource.
     if [[ -z "${instances:-}" ]]
     then
@@ -106,6 +122,11 @@ do
     fi
   done
 done
+
+if [[ "${all_failed}" -eq 1 ]]; then
+  echo "kubectl get failed for all resources"
+  exit 1
+fi
 
 echo "All objects updated successfully!!"
 
