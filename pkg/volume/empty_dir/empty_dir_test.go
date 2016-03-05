@@ -88,7 +88,7 @@ func TestPluginRootContextSet(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                 api.StorageMediumDefault,
 		rootContext:            "user:role:type:range",
-		expectedSELinuxContext: "user:role:type:range",
+		expectedSELinux:        "user:role:type:range",
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
 }
@@ -101,7 +101,7 @@ func TestPluginTmpfs(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                        api.StorageMediumMemory,
 		rootContext:                   "user:role:type:range",
-		expectedSELinuxContext:        "user:role:type:range",
+		expectedSELinux:               "user:role:type:range",
 		expectedSetupMounts:           1,
 		shouldBeMountedBeforeTeardown: true,
 		expectedTeardownMounts:        1})
@@ -112,7 +112,7 @@ type pluginTestConfig struct {
 	rootContext                   string
 	SELinuxOptions                *api.SELinuxOptions
 	idempotent                    bool
-	expectedSELinuxContext        string
+	expectedSELinux               string
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
