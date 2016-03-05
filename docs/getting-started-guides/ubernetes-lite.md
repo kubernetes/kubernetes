@@ -28,14 +28,25 @@ Documentation for other releases can be found at
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 Create the first cluster, but pass MULTIZONE to tell the cluster to manage multiple zones; creating nodes in us-central1-a.
 
+GCE:
 ```
 MULTIZONE=1 KUBE_GCE_ZONE=us-central1-a cluster/kube-up.sh
 ```
 
+AWS:
+```
+MULTIZONE=1 KUBE_AWS_ZONE=us-west-2a cluster/kube-up.sh
+```
+
+
 View the nodes; you can see that they are tagged with the zone they are in (they are all in us-central1-a so far):
 
 ```
-kubectl get nodes
+> kubectl get nodes
+
+NAME                                         LABELS                                                                                                                                                                                                              STATUS    AGE
+ip-172-20-0-155.us-west-2.compute.internal   beta.kubernetes.io/instance-type=m3.medium,failure-domain.beta.kubernetes.io/region=us-west-2,failure-domain.beta.kubernetes.io/zone=us-west-2a,kubernetes.io/hostname=ip-172-20-0-155.us-west-2.compute.internal   Ready     3m
+ip-172-20-0-79.us-west-2.compute.internal    beta.kubernetes.io/instance-type=m3.medium,failure-domain.beta.kubernetes.io/region=us-west-2,failure-domain.beta.kubernetes.io/zone=us-west-2a,kubernetes.io/hostname=ip-172-20-0-79.us-west-2.compute.internal    Ready     3m
 ```
 
 Add more nodes to the existing cluster, reusing the existing master, running in a different zone (us-central1-b):
@@ -44,30 +55,48 @@ Add more nodes to the existing cluster, reusing the existing master, running in 
 KUBE_USE_EXISTING_MASTER=true MULTIZONE=1 KUBE_GCE_ZONE=us-central1-b cluster/kube-up.sh
 ```
 
+AWS:
+```
+KUBE_USE_EXISTING_MASTER=true MULTIZONE=1 KUBE_SUBNET_CIDR=172.20.1.0/24 MASTER_INTERNAL_IP=172.20.0.9 KUBE_AWS_ZONE=us-west-2b cluster/kube-up.sh
+```
+
+
 View the nodes again; 3 more nodes should have launched and be tagged in us-central1-b:
 
 ```
-kubectl get nodes
+> kubectl get nodes
+
+NAME                                         LABELS                                                                                                                                                                                                              STATUS    AGE
+ip-172-20-0-114.us-west-2.compute.internal   beta.kubernetes.io/instance-type=m3.medium,failure-domain.beta.kubernetes.io/region=us-west-2,failure-domain.beta.kubernetes.io/zone=us-west-2a,kubernetes.io/hostname=ip-172-20-0-114.us-west-2.compute.internal   Ready     36m
+ip-172-20-0-13.us-west-2.compute.internal    beta.kubernetes.io/instance-type=m3.medium,failure-domain.beta.kubernetes.io/region=us-west-2,failure-domain.beta.kubernetes.io/zone=us-west-2a,kubernetes.io/hostname=ip-172-20-0-13.us-west-2.compute.internal    Ready     36m
+ip-172-20-1-110.us-west-2.compute.internal   beta.kubernetes.io/instance-type=m3.medium,failure-domain.beta.kubernetes.io/region=us-west-2,failure-domain.beta.kubernetes.io/zone=us-west-2b,kubernetes.io/hostname=ip-172-20-1-110.us-west-2.compute.internal   Ready     8m
+ip-172-20-1-216.us-west-2.compute.internal   beta.kubernetes.io/instance-type=m3.medium,failure-domain.beta.kubernetes.io/region=us-west-2,failure-domain.beta.kubernetes.io/zone=us-west-2b,kubernetes.io/hostname=ip-172-20-1-216.us-west-2.compute.internal   Ready     7m
 ```
 
 Create a volume (only PersistentVolumes are supported for zone affinity):
 
 ```
-gcloud compute disks create --size=5GB --zone=us-central1-a my-data-disk
-
 kubectl create -f - <<EOF
-kind: PersistentVolume
-apiVersion: v1
-metadata:
-  name: my-data-disk
-spec:
-  capacity:
-    storage: "5Gi"
-  accessModes:
-    - "ReadWriteOnce"
-  gcePersistentDisk:
-    pdName: "my-data-disk"
-    fsType: "ext4"
+{
+  "kind": "PersistentVolumeClaim",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "claim1",
+    "annotations": {
+        "volume.alpha.kubernetes.io/storage-class": "foo"
+    }
+  },
+  "spec": {
+    "accessModes": [
+      "ReadWriteOnce"
+    ],
+    "resources": {
+      "requests": {
+        "storage": "5Gi"
+      }
+    }
+  }
+}
 EOF
 ```
 
@@ -79,22 +108,9 @@ NAME           LABELS                                                           
 my-data-disk   failure-domain.alpha.kubernetes.io/region=us-central1,failure-domain.alpha.kubernetes.io/zone=us-central1-a   5Gi        RWO           Available                       5s
 ```
 
-Create a PersistentVolumeClaim and a pod that uses it:
+Create a pod that uses the PVC:
 
 ```
-kubectl create -f - <<EOF
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: pvc1
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-EOF
-
 kubectl create -f - <<EOF
 kind: Pod
 apiVersion: v1
@@ -110,7 +126,7 @@ spec:
   volumes:
     - name: mypd
       persistentVolumeClaim:
-        claimName: pvc1
+        claimName: claim1
 EOF
 ```
 
@@ -129,6 +145,14 @@ Now we'll verify that pods in an RC are spread across zones.  Launch more nodes 
 
 ```
 KUBE_USE_EXISTING_MASTER=true MULTIZONE=1 KUBE_GCE_ZONE=us-central1-f cluster/kube-up.sh
+```
+
+AWS:
+TODO: Make it so we don't have to specify MASTER_INTERNAL_IP
+
+```
+KUBE_USE_EXISTING_MASTER=true MULTIZONE=1 KUBE_SUBNET_CIDR=172.20.2.0/24 MASTER_INTERNAL_IP=172.20.0.9 KUBE_AWS_ZONE=us-west-2c cluster/kube-up.sh
+```
 
 kubectl get nodes
 ```
@@ -157,6 +181,16 @@ kubernetes-minion-lqrm   failure-domain.alpha.kubernetes.io/region=us-central1,f
 
 ```
 
+On AWS:
+```
+> kubectl get pods | cut -f 1 -d ' ' | grep guestbook | xargs kubectl describe pod | grep Node
+Node:                           ip-172-20-2-236.us-west-2.compute.internal/172.20.2.236
+Node:                           ip-172-20-0-114.us-west-2.compute.internal/172.20.0.114
+Node:                           ip-172-20-1-110.us-west-2.compute.internal/172.20.1.110
+```
+
+(note the subnets)
+
 Load-balancers can span zones; the guestbook-go example includes an example load-balanced service:
 
 ```
@@ -168,7 +202,7 @@ LoadBalancer Ingress:   130.211.126.21
 > curl -s http://${ip}:3000/env | grep HOSTNAME
   "HOSTNAME": "guestbook-44sep",
 
-> (for i in `seq 20`; do curl -s http://<ip>:3000/env | grep HOSTNAME; done)  | sort | uniq
+> (for i in `seq 20`; do curl -s http://${ip}:3000/env | grep HOSTNAME; done)  | sort | uniq
   "HOSTNAME": "guestbook-44sep",
   "HOSTNAME": "guestbook-hum5n",
   "HOSTNAME": "guestbook-ppm40",
@@ -182,7 +216,9 @@ KUBE_USE_EXISTING_MASTER=true KUBE_GCE_ZONE=us-central1-f cluster/kube-down.sh
 KUBE_GCE_ZONE=us-central1-a cluster/kube-down.sh
 ```
 
-
+```
+KUBE_AWS_ZONE=us-west-2a cluster/kube-down.sh
+```
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
