@@ -28,6 +28,7 @@ var (
 	resolveTCPAddr = net.ResolveTCPAddr
 )
 
+// SRVGetCluster gets the cluster information via DNS discovery.
 // TODO(barakmich): Currently ignores priority and weight (as they don't make as much sense for a bootstrap)
 // Also doesn't do any lookups for the token (though it could)
 // Also sees each entry as a separate instance.

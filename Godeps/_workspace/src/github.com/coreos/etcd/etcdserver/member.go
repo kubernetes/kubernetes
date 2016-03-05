@@ -35,6 +35,7 @@ var (
 
 // RaftAttributes represents the raft related attributes of an etcd member.
 type RaftAttributes struct {
+	// PeerURLs is the list of peers in the raft cluster.
 	// TODO(philips): ensure these are URLs
 	PeerURLs []string `json:"peerURLs"`
 }
@@ -52,7 +53,7 @@ type Member struct {
 }
 
 // NewMember creates a Member without an ID and generates one based on the
-// name, peer URLs. This is used for bootstrapping/adding new member.
+// cluster name, peer URLs, and time. This is used for bootstrapping/adding new member.
 func NewMember(name string, peerURLs types.URLs, clusterName string, now *time.Time) *Member {
 	m := &Member{
 		RaftAttributes: RaftAttributes{PeerURLs: peerURLs.StringSlice()},
@@ -105,6 +106,10 @@ func (m *Member) Clone() *Member {
 	return mm
 }
 
+func (m *Member) IsStarted() bool {
+	return len(m.Name) != 0
+}
+
 func memberStoreKey(id types.ID) string {
 	return path.Join(storeMembersPrefix, id.String())
 }
@@ -153,14 +158,14 @@ func nodeToMember(n *store.NodeExtern) (*Member, error) {
 	return m, nil
 }
 
-// implement sort by ID interface
+// MembersByID implements sort by ID interface
 type MembersByID []*Member
 
 func (ms MembersByID) Len() int           { return len(ms) }
 func (ms MembersByID) Less(i, j int) bool { return ms[i].ID < ms[j].ID }
 func (ms MembersByID) Swap(i, j int)      { ms[i], ms[j] = ms[j], ms[i] }
 
-// implement sort by peer urls interface
+// MembersByPeerURLs implements sort by peer urls interface
 type MembersByPeerURLs []*Member
 
 func (ms MembersByPeerURLs) Len() int { return len(ms) }

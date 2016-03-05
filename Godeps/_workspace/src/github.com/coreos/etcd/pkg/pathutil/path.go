@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Package pathutil implements utility functions for handling slash-separated
+// paths.
 package pathutil
 
 import "path"

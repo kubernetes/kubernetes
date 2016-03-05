@@ -16,7 +16,7 @@ package raft
 
 import pb "github.com/coreos/etcd/raft/raftpb"
 
-// unstable.entris[i] has raft log position i+unstable.offset.
+// unstable.entries[i] has raft log position i+unstable.offset.
 // Note that unstable.offset may be less than the highest log
 // position in storage; this means that the next write to storage
 // might need to truncate the log before persisting unstable.entries.
@@ -51,7 +51,7 @@ func (u *unstable) maybeLastIndex() (uint64, bool) {
 	return 0, false
 }
 
-// myabeTerm returns the term of the entry at index i, if there
+// maybeTerm returns the term of the entry at index i, if there
 // is any.
 func (u *unstable) maybeTerm(i uint64) (uint64, bool) {
 	if i < u.offset {
@@ -79,8 +79,8 @@ func (u *unstable) stableTo(i, t uint64) {
 	if !ok {
 		return
 	}
-	// if i < offest, term is matched with the snapshot
-	// only update the unstalbe entries if term is matched with
+	// if i < offset, term is matched with the snapshot
+	// only update the unstable entries if term is matched with
 	// an unstable entry.
 	if gt == t && i >= u.offset {
 		u.entries = u.entries[i+1-u.offset:]

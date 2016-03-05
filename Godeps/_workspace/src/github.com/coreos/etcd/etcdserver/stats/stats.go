@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package stats defines a standard interface for etcd cluster statistics.
 package stats
 
 import "github.com/coreos/pkg/capnslog"

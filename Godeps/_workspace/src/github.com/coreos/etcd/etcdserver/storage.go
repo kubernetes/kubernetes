@@ -15,13 +15,16 @@
 package etcdserver
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/pkg/pbutil"
+	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/coreos/etcd/pkg/types"
+	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/snap"
 	"github.com/coreos/etcd/version"
@@ -35,6 +38,9 @@ type Storage interface {
 	Save(st raftpb.HardState, ents []raftpb.Entry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
 	SaveSnap(snap raftpb.Snapshot) error
+	// DBFilePath returns the file path of database snapshot saved with given
+	// id.
+	DBFilePath(id uint64) (string, error)
 	// Close closes the Storage and performs finalization.
 	Close() error
 }
@@ -104,7 +110,7 @@ func readWAL(waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, 
 	return
 }
 
-// upgradeWAL converts an older version of the etcdServer data to the newest version.
+// upgradeDataDir converts an older version of the etcdServer data to the newest version.
 // It must ensure that, after upgrading, the most recent version is present.
 func upgradeDataDir(baseDataDir string, name string, ver version.DataDirVersion) error {
 	switch ver {
@@ -141,3 +147,39 @@ func makeMemberDir(dir string) error {
 	}
 	return nil
 }
+
+type storageRecorder struct {
+	testutil.Recorder
+	dbPath string // must have '/' suffix if set
+}
+
+func newStorageRecorder(db string) *storageRecorder {
+	return &storageRecorder{&testutil.RecorderBuffered{}, db}
+}
+
+func newStorageRecorderStream(db string) *storageRecorder {
+	return &storageRecorder{testutil.NewRecorderStream(), db}
+}
+
+func (p *storageRecorder) Save(st raftpb.HardState, ents []raftpb.Entry) error {
+	p.Record(testutil.Action{Name: "Save"})
+	return nil
+}
+
+func (p *storageRecorder) SaveSnap(st raftpb.Snapshot) error {
+	if !raft.IsEmptySnap(st) {
+		p.Record(testutil.Action{Name: "SaveSnap"})
+	}
+	return nil
+}
+
+func (p *storageRecorder) DBFilePath(id uint64) (string, error) {
+	p.Record(testutil.Action{Name: "DBFilePath"})
+	path := p.dbPath
+	if path != "" {
+		path = path + "/"
+	}
+	return fmt.Sprintf("%s%016x.snap.db", path, id), nil
+}
+
+func (p *storageRecorder) Close() error { return nil }
