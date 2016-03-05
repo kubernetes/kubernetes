@@ -1887,3 +1887,55 @@ func TestCheckVersionCompatibility(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPodStatusNoSuchContainer(t *testing.T) {
+	const (
+		noSuchContainerID = "nosuchcontainer"
+		infraContainerID  = "9876"
+	)
+	dm, fakeDocker := newTestDockerManager()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{{Name: "nosuchcontainer"}},
+		},
+	}
+
+	fakeDocker.SetFakeContainers([]*docker.Container{
+		{
+			ID:   noSuchContainerID,
+			Name: "/k8s_nosuchcontainer_foo_new_12345678_42",
+			State: docker.State{
+				ExitCode:   0,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+				Running:    false,
+			},
+		},
+		{
+			ID:   infraContainerID,
+			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
+			State: docker.State{
+				ExitCode:   0,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+				Running:    false,
+			},
+		}})
+
+	fakeDocker.Errors = map[string]error{"inspect": &docker.NoSuchContainer{}}
+	runSyncPod(t, dm, fakeDocker, pod, nil, false)
+
+	// Verify that we will try to start new contrainers even if the inspections
+	// failed.
+	verifyCalls(t, fakeDocker, []string{
+		// Start a new infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Start a new container.
+		"create", "start", "inspect_container",
+	})
+}
