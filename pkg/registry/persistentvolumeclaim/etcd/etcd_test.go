@@ -165,6 +165,12 @@ func TestUpdateStatus(t *testing.T) {
 		},
 		Status: api.PersistentVolumeClaimStatus{
 			Phase: api.ClaimBound,
+			Conditions: []api.PersistentVolumeClaimCondition{
+				{
+					Type:   api.PersistentVolumeClaimBound,
+					Status: api.ConditionFalse,
+				},
+			},
 		},
 	}
 

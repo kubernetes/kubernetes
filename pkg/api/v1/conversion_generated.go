@@ -1805,6 +1805,27 @@ func Convert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.Persi
 	return autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in, out, s)
 }
 
+func autoConvert_api_PersistentVolumeClaimCondition_To_v1_PersistentVolumeClaimCondition(in *api.PersistentVolumeClaimCondition, out *PersistentVolumeClaimCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeClaimCondition))(in)
+	}
+	out.Type = PersistentVolumeClaimConditionType(in.Type)
+	out.Status = ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_api_PersistentVolumeClaimCondition_To_v1_PersistentVolumeClaimCondition(in *api.PersistentVolumeClaimCondition, out *PersistentVolumeClaimCondition, s conversion.Scope) error {
+	return autoConvert_api_PersistentVolumeClaimCondition_To_v1_PersistentVolumeClaimCondition(in, out, s)
+}
+
 func autoConvert_api_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *api.PersistentVolumeClaimList, out *PersistentVolumeClaimList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PersistentVolumeClaimList))(in)
@@ -1857,6 +1878,16 @@ func autoConvert_api_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimStat
 		defaulting.(func(*api.PersistentVolumeClaimStatus))(in)
 	}
 	out.Phase = PersistentVolumeClaimPhase(in.Phase)
+	if in.Conditions != nil {
+		out.Conditions = make([]PersistentVolumeClaimCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := Convert_api_PersistentVolumeClaimCondition_To_v1_PersistentVolumeClaimCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	if in.AccessModes != nil {
 		out.AccessModes = make([]PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
@@ -1895,6 +1926,27 @@ func autoConvert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeCla
 
 func Convert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource(in *api.PersistentVolumeClaimVolumeSource, out *PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
 	return autoConvert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource(in, out, s)
+}
+
+func autoConvert_api_PersistentVolumeCondition_To_v1_PersistentVolumeCondition(in *api.PersistentVolumeCondition, out *PersistentVolumeCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeCondition))(in)
+	}
+	out.Type = PersistentVolumeConditionType(in.Type)
+	out.Status = ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_api_PersistentVolumeCondition_To_v1_PersistentVolumeCondition(in *api.PersistentVolumeCondition, out *PersistentVolumeCondition, s conversion.Scope) error {
+	return autoConvert_api_PersistentVolumeCondition_To_v1_PersistentVolumeCondition(in, out, s)
 }
 
 func autoConvert_api_PersistentVolumeList_To_v1_PersistentVolumeList(in *api.PersistentVolumeList, out *PersistentVolumeList, s conversion.Scope) error {
@@ -2098,6 +2150,16 @@ func autoConvert_api_PersistentVolumeStatus_To_v1_PersistentVolumeStatus(in *api
 		defaulting.(func(*api.PersistentVolumeStatus))(in)
 	}
 	out.Phase = PersistentVolumePhase(in.Phase)
+	if in.Conditions != nil {
+		out.Conditions = make([]PersistentVolumeCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := Convert_api_PersistentVolumeCondition_To_v1_PersistentVolumeCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	out.Message = in.Message
 	out.Reason = in.Reason
 	return nil
@@ -5059,6 +5121,27 @@ func Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *Persisten
 	return autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in, out, s)
 }
 
+func autoConvert_v1_PersistentVolumeClaimCondition_To_api_PersistentVolumeClaimCondition(in *PersistentVolumeClaimCondition, out *api.PersistentVolumeClaimCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeClaimCondition))(in)
+	}
+	out.Type = api.PersistentVolumeClaimConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1_PersistentVolumeClaimCondition_To_api_PersistentVolumeClaimCondition(in *PersistentVolumeClaimCondition, out *api.PersistentVolumeClaimCondition, s conversion.Scope) error {
+	return autoConvert_v1_PersistentVolumeClaimCondition_To_api_PersistentVolumeClaimCondition(in, out, s)
+}
+
 func autoConvert_v1_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *PersistentVolumeClaimList, out *api.PersistentVolumeClaimList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaimList))(in)
@@ -5111,6 +5194,16 @@ func autoConvert_v1_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStat
 		defaulting.(func(*PersistentVolumeClaimStatus))(in)
 	}
 	out.Phase = api.PersistentVolumeClaimPhase(in.Phase)
+	if in.Conditions != nil {
+		out.Conditions = make([]api.PersistentVolumeClaimCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := Convert_v1_PersistentVolumeClaimCondition_To_api_PersistentVolumeClaimCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	if in.AccessModes != nil {
 		out.AccessModes = make([]api.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
@@ -5140,6 +5233,27 @@ func autoConvert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeCla
 
 func Convert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in *PersistentVolumeClaimVolumeSource, out *api.PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
 	return autoConvert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in, out, s)
+}
+
+func autoConvert_v1_PersistentVolumeCondition_To_api_PersistentVolumeCondition(in *PersistentVolumeCondition, out *api.PersistentVolumeCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeCondition))(in)
+	}
+	out.Type = api.PersistentVolumeConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1_PersistentVolumeCondition_To_api_PersistentVolumeCondition(in *PersistentVolumeCondition, out *api.PersistentVolumeCondition, s conversion.Scope) error {
+	return autoConvert_v1_PersistentVolumeCondition_To_api_PersistentVolumeCondition(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolumeList_To_api_PersistentVolumeList(in *PersistentVolumeList, out *api.PersistentVolumeList, s conversion.Scope) error {
@@ -5334,6 +5448,16 @@ func autoConvert_v1_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *Per
 		defaulting.(func(*PersistentVolumeStatus))(in)
 	}
 	out.Phase = api.PersistentVolumePhase(in.Phase)
+	if in.Conditions != nil {
+		out.Conditions = make([]api.PersistentVolumeCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := Convert_v1_PersistentVolumeCondition_To_api_PersistentVolumeCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	out.Message = in.Message
 	out.Reason = in.Reason
 	return nil
@@ -6591,11 +6715,13 @@ func init() {
 		autoConvert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector,
 		autoConvert_api_ObjectMeta_To_v1_ObjectMeta,
 		autoConvert_api_ObjectReference_To_v1_ObjectReference,
+		autoConvert_api_PersistentVolumeClaimCondition_To_v1_PersistentVolumeClaimCondition,
 		autoConvert_api_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList,
 		autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec,
 		autoConvert_api_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimStatus,
 		autoConvert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource,
 		autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim,
+		autoConvert_api_PersistentVolumeCondition_To_v1_PersistentVolumeCondition,
 		autoConvert_api_PersistentVolumeList_To_v1_PersistentVolumeList,
 		autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource,
 		autoConvert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec,
@@ -6723,11 +6849,13 @@ func init() {
 		autoConvert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector,
 		autoConvert_v1_ObjectMeta_To_api_ObjectMeta,
 		autoConvert_v1_ObjectReference_To_api_ObjectReference,
+		autoConvert_v1_PersistentVolumeClaimCondition_To_api_PersistentVolumeClaimCondition,
 		autoConvert_v1_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList,
 		autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec,
 		autoConvert_v1_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStatus,
 		autoConvert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource,
 		autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim,
+		autoConvert_v1_PersistentVolumeCondition_To_api_PersistentVolumeCondition,
 		autoConvert_v1_PersistentVolumeList_To_api_PersistentVolumeList,
 		autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource,
 		autoConvert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec,
