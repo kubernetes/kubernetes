@@ -33,6 +33,9 @@ type ContainerManager interface {
 
 	// Returns a NodeConfig that is being used by the container manager.
 	GetNodeConfig() NodeConfig
+
+	// Returns internal Status.
+	Status() Status
 }
 
 type NodeConfig struct {
@@ -40,4 +43,9 @@ type NodeConfig struct {
 	SystemCgroupsName  string
 	KubeletCgroupsName string
 	ContainerRuntime   string
+}
+
+type Status struct {
+	// Any soft requirements that were unsatisfied.
+	SoftRequirements error
 }

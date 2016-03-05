@@ -2964,6 +2964,12 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 		}
 	}
 
+	// Record any soft requirements that were not met in the container manager.
+	status := kl.containerManager.Status()
+	if status.SoftRequirements != nil {
+		newNodeReadyCondition.Message = fmt.Sprintf("%s. WARNING: %s", newNodeReadyCondition.Message, status.SoftRequirements.Error())
+	}
+
 	readyConditionUpdated := false
 	needToRecordEvent := false
 	for i := range node.Status.Conditions {
