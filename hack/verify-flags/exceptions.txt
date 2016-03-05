@@ -92,3 +92,4 @@ test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
+test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),

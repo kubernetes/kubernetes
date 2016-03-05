@@ -748,6 +748,28 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 
 // This validate will make sure targetPath:
 // 1. is not abs path
+// 2. does not start with '../'
+// 3. does not contain '/../'
+// 4. does not end with '/..'
+func validateSubPath(targetPath string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if path.IsAbs(targetPath) {
+		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must be a relative path"))
+	}
+	if strings.HasPrefix(targetPath, "../") {
+		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not start with '../'"))
+	}
+	if strings.Contains(targetPath, "/../") {
+		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '/../'"))
+	}
+	if strings.HasSuffix(targetPath, "/..") {
+		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not end with '/..'"))
+	}
+	return allErrs
+}
+
+// This validate will make sure targetPath:
+// 1. is not abs path
 // 2. does not contain '..'
 // 3. does not start with '..'
 func validateVolumeSourcePath(targetPath string, fldPath *field.Path) field.ErrorList {
@@ -1168,6 +1190,9 @@ func validateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be unique"))
 		}
 		mountpoints.Insert(mnt.MountPath)
+		if len(mnt.SubPath) > 0 {
+			allErrs = append(allErrs, validateSubPath(mnt.SubPath, fldPath.Child("subPath"))...)
+		}
 	}
 	return allErrs
 }
