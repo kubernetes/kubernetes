@@ -472,3 +472,12 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 // Option is a functional option type for Runtime, useful for
 // completely optional settings.
 type Option func(Runtime)
+
+// Sort the container statuses by creation time.
+type SortContainerStatusesByCreationTime []*ContainerStatus
+
+func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }
+func (s SortContainerStatusesByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortContainerStatusesByCreationTime) Less(i, j int) bool {
+	return s[i].CreatedAt.Before(s[j].CreatedAt)
+}
