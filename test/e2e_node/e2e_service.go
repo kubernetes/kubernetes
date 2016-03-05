@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 )
 
-var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*30, "Time to wait for each server to become healthy.")
+var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
 type e2eService struct {
 	etcdCmd              *exec.Cmd
