@@ -162,7 +162,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from
 
 You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
 
-This may be in `/etc/default/docker` or `/etc/systemd/service/docker.service` or it may be elsewhere.
+This may be in `/etc/default/docker`, `/etc/sysconfig/docker` or `/etc/systemd/service/docker.service` or it may be elsewhere.
 
 Regardless, you need to add the following to the docker command line:
 
