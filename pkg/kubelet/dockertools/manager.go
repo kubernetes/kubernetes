@@ -791,19 +791,16 @@ func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
 
 // podInfraContainerChanged returns true if the pod infra container has changed.
 func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContainerStatus *kubecontainer.ContainerStatus) (bool, error) {
-	networkMode := ""
 	var ports []api.ContainerPort
 
-	dockerPodInfraContainer, err := dm.client.InspectContainer(podInfraContainerStatus.ID.ID)
-	if err != nil {
-		return false, err
-	}
-
 	// Check network mode.
-	if dockerPodInfraContainer.HostConfig != nil {
-		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
-	}
 	if usesHostNetwork(pod) {
+		dockerPodInfraContainer, err := dm.client.InspectContainer(podInfraContainerStatus.ID.ID)
+		if err != nil {
+			return false, err
+		}
+
+		networkMode := getDockerNetworkMode(dockerPodInfraContainer)
 		if networkMode != namespaceModeHost {
 			glog.V(4).Infof("host: %v, %v", pod.Spec.SecurityContext.HostNetwork, networkMode)
 			return true, nil
@@ -833,6 +830,14 @@ func usesHostNetwork(pod *api.Pod) bool {
 // determine if the container root should be a read only filesystem.
 func readOnlyRootFilesystem(container *api.Container) bool {
 	return container.SecurityContext != nil && container.SecurityContext.ReadOnlyRootFilesystem != nil && *container.SecurityContext.ReadOnlyRootFilesystem
+}
+
+// container must not be nil
+func getDockerNetworkMode(container *docker.Container) string {
+	if container.HostConfig != nil {
+		return container.HostConfig.NetworkMode
+	}
+	return ""
 }
 
 // dockerVersion implementes kubecontainer.Version interface by implementing
@@ -1257,7 +1262,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 			result.Fail(err)
 			return
 		}
-		if ins.HostConfig != nil && ins.HostConfig.NetworkMode != namespaceModeHost {
+		if getDockerNetworkMode(ins) != namespaceModeHost {
 			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
 			result.AddSyncResult(teardownNetworkResult)
 			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.DockerID(networkContainer.ID.ID)); err != nil {
@@ -1577,12 +1582,10 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	netNamespace := ""
 	var ports []api.ContainerPort
 
-	if dm.networkPlugin.Name() == "cni" || dm.networkPlugin.Name() == "kubenet" {
-		netNamespace = "none"
-	}
-
 	if usesHostNetwork(pod) {
 		netNamespace = namespaceModeHost
+	} else if dm.networkPlugin.Name() == "cni" || dm.networkPlugin.Name() == "kubenet" {
+		netNamespace = "none"
 	} else {
 		// Docker only exports ports from the pod infra container.  Let's
 		// collect all of the relevant ports and export them.
@@ -1839,25 +1842,26 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 				}
 				return
 			}
-		}
 
-		// Setup the host interface unless the pod is on the host's network (FIXME: move to networkPlugin when ready)
-		var podInfraContainer *docker.Container
-		podInfraContainer, err = dm.client.InspectContainer(string(podInfraContainerID))
-		if err != nil {
-			glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
-			result.Fail(err)
-			return
-		}
-		if !usesHostNetwork(pod) && dm.configureHairpinMode {
-			if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, network.DefaultInterfaceName); err != nil {
-				glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
+			// Setup the host interface unless the pod is on the host's network (FIXME: move to networkPlugin when ready)
+			var podInfraContainer *docker.Container
+			podInfraContainer, err = dm.client.InspectContainer(string(podInfraContainerID))
+			if err != nil {
+				glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
+				result.Fail(err)
+				return
 			}
-		}
 
-		// Find the pod IP after starting the infra container in order to expose
-		// it safely via the downward API without a race and be able to use podIP in kubelet-managed /etc/hosts file.
-		pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+			if dm.configureHairpinMode {
+				if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, network.DefaultInterfaceName); err != nil {
+					glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
+				}
+			}
+
+			// Find the pod IP after starting the infra container in order to expose
+			// it safely via the downward API without a race and be able to use podIP in kubelet-managed /etc/hosts file.
+			pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		}
 	}
 
 	// Start everything
