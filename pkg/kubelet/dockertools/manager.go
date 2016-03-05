@@ -1979,9 +1979,17 @@ func getUidFromUser(id string) string {
 // backoff deadline. However, because that won't cause error and the chance is really slim, we can just ignore it for now.
 // If a container is still in backoff, the function will return a brief backoff error and a detailed error message.
 func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus *kubecontainer.PodStatus, backOff *util.Backoff) (bool, error, string) {
-	containerStatus := podStatus.FindContainerStatusByName(container.Name)
-	if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateExited && !containerStatus.FinishedAt.IsZero() {
-		ts := containerStatus.FinishedAt
+	var cStatus *kubecontainer.ContainerStatus
+	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
+	// TODO(random-liu): Better define backoff start point; add unit and e2e test after we finalize this. (See github issue #22240)
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
+			cStatus = c
+			break
+		}
+	}
+	if cStatus != nil {
+		ts := cStatus.FinishedAt
 		// found a container that requires backoff
 		dockerName := KubeletContainerName{
 			PodFullName:   kubecontainer.GetPodFullName(pod),
@@ -1998,7 +2006,6 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 			return true, kubecontainer.ErrCrashLoopBackOff, err.Error()
 		}
 		backOff.Next(stableName, ts)
-
 	}
 	return false, nil, ""
 }
