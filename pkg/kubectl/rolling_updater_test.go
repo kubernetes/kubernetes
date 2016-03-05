@@ -541,7 +541,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 10, newReady: 20, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 20 pods available, don't exceed 70 pods)
+Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 20 pods available, don't exceed 80 pods)
 Scaling foo-v2 up to 20
 Scaling foo-v1 down to 0
 `,
@@ -572,7 +572,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 3, newReady: 0, to: 0},
 			},
 			output: `Continuing update with existing controller foo-v2.
-Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 4 pods)
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 1 pods)
 Scaling foo-v1 down to 0
 `,
 		},
@@ -587,7 +587,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 3, newReady: 0, to: 0},
 			},
 			output: `Continuing update with existing controller foo-v2.
-Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 3 pods)
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 0 pods)
 Scaling foo-v1 down to 0
 `,
 		},
@@ -602,7 +602,7 @@ Scaling foo-v1 down to 0
 				down{oldReady: 3, newReady: 0, to: 0},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 3 pods)
+Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 3 to 0 (keep 0 pods available, don't exceed 0 pods)
 Scaling foo-v1 down to 0
 `,
 		},
@@ -628,14 +628,16 @@ Scaling up foo-v2 from 0 to 0, scaling down foo-v1 from 0 to 0 (keep 0 pods avai
 			maxSurge:    intstr.FromInt(0),
 			expected: []interface{}{
 				down{oldReady: 30, newReady: 0, to: 1},
-				up{2},
+				up{1},
 				down{oldReady: 1, newReady: 2, to: 0},
+				up{2},
 			},
 			output: `Created foo-v2
-Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 30 to 0 (keep 1 pods available, don't exceed 30 pods)
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 30 to 0 (keep 1 pods available, don't exceed 2 pods)
 Scaling foo-v1 down to 1
-Scaling foo-v2 up to 2
+Scaling foo-v2 up to 1
 Scaling foo-v1 down to 0
+Scaling foo-v2 up to 2
 `,
 		},
 		{
@@ -674,6 +676,23 @@ Scaling foo-v2 up to 2
 Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (keep 0 pods available, don't exceed 1 pods)
 Scaling foo-v1 down to 0
 Scaling foo-v2 up to 1
+`,
+		},
+		{
+			name:        "1->2 25/25 complex asymetric deployment",
+			oldRc:       oldRc(1, 1),
+			newRc:       newRc(0, 2),
+			newRcExists: false,
+			maxUnavail:  intstr.FromString("25%"),
+			maxSurge:    intstr.FromString("25%"),
+			expected: []interface{}{
+				up{2},
+				down{oldReady: 1, newReady: 2, to: 0},
+			},
+			output: `Created foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 1 to 0 (keep 2 pods available, don't exceed 3 pods)
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
 `,
 		},
 	}
