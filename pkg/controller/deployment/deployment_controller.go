@@ -310,7 +310,7 @@ func (dc *DeploymentController) addPod(obj interface{}) {
 	if !ok {
 		return
 	}
-	glog.V(4).Infof("Pod %s created.", pod.Name)
+	glog.V(4).Infof("Pod %s created: %+v.", pod.Name, pod)
 	if d := dc.getDeploymentForPod(pod); d != nil {
 		dc.enqueueDeployment(d)
 	}
@@ -324,11 +324,11 @@ func (dc *DeploymentController) updatePod(old, cur interface{}) {
 		return
 	}
 	curPod := cur.(*api.Pod)
-	glog.V(4).Infof("Pod %s updated.", curPod.Name)
+	oldPod := old.(*api.Pod)
+	glog.V(4).Infof("Pod %s updated %+v -> %+v.", curPod.Name, oldPod, curPod)
 	if d := dc.getDeploymentForPod(curPod); d != nil {
 		dc.enqueueDeployment(d)
 	}
-	oldPod := old.(*api.Pod)
 	if !api.Semantic.DeepEqual(oldPod, curPod) {
 		if oldD := dc.getDeploymentForPod(oldPod); oldD != nil {
 			dc.enqueueDeployment(oldD)
@@ -357,7 +357,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s deleted.", pod.Name)
+	glog.V(4).Infof("Pod %s deleted: %+v.", pod.Name, pod)
 	if d := dc.getDeploymentForPod(pod); d != nil {
 		dc.enqueueDeployment(d)
 	}
