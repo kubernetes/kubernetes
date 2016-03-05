@@ -57,6 +57,10 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	if status.State == ContainerStateRunning {
 		return false
 	}
+	// Always restart container in unknown state now
+	if status.State == ContainerStateUnknown {
+		return true
+	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == api.RestartPolicyNever {
 		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
