@@ -1,0 +1,7 @@
+---
+etcd_name : 'etcd-{{etcd_version}}-linux-amd64'
+etcd_tgz : '{{etcd_name}}.tar.gz'
+etcd_tgz_url : 'http://github.com/coreos/etcd/releases/download/{{etcd_version}}/{{etcd_tgz}}'
+
+##
+etcd_data_dir :  /var/lib/etcd/default.etcd

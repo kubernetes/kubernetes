@@ -1,0 +1,123 @@
+---
+- name: Gather facts on all hosts in cluster
+  hosts: all
+  gather_facts: True
+
+- name: prepare PKI credentials
+  hosts: localhost
+  gather_facts: False
+
+  vars_files:
+    - vars.yml
+    - "{{ config_vars }}"
+  vars:
+    - clc_cluster_home: "{{ lookup('env','HOME') }}/.clc_kube/{{ clc_cluster_name }}"
+    - cert_dir: "{{ clc_cluster_home }}/pki"
+
+  pre_tasks:
+    - name: include vars for master configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+  roles:
+
+    - role: k8s_certificates
+      create_ca: True
+      create_server: True
+      cert_client: kubecfg
+
+    - role: k8s_certificates
+      cert_client: kubectl
+
+
+- name: Provision kubernetes Master
+  hosts: kube-master
+  gather_facts: True
+  vars_files:
+    - vars.yml
+    - "{{ config_vars }}"
+  vars:
+    - apiserver_endpoint: https://{{ ansible_default_ipv4.address }}:6443
+
+    - clc_cluster_home: "{{ lookup('env','HOME') }}/.clc_kube/{{ clc_cluster_name }}"
+    - kube_config_local: "{{ clc_cluster_home }}/kube"
+    - cert_dir: "{{ clc_cluster_home }}/pki"
+
+    - ca_cert_b64: "{{ lookup('file', cert_dir+'/ca.crt') | b64encode }}"
+    - server_cert_b64: "{{ lookup('file', cert_dir+'/server.crt') | b64encode }}"
+    - server_key_b64: "{{ lookup('file', cert_dir+'/server.key') | b64encode }}"
+    - kubecfg_cert_b64: "{{ lookup('file', cert_dir+'/kubecfg.crt') | b64encode }}"
+    - kubecfg_key_b64: "{{ lookup('file', cert_dir+'/kubecfg.key') | b64encode }}"
+
+  pre_tasks:
+    - name: set master ip address
+      set_fact: master_ip={{ ansible_default_ipv4.address }}
+    - name: Set etcd url for cluster in group "{{ etcd_group }}"
+      set_fact:
+        etcd_endpoint: "{% for host in groups[etcd_group] %}http://{{ hostvars[host]['ansible_default_ipv4']['address'] }}:2379{% if not loop.last %},{% endif %}{% endfor %}"
+    - name: include vars for master configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+  roles:
+    - resolv
+    - etcd
+    - flannel
+    - flannel-network
+    - flannel-client
+    - kubernetes
+    - kubernetes-master
+
+- name: Save master configuration information to minion_config
+  hosts: localhost
+
+  vars:
+    - clc_cluster_home: "{{ lookup('env','HOME') }}/.clc_kube/{{ clc_cluster_name }}"
+
+  tasks:
+    - name: master_ip -> minion config
+      lineinfile:
+        dest: "{{ clc_cluster_home }}/config/minion_config.yml"
+        line: "master_ip: {{ hostvars[ item ].ansible_default_ipv4.address  }}"
+        state: present
+        regexp: "^master_ip:"
+      with_items: "{{groups['kube-master'][0]}}"
+
+
+- name: Provision kubernetes node
+  hosts: kube-node
+
+  vars_files:
+    - vars.yml
+    - "{{ config_vars }}"
+  vars:
+    - clc_cluster_home: "{{ lookup('env','HOME') }}/.clc_kube/{{ clc_cluster_name }}"
+    - cert_dir: "{{ clc_cluster_home }}/pki"
+
+    - ca_cert_b64: "{{ lookup('file', cert_dir+'/ca.crt') | b64encode }}"
+    - kubecfg_cert_b64: "{{ lookup('file', cert_dir+'/kubecfg.crt') | b64encode }}"
+    - kubecfg_key_b64: "{{ lookup('file', cert_dir+'/kubecfg.key') | b64encode }}"
+
+  pre_tasks:
+
+    - name: include vars for minion configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+    - set_fact:
+        master_ip: "{{ hostvars[ item ].ansible_default_ipv4.address }}"
+      with_items: "{{groups['kube-master'][0]}}"
+      when: master_ip is not defined
+
+    - set_fact:
+        apiserver_endpoint: "https://{{ master_ip }}:6443"
+
+  roles:
+    - resolv
+    - etcd
+    - flannel
+    - flannel-client
+    - docker
+    - docker-flannel
+    - kubernetes
+    - kubernetes-node

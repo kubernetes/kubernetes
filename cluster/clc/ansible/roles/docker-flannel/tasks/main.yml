@@ -1,0 +1,37 @@
+- name: Install required packages.
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - bridge-utils
+
+- name: Get the flannel mtu value from the subnet.env file.
+  shell: cat /run/flannel/subnet.env | grep FLANNEL_MTU | cut -f2 -d"="
+  register: flannel_mtu
+  changed_when: False
+
+- name: Get the flannel subnet value from the subnet.env file.
+  shell: cat /run/flannel/subnet.env | grep FLANNEL_SUBNET | cut -f2 -d"="
+  register: flannel_subnet
+  changed_when: False
+
+- name: Update facts with flannel values.
+  set_fact:
+    flannel_mtu: "{{ flannel_mtu.stdout }}"
+    flannel_subnet: "{{ flannel_subnet.stdout }}"
+
+#- debug: msg={{ flannel_mtu }}
+#- debug: msg={{ flannel_subnet }}
+
+- name: Update docker with flannel configuration.
+  lineinfile:
+    dest: /etc/default/docker
+    regexp: '^DOCKER_OPTS'
+    line: 'DOCKER_OPTS="-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock --bip={{ flannel_subnet }} --mtu={{ flannel_mtu }} {{ docker_opts }}"'
+  notify:
+    - reload docker
+
+- name: Docker service is running
+  service:
+    name: docker
+    state: running

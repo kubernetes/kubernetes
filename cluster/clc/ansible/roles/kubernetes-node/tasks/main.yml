@@ -1,0 +1,40 @@
+
+- name: Create kubelet/kube-proxy config directory
+  file:
+    path: /var/lib/kubelet
+    state: directory
+
+- name: Template kubelet config with certificate data
+  template:
+    src: roles/kubernetes-node/templates/kubelet-kubeconfig.j2
+    dest: /var/lib/kubelet/kubeconfig
+  notify:
+    - restart kubelet
+
+- name: Add kubelet service configuration.
+  template:
+    src: kubelet.conf.j2
+    dest: /etc/init/kubelet.conf
+  notify:
+    - restart kubelet
+
+- name: Run kubelet service.
+  service:
+    name: kubelet
+    state: running
+    enabled: True
+
+- name: Add kube-proxy service configuration.
+  template:
+    src: kube-proxy.conf.j2
+    dest: /etc/init/kube-proxy.conf
+  notify:
+    - restart kube-proxy
+
+- name: Run kube-proxy service.
+  service:
+    name: kube-proxy
+    enabled: True
+    state: running
+
+- meta: flush_handlers

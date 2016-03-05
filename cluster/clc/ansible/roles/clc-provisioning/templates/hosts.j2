@@ -1,0 +1,5 @@
+
+[{{ server_group }}]
+{% for item in clc_servers.servers %}
+{{ item.name }}   ansible_ssh_host={{ item.ipaddress }} ansible_ssh_private_key_file={{ server_cert_store }}/id_rsa ansible_ssh_user=root 
+{% endfor %}

@@ -1,0 +1,13 @@
+---
+
+- name: create facts.d directory
+  action: file path=/etc/ansible/facts.d state=directory owner=root group=root
+  tags:
+    - resolv 
+    - facts
+
+- name: create facts file
+  action: template src=facts.j2 dest=/etc/ansible/facts.d/resolv.fact mode=0644 owner=root group=root
+  tags:
+    - resolv
+    - facts

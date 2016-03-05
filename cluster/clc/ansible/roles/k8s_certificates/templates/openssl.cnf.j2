@@ -1,0 +1,18 @@
+[req]
+default_md = sha256
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+IP.1 = {{ cluster_k8s_service_vip }}
+{% for host in groups['kube-master'] %}
+{% set offset = loop.index + 1 %}
+IP.{{ offset }} = {{ hostvars[host]['ansible_default_ipv4']['address'] }}
+{% endfor %}

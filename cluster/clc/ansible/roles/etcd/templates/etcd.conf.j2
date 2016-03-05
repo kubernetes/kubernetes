@@ -1,0 +1,26 @@
+
+export ETCD_NAME={{ ansible_hostname }}
+
+## /var/lib/etcd/default.etcd
+export ETCD_DATA_DIR={{ etcd_data_dir }}
+
+## -listen-client-urls http://10.0.1.11:2379,http://127.0.0.1:2379
+export ETCD_LISTEN_CLIENT_URLS="http://{{ ansible_default_ipv4['address'] }}:2379,http://127.0.0.1:2379"
+
+## -advertise-client-urls http://10.0.1.11:2379 \
+export ETCD_ADVERTISE_CLIENT_URLS="http://{{ ansible_default_ipv4['address'] }}:2379"
+
+## -listen-peer-urls http://10.0.1.11:2380
+export ETCD_LISTEN_PEER_URLS="http://{{ ansible_default_ipv4['address'] }}:2380"
+
+## -initial-advertise-peer-urls http://10.0.1.11:2380
+export ETCD_INITIAL_ADVERTISE_PEER_URLS="http://{{ ansible_default_ipv4['address'] }}:2380"
+
+## -initial-cluster infra0=http://10.0.1.10:2380,infra1=http://10.0.1.11:2380,infra2=http://10.0.1.12:2380 \
+export ETCD_INITIAL_CLUSTER="{% for host in groups[etcd_group]  %}{{ host }}=http://{{ hostvars[host]['ansible_default_ipv4']['address'] }}:2380{% if not loop.last %},{% endif %}{% endfor %}"
+
+## -initial-cluster-state new
+export ETCD_INITIAL_CLUSTER_STATE="new"
+
+## -initial-cluster-token etcd-cluster-1 \
+export ETCD_INITIAL_CLUSTER_TOKEN="etcd-initial-token-{{ etcd_cluster_name}}"

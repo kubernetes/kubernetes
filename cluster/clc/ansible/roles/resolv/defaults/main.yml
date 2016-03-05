@@ -1,0 +1,14 @@
+---
+# defaults file for resolv
+
+resolv_domain: "{{ cluster_dns_domain }}"
+
+resolv_search: []
+
+resolv_nameserver:
+  - "8.8.8.8"
+  - "8.8.4.4"
+
+resolv_sortlist: []
+
+resolv_options: []

@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kibana-logging
+  namespace: kube-system
+  labels:
+    component: kibana-logging
+spec:
+  replicas: 1
+  selector:
+    component: kibana-logging
+  template:
+    metadata:
+      labels:
+        component: kibana-logging
+    spec:
+      containers:
+      - name: kibana-logging
+        resources:
+          # keep request = limit to keep this container in guaranteed class
+          limits:
+            cpu: 100m
+          requests:
+            cpu: 100m
+        image: kibana:4.3.1
+        env:
+        - name: ELASTICSEARCH_URL
+          value: "http://elasticsearch-logging:9200"
+        ports:
+        - containerPort: 5601
+          name: ui
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-logging
+  namespace: kube-system
+  labels:
+      kubernetes.io/cluster-service: "true"
+      kubernetes.io/name: "kibana-logging"
+      component: "kibana-logging"
+spec:
+  type: NodePort
+  ports:
+  - port: 5601
+    nodePort: 30056
+    protocol: TCP
+    targetPort: ui
+  selector:
+    component: kibana-logging

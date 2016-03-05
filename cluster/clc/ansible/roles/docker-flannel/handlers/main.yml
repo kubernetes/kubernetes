@@ -1,0 +1,26 @@
+---
+- name: reload docker
+  command: /bin/true
+  notify:
+    - stop docker
+    - shutdown docker0
+    - remove docker0
+    - restart docker
+
+- name: stop docker
+  service:
+    name: docker
+    state: stopped
+
+- name: shutdown docker0
+  command: ip link set dev docker0 down
+  ignore_errors: yes
+
+- name: remove docker0
+  command: brctl delbr docker0
+  ignore_errors: yes
+
+- name: restart docker
+  service:
+    name: docker
+    state: restarted

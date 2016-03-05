@@ -1,0 +1,24 @@
+- name: Create flannel network configuration.
+  template:
+    src: flannel-config.json.j2
+    dest: /tmp/flannel-config.json
+  changed_when: False
+
+- name: fetch current network configuration
+  shell: etcdctl --endpoint={{ etcd_endpoint }} get /coreos.com/network/config
+  register: flannel_config_etcd
+  failed_when: False
+  changed_when: False
+
+- name: read network configuration
+  shell: cat /tmp/flannel-config.json
+  register: flannel_config_file
+  failed_when: False
+  changed_when: False
+
+#- debug: var=flannel_config_file
+#- debug: var=flannel_config_etcd
+
+- name: Deploy network configuration to etcd
+  shell: etcdctl --endpoint={{ etcd_endpoint }} set /coreos.com/network/config < /tmp/flannel-config.json
+  when: "'''{{ flannel_config_etcd.stdout }}''' != '''{{ flannel_config_file.stdout }}'''"

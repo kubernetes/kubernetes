@@ -1,0 +1,22 @@
+description "kubelet service"
+author "mark ramach"
+
+script
+
+	KUBELET_OPTS="\
+		--address=0.0.0.0 \
+		--allow-privileged={{ allow_privileged }}\
+		--api-servers={{ apiserver_endpoint }} \
+		--cadvisor-port=4194 \
+		--cluster-dns={{ cluster_dns_service_vip }} \
+		--cluster-domain={{ cluster_dns_domain }} \
+		--config="/etc/kubernetes/manifests" \
+		--hostname-override={{ ansible_ssh_host }} \
+		--kubeconfig="/var/lib/kubelet/kubeconfig" \
+		--serialize-image-pulls=false\
+		--register-node=true \
+		"
+
+	exec kubelet $KUBELET_OPTS > /var/log/kubelet.log
+
+end script

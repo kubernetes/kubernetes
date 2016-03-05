@@ -1,0 +1,4 @@
+ansible>=2.0
+requests>=2.5
+clc-sdk>=2.40
+clc-ansible-module>=1.1.2

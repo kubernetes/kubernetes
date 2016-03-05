@@ -1,0 +1,13 @@
+description "kube-scheduler service"
+author "mark ramach"
+
+script
+
+	KUBE_SCHEDULER_OPTS="\
+	--address=0.0.0.0 \
+	--kubeconfig=/srv/kubernetes/kubeconfig \
+	--v=1 \
+	"
+  exec kube-scheduler $KUBE_SCHEDULER_OPTS > /var/log/kube-scheduler.log
+  
+end script

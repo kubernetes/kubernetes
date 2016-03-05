@@ -1,0 +1,6 @@
+cluster_service_vip_range: 10.0.0.0/16
+cluster_k8s_service_vip: 10.0.0.1
+cluster_dns_replicas: 1
+cluster_dns_service_vip: 10.0.0.10
+cluster_dns_domain: cluster.local
+flannel_network: 10.244.0.0/16

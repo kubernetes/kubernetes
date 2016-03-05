@@ -1,0 +1,10 @@
+description "flanneld service"
+author "mark ramach"
+
+script
+
+	FLANNELD_OPTS="-etcd-endpoints={{ etcd_endpoint }} -etcd-prefix=/coreos.com/network"
+
+	exec flanneld $FLANNELD_OPTS
+
+end script

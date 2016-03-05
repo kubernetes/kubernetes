@@ -1,0 +1,38 @@
+---
+galaxy_info:
+  author: Peter Hudec
+  description: role for setting /etc/resolv.conf
+  company: CNC, a.s.
+  license: BSD
+  min_ansible_version: 1.4
+  #
+  # Below are all platforms currently available. Just uncomment
+  # the ones that apply to your role. If you don't see your 
+  # platform on this list, let us know and we'll get it added!
+  #
+  platforms:
+  - name: EL
+    versions:
+    - all
+  - name: Fedora
+    versions:
+    - all
+  - name: opensuse
+    versions:
+    - all
+  - name: Ubuntu
+    versions:
+    - all
+  - name: SLES
+    versions:
+    - all
+  - name: GenericLinux
+    versions:
+    - all
+  - name: Debian
+    versions:
+    - all
+  categories:
+  - system
+
+dependencies: []

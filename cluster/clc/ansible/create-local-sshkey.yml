@@ -1,0 +1,8 @@
+---
+- name: Create local ssh-key
+  hosts: localhost
+  gather_facts: False
+  connection: local
+
+  roles:
+    - local-sshkey

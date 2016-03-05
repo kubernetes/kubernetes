@@ -1,0 +1,21 @@
+---
+# defaults file for resolv
+
+resolv_domain: "{{ cluster_dns_domain }}"
+
+resolv_search:
+  - "{{ cluster_dns_domain }}"
+  - "svc.{{ cluster_dns_domain }}"
+  - "default.svc.{{ cluster_dns_domain }}"
+
+# at the time that this role is applied, the
+# kubernetes cluster_dns_service_vip _does not exist_
+# so it must not be the primary nameserver
+resolv_nameserver:
+  - "{{ cluster_dns_service_vip }}"
+  - "8.8.8.8"
+  - "8.8.4.4"
+
+resolv_sortlist: []
+resolv_options:
+  - ndots:5

@@ -1,0 +1,32 @@
+---
+- name: Check ansible version
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - fail: msg="This playbook requires Ansible 2.0 or greater (found {{ ansible_version.full }})."
+      when: "{{ ansible_version|version_compare(2.0,'<') }}"
+
+- name: Get machine resources for k8s master
+  hosts: localhost
+  gather_facts: True
+  connection: local
+
+  # playbook default variable definitions
+  vars:
+    - server_group: master
+    - datacenter: VA1
+    - server_count: 1
+    - server_memory: 4
+    - server_cpu: 2
+    - skip_master: False
+    - async_time: 7200
+    - async_poll: 5
+
+  pre_tasks:
+    - name: include vars for master configuration
+      include_vars: "{{ config_vars }}"
+      when: config_vars is defined
+
+  roles:
+    - { role: clc-provisioning, when: skip_master == False }

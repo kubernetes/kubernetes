@@ -1,0 +1,45 @@
+---
+
+- name: download etcd
+  get_url: url={{etcd_tgz_url}} dest=/tmp/{{etcd_tgz}}
+
+- name: unachive etcd
+  unarchive: copy=no src='/tmp/{{etcd_tgz}}' dest='{{etcd_install_dir}}'
+
+- name: link etcd and etcdctl
+  file: >
+    src='{{etcd_install_dir}}/{{etcd_name}}/{{item}}'
+    dest='{{etcd_install_dir}}/{{item}}'
+    state=link
+    force=yes
+  with_items:
+    - etcd
+    - etcdctl
+
+- block:
+
+  - name: set config
+    template: src=etcd.conf.j2 dest=/etc/default/etcd
+
+  - name: install Upstart script
+    copy:
+      src: etcd.conf
+      dest: /etc/init/etcd.conf
+
+  - name: create /var/etcd/
+    file:
+      path: /var/etcd
+      state: directory
+
+  #- name: clear datadir
+  #  file: path="{{ etcd_data_dir }}" state=absent
+
+  - name: restore datadir
+    file:
+      path: "{{ etcd_data_dir }}"
+      state: directory
+
+  - name: run etcd service
+    service: name=etcd state=running
+
+  when: "{{ etcd_install_and_run_service }}"
