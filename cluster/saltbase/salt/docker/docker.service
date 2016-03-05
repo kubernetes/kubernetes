@@ -1,10 +1,11 @@
 [Unit]
 Description=Docker Application Container Engine
-Documentation=http://docs.docker.com
+Documentation=https://docs.docker.com
 After=network.target docker.socket
 Requires=docker.socket
 
 [Service]
+Type=notify
 EnvironmentFile={{ environment_file }}
 ExecStart=/usr/bin/docker daemon -H fd:// "$DOCKER_OPTS"
 MountFlags=slave
@@ -14,7 +15,7 @@ LimitCORE=infinity
 Restart=always
 RestartSec=2s
 StartLimitInterval=0
+ExecStartPre=/opt/kubernetes/helpers/docker-prestart
 
 [Install]
 WantedBy=multi-user.target
-

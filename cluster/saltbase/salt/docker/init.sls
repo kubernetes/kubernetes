@@ -51,6 +51,13 @@ docker:
 
 {% if pillar.get('is_systemd') %}
 
+/opt/kubernetes/helpers/docker-prestart:
+  file.managed:
+    - source: salt://docker/docker-prestart
+    - user: root
+    - group: root
+    - mode: 755
+
 {{ pillar.get('systemd_system_path') }}/docker.service:
   file.managed:
     - source: salt://docker/docker.service
@@ -60,6 +67,8 @@ docker:
     - mode: 644
     - defaults:
         environment_file: {{ environment_file }}
+    - require:
+      - file: /opt/kubernetes/helpers/docker-prestart
 
 # The docker service.running block below doesn't work reliably
 # Instead we run our script which e.g. does a systemd daemon-reload
@@ -297,9 +306,16 @@ docker-upgrade:
       - file: /var/cache/docker-install/{{ override_deb }}
 {% endif %} # end override_docker_ver != ''
 
-# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
 {% if pillar.get('is_systemd') %}
 
+/opt/kubernetes/helpers/docker-prestart:
+  file.managed:
+    - source: salt://docker/docker-prestart
+    - user: root
+    - group: root
+    - mode: 755
+
+# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
 {{ pillar.get('systemd_system_path') }}/docker.service:
   file.managed:
     - source: salt://docker/docker.service
@@ -309,6 +325,8 @@ docker-upgrade:
     - mode: 644
     - defaults:
         environment_file: {{ environment_file }}
+    - require:
+      - file: /opt/kubernetes/helpers/docker-prestart
 
 # The docker service.running block below doesn't work reliably
 # Instead we run our script which e.g. does a systemd daemon-reload
@@ -316,7 +334,7 @@ docker-upgrade:
 # TODO: Fix this
 fix-service-docker:
   cmd.wait:
-    - name: /opt/kubernetes/helpers/services bounce docker
+    - name: /opt/kubernetes/helpers/services enable docker
     - watch:
       - file: {{ pillar.get('systemd_system_path') }}/docker.service
       - file: {{ environment_file }}
@@ -325,30 +343,77 @@ fix-service-docker:
       - cmd: docker-upgrade
 {% endif %}
 
+/opt/kubernetes/helpers/docker-healthcheck:
+  file.managed:
+    - source: salt://docker/docker-healthcheck
+    - user: root
+    - group: root
+    - mode: 755
+
+{{ pillar.get('systemd_system_path') }}/docker-healthcheck.service:
+  file.managed:
+    - source: salt://docker/docker-healthcheck.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+
+{{ pillar.get('systemd_system_path') }}/docker-healthcheck.timer:
+  file.managed:
+    - source: salt://docker/docker-healthcheck.timer
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+
+# Tell systemd to load the timer
+fix-systemd-docker-healthcheck-timer:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker-healthcheck.timer
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker-healthcheck.timer
+
+# Trigger a first run of docker-healthcheck; needed because the timer fires 10s after the previous run.
+fix-systemd-docker-healthcheck-service:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker-healthcheck.service
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker-healthcheck.service
+    - require:
+      - cmd: fix-service-docker
+
 {% endif %}
 
 docker:
-  service.running:
 # Starting Docker is racy on aws for some reason.  To be honest, since Monit
 # is managing Docker restart we should probably just delete this whole thing
 # but the kubernetes components use salt 'require' to set up a dag, and that
 # complicated and scary to unwind.
+# On AWS, we use a trick now... we don't start the docker service through Salt.
+# Kubelet or our health checker will start it.  But we use service.enabled,
+# so we still have a `service: docker` node for our DAG.
 {% if grains.cloud is defined and grains.cloud == 'aws' %}
-    - enable: False
+  service.enabled:
 {% else %}
+  service.running:
     - enable: True
 {% endif %}
+# If we put a watch on this, salt will try to start the service.
+# We put the watch on the fixer instead
+{% if not pillar.get('is_systemd') %}
     - watch:
+      - file: {{ environment_file }}
+{% if override_docker_ver != '' %}
+      - cmd: docker-upgrade
+{% endif %}
+{% endif %}
+    - require:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
       - cmd: docker-upgrade
 {% endif %}
 {% if pillar.get('is_systemd') %}
-      - file: {{ pillar.get('systemd_system_path') }}/docker.service
-{% endif %}
-{% if override_docker_ver != '' %}
-    - require:
-      - cmd: docker-upgrade
+      - cmd: fix-service-docker
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'
 
