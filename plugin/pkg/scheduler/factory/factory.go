@@ -444,7 +444,7 @@ func (b *backoffEntry) tryLock() bool {
 // unlock returns the lock.  panics if the lock isn't held
 func (b *backoffEntry) unlock() {
 	if !atomic.CompareAndSwapInt32(&b.reqInFlight, 1, 0) {
-		panic(fmt.Sprintf("unexpected state on unlocking: %v", b))
+		panic(fmt.Sprintf("unexpected state on unlocking: %+v", b))
 	}
 }
 
@@ -465,7 +465,7 @@ func (entry *backoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
 		newDuration = maxDuration
 	}
 	entry.backoff = newDuration
-	glog.V(4).Infof("Backing off %s for pod %v", duration.String(), entry)
+	glog.V(4).Infof("Backing off %s for pod %+v", duration.String(), entry)
 	return duration
 }
 
