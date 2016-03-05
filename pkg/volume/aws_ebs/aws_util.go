@@ -126,10 +126,12 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 	return nil
 }
 
-func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, err error) {
+// CreateVolume creates an AWS EBS volume.
+// Returns: volumeID, volumeSizeGB, labels, error
+func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (string, int, map[string]string, error) {
 	cloud, err := getCloudProvider()
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 
 	// AWS volumes don't have Name field, store the name in Name tag
@@ -152,10 +154,17 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volum
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating EBS Disk volume: %v", err)
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	glog.V(2).Infof("Successfully created EBS Disk volume %s", name)
-	return name, int(requestGB), nil
+
+	labels, err := cloud.GetVolumeLabels(name)
+	if err != nil {
+		// We don't really want to leak the volume here...
+		glog.Errorf("error building labels for new EBS volume %q: %v", name, err)
+	}
+
+	return name, int(requestGB), labels, nil
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
