@@ -1596,10 +1596,80 @@ func isEqualUserGroupPair(l, r *ec2.UserIdGroupPair, compareGroupUserIDs bool) b
 	return false
 }
 
+// Makes sure the security group ingress is exactly the specified permissions
+// Returns true if and only if changes were made
+// The security group must already exist
+func (s *AWSCloud) setSecurityGroupIngress(securityGroupId string, permissions IPPermissionSet) (bool, error) {
+	group, err := s.findSecurityGroup(securityGroupId)
+	if err != nil {
+		glog.Warning("Error retrieving security group", err)
+		return false, err
+	}
+
+	if group == nil {
+		return false, fmt.Errorf("security group not found: %s", securityGroupId)
+	}
+
+	glog.V(2).Infof("Existing security group ingress: %s %v", securityGroupId, group.IpPermissions)
+
+	actual := NewIPPermissionSet(group.IpPermissions...)
+
+	// EC2 groups rules together, for example combining:
+	//
+	// { Port=80, Range=[A] } and { Port=80, Range=[B] }
+	//
+	// into { Port=80, Range=[A,B] }
+	//
+	// We have to ungroup them, because otherwise the logic becomes really
+	// complicated, and also because if we have Range=[A,B] and we try to
+	// add Range=[A] then EC2 complains about a duplicate rule.
+	permissions = permissions.Ungroup()
+	actual = actual.Ungroup()
+
+	remove := actual.Difference(permissions)
+	add := permissions.Difference(actual)
+
+	if add.Len() == 0 && remove.Len() == 0 {
+		return false, nil
+	}
+
+	// TODO: There is a limit in VPC of 100 rules per security group, so we
+	// probably should try grouping or combining to fit under this limit.
+	// But this is only used on the ELB security group currently, so it
+	// would require (ports * CIDRS) > 100.  Also, it isn't obvious exactly
+	// how removing single permissions from compound rules works, and we
+	// don't want to accidentally open more than intended while we're
+	// applying changes.
+	if add.Len() != 0 {
+		glog.V(2).Infof("Adding security group ingress: %s %v", securityGroupId, add.List())
+
+		request := &ec2.AuthorizeSecurityGroupIngressInput{}
+		request.GroupId = &securityGroupId
+		request.IpPermissions = add.List()
+		_, err = s.ec2.AuthorizeSecurityGroupIngress(request)
+		if err != nil {
+			return false, fmt.Errorf("error authorizing security group ingress: %v", err)
+		}
+	}
+	if remove.Len() != 0 {
+		glog.V(2).Infof("Remove security group ingress: %s %v", securityGroupId, remove.List())
+
+		request := &ec2.RevokeSecurityGroupIngressInput{}
+		request.GroupId = &securityGroupId
+		request.IpPermissions = remove.List()
+		_, err = s.ec2.RevokeSecurityGroupIngress(request)
+		if err != nil {
+			return false, fmt.Errorf("error revoking security group ingress: %v", err)
+		}
+	}
+
+	return true, nil
+}
+
 // Makes sure the security group includes the specified permissions
 // Returns true if and only if changes were made
 // The security group must already exist
-func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IpPermission) (bool, error) {
+func (s *AWSCloud) addSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("Error retrieving security group", err)
@@ -2020,7 +2090,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 			ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
 		}
 
-		permissions := []*ec2.IpPermission{}
+		permissions := NewIPPermissionSet()
 		for _, port := range ports {
 			portInt64 := int64(port.Port)
 			protocol := strings.ToLower(string(port.Protocol))
@@ -2031,9 +2101,9 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 			permission.IpRanges = ec2SourceRanges
 			permission.IpProtocol = &protocol
 
-			permissions = append(permissions, permission)
+			permissions.Insert(permission)
 		}
-		_, err = s.ensureSecurityGroupIngress(securityGroupID, permissions)
+		_, err = s.setSecurityGroupIngress(securityGroupID, permissions)
 		if err != nil {
 			return nil, err
 		}
@@ -2285,7 +2355,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		permissions := []*ec2.IpPermission{permission}
 
 		if add {
-			changed, err := s.ensureSecurityGroupIngress(instanceSecurityGroupId, permissions)
+			changed, err := s.addSecurityGroupIngress(instanceSecurityGroupId, permissions)
 			if err != nil {
 				return err
 			}
