@@ -141,7 +141,8 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 - [fedora/fedora_ansible_config.md](fedora/fedora_ansible_config.md)
 - [Fedora single node](fedora/fedora_manual_config.md)
 - [Fedora multi node](fedora/flannel_multi_node_cluster.md)
-- [Centos](centos/centos_manual_config.md)
+- [CentOS manual config](centos/centos_manual_config.md)
+- [CentOS automated deployment](centos/centos_baremetal.md)
 - [Ubuntu](ubuntu.md)
 - [Docker Multi Node](docker-multinode.md)
 
@@ -183,6 +184,7 @@ Bare-metal           | CoreOS       | CoreOS | Calico      | [docs](coreos/bare_
 CloudStack           | Ansible      | CoreOS | flannel     | [docs](cloudstack.md)                             |          | Community ([@runseb](https://github.com/runseb))
 Vmware               |              | Debian | OVS         | [docs](vsphere.md)                                |          | Community ([@pietern](https://github.com/pietern))
 Bare-metal           | custom       | CentOS | _none_      | [docs](centos/centos_manual_config.md)            |          | Community ([@coolsvap](https://github.com/coolsvap))
+Bare-metal           | custom       | CentOS | flannel     | [docs](centos/centos_baremetal.md)                |          | Community ([@kevin-wangzefeng](https://github.com/kevin-wangzefeng), [@alfred-huangjian](https://github.com/alfred-huangjian), [@hw-qiaolei](https://github.com/hw-qiaolei), [@huangyuqi](https://github.com/huangyuqi))
 AWS                  | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
 OpenStack/HPCloud    | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
 Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
