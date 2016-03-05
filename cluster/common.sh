@@ -715,3 +715,29 @@ function create-certs {
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
 }
+
+#
+# Using provided master env, extracts value from provided key.
+#
+# Args:
+# $1 master env (kube-env of master; result of calling get-master-env)
+# $2 env key to use
+function get-env-val() {
+  local match=`(echo "${1}" | grep ${2}) || echo ""`
+  if [[ -z ${match} ]]; then
+    echo ""
+  fi
+  echo ${match} | cut -d : -f 2 | cut -d \' -f 2
+}
+
+# Load the master env by calling get-master-env, and extract important values
+function parse-master-env() {
+  # Get required master env vars
+  local master_env=$(get-master-env)
+  KUBELET_TOKEN=$(get-env-val "${master_env}" "KUBELET_TOKEN")
+  KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
+  CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
+  EXTRA_DOCKER_OPTS=$(get-env-val "${master_env}" "EXTRA_DOCKER_OPTS")
+  KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
+  KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
+}

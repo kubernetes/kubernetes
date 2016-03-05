@@ -190,6 +190,16 @@ function detect-master() {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
+# Reads kube-env metadata from master
+#
+# Assumed vars:
+#   KUBE_MASTER_IP
+#   AWS_SSH_KEY
+#   SSH_USER
+function get-master-env() {
+  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo cat /etc/kubernetes/kube_env.yaml
+}
+
 
 function query-running-minions () {
   local query=$1
@@ -453,8 +463,14 @@ function authorize-security-group-ingress {
 function find-master-pd {
   local name=${MASTER_NAME}-pd
   if [[ -z "${MASTER_DISK_ID}" ]]; then
+    local zone_filter="Name=availability-zone,Values=${ZONE}"
+    if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
+      # If we're reusing an existing master, it is likely to be in another zone
+      # If running multizone, your cluster must be uniquely named across zones
+      zone_filter=""
+    fi
     MASTER_DISK_ID=`$AWS_CMD describe-volumes \
-                             --filters Name=availability-zone,Values=${ZONE} \
+                             --filters ${zone_filter} \
                                        Name=tag:Name,Values=${name} \
                                        Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                              --query Volumes[].VolumeId`
@@ -927,8 +943,8 @@ function kube-up {
 
   # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
   if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
-    # Detect existing master
     detect-master
+    parse-master-env
 
     # Start minions
     start-minions
