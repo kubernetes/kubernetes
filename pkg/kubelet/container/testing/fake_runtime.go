@@ -48,6 +48,7 @@ type FakeRuntime struct {
 	RuntimeType       string
 	Err               error
 	InspectErr        error
+	StatusErr         error
 }
 
 // FakeRuntime should implement Runtime.
@@ -108,6 +109,7 @@ func (f *FakeRuntime) ClearCalls() {
 	f.RuntimeType = ""
 	f.Err = nil
 	f.InspectErr = nil
+	f.StatusErr = nil
 }
 
 func (f *FakeRuntime) assertList(expect []string, test []string) error {
@@ -166,6 +168,14 @@ func (f *FakeRuntime) APIVersion() (Version, error) {
 
 	f.CalledFunctions = append(f.CalledFunctions, "APIVersion")
 	return &FakeVersion{Version: f.APIVersionInfo}, f.Err
+}
+
+func (f *FakeRuntime) Status() error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "Status")
+	return f.StatusErr
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
