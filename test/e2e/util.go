@@ -1967,6 +1967,7 @@ func startPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		_, err := c.Pods(namespace).Create(&pod)
 		expectNoError(err)
 	}
+	Logf("Waiting for running...")
 	if waitForRunning {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
 		err := waitForPodsWithLabelRunning(c, namespace, label)
