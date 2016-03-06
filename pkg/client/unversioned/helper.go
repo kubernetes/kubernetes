@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
+	// Import solely to initialize client auth plugins.
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 const (

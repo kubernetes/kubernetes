@@ -58,14 +58,17 @@ func Example_ofOptionsConfig() {
 	defaultConfig.AuthInfos["red-mage-via-token"] = &AuthInfo{
 		Token: "my-secret-token",
 	}
+	defaultConfig.AuthInfos["black-mage-via-auth-provider"] = &AuthInfo{
+		AuthProvider: &AuthProviderConfig{Name: "gcp"},
+	}
 	defaultConfig.Contexts["bravo-as-black-mage"] = &Context{
 		Cluster:   "bravo",
-		AuthInfo:  "black-mage-via-file",
+		AuthInfo:  "black-mage-via-auth-provider",
 		Namespace: "yankee",
 	}
 	defaultConfig.Contexts["alfa-as-black-mage"] = &Context{
 		Cluster:   "alfa",
-		AuthInfo:  "black-mage-via-file",
+		AuthInfo:  "black-mage-via-auth-provider",
 		Namespace: "zulu",
 	}
 	defaultConfig.Contexts["alfa-as-white-mage"] = &Context{
@@ -95,7 +98,7 @@ func Example_ofOptionsConfig() {
 	//     LocationOfOrigin: ""
 	//     cluster: alfa
 	//     namespace: zulu
-	//     user: black-mage-via-file
+	//     user: black-mage-via-auth-provider
 	//   alfa-as-white-mage:
 	//     LocationOfOrigin: ""
 	//     cluster: alfa
@@ -104,11 +107,15 @@ func Example_ofOptionsConfig() {
 	//     LocationOfOrigin: ""
 	//     cluster: bravo
 	//     namespace: yankee
-	//     user: black-mage-via-file
+	//     user: black-mage-via-auth-provider
 	// current-context: alfa-as-white-mage
 	// preferences:
 	//   colors: true
 	// users:
+	//   black-mage-via-auth-provider:
+	//     LocationOfOrigin: ""
+	//     auth-provider:
+	//       name: gcp
 	//   red-mage-via-token:
 	//     LocationOfOrigin: ""
 	//     token: my-secret-token
