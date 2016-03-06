@@ -31,7 +31,7 @@ function detect-jessie-image () {
     aws_account="721322707521"
     # TODO: we could use tags for the image
     if [[ -z "${AWS_IMAGE_NAME:-}" ]]; then
-      AWS_IMAGE_NAME="k8s-1.2-debian-jessie-amd64-hvm-2016-02-24-ebs"
+      AWS_IMAGE_NAME="k8s-1.2-debian-jessie-amd64-hvm-2016-03-05-ebs"
     fi
     AWS_IMAGE=`aws ec2 describe-images --owner ${aws_account} --filters Name=name,Values=${AWS_IMAGE_NAME} --query Images[].ImageId --output text`
     if [[ -z "${AWS_IMAGE-}" ]]; then

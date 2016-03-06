@@ -84,6 +84,10 @@ plugins:
        - [ 'chroot', '{root}', '/bin/sh', '-c', 'DEBIAN_FRONTEND=noninteractive dpkg --install /tmp/docker.deb' ]
        - [ 'rm', '{root}/tmp/docker.deb' ]
 
+       # Fix a cloud-init bug where it uses nobootwait
+       # see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=789884
+       - [ 'chroot', '{root}', '/bin/sh', '-c', 'echo "mount_default_fields: [~, ~, ''auto'', ''defaults,nofail'', ''0'', ''2'']" > /etc/cloud/cloud.cfg.d/99_kubernetes.cfg' ]
+
        # We perform a full replacement of some grub conf variables:
        #   GRUB_CMDLINE_LINUX_DEFAULT (add memory cgroup)
        #   GRUB_TIMEOUT (remove boot delay)
