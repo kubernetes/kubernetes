@@ -20,11 +20,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
 	fakev1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
 	fakev1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -53,7 +53,7 @@ type Clientset struct {
 	core.Fake
 }
 
-func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return &FakeDiscovery{&c.Fake}
 }
 

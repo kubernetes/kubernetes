@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -51,7 +52,7 @@ func New(c *restclient.Config) (*Client, error) {
 	}
 
 	discoveryConfig := *c
-	discoveryClient, err := NewDiscoveryClientForConfig(&discoveryConfig)
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(&discoveryConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -109,16 +110,6 @@ func MatchesServerVersion(client *Client, c *restclient.Config) error {
 	return nil
 }
 
-func ExtractGroupVersions(l *unversioned.APIGroupList) []string {
-	var groupVersions []string
-	for _, g := range l.Groups {
-		for _, gv := range g.Versions {
-			groupVersions = append(groupVersions, gv.GroupVersion)
-		}
-	}
-	return groupVersions
-}
-
 // NegotiateVersion queries the server's supported api versions to find
 // a version that both client and server support.
 // - If no version is provided, try registered client versions in order of
@@ -146,7 +137,7 @@ func NegotiateVersion(client *Client, c *restclient.Config, requestedGV *unversi
 		// not a negotiation specific error.
 		return nil, err
 	}
-	versions := ExtractGroupVersions(groups)
+	versions := unversioned.ExtractGroupVersions(groups)
 	serverVersions := sets.String{}
 	for _, v := range versions {
 		serverVersions.Insert(v)

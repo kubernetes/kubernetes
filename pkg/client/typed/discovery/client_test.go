@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package discovery
 
 import (
 	"encoding/json"
@@ -49,9 +49,9 @@ func TestGetServerVersion(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 
-	got, err := client.Discovery().ServerVersion()
+	got, err := client.ServerVersion()
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -85,13 +85,13 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerGroups should not return an error even if server returns error at /api and /apis
-	apiGroupList, err := client.Discovery().ServerGroups()
+	apiGroupList, err := client.ServerGroups()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	groupVersions := ExtractGroupVersions(apiGroupList)
+	groupVersions := unversioned.ExtractGroupVersions(apiGroupList)
 	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
 		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
 	}
@@ -122,9 +122,9 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
-	resourceMap, err := client.Discovery().ServerResources()
+	resourceMap, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -215,9 +215,9 @@ func TestGetServerResources(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := NewOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	for _, test := range tests {
-		got, err := client.Discovery().ServerResourcesForGroupVersion(test.request)
+		got, err := client.ServerResourcesForGroupVersion(test.request)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -233,7 +233,7 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	resourceMap, err := client.Discovery().ServerResources()
+	resourceMap, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -278,8 +278,8 @@ func TestGetSwaggerSchema(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
 
-	client := NewOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.Discovery().SwaggerSchema(v1.SchemeGroupVersion)
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -298,8 +298,8 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
 
-	client := NewOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.Discovery().SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
 	}
