@@ -223,6 +223,13 @@ install_kube_binary_config() {
     echo "Validated ${KUBE_MANIFESTS_TAR_URL} SHA1 = ${KUBE_MANIFESTS_TAR_HASH}"
   fi
   tar xzf "/run/kube-manifests/${manifests_tar}" -C /run/kube-manifests/ --overwrite
+  readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
+  if [ "${kube_addon_registry}" != "gcr.io/google_containers" ]; then
+    find /run/kube-manifests -name \*.yaml -or -name \*.yaml.in | \
+      xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
+    find /run/kube-manifests -name \*.manifest -or -name \*.json | \
+      xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
+  fi
   rm "/run/kube-manifests/${manifests_sha1}"
   rm "/run/kube-manifests/${manifests_tar}"
 }
