@@ -84,8 +84,8 @@ type FrameworkOptions struct {
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
 	options := FrameworkOptions{
-		clientQPS:   5,
-		clientBurst: 10,
+		clientQPS:   20,
+		clientBurst: 50,
 	}
 	return NewFramework(baseName, options)
 }
