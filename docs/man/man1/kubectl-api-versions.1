@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl api\-versions \- Print the supported API versions on the server, in the form of "group/version".
+kubectl api\-versions \- Print the supported API versions and/or resources on the server, in the form of "group/version".
 
 
 .SH SYNOPSIS
@@ -13,7 +13,33 @@ kubectl api\-versions \- Print the supported API versions on the server, in the 
 
 .SH DESCRIPTION
 .PP
-Print the supported API versions on the server, in the form of "group/version".
+Print the supported API versions and/or resources on the server.
+
+.PP
+When run without flags, this command prints out API versions in the form of
+"group/version".
+
+.PP
+When run with \-\-show\-resources, this command prints out all resources in all
+API versions.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-\-only\-namespaced\fP=false
+    Only show namespaced resources
+
+.PP
+\fB\-\-show\-resources\fP=false
+    Show resources in each API version
+
+.PP
+\fB\-\-show\-subresources\fP=false
+    Show subresources
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -108,6 +134,22 @@ Print the supported API versions on the server, in the form of "group/version".
 .PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Print all API versions
+$ kubectl api\-versions
+
+# Print all resources for all API versions, showing only namespaced resources,
+# including subresources.
+$ kubectl api\-versions \-\-show\-resources \-\-only\-namespaced \-\-show\-subresources
+
+.fi
+.RE
 
 
 .SH SEE ALSO
