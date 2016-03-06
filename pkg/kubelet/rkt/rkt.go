@@ -184,13 +184,6 @@ func New(config *Config,
 		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
 	}
 
-	if err := rkt.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion); err != nil {
-		// TODO(yifan): Latest go-systemd version have the ability to close the
-		// dbus connection. However the 'docker/libcontainer' package is using
-		// the older go-systemd version, so we can't update the go-systemd version.
-		rkt.apisvcConn.Close()
-		return nil, err
-	}
 	return rkt, nil
 }
 
@@ -1062,7 +1055,12 @@ func (r *Runtime) Version() (kubecontainer.Version, error) {
 }
 
 func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
-	return r.binVersion, nil
+	return r.apiVersion, nil
+}
+
+// Status returns error if rkt is unhealthy, nil otherwise.
+func (r *Runtime) Status() error {
+	return r.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion)
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.

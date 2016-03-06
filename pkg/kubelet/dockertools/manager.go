@@ -60,7 +60,7 @@ import (
 const (
 	DockerType = "docker"
 
-	MinimumDockerAPIVersion = "1.18"
+	minimumDockerAPIVersion = "1.18"
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
@@ -936,6 +936,30 @@ func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
 		return nil, fmt.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
 	}
 	return dockerAPIVersion(version), nil
+}
+
+// Status returns error if docker daemon is unhealthy, nil otherwise.
+// Now we do this by checking whether:
+// 1) `docker version` works
+// 2) docker version is compatible with minimum requirement
+func (dm *DockerManager) Status() error {
+	return dm.checkVersionCompatibility()
+}
+
+func (dm *DockerManager) checkVersionCompatibility() error {
+	version, err := dm.APIVersion()
+	if err != nil {
+		return err
+	}
+	// Verify the docker version.
+	result, err := version.Compare(minimumDockerAPIVersion)
+	if err != nil {
+		return fmt.Errorf("failed to compare current docker version %v with minimum support Docker version %q - %v", version, minimumDockerAPIVersion, err)
+	}
+	if result < 0 {
+		return fmt.Errorf("container runtime version is older than %s", minimumDockerAPIVersion)
+	}
+	return nil
 }
 
 // The first version of docker that supports exec natively is 1.3.0 == API 1.15
