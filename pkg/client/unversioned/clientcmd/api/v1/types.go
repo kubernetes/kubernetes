@@ -88,6 +88,8 @@ type AuthInfo struct {
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	Password string `json:"password,omitempty"`
+	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
+	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
@@ -134,4 +136,9 @@ type NamedExtension struct {
 	Name string `json:"name"`
 	// Extension holds the extension information
 	Extension runtime.RawExtension `json:"extension"`
+}
+
+// AuthProviderConfig holds the configuration for a specified auth provider.
+type AuthProviderConfig struct {
+	Name string `json:"name"`
 }
