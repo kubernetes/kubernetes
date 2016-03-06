@@ -38,10 +38,10 @@ You can use [hack/get-build.sh](http://releases.k8s.io/HEAD/hack/get-build.sh) t
 
 Run `./hack/get-build.sh -h` for its usage.
 
-For example, to get a build at a specific version (v1.0.2):
+For example, to get a build at a specific version (v1.1.1):
 
 ```console
-./hack/get-build.sh v1.0.2
+./hack/get-build.sh v1.1.1
 ```
 
 Alternatively, to get the latest stable release:
@@ -65,6 +65,14 @@ gsutil ls gs://kubernetes-release/ci/v0.20.0-29-g29a55cc/ # list the contents of
 gsutil ls gs://kubernetes-release/release                 # list all official releases and rcs
 ```
 
+## Install `gsutil`
+
+Example installation:
+
+```console
+$ curl -sSL https://storage.googleapis.com/pub/gsutil.tar.gz | sudo tar -xz -C /usr/local/src
+$ sudo ln -s /usr/local/src/gsutil/gsutil /usr/bin/gsutil
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/getting-builds.md?pixel)]()
