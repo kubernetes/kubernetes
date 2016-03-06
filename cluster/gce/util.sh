@@ -791,27 +791,6 @@ function check-cluster() {
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
-          if [[ ${KUBE_TEST_DEBUG-} =~ ^[yY]$ ]]; then
-            local savedir="${E2E_REPORT_DIR-}"
-            if [[ -z "${savedir}" ]]; then
-              savedir="$(mktemp -t -d k8s-e2e.XXX)"
-            fi
-            echo "Preserving master logs in ${savedir}"
-            local logdir=/var/log
-            local basename
-            for basename in startupscript docker kubelet kube-apiserver; do
-              # TODO(mml): Perhaps revisit how we name logs for preservation and
-              # centralize an implementation.  Options include putting basename
-              # before hostname and including a timestamp.
-              local src="${logdir}/${basename}.log"
-              local dst="${savedir}/${MASTER_NAME}-${basename}.log"
-              echo "Copying ${MASTER_NAME}:${src}"
-              gcloud compute copy-files \
-                --project "${PROJECT}" --zone "${ZONE}" \
-                "${MASTER_NAME}:${src}" "${dst}" \
-                || true
-            done
-          fi
           exit 2
       fi
       printf "."
