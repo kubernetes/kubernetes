@@ -428,7 +428,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	if d.Spec.Paused {
 		// TODO: Implement scaling for paused deployments.
-		// Dont take any action for paused deployment.
+		// Don't take any action for paused deployment.
 		// But keep the status up-to-date.
 		// Ignore paused deployments
 		glog.V(4).Infof("Updating status only for paused deployment %s/%s", d.Namespace, d.Name)

@@ -33,7 +33,7 @@ import (
 //		   *any* item in the cache.
 //	3. Time-stamps are stripped off unexpired entries before return
 // Note that the ExpirationCache is inherently slower than a normal
-// threadSafeStore because it takes a write lock everytime it checks if
+// threadSafeStore because it takes a write lock every time it checks if
 // an item has expired.
 type ExpirationCache struct {
 	cacheStorage     ThreadSafeStore
