@@ -49,7 +49,7 @@ const (
 	// happens based on contents in local pod storage.
 	FullControllerResyncPeriod = 30 * time.Second
 
-	// Realistic value of the burstReplica field for the replication manager based off
+	// Realistic value of the burstReplica field for the replica set manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
 
@@ -73,8 +73,8 @@ type ReplicaSetController struct {
 	// To allow injection of syncReplicaSet for testing.
 	syncHandler func(rsKey string) error
 
-	// A TTLCache of pod creates/deletes each ReplicaSet expects to see
-	expectations controller.ControllerExpectationsInterface
+	// A TTLCache of pod creates/deletes each rc expects to see.
+	expectations *controller.UIDTrackingControllerExpectations
 
 	// A store of ReplicaSets, populated by the rsController
 	rsStore cache.StoreToReplicaSetLister
@@ -107,7 +107,7 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "replicaset-controller"}),
 		},
 		burstReplicas: burstReplicas,
-		expectations:  controller.NewControllerExpectations(),
+		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue:         workqueue.New(),
 	}
 
@@ -297,17 +297,16 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	}
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		glog.Errorf("Couldn't get key for replication controller %#v: %v", rs, err)
+		glog.Errorf("Couldn't get key for replica set %#v: %v", rs, err)
 		return
 	}
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		glog.V(4).Infof("Add for pod %v with deletion timestamp %+v, counted as new deletion for rs %v", pod.Name, pod.DeletionTimestamp, rsKey)
-		rsc.expectations.DeletionObserved(rsKey)
-	} else {
-		rsc.expectations.CreationObserved(rsKey)
+		rsc.deletePod(pod)
+		return
 	}
+	rsc.expectations.CreationObserved(rsKey)
 	rsc.enqueueReplicaSet(rs)
 }
 
@@ -326,22 +325,15 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	if rs == nil {
 		return
 	}
-	rsKey, err := controller.KeyFunc(rs)
-	if err != nil {
-		glog.Errorf("Couldn't get key for replication controller %#v: %v", rs, err)
-		return
-	}
 
-	if curPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
+	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
-		glog.V(4).Infof("Update to pod %v with deletion timestamp %+v counted as delete for rs %v", curPod.Name, curPod.DeletionTimestamp, rsKey)
-		rsc.expectations.DeletionObserved(rsKey)
-	} else {
-		glog.V(4).Infof("Update to pod %v with deletion timestamp %+v. Not counting it as a new deletion for rs %v", curPod.Name, curPod.DeletionTimestamp, rsKey)
+		rsc.deletePod(curPod)
+		return
 	}
 
 	rsc.enqueueReplicaSet(rs)
@@ -375,21 +367,14 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s deleted: %+v.", pod.Name, pod)
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %+v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 	if rs := rsc.getPodReplicaSet(pod); rs != nil {
 		rsKey, err := controller.KeyFunc(rs)
 		if err != nil {
 			glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
 			return
 		}
-		// This method only manages expectations for the case where a pod is
-		// deleted without a grace period.
-		if pod.DeletionTimestamp == nil {
-			glog.V(4).Infof("Received new delete for rs %v, pod %v", rsKey, pod.Name)
-			rsc.expectations.DeletionObserved(rsKey)
-		} else {
-			glog.V(4).Infof("Received delete for rs %v pod %v with non nil deletion timestamp %+v. Not counting it as a new deletion.", rsKey, pod.Name, pod.DeletionTimestamp)
-		}
+		rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 		rsc.enqueueReplicaSet(rs)
 	}
 }
@@ -442,6 +427,11 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *ext
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
+		// TODO: Track UIDs of creates just like deletes. The problem currently
+		// is we'd need to wait on the result of a create to record the pod's
+		// UID, which would require locking *across* the create, which will turn
+		// into a performance bottleneck. We should generate a UID for the pod
+		// beforehand and store it via ExpectCreations.
 		rsc.expectations.ExpectCreations(rsKey, diff)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
@@ -462,7 +452,6 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *ext
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
-		rsc.expectations.ExpectDeletions(rsKey, diff)
 		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rs.Namespace, rs.Name, rs.Spec.Replicas, diff)
 		// No need to sort pods if we are about to delete all of them
 		if rs.Spec.Replicas != 0 {
@@ -471,7 +460,17 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *ext
 			// in the earlier stages whenever possible.
 			sort.Sort(controller.ActivePods(filteredPods))
 		}
-
+		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
+		// deleted, so we know to record their expectations exactly once either
+		// when we see it as an update of the deletion timestamp, or as a delete.
+		// Note that if the labels on a pod/rs change in a way that the pod gets
+		// orphaned, the rs will only wake up after the expectations have
+		// expired even if other pods are deleted.
+		deletedPodKeys := []string{}
+		for i := 0; i < diff; i++ {
+			deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
+		}
+		rsc.expectations.ExpectDeletions(rsKey, deletedPodKeys)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
 		for i := 0; i < diff; i++ {
@@ -479,8 +478,9 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *ext
 				defer wait.Done()
 				if err := rsc.podControl.DeletePod(rs.Namespace, filteredPods[ix].Name, rs); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
-					glog.V(2).Infof("Failed deletion, decrementing expectations for replica set %q/%q", rs.Namespace, rs.Name)
-					rsc.expectations.DeletionObserved(rsKey)
+					podKey := controller.PodKey(filteredPods[ix])
+					glog.V(2).Infof("Failed to delete %v, decrementing expectations for controller %q/%q", podKey, rs.Namespace, rs.Name)
+					rsc.expectations.DeletionObserved(rsKey, podKey)
 					utilruntime.HandleError(err)
 				}
 			}(i)

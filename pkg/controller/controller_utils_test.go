@@ -183,6 +183,57 @@ func TestControllerExpectations(t *testing.T) {
 	}
 }
 
+func TestUIDExpectations(t *testing.T) {
+	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
+	rcList := []*api.ReplicationController{
+		newReplicationController(2),
+		newReplicationController(1),
+		newReplicationController(0),
+		newReplicationController(5),
+	}
+	rcToPods := map[string][]string{}
+	rcKeys := []string{}
+	for i := range rcList {
+		rc := rcList[i]
+		rcName := fmt.Sprintf("rc-%v", i)
+		rc.Name = rcName
+		rc.Spec.Selector[rcName] = rcName
+		podList := newPodList(nil, 5, api.PodRunning, rc)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %+v: %v", rc, err)
+		}
+		rcKeys = append(rcKeys, rcKey)
+		rcPodNames := []string{}
+		for i := range podList.Items {
+			p := &podList.Items[i]
+			p.Name = fmt.Sprintf("%v-%v", p.Name, rc.Name)
+			rcPodNames = append(rcPodNames, PodKey(p))
+		}
+		rcToPods[rcKey] = rcPodNames
+		uidExp.ExpectDeletions(rcKey, rcPodNames)
+	}
+	for i := range rcKeys {
+		j := rand.Intn(i + 1)
+		rcKeys[i], rcKeys[j] = rcKeys[j], rcKeys[i]
+	}
+	for _, rcKey := range rcKeys {
+		if uidExp.SatisfiedExpectations(rcKey) {
+			t.Errorf("Controller %v satisfied expectations before deletion", rcKey)
+		}
+		for _, p := range rcToPods[rcKey] {
+			uidExp.DeletionObserved(rcKey, p)
+		}
+		if !uidExp.SatisfiedExpectations(rcKey) {
+			t.Errorf("Controller %v didn't satisfy expectations after deletion", rcKey)
+		}
+		uidExp.DeleteExpectations(rcKey)
+		if uidExp.GetUIDs(rcKey) != nil {
+			t.Errorf("Failed to delete uid expectations for %v", rcKey)
+		}
+	}
+}
+
 func TestCreatePods(t *testing.T) {
 	ns := api.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
