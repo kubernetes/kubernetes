@@ -40,7 +40,15 @@ type ScaleInterface interface {
 }
 
 func NewClient(conf *restclient.Config) (*Client, error) {
-	dc, err := dynamic.NewClient(conf)
+	// Make a copy, do not modify the passed config.
+	// TODO(madhusudancs): Should we just receive the conf argument by value? Receiving this as a
+	// pointer now just to be consistent with other clients.
+	conf2 := *conf
+	if conf2.APIPath == "" {
+		conf2.APIPath = "/apis"
+	}
+
+	dc, err := dynamic.NewClient(&conf2)
 	if err != nil {
 		return nil, err
 	}

@@ -417,7 +417,7 @@ func (tc *testCase) prepareTestClients(t *testing.T) (*fake.Clientset, *scalecli
 	gv := unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
 	scale := &fakeScale{
 		gv:   gv,
-		path: fmt.Sprintf("/api/%s/%s/namespaces/%s/replicationcontrollers/%s/scale", gv.Group, gv.Version, namespace, rcName),
+		path: fmt.Sprintf("/apis/%s/%s/namespaces/%s/replicationcontrollers/%s/scale", gv.Group, gv.Version, namespace, rcName),
 		obj: &extensions.Scale{
 			ObjectMeta: api.ObjectMeta{
 				Name:      rcName,
