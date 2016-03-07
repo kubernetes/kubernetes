@@ -40,8 +40,17 @@ a good idea to make sure these work as well.
 
 ## Unit tests
 
-Unit tests should be fully hermetic and
-access no resources outside the test binary.
+* Unit tests should be fully hermetic
+  - Only access resources in the test binary.
+* All packages and any significant files require unit tests.
+* The preferred method of testing multiple scenarios or inputs
+is [table driven testing](https://github.com/golang/go/wiki/TableDrivenTests)
+  - Example: [TestNamespaceAuthorization](../../test/integration/auth_test.go)
+* Unit tests must pass on OS X and Windows platforms.
+  - Tests using linux-specific features must be skipped or compiled out.
+  - Skipped is better, compiled out is required when it won't compile.
+* Concurrent unit test runs must pass.
+* See [coding conventions](coding-conventions.md).
 
 ### Run all unit tests
 
@@ -123,8 +132,17 @@ See `go help test` and `go help testflag` for additional info.
 
 ## Integration tests
 
-Integration tests should only access other resources on the local machine,
-most commonly etcd or a kubernetes/docker binary.
+* Integration tests should only access other resources on the local machine
+  - Most commonly etcd or a service listening on localhost.
+* All significant features require integration tests.
+  - This includes kubectl commands
+* The preferred method of testing multiple scenarios or inputs
+is [table driven testing](https://github.com/golang/go/wiki/TableDrivenTests)
+  - Example: [TestNamespaceAuthorization](../../test/integration/auth_test.go)
+* Integration tests must run in parallel
+  - Each test should create its own master, httpserver and config.
+  - Example: [TestPodUpdateActiveDeadlineSeconds](../../test/integration/pods.go)
+* See [coding conventions](coding-conventions.md).
 
 ### Install etcd dependency
 
@@ -155,6 +173,17 @@ hack/test-integration.sh  # Run all integration tests.
 
 
 ## End-to-End tests
+
+* e2e tests build kubernetes and deploy a cluster of nodes.
+  - Generally on a specific cloud provider.
+* Access gcr.io images
+* Access a specific, non-latest image tag (unless testing pulling).
+* Tests may not flake due to intermittent issues.
+* Use ginko to desribe steps.
+  - See [should run a job to completion when tasks succeed](../../test/e2e/job.go)
+* Use [NewDefaultFramework](../../test/e2e/framework.go)
+  - Contains clients, namespace and auto resource cleanup
+* See [coding conventions](coding-conventions.md).
 
 ### e2e test philosophy
 
