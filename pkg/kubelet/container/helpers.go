@@ -39,7 +39,7 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*RunContainerOptions, error)
+	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*RunContainerOptions, error)
 	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
 }
 
