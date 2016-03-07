@@ -116,7 +116,7 @@ kubectl="${KUBECTL_PATH:-${kubectl}}"
 
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
   detect-master > /dev/null
   config=(
     "--server=http://${KUBE_MASTER_IP}:8080"
