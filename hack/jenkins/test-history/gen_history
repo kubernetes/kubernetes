@@ -40,5 +40,5 @@ cat index_template.html | sed -e "s/TIME/Last updated: ${datestr}/" > static/ind
 # Upload to GCS
 readonly bucket="kubernetes-test-history"
 readonly gcs_acl="public-read"
-gsutil -q cp -az "${gcs_acl}" "tests.json" "gs://${bucket}/logs/${datestr}.json"
+gsutil -q cp -a "${gcs_acl}" -z json "tests.json" "gs://${bucket}/logs/${datestr}.json"
 gsutil -q cp -ra "${gcs_acl}" "static" "gs://${bucket}/"
