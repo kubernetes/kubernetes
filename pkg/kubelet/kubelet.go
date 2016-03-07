@@ -339,8 +339,8 @@ func NewMainKubelet(
 	}
 
 	klet.gpuPlugins = gpu.ProbeGPUPlugins()
-	glog.Infof("Hans: NewMainKubelet: gpu init: gpuPlugins:%+v", klet.gpuPlugins)
-	glog.Infof("Hans: NewMainKubelet: gpu init: len(gpuPlugins):%d", len(klet.gpuPlugins))
+	//glog.Infof("Hans: NewMainKubelet: gpu init: gpuPlugins:%+v", klet.gpuPlugins)
+	//glog.Infof("Hans: NewMainKubelet: gpu init: len(gpuPlugins):%d", len(klet.gpuPlugins))
 
 	procFs := procfs.NewProcFS()
 	imageBackOff := util.NewBackOff(backOffPeriod, MaxContainerBackOff)
@@ -1036,7 +1036,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
 func (kl *Kubelet) registerWithApiserver() {
-	glog.Infof("Hans: registerWithApiserver(): kubelet: %+v ", kl)
+	//glog.Infof("Hans: registerWithApiserver(): kubelet: %+v ", kl)
 	if kl.registrationCompleted {
 		return
 	}
@@ -1053,8 +1053,8 @@ func (kl *Kubelet) registerWithApiserver() {
 			glog.Errorf("Unable to construct api.Node object for kubelet: %v", err)
 			continue
 		}
-		glog.V(2).Infof("Attempting to register node %s", node.Name)
-		glog.V(2).Infof("Hans: registerWithApiserver: Node: %+v", node)
+		//glog.V(2).Infof("Attempting to register node %s", node.Name)
+		//glog.V(2).Infof("Hans: registerWithApiserver: Node: %+v", node)
 		if _, err := kl.kubeClient.Nodes().Create(node); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
@@ -1065,7 +1065,7 @@ func (kl *Kubelet) registerWithApiserver() {
 				glog.Errorf("error getting node %q: %v", kl.nodeName, err)
 				continue
 			}
-			glog.V(2).Infof("Hans: registerWithApiserver: currentNode: %+v", currentNode)
+			//glog.V(2).Infof("Hans: registerWithApiserver: currentNode: %+v", currentNode)
 			if currentNode == nil {
 				glog.Errorf("no node instance returned for %q", kl.nodeName)
 				continue
@@ -2184,16 +2184,16 @@ func hasHostPortConflicts(pods []*api.Pod) bool {
 // hasInsufficientfFreeResources detects pods that exceeds node's resources.
 // TODO: Consider integrate disk space into this function, and returns a
 // suitable reason and message per resource type.
-func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool, bool) {
+func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
 		glog.Errorf("error getting machine info: %v", err)
 		// TODO: Should we admit the pod when machine info is unavailable?
-		return false, false, false
+		return false, false
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(info)
-	_, notFittingCPU, notFittingMemory, notFittingDevices := predicates.CheckPodsExceedingFreeResources(pods, capacity)
-	return len(notFittingCPU) > 0, len(notFittingMemory) > 0, len(notFittingDevices) > 0
+	_, notFittingCPU, notFittingMemory, _ := predicates.CheckPodsExceedingFreeResources(pods, capacity)
+	return len(notFittingCPU) > 0, len(notFittingMemory) > 0
 }
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
@@ -2261,14 +2261,13 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	if !kl.matchesNodeSelector(pod) {
 		return false, "NodeSelectorMismatching", "cannot be started due to node selector mismatch"
 	}
-	cpu, memory, devices := kl.hasInsufficientfFreeResources(pods)
+	cpu, memory := kl.hasInsufficientfFreeResources(pods)
 	if cpu {
 		return false, "InsufficientFreeCPU", "cannot start the pod due to insufficient free CPU."
 	} else if memory {
 		return false, "InsufficientFreeMemory", "cannot be started due to insufficient free memory."
-	} else if devices {
-		return false, "InsufficientFreeDevices", "cannot be started due to insufficient free devices."
 	}
+
 	if kl.isOutOfDisk() {
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
@@ -3052,9 +3051,9 @@ func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
-	glog.Infof("Hans: tryUpdateNodeStatus: Kubelet: %+v", kl)
+	//glog.Infof("Hans: tryUpdateNodeStatus: Kubelet: %+v", kl)
 	node, err := kl.kubeClient.Nodes().Get(kl.nodeName)
-	glog.Infof("Hans: tryUpdateNodeStatus: after Nodes().Get() node: %+v", node)
+	//glog.Infof("Hans: tryUpdateNodeStatus: after Nodes().Get() node: %+v", node)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
