@@ -34,6 +34,6 @@ trap stop TERM
 start "$@"
 
 while true; do
- read
+    sleep 5
 done
 
