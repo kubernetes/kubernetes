@@ -50,5 +50,7 @@
             branch: 'release-1.0'
         - 'build-1.1':
             branch: 'release-1.1'
+        - 'build-1.2':
+            branch: 'release-1.2'
     jobs:
         - 'kubernetes-{build}'
