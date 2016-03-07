@@ -53,6 +53,10 @@ type RollingUpdaterByNodeConfig struct {
 	Interval time.Duration
 	// Timeout is the time to wait for controller updates before giving up.
 	Timeout time.Duration
+	// Timeout is the time to wait for controller updates before giving up.
+	DeletionTimeout time.Duration
+	// Timeout is the time to wait for controller updates before giving up.
+	CreationTimeout time.Duration
 	// CleanupPolicy defines the cleanup action to take after the deployment is
 	// complete.
 	CleanupPolicy RollingUpdaterByNodeCleanupPolicy
@@ -347,12 +351,17 @@ func (r *RollingUpdaterByNode) Update(config *RollingUpdaterByNodeConfig) error 
 		}
 		if len(podList.Items) > 0 {
 			// Waiting for pods deletion
-			// TODO add timeout
+			fmt.Fprintf(config.Out, "configtimeout %s", config.DeletionTimeout)
+			timer := time.NewTimer(config.DeletionTimeout)
 			watcher, _ := r.c.Pods(oldRc.Namespace).Watch(oldPodsListOptions)
 			if watcher != nil {
 				for nbPods > 0 {
-					// Waiting for events
-					<-watcher.ResultChan()
+					// Waiting for events or timeout
+					select {
+					case <-timer.C:
+						return fmt.Errorf("Timeout waiting pod deletion on node %s", node.Name)
+					case <-watcher.ResultChan():
+					}
 					// init counter
 					nbPods = 0
 					// Counting pod deleted still running on this node
@@ -476,12 +485,17 @@ func (r *RollingUpdaterByNode) scaleUp(newRc, oldRc *api.ReplicationController, 
 	}
 	watcher, _ := r.c.Pods(newRc.Namespace).Watch(NewPodsListOptions)
 	if watcher != nil {
+		timer := time.NewTimer(config.CreationTimeout)
+		//ticker.Reset(config.Timeout)
 		runningPods := 0
 		// Wait to get all pods ready
-		// TODO add timeout
 		for runningPods < newRc.Spec.Replicas {
-			// Waiting for events
-			<-watcher.ResultChan()
+			// Waiting for events or timeout
+			select {
+			case <-timer.C:
+				return nil, fmt.Errorf("Timeout waiting pods creation")
+			case <-watcher.ResultChan():
+			}
 			// init counter
 			runningPods = 0
 			// Counting

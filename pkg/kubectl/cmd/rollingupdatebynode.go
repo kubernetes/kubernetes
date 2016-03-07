@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 	//"os"
-	//	"time"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -60,13 +60,11 @@ $ kubectl rolling-update-by-node frontend-v1 frontend-v2 --rollback
 `
 )
 
-/*
 var (
-	updatePeriod, _ = time.ParseDuration("1m0s")
-	timeout, _      = time.ParseDuration("5m0s")
-	pollInterval, _ = time.ParseDuration("3s")
+	deletionTimeout, _ = time.ParseDuration("10m0s")
+	creationTimeout, _ = time.ParseDuration("15m0s")
 )
-*/
+
 func NewCmdRollingUpdateByNode(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &RollingUpdateByNodeOptions{}
 
@@ -85,6 +83,8 @@ func NewCmdRollingUpdateByNode(f *cmdutil.Factory, out io.Writer) *cobra.Command
 	cmd.Flags().Duration("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
+	cmd.Flags().Duration("deletion-timeout", deletionTimeout, `Max time to wait for old pods deletion on a node before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
+	cmd.Flags().Duration("creation-timeout", creationTimeout, `Max time to wait for new pods creation on a node before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	usage := "Filename or URL to file to use to create the new replication controller."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
@@ -145,6 +145,8 @@ func RunRollingUpdateByNode(f *cmdutil.Factory, out io.Writer, cmd *cobra.Comman
 	period := cmdutil.GetFlagDuration(cmd, "update-period")
 	interval := cmdutil.GetFlagDuration(cmd, "poll-interval")
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
+	deletionTimeout := cmdutil.GetFlagDuration(cmd, "deletion-timeout")
+	creationTimeout := cmdutil.GetFlagDuration(cmd, "creation-timeout")
 	dryrun := cmdutil.GetFlagBool(cmd, "dry-run")
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 
@@ -281,14 +283,16 @@ func RunRollingUpdateByNode(f *cmdutil.Factory, out io.Writer, cmd *cobra.Comman
 		updateCleanupPolicy = kubectl.RenameRollingUpdateByNodeCleanupPolicy
 	}
 	config := &kubectl.RollingUpdaterByNodeConfig{
-		Out:           out,
-		OldRc:         oldRc,
-		NewRc:         newRc,
-		NodeLabel:     nodeLabel,
-		UpdatePeriod:  period,
-		Interval:      interval,
-		Timeout:       timeout,
-		CleanupPolicy: updateCleanupPolicy,
+		Out:             out,
+		OldRc:           oldRc,
+		NewRc:           newRc,
+		NodeLabel:       nodeLabel,
+		UpdatePeriod:    period,
+		Interval:        interval,
+		Timeout:         timeout,
+		DeletionTimeout: deletionTimeout,
+		CreationTimeout: creationTimeout,
+		CleanupPolicy:   updateCleanupPolicy,
 	}
 	if rollback {
 		err = kubectl.AbortRollingUpdateByNode(config)
