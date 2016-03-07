@@ -345,7 +345,7 @@ function ssh-to-node {
   if [[ -z "$machine" ]]; then
       echo "$node is an unknown machine to ssh to" >&2
   fi
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no "core@$machine" "$cmd"
+  ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no "core@$machine" "$cmd"
 }
 
 # Restart the kube-proxy on a node ($1)
