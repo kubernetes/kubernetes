@@ -294,7 +294,8 @@ func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames [
 
 func checkRunningOnAllNodes(f *Framework, selector map[string]string) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList := ListSchedulableNodesOrDie(f.Client)
+		nodeList, err := f.Client.Nodes().List(api.ListOptions{})
+		expectNoError(err)
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
 			nodeNames = append(nodeNames, node.Name)
