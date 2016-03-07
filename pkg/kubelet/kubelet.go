@@ -337,7 +337,6 @@ func NewMainKubelet(
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
-		hairpinMode:                  componentconfig.HairpinMode(hairpinMode),
 		babysitDaemons:               babysitDaemons,
 	}
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
@@ -371,37 +370,14 @@ func NewMainKubelet(
 	klet.podCache = kubecontainer.NewCache()
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
-	// The hairpin mode setting doesn't matter if:
-	// - We're not using a bridge network. This is hard to check because we might
-	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
-	//   don't pipe it down to any plugins.
-	// - It's set to hairpin-veth for a container runtime that doesn't know how
-	//   to set the hairpin flag on the veth's of containers. Currently the
-	//   docker runtime is the only one that understands this.
-	// - It's set to "none" or an unrecognized string.
-	switch hairpinMode {
-	case componentconfig.PromiscuousBridge:
-		if !configureCBR0 {
-			glog.Warningf("Hairpin mode set to %v but configureCBR0 is false", hairpinMode)
-			break
-		}
-		fallthrough
-	case componentconfig.HairpinVeth:
-		if containerRuntime != "docker" {
-			glog.Warningf("Hairpin mode set to %v but container runtime is %v", hairpinMode, containerRuntime)
-			break
-		}
-		fallthrough
-	case componentconfig.HairpinNone:
-		if configureCBR0 {
-			glog.Warningf("Hairpin mode set to %q and configureCBR0 is true, this might result in loss of hairpin packets.", hairpinMode)
-			break
-		}
-		glog.Infof("Hairpin mode set to %q", hairpinMode)
-	default:
-		glog.Infof("Unrecognized hairpin mode setting %q, setting it to %v", hairpinMode, componentconfig.HairpinNone)
-		hairpinMode = componentconfig.HairpinNone
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(hairpinMode), containerRuntime, configureCBR0); err != nil {
+		// This is a non-recoverable error. Returning it up the callstack will just
+		// lead to retries of the same failure, so just fail hard.
+		glog.Fatalf("Invalid hairpin mode: %v", err)
+	} else {
+		klet.hairpinMode = mode
 	}
+	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
 	// Initialize the runtime.
 	switch containerRuntime {
@@ -508,6 +484,38 @@ func NewMainKubelet(
 		opt(klet)
 	}
 	return klet, nil
+}
+
+func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, configureCBR0 bool) (componentconfig.HairpinMode, error) {
+	// The hairpin mode setting doesn't matter if:
+	// - We're not using a bridge network. This is hard to check because we might
+	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
+	//   don't pipe it down to any plugins.
+	// - It's set to hairpin-veth for a container runtime that doesn't know how
+	//   to set the hairpin flag on the veth's of containers. Currently the
+	//   docker runtime is the only one that understands this.
+	// - It's set to "none".
+	if hairpinMode == componentconfig.PromiscuousBridge || hairpinMode == componentconfig.HairpinVeth {
+		// Only on docker.
+		if containerRuntime != "docker" {
+			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
+			return componentconfig.HairpinNone, nil
+		}
+		if hairpinMode == componentconfig.PromiscuousBridge && !configureCBR0 {
+			// This is not a valid combination.  Users might be using the
+			// default values (from before the hairpin-mode flag existed) and we
+			// should keep the old behavior.
+			glog.Warningf("Hairpin mode set to %q but configureCBR0 is false, falling back to %q", hairpinMode, componentconfig.HairpinVeth)
+			return componentconfig.HairpinVeth, nil
+		}
+	} else if hairpinMode == componentconfig.HairpinNone {
+		if configureCBR0 {
+			glog.Warningf("Hairpin mode set to %q and configureCBR0 is true, this might result in loss of hairpin packets", hairpinMode)
+		}
+	} else {
+		return "", fmt.Errorf("unknown value: %q", hairpinMode)
+	}
+	return hairpinMode, nil
 }
 
 type serviceLister interface {
