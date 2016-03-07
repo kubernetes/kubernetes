@@ -2110,10 +2110,22 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 		if dockerName.PodUID != uid {
 			continue
 		}
-
 		result, ip, err := dm.inspectContainer(c.ID, name, namespace)
 		if err != nil {
-			return podStatus, err
+			if _, ok := err.(*docker.NoSuchContainer); ok {
+				// https://github.com/kubernetes/kubernetes/issues/22541
+				// Sometimes when docker's state is corrupt, a container can be listed
+				// but couldn't be inspected. We fake a status for this container so
+				// that we can still return a status for the pod to sync.
+				result = &kubecontainer.ContainerStatus{
+					ID:    kubecontainer.DockerID(c.ID).ContainerID(),
+					Name:  dockerName.ContainerName,
+					State: kubecontainer.ContainerStateUnknown,
+				}
+				glog.Errorf("Unable to inspect container %q: %v", c.ID, err)
+			} else {
+				return podStatus, err
+			}
 		}
 		containerStatuses = append(containerStatuses, result)
 		if ip != "" {
