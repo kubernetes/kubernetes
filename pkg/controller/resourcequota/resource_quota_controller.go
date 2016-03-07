@@ -45,6 +45,8 @@ type ResourceQuotaControllerOptions struct {
 	Registry quota.Registry
 	// Knows how to build controllers that notify replenishment events
 	ControllerFactory ReplenishmentControllerFactory
+	// Controls full resync of objects monitored for replenihsment.
+	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
 	// List of GroupKind objects that should be monitored for replenishment at
 	// a faster frequency than the quota controller recalculation interval
 	GroupKindsToReplenish []unversioned.GroupKind
@@ -124,7 +126,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	for _, groupKindToReplenish := range options.GroupKindsToReplenish {
 		controllerOptions := &ReplenishmentControllerOptions{
 			GroupKind:         groupKindToReplenish,
-			ResyncPeriod:      options.ResyncPeriod,
+			ResyncPeriod:      options.ReplenishmentResyncPeriod,
 			ReplenishmentFunc: rq.replenishQuota,
 		}
 		replenishmentController, err := options.ControllerFactory.NewController(controllerOptions)
