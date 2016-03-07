@@ -70,15 +70,15 @@ type testCase struct {
 	reportedMetricsPoints [][]metricPoint
 	namespace             string
 	podListOverride       *api.PodList
-	selector              labels.Selector
+	selector              string
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	namespace := "test-namespace"
 	tc.namespace = namespace
 	podNamePrefix := "test-pod"
-	podLabels := map[string]string{"name": podNamePrefix}
-	tc.selector = labels.SelectorFromSet(podLabels)
+	selector := map[string]string{"name": podNamePrefix}
+	tc.selector = "name=" + podNamePrefix
 
 	fakeClient := &fake.Clientset{}
 
