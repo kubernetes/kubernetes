@@ -67,7 +67,7 @@ var _ kubecontainer.RuntimeHelper = &fakeRuntimeHelper{}
 
 var testPodContainerDir string
 
-func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
+func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var opts kubecontainer.RunContainerOptions
 	var err error
 	if len(container.TerminationMessagePath) != 0 {

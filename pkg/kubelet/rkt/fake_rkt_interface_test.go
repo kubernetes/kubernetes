@@ -153,7 +153,7 @@ type fakeRuntimeHelper struct {
 	err         error
 }
 
-func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
+func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
