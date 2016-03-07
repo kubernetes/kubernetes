@@ -76,7 +76,7 @@ saved copy to include the latest resource version.`
 
 var errExit = fmt.Errorf("exit directly")
 
-func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	filenames := []string{}
 	cmd := &cobra.Command{
 		Use:     "edit (RESOURCE/NAME | -f FILENAME)",
@@ -84,7 +84,7 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    editLong,
 		Example: fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunEdit(f, out, cmd, args, filenames)
+			err := RunEdit(f, out, errOut, cmd, args, filenames)
 			if err == errExit {
 				os.Exit(1)
 			}
@@ -101,7 +101,7 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames []string) error {
+func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, filenames []string) error {
 	var printer kubectl.ResourcePrinter
 	var ext string
 	switch format := cmdutil.GetFlagString(cmd, "output"); format {
@@ -184,11 +184,11 @@ outter:
 				w = util.NewCRLFWriter(w)
 			}
 			if err := results.header.writeTo(w); err != nil {
-				return preservedFile(err, results.file, out)
+				return preservedFile(err, results.file, errOut)
 			}
 			if !containsError {
 				if err := printer.PrintObj(obj, w); err != nil {
-					return preservedFile(err, results.file, out)
+					return preservedFile(err, results.file, errOut)
 				}
 				original = buf.Bytes()
 			} else {
@@ -202,7 +202,7 @@ outter:
 			editedDiff := edited
 			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", path.Base(os.Args[0])), ext, buf)
 			if err != nil {
-				return preservedFile(err, results.file, out)
+				return preservedFile(err, results.file, errOut)
 			}
 			if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
 				// Ugly hack right here. We will hit this either (1) when we try to
@@ -210,7 +210,7 @@ outter:
 				// which means our changes are invalid or (2) when we exit the second
 				// time. The second case is more usual so we can probably live with it.
 				// TODO: A less hacky fix would be welcome :)
-				fmt.Fprintln(out, "Edit cancelled, no valid changes were saved.")
+				fmt.Fprintln(errOut, "Edit cancelled, no valid changes were saved.")
 				continue outter
 			}
 
@@ -223,16 +223,16 @@ outter:
 			// Compare content without comments
 			if bytes.Equal(stripComments(original), stripComments(edited)) {
 				os.Remove(file)
-				fmt.Fprintln(out, "Edit cancelled, no changes made.")
+				fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
 				continue outter
 			}
 			lines, err := hasLines(bytes.NewBuffer(edited))
 			if err != nil {
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			}
 			if !lines {
 				os.Remove(file)
-				fmt.Fprintln(out, "Edit cancelled, saved file was empty.")
+				fmt.Fprintln(errOut, "Edit cancelled, saved file was empty.")
 				continue outter
 			}
 
@@ -253,7 +253,7 @@ outter:
 
 			// put configuration annotation in "updates"
 			if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), updates, encoder); err != nil {
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			}
 			if cmdutil.ShouldRecord(cmd, updates) {
 				err = cmdutil.RecordChangeCause(updates.Object, f.Command())
@@ -263,24 +263,24 @@ outter:
 			}
 			editedCopy := edited
 			if editedCopy, err = runtime.Encode(encoder, updates.Object); err != nil {
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			}
 
 			visitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 
 			// need to make sure the original namespace wasn't changed while editing
 			if err = visitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			}
 
 			// use strategic merge to create a patch
 			originalJS, err := yaml.ToJSON(original)
 			if err != nil {
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			}
 			editedJS, err := yaml.ToJSON(editedCopy)
 			if err != nil {
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			}
 			patch, err := strategicpatch.CreateStrategicMergePatch(originalJS, editedJS, obj)
 			// TODO: change all jsonmerge to strategicpatch
@@ -288,7 +288,7 @@ outter:
 			preconditions := []jsonmerge.PreconditionFunc{}
 			if err != nil {
 				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-				return preservedFile(err, file, out)
+				return preservedFile(err, file, errOut)
 			} else {
 				preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("apiVersion"))
 				preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("kind"))
@@ -297,14 +297,15 @@ outter:
 			}
 
 			if hold, msg := jsonmerge.TestPreconditionsHold(patch, preconditions); !hold {
-				fmt.Fprintf(out, "error: %s", msg)
-				return preservedFile(nil, file, out)
+				fmt.Fprintf(errOut, "error: %s\n", msg)
+				return preservedFile(nil, file, errOut)
 			}
 
+			errorMsg := ""
 			err = visitor.Visit(func(info *resource.Info, err error) error {
 				patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 				if err != nil {
-					glog.V(4).Infof(results.addError(err, info))
+					errorMsg = results.addError(err, info)
 					return err
 				}
 				info.Refresh(patched, true)
@@ -321,11 +322,13 @@ outter:
 			// 2. notfound: indicate the location of the saved configuration of the deleted resource
 			// 3. invalid: retry those on the spot by looping ie. reloading the editor
 			if results.retryable > 0 {
-				fmt.Fprintf(out, "You can run `%s replace -f %s` to try this update again.\n", os.Args[0], file)
+				fmt.Fprintln(errOut, errorMsg)
+				fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", path.Base(os.Args[0]), file)
 				continue outter
 			}
 			if results.notfound > 0 {
-				fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
+				fmt.Fprintln(errOut, errorMsg)
+				fmt.Fprintf(errOut, "The edits you made on deleted resources have been saved to %q\n", file)
 				continue outter
 			}
 			// validation error
@@ -397,13 +400,13 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 			}
 		}
 		r.header.reasons = append(r.header.reasons, reason)
-		return fmt.Sprintf("Error: %s %q is invalid", info.Mapping.Resource, info.Name)
+		return fmt.Sprintf("error: %s %q is invalid", info.Mapping.Resource, info.Name)
 	case errors.IsNotFound(err):
 		r.notfound++
-		return fmt.Sprintf("Error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
+		return fmt.Sprintf("error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
 	default:
 		r.retryable++
-		return fmt.Sprintf("Error: %s %q could not be patched: %v", info.Mapping.Resource, info.Name, err)
+		return fmt.Sprintf("error: %s %q could not be patched: %v", info.Mapping.Resource, info.Name, err)
 	}
 }
 
