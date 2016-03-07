@@ -900,6 +900,13 @@ var _ = Describe("Kubectl client", func() {
 			}
 
 			By("confirm that you can get logs from an rc")
+			podNames := []string{}
+			for _, pod := range pods {
+				podNames = append(podNames, pod.Name)
+			}
+			if !checkPodsRunningReady(c, ns, podNames, podStartTimeout) {
+				Failf("Pods for rc %s were not ready", rcName)
+			}
 			_, err = runKubectl("logs", "rc/"+rcName, nsFlag)
 			// a non-nil error is fine as long as we actually found a pod.
 			if err != nil && !strings.Contains(err.Error(), " in pod ") {
