@@ -29,6 +29,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -191,13 +192,9 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		}
 		oldRc = updated
 	}
-	// The maximum pods which can go unavailable during the update.
-	maxUnavailable, err := intstr.GetValueFromIntOrPercent(&config.MaxUnavailable, desired, false)
-	if err != nil {
-		return err
-	}
-	// The maximum scaling increment.
-	maxSurge, err := intstr.GetValueFromIntOrPercent(&config.MaxSurge, desired, true)
+	// maxSurge is the maximum scaling increment and maxUnavailable are the maximum pods
+	// that can be unavailable during a rollout.
+	maxSurge, maxUnavailable, err := deployment.ResolveFenceposts(&config.MaxSurge, &config.MaxUnavailable, desired)
 	if err != nil {
 		return err
 	}

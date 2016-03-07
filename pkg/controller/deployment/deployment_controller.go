@@ -38,7 +38,6 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
-	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -843,7 +842,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*extensions.Rep
 		return false, fmt.Errorf("could not find available pods: %v", err)
 	}
 
-	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas, false)
+	_, maxUnavailable, err := deploymentutil.ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
 	if err != nil {
 		return false, err
 	}
@@ -940,7 +939,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*extensions.Re
 // scaleDownOldReplicaSetsForRollingUpdate scales down old replica sets when deployment strategy is "RollingUpdate".
 // Need check maxUnavailable to ensure availability
 func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs []*extensions.ReplicaSet, oldRSs []*extensions.ReplicaSet, deployment *extensions.Deployment) (int, error) {
-	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas, false)
+	_, maxUnavailable, err := deploymentutil.ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
 	if err != nil {
 		return 0, err
 	}
