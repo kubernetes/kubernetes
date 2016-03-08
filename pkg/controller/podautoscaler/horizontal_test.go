@@ -70,14 +70,15 @@ type fakeResource struct {
 }
 
 type fakeScale struct {
-	gv   unversioned.GroupVersion
-	path string
-	obj  runtime.Object
+	resourceName string
+	resourceGVK  unversioned.GroupVersionKind
+	path         string
+	obj          runtime.Object
 }
 
-func writeScale(w http.ResponseWriter, gv unversioned.GroupVersion, obj runtime.Object) {
-	if err := testapi.Extensions.Codec().EncodeToStream(obj, w); err != nil {
-		errMsg := fmt.Sprintf("server was unable to write a JSON response: %v", err)
+func writeScale(w http.ResponseWriter, group string, obj runtime.Object) {
+	if err := testapi.Groups[group].Codec().EncodeToStream(obj, w); err != nil {
+		errMsg := fmt.Sprintf("server was unable to write a JSON response for group %s: %v", group, err)
 		http.Error(w, errMsg, http.StatusInternalServerError)
 	}
 }
@@ -87,7 +88,7 @@ func (fs *fakeScale) handleScaleGet(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	writeScale(w, fs.gv, fs.obj)
+	writeScale(w, fs.resourceGVK.Group, fs.obj)
 }
 
 func readScale(r *http.Request, gv unversioned.GroupVersion) (*extensions.Scale, error) {
@@ -180,6 +181,8 @@ type testCase struct {
 
 	// Target resource information.
 	resource *fakeResource
+
+	scale *fakeScale
 }
 
 func (tc *testCase) computeCPUCurrent() {
@@ -203,6 +206,32 @@ func (tc *testCase) prepareTestClients(t *testing.T) (*fake.Clientset, *scalecli
 	podNamePrefix := "test-pod"
 	selector := &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
+	}
+	if tc.scale == nil {
+		resourceName := "test-rc"
+		gvk := unversioned.GroupVersion{
+			Group:   "extensions",
+			Version: "v1beta1",
+			Kind:    "ReplicationController",
+		}
+		tc.scale = &fakeScale{
+			resourceName: resourceName,
+			resourceGVK:  gvk,
+			path:         fmt.Sprintf("/apis/%s/%s/namespaces/%s/replicationcontrollers/%s/scale", gv.Group, gv.Version, namespace, resourceName),
+			obj: &extensions.Scale{
+				ObjectMeta: api.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: extensions.ScaleSpec{
+					Replicas: tc.initialReplicas,
+				},
+				Status: extensions.ScaleStatus{
+					Replicas: tc.initialReplicas,
+					Selector: selector,
+				},
+			},
+		}
 	}
 
 	tc.scaleUpdated = false
@@ -233,9 +262,13 @@ func (tc *testCase) prepareTestClients(t *testing.T) (*fake.Clientset, *scalecli
 					},
 					Spec: extensions.HorizontalPodAutoscalerSpec{
 						ScaleRef: extensions.SubresourceReference{
-							Kind:        tc.resource.kind,
-							Name:        tc.resource.name,
-							APIVersion:  tc.resource.apiVersion,
+							// DEBUG: Code before rebase. Remove before submission
+							// Kind:        tc.resource.kind,
+							// Name:        tc.resource.name,
+							// APIVersion:  tc.resource.apiVersion,
+							Kind:        tc.scale.resourceGVK.Kind,
+							Name:        tc.scale.resourceName,
+							APIVersion:  tc.scale.resourceGVK.GroupVersion(),
 							Subresource: "scale",
 						},
 						MinReplicas: &tc.minReplicas,
@@ -414,28 +447,7 @@ func (tc *testCase) prepareTestClients(t *testing.T) (*fake.Clientset, *scalecli
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
-	gv := unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
-	scale := &fakeScale{
-		gv:   gv,
-		path: fmt.Sprintf("/apis/%s/%s/namespaces/%s/replicationcontrollers/%s/scale", gv.Group, gv.Version, namespace, rcName),
-		obj: &extensions.Scale{
-			ObjectMeta: api.ObjectMeta{
-				Name:      rcName,
-				Namespace: namespace,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: tc.initialReplicas,
-			},
-			Status: extensions.ScaleStatus{
-				Replicas: tc.initialReplicas,
-				Selector: selector,
-			},
-		},
-	}
-	scaleClient, scaleSrvr, err := scale.clientServer(t, tc)
-	// DEBUG: Use this instead of the previous line
-	// TODO(madhusudancs): Add tests for autoscaling.Scale
-	// scaleClient, scaleSrvr, err := tc.scale.getScaleClientServer(gv)
+	scaleClient, scaleSrvr, err := tc.scale.clientServer(t, tc)
 	assert.Equal(t, nil, err)
 
 	return fakeClient, scaleClient, scaleSrvr

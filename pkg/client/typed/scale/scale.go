@@ -34,20 +34,13 @@ type Client struct {
 }
 
 type ScaleInterface interface {
+	getScale() *runtime.Unstructured
 	Replicas() (int, error)
 	SetReplicas(replicas int)
 	Selector() (string, error)
 }
 
 func NewClient(conf *restclient.Config) (*Client, error) {
-	// Make a copy, do not modify the passed config.
-	// TODO(madhusudancs): Should we just receive the conf argument by value? Receiving this as a
-	// pointer now just to be consistent with other clients.
-	conf2 := *conf
-	if conf2.APIPath == "" {
-		conf2.APIPath = "/apis"
-	}
-
 	dc, err := dynamic.NewClient(&conf2)
 	if err != nil {
 		return nil, err
@@ -83,6 +76,13 @@ func (c *Client) decode(res *runtime.Unstructured) (ScaleInterface, error) {
 	}
 }
 
+func apiPrefix(gv GroupVersion) string {
+	if len(groupVersion.Group) == 0 && len(groupVersion.Version) == "v1" {
+		return "api"
+	}
+	return "apis"
+}
+
 func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string) (ScaleInterface, error) {
 	gv, err := unversioned.ParseGroupVersion(scaleRef.APIVersion)
 	if err != nil {
@@ -95,7 +95,7 @@ func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string)
 		Namespaced: true,
 		Kind:       scaleRef.Kind,
 	}
-	res, err := c.dc.Subresource(resource, scaleRef.Subresource, namespace).Get(scaleRef.Name)
+	res, err := c.dc.Resource(resource, namespace).Subresource(scaleRef.Subresource).Get(scaleRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch resource %s(%s): %v", scaleRef.Name, scaleRef.Kind, err)
 	}
@@ -114,15 +114,8 @@ func (c *Client) Update(scaleRef extensions.SubresourceReference, namespace stri
 		Namespaced: true,
 		Kind:       scaleRef.Kind,
 	}
-	var res *runtime.Unstructured
-	switch t := obj.(type) {
-	case *extScale:
-		res, err = c.dc.Subresource(resource, scaleRef.Subresource, namespace).Update(t.getScale())
-	case *asScale:
-		res, err = c.dc.Subresource(resource, scaleRef.Subresource, namespace).Update(t.getScale())
-	default:
-		return nil, fmt.Errorf("error obtaining existing scale values")
-	}
+	res, err := c.dc.Resource(resource, namespace).Subresource(scaleRef.Subresource).Update(obj.getScale())
+
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch resource %s(%s): %v", scaleRef.Name, scaleRef.Kind, err)
 	}

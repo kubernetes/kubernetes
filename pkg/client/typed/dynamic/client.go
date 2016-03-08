@@ -49,10 +49,6 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	conf.Codec = dynamicCodec{}
 
-	if conf.APIPath == "" {
-		conf.APIPath = "/api"
-	}
-
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
@@ -83,10 +79,10 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 	}
 }
 
-func (c *Client) Subresource(resource *unversioned.APIResource, subresource string, namespace string) *SubresourceClient {
+func (c *ResourceClient) Subresource(subresource string) *SubresourceClient {
 	return &SubresourceClient{
-		ResourceClient: c.Resource(resource, namespace),
-		subresource:    subresource,
+		resourceCl:  c,
+		subresource: subresource,
 	}
 }
 
@@ -101,7 +97,7 @@ type ResourceClient struct {
 // SubresourceClient is an API interface to a specific subresource of a resource under a
 // dynamic client.
 type SubresourceClient struct {
-	*ResourceClient
+	resourceCl  *ResourceClient
 	subresource string
 }
 
@@ -207,7 +203,7 @@ func (rc *ResourceClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Get gets the resource with the specified name.
 func (src *SubresourceClient) Get(name string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	err := src.get(name).
+	err := src.resourceCl.get(name).
 		SubResource(src.subresource).
 		Do().
 		Into(result)
@@ -217,7 +213,7 @@ func (src *SubresourceClient) Get(name string) (*runtime.Unstructured, error) {
 // Update updates the provided subresource.
 func (src *SubresourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	req, err := src.update(obj)
+	req, err := src.resourceCl.update(obj)
 	if err != nil {
 		return result, err
 	}
