@@ -14,7 +14,7 @@
 {% set srv_sshproxy_path = "/srv/sshproxy" -%}
 
 {% if grains.cloud is defined -%}
-  {% if grains.cloud not in ['vagrant', 'vsphere'] -%}
+  {% if grains.cloud not in ['vagrant', 'vsphere', 'photon-controller'] -%}
     {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
   {% endif -%}
 
@@ -58,7 +58,7 @@
 {% set client_ca_file = "" -%}
 
 {% set secure_port = "6443" -%}
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere' ]    %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller' ]    %}
   {% set secure_port = "443" -%}
   {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
@@ -72,12 +72,12 @@
 {% endif -%}
 
 {% if grains.cloud is defined -%}
-{% if grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere' ] -%}
+{% if grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller' ] -%}
     {% set token_auth_file = "--token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
 {% endif -%}
 {% endif -%}
 
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere']  %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller' ]  %}
   {% set basic_auth_file = "--basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
 {% endif -%}
 
