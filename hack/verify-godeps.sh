@@ -39,9 +39,15 @@ preload-dep() {
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-branch="${1:-master}"
+readonly branch="origin/${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}"
+echo "Checking for Godeps changes against ${branch}"
+# make sure the branch is valid, otherwise the next check will pass erroneously.
+if ! git describe "${branch}" >/dev/null; then
+  exit 1
+fi
 # notice this uses ... to find the first shared ancestor
-if ! git diff origin/"${branch}"...HEAD | grep 'Godeps/' > /dev/null; then
+if ! git diff --name-only "${branch}...HEAD" | grep 'Godeps/' > /dev/null; then
+  echo "No Godeps changes detected."
   exit 0
 fi
 
