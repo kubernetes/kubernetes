@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   # Keep this file in sync with addons/dashboard/dashboard-controller.yaml
-  name: kubernetes-dashboard-v1.0.0beta1
+  name: kubernetes-dashboard-v1.0.0
   namespace: kube-system
   labels:
     k8s-app: kubernetes-dashboard
@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.0.0-beta1
+        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.0.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
