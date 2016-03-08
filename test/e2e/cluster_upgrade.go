@@ -61,7 +61,7 @@ var masterUpgrade = func(v string) error {
 
 func masterUpgradeGCE(rawV string) error {
 	v := "v" + rawV
-	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-M", v)
+	_, _, err := runCmd(path.Join(testContext.RepoRoot, "cluster/gce/upgrade.sh"), "-M", v)
 	return err
 }
 
@@ -111,7 +111,7 @@ func nodeUpgradeGCE(rawV string) error {
 	// would trigger a node update; right now it's very different.
 	v := "v" + rawV
 	Logf("Preparing node upgrade by creating new instance template for %q", v)
-	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-P", v)
+	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "cluster/gce/upgrade.sh"), "-P", v)
 	if err != nil {
 		return err
 	}
