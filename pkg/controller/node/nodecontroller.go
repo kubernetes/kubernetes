@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -284,6 +285,8 @@ func (nc *NodeController) Run(period time.Duration) {
 			return false, remaining
 		})
 	}, nodeEvictionPeriod, wait.NeverStop)
+
+	go wait.Until(nc.cleanupOrphanedPods, 30*time.Second, wait.NeverStop)
 }
 
 // Generates num pod CIDRs that could be assigned to nodes.
@@ -365,6 +368,28 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	if gracefulDeletionVersion.GT(v) {
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
+	}
+}
+
+// cleanupOrphanedPods deletes pods that are bound to nodes that don't
+// exist.
+func (nc *NodeController) cleanupOrphanedPods() {
+	pods, err := nc.podStore.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
+	for _, pod := range pods {
+		if pod.Spec.NodeName == "" {
+			continue
+		}
+		if _, exists, _ := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName); exists {
+			continue
+		}
+		if err := nc.forcefullyDeletePod(pod); err != nil {
+			utilruntime.HandleError(err)
+		}
 	}
 }
 
@@ -757,18 +782,6 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	}
 
 	return gracePeriod, lastReadyCondition, readyCondition, err
-}
-
-// returns true if the provided node still has pods scheduled to it, or an error if
-// the server could not be contacted.
-func (nc *NodeController) hasPods(nodeName string) (bool, error) {
-	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
-	options := api.ListOptions{FieldSelector: selector}
-	pods, err := nc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
-	if err != nil {
-		return false, err
-	}
-	return len(pods.Items) > 0, nil
 }
 
 // evictPods queues an eviction for the provided node name, and returns false if the node is already
