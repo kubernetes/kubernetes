@@ -2320,10 +2320,12 @@ func DeleteRC(c *client.Client, ns, name string) error {
 // waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
 // have completed termination).
 func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
+	labels := labels.SelectorFromSet(rc.Spec.Selector)
+	podStore := newPodStore(c, rc.Namespace, labels, fields.Everything())
+	defer podStore.Stop()
+
 	return wait.PollImmediate(poll, 2*time.Minute, func() (bool, error) {
-		selector := labels.SelectorFromSet(rc.Spec.Selector)
-		options := api.ListOptions{LabelSelector: selector}
-		if pods, err := c.Pods(rc.Namespace).List(options); err == nil && len(pods.Items) == 0 {
+		if pods := podStore.List(); len(pods) == 0 {
 			return true, nil
 		}
 		return false, nil
