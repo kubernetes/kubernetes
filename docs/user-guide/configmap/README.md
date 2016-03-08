@@ -36,6 +36,7 @@ Documentation for other releases can be found at
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 This file has moved to: http://kubernetes.github.io/docs/user-guide/configmap/
+<<<<<<< 21d088e251061e238c8107a92726ff56b90aeffe
 
 
 
@@ -43,6 +44,8 @@ This file has moved to: http://kubernetes.github.io/docs/user-guide/configmap/
 <!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
 <!-- END MUNGE: IS_VERSIONED -->
+=======
+>>>>>>> Merge pull request #22697 from eparis/docs-readme-link
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
