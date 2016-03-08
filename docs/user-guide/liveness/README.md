@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-This file has moved to: http://kubernetes.github.io/docs/user-guide/liveness/README/
+This file has moved to: http://kubernetes.github.io/docs/user-guide/liveness/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-This file has moved to: http://kubernetes.github.io/docs/user-guide/downward-api/README/
+This file has moved to: http://kubernetes.github.io/docs/user-guide/downward-api/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
