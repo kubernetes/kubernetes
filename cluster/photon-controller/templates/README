@@ -1,0 +1,4 @@
+The scripts in this directory are not meant to be invoked
+directly. Instead they are partial scripts that are combined into full
+scripts by util.sh and are run on the Kubernetes nodes are part of the
+setup. 
