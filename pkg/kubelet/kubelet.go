@@ -2706,7 +2706,9 @@ func (kl *Kubelet) updateRuntimeUp() {
 		glog.Errorf("Container runtime sanity check failed: %v", err)
 		return
 	}
-	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
+	// Spawn a separate goroutine to initialize the modules, so that it
+	// doesn't block/interfere the periodic runtime health check.
+	kl.oneTimeInitializer.Do(func() { go kl.initializeRuntimeDependentModules() })
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }
 
