@@ -87,6 +87,11 @@
 			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/restxml",
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
 			"Comment": "v1.0.7",
 			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
@@ -118,6 +123,11 @@
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/elb",
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/route53",
 			"Comment": "v1.0.7",
 			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
