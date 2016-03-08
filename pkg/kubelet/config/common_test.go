@@ -26,8 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-
-	//"github.com/ghodss/yaml"
 )
 
 func noDefault(*api.Pod) error { return nil }

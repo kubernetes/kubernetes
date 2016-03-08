@@ -150,13 +150,13 @@ var FooAnotherVar proto.Frobber = proto.AnotherVar
 	rawNamer := namer.NewRawNamer("o", nil)
 	_, u, o := construct(t, testFiles, testNamer)
 	t.Logf("\n%v\n\n", o)
+	args := map[string]interface{}{
+		"Name": testNamer.Name,
+		"Raw":  rawNamer.Name,
+	}
 	tmpl := template.Must(
 		template.New("").
-			Funcs(
-			map[string]interface{}{
-				"Name": testNamer.Name,
-				"Raw":  rawNamer.Name,
-			}).
+			Funcs(args).
 			Parse(tmplText),
 	)
 	buf := &bytes.Buffer{}
