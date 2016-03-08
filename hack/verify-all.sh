@@ -23,11 +23,17 @@ source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 SILENT=true
 
+# Excluded checks are always skipped.
+EXCLUDED_CHECKS=(
+  "verify-linkcheck.sh"  # runs in separate Jenkins job once per day due to high network usage
+  "verify-generated-protobuf.sh"  # TODO(smarterclayton) add when protobuf is part of direct generation
+  )
+
 function is-excluded {
-  for e in $EXCLUDE; do
-    if [[ $1 -ef ${BASH_SOURCE} ]]; then
-      return
-    fi
+  if [[ $1 -ef ${BASH_SOURCE} ]]; then
+    return
+  fi
+  for e in ${EXCLUDED_CHECKS[@]}; do
     if [[ $1 -ef "$KUBE_ROOT/hack/$e" ]]; then
       return
     fi
@@ -35,7 +41,7 @@ function is-excluded {
   return 1
 }
 
-function run-cmd() {
+function run-cmd {
   if ${SILENT}; then
     "$@" &> /dev/null
   else
@@ -43,55 +49,48 @@ function run-cmd() {
   fi
 }
 
+function run-checks {
+  local -r pattern=$1
+  local -r runner=$2
+
+  for t in $(ls ${pattern})
+  do
+    if is-excluded "${t}" ; then
+      echo "Skipping ${t}"
+      continue
+    fi
+    echo -e "Verifying ${t}"
+    local start=$(date +%s)
+    run-cmd "${runner}" "${t}" && tr=$? || tr=$?
+    local elapsed=$(($(date +%s) - ${start}))
+    if [[ ${tr} -eq 0 ]]; then
+      echo -e "${color_green}SUCCESS${color_norm}  ${t}\t${elapsed}s"
+    else
+      echo -e "${color_red}FAILED${color_norm}   ${t}\t${elapsed}s"
+      ret=1
+    fi
+  done
+}
+
 while getopts ":v" opt; do
-  case $opt in
+  case ${opt} in
     v)
       SILENT=false
       ;;
     \?)
-      echo "Invalid flag: -$OPTARG" >&2
+      echo "Invalid flag: -${OPTARG}" >&2
       exit 1
       ;;
   esac
 done
 
-if $SILENT ; then
+if ${SILENT} ; then
   echo "Running in the silent mode, run with -v if you want to see script logs."
 fi
 
-# remove protobuf until it is part of direct generation
-EXCLUDE="verify-godeps.sh verify-godep-licenses.sh verify-generated-protobuf.sh verify-linkcheck.sh"
-
 ret=0
-for t in `ls $KUBE_ROOT/hack/verify-*.sh`
-do
-  if is-excluded $t ; then
-    echo "Skipping $t"
-    continue
-  fi
-  echo -e "Verifying $t"
-  if run-cmd bash "$t"; then
-    echo -e "${color_green}SUCCESS${color_norm}"
-  else
-    echo -e "${color_red}FAILED${color_norm}"
-    ret=1
-  fi
-done
-
-for t in `ls $KUBE_ROOT/hack/verify-*.py`
-do
-  if is-excluded $t ; then
-    echo "Skipping $t"
-    continue
-  fi
-  echo -e "Verifying $t"
-  if run-cmd python "$t"; then
-    echo -e "${color_green}SUCCESS${color_norm}"
-  else
-    echo -e "${color_red}FAILED${color_norm}"
-    ret=1
-  fi
-done
-exit $ret
+run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
+run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+exit ${ret}
 
 # ex: ts=2 sw=2 et filetype=sh
