@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/rkt/README/
+This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/rkt/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
