@@ -116,6 +116,7 @@
                                          --ginkgo.skip=\[Flaky\]"
                 export PROJECT="k8s-jnks-e2e-gce-autoscaling"
                 # Override GCE default for cluster size autoscaling purposes.
+                export ENABLE_CUSTOM_METRICS="true"
                 export KUBE_ENABLE_CLUSTER_MONITORING="googleinfluxdb"
                 export KUBE_ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
         - 'gce-flaky':
