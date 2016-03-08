@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -512,24 +513,29 @@ func SimpleKubelet(client *clientset.Clientset,
 	}
 
 	kcfg := KubeletConfig{
-		Address:                   net.ParseIP(address),
-		CAdvisorInterface:         cadvisorInterface,
-		VolumeStatsAggPeriod:      time.Minute,
-		CgroupRoot:                "",
-		Cloud:                     cloud,
-		ClusterDNS:                clusterDNS,
-		ConfigFile:                configFilePath,
-		ContainerManager:          containerManager,
-		ContainerRuntime:          "docker",
-		CPUCFSQuota:               true,
-		DiskSpacePolicy:           diskSpacePolicy,
-		DockerClient:              dockerClient,
-		RuntimeCgroups:            "",
-		DockerExecHandler:         &dockertools.NativeExecHandler{},
-		EnableCustomMetrics:       false,
-		EnableDebuggingHandlers:   true,
-		EnableServer:              true,
-		FileCheckFrequency:        fileCheckFrequency,
+		Address:                 net.ParseIP(address),
+		CAdvisorInterface:       cadvisorInterface,
+		VolumeStatsAggPeriod:    time.Minute,
+		CgroupRoot:              "",
+		Cloud:                   cloud,
+		ClusterDNS:              clusterDNS,
+		ConfigFile:              configFilePath,
+		ContainerManager:        containerManager,
+		ContainerRuntime:        "docker",
+		CPUCFSQuota:             true,
+		DiskSpacePolicy:         diskSpacePolicy,
+		DockerClient:            dockerClient,
+		RuntimeCgroups:          "",
+		DockerExecHandler:       &dockertools.NativeExecHandler{},
+		EnableCustomMetrics:     false,
+		EnableDebuggingHandlers: true,
+		EnableServer:            true,
+		FileCheckFrequency:      fileCheckFrequency,
+		// Since this kubelet runs with --configure-cbr0=false, it needs to use
+		// hairpin-veth to allow hairpin packets. Note that this deviates from
+		// what the "real" kubelet currently does, because there's no way to
+		// set promiscuous mode on docker0.
+		HairpinMode:               componentconfig.HairpinVeth,
 		HostnameOverride:          hostname,
 		HTTPCheckFrequency:        httpCheckFrequency,
 		ImageGCPolicy:             imageGCPolicy,
