@@ -347,6 +347,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 	if configAccess.IsExplicitFile() {
 		file := configAccess.GetExplicitFile()
 		currConfig := getConfigFromFileOrDie(file)
+		currConfig.PreviousContext = currConfig.CurrentContext
 		currConfig.CurrentContext = newCurrentContext
 		if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
 			return err
@@ -358,6 +359,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 	if len(newCurrentContext) > 0 {
 		destinationFile := configAccess.GetDefaultFilename()
 		config := getConfigFromFileOrDie(destinationFile)
+		config.PreviousContext = config.CurrentContext
 		config.CurrentContext = newCurrentContext
 
 		if err := clientcmd.WriteToFile(*config, destinationFile); err != nil {
@@ -373,6 +375,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			currConfig := getConfigFromFileOrDie(file)
 
 			if len(currConfig.CurrentContext) > 0 {
+				currConfig.PreviousContext = currConfig.CurrentContext
 				currConfig.CurrentContext = newCurrentContext
 				if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
 					return err
