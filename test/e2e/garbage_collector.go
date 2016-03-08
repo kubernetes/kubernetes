@@ -61,7 +61,7 @@ var _ = Describe("Garbage collector [Slow]", func() {
 		gcThreshold := 100
 
 		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
-		pollErr := wait.Poll(30*time.Second, timeout, func() (bool, error) {
+		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
 			pods, err = f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
 			if err != nil {
 				Logf("Failed to list pod %v", err)
@@ -84,9 +84,11 @@ func createTerminatingPod(f *Framework) (*api.Pod, error) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: string(uuid),
+			Annotations: map[string]string{
+				"scheduler.alpha.kubernetes.io/name": "please don't schedule my pods",
+			},
 		},
 		Spec: api.PodSpec{
-			NodeName: "nonexistant-node",
 			Containers: []api.Container{
 				{
 					Name:  string(uuid),
