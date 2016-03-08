@@ -850,7 +850,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	}
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
 
-	result, err := c.listPublicSubnetIDsinVPC()
+	result, err := c.findELBSubnets(false)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
@@ -876,7 +876,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	// test implicit routing table - when subnets are not explicitly linked to a table they should use main
 	awsServices.ec2.RouteTables = constructRouteTables(map[string]bool{})
 
-	result, err = c.listPublicSubnetIDsinVPC()
+	result, err = c.findELBSubnets(false)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
@@ -908,7 +908,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	routeTables["subnet-c0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
 
-	result, err = c.listPublicSubnetIDsinVPC()
+	result, err = c.findELBSubnets(false)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
@@ -936,7 +936,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	routeTables["subnet-d0000001"] = true
 	routeTables["subnet-d0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
-	result, err = c.listPublicSubnetIDsinVPC()
+	result, err = c.findELBSubnets(false)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
