@@ -198,7 +198,7 @@ kind: ConfigMap
 metadata:
   name: etcd-env-config
 data:
-  number-of-members: 1
+  number-of-members: "1"
   initial-cluster-state: new
   initial-cluster-token: DUMMY_ETCD_INITIAL_CLUSTER_TOKEN
   discovery-token: DUMMY_ETCD_DISCOVERY_TOKEN

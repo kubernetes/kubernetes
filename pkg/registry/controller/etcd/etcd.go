@@ -19,7 +19,13 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -28,6 +34,24 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 )
+
+// ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
+type ControllerStorage struct {
+	Controller *REST
+	Status     *StatusREST
+	Scale      *ScaleREST
+}
+
+func NewStorage(opts generic.RESTOptions) ControllerStorage {
+	controllerREST, statusREST := NewREST(opts)
+	controllerRegistry := controller.NewRegistry(controllerREST)
+
+	return ControllerStorage{
+		Controller: controllerREST,
+		Status:     statusREST,
+		Scale:      &ScaleREST{registry: controllerRegistry},
+	}
+}
 
 type REST struct {
 	*etcdgeneric.Etcd
@@ -94,4 +118,70 @@ func (r *StatusREST) New() runtime.Object {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, obj)
+}
+
+type ScaleREST struct {
+	registry controller.Registry
+}
+
+// ScaleREST implements Patcher
+var _ = rest.Patcher(&ScaleREST{})
+
+// New creates a new Scale object
+func (r *ScaleREST) New() runtime.Object {
+	return &autoscaling.Scale{}
+}
+
+func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	rc, err := r.registry.GetController(ctx, name)
+	if err != nil {
+		return nil, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), name)
+	}
+	return scaleFromRC(rc), nil
+}
+
+func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	if obj == nil {
+		return nil, false, errors.NewBadRequest("nil update passed to Scale")
+	}
+	scale, ok := obj.(*autoscaling.Scale)
+	if !ok {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+	}
+
+	if errs := validation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
+	}
+
+	rc, err := r.registry.GetController(ctx, scale.Name)
+	if err != nil {
+		return nil, false, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), scale.Name)
+	}
+	rc.Spec.Replicas = scale.Spec.Replicas
+	rc.ResourceVersion = scale.ResourceVersion
+	rc, err = r.registry.UpdateController(ctx, rc)
+	if err != nil {
+		return nil, false, err
+	}
+	return scaleFromRC(rc), false, nil
+}
+
+// scaleFromRC returns a scale subresource for a replication controller.
+func scaleFromRC(rc *api.ReplicationController) *autoscaling.Scale {
+	return &autoscaling.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              rc.Name,
+			Namespace:         rc.Namespace,
+			UID:               rc.UID,
+			ResourceVersion:   rc.ResourceVersion,
+			CreationTimestamp: rc.CreationTimestamp,
+		},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: rc.Spec.Replicas,
+		},
+		Status: autoscaling.ScaleStatus{
+			Replicas: rc.Status.Replicas,
+			Selector: labels.SelectorFromSet(rc.Spec.Selector).String(),
+		},
+	}
 }

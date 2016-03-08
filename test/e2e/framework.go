@@ -84,8 +84,8 @@ type FrameworkOptions struct {
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
 	options := FrameworkOptions{
-		clientQPS:   5,
-		clientBurst: 10,
+		clientQPS:   20,
+		clientBurst: 50,
 	}
 	return NewFramework(baseName, options)
 }
@@ -270,6 +270,11 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
 	return waitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
+}
+
+// WaitForPodReady waits for the pod to flip to ready in the namespace.
+func (f *Framework) WaitForPodReady(podName string) error {
+	return waitTimeoutForPodReadyInNamespace(f.Client, podName, f.Namespace.Name, podStartTimeout)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.

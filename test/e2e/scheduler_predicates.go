@@ -28,19 +28,26 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/system"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	_ "github.com/stretchr/testify/assert"
 )
 
+// variable set in BeforeEach, never modified afterwards
+var masterNodes sets.String
+
 // Returns a number of currently scheduled and not scheduled Pods.
 func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
 	for _, pod := range pods.Items {
-		if pod.Spec.NodeName != "" {
-			scheduledPods = append(scheduledPods, pod)
-		} else {
-			notScheduledPods = append(notScheduledPods, pod)
+		if !masterNodes.Has(pod.Spec.NodeName) {
+			if pod.Spec.NodeName != "" {
+				scheduledPods = append(scheduledPods, pod)
+			} else {
+				notScheduledPods = append(notScheduledPods, pod)
+			}
 		}
 	}
 	return
@@ -155,9 +162,18 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		nodeList = ListSchedulableNodesOrDie(c)
+		nodeList = &api.NodeList{}
+		nodes, err := c.Nodes().List(api.ListOptions{})
+		masterNodes = sets.NewString()
+		for _, node := range nodes.Items {
+			if system.IsMasterNode(&node) {
+				masterNodes.Insert(node.Name)
+			} else {
+				nodeList.Items = append(nodeList.Items, node)
+			}
+		}
 
-		err := checkTestingNSDeletedExcept(c, ns)
+		err = checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
@@ -165,7 +181,12 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		// It is so because we need to have precise control on what's running in the cluster.
 		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = len(systemPods.Items)
+		systemPodsNo = 0
+		for _, pod := range systemPods.Items {
+			if !masterNodes.Has(pod.Spec.NodeName) && pod.DeletionTimestamp == nil {
+				systemPodsNo++
+			}
+		}
 
 		err = waitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, podReadyBeforeTimeout)
 		Expect(err).NotTo(HaveOccurred())
@@ -186,10 +207,10 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
+			Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity["pods"]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
-			Logf("Node: %v", node)
 		}
 
 		currentlyScheduledPods := waitForStableCluster(c)
@@ -259,8 +280,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		expectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
-			Expect(found).To(Equal(true))
-			if pod.Status.Phase == api.PodRunning {
+			if found && pod.Status.Phase == api.PodRunning {
 				Logf("Pod %v requesting resource %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}

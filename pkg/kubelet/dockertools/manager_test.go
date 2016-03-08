@@ -546,7 +546,7 @@ func TestKillContainerInPodWithError(t *testing.T) {
 		},
 	}
 	fakeDocker.SetFakeRunningContainers(containers)
-	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
+	fakeDocker.InjectError("stop", fmt.Errorf("sample error"))
 
 	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with error."); err == nil {
 		t.Errorf("expected error, found nil")
@@ -710,8 +710,6 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Inspect pod infra container (but does not create)"
-		"inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -798,8 +796,6 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra container.
-		"inspect_container",
 		// Kill the duplicated container.
 		"stop",
 	})
@@ -836,8 +832,6 @@ func TestSyncPodBadHash(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra container.
-		"inspect_container",
 		// Kill and restart the bad hash container.
 		"stop", "create", "start", "inspect_container",
 	})
@@ -878,8 +872,6 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra container.
-		"inspect_container",
 		// Kill the unhealthy container.
 		"stop",
 		// Restart the unhealthy container.
@@ -918,10 +910,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
-	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra container.
-		"inspect_container",
-	})
+	verifyCalls(t, fakeDocker, []string{})
 }
 
 func TestSyncPodWithRestartPolicy(t *testing.T) {
@@ -980,8 +969,6 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyAlways,
 			[]string{
-				// Check the pod infra container.
-				"inspect_container",
 				// Restart both containers.
 				"create", "start", "inspect_container", "create", "start", "inspect_container",
 			},
@@ -991,8 +978,6 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyOnFailure,
 			[]string{
-				// Check the pod infra container.
-				"inspect_container",
 				// Restart the failed container.
 				"create", "start", "inspect_container",
 			},
@@ -1003,7 +988,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 			api.RestartPolicyNever,
 			[]string{
 				// Check the pod infra container.
-				"inspect_container", "inspect_container", "inspect_container",
+				"inspect_container", "inspect_container",
 				// Stop the last pod infra container.
 				"stop",
 			},
@@ -1077,8 +1062,8 @@ func TestSyncPodBackoff(t *testing.T) {
 		},
 	}
 
-	startCalls := []string{"inspect_container", "create", "start", "inspect_container"}
-	backOffCalls := []string{"inspect_container"}
+	startCalls := []string{"create", "start", "inspect_container"}
+	backOffCalls := []string{}
 	startResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", nil, ""}
 	backoffResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", kubecontainer.ErrCrashLoopBackOff, ""}
 	tests := []struct {
@@ -1287,8 +1272,6 @@ func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra container.
-		"inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -1339,8 +1322,6 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	runSyncPod(t, dm, fakeDocker, pod, nil, true)
 
 	verifyCalls(t, fakeDocker, []string{
-		// Check the pod infra container.
-		"inspect_container",
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
@@ -1461,7 +1442,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container", "inspect_container",
+		"create", "start", "inspect_container",
 		// Create container.
 		"create", "start", "inspect_container",
 	})
@@ -1744,7 +1725,7 @@ func TestSyncPodWithFailure(t *testing.T) {
 			ID:   "9876",
 			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0",
 		}})
-		fakeDocker.Errors = test.dockerError
+		fakeDocker.InjectErrors(test.dockerError)
 		puller.ErrorsToInject = test.pullerError
 		pod.Spec.Containers = []api.Container{test.container}
 		result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
@@ -1864,4 +1845,97 @@ func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	assert.NotContains(t, newContainer.HostConfig.SecurityOpt, "seccomp:unconfined", "Pods with Docker versions < 1.10 must not have seccomp disabled by default")
+}
+
+func TestCheckVersionCompatibility(t *testing.T) {
+	apiVersion, err := docker.NewAPIVersion(minimumDockerAPIVersion)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	type test struct {
+		version    string
+		compatible bool
+	}
+	tests := []test{
+		// Minimum apiversion
+		{minimumDockerAPIVersion, true},
+		// Invalid apiversion
+		{"invalid_api_version", false},
+	}
+	for i := range apiVersion {
+		apiVersion[i]++
+		// Newer apiversion
+		tests = append(tests, test{apiVersion.String(), true})
+		apiVersion[i] -= 2
+		// Older apiversion
+		if apiVersion[i] >= 0 {
+			tests = append(tests, test{apiVersion.String(), false})
+		}
+		apiVersion[i]++
+	}
+
+	for i, tt := range tests {
+		testCase := fmt.Sprintf("test case #%d test version %q", i, tt.version)
+		dm, fakeDocker := newTestDockerManagerWithHTTPClientWithVersion(&fakeHTTP{}, "", tt.version)
+		err := dm.checkVersionCompatibility()
+		assert.Equal(t, tt.compatible, err == nil, testCase)
+		if tt.compatible == true {
+			// Get docker version error
+			fakeDocker.InjectError("version", fmt.Errorf("injected version error"))
+			err := dm.checkVersionCompatibility()
+			assert.NotNil(t, err, testCase+" version error check")
+		}
+	}
+}
+
+func TestGetPodStatusNoSuchContainer(t *testing.T) {
+	const (
+		noSuchContainerID = "nosuchcontainer"
+		infraContainerID  = "9876"
+	)
+	dm, fakeDocker := newTestDockerManager()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{{Name: "nosuchcontainer"}},
+		},
+	}
+
+	fakeDocker.SetFakeContainers([]*docker.Container{
+		{
+			ID:   noSuchContainerID,
+			Name: "/k8s_nosuchcontainer_foo_new_12345678_42",
+			State: docker.State{
+				ExitCode:   0,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+				Running:    false,
+			},
+		},
+		{
+			ID:   infraContainerID,
+			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
+			State: docker.State{
+				ExitCode:   0,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+				Running:    false,
+			},
+		}})
+
+	fakeDocker.Errors = map[string]error{"inspect": &docker.NoSuchContainer{}}
+	runSyncPod(t, dm, fakeDocker, pod, nil, false)
+
+	// Verify that we will try to start new contrainers even if the inspections
+	// failed.
+	verifyCalls(t, fakeDocker, []string{
+		// Start a new infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Start a new container.
+		"create", "start", "inspect_container",
+	})
 }

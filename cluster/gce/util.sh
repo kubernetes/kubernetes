@@ -133,10 +133,12 @@ function copy-to-staging() {
 # give us an API for this, so we hardcode it.
 #
 # Assumed vars:
-#   REGIONAL_RELEASE
+#   RELEASE_REGION_FALLBACK
+#   REGIONAL_KUBE_ADDONS
 #   ZONE
 # Vars set:
 #   PREFERRED_REGION
+#   KUBE_ADDON_REGISTRY
 function set-preferred-region() {
   case ${ZONE} in
     asia-*)
@@ -149,9 +151,19 @@ function set-preferred-region() {
       PREFERRED_REGION=("us" "eu" "asia")
       ;;
   esac
+  local -r preferred="${PREFERRED_REGION[0]}"
 
   if [[ "${RELEASE_REGION_FALLBACK}" != "true" ]]; then
-    PREFERRED_REGION=( "${PREFERRED_REGION[0]}" )
+    PREFERRED_REGION=( "${preferred}" )
+  fi
+
+  # If we're using regional GCR, and we're outside the US, go to the
+  # regional registry. The gcr.io/google_containers registry is
+  # appropriate for US (for now).
+  if [[ "${REGIONAL_KUBE_ADDONS}" == "true" ]] && [[ "${preferred}" != "us" ]]; then
+    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
+  else
+    KUBE_ADDON_REGISTRY="gcr.io/google_containers"
   fi
 }
 
@@ -791,27 +803,6 @@ function check-cluster() {
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
-          if [[ ${KUBE_TEST_DEBUG-} =~ ^[yY]$ ]]; then
-            local savedir="${E2E_REPORT_DIR-}"
-            if [[ -z "${savedir}" ]]; then
-              savedir="$(mktemp -t -d k8s-e2e.XXX)"
-            fi
-            echo "Preserving master logs in ${savedir}"
-            local logdir=/var/log
-            local basename
-            for basename in startupscript docker kubelet kube-apiserver; do
-              # TODO(mml): Perhaps revisit how we name logs for preservation and
-              # centralize an implementation.  Options include putting basename
-              # before hostname and including a timestamp.
-              local src="${logdir}/${basename}.log"
-              local dst="${savedir}/${MASTER_NAME}-${basename}.log"
-              echo "Copying ${MASTER_NAME}:${src}"
-              gcloud compute copy-files \
-                --project "${PROJECT}" --zone "${ZONE}" \
-                "${MASTER_NAME}:${src}" "${dst}" \
-                || true
-            done
-          fi
           exit 2
       fi
       printf "."

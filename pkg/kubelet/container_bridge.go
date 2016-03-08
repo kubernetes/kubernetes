@@ -98,7 +98,7 @@ func ensureCbr0(wantCIDR *net.IPNet, promiscuous, babysitDaemons bool) error {
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
 	if promiscuous {
 		// Checking if the bridge is in promiscuous mode is as expensive and more brittle than
-		// simply setting the flag everytime.
+		// simply setting the flag every time.
 		if err := exec.Command("ip", "link", "set", "cbr0", "promisc", "on").Run(); err != nil {
 			glog.Error(err)
 			return err

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -652,6 +653,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	}
 }
 
+// TODO: This test is too hairy for a unittest. It should be moved to an E2E suite.
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	fakePodControl := controller.FakePodControl{}
@@ -703,7 +705,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
 				if !exists || err != nil {
-					t.Fatalf("Did not find expectations for ReplicaSet.")
+					t.Fatalf("Did not find expectations for rc.")
 				}
 				if add, _ := podExp.GetExpectations(); add != 1 {
 					t.Fatalf("Expectations are wrong %v", podExp)
@@ -714,9 +716,27 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					expectedPods = burstReplicas
 				}
 				validateSyncReplicaSet(t, &fakePodControl, 0, expectedPods)
-				for i := 0; i < expectedPods-1; i++ {
-					manager.podStore.Store.Delete(&pods.Items[i])
-					manager.deletePod(&pods.Items[i])
+
+				// To accurately simulate a watch we must delete the exact pods
+				// the rs is waiting for.
+				expectedDels := manager.expectations.GetUIDs(getKey(rsSpec, t))
+				podsToDelete := []*api.Pod{}
+				for _, key := range expectedDels.List() {
+					nsName := strings.Split(key, "/")
+					podsToDelete = append(podsToDelete, &api.Pod{
+						ObjectMeta: api.ObjectMeta{
+							Name:      nsName[1],
+							Namespace: nsName[0],
+							Labels:    rsSpec.Spec.Selector.MatchLabels,
+						},
+					})
+				}
+				// Don't delete all pods because we confirm that the last pod
+				// has exactly one expectation at the end, to verify that we
+				// don't double delete.
+				for i := range podsToDelete[1:] {
+					manager.podStore.Delete(podsToDelete[i])
+					manager.deletePod(podsToDelete[i])
 				}
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
 				if !exists || err != nil {
@@ -739,8 +759,20 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				manager.podStore.Store.Add(&pods.Items[expectedPods-1])
 				manager.addPod(&pods.Items[expectedPods-1])
 			} else {
-				manager.podStore.Store.Delete(&pods.Items[expectedPods-1])
-				manager.deletePod(&pods.Items[expectedPods-1])
+				expectedDel := manager.expectations.GetUIDs(getKey(rsSpec, t))
+				if expectedDel.Len() != 1 {
+					t.Fatalf("Waiting on unexpected number of deletes.")
+				}
+				nsName := strings.Split(expectedDel.List()[0], "/")
+				lastPod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      nsName[1],
+						Namespace: nsName[0],
+						Labels:    rsSpec.Spec.Selector.MatchLabels,
+					},
+				}
+				manager.podStore.Store.Delete(lastPod)
+				manager.deletePod(lastPod)
 			}
 			pods.Items = pods.Items[expectedPods:]
 		}
@@ -788,14 +820,14 @@ func TestRSSyncExpectations(t *testing.T) {
 	manager.podStore.Store.Add(&pods.Items[0])
 	postExpectationsPod := pods.Items[1]
 
-	manager.expectations = FakeRSExpectations{
+	manager.expectations = controller.NewUIDTrackingControllerExpectations(FakeRSExpectations{
 		controller.NewControllerExpectations(), true, func() {
 			// If we check active pods before checking expectataions, the
 			// ReplicaSet will create a new replica because it doesn't see
 			// this pod, but has fulfilled its expectations.
 			manager.podStore.Store.Add(&postExpectationsPod)
 		},
-	}
+	})
 	manager.syncReplicaSet(getKey(rsSpec, t))
 	validateSyncReplicaSet(t, &fakePodControl, 0, 0)
 }
@@ -925,7 +957,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	}
 	pod := newPodList(nil, 1, api.PodPending, labelMap, rs).Items[0]
 	pod.DeletionTimestamp = &unversioned.Time{time.Now()}
-	manager.expectations.SetExpectations(rsKey, 0, 1)
+	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
 	manager.addPod(&pod)
@@ -944,7 +976,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	// An update from no deletion timestamp to having one should be treated
 	// as a deletion.
 	oldPod := newPodList(nil, 1, api.PodPending, labelMap, rs).Items[0]
-	manager.expectations.SetExpectations(rsKey, 0, 1)
+	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 	manager.updatePod(&oldPod, &pod)
 
 	queueRC, _ = manager.queue.Get()
@@ -960,7 +992,14 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// An update to the pod (including an update to the deletion timestamp)
 	// should not be counted as a second delete.
-	manager.expectations.SetExpectations(rsKey, 0, 1)
+	secondPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: pod.Namespace,
+			Name:      "secondPod",
+			Labels:    pod.Labels,
+		},
+	}
+	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
 	oldPod.DeletionTimestamp = &unversioned.Time{time.Now()}
 	manager.updatePod(&oldPod, &pod)
 
@@ -977,9 +1016,8 @@ func TestDeletionTimestamp(t *testing.T) {
 		t.Fatalf("Wrong expectations %+v", podExp)
 	}
 
-	// A pod with a nil timestamp should be counted as a deletion.
-	pod.DeletionTimestamp = nil
-	manager.deletePod(&pod)
+	// Deleting the second pod should clear expectations.
+	manager.deletePod(secondPod)
 
 	queueRC, _ = manager.queue.Get()
 	if queueRC != rsKey {

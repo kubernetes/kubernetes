@@ -43,11 +43,11 @@ func validNewPodSecurityPolicy() *extensions.PodSecurityPolicy {
 			Name: "foo",
 		},
 		Spec: extensions.PodSecurityPolicySpec{
-			SELinuxContext: extensions.SELinuxContextStrategyOptions{
-				Type: extensions.SELinuxStrategyRunAsAny,
+			SELinux: extensions.SELinuxStrategyOptions{
+				Rule: extensions.SELinuxStrategyRunAsAny,
 			},
 			RunAsUser: extensions.RunAsUserStrategyOptions{
-				Type: extensions.RunAsUserStrategyRunAsAny,
+				Rule: extensions.RunAsUserStrategyRunAsAny,
 			},
 		},
 	}

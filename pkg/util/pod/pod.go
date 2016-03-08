@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -38,7 +39,7 @@ func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
-type updatePodFunc func(pod *api.Pod)
+type updatePodFunc func(pod *api.Pod) error
 
 // UpdatePodWithRetries updates a pod with given applyUpdate function. Note that pod not found error is ignored.
 // The returned bool value can be used to tell if the pod is actually updated.
@@ -52,8 +53,9 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
-		// TODO: add precondition for update
-		applyUpdate(pod)
+		if err = applyUpdate(pod); err != nil {
+			return false, err
+		}
 		if pod, err = podClient.Update(pod); err == nil {
 			// Update successful.
 			return true, nil
@@ -66,12 +68,22 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 		podUpdated = true
 	}
 
+	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("timed out trying to update pod: %+v", oldPod)
 	}
+	// Ignore the pod not found error, but the pod isn't updated.
 	if errors.IsNotFound(err) {
 		glog.V(4).Infof("%s %s/%s is not found, skip updating it.", oldPod.Kind, oldPod.Namespace, oldPod.Name)
 		err = nil
 	}
+	// Ignore the precondition violated error, but the pod isn't updated.
+	if err == errorsutil.ErrPreconditionViolated {
+		glog.V(4).Infof("%s %s/%s precondition doesn't hold, skip updating it.", oldPod.Kind, oldPod.Namespace, oldPod.Name)
+		err = nil
+	}
+
+	// If the error is non-nil the returned pod cannot be trusted; if podUpdated is false, the pod isn't updated;
+	// if the error is nil and podUpdated is true, the returned pod contains the applied update.
 	return pod, podUpdated, err
 }

@@ -199,9 +199,15 @@ func (b flockerBuilder) SetUpAt(dir string, fsGroup *int64) error {
 		if err := b.updateDatasetPrimary(datasetID, primaryUUID); err != nil {
 			return err
 		}
+		newState, err := b.client.GetDatasetState(datasetID)
+		if err != nil {
+			return fmt.Errorf("The volume '%s' migrated unsuccessfully.", datasetID)
+		}
+		b.flocker.path = newState.Path
+	} else {
+		b.flocker.path = s.Path
 	}
 
-	b.flocker.path = s.Path
 	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }

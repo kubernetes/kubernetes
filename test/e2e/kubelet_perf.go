@@ -99,7 +99,7 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("%s", rm.FormatResourceUsage(usageSummary))
-	verifyMemoryLimits(expectedMemory, usageSummary)
+	verifyMemoryLimits(framework.Client, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	Logf("%s", rm.FormatCPUSummary(cpuSummary))
@@ -109,7 +109,7 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
 }
 
-func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsagePerNode) {
+func verifyMemoryLimits(c *client.Client, expected resourceUsagePerContainer, actual resourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -132,10 +132,16 @@ func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsage
 		}
 		if len(nodeErrs) > 0 {
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
+			heapStats, err := getKubeletHeapStats(c, nodeName)
+			if err != nil {
+				Logf("Unable to get heap stats from %q", nodeName)
+			} else {
+				Logf("Heap stats on %q\n:%v", nodeName, heapStats)
+			}
 		}
 	}
 	if len(errList) > 0 {
-		Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
@@ -204,7 +210,8 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 		// deliberately set higher resource usage limits to account for the
 		// noise.
 		rTests := []resourceTest{
-			{podsPerNode: 0,
+			{
+				podsPerNode: 0,
 				cpuLimits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.06, 0.95: 0.08},
 					"/docker-daemon": {0.50: 0.05, 0.95: 0.06},
@@ -216,9 +223,8 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
 				},
 			},
-			// TODO(yujuhong): change this test to ~100 pods per node after
-			// --max-pods have been changed.
-			{podsPerNode: 35,
+			{
+				podsPerNode: 35,
 				cpuLimits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.12, 0.95: 0.14},
 					"/docker-daemon": {0.50: 0.06, 0.95: 0.08},
@@ -229,6 +235,10 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 75 * 1024 * 1024},
 					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
 				},
+			},
+			{
+				// TODO(yujuhong): Set the limits after collecting enough data.
+				podsPerNode: 100,
 			},
 		}
 		for _, testArg := range rTests {

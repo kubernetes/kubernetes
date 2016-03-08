@@ -230,13 +230,14 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		expectedOldReplicas int
 	}{
 		{
-			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(0),
-			oldReplicas:        10,
-			newReplicas:        0,
-			readyPodsFromOldRS: 10,
-			readyPodsFromNewRS: 0,
-			scaleExpected:      false,
+			deploymentReplicas:  10,
+			maxUnavailable:      intstr.FromInt(0),
+			oldReplicas:         10,
+			newReplicas:         0,
+			readyPodsFromOldRS:  10,
+			readyPodsFromNewRS:  0,
+			scaleExpected:       true,
+			expectedOldReplicas: 9,
 		},
 		{
 			deploymentReplicas:  10,
@@ -492,11 +493,12 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		expectedOldReplicas int
 	}{
 		{
-			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(0),
-			readyPods:          10,
-			oldReplicas:        10,
-			scaleExpected:      false,
+			deploymentReplicas:  10,
+			maxUnavailable:      intstr.FromInt(0),
+			readyPods:           10,
+			oldReplicas:         10,
+			scaleExpected:       true,
+			expectedOldReplicas: 9,
 		},
 		{
 			deploymentReplicas:  10,

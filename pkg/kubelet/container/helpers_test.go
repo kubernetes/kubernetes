@@ -148,6 +148,7 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 				{Name: "alive"},
 				{Name: "succeed"},
 				{Name: "failed"},
+				{Name: "unknown"},
 			},
 		},
 	}
@@ -176,6 +177,10 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 				ExitCode: 2,
 			},
 			{
+				Name:  "unknown",
+				State: ContainerStateUnknown,
+			},
+			{
 				Name:     "failed",
 				State:    ContainerStateExited,
 				ExitCode: 3,
@@ -192,6 +197,7 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		"alive":      {false, false, false},
 		"succeed":    {false, false, true},
 		"failed":     {false, true, true},
+		"unknown":    {true, true, true},
 	}
 	for _, c := range pod.Spec.Containers {
 		for i, policy := range policies {

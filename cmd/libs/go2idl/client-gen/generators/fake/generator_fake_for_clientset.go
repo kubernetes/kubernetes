@@ -71,7 +71,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports,
 		"k8s.io/kubernetes/pkg/api",
 		"k8s.io/kubernetes/pkg/client/testing/core",
-		"k8s.io/kubernetes/pkg/client/unversioned",
+		"k8s.io/kubernetes/pkg/client/typed/discovery",
 		"k8s.io/kubernetes/pkg/runtime",
 		"k8s.io/kubernetes/pkg/watch",
 	)
@@ -132,7 +132,7 @@ type Clientset struct {
 	core.Fake
 }
 
-func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return &FakeDiscovery{&c.Fake}
 }
 `

@@ -93,7 +93,6 @@ func main() {
 	}
 
 	os.Setenv("KUBECTL", *root+`/cluster/kubectl.sh`+kubectlArgs())
-	os.Setenv("KUBE_TEST_DEBUG", "y")
 
 	if *pushup {
 		if IsUp() {

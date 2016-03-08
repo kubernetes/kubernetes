@@ -407,6 +407,22 @@ func getKubeletMetricsThroughNode(nodeName string) (string, error) {
 	return string(body), nil
 }
 
+func getKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
+	client, err := nodeProxyRequest(c, nodeName, "debug/pprof/heap")
+	if err != nil {
+		return "", err
+	}
+	raw, errRaw := client.Raw()
+	if errRaw != nil {
+		return "", err
+	}
+	stats := string(raw)
+	// Only dumping the runtime.MemStats numbers to avoid polluting the log.
+	numLines := 23
+	lines := strings.Split(stats, "\n")
+	return strings.Join(lines[len(lines)-numLines:], "\n"), nil
+}
+
 // GetKubeletPods retrieves the list of running pods on the kubelet. The pods
 // includes necessary information (e.g., UID, name, namespace for
 // pods/containers), but do not contain the full spec.

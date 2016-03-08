@@ -3,10 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Getting started on Microsoft Azure
-----------------------------------
-
-Checkout the [coreos azure getting started guide](coreos/azure/README.md)
+This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/azure/
 
 
 
