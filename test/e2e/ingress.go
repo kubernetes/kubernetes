@@ -146,10 +146,11 @@ func ruleByIndex(i int) extensions.IngressRule {
 //	 foo1.bar.com: /foo1
 //	 foo2.bar.com: /foo2
 // }
-func createIngress(c *client.Client, ns string, start, num int) extensions.Ingress {
+func generateIngressSpec(start, num int, ns string) *extensions.Ingress {
+	name := fmt.Sprintf("%v%d", appPrefix, start)
 	ing := extensions.Ingress{
 		ObjectMeta: api.ObjectMeta{
-			Name:      fmt.Sprintf("%v%d", appPrefix, start),
+			Name:      name,
 			Namespace: ns,
 		},
 		Spec: extensions.IngressSpec{
@@ -163,10 +164,15 @@ func createIngress(c *client.Client, ns string, start, num int) extensions.Ingre
 	for i := start; i < start+num; i++ {
 		ing.Spec.Rules = append(ing.Spec.Rules, ruleByIndex(i))
 	}
-	Logf("Creating ingress %v", start)
-	_, err := c.Extensions().Ingress(ns).Create(&ing)
-	Expect(err).NotTo(HaveOccurred())
-	return ing
+	// Create the host for the cert by appending all hosts mentioned in rules.
+	hosts := []string{}
+	for _, rules := range ing.Spec.Rules {
+		hosts = append(hosts, rules.Host)
+	}
+	ing.Spec.TLS = []extensions.IngressTLS{
+		{Hosts: hosts, SecretName: name},
+	}
+	return &ing
 }
 
 // createApp will create a single RC and Svc. The Svc will match pods of the
@@ -323,21 +329,36 @@ func (cont *IngressController) Cleanup(del bool) error {
 	// Ordering is important here because we cannot delete resources that other
 	// resources hold references to.
 	fwList := []compute.ForwardingRule{}
-	gcloudUnmarshal("forwarding-rules", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.Project, &fwList)
-	if len(fwList) != 0 {
-		msg := ""
-		for _, f := range fwList {
-			msg += fmt.Sprintf("%v\n", f.Name)
-			if del {
-				Logf("Deleting forwarding-rule: %v", f.Name)
-				output, err := exec.Command("gcloud", "compute", "forwarding-rules", "delete",
-					f.Name, fmt.Sprintf("--project=%v", cont.Project), "-q", "--global").CombinedOutput()
-				if err != nil {
-					Logf("Error deleting forwarding rules, output: %v\nerror:%v", string(output), err)
+	for _, regex := range []string{fmt.Sprintf("k8s-fw-.*--%v", cont.UID), fmt.Sprintf("k8s-fws-.*--%v", cont.UID)} {
+		gcloudUnmarshal("forwarding-rules", regex, cont.Project, &fwList)
+		if len(fwList) != 0 {
+			msg := ""
+			for _, f := range fwList {
+				msg += fmt.Sprintf("%v\n", f.Name)
+				if del {
+					Logf("Deleting forwarding-rule: %v", f.Name)
+					output, err := exec.Command("gcloud", "compute", "forwarding-rules", "delete",
+						f.Name, fmt.Sprintf("--project=%v", cont.Project), "-q", "--global").CombinedOutput()
+					if err != nil {
+						Logf("Error deleting forwarding rules, output: %v\nerror:%v", string(output), err)
+					}
 				}
 			}
+			errMsg += fmt.Sprintf("\nFound forwarding rules:\n%v", msg)
 		}
-		errMsg += fmt.Sprintf("\nFound forwarding rules:\n%v", msg)
+	}
+	// Static IPs are named after forwarding rules.
+	ipList := []compute.Address{}
+	gcloudUnmarshal("addresses", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.Project, &ipList)
+	if len(ipList) != 0 {
+		msg := ""
+		for _, ip := range ipList {
+			msg += fmt.Sprintf("%v\n", ip.Name)
+			if del {
+				gcloudDelete("addresses", ip.Name, cont.Project)
+			}
+		}
+		errMsg += fmt.Sprintf("Found health check:\n%v", msg)
 	}
 
 	tpList := []compute.TargetHttpProxy{}
@@ -352,6 +373,19 @@ func (cont *IngressController) Cleanup(del bool) error {
 		}
 		errMsg += fmt.Sprintf("Found target proxies:\n%v", msg)
 	}
+	tpsList := []compute.TargetHttpsProxy{}
+	gcloudUnmarshal("target-https-proxies", fmt.Sprintf("k8s-tps-.*--%v", cont.UID), cont.Project, &tpsList)
+	if len(tpsList) != 0 {
+		msg := ""
+		for _, t := range tpsList {
+			msg += fmt.Sprintf("%v\n", t.Name)
+			if del {
+				gcloudDelete("target-http-proxies", t.Name, cont.Project)
+			}
+		}
+		errMsg += fmt.Sprintf("Found target HTTPS proxies:\n%v", msg)
+	}
+	// TODO: Check for leaked ssl certs.
 
 	umList := []compute.UrlMap{}
 	gcloudUnmarshal("url-maps", fmt.Sprintf("k8s-um-.*--%v", cont.UID), cont.Project, &umList)
@@ -439,6 +473,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() {
 			c:              client,
 		}
 		ingController.create()
+		Logf("Finished creating ingress controller")
 		// If we somehow get the same namespace uid as someone else in this
 		// gce project, just back off.
 		Expect(ingController.Cleanup(false)).NotTo(HaveOccurred())
@@ -503,19 +538,34 @@ var _ = Describe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() {
 		if numApps < numIng {
 			Failf("Need more apps than Ingress")
 		}
+		Logf("Starting ingress test")
 		appsPerIngress := numApps / numIng
 		By(fmt.Sprintf("Creating %d rcs + svc, and %d apps per Ingress", numApps, appsPerIngress))
+
+		ingCAs := map[string][]byte{}
 		for appID := 0; appID < numApps; appID = appID + appsPerIngress {
 			// Creates appsPerIngress apps, then creates one Ingress with paths to all the apps.
 			for j := appID; j < appID+appsPerIngress; j++ {
 				createApp(client, ns, j)
 			}
-			createIngress(client, ns, appID, appsPerIngress)
+			var err error
+			ing := generateIngressSpec(appID, appsPerIngress, ns)
+
+			// Secrets must be created before the Ingress. The cert of each
+			// Ingress contains all the hostnames of that Ingress as the subject
+			// name field in the cert.
+			By(fmt.Sprintf("Creating secret for ingress %v/%v", ing.Namespace, ing.Name))
+			_, rootCA, _, err := createSecret(client, ing)
+			Expect(err).NotTo(HaveOccurred())
+			ingCAs[ing.Name] = rootCA
+
+			By(fmt.Sprintf("Creating ingress %v/%v", ing.Namespace, ing.Name))
+			ing, err = client.Extensions().Ingress(ing.Namespace).Create(ing)
+			Expect(err).NotTo(HaveOccurred())
 		}
 
 		ings, err := client.Extensions().Ingress(ns).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-
 		for _, ing := range ings.Items {
 			// Wait for the loadbalancer IP.
 			start := time.Now()
@@ -538,10 +588,14 @@ var _ = Describe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() {
 				if rules.IngressRuleValue.HTTP == nil {
 					continue
 				}
-				for _, p := range rules.IngressRuleValue.HTTP.Paths {
-					route := fmt.Sprintf("http://%v%v", address, p.Path)
-					Logf("Testing route %v host %v with simple GET", route, rules.Host)
+				timeoutClient.Transport, err = buildTransport(rules.Host, ingCAs[ing.Name])
 
+				for _, p := range rules.IngressRuleValue.HTTP.Paths {
+					route := fmt.Sprintf("https://%v%v", address, p.Path)
+					Logf("Testing route %v host %v with simple GET", route, rules.Host)
+					if err != nil {
+						Failf("Unable to create transport: %v", err)
+					}
 					// Make sure the service node port is reachable
 					Expect(curlServiceNodePort(client, ns, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))).NotTo(HaveOccurred())
 
@@ -597,9 +651,18 @@ func curlServiceNodePort(client *client.Client, ns, name string, port int) error
 	if err != nil {
 		return err
 	}
-	svcCurlBody, err := simpleGET(timeoutClient, u, "")
-	if err != nil {
-		return fmt.Errorf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
+	var svcCurlBody string
+	timeout := 30 * time.Second
+	pollErr := wait.Poll(10*time.Second, timeout, func() (bool, error) {
+		svcCurlBody, err = simpleGET(timeoutClient, u, "")
+		if err != nil {
+			Logf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("Failed to curl service node port in %v, body: %v\nerror %v", timeout, svcCurlBody, err)
 	}
 	Logf("Successfully curled service node port, body: %v", svcCurlBody)
 	return nil
