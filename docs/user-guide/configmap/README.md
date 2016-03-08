@@ -27,7 +27,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-This file has moved to: http://kubernetes.github.io/docs/user-guide/configmap/README/
+This file has moved to: http://kubernetes.github.io/docs/user-guide/configmap/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
