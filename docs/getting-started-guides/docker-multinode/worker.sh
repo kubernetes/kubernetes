@@ -216,6 +216,13 @@ start_k8s() {
     # sleep a little bit
     sleep 5
 
+    # If we're using k8 greater than 1.1.8, we need the arch argument
+    if [ vercomp K8S_VERSION '1.1.8' -gt 1 ]; then
+        HYPERKUBE_VERSION="-${ARCH}:v${K8S_VERSION}"
+    else
+        HYPERKUBE_VERSION=":v${K8S_VERSION}"
+    fi
+
     # Start kubelet & proxy in container
     # TODO: Use secure port for communication
     docker run \
@@ -229,7 +236,7 @@ start_k8s() {
         -v /:/rootfs:ro \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
-        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube${HYPERKUBE_VERSION} \
         /hyperkube kubelet \
             --allow-privileged=true \
             --api-servers=http://${MASTER_IP}:8080 \
@@ -245,7 +252,7 @@ start_k8s() {
         --net=host \
         --privileged \
         --restart=on-failure \
-        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube${HYPERKUBE_VERSION} \
         /hyperkube proxy \
             --master=http://${MASTER_IP}:8080 \
             --v=2
