@@ -3,7 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-This file has moved to: http://kubernetes.github.io/docs/admin/limitrange/README/
+This file has moved to: http://kubernetes.github.io/docs/admin/limitrange/
 
 
 
