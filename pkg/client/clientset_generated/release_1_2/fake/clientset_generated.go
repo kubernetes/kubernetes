@@ -22,6 +22,8 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	v1alpha1controlplane "k8s.io/kubernetes/pkg/client/typed/generated/controlplane/v1alpha1"
+	fakev1alpha1controlplane "k8s.io/kubernetes/pkg/client/typed/generated/controlplane/v1alpha1/fake"
 	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
 	fakev1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
@@ -68,4 +70,9 @@ func (c *Clientset) Core() v1core.CoreInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return &fakev1beta1extensions.FakeExtensions{&c.Fake}
+}
+
+// Controlplane retrieves the ControlplaneClient
+func (c *Clientset) Controlplane() v1alpha1controlplane.ControlplaneInterface {
+	return &fakev1alpha1controlplane.FakeControlplane{&c.Fake}
 }
