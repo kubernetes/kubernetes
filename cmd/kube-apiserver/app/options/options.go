@@ -32,7 +32,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
@@ -74,7 +74,7 @@ type APIServer struct {
 	OIDCIssuerURL              string
 	OIDCUsernameClaim          string
 	OIDCGroupsClaim            string
-	RuntimeConfig              util.ConfigurationMap
+	RuntimeConfig              config.ConfigurationMap
 	SSHKeyfile                 string
 	SSHUser                    string
 	ServiceAccountKeyFile      string
@@ -106,7 +106,7 @@ func NewAPIServer() *APIServer {
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
 		MasterServiceNamespace: api.NamespaceDefault,
-		RuntimeConfig:          make(util.ConfigurationMap),
+		RuntimeConfig:          make(config.ConfigurationMap),
 		StorageVersions:        registered.AllPreferredGroupVersions(),
 		DefaultStorageVersions: registered.AllPreferredGroupVersions(),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
