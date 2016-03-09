@@ -64,6 +64,8 @@ type ClusterStatus struct {
 	ClusterMeta string           `json:",inline"`
 }
 
+// +genclient=true,nonNamespaced=true
+
 // Cluster information in Ubernetes
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
