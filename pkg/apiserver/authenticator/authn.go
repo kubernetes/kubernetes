@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/crypto"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/keystone"
@@ -159,7 +159,7 @@ func newServiceAccountAuthenticator(keyfile string, lookup bool, serviceAccountG
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
 func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
-	roots, err := util.CertPoolFromFile(clientCAFile)
+	roots, err := crypto.CertPoolFromFile(clientCAFile)
 	if err != nil {
 		return nil, err
 	}
