@@ -33,8 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -80,7 +80,7 @@ type GCECloud struct {
 	managedZones             []string // List of zones we are spanning (for Ubernetes-Lite, primarily when running on master)
 	networkURL               string
 	useMetadataServer        bool
-	operationPollRateLimiter util.RateLimiter
+	operationPollRateLimiter flowcontrol.RateLimiter
 }
 
 type Config struct {
@@ -297,7 +297,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		glog.Infof("managing multiple zones: %v", managedZones)
 	}
 
-	operationPollRateLimiter := util.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
+	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
 
 	return &GCECloud{
 		service:                  svc,
