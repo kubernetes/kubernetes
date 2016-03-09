@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package flowcontrol
 
 import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/integer"
 )
 
@@ -30,13 +31,13 @@ type backoffEntry struct {
 
 type Backoff struct {
 	sync.Mutex
-	Clock           Clock
+	Clock           util.Clock
 	defaultDuration time.Duration
 	maxDuration     time.Duration
 	perItemBackoff  map[string]*backoffEntry
 }
 
-func NewFakeBackOff(initial, max time.Duration, tc *FakeClock) *Backoff {
+func NewFakeBackOff(initial, max time.Duration, tc *util.FakeClock) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
 		Clock:           tc,
@@ -48,7 +49,7 @@ func NewFakeBackOff(initial, max time.Duration, tc *FakeClock) *Backoff {
 func NewBackOff(initial, max time.Duration) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
-		Clock:           RealClock{},
+		Clock:           util.RealClock{},
 		defaultDuration: initial,
 		maxDuration:     max,
 	}
