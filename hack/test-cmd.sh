@@ -485,11 +485,11 @@ runTests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   # Post-condition: valid-pod has the record annotation
   kube::test::get_object_assert pods "{{range.items}}{{$annotations_field}}:{{end}}" "${change_cause_annotation}"
-  # prove that patch can use different types 
+  # prove that patch can use different types
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx2"}]'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx2:'
-  # prove that patch can use different types 
+  # prove that patch can use different types
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx"}]'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
@@ -545,7 +545,7 @@ runTests() {
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
   #cleaning
   rm /tmp/tmp-valid-pod.json
-  
+
   ## replace of a cluster scoped resource can succeed
   # Pre-condition: a node exists
   kubectl create -f - "${kube_flags[@]}" << __EOF__
@@ -755,6 +755,12 @@ __EOF__
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
+  # Command
+  kubectl run pi --generator=job/v1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: Job "pi" is created
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete jobs pi "${kube_flags[@]}"
   # Post-condition: no pods exist.
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Pre-Condition: no Deployment exists
@@ -853,7 +859,7 @@ __EOF__
   # Command
   [[ "$(kubectl create secret generic test-secret --namespace=test-secrets --from-literal=key1=value1 --output=go-template --template=\"{{.metadata.name}}:\" | grep 'test-secret:')" ]]
   ## Clean-up
-  kubectl delete secret test-secret --namespace=test-secrets  
+  kubectl delete secret test-secret --namespace=test-secrets
   # Clean up
   kubectl delete namespace test-secrets
 
@@ -884,7 +890,7 @@ __EOF__
   # Clean-up
   kubectl delete configmap test-configmap --namespace=test-configmaps
   kubectl delete namespace test-configmaps
-  
+
   ####################
   # Service Accounts #
   ####################
