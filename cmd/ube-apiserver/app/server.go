@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -254,8 +254,13 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("error in parsing runtime-config: %s", err)
 	}
 
-	clientConfig := &client.Config{
+	clientConfig := &restclient.Config{
 		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
 	}
 	if len(s.DeprecatedStorageVersion) != 0 {
 		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
@@ -406,7 +411,7 @@ func Run(s *options.APIServer) error {
 	}
 
 	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, s.AuthorizationPolicyFile)
+	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, s.AuthorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
@@ -469,9 +474,10 @@ func Run(s *options.APIServer) error {
 			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
 			Serializer:                api.Codecs,
 		},
-		EnableCoreControllers: true,
-		EventTTL:              s.EventTTL,
-		KubeletClient:         kubeletClient,
+		EnableCoreControllers:   true,
+		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
+		EventTTL:                s.EventTTL,
+		KubeletClient:           kubeletClient,
 
 		Tunneler: tunneler,
 	}
@@ -484,6 +490,9 @@ func Run(s *options.APIServer) error {
 	if err != nil {
 		return err
 	}
+
+	addClusterAPIGroup(storageDestinations, s)
+	installClusterAPI(m, storageDestinations)
 
 	m.Run(s.ServerRunOptions)
 	return nil

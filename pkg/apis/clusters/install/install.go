@@ -88,7 +88,9 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString()
+	rootScoped := sets.NewString(
+		"Cluster",
+	)
 
 	ignoredKinds := sets.NewString()
 
@@ -114,6 +116,7 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
 	clusters.AddToScheme(api.Scheme)
 	// add the enabled external versions to Scheme
+	glog.Infof("== clusters.install.addVersionsToScheme: externalVersions: %v\n", externalVersions)
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
 			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)

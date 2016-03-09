@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -38,6 +39,10 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Cluster{},
 		&ClusterList{},
+		&unversioned.Status{},
+		&v1.ListOptions{},
+		&v1.DeleteOptions{},
+		&v1.ExportOptions{},
 	)
 }
 

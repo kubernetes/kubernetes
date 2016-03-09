@@ -17,6 +17,7 @@ limitations under the License.
 package clusters
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -46,6 +47,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Cluster{},
 		&ClusterList{},
+		&api.ListOptions{},
+		&api.DeleteOptions{},
 	)
 }
 

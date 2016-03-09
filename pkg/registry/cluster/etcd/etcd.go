@@ -62,8 +62,9 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*apiclusters.Cluster).Name, nil
 		},
-		PredicateFunc:     cluster.MatchCluster,
-		QualifiedResource: apiclusters.Resource(""),
+		PredicateFunc:           cluster.MatchCluster,
+		QualifiedResource:       apiclusters.Resource("clusters"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: cluster.Strategy,
 		UpdateStrategy: cluster.Strategy,
