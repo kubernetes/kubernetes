@@ -72,8 +72,8 @@ const (
 	NotEqualsOperator    Operator = "!="
 	NotInOperator        Operator = "notin"
 	ExistsOperator       Operator = "exists"
-	GreaterThanOperator  Operator = "Gt"
-	LessThanOperator     Operator = "Lt"
+	GreaterThanOperator  Operator = "gt"
+	LessThanOperator     Operator = "lt"
 )
 
 func NewSelector() Selector {
