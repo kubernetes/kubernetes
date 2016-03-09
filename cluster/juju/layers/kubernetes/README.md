@@ -72,3 +72,6 @@ cluster is operational.
 
  * Charm Author: Matthew Bruzek &lt;Matthew.Bruzek@canonical.com&gt;
  * Charm Contributor: Charles Butler &lt;Charles.Butler@canonical.com&gt;
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/layers/kubernetes/README.md?pixel)]()
