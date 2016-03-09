@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/crlf"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
@@ -181,7 +181,7 @@ outter:
 			buf := &bytes.Buffer{}
 			var w io.Writer = buf
 			if windowsLineEndings {
-				w = util.NewCRLFWriter(w)
+				w = crlf.NewCRLFWriter(w)
 			}
 			if err := results.header.writeTo(w); err != nil {
 				return preservedFile(err, results.file, out)
