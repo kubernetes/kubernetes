@@ -14,9 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
+# This script contains skeletons of helper functions that each provider hosting
+# Kubernetes must implement to use cluster/kube-*.sh scripts.
+# It sets KUBERNETES_PROVIDER to its default value (gce) if it is unset, and
+# then sources cluster/${KUBERNETES_PROVIDER}/util.sh.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
 
 # Must ensure that the following ENV vars are set
 function detect-master {
@@ -91,10 +94,8 @@ function test-teardown {
 	echo "TODO: test-teardown" 1>&2
 }
 
-# Providers util.sh scripts should define functions that override the above default functions impls
-if [ -n "${KUBERNETES_PROVIDER}" ]; then
-	PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
-	if [ -f ${PROVIDER_UTILS} ]; then
-		source "${PROVIDER_UTILS}"
-	fi
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+if [ -f ${PROVIDER_UTILS} ]; then
+    source "${PROVIDER_UTILS}"
 fi

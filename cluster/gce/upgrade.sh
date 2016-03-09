@@ -28,7 +28,6 @@ if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
 fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {
