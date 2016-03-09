@@ -127,6 +127,16 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
 }
 
+var standardLimitRangeTypes = sets.NewString(
+	string(LimitTypePod),
+	string(LimitTypeContainer),
+)
+
+// IsStandardLimitRangeType returns true if the type is Pod or Container
+func IsStandardLimitRangeType(str string) bool {
+	return standardLimitRangeTypes.Has(str)
+}
+
 var standardQuotaResources = sets.NewString(
 	string(ResourceCPU),
 	string(ResourceMemory),

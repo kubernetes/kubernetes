@@ -2034,6 +2034,33 @@ func validateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 	return field.ErrorList{}
 }
 
+// Validate limit range types
+func validateLimitRangeTypeName(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !validation.IsQualifiedName(value) {
+		return append(allErrs, field.Invalid(fldPath, value, qualifiedNameErrorMsg))
+	}
+
+	if len(strings.Split(value, "/")) == 1 {
+		if !api.IsStandardLimitRangeType(value) {
+			return append(allErrs, field.Invalid(fldPath, value, "must be a standard limit type or fully qualified"))
+		}
+	}
+
+	return allErrs
+}
+
+// Validate limit range resource name
+// limit types (other than Pod/Container) could contain storage not just cpu or memory
+func validateLimitRangeResourceName(limitType api.LimitType, value string, fldPath *field.Path) field.ErrorList {
+	switch limitType {
+	case api.LimitTypePod, api.LimitTypeContainer:
+		return validateContainerResourceName(value, fldPath)
+	default:
+		return validateResourceName(value, fldPath)
+	}
+}
+
 // ValidateLimitRange tests if required fields in the LimitRange are set.
 func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 	allErrs := ValidateObjectMeta(&limitRange.ObjectMeta, true, ValidateLimitRangeName, field.NewPath("metadata"))
@@ -2044,6 +2071,8 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 	for i := range limitRange.Spec.Limits {
 		idxPath := fldPath.Index(i)
 		limit := &limitRange.Spec.Limits[i]
+		allErrs = append(allErrs, validateLimitRangeTypeName(string(limit.Type), idxPath.Child("type"))...)
+
 		_, found := limitTypeSet[limit.Type]
 		if found {
 			allErrs = append(allErrs, field.Duplicate(idxPath.Child("type"), limit.Type))
@@ -2058,12 +2087,12 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 		maxLimitRequestRatios := map[string]resource.Quantity{}
 
 		for k, q := range limit.Max {
-			allErrs = append(allErrs, validateContainerResourceName(string(k), idxPath.Child("max").Key(string(k)))...)
+			allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("max").Key(string(k)))...)
 			keys.Insert(string(k))
 			max[string(k)] = q
 		}
 		for k, q := range limit.Min {
-			allErrs = append(allErrs, validateContainerResourceName(string(k), idxPath.Child("min").Key(string(k)))...)
+			allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("min").Key(string(k)))...)
 			keys.Insert(string(k))
 			min[string(k)] = q
 		}
@@ -2077,19 +2106,19 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 			}
 		} else {
 			for k, q := range limit.Default {
-				allErrs = append(allErrs, validateContainerResourceName(string(k), idxPath.Child("default").Key(string(k)))...)
+				allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("default").Key(string(k)))...)
 				keys.Insert(string(k))
 				defaults[string(k)] = q
 			}
 			for k, q := range limit.DefaultRequest {
-				allErrs = append(allErrs, validateContainerResourceName(string(k), idxPath.Child("defaultRequest").Key(string(k)))...)
+				allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("defaultRequest").Key(string(k)))...)
 				keys.Insert(string(k))
 				defaultRequests[string(k)] = q
 			}
 		}
 
 		for k, q := range limit.MaxLimitRequestRatio {
-			allErrs = append(allErrs, validateContainerResourceName(string(k), idxPath.Child("maxLimitRequestRatio").Key(string(k)))...)
+			allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("maxLimitRequestRatio").Key(string(k)))...)
 			keys.Insert(string(k))
 			maxLimitRequestRatios[string(k)] = q
 		}
