@@ -30,7 +30,7 @@ if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
