@@ -1,42 +1,33 @@
 package stacktemplates
 
 import (
+	"encoding/json"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rackspace/gophercloud"
 )
-
-// Template represents a stack template.
-type Template struct {
-	Description         string                 `mapstructure:"description"`
-	HeatTemplateVersion string                 `mapstructure:"heat_template_version"`
-	Parameters          map[string]interface{} `mapstructure:"parameters"`
-	Resources           map[string]interface{} `mapstructure:"resources"`
-}
 
 // GetResult represents the result of a Get operation.
 type GetResult struct {
 	gophercloud.Result
 }
 
-// Extract returns a pointer to a Template object and is called after a
-// Get operation.
-func (r GetResult) Extract() (*Template, error) {
+// Extract returns the JSON template and is called after a Get operation.
+func (r GetResult) Extract() ([]byte, error) {
 	if r.Err != nil {
 		return nil, r.Err
 	}
-
-	var res Template
-	if err := mapstructure.Decode(r.Body, &res); err != nil {
+	template, err := json.MarshalIndent(r.Body, "", "  ")
+	if err != nil {
 		return nil, err
 	}
-
-	return &res, nil
+	return template, nil
 }
 
 // ValidatedTemplate represents the parsed object returned from a Validate request.
 type ValidatedTemplate struct {
-	Description string
-	Parameters  map[string]interface{}
+	Description     string                 `mapstructure:"Description"`
+	Parameters      map[string]interface{} `mapstructure:"Parameters"`
+	ParameterGroups map[string]interface{} `mapstructure:"ParameterGroups"`
 }
 
 // ValidateResult represents the result of a Validate operation.

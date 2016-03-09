@@ -163,8 +163,8 @@ type ListResourceEventsOpts struct {
 	SortDir SortDir `q:"sort_dir"`
 }
 
-// ToResourceEventsListQuery formats a ListOpts into a query string.
-func (opts ListOpts) ToResourceEventsListQuery() (string, error) {
+// ToResourceEventListQuery formats a ListResourceEventsOpts into a query string.
+func (opts ListResourceEventsOpts) ToResourceEventListQuery() (string, error) {
 	q, err := gophercloud.BuildQueryString(opts)
 	if err != nil {
 		return "", err

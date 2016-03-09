@@ -177,6 +177,9 @@ func (client *ProviderClient) Request(method, url string, options RequestOpts) (
 		}
 	}
 
+	// Set connection parameter to close the connection immediately when we've got the response
+	req.Close = true
+	
 	// Issue the request.
 	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
@@ -192,10 +195,13 @@ func (client *ProviderClient) Request(method, url string, options RequestOpts) (
 			if options.RawBody != nil {
 				options.RawBody.Seek(0, 0)
 			}
+			resp.Body.Close()
 			resp, err = client.Request(method, url, options)
 			if err != nil {
 				return nil, fmt.Errorf("Successfully re-authenticated, but got error executing request: %s", err)
 			}
+
+			return resp, nil
 		}
 	}
 
@@ -243,6 +249,8 @@ func defaultOkCodes(method string) []int {
 		return []int{201, 202}
 	case method == "PUT":
 		return []int{201, 202}
+	case method == "PATCH":
+		return []int{200, 204}
 	case method == "DELETE":
 		return []int{202, 204}
 	}
@@ -294,6 +302,24 @@ func (client *ProviderClient) Put(url string, JSONBody interface{}, JSONResponse
 	}
 
 	return client.Request("PUT", url, *opts)
+}
+
+func (client *ProviderClient) Patch(url string, JSONBody interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
+	if opts == nil {
+		opts = &RequestOpts{}
+	}
+
+	if v, ok := (JSONBody).(io.ReadSeeker); ok {
+		opts.RawBody = v
+	} else if JSONBody != nil {
+		opts.JSONBody = JSONBody
+	}
+
+	if JSONResponse != nil {
+		opts.JSONResponse = JSONResponse
+	}
+
+	return client.Request("PATCH", url, *opts)
 }
 
 func (client *ProviderClient) Delete(url string, opts *RequestOpts) (*http.Response, error) {

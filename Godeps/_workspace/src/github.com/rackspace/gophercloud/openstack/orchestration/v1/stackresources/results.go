@@ -1,6 +1,7 @@
 package stackresources
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -12,15 +13,18 @@ import (
 
 // Resource represents a stack resource.
 type Resource struct {
-	Links        []gophercloud.Link `mapstructure:"links"`
-	LogicalID    string             `mapstructure:"logical_resource_id"`
-	Name         string             `mapstructure:"resource_name"`
-	PhysicalID   string             `mapstructure:"physical_resource_id"`
-	RequiredBy   []interface{}      `mapstructure:"required_by"`
-	Status       string             `mapstructure:"resource_status"`
-	StatusReason string             `mapstructure:"resource_status_reason"`
-	Type         string             `mapstructure:"resource_type"`
-	UpdatedTime  time.Time          `mapstructure:"-"`
+	Attributes   map[string]interface{} `mapstructure:"attributes"`
+	CreationTime time.Time              `mapstructure:"-"`
+	Description  string                 `mapstructure:"description"`
+	Links        []gophercloud.Link     `mapstructure:"links"`
+	LogicalID    string                 `mapstructure:"logical_resource_id"`
+	Name         string                 `mapstructure:"resource_name"`
+	PhysicalID   string                 `mapstructure:"physical_resource_id"`
+	RequiredBy   []interface{}          `mapstructure:"required_by"`
+	Status       string                 `mapstructure:"resource_status"`
+	StatusReason string                 `mapstructure:"resource_status_reason"`
+	Type         string                 `mapstructure:"resource_type"`
+	UpdatedTime  time.Time              `mapstructure:"-"`
 }
 
 // FindResult represents the result of a Find operation.
@@ -54,6 +58,13 @@ func (r FindResult) Extract() ([]Resource, error) {
 			}
 			res.Res[i].UpdatedTime = t
 		}
+		if date, ok := resource["creation_time"]; ok && date != nil {
+			t, err := time.Parse(gophercloud.STACK_TIME_FMT, date.(string))
+			if err != nil {
+				return nil, err
+			}
+			res.Res[i].CreationTime = t
+		}
 	}
 
 	return res.Res, nil
@@ -75,18 +86,6 @@ func (r ResourcePage) IsEmpty() (bool, error) {
 	return len(resources) == 0, nil
 }
 
-// LastMarker returns the last container name in a ListResult.
-func (r ResourcePage) LastMarker() (string, error) {
-	resources, err := ExtractResources(r)
-	if err != nil {
-		return "", err
-	}
-	if len(resources) == 0 {
-		return "", nil
-	}
-	return resources[len(resources)-1].PhysicalID, nil
-}
-
 // ExtractResources interprets the results of a single page from a List() call, producing a slice of Resource entities.
 func ExtractResources(page pagination.Page) ([]Resource, error) {
 	casted := page.(ResourcePage).Body
@@ -94,8 +93,9 @@ func ExtractResources(page pagination.Page) ([]Resource, error) {
 	var response struct {
 		Resources []Resource `mapstructure:"resources"`
 	}
-	err := mapstructure.Decode(casted, &response)
-
+	if err := mapstructure.Decode(casted, &response); err != nil {
+		return nil, err
+	}
 	var resources []interface{}
 	switch casted.(type) {
 	case map[string]interface{}:
@@ -115,9 +115,16 @@ func ExtractResources(page pagination.Page) ([]Resource, error) {
 			}
 			response.Resources[i].UpdatedTime = t
 		}
+		if date, ok := resource["creation_time"]; ok && date != nil {
+			t, err := time.Parse(gophercloud.STACK_TIME_FMT, date.(string))
+			if err != nil {
+				return nil, err
+			}
+			response.Resources[i].CreationTime = t
+		}
 	}
 
-	return response.Resources, err
+	return response.Resources, nil
 }
 
 // GetResult represents the result of a Get operation.
@@ -148,6 +155,13 @@ func (r GetResult) Extract() (*Resource, error) {
 			return nil, err
 		}
 		res.Res.UpdatedTime = t
+	}
+	if date, ok := resource["creation_time"]; ok && date != nil {
+		t, err := time.Parse(gophercloud.STACK_TIME_FMT, date.(string))
+		if err != nil {
+			return nil, err
+		}
+		res.Res.CreationTime = t
 	}
 
 	return res.Res, nil
@@ -192,21 +206,42 @@ func (r ResourceTypePage) IsEmpty() (bool, error) {
 	return len(rts) == 0, nil
 }
 
+// ResourceTypes represents the type that holds the result of ExtractResourceTypes.
+// We define methods on this type to sort it before output
+type ResourceTypes []string
+
+func (r ResourceTypes) Len() int {
+	return len(r)
+}
+
+func (r ResourceTypes) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r ResourceTypes) Less(i, j int) bool {
+	return r[i] < r[j]
+}
+
 // ExtractResourceTypes extracts and returns resource types.
-func ExtractResourceTypes(page pagination.Page) ([]string, error) {
+func ExtractResourceTypes(page pagination.Page) (ResourceTypes, error) {
+	casted := page.(ResourceTypePage).Body
+
 	var response struct {
-		ResourceTypes []string `mapstructure:"resource_types"`
+		ResourceTypes ResourceTypes `mapstructure:"resource_types"`
 	}
 
-	err := mapstructure.Decode(page.(ResourceTypePage).Body, &response)
-	return response.ResourceTypes, err
+	if err := mapstructure.Decode(casted, &response); err != nil {
+		return nil, err
+	}
+	return response.ResourceTypes, nil
 }
 
 // TypeSchema represents a stack resource schema.
 type TypeSchema struct {
-	Attributes   map[string]interface{} `mapstructure:"attributes"`
-	Properties   map[string]interface{} `mapstrucutre:"properties"`
-	ResourceType string                 `mapstructure:"resource_type"`
+	Attributes    map[string]interface{} `mapstructure:"attributes"`
+	Properties    map[string]interface{} `mapstrucutre:"properties"`
+	ResourceType  string                 `mapstructure:"resource_type"`
+	SupportStatus map[string]interface{} `mapstructure:"support_status"`
 }
 
 // SchemaResult represents the result of a Schema operation.
@@ -230,31 +265,20 @@ func (r SchemaResult) Extract() (*TypeSchema, error) {
 	return &res, nil
 }
 
-// TypeTemplate represents a stack resource template.
-type TypeTemplate struct {
-	HeatTemplateFormatVersion string
-	Outputs                   map[string]interface{}
-	Parameters                map[string]interface{}
-	Resources                 map[string]interface{}
-}
-
 // TemplateResult represents the result of a Template operation.
 type TemplateResult struct {
 	gophercloud.Result
 }
 
-// Extract returns a pointer to a TypeTemplate object and is called after a
+// Extract returns the template and is called after a
 // Template operation.
-func (r TemplateResult) Extract() (*TypeTemplate, error) {
+func (r TemplateResult) Extract() ([]byte, error) {
 	if r.Err != nil {
 		return nil, r.Err
 	}
-
-	var res TypeTemplate
-
-	if err := mapstructure.Decode(r.Body, &res); err != nil {
+	template, err := json.MarshalIndent(r.Body, "", "  ")
+	if err != nil {
 		return nil, err
 	}
-
-	return &res, nil
+	return template, nil
 }

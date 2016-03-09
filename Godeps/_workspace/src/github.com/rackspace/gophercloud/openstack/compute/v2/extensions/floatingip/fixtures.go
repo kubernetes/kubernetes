@@ -155,6 +155,25 @@ func HandleAssociateSuccessfully(t *testing.T) {
 	})
 }
 
+// HandleFixedAssociateSucessfully configures the test server to respond to a Post request
+// to associate an allocated floating IP with a specific fixed IP address
+func HandleAssociateFixedSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/4d8c3732-a248-40ed-bebc-539a6ffd25c0/action", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "POST")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `
+{
+	"addFloatingIp": {
+		"address": "10.10.10.2",
+		"fixed_address": "166.78.185.201"
+	}
+}
+`)
+
+		w.WriteHeader(http.StatusAccepted)
+	})
+}
+
 // HandleDisassociateSuccessfully configures the test server to respond to a Post request
 // to disassociate an allocated floating IP
 func HandleDisassociateSuccessfully(t *testing.T) {
