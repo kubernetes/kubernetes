@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -42,7 +42,7 @@ type imagePullRequest struct {
 type serializedImagePuller struct {
 	recorder     record.EventRecorder
 	runtime      Runtime
-	backOff      *util.Backoff
+	backOff      *flowcontrol.Backoff
 	pullRequests chan *imagePullRequest
 }
 
@@ -53,7 +53,7 @@ var _ ImagePuller = &serializedImagePuller{}
 // image puller that wraps the container runtime's PullImage interface.
 // Pulls one image at a time.
 // Issue #10959 has the rationale behind serializing image pulls.
-func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime, imageBackOff *util.Backoff) ImagePuller {
+func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime, imageBackOff *flowcontrol.Backoff) ImagePuller {
 	imagePuller := &serializedImagePuller{
 		recorder:     recorder,
 		runtime:      runtime,

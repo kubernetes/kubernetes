@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 func parse(raw string) *url.URL {
@@ -31,7 +31,7 @@ func parse(raw string) *url.URL {
 
 func TestURLBackoffFunctionalityCollisions(t *testing.T) {
 	myBackoff := &URLBackoff{
-		Backoff: util.NewBackOff(1*time.Second, 60*time.Second),
+		Backoff: flowcontrol.NewBackOff(1*time.Second, 60*time.Second),
 	}
 
 	// Add some noise and make sure backoff for a clean URL is zero.
@@ -47,7 +47,7 @@ func TestURLBackoffFunctionalityCollisions(t *testing.T) {
 // TestURLBackoffFunctionality generally tests the URLBackoff wrapper.  We avoid duplicating tests from backoff and request.
 func TestURLBackoffFunctionality(t *testing.T) {
 	myBackoff := &URLBackoff{
-		Backoff: util.NewBackOff(1*time.Second, 60*time.Second),
+		Backoff: flowcontrol.NewBackOff(1*time.Second, 60*time.Second),
 	}
 
 	// Now test that backoff increases, then recovers.
