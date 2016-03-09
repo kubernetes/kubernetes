@@ -226,6 +226,24 @@
         - 'kubernetes-e2e-{suffix}'
 
 - project:
+    name: kubernetes-e2e-gce-1-2
+    trigger-job: 'kubernetes-build-1.2'
+    test-owner: 'Build Cop'
+    provider-env: |
+        {gce-provider-env}
+        export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
+    suffix:
+        - 'gce-release-1.2':
+            description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel on the release-1.2 branch.'
+            timeout: 30
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export PROJECT="k8s-jkns-e2e-gce-1-2"
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+ 
+- project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'GKE on-call'
