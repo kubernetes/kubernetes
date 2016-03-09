@@ -104,7 +104,7 @@ type GetterWithOptions interface {
 	// value of the request path below the object will be included as the named
 	// string in the serialization of the runtime object. E.g., returning "path"
 	// will convert the trailing request scheme value to "path" in the map[string][]string
-	// passed to the convertor.
+	// passed to the converter.
 	NewGetOptions() (runtime.Object, bool, string)
 }
 

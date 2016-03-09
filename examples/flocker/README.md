@@ -53,7 +53,7 @@ It is recommended to follow [Installing Flocker](https://docs.clusterhq.com/en/l
 
 #### Flocker Control Service
 
-The Flocker Control Service should be installed manually on a host, . In the future, this may be deployed in pod(s) and exposed as a Kubernetes service.
+The Flocker Control Service should be installed manually on a host. In the future, this may be deployed in pod(s) and exposed as a Kubernetes service.
 
 #### Flocker Agent(s)
 

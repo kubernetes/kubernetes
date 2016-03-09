@@ -167,8 +167,11 @@ function test-setup() {
   echo "... in gke:test-setup()" >&2
   # Detect the project into $PROJECT if it isn't set
   detect-project >&2
-  detect-nodes >&2
 
+  "${KUBE_ROOT}/cluster/kube-up.sh"
+
+  detect-nodes >&2
+ 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
   NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
   OLD_NODE_TAG="k8s-${CLUSTER_NAME}-node"
@@ -282,8 +285,8 @@ function restart-apiserver() {
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
-# from hack/e2e-test.sh. This calls kube-down, so the cluster still exists when
-# this is called.
+# from hack/e2e.go. This calls kube-down, so the cluster still exists when this
+# is called.
 #
 # Assumed vars:
 #   CLUSTER_NAME

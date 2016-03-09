@@ -120,8 +120,7 @@ func (t ErrorType) String() string {
 	case ErrorTypeInternal:
 		return "Internal error"
 	default:
-		panic(fmt.Sprintf("unrecognized validation error: %q", t))
-		return ""
+		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
 	}
 }
 

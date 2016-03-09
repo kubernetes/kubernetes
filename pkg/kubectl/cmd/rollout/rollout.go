@@ -26,7 +26,7 @@ import (
 const (
 	rollout_long    = `rollout manages a deployment using subcommands like "kubectl rollout undo deployment/abc"`
 	rollout_example = `# Rollback to the previous deployment
-$ kubectl rollout undo deployment/abc`
+kubectl rollout undo deployment/abc`
 	rollout_valid_resources = `Valid resource types include:
    * deployments
 `

@@ -43,6 +43,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
@@ -66,14 +67,15 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversioned_core "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
@@ -95,8 +97,8 @@ const (
 	defaultReconcileCooldown     = 15 * time.Second
 	defaultNodeRelistPeriod      = 5 * time.Minute
 	defaultFrameworkName         = "Kubernetes"
-	defaultExecutorCPUs          = mresource.CPUShares(0.25)  // initial CPU allocated for executor
-	defaultExecutorMem           = mresource.MegaBytes(128.0) // initial memory allocated for executor
+	defaultExecutorCPUs          = resources.CPUShares(0.25)  // initial CPU allocated for executor
+	defaultExecutorMem           = resources.MegaBytes(128.0) // initial memory allocated for executor
 	defaultExecutorInfoCacheSize = 10000
 )
 
@@ -119,8 +121,8 @@ type SchedulerServer struct {
 	mesosAuthPrincipal    string
 	mesosAuthSecretFile   string
 	mesosCgroupPrefix     string
-	mesosExecutorCPUs     mresource.CPUShares
-	mesosExecutorMem      mresource.MegaBytes
+	mesosExecutorCPUs     resources.CPUShares
+	mesosExecutorMem      resources.MegaBytes
 	checkpoint            bool
 	failoverTimeout       float64
 	generateTaskDiscovery bool
@@ -147,8 +149,8 @@ type SchedulerServer struct {
 	hostnameOverride               string
 	reconcileInterval              int64
 	reconcileCooldown              time.Duration
-	defaultContainerCPULimit       mresource.CPUShares
-	defaultContainerMemLimit       mresource.MegaBytes
+	defaultContainerCPULimit       resources.CPUShares
+	defaultContainerMemLimit       resources.MegaBytes
 	schedulerConfigFileName        string
 	graceful                       bool
 	frameworkName                  string
@@ -162,6 +164,7 @@ type SchedulerServer struct {
 	clusterDomain                  string
 	globalHousekeepingInterval     time.Duration
 	housekeepingInterval           time.Duration
+	kubeletApiServerList           []string
 	kubeletRootDirectory           string
 	kubeletDockerEndpoint          string
 	kubeletPodInfraContainerImage  string
@@ -169,6 +172,7 @@ type SchedulerServer struct {
 	kubeletHostNetworkSources      string
 	kubeletSyncFrequency           time.Duration
 	kubeletNetworkPluginName       string
+	kubeletKubeconfig              string
 	staticPodsConfigPath           string
 	dockerCfgPath                  string
 	containPodResources            bool
@@ -176,6 +180,7 @@ type SchedulerServer struct {
 	sandboxOverlay                 string
 	conntrackMax                   int
 	conntrackTCPTimeoutEstablished int
+	useHostPortEndpoints           bool
 
 	executable  string // path to the binary running this service
 	client      *clientset.Clientset
@@ -204,8 +209,8 @@ func NewSchedulerServer() *SchedulerServer {
 		runProxy:                 true,
 		executorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
 		launchGracePeriod:        execcfg.DefaultLaunchGracePeriod,
-		defaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
-		defaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
+		defaultContainerCPULimit: resources.DefaultDefaultContainerCPULimit,
+		defaultContainerMemLimit: resources.DefaultDefaultContainerMemLimit,
 
 		proxyMode: "userspace", // upstream default is "iptables" post-v1.1
 
@@ -233,6 +238,7 @@ func NewSchedulerServer() *SchedulerServer {
 		containPodResources:            true,
 		nodeRelistPeriod:               defaultNodeRelistPeriod,
 		conntrackTCPTimeoutEstablished: 0, // non-zero values may require hand-tuning other sysctl's on the host; do so with caution
+		useHostPortEndpoints:           true,
 
 		// non-zero values can trigger failures when updating /sys/module/nf_conntrack/parameters/hashsize
 		// when kube-proxy is running in a non-root netns (init_net); setting this to a non-zero value will
@@ -260,7 +266,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.address, "address", s.address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.enableProfiling, "profiling", s.enableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.apiServerList, "api-servers", s.apiServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
-	fs.StringVar(&s.kubeconfig, "kubeconfig", s.kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&s.kubeconfig, "kubeconfig", s.kubeconfig, "Path to kubeconfig file with authorization and master location information used by the scheduler.")
 	fs.Float32Var(&s.kubeAPIQPS, "kube-api-qps", s.kubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.kubeAPIBurst, "kube-api-burst", s.kubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
@@ -299,6 +305,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.defaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
 	fs.BoolVar(&s.containPodResources, "contain-pod-resources", s.containPodResources, "Reparent pod containers into mesos cgroups; disable if you're having strange mesos/docker/systemd interactions.")
 	fs.DurationVar(&s.nodeRelistPeriod, "node-monitor-period", s.nodeRelistPeriod, "Period between relisting of all nodes from the apiserver.")
+	fs.BoolVar(&s.useHostPortEndpoints, "host-port-endpoints", s.useHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
 
 	fs.IntVar(&s.executorLogV, "executor-logv", s.executorLogV, "Logging verbosity of spawned minion and executor processes.")
 	fs.BoolVar(&s.executorBindall, "executor-bindall", s.executorBindall, "When true will set -address of the executor to 0.0.0.0.")
@@ -316,6 +323,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.minionLogMaxAgeInDays, "minion-max-log-age", s.minionLogMaxAgeInDays, "Maximum log file age of the executor and proxy in days")
 	fs.IntVar(&s.minionLogMaxBackups, "minion-max-log-backups", s.minionLogMaxBackups, "Maximum log file backups of the executor and proxy to keep after rotation")
 
+	fs.StringSliceVar(&s.kubeletApiServerList, "kubelet-api-servers", s.kubeletApiServerList, "List of Kubernetes API servers kubelet will use. (ip:port), comma separated. If unspecified it defaults to the value of --api-servers.")
 	fs.StringVar(&s.kubeletRootDirectory, "kubelet-root-dir", s.kubeletRootDirectory, "Directory path for managing kubelet files (volume mounts,etc). Defaults to executor sandbox.")
 	fs.StringVar(&s.kubeletDockerEndpoint, "kubelet-docker-endpoint", s.kubeletDockerEndpoint, "If non-empty, kubelet will use this for the docker endpoint to communicate with.")
 	fs.StringVar(&s.kubeletPodInfraContainerImage, "kubelet-pod-infra-container-image", s.kubeletPodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
@@ -324,6 +332,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.kubeletSyncFrequency, "kubelet-sync-frequency", s.kubeletSyncFrequency, "Max period between synchronizing running containers and config")
 	fs.StringVar(&s.kubeletNetworkPluginName, "kubelet-network-plugin", s.kubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.BoolVar(&s.kubeletEnableDebuggingHandlers, "kubelet-enable-debugging-handlers", s.kubeletEnableDebuggingHandlers, "Enables kubelet endpoints for log collection and local running of containers and commands")
+	fs.StringVar(&s.kubeletKubeconfig, "kubelet-kubeconfig", s.kubeletKubeconfig, "Path to kubeconfig file with authorization and master location information used by the kubelet.")
 	fs.IntVar(&s.conntrackMax, "conntrack-max", s.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
 	fs.IntVar(&s.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 
@@ -383,6 +392,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		uri, executorCmd := s.serveFrameworkArtifact(s.executorPath)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 		ci.Value = proto.String(fmt.Sprintf("./%s", executorCmd))
+		ci.Arguments = append(ci.Arguments, ci.GetValue())
 	} else if !hks.FindServer(hyperkube.CommandMinion) {
 		return nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
 	} else {
@@ -401,7 +411,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 			ci.Value = proto.String(fmt.Sprintf("./%s", kmCmd))
 		}
-		ci.Arguments = append(ci.Arguments, hyperkube.CommandMinion)
+		ci.Arguments = append(ci.Arguments, ci.GetValue(), hyperkube.CommandMinion)
 
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--run-proxy=%v", s.runProxy))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.proxyBindall))
@@ -412,6 +422,8 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-size=%v", s.minionLogMaxSize.String()))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-backups=%d", s.minionLogMaxBackups))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-age=%d", s.minionLogMaxAgeInDays))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 	}
 
 	if s.sandboxOverlay != "" {
@@ -430,7 +442,12 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	//TODO(jdef): provide some way (env var?) for users to customize executor config
 	//TODO(jdef): set -address to 127.0.0.1 if `address` is 127.0.0.1
 
-	apiServerArgs := strings.Join(s.apiServerList, ",")
+	var apiServerArgs string
+	if len(s.kubeletApiServerList) > 0 {
+		apiServerArgs = strings.Join(s.kubeletApiServerList, ",")
+	} else {
+		apiServerArgs = strings.Join(s.apiServerList, ",")
+	}
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--api-servers=%s", apiServerArgs))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--v=%d", s.executorLogV)) // this also applies to the minion
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--allow-privileged=%t", s.allowPrivileged))
@@ -449,16 +466,14 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.kubeletSyncFrequency))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.containPodResources))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 
 	// adding cadvisor housekeeping config
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--housekeeping-interval=%v", s.housekeepingInterval))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--global-housekeeping-interval=%v", s.globalHousekeepingInterval))
 
-	if s.kubeconfig != "" {
+	if s.kubeletKubeconfig != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
-		uri, basename := s.serveFrameworkArtifact(s.kubeconfig)
+		uri, basename := s.serveFrameworkArtifact(s.kubeletKubeconfig)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--kubeconfig=%s", basename))
 	}
@@ -504,6 +519,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	// running executors in a cluster.
 	execInfo.ExecutorId = executorinfo.NewID(execInfo)
 	execInfo.Data = data
+	log.V(1).Infof("started with executor id %v", execInfo.ExecutorId.GetValue())
 
 	return execInfo, nil
 }
@@ -541,7 +557,7 @@ func (s *SchedulerServer) prepareStaticPods() (data []byte, staticPodCPUs, stati
 }
 
 // TODO(jdef): hacked from plugin/cmd/kube-scheduler/app/server.go
-func (s *SchedulerServer) createAPIServerClientConfig() (*client.Config, error) {
+func (s *SchedulerServer) createAPIServerClientConfig() (*restclient.Config, error) {
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.apiServerList[0], s.kubeconfig)
 	if err != nil {
 		return nil, err
@@ -566,7 +582,6 @@ func (s *SchedulerServer) getDriver() (driver bindings.SchedulerDriver) {
 }
 
 func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
-	podtask.GenerateTaskDiscoveryEnabled = s.generateTaskDiscovery
 	if n := len(s.frameworkRoles); n == 0 || n > 2 || (n == 2 && s.frameworkRoles[0] != "*" && s.frameworkRoles[1] != "*") {
 		log.Fatalf(`only one custom role allowed in addition to "*"`)
 	}
@@ -605,8 +620,14 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 		validation := ha.ValidationFunc(validateLeadershipTransition)
 		srv := ha.NewCandidate(schedulerProcess, driverFactory, validation)
 		path := meta.ElectionPath(s.frameworkName)
-		log.Infof("registering for election at %v with id %v", path, eid.GetValue())
-		go election.Notify(election.NewEtcdMasterElector(etcdClient), path, eid.GetValue(), srv, nil)
+		uuid := eid.GetValue() + ":" + uuid.New() // unique for each scheduler instance
+		log.Infof("registering for election at %v with id %v", path, uuid)
+		go election.Notify(
+			election.NewEtcdMasterElector(etcdClient),
+			path,
+			uuid,
+			srv,
+			nil)
 	} else {
 		log.Infoln("self-electing in non-HA mode")
 		schedulerProcess.Elect(driverFactory)
@@ -661,8 +682,28 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 
 func validateLeadershipTransition(desired, current string) {
 	log.Infof("validating leadership transition")
+	// desired, current are of the format <executor-id>:<scheduler-uuid> (see Run()).
+	// parse them and ensure that executor ID's match, otherwise the cluster can get into
+	// a bad state after scheduler failover: executor ID is a config hash that must remain
+	// consistent across failover events.
+	var (
+		i = strings.LastIndex(desired, ":")
+		j = strings.LastIndex(current, ":")
+	)
+
+	if i > -1 {
+		desired = desired[0:i]
+	} else {
+		log.Fatalf("desired id %q is invalid", desired)
+	}
+	if j > -1 {
+		current = current[0:j]
+	} else if current != "" {
+		log.Fatalf("current id %q is invalid", current)
+	}
+
 	if desired != current && current != "" {
-		log.Fatalf("desired executor id != current executor id", desired, current)
+		log.Fatalf("desired executor id %q != current executor id %q", desired, current)
 	}
 }
 
@@ -733,10 +774,18 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
 	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
-			node := obj.(*api.Node)
 			if eiRegistry != nil {
-				log.V(2).Infof("deleting node %q from registry", node.Name)
-				eiRegistry.Invalidate(node.Name)
+				// TODO(jdef) use controllerfw.DeletionHandlingMetaNamespaceKeyFunc at some point?
+				nodeName := ""
+				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					nodeName = tombstone.Key
+				} else if node, ok := obj.(*api.Node); ok {
+					nodeName = node.Name
+				}
+				if nodeName != "" {
+					log.V(2).Infof("deleting node %q from registry", nodeName)
+					eiRegistry.Invalidate(nodeName)
+				}
 			}
 		},
 	})
@@ -782,6 +831,16 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	schedulerProcess := ha.New(framework)
+
+	// try publishing on the same IP as the slave
+	var publishedAddress net.IP
+	if libprocessIP := os.Getenv("LIBPROCESS_IP"); libprocessIP != "" {
+		publishedAddress = net.ParseIP(libprocessIP)
+	}
+	if publishedAddress != nil {
+		log.V(1).Infof("driver will publish address %v", publishedAddress)
+	}
+
 	dconfig := &bindings.DriverConfig{
 		Scheduler:        schedulerProcess,
 		Framework:        info,
@@ -789,6 +848,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		Credential:       cred,
 		BindingAddress:   s.address,
 		BindingPort:      uint16(s.driverPort),
+		PublishedAddress: publishedAddress,
 		HostnameOverride: s.hostnameOverride,
 		WithAuthContext: func(ctx context.Context) context.Context {
 			ctx = auth.WithLoginProvider(ctx, s.mesosAuthProvider)
@@ -806,10 +866,16 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	broadcaster.StartLogging(log.Infof)
-	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{eventsClient.Events("")})
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{eventsClient.Events("")})
+
+	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
+
+	hostPortStrategy := hostport.StrategyFixed
+	if s.useHostPortEndpoints {
+		hostPortStrategy = hostport.StrategyWildcard
+	}
 
 	// create scheduler core with all components arranged around it
-	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(
 		sc,
 		framework,
@@ -819,15 +885,19 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		schedulerProcess.Terminal(),
 		s.mux,
 		lw,
-		eiPrototype,
-		s.frameworkRoles,
-		s.defaultPodRoles,
+		podtask.Config{
+			DefaultPodRoles:              s.defaultPodRoles,
+			FrameworkRoles:               s.frameworkRoles,
+			GenerateTaskDiscoveryEnabled: s.generateTaskDiscovery,
+			HostPortStrategy:             hostPortStrategy,
+			Prototype:                    eiPrototype,
+		},
 		s.defaultContainerCPULimit,
 		s.defaultContainerMemLimit,
 	)
 
 	runtime.On(framework.Registration(), func() { sched.Run(schedulerProcess.Terminal()) })
-	runtime.On(framework.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
+	runtime.On(framework.Registration(), s.newServiceWriter(publishedAddress, schedulerProcess.Terminal()))
 	runtime.On(framework.Registration(), func() { nodeCtl.Run(schedulerProcess.Terminal()) })
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {
@@ -884,7 +954,7 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 	// signals, so we'll need to restart if we want to really stop everything
 
 	// run the same command that we were launched with
-	//TODO(jdef) assumption here is that the sheduler is the only service running in this process, we should probably validate that somehow
+	//TODO(jdef) assumption here is that the scheduler is the only service running in this process, we should probably validate that somehow
 	args := []string{}
 	flags := pflag.CommandLine
 	if hks != nil {
@@ -892,7 +962,7 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 		flags = hks.Flags()
 	}
 	flags.Visit(func(flag *pflag.Flag) {
-		if flag.Name != "api-servers" && flag.Name != "etcd-servers" {
+		if flag.Name != "api-servers" && flag.Name != "etcd-servers" && flag.Name != "kubelet-api-servers" {
 			args = append(args, fmt.Sprintf("--%s=%s", flag.Name, flag.Value.String()))
 		}
 	})
@@ -904,6 +974,9 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 	}
 	if len(s.etcdServerList) > 0 {
 		args = append(args, "--etcd-servers="+strings.Join(s.etcdServerList, ","))
+	}
+	if len(s.kubeletApiServerList) > 0 {
+		args = append(args, "--kubelet-api-servers="+strings.Join(s.kubeletApiServerList, ","))
 	}
 	args = append(args, flags.Args()...)
 

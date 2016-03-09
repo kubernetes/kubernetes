@@ -280,7 +280,8 @@ func TestUpdatePodStatus(t *testing.T) {
 }
 
 func TestUpdateReadiness(t *testing.T) {
-	testPod := getTestPod(readiness, api.Probe{})
+	testPod := getTestPod()
+	setTestProbe(testPod, readiness, api.Probe{})
 	m := newTestManager()
 	defer cleanup(t, m)
 
@@ -297,9 +298,9 @@ func TestUpdateReadiness(t *testing.T) {
 	exec.set(probe.Success, nil)
 	m.prober.exec = &exec
 
-	m.statusManager.SetPodStatus(&testPod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(testPod, getTestRunningStatus())
 
-	m.AddPod(&testPod)
+	m.AddPod(testPod)
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)

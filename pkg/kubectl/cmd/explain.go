@@ -29,10 +29,10 @@ import (
 
 const (
 	explainExamples = `# Get the documentation of the resource and its fields
-$ kubectl explain pods
+kubectl explain pods
 
 # Get the documentation of a specific field of a resource
-$ kubectl explain pods.spec.containers`
+kubectl explain pods.spec.containers`
 
 	explainLong = `Documentation of resources.
 
@@ -79,7 +79,7 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	// TODO: We should deduce the group for a resource by discovering the supported resources at server.
-	gvk, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: inModel})
+	gvk, err := mapper.KindFor(unversioned.ParseGroupResource(inModel).WithVersion(""))
 	if err != nil {
 		return err
 	}

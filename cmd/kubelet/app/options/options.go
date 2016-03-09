@@ -46,8 +46,7 @@ type KubeletServer struct {
 	KubeConfig    util.StringFlag
 	APIServerList []string
 
-	DockerDaemonContainer string
-	RunOnce               bool
+	RunOnce bool
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -60,9 +59,8 @@ type KubeletServer struct {
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
-		AuthPath:              util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		KubeConfig:            util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-		DockerDaemonContainer: "/docker-daemon",
+		AuthPath:   util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		KubeConfig: util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 
 		SystemReserved: make(util.ConfigurationMap),
 		KubeReserved:   make(util.ConfigurationMap),
@@ -88,14 +86,15 @@ func NewKubeletServer() *KubeletServer {
 			HostPIDSources:              kubetypes.AllSource,
 			HostIPCSources:              kubetypes.AllSource,
 			HTTPCheckFrequency:          unversioned.Duration{20 * time.Second},
+			ImageMinimumGCAge:           unversioned.Duration{2 * time.Minute},
 			ImageGCHighThresholdPercent: 90,
 			ImageGCLowThresholdPercent:  80,
 			LowDiskSpaceThresholdMB:     256,
 			MasterServiceNamespace:      api.NamespaceDefault,
-			MaxContainerCount:           100,
+			MaxContainerCount:           240,
 			MaxPerPodContainerCount:     2,
 			MaxOpenFiles:                1000000,
-			MaxPods:                     40,
+			MaxPods:                     110,
 			MinimumGCAge:                unversioned.Duration{1 * time.Minute},
 			NetworkPluginDir:            "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
 			NetworkPluginName:           "",
@@ -104,6 +103,7 @@ func NewKubeletServer() *KubeletServer {
 			NodeStatusUpdateFrequency:   unversioned.Duration{10 * time.Second},
 			NodeLabels:                  make(map[string]string),
 			OOMScoreAdj:                 qos.KubeletOOMScoreAdj,
+			LockFilePath:                "",
 			PodInfraContainerImage:      kubetypes.PodInfraContainerImage,
 			Port:                           ports.KubeletPort,
 			ReadOnlyPort:                   ports.KubeletReadOnlyPort,
@@ -111,19 +111,22 @@ func NewKubeletServer() *KubeletServer {
 			RegisterSchedulable:            true,
 			RegistryBurst:                  10,
 			RegistryPullQPS:                5.0,
-			ResourceContainer:              "/kubelet",
+			KubeletCgroups:                 "",
 			RktPath:                        "",
 			RktStage1Image:                 "",
 			RootDirectory:                  defaultRootDir,
+			RuntimeCgroups:                 "",
 			SerializeImagePulls:            true,
 			StreamingConnectionIdleTimeout: unversioned.Duration{4 * time.Hour},
 			SyncFrequency:                  unversioned.Duration{1 * time.Minute},
-			SystemContainer:                "",
+			SystemCgroups:                  "",
 			ReconcileCIDR:                  true,
 			KubeAPIQPS:                     5.0,
 			KubeAPIBurst:                   10,
 			ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
 			OutOfDiskTransitionFrequency:   unversioned.Duration{5 * time.Minute},
+			HairpinMode:                    componentconfig.PromiscuousBridge,
+			BabysitDaemons:                 false,
 		},
 	}
 }
@@ -179,7 +182,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	bindableNodeLabels := util.ConfigurationMap(s.NodeLabels)
-	fs.Var(&bindableNodeLabels, "node-labels", "<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must are key=value pairs seperated by ','.")
+	fs.Var(&bindableNodeLabels, "node-labels", "<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','.")
+	fs.DurationVar(&s.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", s.ImageMinimumGCAge.Duration, "Minimum age for a unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'. Default: '2m'")
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image-gc-high-threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%")
 	fs.IntVar(&s.ImageGCLowThresholdPercent, "image-gc-low-threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%")
 	fs.IntVar(&s.LowDiskSpaceThresholdMB, "low-diskspace-threshold-mb", s.LowDiskSpaceThresholdMB, "The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256")
@@ -189,13 +193,24 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+
+	fs.StringVar(&s.KubeletCgroups, "resource-container", s.KubeletCgroups, "Optional absolute name of the resource-only container to create and run the Kubelet in.")
+	fs.MarkDeprecated("resource-container", "Use --kubelet-cgroups instead. Will be removed in a future version.")
+	fs.StringVar(&s.KubeletCgroups, "kubelet-cgroups", s.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
+
+	fs.StringVar(&s.SystemCgroups, "system-container", s.SystemCgroups, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
+	fs.MarkDeprecated("system-container", "Use --system-cgroups instead. Will be removed in a future version.")
+	fs.StringVar(&s.SystemCgroups, "system-cgroups", s.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
+
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
+	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'")
 	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used")
-	fs.StringVar(&s.SystemContainer, "system-container", s.SystemContainer, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
+	fs.StringVar(&s.HairpinMode, "hairpin-mode", s.HairpinMode, "How should the kubelet setup hairpin NAT. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service. Valid values are \"promiscuous-bridge\", \"hairpin-veth\" and \"none\".")
+	fs.BoolVar(&s.BabysitDaemons, "babysit-daemons", s.BabysitDaemons, "If true, the node has babysitter process monitoring docker and kubelet.")
+	fs.MarkDeprecated("babysit-daemons", "Will be removed in a future version.")
 	fs.IntVar(&s.MaxPods, "max-pods", s.MaxPods, "Number of Pods that can run on this Kubelet.")
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
 	fs.StringVar(&s.NonMasqueradeCIDR, "non-masquerade-cidr", s.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade.")
@@ -208,8 +223,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", s.MaxOpenFiles, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
-	fs.Var(&s.SystemReserved, "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]")
-	fs.Var(&s.KubeReserved, "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]")
+	fs.Var(&s.SystemReserved, "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail. [default=none]")
+	fs.Var(&s.KubeReserved, "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail. [default=none]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
@@ -218,4 +233,5 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
+	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 }

@@ -1,0 +1,116 @@
+- job-template:
+    name: 'kubernetes-kubemark-{suffix}'
+    description: '{description} Test owner: gmarek'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            {provider-env}
+            {job-env}
+            {post-env}
+            timeout -k {kill-timeout}m {timeout}m {runner} && rc=$? || rc=$?
+            {report-rc}
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - junit-publisher
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: "gmarek@google.com"
+    triggers:
+        - reverse:
+            jobs: 'kubernetes-build'
+            result: success
+        - timed: '{cron-string}'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{jenkins-timeout}'
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- project:
+    name: kubernetes-kubemark
+    provider-env: '{gce-provider-env}'
+    suffix:
+        - 'gce':
+            description: 'Run Kubemark test on a fake 100 node cluster to have a comparison to the real results from scalability suite.'
+            timeout: 120
+            cron-string: '@hourly'
+            job-env: |
+                export PROJECT="k8s-jenkins-kubemark"
+                export E2E_TEST="false"
+                export USE_KUBEMARK="true"
+                export KUBEMARK_TESTS="\[Feature:Performance\]"
+                # Override defaults to be independent from GCE defaults and set kubemark parameters
+                export NUM_NODES="3"
+                export MASTER_SIZE="n1-standard-2"
+                export NODE_SIZE="n1-standard-4"
+                export KUBE_GCE_ZONE="us-central1-b"
+                export KUBEMARK_MASTER_SIZE="n1-standard-4"
+                export KUBEMARK_NUM_NODES="100"
+        - 'high-density-100-gce':
+            description: 'Run Kubemark high-density (100 pods/node) test on a fake 100 node cluster.'
+            timeout: 160
+            cron-string: '@hourly'
+            job-env: |
+                export E2E_NAME="kubemark-100pods"
+                export PROJECT="k8s-jenkins-kubemark"
+                export E2E_TEST="false"
+                export USE_KUBEMARK="true"
+                export KUBEMARK_TESTS="\[Feature:HighDensityPerformance\]"
+                # Override defaults to be independent from GCE defaults and set kubemark parameters
+                export NUM_NODES="3"
+                export MASTER_SIZE="n1-standard-2"
+                export NODE_SIZE="n1-standard-4"
+                export KUBE_GCE_ZONE="us-east1-d"
+                export KUBEMARK_MASTER_SIZE="n1-standard-4"
+                export KUBEMARK_NUM_NODES="100"
+        - '500-gce':
+            description: 'Run Kubemark test on a fake 500 node cluster to test for regressions on bigger clusters'
+            timeout: 300
+            cron-string: '@hourly'
+            job-env: |
+                # XXX Not a unique project
+                export E2E_NAME="kubemark-500"
+                export PROJECT="kubernetes-scale"
+                export E2E_TEST="false"
+                export USE_KUBEMARK="true"
+                export KUBEMARK_TESTS="\[Feature:Performance\]"
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
+                # Override defaults to be independent from GCE defaults and set kubemark parameters
+                export NUM_NODES="6"
+                export MASTER_SIZE="n1-standard-4"
+                export NODE_SIZE="n1-standard-8"
+                export KUBE_GCE_ZONE="us-central1-f"
+                export KUBEMARK_MASTER_SIZE="n1-standard-16"
+                export KUBEMARK_NUM_NODES="500"
+        - 'gce-scale':
+            description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 6 hours so as not to waste too many resources.'
+            # 12h - load tests take really, really, really long time.
+            timeout: 720
+            cron-string: 'H H/8 * * *'
+            job-env: |
+                # XXX Not a unique project
+                export E2E_NAME="kubemark-1000"
+                export PROJECT="kubernetes-scale"
+                export E2E_TEST="false"
+                export USE_KUBEMARK="true"
+                export KUBEMARK_TESTS="\[Feature:Performance\]"
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
+                # Override defaults to be independent from GCE defaults and set kubemark parameters
+                # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
+                export NUM_NODES="11"
+                export MASTER_SIZE="n1-standard-4"
+                # Note: can fit about 17 hollow nodes per core so NUM_NODES x
+                # cores_per_node should be set accordingly.
+                export NODE_SIZE="n1-standard-8"
+                export KUBEMARK_MASTER_SIZE="n1-standard-16"
+                export KUBEMARK_NUM_NODES="1000"
+                export KUBE_GCE_ZONE="us-central1-f"
+    jobs:
+        - 'kubernetes-kubemark-{suffix}'

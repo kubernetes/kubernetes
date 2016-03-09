@@ -30,14 +30,14 @@ import (
 //
 // Flaky issue #20272
 var _ = Describe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
-	f := NewFramework("initial-resources")
+	f := NewDefaultFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {
 		// TODO(piosz): Add cleanup data in InfluxDB that left from previous tests.
 		cpu := 100
 		mem := 200
 		for i := 0; i < 10; i++ {
-			rc := NewStaticResourceConsumer(fmt.Sprintf("ir-%d", i), 1, cpu, mem, int64(2*cpu), int64(2*mem), f)
+			rc := NewStaticResourceConsumer(fmt.Sprintf("ir-%d", i), 1, cpu, mem, 0, int64(2*cpu), int64(2*mem), f)
 			defer rc.CleanUp()
 		}
 		// Wait some time to make sure usage data is gathered.

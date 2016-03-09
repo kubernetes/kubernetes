@@ -32,41 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Connecting to applications: kubectl proxy and apiserver proxy
-
-<!-- BEGIN MUNGE: GENERATED_TOC -->
-
-- [Connecting to applications: kubectl proxy and apiserver proxy](#connecting-to-applications-kubectl-proxy-and-apiserver-proxy)
-  - [Getting the apiserver proxy URL of kube-ui](#getting-the-apiserver-proxy-url-of-kube-ui)
-  - [Connecting to the kube-ui service from your local workstation](#connecting-to-the-kube-ui-service-from-your-local-workstation)
-
-<!-- END MUNGE: GENERATED_TOC -->
-
-You have seen the [basics](accessing-the-cluster.md) about `kubectl proxy` and `apiserver proxy`. This guide shows how to use them together to access a service([kube-ui](ui.md)) running on the Kubernetes cluster from your workstation.
-
-
-## Getting the apiserver proxy URL of kube-ui
-
-kube-ui is deployed as a cluster add-on. To find its apiserver proxy URL,
-
-```console
-$ kubectl cluster-info | grep "KubeUI"
-KubeUI is running at https://173.255.119.104/api/v1/proxy/namespaces/kube-system/services/kube-ui
-```
-
-if this command does not find the URL, try the steps [here](ui.md#accessing-the-ui).
-
-
-## Connecting to the kube-ui service from your local workstation
-
-The above proxy URL is an access to the kube-ui service provided by the apiserver. To access it, you still need to authenticate to the apiserver. `kubectl proxy` can handle the authentication.
-
-```console
-$ kubectl proxy --port=8001
-Starting to serve on localhost:8001
-```
-
-Now you can access the kube-ui service on your local workstation at [http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui](http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui)
+This file has moved to: http://kubernetes.github.io/docs/user-guide/connecting-to-applications-proxy/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

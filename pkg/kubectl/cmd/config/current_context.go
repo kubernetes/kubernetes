@@ -31,7 +31,7 @@ type CurrentContextOptions struct {
 const (
 	current_context_long    = `Displays the current-context`
 	current_context_example = `# Display the current-context
-$ kubectl config current-context`
+kubectl config current-context`
 )
 
 func NewCmdConfigCurrentContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {

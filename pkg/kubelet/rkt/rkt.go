@@ -77,9 +77,9 @@ const (
 	k8sRktNamespaceAnno    = "rkt.kubernetes.io/namespace"
 	//TODO: remove the creation time annotation once this is closed: https://github.com/coreos/rkt/issues/1789
 	k8sRktCreationTimeAnno           = "rkt.kubernetes.io/created"
-	k8sRktContainerHashAnno          = "rkt.kubernetes.io/containerhash"
-	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restartcount"
-	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/terminationMessagePath"
+	k8sRktContainerHashAnno          = "rkt.kubernetes.io/container-hash"
+	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restart-count"
+	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/termination-message-path"
 	dockerPrefix                     = "docker://"
 
 	authDir            = "auth.d"
@@ -184,13 +184,6 @@ func New(config *Config,
 		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
 	}
 
-	if err := rkt.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion); err != nil {
-		// TODO(yifan): Latest go-systemd version have the ability to close the
-		// dbus connection. However the 'docker/libcontainer' package is using
-		// the older go-systemd version, so we can't update the go-systemd version.
-		rkt.apisvcConn.Close()
-		return nil, err
-	}
 	return rkt, nil
 }
 
@@ -1045,7 +1038,8 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 
 	res := <-reschan
 	if res != "done" {
-		glog.Errorf("rkt: Failed to stop unit %q: %s", serviceName, res)
+		err := fmt.Errorf("invalid result: %s", res)
+		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
 	}
 
@@ -1061,7 +1055,12 @@ func (r *Runtime) Version() (kubecontainer.Version, error) {
 }
 
 func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
-	return r.binVersion, nil
+	return r.apiVersion, nil
+}
+
+// Status returns error if rkt is unhealthy, nil otherwise.
+func (r *Runtime) Status() error {
+	return r.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion)
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
@@ -1449,7 +1448,7 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 	for _, pod := range listResp.Pods {
 		manifest, creationTime, restartCount, err := getPodInfo(pod)
 		if err != nil {
-			glog.Warning("rkt: Couldn't get necessary info from the rkt pod, (uuid %q): %v", pod.Id, err)
+			glog.Warningf("rkt: Couldn't get necessary info from the rkt pod, (uuid %q): %v", pod.Id, err)
 			continue
 		}
 
@@ -1482,9 +1481,3 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 
 	return podStatus, nil
 }
-
-type sortByRestartCount []*kubecontainer.ContainerStatus
-
-func (s sortByRestartCount) Len() int           { return len(s) }
-func (s sortByRestartCount) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s sortByRestartCount) Less(i, j int) bool { return s[i].RestartCount < s[j].RestartCount }

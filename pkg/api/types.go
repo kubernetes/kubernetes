@@ -98,7 +98,7 @@ type ObjectMeta struct {
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
 	// A sequence number representing a specific generation of the desired state.
-	// Currently only implemented by replication controllers.
+	// Populated by the system. Read-only.
 	Generation int64 `json:"generation,omitempty"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
@@ -217,6 +217,8 @@ type VolumeSource struct {
 	FC *FCVolumeSource `json:"fc,omitempty"`
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
+	// ConfigMap represents a configMap that should populate this volume
+	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -427,7 +429,7 @@ const (
 	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
-// Protocol defines network protocols supported for things like conatiner ports.
+// Protocol defines network protocols supported for things like container ports.
 type Protocol string
 
 const (
@@ -439,16 +441,16 @@ const (
 
 // Represents a Persistent Disk resource in Google Compute Engine.
 //
-// A GCE PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same GCE project and zone as the kubelet.
-// A GCE PD can only be mounted as read/write once.
-// GCE PDs support ownership management and SELinux relabeling.
+// A GCE PD must exist before mounting to a container. The disk must
+// also be in the same GCE project and zone as the kubelet. A GCE PD
+// can only be mounted as read/write once or read-only many times. GCE
+// PDs support ownership management and SELinux relabeling.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Partition on the disk to mount.
@@ -473,9 +475,9 @@ type ISCSIVolumeSource struct {
 	Lun int `json:"lun,omitempty"`
 	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
 	ISCSIInterface string `json:"iscsiInterface,omitempty"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
@@ -491,11 +493,11 @@ type FCVolumeSource struct {
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
 	Lun *int `json:"lun"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	FSType string `json:"fsType"`
+	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -506,9 +508,9 @@ type FCVolumeSource struct {
 type FlexVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	Driver string `json:"driver"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
 	FSType string `json:"fsType,omitempty"`
 	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
@@ -521,16 +523,16 @@ type FlexVolumeSource struct {
 
 // Represents a Persistent Disk resource in AWS.
 //
-// An AWS EBS disk must exist and be formatted before mounting to a container.
-// The disk must also be in the same AWS zone as the kubelet.
-// A AWS EBS disk can only be mounted as read/write once.
-// AWS EBS volumes support ownership management and SELinux relabeling.
+// An AWS EBS disk must exist before mounting to a container. The disk
+// must also be in the same AWS zone as the kubelet. A AWS EBS disk
+// can only be mounted as read/write once. AWS EBS volumes support
+// ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the persistent disk resource. Used to identify the disk in AWS
 	VolumeID string `json:"volumeID"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Partition on the disk to mount.
@@ -603,9 +605,9 @@ type RBDVolumeSource struct {
 	CephMonitors []string `json:"monitors"`
 	// Required: RBDImage is the rados image name
 	RBDImage string `json:"image"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: RadosPool is the rados pool name,default is rbd
@@ -621,15 +623,16 @@ type RBDVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// Represents a cinder volume resource in Openstack.
-// A Cinder volume must exist and be formatted before mounting to a container.
-// The volume must also be in the same region as the kubelet.
-// Cinder volumes support ownership management and SELinux relabeling.
+// Represents a cinder volume resource in Openstack. A Cinder volume
+// must exist before mounting to a container. The volume must also be
+// in the same region as the kubelet. Cinder volumes support ownership
+// management and SELinux relabeling.
 type CinderVolumeSource struct {
 	// Unique id of the volume used to identify the cinder volume
 	VolumeID string `json:"volumeID"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -687,6 +690,36 @@ type AzureFileVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
+// Adapts a ConfigMap into a volume.
+//
+// The contents of the target ConfigMap's Data field will be presented in a
+// volume as files using the keys in the Data field as the file names, unless
+// the items element is populated with specific mappings of keys to paths.
+// ConfigMap volumes support ownership management and SELinux relabeling.
+type ConfigMapVolumeSource struct {
+	LocalObjectReference `json:",inline"`
+	// If unspecified, each key-value pair in the Data field of the referenced
+	// ConfigMap will be projected into the volume as a file whose name is the
+	// key and content is the value. If specified, the listed keys will be
+	// projected into the specified paths, and unlisted keys will not be
+	// present. If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error. Paths must be relative and may not contain
+	// the '..' path or start with '..'.
+	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// Maps a string key to a path within a volume.
+type KeyToPath struct {
+	// The key to project.
+	Key string `json:"key"`
+
+	// The relative path of the file to map the key to.
+	// May not be an absolute path.
+	// May not contain the path element '..'.
+	// May not start with the string '..'.
+	Path string `json:"path"`
+}
+
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
@@ -709,7 +742,7 @@ type VolumeMount struct {
 	Name string `json:"name"`
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `json:"readOnly,omitempty"`
-	// Required.
+	// Required. Must not contain ':'.
 	MountPath string `json:"mountPath"`
 }
 
@@ -984,7 +1017,7 @@ type ContainerStatus struct {
 	Name                 string         `json:"name"`
 	State                ContainerState `json:"state,omitempty"`
 	LastTerminationState ContainerState `json:"lastState,omitempty"`
-	// Ready specifies whether the conatiner has passed its readiness check.
+	// Ready specifies whether the container has passed its readiness check.
 	Ready bool `json:"ready"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
@@ -1112,23 +1145,23 @@ const (
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
 
-// Affinity is a group of affinity scheduling requirements.
+// Affinity is a group of affinity scheduling rules, currently
+// only node affinity, but in the future also inter-pod affinity.
 type Affinity struct {
-	// Describes node affinity scheduling requirements for the pod.
+	// Describes node affinity scheduling rules for the pod.
 	NodeAffinity *NodeAffinity `json:"nodeAffinity,omitempty"`
 }
 
-// Node affinity is a group of node affinity scheduling requirements.
-// If RequiredDuringSchedulingRequiredDuringExecution and
-// RequiredDuringSchedulingIgnoredDuringExecution are both set,
-// then both node selectors must be satisfied.
+// Node affinity is a group of node affinity scheduling rules.
 type NodeAffinity struct {
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
 	// at some point during pod execution (e.g. due to an update), the system
 	// will try to eventually evict the pod from its node.
-	RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
@@ -1493,8 +1526,10 @@ type ServicePort struct {
 
 	// Optional: The target port on pods selected by this service.  If this
 	// is a string, it will be looked up as a named port in the target
-	// Pod's container ports.  If this is not specified, the default value
-	// is the sames as the Port field (an identity map).
+	// Pod's container ports.  If this is not specified, the value
+	// of the 'port' field is used (an identity map).
+	// This field is ignored for services with clusterIP=None, and should be
+	// omitted or set equal to the 'port' field.
 	TargetPort intstr.IntOrString `json:"targetPort"`
 
 	// The port on each node on which this service is exposed.
@@ -1686,9 +1721,9 @@ type NodeStatus struct {
 // Describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
-	RepoTags []string `json:"repoTags"`
+	Names []string `json:"names"`
 	// The size of the image in bytes.
-	Size int64 `json:"size,omitempty"`
+	SizeBytes int64 `json:"sizeBytes,omitempty"`
 }
 
 type NodePhase string
@@ -1901,7 +1936,7 @@ type PodLogOptions struct {
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceSeconds *int64
 	// An RFC3339 timestamp from which to show logs. If this value
-	// preceeds the time a pod was started, only logs since the pod start will be returned.
+	// precedes the time a pod was started, only logs since the pod start will be returned.
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceTime *unversioned.Time
@@ -1966,6 +2001,26 @@ type PodProxyOptions struct {
 	unversioned.TypeMeta
 
 	// Path is the URL path to use for the current proxy request
+	Path string
+}
+
+// NodeProxyOptions is the query options to a Node's proxy call
+type NodeProxyOptions struct {
+	unversioned.TypeMeta
+
+	// Path is the URL path to use for the current proxy request
+	Path string
+}
+
+// ServiceProxyOptions is the query options to a Service's proxy call.
+type ServiceProxyOptions struct {
+	unversioned.TypeMeta
+
+	// Path is the part of URLs that include service endpoints, suffixes,
+	// and parameters to use for the current proxy request to service.
+	// For example, the whole request URL is
+	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
+	// Path is _search?q=user:kimchy.
 	Path string
 }
 
@@ -2132,14 +2187,41 @@ const (
 	ResourceQuotas ResourceName = "resourcequotas"
 	// ResourceSecrets, number
 	ResourceSecrets ResourceName = "secrets"
+	// ResourceConfigMaps, number
+	ResourceConfigMaps ResourceName = "configmaps"
 	// ResourcePersistentVolumeClaims, number
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	// CPU request, in cores. (500m = .5 cores)
+	ResourceRequestsCPU ResourceName = "requests.cpu"
+	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceRequestsMemory ResourceName = "requests.memory"
+	// CPU limit, in cores. (500m = .5 cores)
+	ResourceLimitsCPU ResourceName = "limits.cpu"
+	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceLimitsMemory ResourceName = "limits.memory"
+)
+
+// A ResourceQuotaScope defines a filter that must match each object tracked by a quota
+type ResourceQuotaScope string
+
+const (
+	// Match all pod objects where spec.activeDeadlineSeconds
+	ResourceQuotaScopeTerminating ResourceQuotaScope = "Terminating"
+	// Match all pod objects where !spec.activeDeadlineSeconds
+	ResourceQuotaScopeNotTerminating ResourceQuotaScope = "NotTerminating"
+	// Match all pod objects that have best effort quality of service
+	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
+	// Match all pod objects that do not have best effort quality of service
+	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
 	Hard ResourceList `json:"hard,omitempty"`
+	// A collection of filters that must match each object tracked by a quota.
+	// If not specified, the quota matches all objects.
+	Scopes []ResourceQuotaScope `json:"scopes,omitempty"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
@@ -2217,6 +2299,8 @@ const (
 	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
 	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
 	ServiceAccountRootCAKey = "ca.crt"
+	// ServiceAccountNamespaceKey is the key of the optional namespace to use as the default for namespaced API calls
+	ServiceAccountNamespaceKey = "namespace"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//
@@ -2411,6 +2495,9 @@ type SecurityContext struct {
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
+	// The read-only root filesystem allows you to restrict the locations that an application can write
+	// files to, ensuring the persistent data can only be written to mounts.
+	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
 }
 
 // SELinuxOptions are the labels to be applied to the container.

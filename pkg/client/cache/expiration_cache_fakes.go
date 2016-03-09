@@ -28,6 +28,7 @@ type fakeThreadSafeMap struct {
 
 func (c *fakeThreadSafeMap) Delete(key string) {
 	if c.deletedKeys != nil {
+		c.ThreadSafeStore.Delete(key)
 		c.deletedKeys <- key
 	}
 }

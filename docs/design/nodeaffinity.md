@@ -37,7 +37,7 @@ intended to be used only for selecting nodes.
 
 In addition, we propose to replace the `map[string]string` in `PodSpec` that the scheduler
 currently uses as part of restricting the set of nodes onto which a pod is
-eligible to schedule, with a field of type `Affinity` that contains contains one or
+eligible to schedule, with a field of type `Affinity` that contains one or
 more affinity specifications. In this document we discuss `NodeAffinity`, which
 contains one or more of the following
 * a field called `RequiredDuringSchedulingRequiredDuringExecution` that will be

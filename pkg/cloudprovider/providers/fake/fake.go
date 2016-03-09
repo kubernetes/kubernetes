@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "fake"
@@ -51,6 +52,7 @@ type FakeCloud struct {
 	Calls         []string
 	Addresses     []api.NodeAddress
 	ExtID         map[string]string
+	InstanceTypes map[string]string
 	Machines      []string
 	NodeResources *api.NodeResources
 	ClusterList   []string
@@ -130,7 +132,7 @@ func (f *FakeCloud) GetLoadBalancer(name, region string) (*api.LoadBalancerStatu
 
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)
@@ -186,6 +188,12 @@ func (f *FakeCloud) ExternalID(instance string) (string, error) {
 func (f *FakeCloud) InstanceID(instance string) (string, error) {
 	f.addCall("instance-id")
 	return f.ExtID[instance], nil
+}
+
+// InstanceType returns the type of the specified instance.
+func (f *FakeCloud) InstanceType(instance string) (string, error) {
+	f.addCall("instance-type")
+	return f.InstanceTypes[instance], nil
 }
 
 // List is a test-spy implementation of Instances.List.

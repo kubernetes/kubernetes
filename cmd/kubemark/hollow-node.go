@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
@@ -48,6 +48,10 @@ type HollowNodeConfig struct {
 	NodeName            string
 	ServerPort          int
 }
+
+const (
+	maxPods = 110
+)
 
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
@@ -84,7 +88,7 @@ func main() {
 	util.InitFlags()
 
 	if !knownMorphs.Has(config.Morph) {
-		glog.Fatal("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
@@ -95,7 +99,7 @@ func main() {
 	}
 
 	if config.Morph == "kubelet" {
-		cadvisorInterface := new(cadvisor.Fake)
+		cadvisorInterface := new(cadvisortest.Fake)
 		containerManager := cm.NewStubContainerManager()
 
 		fakeDockerClient := dockertools.NewFakeDockerClient()
@@ -110,6 +114,7 @@ func main() {
 			config.KubeletPort,
 			config.KubeletReadOnlyPort,
 			containerManager,
+			maxPods,
 		)
 		hollowKubelet.Run()
 	}

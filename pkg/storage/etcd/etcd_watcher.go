@@ -77,7 +77,10 @@ func exceptKey(except string) includeFunc {
 
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
-	encoding  runtime.Codec
+	encoding runtime.Codec
+	// Note that versioner is required for etcdWatcher to work correctly.
+	// There is no public constructor of it, so be careful when manipulating
+	// with it manually.
 	versioner storage.Versioner
 	transform TransformFunc
 
@@ -108,9 +111,12 @@ type etcdWatcher struct {
 // watchWaitDuration is the amount of time to wait for an error from watch.
 const watchWaitDuration = 100 * time.Millisecond
 
-// newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
-// and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, quorum bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
+// newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
+// The versioner must be able to handle the objects that transform creates.
+func newEtcdWatcher(
+	list bool, quorum bool, include includeFunc, filter storage.FilterFunc,
+	encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc,
+	cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
 		versioner: versioner,
@@ -310,10 +316,8 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	}
 
 	// ensure resource version is set on the object we load from etcd
-	if w.versioner != nil {
-		if err := w.versioner.UpdateObject(obj, node.Expiration, node.ModifiedIndex); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err))
-		}
+	if err := w.versioner.UpdateObject(obj, node.Expiration, node.ModifiedIndex); err != nil {
+		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err))
 	}
 
 	// perform any necessary transformation

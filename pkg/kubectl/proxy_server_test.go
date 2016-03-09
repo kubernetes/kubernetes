@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 func TestAccept(t *testing.T) {
@@ -293,7 +293,7 @@ func TestPathHandling(t *testing.T) {
 		{"/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
 	}
 
-	cc := &client.Config{
+	cc := &restclient.Config{
 		Host: ts.URL,
 	}
 

@@ -473,7 +473,7 @@ func (f *encFnInfo) kSlice(rv reflect.Value) {
 		for j := 0; j < l; j++ {
 			if cr != nil {
 				if ti.mbs {
-					if l%2 == 0 {
+					if j%2 == 0 {
 						cr.sendContainerState(containerMapKey)
 					} else {
 						cr.sendContainerState(containerMapValue)
@@ -1188,7 +1188,8 @@ func (e *Encoder) doEncodeValue(rv reflect.Value, fn *encFn, sptr uintptr,
 	if fn == nil {
 		rt := rv.Type()
 		rtid := reflect.ValueOf(rt).Pointer()
-		fn = e.getEncFn(rtid, rt, true, true)
+		// fn = e.getEncFn(rtid, rt, true, true)
+		fn = e.getEncFn(rtid, rt, checkFastpath, checkCodecSelfer)
 	}
 	fn.f(&fn.i, rv)
 	if sptr != 0 {
@@ -1265,7 +1266,7 @@ func (e *Encoder) getEncFn(rtid uintptr, rt reflect.Type, checkFastpath, checkCo
 	} else {
 		rk := rt.Kind()
 		if fastpathEnabled && checkFastpath && (rk == reflect.Map || rk == reflect.Slice) {
-			if rt.PkgPath() == "" {
+			if rt.PkgPath() == "" { // un-named slice or map
 				if idx := fastpathAV.index(rtid); idx != -1 {
 					fn.f = fastpathAV[idx].encfn
 				}

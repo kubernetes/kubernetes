@@ -41,7 +41,7 @@ type KubeletManagedHostConfig struct {
 }
 
 var _ = Describe("KubeletManagedEtcHosts", func() {
-	f := NewFramework("e2e-kubelet-etc-hosts")
+	f := NewDefaultFramework("e2e-kubelet-etc-hosts")
 	config := &KubeletManagedHostConfig{
 		f: f,
 	}

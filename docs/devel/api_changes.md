@@ -306,7 +306,7 @@ removed value as deprecated but allowed). This is actually a special case of
 a new representation, discussed above.
 
 For [Unions](api-conventions.md), sets of fields where at most one should be set,
-it is acceptible to add a new option to the union if the [appropriate conventions]
+it is acceptable to add a new option to the union if the [appropriate conventions]
 were followed in the original object.  Removing an option requires following
 the deprecation process.
 

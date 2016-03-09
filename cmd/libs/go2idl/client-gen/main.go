@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 
@@ -35,6 +36,7 @@ var (
 	clientsetName = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
 	clientsetPath = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>. Default to \"k8s.io/kubernetes/pkg/client/clientset_generated/\"")
 	clientsetOnly = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
+	fakeClient    = flag.Bool("fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
 )
 
 func versionToPath(group string, version string) (path string) {
@@ -48,24 +50,25 @@ func versionToPath(group string, version string) (path string) {
 	return
 }
 
-func parseInputVersions() ([]string, []unversioned.GroupVersion, error) {
+func parseInputVersions() (paths []string, groupVersions []unversioned.GroupVersion, gvToPath map[unversioned.GroupVersion]string, err error) {
 	var visitedGroups = make(map[string]struct{})
-	var groupVersions []unversioned.GroupVersion
-	var paths []string
+	gvToPath = make(map[unversioned.GroupVersion]string)
 	for _, gvString := range *inputVersions {
 		gv, err := unversioned.ParseGroupVersion(gvString)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		if _, found := visitedGroups[gv.Group]; found {
-			return nil, nil, fmt.Errorf("group %q appeared more than once in the input. At most one version is allowed for each group.", gv.Group)
+			return nil, nil, nil, fmt.Errorf("group %q appeared more than once in the input. At most one version is allowed for each group.", gv.Group)
 		}
 		visitedGroups[gv.Group] = struct{}{}
 		groupVersions = append(groupVersions, gv)
-		paths = append(paths, versionToPath(gv.Group, gv.Version))
+		path := versionToPath(gv.Group, gv.Version)
+		paths = append(paths, path)
+		gvToPath[gv] = path
 	}
-	return paths, groupVersions, nil
+	return paths, groupVersions, gvToPath, nil
 }
 
 func main() {
@@ -76,7 +79,6 @@ func main() {
 		"k8s.io/kubernetes/pkg/labels",
 		"k8s.io/kubernetes/pkg/watch",
 		"k8s.io/kubernetes/pkg/client/unversioned",
-		"k8s.io/kubernetes/pkg/client/testing/fake",
 		"k8s.io/kubernetes/pkg/apimachinery/registered",
 	}
 
@@ -86,19 +88,22 @@ func main() {
 		}...)
 		// We may change the output path later.
 		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
-		arguments.CustomArgs = generators.ClientGenArgs{
+		arguments.CustomArgs = clientgenargs.Args{
 			[]unversioned.GroupVersion{{"testgroup", ""}},
+			map[unversioned.GroupVersion]string{
+				unversioned.GroupVersion{"testgroup", ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+			},
 			"test_internalclientset",
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
 			false,
 			false,
 		}
 	} else {
-		inputPath, groupVersions, err := parseInputVersions()
+		inputPath, groupVersions, gvToPath, err := parseInputVersions()
 		if err != nil {
 			glog.Fatalf("Error: %v", err)
 		}
-		glog.Info("going to generate clientset from these input paths: %v", inputPath)
+		glog.Infof("going to generate clientset from these input paths: %v", inputPath)
 		arguments.InputDirs = append(inputPath, dependencies...)
 		// TODO: we need to make OutPackagePath a map[string]string. For example,
 		// we need clientset and the individual typed clients be output to different
@@ -107,12 +112,13 @@ func main() {
 		// We may change the output path later.
 		arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/typed/generated"
 
-		arguments.CustomArgs = generators.ClientGenArgs{
+		arguments.CustomArgs = clientgenargs.Args{
 			groupVersions,
+			gvToPath,
 			*clientsetName,
 			*clientsetPath,
 			*clientsetOnly,
-			true,
+			*fakeClient,
 		}
 	}
 

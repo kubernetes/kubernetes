@@ -21,12 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -124,10 +126,6 @@ func (t *thirdPartyResourceDataMapper) AliasesForResource(resource string) ([]st
 
 func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return t.mapper.ResourceSingularizer(resource)
-}
-
-func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
-	return t.isThirdPartyResource(resource) || t.mapper.ResourceIsValid(resource)
 }
 
 func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMapper {
@@ -367,4 +365,20 @@ func (t *thirdPartyResourceDataCreator) New(kind unversioned.GroupVersionKind) (
 	default:
 		return t.delegate.New(kind)
 	}
+}
+
+func NewThirdPartyParameterCodec(p runtime.ParameterCodec) runtime.ParameterCodec {
+	return &thirdPartyParameterCodec{p}
+}
+
+type thirdPartyParameterCodec struct {
+	delegate runtime.ParameterCodec
+}
+
+func (t *thirdPartyParameterCodec) DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into runtime.Object) error {
+	return t.delegate.DecodeParameters(parameters, v1.SchemeGroupVersion, into)
+}
+
+func (t *thirdPartyParameterCodec) EncodeParameters(obj runtime.Object, to unversioned.GroupVersion) (url.Values, error) {
+	return t.delegate.EncodeParameters(obj, v1.SchemeGroupVersion)
 }

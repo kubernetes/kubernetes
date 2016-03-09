@@ -25,7 +25,7 @@ spec:
           resources:
             limits:
               cpu: 100m
-              memory: 200Mi
+              memory: 500Mi
           ports: 
             - containerPort: 8083
               hostPort: 8083

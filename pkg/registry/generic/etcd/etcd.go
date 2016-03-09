@@ -19,6 +19,7 @@ package etcd
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -83,6 +85,10 @@ type Etcd struct {
 
 	// Returns a matcher corresponding to the provided labels and fields.
 	PredicateFunc func(label labels.Selector, field fields.Selector) generic.Matcher
+
+	// DeleteCollectionWorkers is the maximum number of workers in a single
+	// DeleteCollection call.
+	DeleteCollectionWorkers int
 
 	// Called on all objects returned from the underlying store, after
 	// the exit hooks are invoked. Decorators are intended for integrations
@@ -254,6 +260,15 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	creating := false
 	out := e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		// Since we return 'obj' from this function and it can be modified outside this
+		// function, we are resetting resourceVersion to the initial value here.
+		//
+		// TODO: In fact, we should probably return a DeepCopy of obj in all places.
+		err := e.Storage.Versioner().UpdateObject(obj, nil, resourceVersion)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
@@ -387,7 +402,9 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if pendingGraceful {
 		return e.finalizeDelete(obj, false)
 	}
-	if graceful && *options.GracePeriodSeconds > 0 {
+	var ignoreNotFound bool = false
+	var lastExisting runtime.Object = nil
+	if graceful {
 		out := e.NewFunc()
 		lastGraceful := int64(0)
 		err := e.Storage.GuaranteedUpdate(
@@ -404,6 +421,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 					return nil, errDeleteNow
 				}
 				lastGraceful = *options.GracePeriodSeconds
+				lastExisting = existing
 				return existing, nil
 			}),
 		)
@@ -412,7 +430,15 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 			if lastGraceful > 0 {
 				return out, nil
 			}
-			// fall through and delete immediately
+			// If we are here, the registry supports grace period mechanism and
+			// we are intentionally delete gracelessly. In this case, we may
+			// enter a race with other k8s components. If other component wins
+			// the race, the object will not be found, and we should tolerate
+			// the NotFound error. See
+			// https://github.com/kubernetes/kubernetes/issues/19403 for
+			// details.
+			ignoreNotFound = true
+			// exit the switch and delete immediately
 		case errDeleteNow:
 			// we've updated the object to have a zero grace period, or it's already at 0, so
 			// we should fall through and truly delete the object.
@@ -426,6 +452,13 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out); err != nil {
+		// Please refer to the place where we set ignoreNotFound for the reason
+		// why we ignore the NotFound error .
+		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
+			// The lastExisting object may not be the last state of the object
+			// before its deletion, but it's the best approximation.
+			return e.finalizeDelete(lastExisting, true)
+		}
 		return nil, etcderr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	return e.finalizeDelete(out, true)
@@ -450,16 +483,63 @@ func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, lis
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range items {
-		accessor, err := meta.Accessor(item)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil {
-			return nil, err
-		}
+	// Spawn a number of goroutines, so that we can issue requests to etcd
+	// in parallel to speed up deletion.
+	// TODO: Make this proportional to the number of items to delete, up to
+	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
+	// workers to delete 10 items).
+	workersNumber := e.DeleteCollectionWorkers
+	if workersNumber < 1 {
+		workersNumber = 1
 	}
-	return listObj, nil
+	wg := sync.WaitGroup{}
+	toProcess := make(chan int, 2*workersNumber)
+	errs := make(chan error, workersNumber+1)
+
+	go func() {
+		defer utilruntime.HandleCrash(func(panicReason interface{}) {
+			errs <- fmt.Errorf("DeleteCollection distributor panicked: %v", panicReason)
+		})
+		for i := 0; i < len(items); i++ {
+			toProcess <- i
+		}
+		close(toProcess)
+	}()
+
+	wg.Add(workersNumber)
+	for i := 0; i < workersNumber; i++ {
+		go func() {
+			// panics don't cross goroutine boundaries
+			defer utilruntime.HandleCrash(func(panicReason interface{}) {
+				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
+			})
+			defer wg.Done()
+
+			for {
+				index, ok := <-toProcess
+				if !ok {
+					return
+				}
+				accessor, err := meta.Accessor(items[index])
+				if err != nil {
+					errs <- err
+					return
+				}
+				if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	select {
+	case err := <-errs:
+		return nil, err
+	default:
+		return listObj, nil
+	}
 }
 
 func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {

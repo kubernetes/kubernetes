@@ -20,7 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"net/http/httptest"
+
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -100,7 +106,18 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
 			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
 		}
-		if _, err := factory.NewConfigFactory(nil, "some-scheduler-name").CreateFromConfig(policy); err != nil {
+
+		handler := utiltesting.FakeHandler{
+			StatusCode:   500,
+			ResponseBody: "",
+			T:            t,
+		}
+		server := httptest.NewServer(&handler)
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
+		client := client.NewOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+		if _, err := factory.NewConfigFactory(client, "some-scheduler-name").CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}

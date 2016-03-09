@@ -72,13 +72,35 @@ func ReadOnly(handler http.Handler) http.Handler {
 	})
 }
 
+type LongRunningRequestCheck func(r *http.Request) bool
+
+// BasicLongRunningRequestCheck pathRegex operates against the url path, the queryParams match is case insensitive.
+// Any one match flags the request.
+// TODO tighten this check to eliminate the abuse potential by malicious clients that start setting queryParameters
+// to bypass the rate limitter.  This could be done using a full parse and special casing the bits we need.
+func BasicLongRunningRequestCheck(pathRegex *regexp.Regexp, queryParams map[string]string) LongRunningRequestCheck {
+	return func(r *http.Request) bool {
+		if pathRegex.MatchString(r.URL.Path) {
+			return true
+		}
+
+		for key, expectedValue := range queryParams {
+			if strings.ToLower(expectedValue) == strings.ToLower(r.URL.Query().Get(key)) {
+				return true
+			}
+		}
+
+		return false
+	}
+}
+
 // MaxInFlight limits the number of in-flight requests to buffer size of the passed in channel.
-func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler http.Handler) http.Handler {
+func MaxInFlightLimit(c chan bool, longRunningRequestCheck LongRunningRequestCheck, handler http.Handler) http.Handler {
 	if c == nil {
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if longRunningRequestRE.MatchString(r.URL.Path) {
+		if longRunningRequestCheck(r) {
 			// Skip tracking long running events.
 			handler.ServeHTTP(w, r)
 			return
@@ -553,6 +575,10 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
 		requestInfo.Verb = "list"
+	}
+	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection
+	if len(requestInfo.Name) == 0 && requestInfo.Verb == "delete" {
+		requestInfo.Verb = "deletecollection"
 	}
 
 	return requestInfo, nil

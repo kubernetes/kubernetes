@@ -145,6 +145,17 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 		},
+		// 2 nodes, one node without CIDR assigned.
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: ""}},
+			},
+			initialRoutes: []*cloudprovider.Route{},
+			expectedRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+			},
+		},
 	}
 	for i, testCase := range testCases {
 		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}

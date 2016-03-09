@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,8 +26,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
 	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
@@ -38,7 +40,7 @@ var _ = Describe("Kubelet", func() {
 	var cl *client.Client
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&client.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
 	})
 
 	Describe("pod scheduling", func() {
@@ -69,7 +71,8 @@ var _ = Describe("Kubelet", func() {
 
 			It("it should print the output to logs", func() {
 				Eventually(func() string {
-					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
+					sinceTime := unversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
+					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
 					if err != nil {
 						return ""
 					}
@@ -78,6 +81,54 @@ var _ = Describe("Kubelet", func() {
 					buf.ReadFrom(rc)
 					return buf.String()
 				}, time.Second*30, time.Second*4).Should(Equal("'Hello World'\n"))
+			})
+
+			It("it should be possible to delete", func() {
+				err := cl.Pods(api.NamespaceDefault).Delete("busybox", &api.DeleteOptions{})
+				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+			})
+		})
+
+		Context("when scheduling a read only busybox container", func() {
+			It("it should return success", func() {
+				isReadOnly := true
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "busybox",
+						Namespace: api.NamespaceDefault,
+					},
+					Spec: api.PodSpec{
+						// Force the Pod to schedule to the node without a scheduler running
+						NodeName: *nodeName,
+						// Don't restart the Pod since it is expected to exit
+						RestartPolicy: api.RestartPolicyNever,
+						Containers: []api.Container{
+							{
+								Image:   "gcr.io/google_containers/busybox",
+								Name:    "busybox",
+								Command: []string{"sh", "-c", "echo test > /file"},
+								SecurityContext: &api.SecurityContext{
+									ReadOnlyRootFilesystem: &isReadOnly,
+								},
+							},
+						},
+					},
+				}
+				_, err := cl.Pods(api.NamespaceDefault).Create(pod)
+				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+			})
+
+			It("it should not write to the root filesystem", func() {
+				Eventually(func() string {
+					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
+					if err != nil {
+						return ""
+					}
+					defer rc.Close()
+					buf := new(bytes.Buffer)
+					buf.ReadFrom(rc)
+					return buf.String()
+				}, time.Second*30, time.Second*4).Should(Equal("sh: can't create /file: Read-only file system\n"))
 			})
 
 			It("it should be possible to delete", func() {
@@ -120,7 +171,6 @@ var _ = Describe("Kubelet", func() {
 			It("it should report resource usage through the stats api", func() {
 				By("Returning stats summary")
 				resp, err := http.Get(*kubeletAddress + "/stats/summary")
-				now := time.Now()
 				Expect(err).To(BeNil(), fmt.Sprintf("Failed to get /stats/summary"))
 				summary := stats.Summary{}
 				contentsBytes, err := ioutil.ReadAll(resp.Body)
@@ -129,9 +179,6 @@ var _ = Describe("Kubelet", func() {
 				decoder := json.NewDecoder(strings.NewReader(contents))
 				err = decoder.Decode(&summary)
 				Expect(err).To(BeNil(), fmt.Sprintf("Failed to parse /stats/summary to go struct: %+v", resp))
-
-				By("Having the correct time")
-				Expect(summary.Time.Time).To(BeTemporally("~", now, 20*time.Second))
 
 				By("Having resources for node")
 				Expect(summary.Node.NodeName).To(Equal(*nodeName))
@@ -159,7 +206,8 @@ var _ = Describe("Kubelet", func() {
 					sysContainersList = append(sysContainersList, container.Name)
 					ExpectContainerStatsNotEmpty(&container)
 				}
-				Expect(sysContainersList).To(ConsistOf("kubelet", "runtime"))
+				Expect(sysContainersList).To(ContainElement("kubelet"))
+				Expect(sysContainersList).To(ContainElement("runtime"))
 
 				// Verify Pods Stats are present
 				podsList := []string{}
@@ -205,7 +253,7 @@ var _ = Describe("Kubelet", func() {
 					Expect(*container.Logs.UsedBytes).NotTo(BeZero(), spew.Sdump(container))
 
 				}
-				Expect(podsList).To(ConsistOf(podNames))
+				Expect(podsList).To(ConsistOf(podNames), spew.Sdump(summary))
 			})
 		})
 

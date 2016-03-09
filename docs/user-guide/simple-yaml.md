@@ -32,7 +32,8 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-### This document has been subsumed by [deploying-applications.md](deploying-applications.md)
+This file has moved to: http://kubernetes.github.io/docs/user-guide/simple-yaml/
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/simple-yaml.md?pixel)]()

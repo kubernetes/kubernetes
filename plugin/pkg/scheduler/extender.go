@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
@@ -45,7 +45,7 @@ type HTTPExtender struct {
 }
 
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
-	var cfg client.Config
+	var cfg restclient.Config
 	if config.TLSConfig != nil {
 		cfg.TLSClientConfig = *config.TLSConfig
 	}
@@ -55,7 +55,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 			cfg.Insecure = true
 		}
 	}
-	tlsConfig, err := client.TLSConfigFor(&cfg)
+	tlsConfig, err := restclient.TLSConfigFor(&cfg)
 	if err != nil {
 		return nil, err
 	}

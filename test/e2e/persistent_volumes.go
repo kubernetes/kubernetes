@@ -31,7 +31,7 @@ import (
 // This test needs privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
 var _ = Describe("PersistentVolumes [Feature:Volumes]", func() {
-	framework := NewFramework("pv")
+	framework := NewDefaultFramework("pv")
 	var c *client.Client
 	var ns string
 
@@ -44,7 +44,7 @@ var _ = Describe("PersistentVolumes [Feature:Volumes]", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",
-			serverImage: "gcr.io/google_containers/volume-nfs",
+			serverImage: "gcr.io/google_containers/volume-nfs:0.4",
 			serverPorts: []int{2049},
 		}
 

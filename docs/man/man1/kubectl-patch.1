@@ -40,6 +40,10 @@ Please refer to the models in
 \fB\-\-record\fP=false
     Record current kubectl command in the resource annotation.
 
+.PP
+\fB\-\-type\fP="strategic"
+    The type of patch being provided; one of [json merge strategic]
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -149,6 +153,9 @@ kubectl patch \-f node.json \-p '{"spec":{"unschedulable":true}}'
 
 # Update a container's image; spec.containers[*].name is required because it's a merge key
 kubectl patch pod valid\-pod \-p '{"spec":{"containers":[{"name":"kubernetes\-serve\-hostname","image":"new image"}]}}'
+
+# Update a container's image using a json patch with positional arrays
+kubectl patch pod valid\-pod \-type='json' \-p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
 
 .fi
 .RE

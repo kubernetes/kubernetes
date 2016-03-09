@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1
 
-// This file contains a collection of methods that can be used from go-resful to
+// This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
 // information on the implementation: https://github.com/emicklei/go-restful/pull/215
 //
@@ -28,9 +28,9 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AWSElasticBlockStoreVolumeSource = map[string]string{
-	"":          "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist and be formatted before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
+	"":          "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
 	"volumeID":  "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore",
+	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore",
 	"partition": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
 	"readOnly":  "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore",
 }
@@ -40,8 +40,8 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_Affinity = map[string]string{
-	"":             "Affinity is a group of affinity scheduling requirements, including node affinity and inter pod affinity.",
-	"nodeAffinity": "Describes node affinity scheduling requirements for the pod.",
+	"":             "Affinity is a group of affinity scheduling rules, currently only node affinity, but in the future also inter-pod affinity.",
+	"nodeAffinity": "Describes node affinity scheduling rules for the pod.",
 }
 
 func (Affinity) SwaggerDoc() map[string]string {
@@ -96,7 +96,7 @@ func (CephFSVolumeSource) SwaggerDoc() map[string]string {
 var map_CinderVolumeSource = map[string]string{
 	"":         "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
 	"volumeID": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-	"fsType":   "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Only ext3 and ext4 are allowed More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"fsType":   "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"readOnly": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 }
 
@@ -165,14 +165,23 @@ func (ConfigMapList) SwaggerDoc() map[string]string {
 	return map_ConfigMapList
 }
 
+var map_ConfigMapVolumeSource = map[string]string{
+	"":      "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
+	"items": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'.",
+}
+
+func (ConfigMapVolumeSource) SwaggerDoc() map[string]string {
+	return map_ConfigMapVolumeSource
+}
+
 var map_Container = map[string]string{
 	"":                       "A single application container that you want to run within a pod.",
 	"name":                   "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
 	"image":                  "Docker image name. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md",
-	"command":                "Entrypoint array. Not executed within a shell. The docker image's entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands",
-	"args":                   "Arguments to the entrypoint. The docker image's cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands",
-	"workingDir":             "Container's working directory. Defaults to Docker's default. D efaults to image's default. Cannot be updated.",
-	"ports":                  "List of ports to expose from the container. Cannot be updated.",
+	"command":                "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands",
+	"args":                   "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands",
+	"workingDir":             "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
+	"ports":                  "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 	"env":                    "List of environment variables to set in the container. Cannot be updated.",
 	"resources":              "Compute Resources required by this container. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources",
 	"volumeMounts":           "Pod volumes to mount into the container's filesyste. Cannot be updated.",
@@ -192,9 +201,9 @@ func (Container) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerImage = map[string]string{
-	"":         "Describe a container image",
-	"repoTags": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
-	"size":     "The size of the image in bytes.",
+	"":          "Describe a container image",
+	"names":     "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+	"sizeBytes": "The size of the image in bytes.",
 }
 
 func (ContainerImage) SwaggerDoc() map[string]string {
@@ -455,7 +464,7 @@ var map_FCVolumeSource = map[string]string{
 	"":           "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
 	"targetWWNs": "Required: FC target world wide names (WWNs)",
 	"lun":        "Required: FC target lun number",
-	"fsType":     "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\"",
+	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 }
 
@@ -466,7 +475,7 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 var map_FlexVolumeSource = map[string]string{
 	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 	"driver":    "Driver is the name of the driver to use for this volume.",
-	"fsType":    "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\"",
+	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
 	"secretRef": "Optional: SecretRef is reference to the authentication secret for User, default is empty.",
 	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 	"options":   "Optional: Extra command options if any.",
@@ -486,9 +495,9 @@ func (FlockerVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_GCEPersistentDiskVolumeSource = map[string]string{
-	"":          "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once. GCE PDs support ownership management and SELinux relabeling.",
+	"":          "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
 	"pdName":    "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
+	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
 	"partition": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
 	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
 }
@@ -568,12 +577,22 @@ var map_ISCSIVolumeSource = map[string]string{
 	"iqn":            "Target iSCSI Qualified Name.",
 	"lun":            "iSCSI target lun number.",
 	"iscsiInterface": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
-	"fsType":         "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi",
+	"fsType":         "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi",
 	"readOnly":       "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
 	return map_ISCSIVolumeSource
+}
+
+var map_KeyToPath = map[string]string{
+	"":     "Maps a string key to a path within a volume.",
+	"key":  "The key to project.",
+	"path": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
+}
+
+func (KeyToPath) SwaggerDoc() map[string]string {
+	return map_KeyToPath
 }
 
 var map_Lifecycle = map[string]string{
@@ -752,8 +771,7 @@ func (NodeAddress) SwaggerDoc() map[string]string {
 }
 
 var map_NodeAffinity = map[string]string{
-	"": "Node affinity is a group of node affinity scheduling requirements. If RequiredDuringSchedulingRequiredDuringExecution and RequiredDuringSchedulingIgnoredDuringExecution are both set, then both node selectors must be satisfied.",
-	"requiredDuringSchedulingRequiredDuringExecution": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system will try to eventually evict the pod from its node.",
+	"": "Node affinity is a group of node affinity scheduling rules.",
 	"requiredDuringSchedulingIgnoredDuringExecution":  "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node.",
 	"preferredDuringSchedulingIgnoredDuringExecution": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred.",
 }
@@ -793,6 +811,15 @@ var map_NodeList = map[string]string{
 
 func (NodeList) SwaggerDoc() map[string]string {
 	return map_NodeList
+}
+
+var map_NodeProxyOptions = map[string]string{
+	"":     "NodeProxyOptions is the query options to a Node's proxy call.",
+	"path": "Path is the URL path to use for the current proxy request to node.",
+}
+
+func (NodeProxyOptions) SwaggerDoc() map[string]string {
+	return map_NodeProxyOptions
 }
 
 var map_NodeSelector = map[string]string{
@@ -886,7 +913,7 @@ var map_ObjectMeta = map[string]string{
 	"selfLink":                   "SelfLink is a URL representing this object. Populated by the system. Read-only.",
 	"uid":                        "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids",
 	"resourceVersion":            "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
-	"generation":                 "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only.",
+	"generation":                 "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.",
 	"creationTimestamp":          "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"deletionTimestamp":          "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"deletionGracePeriodSeconds": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only.",
@@ -1099,7 +1126,7 @@ var map_PodLogOptions = map[string]string{
 	"follow":       "Follow the log stream of the pod. Defaults to false.",
 	"previous":     "Return previous terminated container logs. Defaults to false.",
 	"sinceSeconds": "A relative time in seconds before the current time from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
-	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value preceeds the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
 	"timestamps":   "If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
 	"tailLines":    "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
 	"limitBytes":   "If set, the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
@@ -1237,7 +1264,7 @@ var map_RBDVolumeSource = map[string]string{
 	"":          "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
 	"monitors":  "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"image":     "The rados image name. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd",
+	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd",
 	"pool":      "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it.",
 	"user":      "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
@@ -1324,8 +1351,9 @@ func (ResourceQuotaList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceQuotaSpec = map[string]string{
-	"":     "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
-	"hard": "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
+	"":       "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
+	"hard":   "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
+	"scopes": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
 }
 
 func (ResourceQuotaSpec) SwaggerDoc() map[string]string {
@@ -1404,12 +1432,13 @@ func (SecretVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_SecurityContext = map[string]string{
-	"":               "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
-	"capabilities":   "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.",
-	"privileged":     "Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false.",
-	"seLinuxOptions": "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"runAsUser":      "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"runAsNonRoot":   "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+	"":                       "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
+	"capabilities":           "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.",
+	"privileged":             "Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false.",
+	"seLinuxOptions":         "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+	"runAsUser":              "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+	"runAsNonRoot":           "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+	"readOnlyRootFilesystem": "Whether this container has a read-only root filesystem. Default is false.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
@@ -1468,16 +1497,25 @@ func (ServiceList) SwaggerDoc() map[string]string {
 }
 
 var map_ServicePort = map[string]string{
-	"":           "ServicePort conatins information on service's port.",
+	"":           "ServicePort contains information on service's port.",
 	"name":       "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. This maps to the 'Name' field in EndpointPort objects. Optional if only one ServicePort is defined on this service.",
 	"protocol":   "The IP protocol for this port. Supports \"TCP\" and \"UDP\". Default is TCP.",
 	"port":       "The port that will be exposed by this service.",
-	"targetPort": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of Port is used (an identity map). Defaults to the service port. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service",
+	"targetPort": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service",
 	"nodePort":   "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport",
 }
 
 func (ServicePort) SwaggerDoc() map[string]string {
 	return map_ServicePort
+}
+
+var map_ServiceProxyOptions = map[string]string{
+	"":     "ServiceProxyOptions is the query options to a Service's proxy call.",
+	"path": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+}
+
+func (ServiceProxyOptions) SwaggerDoc() map[string]string {
+	return map_ServiceProxyOptions
 }
 
 var map_ServiceSpec = map[string]string{
@@ -1527,7 +1565,7 @@ var map_VolumeMount = map[string]string{
 	"":          "VolumeMount describes a mounting of a Volume within a container.",
 	"name":      "This must match the Name of a Volume.",
 	"readOnly":  "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
-	"mountPath": "Path within the container at which the volume should be mounted.",
+	"mountPath": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {
@@ -1554,6 +1592,7 @@ var map_VolumeSource = map[string]string{
 	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
 	"fc":          "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 	"azureFile":   "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":   "ConfigMap represents a configMap that should populate this volume",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

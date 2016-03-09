@@ -24,9 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	exp "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -34,7 +34,103 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func TestDeploymentController_reconcileNewRC(t *testing.T) {
+func rs(name string, replicas int, selector map[string]string) *exp.ReplicaSet {
+	return &exp.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: exp.ReplicaSetSpec{
+			Replicas: replicas,
+			Selector: &unversioned.LabelSelector{MatchLabels: selector},
+			Template: &api.PodTemplateSpec{},
+		},
+	}
+}
+
+func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map[string]string) *exp.ReplicaSet {
+	rs := rs(name, specReplicas, selector)
+	rs.Status = exp.ReplicaSetStatus{
+		Replicas: statusReplicas,
+	}
+	return rs
+}
+
+func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString) exp.Deployment {
+	return exp.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: exp.DeploymentSpec{
+			Replicas: replicas,
+			Strategy: exp.DeploymentStrategy{
+				Type: exp.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &exp.RollingUpdateDeployment{
+					MaxSurge:       maxSurge,
+					MaxUnavailable: maxUnavailable,
+				},
+			},
+		},
+	}
+}
+
+var alwaysReady = func() bool { return true }
+
+func newDeployment(replicas int, revisionHistoryLimit *int) *exp.Deployment {
+	d := exp.Deployment{
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		ObjectMeta: api.ObjectMeta{
+			UID:             util.NewUUID(),
+			Name:            "foobar",
+			Namespace:       api.NamespaceDefault,
+			ResourceVersion: "18",
+		},
+		Spec: exp.DeploymentSpec{
+			Strategy: exp.DeploymentStrategy{
+				Type:          exp.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &exp.RollingUpdateDeployment{},
+			},
+			Replicas: replicas,
+			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: revisionHistoryLimit,
+		},
+	}
+	return &d
+}
+
+func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet {
+	return &exp.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: exp.ReplicaSetSpec{
+			Replicas: replicas,
+			Template: &d.Spec.Template,
+		},
+	}
+
+}
+
+func newListOptions() api.ListOptions {
+	return api.ListOptions{}
+}
+
+func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
 		maxSurge            intstr.IntOrString
@@ -87,16 +183,16 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
-		newRc := rc("foo-v2", test.newReplicas, nil)
-		oldRc := rc("foo-v2", test.oldReplicas, nil)
-		allRcs := []*api.ReplicationController{newRc, oldRc}
+		newRS := rs("foo-v2", test.newReplicas, nil)
+		oldRS := rs("foo-v2", test.oldReplicas, nil)
+		allRSs := []*exp.ReplicaSet{newRS, oldRS}
 		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileNewRC(allRcs, newRc, deployment)
+		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, &deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -115,70 +211,71 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 			t.Errorf("expected 1 action during scale, got: %v", fake.Actions())
 			continue
 		}
-		updated := fake.Actions()[0].(testclient.UpdateAction).GetObject().(*api.ReplicationController)
+		updated := fake.Actions()[0].(testclient.UpdateAction).GetObject().(*exp.ReplicaSet)
 		if e, a := test.expectedNewReplicas, updated.Spec.Replicas; e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
 }
 
-func TestDeploymentController_reconcileOldRCs(t *testing.T) {
+func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
 		maxUnavailable      intstr.IntOrString
 		oldReplicas         int
 		newReplicas         int
-		readyPodsFromOldRC  int
-		readyPodsFromNewRC  int
+		readyPodsFromOldRS  int
+		readyPodsFromNewRS  int
 		scaleExpected       bool
 		expectedOldReplicas int
 	}{
 		{
-			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(0),
-			oldReplicas:        10,
-			newReplicas:        0,
-			readyPodsFromOldRC: 10,
-			readyPodsFromNewRC: 0,
-			scaleExpected:      false,
+			deploymentReplicas:  10,
+			maxUnavailable:      intstr.FromInt(0),
+			oldReplicas:         10,
+			newReplicas:         0,
+			readyPodsFromOldRS:  10,
+			readyPodsFromNewRS:  0,
+			scaleExpected:       true,
+			expectedOldReplicas: 9,
 		},
 		{
 			deploymentReplicas:  10,
 			maxUnavailable:      intstr.FromInt(2),
 			oldReplicas:         10,
 			newReplicas:         0,
-			readyPodsFromOldRC:  10,
-			readyPodsFromNewRC:  0,
+			readyPodsFromOldRS:  10,
+			readyPodsFromNewRS:  0,
 			scaleExpected:       true,
 			expectedOldReplicas: 8,
 		},
-		{ // expect unhealthy replicas from old rcs been cleaned up
+		{ // expect unhealthy replicas from old replica sets been cleaned up
 			deploymentReplicas:  10,
 			maxUnavailable:      intstr.FromInt(2),
 			oldReplicas:         10,
 			newReplicas:         0,
-			readyPodsFromOldRC:  8,
-			readyPodsFromNewRC:  0,
+			readyPodsFromOldRS:  8,
+			readyPodsFromNewRS:  0,
 			scaleExpected:       true,
 			expectedOldReplicas: 8,
 		},
-		{ // expect 1 unhealthy replica from old rcs been cleaned up, and 1 ready pod been scaled down
+		{ // expect 1 unhealthy replica from old replica sets been cleaned up, and 1 ready pod been scaled down
 			deploymentReplicas:  10,
 			maxUnavailable:      intstr.FromInt(2),
 			oldReplicas:         10,
 			newReplicas:         0,
-			readyPodsFromOldRC:  9,
-			readyPodsFromNewRC:  0,
+			readyPodsFromOldRS:  9,
+			readyPodsFromNewRS:  0,
 			scaleExpected:       true,
 			expectedOldReplicas: 8,
 		},
-		{ // the unavailable pods from the newRC would not make us scale down old RCs in a further step
+		{ // the unavailable pods from the newRS would not make us scale down old RSs in a further step
 			deploymentReplicas: 10,
 			maxUnavailable:     intstr.FromInt(2),
 			oldReplicas:        8,
 			newReplicas:        2,
-			readyPodsFromOldRC: 8,
-			readyPodsFromNewRC: 0,
+			readyPodsFromOldRS: 8,
+			readyPodsFromNewRS: 0,
 			scaleExpected:      false,
 		},
 	}
@@ -187,10 +284,10 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 
 		newSelector := map[string]string{"foo": "new"}
 		oldSelector := map[string]string{"foo": "old"}
-		newRc := rc("foo-new", test.newReplicas, newSelector)
-		oldRc := rc("foo-old", test.oldReplicas, oldSelector)
-		oldRCs := []*api.ReplicationController{oldRc}
-		allRCs := []*api.ReplicationController{oldRc, newRc}
+		newRS := rs("foo-new", test.newReplicas, newSelector)
+		oldRS := rs("foo-old", test.oldReplicas, oldSelector)
+		oldRSs := []*exp.ReplicaSet{oldRS}
+		allRSs := []*exp.ReplicaSet{oldRS, newRS}
 
 		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
 		fakeClientset := fake.Clientset{}
@@ -198,10 +295,10 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 			switch action.(type) {
 			case core.ListAction:
 				podList := &api.PodList{}
-				for podIndex := 0; podIndex < test.readyPodsFromOldRC; podIndex++ {
+				for podIndex := 0; podIndex < test.readyPodsFromOldRS; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-oldReadyPod-%d", oldRc.Name, podIndex),
+							Name:   fmt.Sprintf("%s-oldReadyPod-%d", oldRS.Name, podIndex),
 							Labels: oldSelector,
 						},
 						Status: api.PodStatus{
@@ -214,10 +311,10 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 						},
 					})
 				}
-				for podIndex := 0; podIndex < test.oldReplicas-test.readyPodsFromOldRC; podIndex++ {
+				for podIndex := 0; podIndex < test.oldReplicas-test.readyPodsFromOldRS; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-oldUnhealthyPod-%d", oldRc.Name, podIndex),
+							Name:   fmt.Sprintf("%s-oldUnhealthyPod-%d", oldRS.Name, podIndex),
 							Labels: oldSelector,
 						},
 						Status: api.PodStatus{
@@ -230,10 +327,10 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 						},
 					})
 				}
-				for podIndex := 0; podIndex < test.readyPodsFromNewRC; podIndex++ {
+				for podIndex := 0; podIndex < test.readyPodsFromNewRS; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-newReadyPod-%d", oldRc.Name, podIndex),
+							Name:   fmt.Sprintf("%s-newReadyPod-%d", oldRS.Name, podIndex),
 							Labels: newSelector,
 						},
 						Status: api.PodStatus{
@@ -246,10 +343,10 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 						},
 					})
 				}
-				for podIndex := 0; podIndex < test.oldReplicas-test.readyPodsFromOldRC; podIndex++ {
+				for podIndex := 0; podIndex < test.oldReplicas-test.readyPodsFromOldRS; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-newUnhealthyPod-%d", oldRc.Name, podIndex),
+							Name:   fmt.Sprintf("%s-newUnhealthyPod-%d", oldRS.Name, podIndex),
 							Labels: newSelector,
 						},
 						Status: api.PodStatus{
@@ -271,7 +368,7 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 			eventRecorder: &record.FakeRecorder{},
 		}
 
-		scaled, err := controller.reconcileOldRCs(allRCs, oldRCs, newRc, deployment, false)
+		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, &deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -327,8 +424,8 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
-		oldRc := rc("foo-v2", test.oldReplicas, nil)
-		oldRCs := []*api.ReplicationController{oldRc}
+		oldRS := rs("foo-v2", test.oldReplicas, nil)
+		oldRSs := []*exp.ReplicaSet{oldRS}
 		deployment := deployment("foo", 10, intstr.FromInt(2), intstr.FromInt(2))
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -338,7 +435,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 				for podIndex := 0; podIndex < test.readyPods; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name: fmt.Sprintf("%s-readyPod-%d", oldRc.Name, podIndex),
+							Name: fmt.Sprintf("%s-readyPod-%d", oldRS.Name, podIndex),
 						},
 						Status: api.PodStatus{
 							Conditions: []api.PodCondition{
@@ -353,7 +450,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 				for podIndex := 0; podIndex < test.unHealthyPods; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name: fmt.Sprintf("%s-unHealthyPod-%d", oldRc.Name, podIndex),
+							Name: fmt.Sprintf("%s-unHealthyPod-%d", oldRS.Name, podIndex),
 						},
 						Status: api.PodStatus{
 							Conditions: []api.PodCondition{
@@ -374,7 +471,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRCs, deployment, test.maxCleanupCount)
+		cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, &deployment, test.maxCleanupCount)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -386,7 +483,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 	}
 }
 
-func TestDeploymentController_scaleDownOldRCsForRollingUpdate(t *testing.T) {
+func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
 		maxUnavailable      intstr.IntOrString
@@ -396,11 +493,12 @@ func TestDeploymentController_scaleDownOldRCsForRollingUpdate(t *testing.T) {
 		expectedOldReplicas int
 	}{
 		{
-			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(0),
-			readyPods:          10,
-			oldReplicas:        10,
-			scaleExpected:      false,
+			deploymentReplicas:  10,
+			maxUnavailable:      intstr.FromInt(0),
+			readyPods:           10,
+			oldReplicas:         10,
+			scaleExpected:       true,
+			expectedOldReplicas: 9,
 		},
 		{
 			deploymentReplicas:  10,
@@ -428,9 +526,9 @@ func TestDeploymentController_scaleDownOldRCsForRollingUpdate(t *testing.T) {
 
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
-		oldRc := rc("foo-v2", test.oldReplicas, nil)
-		allRcs := []*api.ReplicationController{oldRc}
-		oldRcs := []*api.ReplicationController{oldRc}
+		oldRS := rs("foo-v2", test.oldReplicas, nil)
+		allRSs := []*exp.ReplicaSet{oldRS}
+		oldRSs := []*exp.ReplicaSet{oldRS}
 		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -440,7 +538,8 @@ func TestDeploymentController_scaleDownOldRCsForRollingUpdate(t *testing.T) {
 				for podIndex := 0; podIndex < test.readyPods; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name: fmt.Sprintf("%s-pod-%d", oldRc.Name, podIndex),
+							Name:   fmt.Sprintf("%s-pod-%d", oldRS.Name, podIndex),
+							Labels: map[string]string{"foo": "bar"},
 						},
 						Status: api.PodStatus{
 							Conditions: []api.PodCondition{
@@ -460,7 +559,7 @@ func TestDeploymentController_scaleDownOldRCsForRollingUpdate(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDownOldRCsForRollingUpdate(allRcs, oldRcs, deployment)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, &deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -492,42 +591,54 @@ func TestDeploymentController_scaleDownOldRCsForRollingUpdate(t *testing.T) {
 			t.Errorf("expected an update action")
 			continue
 		}
-		updated := updateAction.GetObject().(*api.ReplicationController)
+		updated := updateAction.GetObject().(*exp.ReplicaSet)
 		if e, a := test.expectedOldReplicas, updated.Spec.Replicas; e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
 }
 
-func TestDeploymentController_cleanupOldRCs(t *testing.T) {
+func TestDeploymentController_cleanupOldReplicaSets(t *testing.T) {
 	selector := map[string]string{"foo": "bar"}
 
 	tests := []struct {
-		oldRCs               []*api.ReplicationController
+		oldRSs               []*exp.ReplicaSet
 		revisionHistoryLimit int
 		expectedDeletions    int
 	}{
 		{
-			oldRCs: []*api.ReplicationController{
-				rc("foo-1", 0, selector),
-				rc("foo-2", 0, selector),
-				rc("foo-3", 0, selector),
+			oldRSs: []*exp.ReplicaSet{
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithStatus("foo-2", 0, 0, selector),
+				newRSWithStatus("foo-3", 0, 0, selector),
 			},
 			revisionHistoryLimit: 1,
 			expectedDeletions:    2,
 		},
 		{
-			oldRCs: []*api.ReplicationController{
-				rc("foo-1", 0, selector),
-				rc("foo-2", 0, selector),
+			// Only delete the replica set with Spec.Replicas = Status.Replicas = 0.
+			oldRSs: []*exp.ReplicaSet{
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithStatus("foo-2", 0, 1, selector),
+				newRSWithStatus("foo-3", 1, 0, selector),
+				newRSWithStatus("foo-4", 1, 1, selector),
+			},
+			revisionHistoryLimit: 0,
+			expectedDeletions:    1,
+		},
+
+		{
+			oldRSs: []*exp.ReplicaSet{
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithStatus("foo-2", 0, 0, selector),
 			},
 			revisionHistoryLimit: 0,
 			expectedDeletions:    2,
 		},
 		{
-			oldRCs: []*api.ReplicationController{
-				rc("foo-1", 1, selector),
-				rc("foo-2", 1, selector),
+			oldRSs: []*exp.ReplicaSet{
+				newRSWithStatus("foo-1", 1, 1, selector),
+				newRSWithStatus("foo-2", 1, 1, selector),
 			},
 			revisionHistoryLimit: 0,
 			expectedDeletions:    0,
@@ -539,14 +650,14 @@ func TestDeploymentController_cleanupOldRCs(t *testing.T) {
 		controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
 
 		controller.eventRecorder = &record.FakeRecorder{}
-		controller.rcStoreSynced = alwaysReady
+		controller.rsStoreSynced = alwaysReady
 		controller.podStoreSynced = alwaysReady
-		for _, rc := range test.oldRCs {
-			controller.rcStore.Add(rc)
+		for _, rs := range test.oldRSs {
+			controller.rsStore.Add(rs)
 		}
 
 		d := newDeployment(1, &tests[i].revisionHistoryLimit)
-		controller.cleanupOldRcs(test.oldRCs, *d)
+		controller.cleanupOldReplicaSets(test.oldRSs, d)
 
 		gotDeletions := 0
 		for _, action := range fake.Actions() {
@@ -555,80 +666,10 @@ func TestDeploymentController_cleanupOldRCs(t *testing.T) {
 			}
 		}
 		if gotDeletions != test.expectedDeletions {
-			t.Errorf("expect %v old rcs been deleted, but got %v", test.expectedDeletions, gotDeletions)
+			t.Errorf("expect %v old replica sets been deleted, but got %v", test.expectedDeletions, gotDeletions)
 			continue
 		}
 	}
-}
-
-func rc(name string, replicas int, selector map[string]string) *api.ReplicationController {
-	return &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
-			Selector: selector,
-			Template: &api.PodTemplateSpec{},
-		},
-	}
-}
-
-func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString) exp.Deployment {
-	return exp.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-		},
-		Spec: exp.DeploymentSpec{
-			Replicas: replicas,
-			Strategy: exp.DeploymentStrategy{
-				Type: exp.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &exp.RollingUpdateDeployment{
-					MaxSurge:       maxSurge,
-					MaxUnavailable: maxUnavailable,
-				},
-			},
-		},
-	}
-}
-
-var alwaysReady = func() bool { return true }
-
-func newDeployment(replicas int, revisionHistoryLimit *int) *exp.Deployment {
-	d := exp.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
-		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
-			Name:            "foobar",
-			Namespace:       api.NamespaceDefault,
-			ResourceVersion: "18",
-		},
-		Spec: exp.DeploymentSpec{
-			Strategy: exp.DeploymentStrategy{
-				Type:          exp.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &exp.RollingUpdateDeployment{},
-			},
-			Replicas: replicas,
-			Selector: map[string]string{"foo": "bar"},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{
-						"name": "foo",
-						"type": "production",
-					},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Image: "foo/bar",
-						},
-					},
-				},
-			},
-			RevisionHistoryLimit: revisionHistoryLimit,
-		},
-	}
-	return &d
 }
 
 func getKey(d *exp.Deployment, t *testing.T) string {
@@ -640,31 +681,13 @@ func getKey(d *exp.Deployment, t *testing.T) string {
 	}
 }
 
-func newReplicationController(d *exp.Deployment, name string, replicas int) *api.ReplicationController {
-	return &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: api.NamespaceDefault,
-		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
-			Template: &d.Spec.Template,
-		},
-	}
-
-}
-
-func newListOptions() api.ListOptions {
-	return api.ListOptions{}
-}
-
 type fixture struct {
 	t *testing.T
 
 	client *fake.Clientset
 	// Objects to put in the store.
 	dStore   []*exp.Deployment
-	rcStore  []*api.ReplicationController
+	rsStore  []*exp.ReplicaSet
 	podStore []*api.Pod
 
 	// Actions expected to happen on the client. Objects from here are also
@@ -678,14 +701,14 @@ func (f *fixture) expectUpdateDeploymentAction(d *exp.Deployment) {
 	f.objects.Items = append(f.objects.Items, d)
 }
 
-func (f *fixture) expectCreateRCAction(rc *api.ReplicationController) {
-	f.actions = append(f.actions, core.NewCreateAction("replicationcontrollers", rc.Namespace, rc))
-	f.objects.Items = append(f.objects.Items, rc)
+func (f *fixture) expectCreateRSAction(rs *exp.ReplicaSet) {
+	f.actions = append(f.actions, core.NewCreateAction("replicasets", rs.Namespace, rs))
+	f.objects.Items = append(f.objects.Items, rs)
 }
 
-func (f *fixture) expectUpdateRCAction(rc *api.ReplicationController) {
-	f.actions = append(f.actions, core.NewUpdateAction("replicationcontrollers", rc.Namespace, rc))
-	f.objects.Items = append(f.objects.Items, rc)
+func (f *fixture) expectUpdateRSAction(rs *exp.ReplicaSet) {
+	f.actions = append(f.actions, core.NewUpdateAction("replicasets", rs.Namespace, rs))
+	f.objects.Items = append(f.objects.Items, rs)
 }
 
 func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
@@ -703,13 +726,13 @@ func (f *fixture) run(deploymentName string) {
 	f.client = fake.NewSimpleClientset(f.objects)
 	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
 	c.eventRecorder = &record.FakeRecorder{}
-	c.rcStoreSynced = alwaysReady
+	c.rsStoreSynced = alwaysReady
 	c.podStoreSynced = alwaysReady
 	for _, d := range f.dStore {
 		c.dStore.Store.Add(d)
 	}
-	for _, rc := range f.rcStore {
-		c.rcStore.Store.Add(rc)
+	for _, rs := range f.rsStore {
+		c.rsStore.Store.Add(rs)
 	}
 	for _, pod := range f.podStore {
 		c.podStore.Store.Add(pod)
@@ -739,22 +762,22 @@ func (f *fixture) run(deploymentName string) {
 	}
 }
 
-func TestSyncDeploymentCreatesRC(t *testing.T) {
+func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f := newFixture(t)
 
 	d := newDeployment(1, nil)
 	f.dStore = append(f.dStore, d)
 
-	// expect that one rc with zero replicas is created
+	// expect that one ReplicaSet with zero replicas is created
 	// then is updated to 1 replica
-	rc := newReplicationController(d, "deploymentrc-4186632231", 0)
-	updatedRC := newReplicationController(d, "deploymentrc-4186632231", 1)
+	rs := newReplicaSet(d, "deploymentrs-4186632231", 0)
+	updatedRS := newReplicaSet(d, "deploymentrs-4186632231", 1)
 	opt := newListOptions()
 
-	f.expectCreateRCAction(rc)
+	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentAction(d)
-	f.expectUpdateRCAction(updatedRC)
-	f.expectListPodAction(rc.Namespace, opt)
+	f.expectUpdateRSAction(updatedRS)
+	f.expectListPodAction(rs.Namespace, opt)
 	f.expectUpdateDeploymentAction(d)
 
 	f.run(getKey(d, t))

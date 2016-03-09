@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("ReplicaSet", func() {
-	framework := NewFramework("replicaset")
+	framework := NewDefaultFramework("replicaset")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
 		ReplicaSetServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
@@ -94,6 +94,7 @@ func ReplicaSetServeImageOrFail(f *Framework, test string, image string) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 
 	pods, err := podsCreated(f.Client, f.Namespace.Name, name, replicas)
+	Expect(err).NotTo(HaveOccurred())
 
 	By("Ensuring each pod is running")
 

@@ -23,8 +23,10 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
+// These tests exercise the Kubernetes expansion syntax $(VAR).
+// For more information, see: docs/design/expansion.md
 var _ = Describe("Variable Expansion", func() {
-	framework := NewFramework("var-expansion")
+	framework := NewDefaultFramework("var-expansion")
 
 	It("should allow composing env vars into new env vars [Conformance]", func() {
 		podName := "var-expansion-" + string(util.NewUUID())

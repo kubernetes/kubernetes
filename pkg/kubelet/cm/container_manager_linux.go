@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -66,7 +69,7 @@ type systemContainer struct {
 	manager *fs.Manager
 }
 
-func newSystemContainer(containerName string) *systemContainer {
+func newSystemCgroups(containerName string) *systemContainer {
 	return &systemContainer{
 		name:    containerName,
 		manager: createManager(containerName),
@@ -74,26 +77,39 @@ func newSystemContainer(containerName string) *systemContainer {
 }
 
 type containerManagerImpl struct {
+	sync.RWMutex
 	cadvisorInterface cadvisor.Interface
 	mountUtil         mount.Interface
 	NodeConfig
+	status Status
 	// External containers being managed.
 	systemContainers []*systemContainer
+	periodicTasks    []func()
+}
+
+type features struct {
+	cpuHardcapping bool
 }
 
 var _ ContainerManager = &containerManagerImpl{}
 
 // checks if the required cgroups subsystems are mounted.
 // As of now, only 'cpu' and 'memory' are required.
-func validateSystemRequirements(mountUtil mount.Interface) error {
+// cpu quota is a soft requirement.
+func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	const (
 		cgroupMountType = "cgroup"
 		localErr        = "system validation failed"
 	)
+	var (
+		cpuMountPoint string
+		f             features
+	)
 	mountPoints, err := mountUtil.List()
 	if err != nil {
-		return fmt.Errorf("%s - %v", localErr, err)
+		return f, fmt.Errorf("%s - %v", localErr, err)
 	}
+
 	expectedCgroups := sets.NewString("cpu", "cpuacct", "cpuset", "memory")
 	for _, mountPoint := range mountPoints {
 		if mountPoint.Type == cgroupMountType {
@@ -101,24 +117,41 @@ func validateSystemRequirements(mountUtil mount.Interface) error {
 				if expectedCgroups.Has(opt) {
 					expectedCgroups.Delete(opt)
 				}
+				if opt == "cpu" {
+					cpuMountPoint = mountPoint.Path
+				}
 			}
 		}
 	}
 
 	if expectedCgroups.Len() > 0 {
-		return fmt.Errorf("%s - Following Cgroup subsystem not mounted: %v", localErr, expectedCgroups.List())
+		return f, fmt.Errorf("%s - Following Cgroup subsystem not mounted: %v", localErr, expectedCgroups.List())
 	}
-	return nil
+
+	// Check if cpu quota is available.
+	// CPU cgroup is required and so it expected to be mounted at this point.
+	periodExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
+	if err != nil {
+		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
+	}
+	quotaExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
+	if err != nil {
+		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
+	}
+	if quotaExists && periodExists {
+		f.cpuHardcapping = true
+	}
+	return f, nil
 }
 
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
 		mountUtil:         mountUtil,
-		NodeConfig:        NodeConfig{},
+		NodeConfig:        nodeConfig,
 	}, nil
 }
 
@@ -182,80 +215,143 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 }
 
 func (cm *containerManagerImpl) setupNode() error {
-	if err := validateSystemRequirements(cm.mountUtil); err != nil {
+	f, err := validateSystemRequirements(cm.mountUtil)
+	if err != nil {
 		return err
 	}
-
+	if !f.cpuHardcapping {
+		cm.status.SoftRequirements = fmt.Errorf("CPU hardcapping unsupported")
+	}
 	// TODO: plumb kernel tunable options into container manager, right now, we modify by default
 	if err := setupKernelTunables(KernelTunableModify); err != nil {
 		return err
 	}
 
 	systemContainers := []*systemContainer{}
-	if cm.DockerDaemonContainerName != "" {
-		cont := newSystemContainer(cm.DockerDaemonContainerName)
+	if cm.ContainerRuntime == "docker" {
+		if cm.RuntimeCgroupsName != "" {
+			cont := newSystemCgroups(cm.RuntimeCgroupsName)
+			info, err := cm.cadvisorInterface.MachineInfo()
+			var capacity = api.ResourceList{}
+			if err != nil {
+			} else {
+				capacity = cadvisor.CapacityFromMachineInfo(info)
+			}
+			memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
+			if memoryLimit < MinDockerMemoryLimit {
+				glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.RuntimeCgroupsName, MinDockerMemoryLimit)
+				memoryLimit = MinDockerMemoryLimit
+			}
 
-		info, err := cm.cadvisorInterface.MachineInfo()
-		var capacity = api.ResourceList{}
-		if err != nil {
-		} else {
-			capacity = cadvisor.CapacityFromMachineInfo(info)
-		}
-		memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
-		if memoryLimit < MinDockerMemoryLimit {
-			glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.DockerDaemonContainerName, MinDockerMemoryLimit)
-			memoryLimit = MinDockerMemoryLimit
-		}
+			glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.RuntimeCgroupsName, memoryLimit)
 
-		glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.DockerDaemonContainerName, memoryLimit)
-
-		dockerContainer := &fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Parent: "/",
-				Name:   cm.DockerDaemonContainerName,
-				Resources: &configs.Resources{
-					Memory:          memoryLimit,
-					MemorySwap:      -1,
-					AllowAllDevices: true,
+			dockerContainer := &fs.Manager{
+				Cgroups: &configs.Cgroup{
+					Parent: "/",
+					Name:   cm.RuntimeCgroupsName,
+					Resources: &configs.Resources{
+						Memory:          memoryLimit,
+						MemorySwap:      -1,
+						AllowAllDevices: true,
+					},
 				},
-			},
+			}
+			cont.ensureStateFunc = func(manager *fs.Manager) error {
+				return ensureDockerInContainer(cm.cadvisorInterface, -900, dockerContainer)
+			}
+			systemContainers = append(systemContainers, cont)
+		} else {
+			cm.periodicTasks = append(cm.periodicTasks, func() {
+				cont, err := getContainerNameForProcess("docker")
+				if err != nil {
+					glog.Error(err)
+					return
+				}
+				cm.Lock()
+				defer cm.Unlock()
+				cm.RuntimeCgroupsName = cont
+			})
 		}
-		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureDockerInContainer(cm.cadvisorInterface, -900, dockerContainer)
-		}
-		systemContainers = append(systemContainers, cont)
 	}
 
-	if cm.SystemContainerName != "" {
-		if cm.SystemContainerName == "/" {
+	if cm.SystemCgroupsName != "" {
+		if cm.SystemCgroupsName == "/" {
 			return fmt.Errorf("system container cannot be root (\"/\")")
 		}
-
+		cont := newSystemCgroups(cm.SystemCgroupsName)
 		rootContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Parent: "/",
 				Name:   "/",
 			},
 		}
-		manager := createManager(cm.SystemContainerName)
-
-		err := ensureSystemContainer(rootContainer, manager)
-		if err != nil {
-			return err
+		cont.ensureStateFunc = func(manager *fs.Manager) error {
+			return ensureSystemCgroups(rootContainer, manager)
 		}
-		systemContainers = append(systemContainers, newSystemContainer(cm.SystemContainerName))
+		systemContainers = append(systemContainers, cont)
 	}
 
-	if cm.KubeletContainerName != "" {
-		systemContainers = append(systemContainers, newSystemContainer(cm.KubeletContainerName))
+	if cm.KubeletCgroupsName != "" {
+		cont := newSystemCgroups(cm.KubeletCgroupsName)
+		manager := fs.Manager{
+			Cgroups: &configs.Cgroup{
+				Parent: "/",
+				Name:   cm.KubeletCgroupsName,
+				Resources: &configs.Resources{
+					AllowAllDevices: true,
+				},
+			},
+		}
+		cont.ensureStateFunc = func(_ *fs.Manager) error {
+			return manager.Apply(os.Getpid())
+		}
+		systemContainers = append(systemContainers, cont)
+	} else {
+		cm.periodicTasks = append(cm.periodicTasks, func() {
+			cont, err := getContainer(os.Getpid())
+			if err != nil {
+				glog.Error("failed to find cgroups of kubelet - %v", err)
+				return
+			}
+			cm.Lock()
+			defer cm.Unlock()
+
+			cm.KubeletCgroupsName = cont
+		})
 	}
+
 	cm.systemContainers = systemContainers
 	return nil
 }
 
-func (cm *containerManagerImpl) Start(nodeConfig NodeConfig) error {
-	cm.NodeConfig = nodeConfig
+func getContainerNameForProcess(name string) (string, error) {
+	pids, err := getPidsForProcess(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to detect process id for %q - %v", name, err)
+	}
+	if len(pids) == 0 {
+		return "", nil
+	}
+	cont, err := getContainer(pids[0])
+	if err != nil {
+		return "", err
+	}
+	return cont, nil
+}
 
+func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.NodeConfig
+}
+
+func (cm *containerManagerImpl) Status() Status {
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.status
+}
+
+func (cm *containerManagerImpl) Start() error {
 	// Setup the node
 	if err := cm.setupNode(); err != nil {
 		return err
@@ -267,25 +363,34 @@ func (cm *containerManagerImpl) Start(nodeConfig NodeConfig) error {
 			numEnsureStateFuncs++
 		}
 	}
-	if numEnsureStateFuncs == 0 {
-		return nil
+	if numEnsureStateFuncs >= 0 {
+		go wait.Until(func() {
+			for _, cont := range cm.systemContainers {
+				if cont.ensureStateFunc != nil {
+					if err := cont.ensureStateFunc(cont.manager); err != nil {
+						glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+					}
+				}
+			}
+		}, time.Minute, wait.NeverStop)
+
 	}
 
 	// Run ensure state functions every minute.
-	go wait.Until(func() {
-		for _, cont := range cm.systemContainers {
-			if cont.ensureStateFunc != nil {
-				if err := cont.ensureStateFunc(cont.manager); err != nil {
-					glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+	if len(cm.periodicTasks) > 0 {
+		go wait.Until(func() {
+			for _, task := range cm.periodicTasks {
+				if task != nil {
+					task()
 				}
 			}
-		}
-	}, time.Minute, wait.NeverStop)
+		}, 5*time.Minute, wait.NeverStop)
+	}
 
 	return nil
 }
 
-func (cm *containerManagerImpl) SystemContainersLimit() api.ResourceList {
+func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
 	cpuLimit := int64(0)
 
 	// Sum up resources of all external containers.
@@ -313,16 +418,13 @@ func isProcessRunningInHost(pid int) (bool, error) {
 	return initMntNs == processMntNs, nil
 }
 
-// Ensures that the Docker daemon is in the desired container.
-func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manager *fs.Manager) error {
-	// What container is Docker in?
-	out, err := exec.Command("pidof", "docker").Output()
+func getPidsForProcess(name string) ([]int, error) {
+	out, err := exec.Command("pidof", name).Output()
 	if err != nil {
-		return fmt.Errorf("failed to find pid of Docker container: %v", err)
+		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
 	}
 
 	// The output of pidof is a list of pids.
-	// Docker may be forking and thus there would be more than one result.
 	pids := []int{}
 	for _, pidStr := range strings.Split(strings.TrimSpace(string(out)), " ") {
 		pid, err := strconv.Atoi(pidStr)
@@ -331,7 +433,15 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 		}
 		pids = append(pids, pid)
 	}
+	return pids, nil
+}
 
+// Ensures that the Docker daemon is in the desired container.
+func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manager *fs.Manager) error {
+	pids, err := getPidsForProcess("docker")
+	if err != nil {
+		return err
+	}
 	// Move if the pid is not already in the desired container.
 	errs := []error{}
 	for _, pid := range pids {
@@ -387,7 +497,7 @@ func getContainer(pid int) (string, error) {
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
 //
-func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error {
+func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
 	var errs []error

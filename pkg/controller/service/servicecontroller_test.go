@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/types"
 )

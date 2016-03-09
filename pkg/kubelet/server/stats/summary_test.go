@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	kubestats "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
@@ -44,13 +46,18 @@ const (
 	offsetNetTxErrors
 )
 
+var (
+	timestamp    = time.Now()
+	creationTime = timestamp.Add(-5 * time.Minute)
+)
+
 func TestBuildSummary(t *testing.T) {
 	node := api.Node{}
 	node.Name = "FooNode"
 	nodeConfig := cm.NodeConfig{
-		DockerDaemonContainerName: "/docker-daemon",
-		SystemContainerName:       "/system",
-		KubeletContainerName:      "/kubelet",
+		RuntimeCgroupsName: "/docker-daemon",
+		SystemCgroupsName:  "/system",
+		KubeletCgroupsName: "/kubelet",
 	}
 	const (
 		namespace0 = "test0"
@@ -81,9 +88,9 @@ func TestBuildSummary(t *testing.T) {
 		cName20 = "c1" // ensure cName20 conflicts with cName01, but is in a different pod + namespace
 	)
 
-	prf0 := PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
-	prf1 := PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
-	prf2 := PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
+	prf0 := kubestats.PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
+	prf1 := kubestats.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
+	prf2 := kubestats.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
 	infos := map[string]v2.ContainerInfo{
 		"/":              summaryTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": summaryTestContainerInfo(seedRuntime, "", "", ""),
@@ -111,14 +118,15 @@ func TestBuildSummary(t *testing.T) {
 	assert.NoError(t, err)
 	nodeStats := summary.Node
 	assert.Equal(t, "FooNode", nodeStats.NodeName)
+	assert.EqualValues(t, testTime(creationTime, seedRoot).Unix(), nodeStats.StartTime.Time.Unix())
 	checkCPUStats(t, "Node", seedRoot, nodeStats.CPU)
 	checkMemoryStats(t, "Node", seedRoot, nodeStats.Memory)
 	checkNetworkStats(t, "Node", seedRoot, nodeStats.Network)
 
 	systemSeeds := map[string]int{
-		SystemContainerRuntime: seedRuntime,
-		SystemContainerKubelet: seedKubelet,
-		SystemContainerMisc:    seedMisc,
+		kubestats.SystemContainerRuntime: seedRuntime,
+		kubestats.SystemContainerKubelet: seedKubelet,
+		kubestats.SystemContainerMisc:    seedMisc,
 	}
 	for _, sys := range nodeStats.SystemContainers {
 		name := sys.Name
@@ -126,12 +134,13 @@ func TestBuildSummary(t *testing.T) {
 		if !found {
 			t.Errorf("Unknown SystemContainer: %q", name)
 		}
+		assert.EqualValues(t, testTime(creationTime, seed).Unix(), sys.StartTime.Time.Unix(), name+".StartTime")
 		checkCPUStats(t, name, seed, sys.CPU)
 		checkMemoryStats(t, name, seed, sys.Memory)
 	}
 
 	assert.Equal(t, 3, len(summary.Pods))
-	indexPods := make(map[PodReference]PodStats, len(summary.Pods))
+	indexPods := make(map[kubestats.PodReference]kubestats.PodStats, len(summary.Pods))
 	for _, pod := range summary.Pods {
 		indexPods[pod.PodRef] = pod
 	}
@@ -140,18 +149,21 @@ func TestBuildSummary(t *testing.T) {
 	ps, found := indexPods[prf0]
 	assert.True(t, found)
 	assert.Len(t, ps.Containers, 2)
-	indexCon := make(map[string]ContainerStats, len(ps.Containers))
+	indexCon := make(map[string]kubestats.ContainerStats, len(ps.Containers))
 	for _, con := range ps.Containers {
 		indexCon[con.Name] = con
 	}
 	con := indexCon[cName00]
+	assert.EqualValues(t, testTime(creationTime, seedPod0Container0).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "container", seedPod0Container0, con.CPU)
 	checkMemoryStats(t, "container", seedPod0Container0, con.Memory)
 
 	con = indexCon[cName01]
+	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "container", seedPod0Container1, con.CPU)
 	checkMemoryStats(t, "container", seedPod0Container1, con.Memory)
 
+	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod", seedPod0Infra, ps.Network)
 
 	// Validate Pod1 Results
@@ -231,6 +243,7 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 		}
 	}
 	spec := v2.ContainerSpec{
+		CreationTime:  testTime(creationTime, seed),
 		HasCpu:        true,
 		HasMemory:     true,
 		HasNetwork:    true,
@@ -239,8 +252,9 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 	}
 
 	stats := v2.ContainerStats{
-		Cpu:     &v1.CpuStats{},
-		CpuInst: &v2.CpuInstStats{},
+		Timestamp: testTime(timestamp, seed),
+		Cpu:       &v1.CpuStats{},
+		CpuInst:   &v2.CpuInstStats{},
 		Memory: &v1.MemoryStats{
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
@@ -251,10 +265,17 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 		},
 		Network: &v2.NetworkStats{
 			Interfaces: []v1.InterfaceStats{{
+				Name:     "eth0",
 				RxBytes:  uint64(seed + offsetNetRxBytes),
 				RxErrors: uint64(seed + offsetNetRxErrors),
 				TxBytes:  uint64(seed + offsetNetTxBytes),
 				TxErrors: uint64(seed + offsetNetTxErrors),
+			}, {
+				Name:     "cbr0",
+				RxBytes:  100,
+				RxErrors: 100,
+				TxBytes:  100,
+				TxErrors: 100,
 			}},
 		},
 		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
@@ -267,19 +288,26 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 	}
 }
 
-func checkNetworkStats(t *testing.T, label string, seed int, stats *NetworkStats) {
+func testTime(base time.Time, seed int) time.Time {
+	return base.Add(time.Duration(seed) * time.Second)
+}
+
+func checkNetworkStats(t *testing.T, label string, seed int, stats *kubestats.NetworkStats) {
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.TxBytes, label+".Net.TxBytes")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
 }
 
-func checkCPUStats(t *testing.T, label string, seed int, stats *CPUStats) {
+func checkCPUStats(t *testing.T, label string, seed int, stats *kubestats.CPUStats) {
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
 	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
 	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
 }
 
-func checkMemoryStats(t *testing.T, label string, seed int, stats *MemoryStats) {
+func checkMemoryStats(t *testing.T, label string, seed int, stats *kubestats.MemoryStats) {
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
 	assert.EqualValues(t, seed+offsetMemUsageBytes, *stats.UsageBytes, label+".Mem.UsageBytes")
 	assert.EqualValues(t, seed+offsetMemWorkingSetBytes, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
 	assert.EqualValues(t, seed+offsetMemPageFaults, *stats.PageFaults, label+".Mem.PageFaults")
@@ -301,24 +329,26 @@ func TestCustomMetrics(t *testing.T) {
 			Units:  "count",
 		},
 	}
+	timestamp1 := time.Now()
+	timestamp2 := time.Now().Add(time.Minute)
 	metrics := map[string][]v1.MetricVal{
 		"qos": {
 			{
-				Timestamp: time.Now(),
+				Timestamp: timestamp1,
 				IntValue:  10,
 			},
 			{
-				Timestamp: time.Now().Add(time.Minute),
+				Timestamp: timestamp2,
 				IntValue:  100,
 			},
 		},
 		"cpuLoad": {
 			{
-				Timestamp:  time.Now(),
+				Timestamp:  timestamp1,
 				FloatValue: 1.2,
 			},
 			{
-				Timestamp:  time.Now().Add(time.Minute),
+				Timestamp:  timestamp2,
 				FloatValue: 2.1,
 			},
 		},
@@ -335,20 +365,22 @@ func TestCustomMetrics(t *testing.T) {
 	}
 	sb := &summaryBuilder{}
 	assert.Contains(t, sb.containerInfoV2ToUserDefinedMetrics(&cInfo),
-		UserDefinedMetric{
-			UserDefinedMetricDescriptor: UserDefinedMetricDescriptor{
+		kubestats.UserDefinedMetric{
+			UserDefinedMetricDescriptor: kubestats.UserDefinedMetricDescriptor{
 				Name:  "qos",
-				Type:  MetricGauge,
+				Type:  kubestats.MetricGauge,
 				Units: "per second",
 			},
+			Time:  unversioned.NewTime(timestamp2),
 			Value: 100,
 		},
-		UserDefinedMetric{
-			UserDefinedMetricDescriptor: UserDefinedMetricDescriptor{
+		kubestats.UserDefinedMetric{
+			UserDefinedMetricDescriptor: kubestats.UserDefinedMetricDescriptor{
 				Name:  "cpuLoad",
-				Type:  MetricCumulative,
+				Type:  kubestats.MetricCumulative,
 				Units: "count",
 			},
+			Time:  unversioned.NewTime(timestamp2),
 			Value: 2.1,
 		})
 }

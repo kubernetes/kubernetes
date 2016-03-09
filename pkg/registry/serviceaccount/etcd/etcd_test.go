@@ -30,7 +30,8 @@ import (
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	return NewREST(etcdStorage, generic.UndecoratedStorage), server
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	return NewREST(restOptions), server
 }
 
 func validNewServiceAccount(name string) *api.ServiceAccount {
@@ -70,7 +71,7 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ServiceAccount)
-			// TODO: Update this serviceAccount
+			object.Secrets = []api.ObjectReference{{}}
 			return object
 		},
 	)

@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package taskreconciler implement Mesos task reconcilation.
+// Package taskreconciler implement Mesos task reconciliation.
 package taskreconciler

@@ -37,6 +37,16 @@ func TestFakeClock(t *testing.T) {
 	}
 }
 
+func TestFakeClockSleep(t *testing.T) {
+	startTime := time.Now()
+	tc := NewFakeClock(startTime)
+	tc.Sleep(time.Duration(1) * time.Hour)
+	now := tc.Now()
+	if now.Sub(startTime) != time.Hour {
+		t.Errorf("Fake sleep failed, expected time to advance by one hour, instead, its %v", now.Sub(startTime))
+	}
+}
+
 func TestFakeAfter(t *testing.T) {
 	tc := NewFakeClock(time.Now())
 	if tc.HasWaiters() {

@@ -20,12 +20,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: ${0} <version>"
+if [[ "$#" -lt 1 ]]; then
+  echo "Usage: ${0} <version> [<type>]"
+  echo "(<type> defaults to 'latest')"
   exit 1
 fi
 
 KUBE_RELEASE_VERSION="${1-}"
+KUBE_RELEASE_TYPE="${2:-"latest"}"
 
 KUBE_GCS_NO_CACHING='n'
 KUBE_GCS_MAKE_PUBLIC='y'
@@ -45,7 +47,12 @@ if "${KUBE_ROOT}/cluster/kubectl.sh" 'version' | grep 'Client' | grep 'dirty'; t
   exit 1
 fi
 
+if ! kube::release::has_gcloud_account k8s.production.user@gmail.com; then
+  kube::log::error "Pushing images to gcr.io/google_containers requires credentials for account k8s.production.user@gmail.com"
+  return 1
+fi
+
 kube::release::parse_and_validate_release_version "${KUBE_RELEASE_VERSION}"
 kube::release::gcs::release
 kube::release::docker::release
-kube::release::gcs::publish_official 'latest'
+kube::release::gcs::publish_official $KUBE_RELEASE_TYPE

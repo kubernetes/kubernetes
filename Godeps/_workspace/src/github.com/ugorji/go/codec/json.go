@@ -206,10 +206,22 @@ func (e *jsonEncDriver) EncodeFloat64(f float64) {
 }
 
 func (e *jsonEncDriver) EncodeInt(v int64) {
+	if x := e.h.IntegerAsString; x == 'A' || x == 'L' && (v > 1<<53 || v < -(1<<53)) {
+		e.w.writen1('"')
+		e.w.writeb(strconv.AppendInt(e.b[:0], v, 10))
+		e.w.writen1('"')
+		return
+	}
 	e.w.writeb(strconv.AppendInt(e.b[:0], v, 10))
 }
 
 func (e *jsonEncDriver) EncodeUint(v uint64) {
+	if x := e.h.IntegerAsString; x == 'A' || x == 'L' && v > 1<<53 {
+		e.w.writen1('"')
+		e.w.writeb(strconv.AppendUint(e.b[:0], v, 10))
+		e.w.writen1('"')
+		return
+	}
 	e.w.writeb(strconv.AppendUint(e.b[:0], v, 10))
 }
 
@@ -636,6 +648,11 @@ func (d *jsonDecDriver) decNum(storeBytes bool) {
 		d.tok = b
 	}
 	b := d.tok
+	var str bool
+	if b == '"' {
+		str = true
+		b = d.r.readn1()
+	}
 	if !(b == '+' || b == '-' || b == '.' || (b >= '0' && b <= '9')) {
 		d.d.errorf("json: decNum: got first char '%c'", b)
 		return
@@ -649,6 +666,10 @@ func (d *jsonDecDriver) decNum(storeBytes bool) {
 	r := d.r
 	n.reset()
 	d.bs = d.bs[:0]
+
+	if str && storeBytes {
+		d.bs = append(d.bs, '"')
+	}
 
 	// The format of a number is as below:
 	// parsing:     sign? digit* dot? digit* e?  sign? digit*
@@ -740,6 +761,14 @@ LOOP:
 			default:
 				break LOOP
 			}
+		case '"':
+			if str {
+				if storeBytes {
+					d.bs = append(d.bs, '"')
+				}
+				b, eof = r.readn1eof()
+			}
+			break LOOP
 		default:
 			break LOOP
 		}
@@ -1110,6 +1139,19 @@ type JsonHandle struct {
 	//   - If positive, indent by that number of spaces.
 	//   - If negative, indent by that number of tabs.
 	Indent int8
+
+	// IntegerAsString controls how integers (signed and unsigned) are encoded.
+	//
+	// Per the JSON Spec, JSON numbers are 64-bit floating point numbers.
+	// Consequently, integers > 2^53 cannot be represented as a JSON number without losing precision.
+	// This can be mitigated by configuring how to encode integers.
+	//
+	// IntegerAsString interpretes the following values:
+	//   - if 'L', then encode integers > 2^53 as a json string.
+	//   - if 'A', then encode all integers as a json string
+	//             containing the exact integer representation as a decimal.
+	//   - else    encode all integers as a json number (default)
+	IntegerAsString uint8
 }
 
 func (h *JsonHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {

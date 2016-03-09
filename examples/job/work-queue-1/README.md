@@ -262,21 +262,16 @@ image to match the name you used, and call it `./job.yaml`.
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: job-wq-1
 spec:
-  selector:
-    matchLabels:
-      app: job-wq-1
   completions: 8
   parallelism: 2
   template:
     metadata:
       name: job-wq-1
-      labels:
-        app: job-wq-1
     spec:
       containers:
       - name: c

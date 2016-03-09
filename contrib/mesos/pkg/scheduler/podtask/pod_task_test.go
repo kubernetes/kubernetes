@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -37,16 +39,18 @@ const (
 func fakePodTask(id string, allowedRoles, defaultRoles []string) *T {
 	t, _ := New(
 		api.NewDefaultContext(),
-		"",
+		Config{
+			Prototype:        &mesos.ExecutorInfo{},
+			FrameworkRoles:   allowedRoles,
+			DefaultPodRoles:  defaultRoles,
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      id,
 				Namespace: api.NamespaceDefault,
 			},
 		},
-		&mesos.ExecutorInfo{},
-		allowedRoles,
-		defaultRoles,
 	)
 
 	return t
@@ -219,7 +223,7 @@ func TestAcceptOfferPorts(t *testing.T) {
 		Resources: []*mesos.Resource{
 			mutil.NewScalarResource("cpus", t_min_cpu),
 			mutil.NewScalarResource("mem", t_min_mem),
-			newPortsResource("*", 1, 1),
+			resources.NewPorts("*", 1, 1),
 		},
 	}
 
@@ -413,14 +417,5 @@ func newScalarAttribute(name string, val float64) *mesos.Attribute {
 		Name:   proto.String(name),
 		Type:   mesos.Value_SCALAR.Enum(),
 		Scalar: &mesos.Value_Scalar{Value: proto.Float64(val)},
-	}
-}
-
-func newPortsResource(role string, ports ...uint64) *mesos.Resource {
-	return &mesos.Resource{
-		Name:   proto.String("ports"),
-		Type:   mesos.Value_RANGES.Enum(),
-		Ranges: newRanges(ports),
-		Role:   stringPtrTo(role),
 	}
 }

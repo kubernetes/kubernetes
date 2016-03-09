@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package podreconciler implements pod reconcilation of pods which failed
+// Package podreconciler implements pod reconciliation of pods which failed
 // to launch, i.e. before binding by the executor took place.
 package podreconciler

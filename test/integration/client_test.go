@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -39,11 +40,12 @@ import (
 
 func TestClient(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	ns := api.NamespaceDefault
 	framework.DeleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	info, err := client.Discovery().ServerVersion()
 	if err != nil {
@@ -109,11 +111,12 @@ func TestClient(t *testing.T) {
 
 func TestSingleWatch(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	ns := "blargh"
 	deleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	mkEvent := func(i int) *api.Event {
 		name := fmt.Sprintf("event-%v", i)
@@ -194,10 +197,11 @@ func TestMultiWatch(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 	defer framework.DeleteAllEtcdKeys()
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	ns := api.NamespaceDefault
-	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	dummyEvent := func(i int) *api.Event {
 		name := fmt.Sprintf("unrelated-%v", i)

@@ -140,11 +140,28 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *api.Per
 	}
 }
 
-// RoundUpSize calculates how many allocation units are needed to accomodate
+// RoundUpSize calculates how many allocation units are needed to accommodate
 // a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
 // allocates volumes in gibibyte-sized chunks,
 // RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+}
+
+// GenerateVolumeName returns a PV name with clusterName prefix.
+// The function should be used to generate a name of GCE PD or Cinder volume.
+// It basically adds "<clusterName>-dynamic-" before the PV name,
+// making sure the resulting string fits given length and cuts "dynamic"
+// if not.
+func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
+	prefix := clusterName + "-dynamic"
+	pvLen := len(pvName)
+
+	// cut the "<clusterName>-dynamic" to fit full pvName into maxLength
+	// +1 for the '-' dash
+	if pvLen+1+len(prefix) > maxLength {
+		prefix = prefix[:maxLength-pvLen-1]
+	}
+	return prefix + "-" + pvName
 }

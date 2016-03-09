@@ -110,8 +110,14 @@ __custom_func() {
     esac
 }
 `
+
+	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
+	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	valid_resources = `Valid resource types include:
    * componentstatuses (aka 'cs')
+   * configmaps
+   * daemonsets (aka 'ds')
+   * deployments
    * events (aka 'ev')
    * endpoints (aka 'ep')
    * horizontalpodautoscalers (aka 'hpa')
@@ -125,6 +131,7 @@ __custom_func() {
    * persistentvolumeclaims (aka 'pvc')
    * quota
    * resourcequotas (aka 'quota')
+   * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
    * secrets
    * serviceaccounts
@@ -146,6 +153,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	}
 
 	f.BindFlags(cmds.PersistentFlags())
+	f.BindExternalFlags(cmds.PersistentFlags())
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(util.WarnWordSepNormalizeFunc)

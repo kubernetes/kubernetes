@@ -75,3 +75,29 @@ func (m *InternalAuthenticationResult) GetPid() string {
 	}
 	return ""
 }
+
+type InternalNetworkError struct {
+	// master pid that this event pertains to
+	Pid *string `protobuf:"bytes,1,req,name=pid" json:"pid,omitempty"`
+	// driver session UUID
+	Session          *string `protobuf:"bytes,2,opt,name=session" json:"session,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *InternalNetworkError) Reset()         { *m = InternalNetworkError{} }
+func (m *InternalNetworkError) String() string { return proto.CompactTextString(m) }
+func (*InternalNetworkError) ProtoMessage()    {}
+
+func (m *InternalNetworkError) GetPid() string {
+	if m != nil && m.Pid != nil {
+		return *m.Pid
+	}
+	return ""
+}
+
+func (m *InternalNetworkError) GetSession() string {
+	if m != nil && m.Session != nil {
+		return *m.Session
+	}
+	return ""
+}

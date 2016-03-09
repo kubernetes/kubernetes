@@ -33,7 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
@@ -119,7 +121,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	hashutil.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
-	_, name := BuildDockerName(KubeletContainerName{podFullName, types.UID(podUID), container.Name}, container)
+	_, name, _ := BuildDockerName(KubeletContainerName{podFullName, types.UID(podUID), container.Name}, container)
 	returned, hash, err := ParseDockerName(name)
 	if err != nil {
 		t.Errorf("Failed to parse Docker container name %q: %v", name, err)
@@ -354,7 +356,7 @@ func TestPullWithSecrets(t *testing.T) {
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
 		builtInKeyRing.Add(test.builtInDockerConfig)
 
@@ -367,17 +369,17 @@ func TestPullWithSecrets(t *testing.T) {
 
 		err := dp.Pull(test.imageName, test.passedSecrets)
 		if err != nil {
-			t.Errorf("unexpected non-nil err: %s", err)
+			t.Errorf("%s: unexpected non-nil err: %s", i, err)
 			continue
 		}
 
 		if e, a := 1, len(fakeClient.pulled); e != a {
-			t.Errorf("%s: expected 1 pulled image, got %d: %v", test.imageName, a, fakeClient.pulled)
+			t.Errorf("%s: expected 1 pulled image, got %d: %v", i, a, fakeClient.pulled)
 			continue
 		}
 
 		if e, a := test.expectedPulls, fakeClient.pulled; !reflect.DeepEqual(e, a) {
-			t.Errorf("%s: expected pull of %v, but got %v", test.imageName, e, a)
+			t.Errorf("%s: expected pull of %v, but got %v", i, e, a)
 		}
 	}
 }
@@ -703,9 +705,9 @@ func TestFindContainersByPod(t *testing.T) {
 		},
 	}
 	fakeClient := &FakeDockerClient{}
-	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	// image back-off is set to nil, this test shouldnt pull images
-	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, kubetypes.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
+	// image back-off is set to nil, this test should not pull images
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, kubetypes.PodInfraContainerImage, 0, 0, "", containertest.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

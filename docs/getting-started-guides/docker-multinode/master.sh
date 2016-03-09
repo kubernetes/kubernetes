@@ -66,7 +66,7 @@ detect_lsb() {
         *64)
             ;;
          *)
-            echo "Error: We currently only support 64-bit platforms."       
+            echo "Error: We currently only support 64-bit platforms."
             exit 1
             ;;
     esac
@@ -103,7 +103,15 @@ detect_lsb() {
 # Start the bootstrap daemon
 # TODO: do not start docker-bootstrap if it's already running
 bootstrap_daemon() {
-    docker -d \
+    # Detecting docker version so we could run proper docker_daemon command
+    [[ $(eval "docker --version") =~ ([0-9][.][0-9][.][0-9]*) ]] && version="${BASH_REMATCH[1]}"
+    local got=$(echo -e "${version}\n1.8.0" | sed '/^$/d' | sort -nr | head -1)
+    if [[ "${got}" = "${version}" ]]; then
+        docker_daemon="docker -d"
+    else
+        docker_daemon="docker daemon"
+    fi
+    ${docker_daemon} \
         -H unix:///var/run/docker-bootstrap.sock \
         -p /var/run/docker-bootstrap.pid \
         --iptables=false \
@@ -112,7 +120,7 @@ bootstrap_daemon() {
         --graph=/var/lib/docker-bootstrap \
             2> /var/log/docker-bootstrap.log \
             1> /dev/null &
-    
+
     sleep 5
 }
 
@@ -120,7 +128,7 @@ bootstrap_daemon() {
 DOCKER_CONF=""
 
 start_k8s(){
-    # Start etcd 
+    # Start etcd
     docker -H unix:///var/run/docker-bootstrap.sock run \
         --restart=on-failure \
         --net=host \
@@ -207,7 +215,6 @@ start_k8s(){
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw \
         -v /:/rootfs:ro \
-        -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \

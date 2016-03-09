@@ -420,26 +420,20 @@ function yaml-quote {
   echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
 }
 
-# Builds the RUNTIME_CONFIG var from other feature enable options
+# Builds the RUNTIME_CONFIG var from other feature enable options (such as
+# features in alpha)
 function build-runtime-config() {
-  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/deployments=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
-          fi
-      fi
-  fi
-  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/daemonsets=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
-          fi
-      fi
-  fi
+  # There is nothing to do here for now. Just using this function as a placeholder.
+  :
+}
+
+# Writes the cluster name into a temporary file.
+# Assumed vars
+#   CLUSTER_NAME
+function write-cluster-name {
+  cat >"${KUBE_TEMP}/cluster-name.txt" << EOF
+${CLUSTER_NAME}
+EOF
 }
 
 function write-master-env {
@@ -499,12 +493,14 @@ CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
+HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
 OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
 OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
 OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
+KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 EOF
@@ -542,6 +538,16 @@ EOF
   if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
+EOF
+  fi
+  if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
+EOF
+  fi
+  if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
+    cat >>$file <<EOF
+ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
 EOF
   fi
   if [[ "${master}" == "true" ]]; then
@@ -609,6 +615,11 @@ KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
 EOF
     fi
   fi
+  if [ -n "${NODE_LABELS:-}" ]; then
+      cat >>$file <<EOF
+NODE_LABELS: $(yaml-quote ${NODE_LABELS})
+EOF
+    fi
   if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF

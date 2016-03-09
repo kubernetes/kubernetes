@@ -52,7 +52,7 @@ func newProtobufPackage(packagePath, packageName string, generateAll bool, omitF
 	return pkg
 }
 
-// protobufPackage contains the protobuf implentation of Package.
+// protobufPackage contains the protobuf implementation of Package.
 type protobufPackage struct {
 	// Short name of package, used in the "package xxxx" line.
 	PackageName string

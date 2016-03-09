@@ -46,6 +46,17 @@ func (gr *GroupResource) String() string {
 	return gr.Resource + "." + gr.Group
 }
 
+// ParseGroupResource turns "resource.group" string into a GroupResource struct.  Empty strings are allowed
+// for each field.
+func ParseGroupResource(gr string) GroupResource {
+	s := strings.SplitN(gr, ".", 2)
+	if len(s) == 1 {
+		return GroupResource{Resource: s[0]}
+	}
+
+	return GroupResource{Group: s[1], Resource: s[0]}
+}
+
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
@@ -54,6 +65,10 @@ type GroupVersionResource struct {
 	Group    string
 	Version  string
 	Resource string
+}
+
+func (gvr GroupVersionResource) IsEmpty() bool {
+	return len(gvr.Group) == 0 && len(gvr.Version) == 0 && len(gvr.Resource) == 0
 }
 
 func (gvr GroupVersionResource) GroupResource() GroupResource {

@@ -26,6 +26,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -190,12 +191,18 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 	}
 
-	// Load the module.  It's OK if this fails (e.g. the module is not present)
-	// because we'll catch the error on the sysctl, which is what we actually
-	// care about.
-	exec.Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
-		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
+	// are connected to a Linux bridge (but not SDN bridges).  Until most
+	// plugins handle this, log when config is missing
+	warnBrNetfilter := false
+	if _, err := os.Stat("/sys/module/br_netfilter"); os.IsNotExist(err) {
+		warnBrNetfilter = true
+	}
+	if val, err := utilsysctl.GetSysctl(sysctlBridgeCallIptables); err == nil && val != 1 {
+		warnBrNetfilter = true
+	}
+	if warnBrNetfilter {
+		glog.Infof("missing br-netfilter module or unset br-nf-call-iptables; proxy may not work as intended")
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.

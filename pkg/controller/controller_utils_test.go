@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
@@ -183,6 +183,57 @@ func TestControllerExpectations(t *testing.T) {
 	}
 }
 
+func TestUIDExpectations(t *testing.T) {
+	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
+	rcList := []*api.ReplicationController{
+		newReplicationController(2),
+		newReplicationController(1),
+		newReplicationController(0),
+		newReplicationController(5),
+	}
+	rcToPods := map[string][]string{}
+	rcKeys := []string{}
+	for i := range rcList {
+		rc := rcList[i]
+		rcName := fmt.Sprintf("rc-%v", i)
+		rc.Name = rcName
+		rc.Spec.Selector[rcName] = rcName
+		podList := newPodList(nil, 5, api.PodRunning, rc)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %+v: %v", rc, err)
+		}
+		rcKeys = append(rcKeys, rcKey)
+		rcPodNames := []string{}
+		for i := range podList.Items {
+			p := &podList.Items[i]
+			p.Name = fmt.Sprintf("%v-%v", p.Name, rc.Name)
+			rcPodNames = append(rcPodNames, PodKey(p))
+		}
+		rcToPods[rcKey] = rcPodNames
+		uidExp.ExpectDeletions(rcKey, rcPodNames)
+	}
+	for i := range rcKeys {
+		j := rand.Intn(i + 1)
+		rcKeys[i], rcKeys[j] = rcKeys[j], rcKeys[i]
+	}
+	for _, rcKey := range rcKeys {
+		if uidExp.SatisfiedExpectations(rcKey) {
+			t.Errorf("Controller %v satisfied expectations before deletion", rcKey)
+		}
+		for _, p := range rcToPods[rcKey] {
+			uidExp.DeletionObserved(rcKey, p)
+		}
+		if !uidExp.SatisfiedExpectations(rcKey) {
+			t.Errorf("Controller %v didn't satisfy expectations after deletion", rcKey)
+		}
+		uidExp.DeleteExpectations(rcKey)
+		if uidExp.GetUIDs(rcKey) != nil {
+			t.Errorf("Failed to delete uid expectations for %v", rcKey)
+		}
+	}
+}
+
 func TestCreatePods(t *testing.T) {
 	ns := api.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
@@ -193,7 +244,7 @@ func TestCreatePods(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	// TODO: Uncomment when fix #19254
 	// defer testServer.Close()
-	clientset := clientset.NewForConfigOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	podControl := RealPodControl{
 		KubeClient: clientset,
@@ -245,7 +296,7 @@ func TestActivePodFiltering(t *testing.T) {
 }
 
 func TestSortingActivePods(t *testing.T) {
-	numPods := 5
+	numPods := 9
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
 	podList := newPodList(nil, numPods, api.PodRunning, rc)
@@ -266,10 +317,35 @@ func TestSortingActivePods(t *testing.T) {
 	// pods[3] is running but not ready.
 	pods[3].Spec.NodeName = "foo"
 	pods[3].Status.Phase = api.PodRunning
-	// pods[4] is running and ready.
+	// pods[4] is running and ready but without LastTransitionTime.
+	now := unversioned.Now()
 	pods[4].Spec.NodeName = "foo"
 	pods[4].Status.Phase = api.PodRunning
 	pods[4].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
+	pods[4].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[5] is running and ready and with LastTransitionTime.
+	pods[5].Spec.NodeName = "foo"
+	pods[5].Status.Phase = api.PodRunning
+	pods[5].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: now}}
+	pods[5].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[6] is running ready for a longer time than pods[5].
+	then := unversioned.Time{Time: now.AddDate(0, -1, 0)}
+	pods[6].Spec.NodeName = "foo"
+	pods[6].Status.Phase = api.PodRunning
+	pods[6].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[6].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[7] has lower container restart count than pods[6].
+	pods[7].Spec.NodeName = "foo"
+	pods[7].Status.Phase = api.PodRunning
+	pods[7].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[7].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[7].CreationTimestamp = now
+	// pods[8] is older than pods[7].
+	pods[8].Spec.NodeName = "foo"
+	pods[8].Status.Phase = api.PodRunning
+	pods[8].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[8].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[8].CreationTimestamp = then
 
 	getOrder := func(pods []*api.Pod) []string {
 		names := make([]string, len(pods))

@@ -41,7 +41,7 @@ endif
 	cd ${TEMP_DIR} && sed -i "s/ARCH/${ARCH}/g" master-multi.json master.json kube-proxy.json
 	cd ${TEMP_DIR} && sed -i "s/BASEIMAGE/${BASEIMAGE}/g" Dockerfile
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
-	# Backward compatability.  TODO: deprecate this image tag
+	# Backward compatibility.  TODO: deprecate this image tag
 ifeq ($(ARCH),amd64)
 	docker tag -f ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
 endif

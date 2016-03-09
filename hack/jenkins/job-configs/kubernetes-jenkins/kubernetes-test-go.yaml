@@ -1,0 +1,82 @@
+- job-template:
+    name: 'kubernetes-test-{suffix}'
+    description: |
+        Grab the latest from GitHub, then run unit and integration tests.<br>
+        Test Owner: Build Cop
+    logrotate:
+        numToKeep: 200
+    node: unittest
+    builders:
+        - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
+        - shell: |
+            timeout -k {kill-timeout}m {timeout}m ./hack/jenkins/gotest-dockerized.sh && rc=$? || rc=$?
+            {report-rc}
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext
+        - xunit:
+            thresholds:
+                - failed:
+                    unstable: 0
+                    unstablenew: 0
+                    failure:
+                    failurenew:
+                - skipped:
+                    unstable:
+                    unstablenew:
+                    failure:
+                    failurenew:
+            types:
+                - junit:
+                    pattern: '_artifacts/**.xml'
+                    deleteoutput: false
+    scm:
+        - git:
+            url: https://github.com/kubernetes/kubernetes
+            branches:
+                - '{branch}'
+            browser: githubweb
+            browser-url: https://github.com/kubernetes/kubernetes
+            wipe-workspace: false
+            skip-tag: true
+    triggers:
+        - pollscm:
+            cron: 'H/2 * * * *'
+        - timed: 'H/30 * * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{jenkins-timeout}'
+            fail: true
+        - timestamps
+        - raw:
+            xml: |
+                <hudson.plugins.ws__cleanup.PreBuildCleanup plugin="ws-cleanup@0.28">
+                    <patterns>
+                        <hudson.plugins.ws__cleanup.Pattern>
+                            <pattern>*</pattern>
+                            <type>INCLUDE</type>
+                        </hudson.plugins.ws__cleanup.Pattern>
+                    </patterns>
+                    <deleteDirs>true</deleteDirs>
+                    <cleanupParameter/>
+                    <externalDelete>sudo rm -rf %s</externalDelete>
+                </hudson.plugins.ws__cleanup.PreBuildCleanup>
+
+- project:
+    name: kubernetes-test-go
+    suffix:
+        - 'go':
+            branch: 'master'
+            timeout: 45
+        - 'go-release-1.2':
+            branch: 'release-1.2'
+            timeout: 45
+        - 'go-release-1.1':
+            branch: 'release-1.1'
+            timeout: 30
+    jobs:
+        - 'kubernetes-test-{suffix}'

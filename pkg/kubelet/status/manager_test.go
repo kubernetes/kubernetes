@@ -24,8 +24,8 @@ import (
 	"time"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 
 	"github.com/stretchr/testify/assert"
 
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -68,7 +69,7 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
 	podManager.AddPod(getTestPod())
 	return NewManager(kubeClient, podManager).(*manager)
 }
@@ -205,8 +206,9 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 	if finalStatus.StartTime.IsZero() {
 		t.Errorf("StartTime should not be zero")
 	}
-	if !finalStatus.StartTime.Time.Equal(now.Time) {
-		t.Errorf("Expected %v, but got %v", now.Time, finalStatus.StartTime.Time)
+	expected := now.Rfc3339Copy()
+	if !finalStatus.StartTime.Equal(expected) {
+		t.Errorf("Expected %v, but got %v", expected, finalStatus.StartTime)
 	}
 }
 
@@ -464,8 +466,10 @@ func TestStatusEquality(t *testing.T) {
 		oldPodStatus := api.PodStatus{
 			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
 		}
+		normalizeStatus(&oldPodStatus)
+		normalizeStatus(&podStatus)
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
-			t.Fatalf("Order of container statuses should not affect equality.")
+			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
 	}
 }
@@ -494,6 +498,7 @@ func TestStaticPodStatus(t *testing.T) {
 
 	m.SetPodStatus(staticPod, status)
 	retrievedStatus := expectPodStatus(t, m, staticPod)
+	normalizeStatus(&status)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
@@ -578,9 +583,11 @@ func TestSetContainerReadiness(t *testing.T) {
 	}
 
 	m := newTestManager(&fake.Clientset{})
+	// Add test pod because the container spec has been changed.
+	m.podManager.AddPod(pod)
 
 	t.Log("Setting readiness before status should fail.")
-	m.SetContainerReadiness(pod, cID1, true)
+	m.SetContainerReadiness(pod.UID, cID1, true)
 	verifyUpdates(t, m, 0)
 	if status, ok := m.GetPodStatus(pod.UID); ok {
 		t.Errorf("Unexpected PodStatus: %+v", status)
@@ -593,25 +600,25 @@ func TestSetContainerReadiness(t *testing.T) {
 	verifyReadiness("initial", &status, false, false, false)
 
 	t.Log("Setting unchanged readiness should do nothing.")
-	m.SetContainerReadiness(pod, cID1, false)
+	m.SetContainerReadiness(pod.UID, cID1, false)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("unchanged", &status, false, false, false)
 
 	t.Log("Setting container readiness should generate update but not pod readiness.")
-	m.SetContainerReadiness(pod, cID1, true)
+	m.SetContainerReadiness(pod.UID, cID1, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("c1 ready", &status, true, false, false)
 
 	t.Log("Setting both containers to ready should update pod readiness.")
-	m.SetContainerReadiness(pod, cID2, true)
+	m.SetContainerReadiness(pod.UID, cID2, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("all ready", &status, true, true, true)
 
 	t.Log("Setting non-existant container readiness should fail.")
-	m.SetContainerReadiness(pod, kubecontainer.ContainerID{"test", "foo"}, true)
+	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{"test", "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("ignore non-existant", &status, true, true, true)

@@ -19,6 +19,7 @@ package util
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
@@ -26,7 +27,7 @@ import (
 func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	return &ClientCache{
 		clients: make(map[unversioned.GroupVersion]*client.Client),
-		configs: make(map[unversioned.GroupVersion]*client.Config),
+		configs: make(map[unversioned.GroupVersion]*restclient.Config),
 		loader:  loader,
 	}
 }
@@ -36,14 +37,14 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
 	clients       map[unversioned.GroupVersion]*client.Client
-	configs       map[unversioned.GroupVersion]*client.Config
-	defaultConfig *client.Config
+	configs       map[unversioned.GroupVersion]*restclient.Config
+	defaultConfig *restclient.Config
 	defaultClient *client.Client
 	matchVersion  bool
 }
 
 // ClientConfigForVersion returns the correct config for a server
-func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) (*client.Config, error) {
+func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) (*restclient.Config, error) {
 	if c.defaultConfig == nil {
 		config, err := c.loader.ClientConfig()
 		if err != nil {

@@ -23,6 +23,7 @@ import (
 
 type defaultFunc func(pod *api.Pod) error
 
+// return true if the pod passes the filter
 type FilterFunc func(pod *api.Pod) (bool, error)
 
 type Filters []FilterFunc
@@ -47,6 +48,39 @@ func Annotator(m map[string]string) FilterFunc {
 	})
 }
 
+// Environment returns a filter that writes environment variables into pod containers
+func Environment(env []api.EnvVar) FilterFunc {
+	// index the envvar names
+	var (
+		envcount = len(env)
+		m        = make(map[string]int, envcount)
+	)
+	for j := range env {
+		m[env[j].Name] = j
+	}
+	return func(pod *api.Pod) (bool, error) {
+		for i := range pod.Spec.Containers {
+			ct := &pod.Spec.Containers[i]
+			dup := make(map[string]struct{}, envcount)
+			// overwrite dups (and remember them for later)
+			for j := range ct.Env {
+				name := ct.Env[j].Name
+				if k, ok := m[name]; ok {
+					ct.Env[j] = env[k]
+					dup[name] = struct{}{}
+				}
+			}
+			// append non-dups into ct.Env
+			for name, k := range m {
+				if _, ok := dup[name]; !ok {
+					ct.Env = append(ct.Env, env[k])
+				}
+			}
+		}
+		return true, nil
+	}
+}
+
 // Stream returns a chan of pods that yields each pod from the given list.
 // No pods are yielded if err is non-nil.
 func Stream(list *api.PodList, err error) <-chan *api.Pod {
@@ -63,6 +97,14 @@ func Stream(list *api.PodList, err error) <-chan *api.Pod {
 		}
 	}()
 	return out
+}
+
+func (filters Filters) Do(in <-chan *api.Pod) (out <-chan *api.Pod) {
+	out = in
+	for _, f := range filters {
+		out = f.Do(out)
+	}
+	return
 }
 
 func (filter FilterFunc) Do(in <-chan *api.Pod) <-chan *api.Pod {

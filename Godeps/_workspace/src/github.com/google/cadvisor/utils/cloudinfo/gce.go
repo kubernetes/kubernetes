@@ -35,3 +35,11 @@ func getGceInstanceType() info.InstanceType {
 	responseParts := strings.Split(machineType, "/") // Extract the instance name from the machine type.
 	return info.InstanceType(responseParts[len(responseParts)-1])
 }
+
+func getGceInstanceID() info.InstanceID {
+	instanceID, err := metadata.Get("instance/id")
+	if err != nil {
+		return info.UnknownInstance
+	}
+	return info.InstanceID(info.InstanceType(instanceID))
+}

@@ -37,7 +37,7 @@ limitations under the License.
 // availability.
 //
 // Larger clusters often have a more lenient SLA for API latency. This should be
-// taken into account when configuring the client. The rate of leader transistions
+// taken into account when configuring the client. The rate of leader transitions
 // should be monitored and RetryPeriod and LeaseDuration should be increased
 // until the rate is stable and acceptably low. It's important to keep in mind
 // when configuring this client that the tolerance to API latency varies inversely
@@ -149,7 +149,7 @@ type LeaderElector struct {
 	observedRecord LeaderElectionRecord
 	observedTime   time.Time
 	// used to implement OnNewLeader(), may lag slightly from the
-	// value observedRecord.HolderIdentity if the transistion has
+	// value observedRecord.HolderIdentity if the transition has
 	// not yet been reported.
 	reportedLeader string
 }

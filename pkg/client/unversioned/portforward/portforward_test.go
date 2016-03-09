@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	kubeletserver "k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/types"
@@ -298,7 +298,7 @@ func TestForwardPorts(t *testing.T) {
 		server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
 
 		url, _ := url.Parse(server.URL)
-		exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)
+		exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", url)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -374,7 +374,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	// defer server.Close()
 
 	url, _ := url.Parse(server.URL)
-	exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)
+	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", url)
 	if err != nil {
 		t.Fatal(err)
 	}

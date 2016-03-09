@@ -294,7 +294,7 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
   "kind": "Namespace",
   "metadata": {
     "name": "development",
-    "deletionTimestamp": "..."
+    "deletionTimestamp": "...",
     "labels": {
       "name": "development"
     }
@@ -319,7 +319,7 @@ removing *kubernetes* from the list of finalizers:
   "kind": "Namespace",
   "metadata": {
     "name": "development",
-    "deletionTimestamp": "..."
+    "deletionTimestamp": "...",
     "labels": {
       "name": "development"
     }
@@ -347,7 +347,7 @@ This results in the following state:
   "kind": "Namespace",
   "metadata": {
     "name": "development",
-    "deletionTimestamp": "..."
+    "deletionTimestamp": "...",
     "labels": {
       "name": "development"
     }

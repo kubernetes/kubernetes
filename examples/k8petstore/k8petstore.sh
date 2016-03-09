@@ -28,7 +28,7 @@ _SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server  
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves 
-TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
+TEST="1"              # 0 = Don't run tests, 1 = Do run tests.
 NS="default"       # namespace
 
 kubectl="${1:-$kubectl}"
@@ -38,7 +38,7 @@ _SECONDS="${4:-$_SECONDS}"   # number of seconds to measure throughput.
 FE="${5:-$FE}"       # amount of Web server  
 LG="${6:-$LG}"        # amount of load generators
 SLAVE="${7:-$SLAVE}"     # amount of redis slaves 
-TEST="${8:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
+TEST="${8:-$TEST}"      # 0 = Don't run tests, 1 = Do run tests.
 NS="${9:-$NS}"          # namespace
 
 echo "Running w/ args: kubectl $kubectl version $VERSION ip $PUBLIC_IP sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"

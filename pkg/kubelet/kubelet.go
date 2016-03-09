@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,13 +36,14 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -81,6 +81,7 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -113,7 +114,7 @@ const (
 
 	etcHostsPath = "/etc/hosts"
 
-	// Capacity of the channel for recieving pod lifecycle events. This number
+	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity = 1000
 
@@ -131,6 +132,11 @@ const (
 	// error. It is also used as the base period for the exponential backoff
 	// container restarts and image pulls.
 	backOffPeriod = time.Second * 10
+
+	// Period for performing container garbage collection.
+	ContainerGCPeriod = time.Minute
+	// Period for performing image garbage collection.
+	ImageGCPeriod = 5 * time.Minute
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -144,6 +150,9 @@ type SyncHandler interface {
 }
 
 type SourcesReadyFn func(sourcesSeen sets.String) bool
+
+// Option is a functional option type for Kubelet
+type Option func(*Kubelet)
 
 // New instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
@@ -178,7 +187,6 @@ func NewMainKubelet(
 	cloud cloudprovider.Interface,
 	nodeLabels map[string]string,
 	nodeStatusUpdateFrequency time.Duration,
-	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
 	containerRuntime string,
@@ -186,8 +194,6 @@ func NewMainKubelet(
 	rktStage1Image string,
 	mounter mount.Interface,
 	writer kubeio.Writer,
-	dockerDaemonContainer string,
-	systemContainer string,
 	configureCBR0 bool,
 	nonMasqueradeCIDR string,
 	podCIDR string,
@@ -207,15 +213,15 @@ func NewMainKubelet(
 	enableCustomMetrics bool,
 	volumeStatsAggPeriod time.Duration,
 	containerRuntimeOptions []kubecontainer.Option,
+	hairpinMode string,
+	babysitDaemons bool,
+	kubeOptions []Option,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
-	}
-	if systemContainer != "" && cgroupRoot == "" {
-		return nil, fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 	}
 	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
@@ -239,7 +245,7 @@ func NewMainKubelet(
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
-		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
+		fieldSelector := fields.Set{api.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
@@ -310,28 +316,28 @@ func NewMainKubelet(
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
-		resourceContainer:              resourceContainer,
-		os:                             osInterface,
-		oomWatcher:                     oomWatcher,
-		cgroupRoot:                     cgroupRoot,
-		mounter:                        mounter,
-		writer:                         writer,
-		configureCBR0:                  configureCBR0,
-		nonMasqueradeCIDR:              nonMasqueradeCIDR,
-		reconcileCIDR:                  reconcileCIDR,
-		maxPods:                        maxPods,
-		syncLoopMonitor:                atomic.Value{},
-		resolverConfig:                 resolverConfig,
-		cpuCFSQuota:                    cpuCFSQuota,
-		daemonEndpoints:                daemonEndpoints,
-		containerManager:               containerManager,
-		flannelExperimentalOverlay:     flannelExperimentalOverlay,
-		flannelHelper:                  NewFlannelHelper(),
-		nodeIP:                         nodeIP,
-		clock:                          util.RealClock{},
+		os:                         osInterface,
+		oomWatcher:                 oomWatcher,
+		cgroupRoot:                 cgroupRoot,
+		mounter:                    mounter,
+		writer:                     writer,
+		configureCBR0:              configureCBR0,
+		nonMasqueradeCIDR:          nonMasqueradeCIDR,
+		reconcileCIDR:              reconcileCIDR,
+		maxPods:                    maxPods,
+		syncLoopMonitor:            atomic.Value{},
+		resolverConfig:             resolverConfig,
+		cpuCFSQuota:                cpuCFSQuota,
+		daemonEndpoints:            daemonEndpoints,
+		containerManager:           containerManager,
+		flannelExperimentalOverlay: flannelExperimentalOverlay,
+		flannelHelper:              NewFlannelHelper(),
+		nodeIP:                     nodeIP,
+		clock:                      util.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
+		babysitDaemons:               babysitDaemons,
 	}
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod)
@@ -362,6 +368,16 @@ func NewMainKubelet(
 	klet.livenessManager = proberesults.NewManager()
 
 	klet.podCache = kubecontainer.NewCache()
+	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
+
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(hairpinMode), containerRuntime, configureCBR0); err != nil {
+		// This is a non-recoverable error. Returning it up the callstack will just
+		// lead to retries of the same failure, so just fail hard.
+		glog.Fatalf("Invalid hairpin mode: %v", err)
+	} else {
+		klet.hairpinMode = mode
+	}
+	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
 	// Initialize the runtime.
 	switch containerRuntime {
@@ -372,6 +388,7 @@ func NewMainKubelet(
 			kubecontainer.FilterEventRecorder(recorder),
 			klet.livenessManager,
 			containerRefManager,
+			klet.podManager,
 			machineInfo,
 			podInfraContainerImage,
 			pullQPS,
@@ -388,9 +405,11 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
+			hairpinMode == componentconfig.HairpinVeth,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
+		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
 			Path:            rktPath,
 			Stage1Image:     rktStage1Image,
@@ -410,14 +429,12 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		// No Docker daemon to put in a container.
-		dockerDaemonContainer = ""
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache)
-	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0, klet.isContainerRuntimeVersionCompatible)
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, util.RealClock{})
+	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0)
 	klet.updatePodCIDR(podCIDR)
 
 	// setup containerGC
@@ -434,17 +451,7 @@ func NewMainKubelet(
 	}
 	klet.imageManager = imageManager
 
-	// Setup container manager, can fail if the devices hierarchy is not mounted
-	// (it is required by Docker however).
-	klet.nodeConfig = cm.NodeConfig{
-		DockerDaemonContainerName: dockerDaemonContainer,
-		SystemContainerName:       systemContainer,
-		KubeletContainerName:      resourceContainer,
-	}
-	klet.runtimeState.setRuntimeSync(klet.clock.Now())
-
 	klet.runner = klet.containerRuntime
-	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
@@ -470,7 +477,45 @@ func NewMainKubelet(
 	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
+	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
+
+	// apply functional Option's
+	for _, opt := range kubeOptions {
+		opt(klet)
+	}
 	return klet, nil
+}
+
+func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, configureCBR0 bool) (componentconfig.HairpinMode, error) {
+	// The hairpin mode setting doesn't matter if:
+	// - We're not using a bridge network. This is hard to check because we might
+	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
+	//   don't pipe it down to any plugins.
+	// - It's set to hairpin-veth for a container runtime that doesn't know how
+	//   to set the hairpin flag on the veth's of containers. Currently the
+	//   docker runtime is the only one that understands this.
+	// - It's set to "none".
+	if hairpinMode == componentconfig.PromiscuousBridge || hairpinMode == componentconfig.HairpinVeth {
+		// Only on docker.
+		if containerRuntime != "docker" {
+			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
+			return componentconfig.HairpinNone, nil
+		}
+		if hairpinMode == componentconfig.PromiscuousBridge && !configureCBR0 {
+			// This is not a valid combination.  Users might be using the
+			// default values (from before the hairpin-mode flag existed) and we
+			// should keep the old behavior.
+			glog.Warningf("Hairpin mode set to %q but configureCBR0 is false, falling back to %q", hairpinMode, componentconfig.HairpinVeth)
+			return componentconfig.HairpinVeth, nil
+		}
+	} else if hairpinMode == componentconfig.HairpinNone {
+		if configureCBR0 {
+			glog.Warningf("Hairpin mode set to %q and configureCBR0 is true, this might result in loss of hairpin packets", hairpinMode)
+		}
+	} else {
+		return "", fmt.Errorf("unknown value: %q", hairpinMode)
+	}
+	return hairpinMode, nil
 }
 
 type serviceLister interface {
@@ -609,10 +654,6 @@ type Kubelet struct {
 	// Store kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.Cache
 
-	// The name of the resource-only container to run the Kubelet in (empty for no container).
-	// Name must be absolute.
-	resourceContainer string
-
 	os kubecontainer.OSInterface
 
 	// Watcher of out of memory events.
@@ -701,6 +742,17 @@ type Kubelet struct {
 
 	// support gathering custom metrics.
 	enableCustomMetrics bool
+
+	// How the Kubelet should setup hairpin NAT. Can take the values: "promiscuous-bridge"
+	// (make cbr0 promiscuous), "hairpin-veth" (set the hairpin flag on veth interfaces)
+	// or "none" (do nothing).
+	hairpinMode componentconfig.HairpinMode
+
+	// The node has babysitter process monitoring docker and kubelet
+	babysitDaemons bool
+
+	// handlers called during the tryUpdateNodeStatus cycle
+	setNodeStatusFuncs []func(*api.Node) error
 }
 
 // Validate given node IP belongs to the current host
@@ -886,7 +938,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
-		return nil, errors.New("no node entry for kubelet in standalone mode")
+		return kl.initialNodeStatus()
 	}
 	return kl.nodeInfo.GetNodeInfo(kl.nodeName)
 }
@@ -897,54 +949,44 @@ func (kl *Kubelet) StartGarbageCollection() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, time.Minute, wait.NeverStop)
+	}, ContainerGCPeriod, wait.NeverStop)
 
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
-	}, 5*time.Minute, wait.NeverStop)
+	}, ImageGCPeriod, wait.NeverStop)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
 // Note that the modules here must not depend on modules that are not initialized here.
 func (kl *Kubelet) initializeModules() error {
-	// Step 1: Move Kubelet to a container, if required.
-	if kl.resourceContainer != "" {
-		// Fixme: I need to reside inside ContainerManager interface.
-		err := util.RunInResourceContainer(kl.resourceContainer)
-		if err != nil {
-			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
-		}
-		glog.Infof("Running in container %q", kl.resourceContainer)
-	}
-
-	// Step 2: Promethues metrics.
+	// Step 1: Promethues metrics.
 	metrics.Register(kl.runtimeCache)
 
-	// Step 3: Setup filesystem directories.
+	// Step 2: Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return err
 	}
 
-	// Step 4: If the container logs directory does not exist, create it.
+	// Step 3: If the container logs directory does not exist, create it.
 	if _, err := os.Stat(containerLogsDir); err != nil {
 		if err := kl.os.Mkdir(containerLogsDir, 0755); err != nil {
 			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
 		}
 	}
 
-	// Step 5: Start the image manager.
+	// Step 4: Start the image manager.
 	if err := kl.imageManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
-	// Step 6: Start container manager.
-	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
+	// Step 5: Start container manager.
+	if err := kl.containerManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 7: Start out of memory watcher.
+	// Step 6: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
@@ -998,7 +1040,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:   kl.nodeName,
-			Labels: map[string]string{"kubernetes.io/hostname": kl.hostname},
+			Labels: map[string]string{unversioned.LabelHostname: kl.hostname},
 		},
 		Spec: api.NodeSpec{
 			Unschedulable: !kl.registerSchedulable,
@@ -1036,6 +1078,14 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			return nil, err
 		}
 
+		instanceType, err := instances.InstanceType(kl.nodeName)
+		if err != nil {
+			return nil, err
+		}
+		if instanceType != "" {
+			glog.Infof("Adding node label from cloud provider: %s=%s", unversioned.LabelInstanceType, instanceType)
+			node.ObjectMeta.Labels[unversioned.LabelInstanceType] = instanceType
+		}
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {
@@ -1175,7 +1225,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 	return nil
 }
 
-func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
+func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName, hostDomain string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
 	// Kubernetes only mounts on /etc/hosts if :
 	// - container does not use hostNetwork and
 	// - container is not a infrastructure(pause) container
@@ -1209,7 +1259,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		})
 	}
 	if mountEtcHostsFile {
-		hostsMount, err := makeHostsMount(podDir, pod.Status.PodIP, pod.Name)
+		hostsMount, err := makeHostsMount(podDir, pod.Status.PodIP, hostName, hostDomain)
 		if err != nil {
 			return nil, err
 		}
@@ -1218,9 +1268,9 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 	return mounts, nil
 }
 
-func makeHostsMount(podDir, podIP, podName string) (*kubecontainer.Mount, error) {
+func makeHostsMount(podDir, podIP, hostName, hostDomainName string) (*kubecontainer.Mount, error) {
 	hostsFilePath := path.Join(podDir, "etc-hosts")
-	if err := ensureHostsFile(hostsFilePath, podIP, podName); err != nil {
+	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName); err != nil {
 		return nil, err
 	}
 	return &kubecontainer.Mount{
@@ -1231,7 +1281,7 @@ func makeHostsMount(podDir, podIP, podName string) (*kubecontainer.Mount, error)
 	}, nil
 }
 
-func ensureHostsFile(fileName string, hostIP, hostName string) error {
+func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
 	if _, err := os.Stat(fileName); os.IsExist(err) {
 		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
 		return nil
@@ -1244,7 +1294,11 @@ func ensureHostsFile(fileName string, hostIP, hostName string) error {
 	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
 	buffer.WriteString("fe00::1\tip6-allnodes\n")
 	buffer.WriteString("fe00::2\tip6-allrouters\n")
-	buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
+	if len(hostDomainName) > 0 {
+		buffer.WriteString(fmt.Sprintf("%s\t%s.%s\t%s\n", hostIP, hostName, hostDomainName, hostName))
+	} else {
+		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
+	}
 	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
@@ -1278,12 +1332,40 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	return
 }
 
+func generatePodHostNameAndDomain(pod *api.Pod, clusterDomain string) (string, string) {
+	// TODO(vmarmol): Handle better.
+	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
+	const hostnameMaxLen = 63
+	podAnnotations := pod.Annotations
+	if podAnnotations == nil {
+		podAnnotations = make(map[string]string)
+	}
+	hostname := pod.Name
+	hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
+	if utilvalidation.IsDNS1123Label(hostnameCandidate) {
+		// use hostname annotation, if specified.
+		hostname = hostnameCandidate
+	}
+	if len(hostname) > hostnameMaxLen {
+		hostname = hostname[:hostnameMaxLen]
+		glog.Errorf("hostname for pod:%q was longer than %d. Truncated hostname to :%q", pod.Name, hostnameMaxLen, hostname)
+	}
+
+	hostDomain := ""
+	subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
+	if utilvalidation.IsDNS1123Label(subdomainCandidate) {
+		hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
+	}
+	return hostname, hostDomain
+}
+
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
-
+	hostname, hostDomainName := generatePodHostNameAndDomain(pod, kl.clusterDomain)
+	opts.Hostname = hostname
 	vol, ok := kl.volumeManager.GetVolumes(pod.UID)
 	if !ok {
 		return nil, fmt.Errorf("impossible: cannot find the mounted volumes for pod %q", format.Pod(pod))
@@ -1300,7 +1382,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		}
 	}
 
-	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, vol)
+	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, vol)
 	if err != nil {
 		return nil, err
 	}
@@ -1599,7 +1681,7 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 }
 
 // One of the following aruguements must be non-nil: runningPod, status.
-// TODO: Modify containerRuntime.KillPod() to accept the right arguements.
+// TODO: Modify containerRuntime.KillPod() to accept the right arguments.
 func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus) error {
 	var p kubecontainer.Pod
 	if runningPod != nil {
@@ -1664,14 +1746,16 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 	if kubepod.IsStaticPod(pod) {
 		podFullName := kubecontainer.GetPodFullName(pod)
 		deleted := false
-		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
-			// The mirror pod is semantically different from the static pod. Remove
-			// it. The mirror pod will get recreated later.
-			glog.Errorf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
-			if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
-				glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
-			} else {
-				deleted = true
+		if mirrorPod != nil {
+			if mirrorPod.DeletionTimestamp != nil || !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
+				// The mirror pod is semantically different from the static pod. Remove
+				// it. The mirror pod will get recreated later.
+				glog.Errorf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
+				if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
+					glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
+				} else {
+					deleted = true
+				}
 			}
 		}
 		if mirrorPod == nil || deleted {
@@ -1883,7 +1967,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 		runningSet.Insert(string(pod.ID))
 	}
 
-	for name, vol := range currentVolumes {
+	for name, cleanerTuple := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
 			parts := strings.Split(name, "/")
 			if runningSet.Has(parts[0]) {
@@ -1895,37 +1979,26 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
 			// TODO(yifan): Refactor this hacky string manipulation.
 			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
+			// Get path reference count
+			refs, err := mount.GetMountRefs(kl.mounter, cleanerTuple.Cleaner.GetPath())
+			if err != nil {
+				return fmt.Errorf("Could not get mount path references %v", err)
+			}
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
-			err := vol.TearDown()
+			err = cleanerTuple.Cleaner.TearDown()
 			if err != nil {
 				glog.Errorf("Could not tear down volume %q: %v", name, err)
 			}
-		}
-	}
-	return nil
-}
 
-// Delete any pods that are no longer running and are marked for deletion.
-func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
-	var terminating []*api.Pod
-	for _, pod := range pods {
-		if pod.DeletionTimestamp != nil {
-			found := false
-			for _, runningPod := range runningPods {
-				if runningPod.ID == pod.UID {
-					found = true
-					break
+			// volume is unmounted.  some volumes also require detachment from the node.
+			if cleanerTuple.Detacher != nil && len(refs) == 1 {
+				detacher := *cleanerTuple.Detacher
+				err = detacher.Detach()
+				if err != nil {
+					glog.Errorf("Could not detach volume %q: %v", name, err)
 				}
 			}
-			if found {
-				glog.V(5).Infof("Keeping terminated pod %q, still running", format.Pod(pod))
-				continue
-			}
-			terminating = append(terminating, pod)
 		}
-	}
-	if !kl.statusManager.TerminatePods(terminating) {
-		return errors.New("not all pods were successfully terminated")
 	}
 	return nil
 }
@@ -2121,11 +2194,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
 
-	if err := kl.cleanupTerminatedPods(allPods, runningPods); err != nil {
-		glog.Errorf("Failed to cleanup terminated pods: %v", err)
-	}
-
-	// Clear out any old bandwith rules
+	// Clear out any old bandwidth rules
 	if err = kl.cleanupBandwidthLimits(allPods); err != nil {
 		return err
 	}
@@ -2356,8 +2425,16 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 	case update := <-kl.livenessManager.Updates():
 		// We only care about failures (signalling container death) here.
 		if update.Result == proberesults.Failure {
-			glog.V(1).Infof("SyncLoop (container unhealthy): %q", format.Pod(update.Pod))
-			handler.HandlePodSyncs([]*api.Pod{update.Pod})
+			// We should not use the pod from livenessManager, because it is never updated after
+			// initialization.
+			pod, ok := kl.podManager.GetPodByUID(update.PodUID)
+			if !ok {
+				// If the pod no longer exists, ignore the update.
+				glog.V(4).Infof("SyncLoop (container unhealthy): ignore irrelevant update: %#v", update)
+				break
+			}
+			glog.V(1).Infof("SyncLoop (container unhealthy): %q", format.Pod(pod))
+			handler.HandlePodSyncs([]*api.Pod{pod})
 		}
 	case <-housekeepingCh:
 		if !kl.allSourcesReady() {
@@ -2377,6 +2454,13 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 
 func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType kubetypes.SyncPodType, mirrorPod *api.Pod, start time.Time) {
 	if kl.podIsTerminated(pod) {
+		if pod.DeletionTimestamp != nil {
+			// If the pod is in a termianted state, there is no pod worker to
+			// handle the work item. Check if the DeletionTimestamp has been
+			// set, and force a status update to trigger a pod deletion request
+			// to the apiserver.
+			kl.statusManager.TerminatePod(pod)
+		}
 		return
 	}
 	// Run the sync in an async worker.
@@ -2479,6 +2563,10 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 		return time.Time{}
 	}
 	return val.(time.Time)
+}
+
+func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
+	return kl.pleg.Healthy()
 }
 
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
@@ -2614,7 +2702,7 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 }
 
 func (kl *Kubelet) updateRuntimeUp() {
-	if _, err := kl.containerRuntime.Version(); err != nil {
+	if err := kl.containerRuntime.Status(); err != nil {
 		glog.Errorf("Container runtime sanity check failed: %v", err)
 		return
 	}
@@ -2636,7 +2724,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr); err != nil {
+	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
 		return err
 	}
 	if kl.shaper == nil {
@@ -2845,8 +2933,8 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 	} else {
 		for _, image := range containerImages {
 			imagesOnNode = append(imagesOnNode, api.ContainerImage{
-				RepoTags: image.RepoTags,
-				Size:     image.Size,
+				Names:     image.RepoTags,
+				SizeBytes: image.Size,
 			})
 		}
 	}
@@ -2884,6 +2972,12 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 			Message:           strings.Join(rs, ","),
 			LastHeartbeatTime: currentTime,
 		}
+	}
+
+	// Record any soft requirements that were not met in the container manager.
+	status := kl.containerManager.Status()
+	if status.SoftRequirements != nil {
+		newNodeReadyCondition.Message = fmt.Sprintf("%s. WARNING: %s", newNodeReadyCondition.Message, status.SoftRequirements.Error())
 	}
 
 	readyConditionUpdated := false
@@ -2998,34 +3092,37 @@ func (kl *Kubelet) recordNodeSchdulableEvent(node *api.Node) {
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condtion code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
-	if err := kl.setNodeAddress(node); err != nil {
-		return err
+	for _, f := range kl.setNodeStatusFuncs {
+		if err := f(node); err != nil {
+			return err
+		}
 	}
-	kl.setNodeStatusInfo(node)
-	kl.setNodeOODCondition(node)
-	kl.setNodeReadyCondition(node)
-	kl.recordNodeSchdulableEvent(node)
 	return nil
 }
 
-// FIXME: Why not combine this with container runtime health check?
-func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
-	switch kl.GetRuntime().Type() {
-	case "docker":
-		version, err := kl.GetRuntime().APIVersion()
-		if err != nil {
+// defaultNodeStatusFuncs is a factory that generates the default set of setNodeStatus funcs
+func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
+	// initial set of node status update handlers, can be modified by Option's
+	withoutError := func(f func(*api.Node)) func(*api.Node) error {
+		return func(n *api.Node) error {
+			f(n)
 			return nil
 		}
-		// Verify the docker version.
-		result, err := version.Compare(dockertools.MinimumDockerAPIVersion)
-		if err != nil {
-			return fmt.Errorf("failed to compare current docker version %v with minimum support Docker version %q - %v", version, dockertools.MinimumDockerAPIVersion, err)
-		}
-		if result < 0 {
-			return fmt.Errorf("container runtime version is older than %s", dockertools.MinimumDockerAPIVersion)
-		}
 	}
-	return nil
+	return []func(*api.Node) error{
+		kl.setNodeAddress,
+		withoutError(kl.setNodeStatusInfo),
+		withoutError(kl.setNodeOODCondition),
+		withoutError(kl.setNodeReadyCondition),
+		withoutError(kl.recordNodeSchdulableEvent),
+	}
+}
+
+// SetNodeStatus returns a functional Option that adds the given node status update handler to the Kubelet
+func SetNodeStatus(f func(*api.Node) error) Option {
+	return func(k *Kubelet) {
+		k.setNodeStatusFuncs = append(k.setNodeStatusFuncs, f)
+	}
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
@@ -3204,6 +3301,9 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 		}
 		return status
 	}
+
+	// Make the latest container status comes first.
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
 
 	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
 	// Create a map of expected containers based on the pod spec.
@@ -3488,7 +3588,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 	}
 }
 func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
-	return kl.nodeConfig
+	return kl.containerManager.GetNodeConfig()
 }
 
 var minRsrc = resource.MustParse("1k")

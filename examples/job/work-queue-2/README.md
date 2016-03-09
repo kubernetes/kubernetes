@@ -160,7 +160,7 @@ host="redis"
 
 q = rediswq.RedisWQ(name="job2", host="redis")
 print("Worker with sessionID: " +  q.sessionID())
-print("Inital queue state: empty=" + str(q.empty()))
+print("Initial queue state: empty=" + str(q.empty()))
 while not q.empty():
   item = q.lease(lease_secs=10, block=True, timeout=2) 
   if item is not None:
@@ -217,20 +217,15 @@ Here is the job definition:
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: job-wq-2
 spec:
-  selector:
-    matchLabels:
-      app: job-wq-2
   parallelism: 2
   template:
     metadata:
       name: job-wq-2
-      labels:
-        app: job-wq-2
     spec:
       containers:
       - name: c
@@ -283,7 +278,7 @@ Events:
 
 $ kubectl logs pods/job-wq-2-7r7b2
 Worker with sessionID: bbd72d0a-9e5c-4dd6-abf6-416cc267991f
-Inital queue state: empty=False
+Initial queue state: empty=False
 Working on banana
 Working on date
 Working on lemon

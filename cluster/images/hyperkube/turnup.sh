@@ -20,19 +20,18 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-K8S_VERSION=${K8S_VERSION:-"1.1.3"}
+K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.7"}
 
 docker run \
   --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \
-  --volume=/dev:/dev \
   --volume=/var/lib/docker/:/var/lib/docker:rw \
   --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
   --volume=/var/run:/var/run:rw \
   --net=host \
   --pid=host \
   --privileged=true \
-  -d gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+  -d gcr.io/google_containers/hyperkube-amd64:v${K8S_VERSION} \
   /hyperkube kubelet \
     --containerized \
     --hostname-override="127.0.0.1" \
@@ -41,4 +40,4 @@ docker run \
     --config=/etc/kubernetes/manifests \
     --cluster-dns=10.0.0.10 \
     --cluster-domain=cluster.local \
-    --allow-privileged=true --v=10
+    --allow-privileged=true --v=2

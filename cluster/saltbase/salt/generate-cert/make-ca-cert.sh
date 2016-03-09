@@ -18,6 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+DEBUG="${DEBUG:-false}"
+
+if [ "${DEBUG}" == "true" ]; then
+	set -x
+fi
+
 cert_ip=$1
 extra_sans=${2:-}
 cert_dir=${CERT_DIR:-/srv/kubernetes}
@@ -33,7 +39,16 @@ if [ "$cert_ip" == "_use_gce_external_ip_" ]; then
 fi
 
 if [ "$cert_ip" == "_use_aws_external_ip_" ]; then
-  cert_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+  # If there's no public IP assigned (e.g. this host is running on an internal subnet in a VPC), then
+  # curl will happily spit out the contents of AWS's 404 page and an exit code of zero.
+  #
+  # The string containing the 404 page trips up one of easyrsa's calls to openssl later; whichever
+  # one creates the CA certificate, because the 404 page is > 64 characters.
+  if cert_ip=$(curl -f -s http://169.254.169.254/latest/meta-data/public-ipv4); then
+    :
+  else
+    cert_ip=$(curl -f -s http://169.254.169.254/latest/meta-data/local-ipv4)
+  fi
 fi
 
 sans="IP:${cert_ip}"
@@ -57,7 +72,14 @@ cd "${tmpdir}"
 #
 # Due to GCS caching of public objects, it may take time for this to be widely
 # distributed.
-curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+#
+# Use ~/kube/easy-rsa.tar.gz if it exists, so that it can be
+# pre-pushed in cases where an outgoing connection is not allowed.
+if [ -f ~/kube/easy-rsa.tar.gz ]; then
+	ln -s ~/kube/easy-rsa.tar.gz .
+else
+	curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+fi
 tar xzf easy-rsa.tar.gz > /dev/null 2>&1
 
 cd easy-rsa-master/easyrsa3

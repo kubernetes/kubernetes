@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -165,7 +165,7 @@ func TestCordon(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := test.cmd(f, buf)
@@ -431,7 +431,7 @@ func TestDrain(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdDrain(f, buf)

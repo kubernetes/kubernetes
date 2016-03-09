@@ -17,18 +17,66 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
+
+func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
+	fakeClient.AddReactor("list", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addListPodsReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addGetRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
+	rsList, ok := obj.(*extensions.ReplicaSetList)
+	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		name := action.(testclient.GetAction).GetName()
+		if ok {
+			for _, rs := range rsList.Items {
+				if rs.Name == name {
+					return true, &rs, nil
+				}
+			}
+		}
+		return false, nil, fmt.Errorf("could not find the requested replica set: %s", name)
+
+	})
+	return fakeClient
+}
+
+func addUpdateRSReactor(fakeClient *fake.Clientset) *fake.Clientset {
+	fakeClient.AddReactor("update", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
+		return true, obj, nil
+	})
+	return fakeClient
+}
+
+func addUpdatePodsReactor(fakeClient *fake.Clientset) *fake.Clientset {
+	fakeClient.AddReactor("update", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := action.(testclient.UpdateAction).GetObject().(*api.Pod)
+		return true, obj, nil
+	})
+	return fakeClient
+}
 
 func newPod(now time.Time, ready bool, beforeSec int) api.Pod {
 	conditionStatus := api.ConditionFalse
@@ -82,13 +130,13 @@ func TestGetReadyPodsCount(t *testing.T) {
 	}
 }
 
-// generatePodFromRC creates a pod, with the input rc's selector and its template
-func generatePodFromRC(rc api.ReplicationController) api.Pod {
+// generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
+func generatePodFromRS(rs extensions.ReplicaSet) api.Pod {
 	return api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Labels: rc.Spec.Selector,
+			Labels: rs.Labels,
 		},
-		Spec: rc.Spec.Template.Spec,
+		Spec: rs.Spec.Template.Spec,
 	}
 }
 
@@ -110,15 +158,15 @@ func generatePod(labels map[string]string, image string) api.Pod {
 	}
 }
 
-func generateRCWithLabel(labels map[string]string, image string) api.ReplicationController {
-	return api.ReplicationController{
+func generateRSWithLabel(labels map[string]string, image string) extensions.ReplicaSet {
+	return extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
-			Name:   api.SimpleNameGenerator.GenerateName("rc"),
+			Name:   api.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: labels,
 		},
-		Spec: api.ReplicationControllerSpec{
+		Spec: extensions.ReplicaSetSpec{
 			Replicas: 1,
-			Selector: labels,
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: &api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -135,17 +183,17 @@ func generateRCWithLabel(labels map[string]string, image string) api.Replication
 	}
 }
 
-// generateRC creates a replication controller, with the input deployment's template as its template
-func generateRC(deployment extensions.Deployment) api.ReplicationController {
-	template := GetNewRCTemplate(deployment)
-	return api.ReplicationController{
+// generateRS creates a replica set, with the input deployment's template as its template
+func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
+	template := GetNewReplicaSetTemplate(&deployment)
+	return extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
-			Name:   api.SimpleNameGenerator.GenerateName("rc"),
+			Name:   api.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: template.Labels,
 		},
-		Spec: api.ReplicationControllerSpec{
+		Spec: extensions.ReplicaSetSpec{
 			Template: &template,
-			Selector: template.Labels,
+			Selector: &unversioned.LabelSelector{MatchLabels: template.Labels},
 		},
 	}
 }
@@ -160,7 +208,7 @@ func generateDeployment(image string) extensions.Deployment {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
-			Selector: podLabels,
+			Selector: &unversioned.LabelSelector{MatchLabels: podLabels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,
@@ -186,106 +234,106 @@ func generateDeployment(image string) extensions.Deployment {
 
 func TestGetNewRC(t *testing.T) {
 	newDeployment := generateDeployment("nginx")
-	newRC := generateRC(newDeployment)
+	newRC := generateRS(newDeployment)
 
 	tests := []struct {
 		test     string
-		rcList   api.ReplicationControllerList
-		expected *api.ReplicationController
+		objs     []runtime.Object
+		expected *extensions.ReplicaSet
 	}{
 		{
-			"No new RC",
-			api.ReplicationControllerList{
-				Items: []api.ReplicationController{
-					generateRC(generateDeployment("foo")),
-					generateRC(generateDeployment("bar")),
+			"No new ReplicaSet",
+			[]runtime.Object{
+				&api.PodList{},
+				&extensions.ReplicaSetList{
+					Items: []extensions.ReplicaSet{
+						generateRS(generateDeployment("foo")),
+						generateRS(generateDeployment("bar")),
+					},
 				},
 			},
 			nil,
 		},
 		{
-			"Has new RC",
-			api.ReplicationControllerList{
-				Items: []api.ReplicationController{
-					generateRC(generateDeployment("foo")),
-					generateRC(generateDeployment("bar")),
-					generateRC(generateDeployment("abc")),
-					newRC,
-					generateRC(generateDeployment("xyz")),
+			"Has new ReplicaSet",
+			[]runtime.Object{
+				&api.PodList{},
+				&extensions.ReplicaSetList{
+					Items: []extensions.ReplicaSet{
+						generateRS(generateDeployment("foo")),
+						generateRS(generateDeployment("bar")),
+						generateRS(generateDeployment("abc")),
+						newRC,
+						generateRS(generateDeployment("xyz")),
+					},
 				},
 			},
 			&newRC,
 		},
 	}
 
-	ns := api.NamespaceDefault
 	for _, test := range tests {
-		c := &simple.Client{
-			Request: simple.Request{
-				Method: "GET",
-				Path:   testapi.Default.ResourcePath("replicationControllers", ns, ""),
-			},
-			Response: simple.Response{
-				StatusCode: 200,
-				Body:       &test.rcList,
-			},
-		}
-		rc, err := GetNewRC(newDeployment, c.Setup(t).Clientset)
+		fakeClient := &fake.Clientset{}
+		fakeClient = addListPodsReactor(fakeClient, test.objs[0])
+		fakeClient = addListRSReactor(fakeClient, test.objs[1])
+		fakeClient = addUpdatePodsReactor(fakeClient)
+		fakeClient = addUpdateRSReactor(fakeClient)
+		rs, err := GetNewReplicaSet(&newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
-		if !api.Semantic.DeepEqual(rc, test.expected) {
-			t.Errorf("In test case %s, expected %+v, got %+v", test.test, test.expected, rc)
+		if !api.Semantic.DeepEqual(rs, test.expected) {
+			t.Errorf("In test case %s, expected %+v, got %+v", test.test, test.expected, rs)
 		}
 	}
 }
 
 func TestGetOldRCs(t *testing.T) {
 	newDeployment := generateDeployment("nginx")
-	newRC := generateRC(newDeployment)
-	newPod := generatePodFromRC(newRC)
+	newRS := generateRS(newDeployment)
+	newPod := generatePodFromRS(newRS)
 
-	// create 2 old deployments and related rcs/pods, with the same labels but different template
+	// create 2 old deployments and related replica sets/pods, with the same labels but different template
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
-	oldRC := generateRC(oldDeployment)
-	oldPod := generatePodFromRC(oldRC)
+	oldRS := generateRS(oldDeployment)
+	oldPod := generatePodFromRS(oldRS)
 	oldDeployment2 := generateDeployment("nginx")
 	oldDeployment2.Spec.Template.Spec.Containers[0].Name = "nginx-old-2"
-	oldRC2 := generateRC(oldDeployment2)
-	oldPod2 := generatePodFromRC(oldRC2)
+	oldRS2 := generateRS(oldDeployment2)
+	oldPod2 := generatePodFromRS(oldRS2)
 
-	// create 1 rc that existed before the deployment, with the same labels as the deployment
-	existedPod := generatePod(newDeployment.Spec.Selector, "foo")
-	existedRC := generateRCWithLabel(newDeployment.Spec.Selector, "foo")
+	// create 1 ReplicaSet that existed before the deployment, with the same labels as the deployment
+	existedPod := generatePod(newDeployment.Spec.Template.Labels, "foo")
+	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
 
 	tests := []struct {
 		test     string
 		objs     []runtime.Object
-		expected []*api.ReplicationController
+		expected []*extensions.ReplicaSet
 	}{
 		{
-			"No old RCs",
+			"No old ReplicaSets",
 			[]runtime.Object{
 				&api.PodList{
 					Items: []api.Pod{
-						generatePod(newDeployment.Spec.Selector, "foo"),
-						generatePod(newDeployment.Spec.Selector, "bar"),
+						generatePod(newDeployment.Spec.Template.Labels, "foo"),
+						generatePod(newDeployment.Spec.Template.Labels, "bar"),
 						newPod,
 					},
 				},
-				&api.ReplicationControllerList{
-					Items: []api.ReplicationController{
-						generateRC(generateDeployment("foo")),
-						newRC,
-						generateRC(generateDeployment("bar")),
+				&extensions.ReplicaSetList{
+					Items: []extensions.ReplicaSet{
+						generateRS(generateDeployment("foo")),
+						newRS,
+						generateRS(generateDeployment("bar")),
 					},
 				},
 			},
-			[]*api.ReplicationController{},
+			[]*extensions.ReplicaSet{},
 		},
 		{
-			"Has old RC",
+			"Has old ReplicaSet",
 			[]runtime.Object{
 				&api.PodList{
 					Items: []api.Pod{
@@ -294,51 +342,64 @@ func TestGetOldRCs(t *testing.T) {
 						generatePod(map[string]string{"name": "bar"}, "bar"),
 						generatePod(map[string]string{"name": "xyz"}, "xyz"),
 						existedPod,
-						generatePod(newDeployment.Spec.Selector, "abc"),
+						generatePod(newDeployment.Spec.Template.Labels, "abc"),
 					},
 				},
-				&api.ReplicationControllerList{
-					Items: []api.ReplicationController{
-						oldRC2,
-						oldRC,
-						existedRC,
-						newRC,
-						generateRCWithLabel(map[string]string{"name": "xyz"}, "xyz"),
-						generateRCWithLabel(map[string]string{"name": "bar"}, "bar"),
+				&extensions.ReplicaSetList{
+					Items: []extensions.ReplicaSet{
+						oldRS2,
+						oldRS,
+						existedRS,
+						newRS,
+						generateRSWithLabel(map[string]string{"name": "xyz"}, "xyz"),
+						generateRSWithLabel(map[string]string{"name": "bar"}, "bar"),
 					},
 				},
 			},
-			[]*api.ReplicationController{&oldRC, &oldRC2, &existedRC},
+			[]*extensions.ReplicaSet{&oldRS, &oldRS2, &existedRS},
 		},
 	}
 
 	for _, test := range tests {
-		rcs, _, err := GetOldRCs(newDeployment, fake.NewSimpleClientset(test.objs...))
+		fakeClient := &fake.Clientset{}
+		fakeClient = addListPodsReactor(fakeClient, test.objs[0])
+		fakeClient = addListRSReactor(fakeClient, test.objs[1])
+		fakeClient = addGetRSReactor(fakeClient, test.objs[1])
+		fakeClient = addUpdatePodsReactor(fakeClient)
+		fakeClient = addUpdateRSReactor(fakeClient)
+		rss, _, err := GetOldReplicaSets(&newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
-		if !equal(rcs, test.expected) {
-			t.Errorf("In test case %q, expected %v, got %v", test.test, test.expected, rcs)
+		if !equal(rss, test.expected) {
+			t.Errorf("In test case %q, expected:", test.test)
+			for _, rs := range test.expected {
+				t.Errorf("rs = %+v", rs)
+			}
+			t.Errorf("In test case %q, got:", test.test)
+			for _, rs := range rss {
+				t.Errorf("rs = %+v", rs)
+			}
 		}
 	}
 }
 
-// equal compares the equality of two rc slices regardless of their ordering
-func equal(rcs1, rcs2 []*api.ReplicationController) bool {
-	if reflect.DeepEqual(rcs1, rcs2) {
+// equal compares the equality of two ReplicaSet slices regardless of their ordering
+func equal(rss1, rss2 []*extensions.ReplicaSet) bool {
+	if reflect.DeepEqual(rss1, rss2) {
 		return true
 	}
-	if rcs1 == nil || rcs2 == nil || len(rcs1) != len(rcs2) {
+	if rss1 == nil || rss2 == nil || len(rss1) != len(rss2) {
 		return false
 	}
 	count := 0
-	for _, rc1 := range rcs1 {
-		for _, rc2 := range rcs2 {
-			if reflect.DeepEqual(rc1, rc2) {
+	for _, rs1 := range rss1 {
+		for _, rs2 := range rss2 {
+			if reflect.DeepEqual(rs1, rs2) {
 				count++
 				break
 			}
 		}
 	}
-	return count == len(rcs1)
+	return count == len(rss1)
 }

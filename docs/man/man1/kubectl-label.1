@@ -74,7 +74,7 @@ If \-\-resource\-version is specified, then updates will use this resource versi
 
 .PP
 \fB\-\-sort\-by\fP=""
-    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
 \fB\-\-template\fP=""
@@ -182,23 +182,23 @@ If \-\-resource\-version is specified, then updates will use this resource versi
 
 .nf
 # Update pod 'foo' with the label 'unhealthy' and the value 'true'.
-$ kubectl label pods foo unhealthy=true
+kubectl label pods foo unhealthy=true
 
 # Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
-$ kubectl label \-\-overwrite pods foo status=unhealthy
+kubectl label \-\-overwrite pods foo status=unhealthy
 
 # Update all pods in the namespace
-$ kubectl label pods \-\-all status=unhealthy
+kubectl label pods \-\-all status=unhealthy
 
 # Update a pod identified by the type and name in "pod.json"
-$ kubectl label \-f pod.json status=unhealthy
+kubectl label \-f pod.json status=unhealthy
 
 # Update pod 'foo' only if the resource is unchanged from version 1.
-$ kubectl label pods foo status=unhealthy \-\-resource\-version=1
+kubectl label pods foo status=unhealthy \-\-resource\-version=1
 
 # Update pod 'foo' by removing a label named 'bar' if it exists.
 # Does not require the \-\-overwrite flag.
-$ kubectl label pods foo bar\-
+kubectl label pods foo bar\-
 
 .fi
 .RE

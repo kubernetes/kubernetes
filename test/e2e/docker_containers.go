@@ -25,7 +25,7 @@ import (
 )
 
 var _ = Describe("Docker Containers", func() {
-	framework := NewFramework("containers")
+	framework := NewDefaultFramework("containers")
 	var c *client.Client
 	var ns string
 

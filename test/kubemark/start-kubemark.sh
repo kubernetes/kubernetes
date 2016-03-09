@@ -216,10 +216,29 @@ kubectl create -f "${KUBE_ROOT}"/test/kubemark/hollow-node.json --namespace="kub
 rm "${KUBECONFIG_SECRET}"
 
 echo "Waiting for all HollowNodes to become Running..."
-echo "This can loop forever if something crashed."
-until [[ "$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_NODES}" ]]; do
+start=$(date +%s)
+nodes=$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
+ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
+
+until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
   echo -n .
   sleep 1
+  now=$(date +%s)
+  # Fail it if it already took more than 15 minutes.
+  if [ $((now - start)) -gt 900 ]; then
+    echo ""
+    echo "Timeout waiting for all HollowNodes to become Running"
+    # Try listing nodes again - if it fails it means that API server is not responding
+    if kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node &> /dev/null; then
+      echo "Found only ${ready} ready Nodes while waiting for ${NUM_NODES}."
+      exit 1
+    fi
+    echo "Got error while trying to list Nodes. Probably API server is down."
+    exit 1
+  fi
+  nodes=$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
+  ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 done
+
 echo ""
 echo "Password to kubemark master: ${password}"

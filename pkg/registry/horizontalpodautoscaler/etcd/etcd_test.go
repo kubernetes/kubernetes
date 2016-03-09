@@ -33,7 +33,8 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
-	horizontalPodAutoscalerStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	horizontalPodAutoscalerStorage, statusStorage := NewREST(restOptions)
 	return horizontalPodAutoscalerStorage, statusStorage, server
 }
 

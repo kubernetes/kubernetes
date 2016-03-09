@@ -77,7 +77,7 @@ export PODNAME=`kubectl get pods --selector="app=selenium-hub" --output=template
 kubectl port-forward --pod=$PODNAME 4444:4444
 ```
 
-In a seperate terminal, you can now check the status.
+In a separate terminal, you can now check the status.
 
 ```console
 curl http://localhost:4444

@@ -40,21 +40,18 @@ First, create a template of a Job object:
 <!-- BEGIN MUNGE: EXAMPLE job.yaml.txt -->
 
 ```
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: process-item-$ITEM
+  labels:
+    jobgroup: jobexample
 spec:
-  selector:
-    matchLabels:
-      app: jobexample
-      item: $ITEM
   template:
     metadata:
       name: jobexample
       labels:
-        app: jobexample
-        item: $ITEM
+        jobgroup: jobexample
     spec:
       containers:
       - name: c
@@ -75,12 +72,14 @@ In a real use case, the processing would be some substantial computation, such a
 of a movie, or processing a range of rows in a database.  The "$ITEM" parameter would specify for
 example, the frame number or the row range.
 
-This Job has two labels. The first label, `app=jobexample`, distinguishes this group of jobs from
-other groups of jobs (these are not shown, but there might be other ones).  This label
-makes it convenient to operate on all the jobs in the group at once.  The second label, with
-key `item`, distinguishes individual jobs in the group.  Each Job object needs to have
-a unique label that no other job has.  This is it.
-Neither of these label keys are special to kubernetes -- you can pick your own label scheme.
+This Job and its Pod template have a label: `jobgroup=jobexample`.  There is nothing special
+to the system about this label.  This label
+makes it convenient to operate on all the jobs in this group at once.
+We also put the same label on the pod template so that we can check on all Pods of these Jobs
+with a single command.
+After the job is created, the system will add more labels that distinguish one Job's pods
+from another Job's pods.
+Note that the label key `jobgroup` is not special to Kubernetes. you can pick your own label scheme.
 
 Next, expand the template into multiple files, one for each item to be processed.
 
@@ -113,27 +112,25 @@ job "process-item-cherry" created
 Now, check on the jobs:
 
 ```console
-$ kubectl get jobs -l app=jobexample -L item
-JOB                   CONTAINER(S)   IMAGE(S)   SELECTOR                               SUCCESSFUL ITEM
-process-item-apple    c              busybox    app in (jobexample),item in (apple)    1          apple
-process-item-banana   c              busybox    app in (jobexample),item in (banana)   1          banana
-process-item-cherry   c              busybox    app in (jobexample),item in (cherry)   1          cherry
+$ kubectl get jobs -l app=jobexample
+JOB                   CONTAINER(S)   IMAGE(S)   SELECTOR                               SUCCESSFUL
+process-item-apple    c              busybox    app in (jobexample),item in (apple)    1
+process-item-banana   c              busybox    app in (jobexample),item in (banana)   1
+process-item-cherry   c              busybox    app in (jobexample),item in (cherry)   1
 ```
 
 Here we use the `-l` option to select all jobs that are part of this
 group of jobs.  (There might be other unrelated jobs in the system that we
 do not care to see.)
 
-The `-L` option adds an extra column with just the `item` label value.
-
 We can check on the pods as well using the same label selector:
 
 ```console
-$ kubectl get pods -l app=jobexample -L item
-NAME                        READY     STATUS      RESTARTS   AGE       ITEM
-process-item-apple-kixwv    0/1       Completed   0          4m        apple
-process-item-banana-wrsf7   0/1       Completed   0          4m        banana
-process-item-cherry-dnfu9   0/1       Completed   0          4m        cherry
+$ kubectl get pods -l app=jobexample
+NAME                        READY     STATUS      RESTARTS   AGE
+process-item-apple-kixwv    0/1       Completed   0          4m 
+process-item-banana-wrsf7   0/1       Completed   0          4m 
+process-item-cherry-dnfu9   0/1       Completed   0          4m 
 ```
 
 There is not a single command to check on the output of all jobs at once,
@@ -170,21 +167,17 @@ First, download or paste the following template file to a file called `job.yaml.
 {%- for p in params %}
 {%- set name = p["name"] %}
 {%- set url = p["url"] %}
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: jobexample-{{ name }}
+  labels:
+    jobgroup: jobexample
 spec:
-  selector:
-    matchLabels:
-      app: jobexample
-      item: {{ name }}
   template:
-    metadata:
       name: jobexample
       labels:
-        app: jobexample
-        item: {{ name }}
+        jobgroup: jobexample
     spec:
       containers:
       - name: c

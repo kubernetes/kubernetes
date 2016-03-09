@@ -488,26 +488,6 @@ func TestValidateJob(t *testing.T) {
 	}
 }
 
-type ErrorScales struct {
-	testclient.FakeScales
-	invalid bool
-}
-
-func (c *ErrorScales) Update(kind string, scale *extensions.Scale) (*extensions.Scale, error) {
-	if c.invalid {
-		return nil, kerrors.NewInvalid(extensions.Kind(scale.Kind), scale.Name, nil)
-	}
-	return nil, errors.New("scale update failure")
-}
-
-func (c *ErrorScales) Get(kind, name string) (*extensions.Scale, error) {
-	return &extensions.Scale{
-		Spec: extensions.ScaleSpec{
-			Replicas: 0,
-		},
-	}, nil
-}
-
 type ErrorDeployments struct {
 	testclient.FakeDeployments
 	invalid bool
@@ -535,10 +515,6 @@ type ErrorDeploymentClient struct {
 
 func (c *ErrorDeploymentClient) Deployments(namespace string) client.DeploymentInterface {
 	return &ErrorDeployments{testclient.FakeDeployments{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
-}
-
-func (c *ErrorDeploymentClient) Scales(namespace string) client.ScaleInterface {
-	return &ErrorScales{testclient.FakeScales{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
 }
 
 func TestDeploymentScaleRetry(t *testing.T) {
@@ -580,9 +556,8 @@ func TestDeploymentScale(t *testing.T) {
 	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "deployments" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
-	// TODO: The testclient needs to support subresources
-	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "Deployment" || action.GetObject().(*extensions.Scale).Spec.Replicas != int(count) {
-		t.Errorf("unexpected action %v, expected update-deployment-scale with replicas = %d", actions[1], count)
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "deployments" || action.GetObject().(*extensions.Deployment).Spec.Replicas != int(count) {
+		t.Errorf("unexpected action %v, expected update-deployment with replicas = %d", actions[1], count)
 	}
 }
 

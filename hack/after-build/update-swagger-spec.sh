@@ -40,6 +40,7 @@ kube::golang::setup_env
 
 apiserver=$(kube::util::find-binary "kube-apiserver")
 
+TMP_DIR=$(mktemp -d /tmp/update-swagger-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8050}
@@ -50,29 +51,49 @@ kube::etcd::start
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-  --address="127.0.0.1" \
-  --public-address-override="127.0.0.1" \
-  --port="${API_PORT}" \
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+  --insecure-bind-address="127.0.0.1" \
+  --bind-address="127.0.0.1" \
+  --insecure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-  --public-address-override="127.0.0.1" \
   --advertise-address="10.10.10.10" \
-  --kubelet-port=${KUBELET_PORT} \
+  --cert-dir="${TMP_DIR}/certs" \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
 SWAGGER_API_PATH="http://127.0.0.1:${API_PORT}/swaggerapi/"
-kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
-curl -fs ${SWAGGER_API_PATH} > ${SWAGGER_ROOT_DIR}/resourceListing.json
-curl -fs ${SWAGGER_API_PATH}version > ${SWAGGER_ROOT_DIR}/version.json
-curl -fs ${SWAGGER_API_PATH}api > ${SWAGGER_ROOT_DIR}/api.json
-curl -fs ${SWAGGER_API_PATH}api/v1 > ${SWAGGER_ROOT_DIR}/v1.json
-curl -fs ${SWAGGER_API_PATH}apis > ${SWAGGER_ROOT_DIR}/apis.json
-curl -fs ${SWAGGER_API_PATH}apis/extensions > ${SWAGGER_ROOT_DIR}/extensions.json
-curl -fs ${SWAGGER_API_PATH}apis/extensions/v1beta1 > ${SWAGGER_ROOT_DIR}/v1beta1.json
+DEFAULT_GROUP_VERSIONS="v1 autoscaling/v1 batch/v1 extensions/v1beta1"
+VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 
+kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
+
+for ver in ${VERSIONS}; do
+  # fetch the swagger spec for each group version. 
+  if [[ ${ver} == "v1" ]]; then
+    SUBPATH="api"
+  else
+    SUBPATH="apis"
+  fi
+  SUBPATH="${SUBPATH}/${ver}"
+  SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name ${ver}).json"
+  curl -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+  
+  # fetch the swagger spec for the discovery mechanism at group level.
+  if [[ ${ver} == "v1" ]]; then
+    continue 
+  fi
+  SUBPATH="apis/"${ver%/*}
+  SWAGGER_JSON_NAME="${ver%/*}.json"
+  curl -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+done
+
+# fetch swagger specs for other discovery mechanism.
+curl -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
+curl -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
+curl -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
+curl -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
 kube::log::status "SUCCESS"
 
 # ex: ts=2 sw=2 et filetype=sh

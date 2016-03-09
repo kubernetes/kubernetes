@@ -36,7 +36,7 @@ const (
 )
 
 var _ = Describe("Probing container", func() {
-	framework := NewFramework("container-probe")
+	framework := NewDefaultFramework("container-probe")
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}
 
@@ -148,7 +148,7 @@ func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:           probTestContainerName,
-					Image:          "gcr.io/google_containers/test-webserver",
+					Image:          "gcr.io/google_containers/test-webserver:e2e",
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},

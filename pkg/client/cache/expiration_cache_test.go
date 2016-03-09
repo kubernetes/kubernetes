@@ -28,7 +28,7 @@ import (
 
 func TestTTLExpirationBasic(t *testing.T) {
 	testObj := testStoreObject{id: "foo", val: "bar"}
-	deleteChan := make(chan string)
+	deleteChan := make(chan string, 1)
 	ttlStore := NewFakeExpirationStore(
 		testStoreKeyFunc, deleteChan,
 		&FakeExpirationPolicy{
@@ -62,6 +62,59 @@ func TestTTLExpirationBasic(t *testing.T) {
 	close(deleteChan)
 }
 
+func TestReAddExpiredItem(t *testing.T) {
+	deleteChan := make(chan string, 1)
+	exp := &FakeExpirationPolicy{
+		NeverExpire: sets.NewString(),
+		RetrieveKeyFunc: func(obj interface{}) (string, error) {
+			return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
+		},
+	}
+	ttlStore := NewFakeExpirationStore(
+		testStoreKeyFunc, deleteChan, exp, util.RealClock{})
+	testKey := "foo"
+	testObj := testStoreObject{id: testKey, val: "bar"}
+	err := ttlStore.Add(testObj)
+	if err != nil {
+		t.Errorf("Unable to add obj %#v", testObj)
+	}
+
+	// This get will expire the item.
+	item, exists, err := ttlStore.Get(testObj)
+	if err != nil {
+		t.Errorf("Failed to get from store, %v", err)
+	}
+	if exists || item != nil {
+		t.Errorf("Got unexpected item %#v", item)
+	}
+
+	key, _ := testStoreKeyFunc(testObj)
+	differentValue := "different_bar"
+	err = ttlStore.Add(
+		testStoreObject{id: testKey, val: differentValue})
+	if err != nil {
+		t.Errorf("Failed to add second value")
+	}
+
+	select {
+	case delKey := <-deleteChan:
+		if delKey != key {
+			t.Errorf("Unexpected delete for key %s", key)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("Unexpected timeout waiting on delete")
+	}
+	exp.NeverExpire = sets.NewString(testKey)
+	item, exists, err = ttlStore.GetByKey(testKey)
+	if err != nil {
+		t.Errorf("Failed to get from store, %v", err)
+	}
+	if !exists || item == nil || item.(testStoreObject).val != differentValue {
+		t.Errorf("Got unexpected item %#v", item)
+	}
+	close(deleteChan)
+}
+
 func TestTTLList(t *testing.T) {
 	testObjs := []testStoreObject{
 		{id: "foo", val: "bar"},
@@ -69,7 +122,7 @@ func TestTTLList(t *testing.T) {
 		{id: "foo2", val: "bar2"},
 	}
 	expireKeys := sets.NewString(testObjs[0].id, testObjs[2].id)
-	deleteChan := make(chan string)
+	deleteChan := make(chan string, len(testObjs))
 	defer close(deleteChan)
 
 	ttlStore := NewFakeExpirationStore(

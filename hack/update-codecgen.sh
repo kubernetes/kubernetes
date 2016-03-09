@@ -32,12 +32,21 @@ generated_files=($(
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
+        -o -wholename '*/codecgen-*-1234.generated.go' \
       \) -prune \
     \) -name '*.generated.go'))
 
-# Build codecgen binary from Godeps.
+# Register function to be called on EXIT to remove codecgen
+# binary and also to touch the files that should be regenerated
+# since they are first removed.
+# This is necessary to make the script work after previous failure.
 function cleanup {
   rm -f "${CODECGEN:-}"
+  pushd "${KUBE_ROOT}" > /dev/null
+  for (( i=0; i < number; i++ )); do
+    touch "${generated_files[${i}]}" || true
+  done
+  popd > /dev/null
 }
 trap cleanup EXIT
 
@@ -112,11 +121,11 @@ for current in "${index[@]}"; do
   pushd "$(dirname ${file})" > /dev/null
   base_file=$(basename "${file}")
   base_generated_file=$(basename "${generated_file}")
-  # We use '-d 1234' flag to have a deterministic output everytime.
+  # We use '-d 1234' flag to have a deterministic output every time.
   # The constant was just randomly chosen.
   echo Running ${CODECGEN} -d 1234 -o  "${base_generated_file}" "${base_file}"
   ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
-  # Add boilerplate at the begining of the generated file.
+  # Add boilerplate at the beginning of the generated file.
   sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
   cat "${base_generated_file}" >> "${base_generated_file}.tmp"
   mv "${base_generated_file}.tmp" "${base_generated_file}"

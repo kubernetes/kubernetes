@@ -48,7 +48,7 @@ type PrivilegedPodTestConfig struct {
 }
 
 var _ = Describe("PrivilegedPod", func() {
-	f := NewFramework("e2e-privilegedpod")
+	f := NewDefaultFramework("e2e-privilegedpod")
 	config := &PrivilegedPodTestConfig{
 		f: f,
 	}

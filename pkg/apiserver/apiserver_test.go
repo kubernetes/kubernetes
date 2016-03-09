@@ -59,9 +59,12 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
+var testAPIGroup2 = "test.group2"
 var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: runtime.APIVersionInternal}
 var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
 var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
+var testGroup2Version = unversioned.GroupVersion{Group: testAPIGroup2, Version: "version"}
+var testInternalGroup2Version = unversioned.GroupVersion{Group: testAPIGroup2, Version: runtime.APIVersionInternal}
 var prefix = "apis"
 
 var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
@@ -95,6 +98,11 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	case grouplessGroupVersion:
+		return &meta.VersionInterfaces{
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case testGroup2Version:
 		return &meta.VersionInterfaces{
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
@@ -139,11 +147,18 @@ func addTestTypes() {
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
-		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
+		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &api.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{},
-		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
+		&SimpleXGSubresource{})
+	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
+	// their corresponding internal versions, to verify that the desired group version object is
+	// served in the tests.
+	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{})
+	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{})
 }
 
 func addNewTestTypes() {
@@ -3154,6 +3169,124 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	} else if !strings.Contains(string(b), "does not match the expected API version") {
 		t.Errorf("unexpected response: %s", string(b))
+	}
+}
+
+// SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
+// same group as its parent resource.
+type SimpleXGSubresource struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata"`
+	SubresourceInfo      string            `json:"subresourceInfo,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty"`
+}
+
+func (obj *SimpleXGSubresource) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+
+type SimpleXGSubresourceRESTStorage struct {
+	item SimpleXGSubresource
+}
+
+func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
+	return &SimpleXGSubresource{}
+}
+
+func (storage *SimpleXGSubresourceRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
+	copied, err := api.Scheme.Copy(&storage.item)
+	if err != nil {
+		panic(err)
+	}
+	return copied, nil
+}
+
+func TestXGSubresource(t *testing.T) {
+	container := restful.NewContainer()
+	container.Router(restful.CurlyRouter{})
+	mux := container.ServeMux
+
+	itemID := "theID"
+	subresourceStorage := &SimpleXGSubresourceRESTStorage{
+		item: SimpleXGSubresource{
+			SubresourceInfo: "foo",
+		},
+	}
+	storage := map[string]rest.Storage{
+		"simple":           &SimpleRESTStorage{},
+		"simple/subsimple": subresourceStorage,
+	}
+
+	group := APIGroupVersion{
+		Storage: storage,
+
+		RequestInfoResolver: newTestRequestInfoResolver(),
+
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    selfLinker,
+		Mapper:    namespaceMapper,
+
+		ParameterCodec: api.ParameterCodec,
+
+		Admit:   admissionControl,
+		Context: requestContextMapper,
+
+		Root:                   "/" + prefix,
+		GroupVersion:           testGroupVersion,
+		OptionsExternalVersion: &testGroupVersion,
+		Serializer:             api.Codecs,
+
+		SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{
+			"simple/subsimple": testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}
+
+	if err := (&group).InstallREST(container); err != nil {
+		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+	}
+
+	ws := new(restful.WebService)
+	InstallSupport(mux, ws)
+	container.Add(ws)
+
+	handler := defaultAPIServer{mux, container}
+	server := httptest.NewServer(handler)
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/subsimple")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	var itemOut SimpleXGSubresource
+	body, err := extractBody(resp, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Test if the returned object has the expected group, version and kind
+	// We are directly unmarshaling JSON here because TypeMeta cannot be decoded through the
+	// installed decoders. TypeMeta cannot be decoded because it is added to the ignored
+	// conversion type list in API scheme and hence cannot be converted from input type object
+	// to output type object. So it's values don't appear in the decoded output object.
+	decoder := json.NewDecoder(strings.NewReader(body))
+	var itemFromBody SimpleXGSubresource
+	err = decoder.Decode(&itemFromBody)
+	if err != nil {
+		t.Errorf("unexpected JSON decoding error: %v", err)
+	}
+	if want := fmt.Sprintf("%s/%s", testGroup2Version.Group, testGroup2Version.Version); itemFromBody.APIVersion != want {
+		t.Errorf("unexpected APIVersion got: %+v want: %+v", itemFromBody.APIVersion, want)
+	}
+	if itemFromBody.Kind != "SimpleXGSubresource" {
+		t.Errorf("unexpected Kind got: %+v want: SimpleXGSubresource", itemFromBody.Kind)
+	}
+
+	if itemOut.Name != subresourceStorage.item.Name {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, subresourceStorage.item, string(body))
 	}
 }
 

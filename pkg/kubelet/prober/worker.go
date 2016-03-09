@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/golang/glog"
@@ -60,6 +61,9 @@ type worker struct {
 	lastResult results.Result
 	// How many times in a row the probe has returned the same result.
 	resultRun int
+
+	// If set, skip probing.
+	onHold bool
 }
 
 // Creates and starts a new probe worker.
@@ -93,7 +97,8 @@ func newWorker(
 
 // run periodically probes the container.
 func (w *worker) run() {
-	probeTicker := time.NewTicker(time.Duration(w.spec.PeriodSeconds) * time.Second)
+	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+	probeTicker := time.NewTicker(probeTickerPeriod)
 
 	defer func() {
 		// Clean up.
@@ -104,6 +109,10 @@ func (w *worker) run() {
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
 	}()
+
+	// If kubelet restarted the probes could be started in rapid succession.
+	// Let the worker wait for a random portion of tickerPeriod before probing.
+	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
 
 probeLoop:
 	for w.doProbe() {
@@ -146,9 +155,9 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	c, ok := api.GetContainerStatus(status.ContainerStatuses, w.container.Name)
-	if !ok {
+	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
-		glog.V(3).Infof("Non-existant container probed: %v - %v",
+		glog.V(3).Infof("Probe target container not found: %v - %v",
 			format.Pod(w.pod), w.container.Name)
 		return true // Wait for more information.
 	}
@@ -159,6 +168,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		// We've got a new container; resume probing.
+		w.onHold = false
+	}
+
+	if w.onHold {
+		// Worker is on hold until there is a new container.
+		return true
 	}
 
 	if c.State.Running == nil {
@@ -196,6 +212,14 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
+
+	if w.probeType == liveness && result == results.Failure {
+		// The container fails a liveness check, it will need to be restared.
+		// Stop probing until we see a new container ID. This is to reduce the
+		// chance of hitting #21751, where running `docker exec` when a
+		// container is being stopped may lead to corrupted container state.
+		w.onHold = true
+	}
 
 	return true
 }

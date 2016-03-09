@@ -108,7 +108,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubetypes.PodUpdate, expected ...ku
 		if len(expected[i].Pods) != len(update.Pods) {
 			t.Fatalf("Expected %#v, Got %#v", expected[i], update)
 		}
-		// Compare pods one by one. This is necessary beacuse we don't want to
+		// Compare pods one by one. This is necessary because we don't want to
 		// compare local annotations.
 		for j := range expected[i].Pods {
 			if podsDifferSemantically(expected[i].Pods[j], update.Pods[j]) || !reflect.DeepEqual(expected[i].Pods[j].Status, update.Pods[j].Status) {

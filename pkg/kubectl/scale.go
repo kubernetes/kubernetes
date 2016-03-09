@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -46,8 +47,8 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 		return &ReplicationControllerScaler{c}, nil
 	case extensions.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
-	case extensions.Kind("Job"):
-		return &JobScaler{c.Extensions()}, nil
+	case extensions.Kind("Job"), batch.Kind("Job"):
+		return &JobScaler{c.Extensions()}, nil // Either kind of job can be scaled with Extensions interface.
 	case extensions.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
@@ -342,9 +343,11 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 			return err
 		}
 	}
-	scale := extensions.ScaleFromDeployment(deployment)
-	scale.Spec.Replicas = int(newSize)
-	if _, err := scaler.c.Scales(namespace).Update("Deployment", scale); err != nil {
+
+	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
+	// For now I'm falling back to regular Deployment update operation.
+	deployment.Spec.Replicas = int(newSize)
+	if _, err := scaler.c.Deployments(namespace).Update(deployment); err != nil {
 		if errors.IsInvalid(err) {
 			return ScaleError{ScaleUpdateInvalidFailure, deployment.ResourceVersion, err}
 		}

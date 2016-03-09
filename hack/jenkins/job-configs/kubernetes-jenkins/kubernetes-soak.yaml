@@ -1,0 +1,160 @@
+- job-template:
+    name: 'kubernetes-soak-weekly-deploy-{suffix}'
+    description: '{deploy-description} Test owner: {test-owner}'
+    logrotate:
+        daysToKeep: 14
+    builders:
+        - shell: |
+            {provider-env}
+            {soak-deploy}
+            {job-env}
+            {post-env}
+            timeout -k {kill-timeout}m 90m {runner} && rc=$? || rc=$?
+            {report-rc}
+    properties:
+        - build-blocker:
+            use-build-blocker: true
+            blocking-jobs:
+                - 'kubernetes-soak-continuous-e2e-{suffix}'
+    publishers:
+        - email-ext
+        - gcs-uploader
+    triggers:
+        - timed: 'H 0 * * 2'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{jenkins-timeout}'
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- job-template:
+    name: 'kubernetes-soak-continuous-e2e-{suffix}'
+    description: '{e2e-description} Test Owner: {test-owner}'
+    workspace: '/var/lib/jenkins/jobs/kubernetes-soak-weekly-deploy-{suffix}/workspace'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            {provider-env}
+            {soak-continuous}
+            {job-env}
+            {post-env}
+            timeout -k {kill-timeout}m 360m {runner} && rc=$? || rc=$?
+            {report-rc}
+    properties:
+        - build-blocker:
+            use-build-blocker: true
+            blocking-jobs:
+                - 'kubernetes-soak-weekly-deploy-{suffix}'
+            queue-scanning: ALL
+    publishers:
+        - claim-build
+        - email-ext
+        - gcs-uploader
+        - junit-publisher
+        - log-parser
+    triggers:
+        - timed: 'H/30 * * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{jenkins-timeout}'
+            fail: true
+        - timestamps
+
+- project:
+    name: soak
+    test-owner: 'Build Cop'
+    soak-deploy: |
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
+        export E2E_TEST="false"
+        export E2E_DOWN="false"
+    soak-continuous: |
+        export JENKINS_USE_EXISTING_BINARIES="y"
+        export FAIL_ON_GCP_RESOURCE_LEAK="false"
+        export E2E_UP="false"
+        export E2E_DOWN="false"
+        # Clear out any orphaned namespaces in case previous run was interrupted.
+        export E2E_CLEAN_START="true"
+        # TODO: Remove when we figure out #22166 and other docker potential slowness.
+        export DOCKER_TEST_LOG_LEVEL="--log-level=warn"
+        # We should be testing the reliability of a long-running cluster. The
+        # [Disruptive] tests kill/restart components or nodes in the cluster,
+        # defeating the purpose of a soak cluster. (#15722)
+        export GINKGO_TEST_ARGS="--ginkgo.skip=\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+    suffix:
+        - 'gce':
+            deploy-description: |
+                Deploy Kubernetes to soak cluster using the latest successful
+                Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gce build is running,
+                this deployment build will be blocked and remain in the queue
+                until the test run is complete.<br>
+            e2e-description: |
+                Assumes Kubernetes soak cluster is already deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gce build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            branch: 'master'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                export PROJECT="k8s-jkns-gce-soak"
+        - 'gce-2':
+            deploy-description: Clone of kubernetes-soak-weekly-deploy-gce.
+            e2e-description: Clone of kubernetes-soak-continuous-e2e-gce.
+            branch: 'master'
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                export HAIRPIN_MODE="hairpin-veth"
+                export PROJECT="k8s-jkns-gce-soak-2"
+        - 'gce-1.1':
+            deploy-description: |
+                Deploy Kubernetes to soak cluster using the latest successful
+                current release CI-produced Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gce-1.1 build is running,
+                this deployment build will be blocked and remain in the queue
+                until the test run is complete.<br>
+            e2e-description: |
+                Assumes Kubernetes soak current-release cluster is already
+                deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gce-1.1 build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            branch: 'release-1.1'
+            runner: '{old-runner-1-1}'
+            post-env: ''
+            soak-deploy: ''
+            soak-continuous: ''
+        - 'gke':
+            deploy-description: |
+                Deploy Kubernetes to a GKE soak cluster using the staging GKE
+                Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gke build is running, this
+                deployment build will be blocked and remain in the queue until
+                the test run is complete.<br>
+                Current Settings:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: staging<br>
+                - client (kubectl): release/stable.txt<br>
+                - cluster (k8s): release/stable.txt<br>
+                - tests: release/stable.txt<br>
+            e2e-description: |
+                Assumes Kubernetes GKE soak cluster is already deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gke build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            branch: 'master'
+            provider-env: '{gke-provider-env}'
+            job-env: |
+                export PROJECT="k8s-jkns-gke-soak"
+                # Need at least n1-standard-2 nodes to run kubelet_perf tests
+                export MACHINE_TYPE="n1-standard-2"
+                export E2E_OPT="--check_version_skew=false"
+    jobs:
+        - 'kubernetes-soak-weekly-deploy-{suffix}'
+        - 'kubernetes-soak-continuous-e2e-{suffix}'

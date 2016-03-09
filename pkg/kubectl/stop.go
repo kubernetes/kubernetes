@@ -25,10 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -40,7 +42,8 @@ const (
 
 // A Reaper handles terminating an object as gracefully as possible.
 // timeout is how long we'll wait for the termination to be successful
-// gracePeriod is time given to an API object for it to delete itself cleanly (e.g. pod shutdown)
+// gracePeriod is time given to an API object for it to delete itself cleanly,
+// e.g., pod shutdown. It may or may not be supported by the API object.
 type Reaper interface {
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error
 }
@@ -75,8 +78,11 @@ func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	case api.Kind("Service"):
 		return &ServiceReaper{c}, nil
 
-	case extensions.Kind("Job"):
+	case extensions.Kind("Job"), batch.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
+
+	case extensions.Kind("Deployment"):
+		return &DeploymentReaper{c, Interval, Timeout}, nil
 
 	}
 	return nil, &NoSuchReaperError{kind}
@@ -99,6 +105,10 @@ type DaemonSetReaper struct {
 	pollInterval, timeout time.Duration
 }
 type JobReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+type DeploymentReaper struct {
 	client.Interface
 	pollInterval, timeout time.Duration
 }
@@ -191,10 +201,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 			return err
 		}
 	}
-	if err := rc.Delete(name); err != nil {
-		return err
-	}
-	return nil
+	return rc.Delete(name)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
@@ -266,7 +273,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		}
 	}
 
-	if err := rsc.Delete(name, gracePeriod); err != nil {
+	if err := rsc.Delete(name, nil); err != nil {
 		return err
 	}
 	return nil
@@ -303,10 +310,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return err
 	}
 
-	if err := reaper.Extensions().DaemonSets(namespace).Delete(name); err != nil {
-		return err
-	}
-	return nil
+	return reaper.Extensions().DaemonSets(namespace).Delete(name)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -352,10 +356,76 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return utilerrors.NewAggregate(errList)
 	}
 	// once we have all the pods removed we can safely remove the job itself
-	if err := jobs.Delete(name, gracePeriod); err != nil {
+	return jobs.Delete(name, nil)
+}
+
+func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
+	deployments := reaper.Extensions().Deployments(namespace)
+	replicaSets := reaper.Extensions().ReplicaSets(namespace)
+	rsReaper, _ := ReaperFor(extensions.Kind("ReplicaSet"), reaper)
+
+	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
+		// set deployment's history and scale to 0
+		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
+		d.Spec.RevisionHistoryLimit = util.IntPtr(0)
+		d.Spec.Replicas = 0
+		d.Spec.Paused = true
+	})
+	if err != nil {
 		return err
 	}
-	return nil
+
+	// Use observedGeneration to determine if the deployment controller noticed the pause.
+	if err := deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
+		return deployments.Get(name)
+	}, deployment.Generation, 10*time.Millisecond, 1*time.Minute); err != nil {
+		return err
+	}
+
+	// Stop all replica sets.
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return err
+	}
+
+	options := api.ListOptions{LabelSelector: selector}
+	rsList, err := replicaSets.List(options)
+	if err != nil {
+		return err
+	}
+	errList := []error{}
+	for _, rc := range rsList.Items {
+		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
+			if !errors.IsNotFound(err) {
+				errList = append(errList, err)
+			}
+		}
+	}
+	if len(errList) > 0 {
+		return utilerrors.NewAggregate(errList)
+	}
+
+	// Delete deployment at the end.
+	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
+	return deployments.Delete(name, nil)
+}
+
+type updateDeploymentFunc func(d *extensions.Deployment)
+
+func (reaper *DeploymentReaper) updateDeploymentWithRetries(namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
+	deployments := reaper.Extensions().Deployments(namespace)
+	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if deployment, err = deployments.Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(deployment)
+		if deployment, err = deployments.Update(deployment); err == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	return deployment, err
 }
 
 func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -364,11 +434,7 @@ func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gra
 	if err != nil {
 		return err
 	}
-	if err := pods.Delete(name, gracePeriod); err != nil {
-		return err
-	}
-
-	return nil
+	return pods.Delete(name, gracePeriod)
 }
 
 func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -377,8 +443,5 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 	if err != nil {
 		return err
 	}
-	if err := services.Delete(name); err != nil {
-		return err
-	}
-	return nil
+	return services.Delete(name)
 }

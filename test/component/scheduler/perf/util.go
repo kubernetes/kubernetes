@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -53,9 +54,9 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		m.Handler.ServeHTTP(w, req)
 	}))
 
-	c := client.NewOrDie(&client.Config{
+	c := client.NewOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		QPS:           5000.0,
 		Burst:         5000,
 	})

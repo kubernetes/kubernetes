@@ -1,0 +1,158 @@
+# Job template to checkout source from github to $WORKSPACE/go/src/{gitbasedir} and build + publish a docker image.
+# - Tags the docker image with 'canary'.
+# - Job is executed daily and when changes are found polling github (every 5m).
+# - Console output is published to google cloud storage.
+#
+# gitproject: name of the project - for display purposes only
+# owner: owner to be notified for job failures.  test results are published to owner email
+# repoName: github repo to checkout e.g. kubernetes/kubernetes or google/cadvisor.  Must match the docker image repo name where the image will be published.
+# gitbasedir: directory under $WORKSPACE/go/src to checkout source repo to - e.g. k8s.io/kubernetes or github.com/google/cadvisor
+# dockerfilePath: workspace relative path to the 'Dockerfile' to build
+- job-template:
+    name: '{gitproject}-dockercanarybuild-ci'
+    description: 'Build and push {gitproject} docker image.<br>Test Owner: {owner}.'
+    node: 'node'
+    logrotate:
+        numToKeep: 200
+    node: node
+    builders:
+         - docker-build-publish:
+             repoName: '{repoName}'
+             dockerfilePath: 'go/src/{gitbasedir}/{dockerfilePath}'
+             tag: 'canary'
+             credentialsId: '1f361efb-5b85-4f61-91a7-4ec7fb2a5c23'
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: '{owner}'
+    scm:
+        - git:
+            url: 'https://github.com/{repoName}'
+            browser: githubweb
+            browser-url: 'https://github.com/{repoName}'
+            branches:
+                - 'master'
+            skip-tag: true
+            basedir: 'go/src/{gitbasedir}'
+    triggers:
+        - pollscm:
+            cron: 'H/5 * * * *'
+        - timed: '@daily'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 30
+            fail: true
+        - timestamps
+
+# Job template to checkout source from github to $WORKSPACE/go/src/{gitbasedir}, setup go environment variables, and execute a
+# shell script.
+# - Job is executed daily and when changes are found polling github (every 5m).
+# - Console output is published to google cloud storage.
+#
+# gitproject: name of the project - for display purposes only
+# owner: owner to be notified for job failures.  test results are published to owner email
+# repoName: github repo to checkout e.g. kubernetes/kubernetes or google/cadvisor
+# gitbasedir: directory under $WORKSPACE/go/src to checkout source repo to - e.g. k8s.io/kubernetes or github.com/google/cadvisor
+# shell: bash command to execute from gitbasedir.  should be a single script such as {gitproject}-jenkins.sh
+- job-template:
+    name: '{gitproject}-gce-e2e-ci'
+    description: '{gitproject} continuous e2e tests.<br>Test Owner: {owner}.'
+    node: 'node'
+    logrotate:
+        numToKeep: 200
+    node: node
+    builders:
+         - shell: |
+              #!/bin/bash
+              set -e
+              set -x
+              cd go/src/{gitbasedir}
+              {shell}
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: '{owner}'
+    scm:
+        - git:
+            url: 'https://github.com/{repoName}'
+            browser: githubweb
+            browser-url: 'https://github.com/{repoName}'
+            branches:
+                - 'master'
+            skip-tag: true
+            basedir: 'go/src/{gitbasedir}'
+    triggers:
+        - pollscm:
+            cron: 'H/5 * * * *'
+        - timed: '@daily'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 30
+            fail: true
+        - timestamps
+        - inject:
+            properties-content: |
+                GOROOT=/usr/local/go
+                GOPATH=$WORKSPACE/go
+                PATH=$PATH:$GOROOT/bin:$WORKSPACE/go/bin
+        - workspace-cleanup
+
+- project:
+    name: node-docker-canary-build
+    repoName: 'google/cadvisor'
+    gitproject:
+        - 'cadvisor':
+            repoName: 'google/cadvisor'
+            gitbasedir: 'github.com/google/cadvisor'
+            dockerfilePath: 'deploy/canary/Dockerfile'
+            owner: 'vishnuk@google.com'
+        - 'heapster':
+            repoName: 'kubernetes/heapster'
+            gitbasedir: 'k8s.io/heapster'
+            dockerfilePath: 'deploy/docker/canary/Dockerfile'
+            owner: 'pszczesniak@google.com'
+    jobs:
+        - '{gitproject}-dockercanarybuild-ci'
+    wrappers:
+        - workspace-cleanup
+
+- project:
+    name: node-gce-e2e
+    repoName: 'google/cadvisor'
+    gitproject:
+        - 'cadvisor':
+            repoName: 'google/cadvisor'
+            gitbasedir: 'github.com/google/cadvisor'
+            owner: 'vishnuk@google.com'
+            shell: |
+                go get -u github.com/tools/godep
+
+                ./build/presubmit.sh
+                godep go build -tags test github.com/google/cadvisor/integration/runner
+                ./runner --logtostderr --test-retry-count=8 --test-retry-whitelist=integration/runner/retrywhitelist.txt \
+                --ssh-options "-i /home/jenkins/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no" \
+                e2e-cadvisor-ubuntu-trusty \
+                e2e-cadvisor-coreos-beta \
+                e2e-cadvisor-container-vm-v20151215 \
+                e2e-cadvisor-container-vm-v20160127 \
+                e2e-cadvisor-rhel-7
+        - 'heapster':
+            repoName: 'kubernetes/heapster'
+            gitbasedir: 'k8s.io/heapster'
+            owner: 'pszczesniak@google.com'
+            shell: 'make test-unit test-integration'
+        - 'kubelet':
+            repoName: 'kubernetes/kubernetes'
+            gitbasedir: 'k8s.io/kubernetes'
+            owner: 'pwittroc@google.com'
+            shell: 'test/e2e_node/jenkins/e2e-node-jenkins.sh test/e2e_node/jenkins/jenkins-ci.properties'
+    jobs:
+        - '{gitproject}-gce-e2e-ci'

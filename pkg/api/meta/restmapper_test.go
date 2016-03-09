@@ -148,7 +148,7 @@ func TestRESTMapperKindsFor(t *testing.T) {
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
-			ExpectedKindErr: "is ambiguous",
+			ExpectedKindErr: " matches multiple kinds ",
 		},
 
 		{
@@ -188,7 +188,7 @@ func TestRESTMapperKindsFor(t *testing.T) {
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 			},
-			ExpectedKindErr: "is ambiguous",
+			ExpectedKindErr: " matches multiple kinds ",
 		},
 	}
 	for _, testCase := range testCases {
@@ -234,10 +234,11 @@ func TestRESTMapperKindsFor(t *testing.T) {
 
 func TestRESTMapperResourcesFor(t *testing.T) {
 	testCases := []struct {
-		Name                     string
-		PreferredOrder           []unversioned.GroupVersion
-		KindsToRegister          []unversioned.GroupVersionKind
-		PartialResourceToRequest unversioned.GroupVersionResource
+		Name                             string
+		PreferredOrder                   []unversioned.GroupVersion
+		KindsToRegister                  []unversioned.GroupVersionKind
+		PluralPartialResourceToRequest   unversioned.GroupVersionResource
+		SingularPartialResourceToRequest unversioned.GroupVersionResource
 
 		ExpectedResources   []unversioned.GroupVersionResource
 		ExpectedResourceErr string
@@ -254,13 +255,14 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Resource: "my-kinds"},
+			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Resource: "my-kinds"},
+			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Resource: "my-kind"},
 
 			ExpectedResources: []unversioned.GroupVersionResource{
 				{Group: "second-group", Version: "first-version", Resource: "my-kinds"},
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 			},
-			ExpectedResourceErr: "is ambiguous",
+			ExpectedResourceErr: " matches multiple resources ",
 		},
 
 		{
@@ -275,7 +277,8 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
+			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
 
 			ExpectedResources: []unversioned.GroupVersionResource{
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
@@ -294,52 +297,56 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Version: "first-version", Resource: "my-kinds"},
+			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Version: "first-version", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Version: "first-version", Resource: "my-kind"},
 
 			ExpectedResources: []unversioned.GroupVersionResource{
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 				{Group: "second-group", Version: "first-version", Resource: "my-kinds"},
 			},
-			ExpectedResourceErr: "is ambiguous",
+			ExpectedResourceErr: " matches multiple resources ",
 		},
 	}
 	for _, testCase := range testCases {
 		tcName := testCase.Name
-		mapper := NewDefaultRESTMapper(testCase.PreferredOrder, fakeInterfaces)
-		for _, kind := range testCase.KindsToRegister {
-			mapper.Add(kind, RESTScopeNamespace)
-		}
 
-		actualResources, err := mapper.ResourcesFor(testCase.PartialResourceToRequest)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tcName, err)
-			continue
-		}
-		if !reflect.DeepEqual(testCase.ExpectedResources, actualResources) {
-			t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResources, actualResources)
-		}
+		for _, partialResource := range []unversioned.GroupVersionResource{testCase.PluralPartialResourceToRequest, testCase.SingularPartialResourceToRequest} {
+			mapper := NewDefaultRESTMapper(testCase.PreferredOrder, fakeInterfaces)
+			for _, kind := range testCase.KindsToRegister {
+				mapper.Add(kind, RESTScopeNamespace)
+			}
 
-		singleResource, err := mapper.ResourceFor(testCase.PartialResourceToRequest)
-		if err == nil && len(testCase.ExpectedResourceErr) != 0 {
-			t.Errorf("%s: expected error: %v", tcName, testCase.ExpectedResourceErr)
-			continue
-		}
-		if err != nil {
-			if len(testCase.ExpectedResourceErr) == 0 {
+			actualResources, err := mapper.ResourcesFor(partialResource)
+			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tcName, err)
 				continue
-			} else {
-				if !strings.Contains(err.Error(), testCase.ExpectedResourceErr) {
-					t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResourceErr, err)
+			}
+			if !reflect.DeepEqual(testCase.ExpectedResources, actualResources) {
+				t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResources, actualResources)
+			}
+
+			singleResource, err := mapper.ResourceFor(partialResource)
+			if err == nil && len(testCase.ExpectedResourceErr) != 0 {
+				t.Errorf("%s: expected error: %v", tcName, testCase.ExpectedResourceErr)
+				continue
+			}
+			if err != nil {
+				if len(testCase.ExpectedResourceErr) == 0 {
+					t.Errorf("%s: unexpected error: %v", tcName, err)
 					continue
+				} else {
+					if !strings.Contains(err.Error(), testCase.ExpectedResourceErr) {
+						t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResourceErr, err)
+						continue
+					}
 				}
-			}
 
-		} else {
-			if testCase.ExpectedResources[0] != singleResource {
-				t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResources[0], singleResource)
-			}
+			} else {
+				if testCase.ExpectedResources[0] != singleResource {
+					t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResources[0], singleResource)
+				}
 
+			}
 		}
 	}
 }

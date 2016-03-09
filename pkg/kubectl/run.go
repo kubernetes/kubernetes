@@ -103,7 +103,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: count,
-			Selector: labels,
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labels,
@@ -269,6 +269,7 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: labels,
 			},
+			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labels,
@@ -606,4 +607,10 @@ func parseEnvs(envArray []string) ([]api.EnvVar, error) {
 		envs = append(envs, envVar)
 	}
 	return envs, nil
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }

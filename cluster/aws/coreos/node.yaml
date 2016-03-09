@@ -6,7 +6,7 @@ coreos:
       command: start
       content: |
         [Unit]
-        Description=Fetch Rocket
+        Description=Fetch rkt
         Documentation=http://github.com/coreos/rkt
         Requires=network-online.target
         After=network-online.target

@@ -20,10 +20,29 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/imdario/mergo"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
+
+func TestOldMergoLib(t *testing.T) {
+	type T struct {
+		X string
+	}
+	dst := T{X: "one"}
+	src := T{X: "two"}
+	mergo.Merge(&dst, &src)
+	if dst.X != "two" {
+		// mergo.Merge changed in an incompatible way with
+		//
+		//   https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a
+		//
+		// We have to stay with the old version which still does eager
+		// copying from src to dst in structs.
+		t.Errorf("mergo.Merge library found with incompatible, new behavior")
+	}
+}
 
 func createValidTestConfig() *clientcmdapi.Config {
 	const (
@@ -225,7 +244,7 @@ func TestCreateMissingContext(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	expectedConfig := &client.Config{Host: clientConfig.Host}
+	expectedConfig := &restclient.Config{Host: clientConfig.Host}
 
 	if !reflect.DeepEqual(expectedConfig, clientConfig) {
 		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)

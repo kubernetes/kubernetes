@@ -19,12 +19,13 @@ package algorithm
 import (
 	"k8s.io/kubernetes/pkg/api"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
-type FitPredicate func(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error)
+type FitPredicate func(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error)
 
-type PriorityFunction func(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister PodLister, nodeLister NodeLister) (schedulerapi.HostPriorityList, error)
+type PriorityFunction func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister NodeLister) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
 	Function PriorityFunction

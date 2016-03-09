@@ -46,14 +46,14 @@ build:
 	docker build -t ${REGISTRY}/etcd-${ARCH}:${TAG} ${TEMP_DIR}
 
 ifeq ($(ARCH),amd64)
-	# Backward compatability. TODO: deprecate this image tag
+	# Backward compatibility. TODO: deprecate this image tag
 	docker tag -f ${REGISTRY}/etcd-${ARCH}:${TAG} ${REGISTRY}/etcd:${TAG}
 endif
 
 push: build
 	gcloud docker push ${REGISTRY}/etcd-${ARCH}:${TAG}
 
-	# Backward compatability. TODO: deprecate this image tag
+	# Backward compatibility. TODO: deprecate this image tag
 ifeq ($(ARCH),amd64)
 	gcloud docker push ${REGISTRY}/etcd:${TAG}
 endif

@@ -32,7 +32,7 @@ import (
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
 var _ = Describe("hostPath", func() {
-	framework := NewFramework("hostpath")
+	framework := NewDefaultFramework("hostpath")
 	var c *client.Client
 	var namespace *api.Namespace
 
@@ -61,7 +61,8 @@ var _ = Describe("hostPath", func() {
 			namespace.Name)
 	})
 
-	It("should support r/w [Conformance]", func() {
+	// This test requires mounting a folder into a container with write privileges.
+	It("should support r/w", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180

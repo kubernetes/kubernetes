@@ -31,7 +31,7 @@ const (
 Create a namespace with the specified name.`
 
 	namespaceExample = `  # Create a new namespace named my-namespace
-  $ kubectl create namespace my-namespace`
+  kubectl create namespace my-namespace`
 )
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
@@ -49,6 +49,7 @@ func NewCmdCreateNamespace(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	}
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.NamespaceV1GeneratorName)
 	return cmd
 }

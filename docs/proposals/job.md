@@ -185,7 +185,7 @@ Below are the possible future extensions to the Job controller:
   [this comment](https://github.com/kubernetes/kubernetes/issues/1624#issuecomment-97622142))
 * Be able to inspect Pods running a Job, especially after a Job has finished, e.g.
   by providing pointers to Pods in the JobStatus ([see comment](https://github.com/kubernetes/kubernetes/pull/11746/files#r37142628)).
-* help users avoid non-unique label selectors ([see this proposal](selector-generation.md))
+* help users avoid non-unique label selectors ([see this proposal](../../docs/design/selector-generation.md))
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

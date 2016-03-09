@@ -36,6 +36,7 @@ type realFsHandler struct {
 	usageBytes     uint64
 	baseUsageBytes uint64
 	period         time.Duration
+	minPeriod      time.Duration
 	rootfs         string
 	extraDir       string
 	fsInfo         fs.FsInfo
@@ -43,7 +44,11 @@ type realFsHandler struct {
 	stopChan chan struct{}
 }
 
-const longDu = time.Second
+const (
+	longDu             = time.Second
+	duTimeout          = time.Minute
+	maxDuBackoffFactor = 20
+)
 
 var _ fsHandler = &realFsHandler{}
 
@@ -53,6 +58,7 @@ func newFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInf
 		usageBytes:     0,
 		baseUsageBytes: 0,
 		period:         period,
+		minPeriod:      period,
 		rootfs:         rootfs,
 		extraDir:       extraDir,
 		fsInfo:         fsInfo,
@@ -60,20 +66,24 @@ func newFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInf
 	}
 }
 
-func (fh *realFsHandler) needsUpdate() bool {
-	return time.Now().After(fh.lastUpdate.Add(fh.period))
-}
-
 func (fh *realFsHandler) update() error {
+	var (
+		baseUsage, extraDirUsage uint64
+		err                      error
+	)
 	// TODO(vishh): Add support for external mounts.
-	baseUsage, err := fh.fsInfo.GetDirUsage(fh.rootfs)
-	if err != nil {
-		return err
+	if fh.rootfs != "" {
+		baseUsage, err = fh.fsInfo.GetDirUsage(fh.rootfs, duTimeout)
+		if err != nil {
+			return err
+		}
 	}
 
-	extraDirUsage, err := fh.fsInfo.GetDirUsage(fh.extraDir)
-	if err != nil {
-		return err
+	if fh.extraDir != "" {
+		extraDirUsage, err = fh.fsInfo.GetDirUsage(fh.extraDir, duTimeout)
+		if err != nil {
+			return err
+		}
 	}
 
 	fh.Lock()
@@ -93,11 +103,17 @@ func (fh *realFsHandler) trackUsage() {
 		case <-time.After(fh.period):
 			start := time.Now()
 			if err := fh.update(); err != nil {
-				glog.V(2).Infof("failed to collect filesystem stats - %v", err)
+				glog.Errorf("failed to collect filesystem stats - %v", err)
+				fh.period = fh.period * 2
+				if fh.period > maxDuBackoffFactor*fh.minPeriod {
+					fh.period = maxDuBackoffFactor * fh.minPeriod
+				}
+			} else {
+				fh.period = fh.minPeriod
 			}
 			duration := time.Since(start)
 			if duration > longDu {
-				glog.V(3).Infof("`du` on following dirs took %v: %v", duration, []string{fh.rootfs, fh.extraDir})
+				glog.V(2).Infof("`du` on following dirs took %v: %v", duration, []string{fh.rootfs, fh.extraDir})
 			}
 		}
 	}

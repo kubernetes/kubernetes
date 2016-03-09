@@ -1,0 +1,56 @@
+- job-template:
+    name: 'kubernetes-{build}'
+    description: 'Grab the latest from GitHub, build. Test owner: Build Cop.'
+    node: 'build'
+    logrotate:
+        numToKeep: 200
+    builders:
+        - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
+        - shell: |
+            timeout -k {kill-timeout}m 30m ./hack/jenkins/build.sh && rc=$? || rc=$?
+            {report-rc}
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: $DEFAULT_RECIPIENTS, cloud-kubernetes-team@google.com
+            presend-script: $DEFAULT_PRESEND_SCRIPT
+            fail: true
+            fixed: true
+            send-to:
+                - culprits
+                - recipients
+    scm:
+        - git:
+            url: https://github.com/kubernetes/kubernetes
+            branches:
+                - '{branch}'
+            browser: githubweb
+            browser-url: https://github.com/kubernetes/kubernetes
+            wipe-workspace: false
+            skip-tag: true
+    triggers:
+        - pollscm:
+            cron: 'H/2 * * * *'
+    wrappers:
+        - timeout:
+            timeout: '{jenkins-timeout}'
+            fail: true
+        - timestamps
+
+- project:
+    name: kubernetes-builds
+    build:
+        - 'build':
+            branch: 'master'
+        - 'build-1.0':
+            branch: 'release-1.0'
+        - 'build-1.1':
+            branch: 'release-1.1'
+        - 'build-1.2':
+            branch: 'release-1.2'
+    jobs:
+        - 'kubernetes-{build}'

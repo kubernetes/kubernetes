@@ -36,8 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -143,7 +145,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 	fakeDocker := dockertools.NewFakeDockerClient()
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	dockerManager := dockertools.NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
@@ -152,7 +154,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		&cadvisorapi.MachineInfo{},
 		kubetypes.PodInfraContainerImage,
 		0, 0, "",
-		kubecontainer.FakeOS{},
+		containertest.FakeOS{},
 		networkPlugin,
 		nil,
 		nil,

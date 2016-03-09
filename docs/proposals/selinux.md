@@ -74,9 +74,9 @@ use-cases:
 We should avoid using the `:z` flag, because it relaxes the SELinux context so that any container
 (from an SELinux standpoint) can use the volume.
 
-### Rocket
+### rkt
 
-Rocket currently reads the base SELinux context to use from `/etc/selinux/*/contexts/lxc_contexts`
+rkt currently reads the base SELinux context to use from `/etc/selinux/*/contexts/lxc_contexts`
 and allocates a unique MCS label per pod.
 
 ### Kubernetes
@@ -194,7 +194,7 @@ From the above, we know that label management must be applied:
 3.  To some volume types *sometimes*
 
 Volumes should be relabeled with the correct SELinux context.  Docker has this capability today; it
-is desireable for other container runtime implementations to provide similar functionality.
+is desirable for other container runtime implementations to provide similar functionality.
 
 Relabeling should be an optional aspect of a volume plugin to accommodate:
 

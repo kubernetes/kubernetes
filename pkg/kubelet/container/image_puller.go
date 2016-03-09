@@ -99,7 +99,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 		}
 	}
 
-	backOffKey := fmt.Sprintf("%s_%s", pod.Name, container.Image)
+	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		puller.logIt(ref, api.EventTypeNormal, BackOffPullImage, logPrefix, msg, glog.Info)
@@ -117,6 +117,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 		}
 	}
 	puller.logIt(ref, api.EventTypeNormal, "Pulled", logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
+	puller.backOff.DeleteEntry(backOffKey)
 	puller.backOff.GC()
 	return nil, ""
 }

@@ -18,14 +18,22 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
+
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -46,20 +54,27 @@ func setUp(t *testing.T) (GenericAPIServer, *etcdtesting.EtcdTestServer, Config,
 	return genericapiserver, etcdServer, config, assert.New(t)
 }
 
-// TestNew verifies that the New function returns a GenericAPIServer
-// using the configuration properly.
-func TestNew(t *testing.T) {
+func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
-	defer etcdserver.Terminate(t)
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.Serializer = api.Codecs
+	config.APIPrefix = "/api"
+	config.APIGroupPrefix = "/apis"
 
 	s, err := New(&config)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
+	return s, etcdserver, config, assert
+}
+
+// TestNew verifies that the New function returns a GenericAPIServer
+// using the configuration properly.
+func TestNew(t *testing.T) {
+	s, etcdserver, config, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableLogsSupport, config.EnableLogsSupport)
@@ -75,7 +90,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.ApiGroupVersionOverrides, config.APIGroupVersionOverrides)
 	assert.Equal(s.RequestContextMapper, config.RequestContextMapper)
 	assert.Equal(s.cacheTimeout, config.CacheTimeout)
-	assert.Equal(s.externalHost, config.ExternalHost)
+	assert.Equal(s.ExternalAddress, config.ExternalHost)
 	assert.Equal(s.ClusterIP, config.PublicAddress)
 	assert.Equal(s.PublicReadWritePort, config.ReadWritePort)
 	assert.Equal(s.ServiceReadWriteIP, config.ServiceReadWriteIP)
@@ -211,11 +226,178 @@ func TestInstallSwaggerAPI(t *testing.T) {
 	// Empty externalHost verification
 	mux = http.NewServeMux()
 	server.HandlerContainer = NewHandlerContainer(mux, nil)
-	server.externalHost = ""
+	server.ExternalAddress = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.PublicReadWritePort = 1010
 	server.InstallSwaggerAPI()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
+	}
+}
+
+func decodeResponse(resp *http.Response, obj interface{}) error {
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, obj); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getGroupList(server *httptest.Server) (*unversioned.APIGroupList, error) {
+	resp, err := http.Get(server.URL + "/apis")
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected server response, expected %d, actual: %d", http.StatusOK, resp.StatusCode)
+	}
+
+	groupList := unversioned.APIGroupList{}
+	err = decodeResponse(resp, &groupList)
+	return &groupList, err
+}
+
+func TestDiscoveryAtAPIS(t *testing.T) {
+	master, etcdserver, config, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	groupList, err := getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assert.Equal(0, len(groupList.Groups))
+
+	// Add a Group.
+	extensionsGroupName := extensions.GroupName
+	extensionsVersions := []unversioned.GroupVersionForDiscovery{
+		{
+			GroupVersion: testapi.Extensions.GroupVersion().String(),
+			Version:      testapi.Extensions.GroupVersion().Version,
+		},
+	}
+	extensionsPreferredVersion := unversioned.GroupVersionForDiscovery{
+		GroupVersion: config.StorageVersions[extensions.GroupName],
+		Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
+	}
+	master.AddAPIGroupForDiscovery(unversioned.APIGroup{
+		Name:             extensionsGroupName,
+		Versions:         extensionsVersions,
+		PreferredVersion: extensionsPreferredVersion,
+	})
+
+	groupList, err = getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(1, len(groupList.Groups))
+	groupListGroup := groupList.Groups[0]
+	assert.Equal(extensionsGroupName, groupListGroup.Name)
+	assert.Equal(extensionsVersions, groupListGroup.Versions)
+	assert.Equal(extensionsPreferredVersion, groupListGroup.PreferredVersion)
+	assert.Equal(master.getServerAddressByClientCIDRs(&http.Request{}), groupListGroup.ServerAddressByClientCIDRs)
+
+	// Remove the group.
+	master.RemoveAPIGroupForDiscovery(extensionsGroupName)
+	groupList, err = getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(0, len(groupList.Groups))
+}
+
+func TestGetServerAddressByClientCIDRs(t *testing.T) {
+	s, etcdserver, _, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
+		{
+			ClientCIDR: "0.0.0.0/0",
+
+			ServerAddress: s.ExternalAddress,
+		},
+	}
+	internalAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
+		publicAddressCIDRMap[0],
+		{
+			ClientCIDR:    s.ServiceClusterIPRange.String(),
+			ServerAddress: net.JoinHostPort(s.ServiceReadWriteIP.String(), strconv.Itoa(s.ServiceReadWritePort)),
+		},
+	}
+	internalIP := "10.0.0.1"
+	publicIP := "1.1.1.1"
+	testCases := []struct {
+		Request     http.Request
+		ExpectedMap []unversioned.ServerAddressByClientCIDR
+	}{
+		{
+			Request:     http.Request{},
+			ExpectedMap: publicAddressCIDRMap,
+		},
+		{
+			Request: http.Request{
+				Header: map[string][]string{
+					"X-Real-Ip": {internalIP},
+				},
+			},
+			ExpectedMap: internalAddressCIDRMap,
+		},
+		{
+			Request: http.Request{
+				Header: map[string][]string{
+					"X-Real-Ip": {publicIP},
+				},
+			},
+			ExpectedMap: publicAddressCIDRMap,
+		},
+		{
+			Request: http.Request{
+				Header: map[string][]string{
+					"X-Forwarded-For": {internalIP},
+				},
+			},
+			ExpectedMap: internalAddressCIDRMap,
+		},
+		{
+			Request: http.Request{
+				Header: map[string][]string{
+					"X-Forwarded-For": {publicIP},
+				},
+			},
+			ExpectedMap: publicAddressCIDRMap,
+		},
+
+		{
+			Request: http.Request{
+				RemoteAddr: internalIP,
+			},
+			ExpectedMap: internalAddressCIDRMap,
+		},
+		{
+			Request: http.Request{
+				RemoteAddr: publicIP,
+			},
+			ExpectedMap: publicAddressCIDRMap,
+		},
+		{
+			Request: http.Request{
+				RemoteAddr: "invalidIP",
+			},
+			ExpectedMap: publicAddressCIDRMap,
+		},
+	}
+
+	for i, test := range testCases {
+		if a, e := s.getServerAddressByClientCIDRs(&test.Request), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
+			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
+		}
 	}
 }

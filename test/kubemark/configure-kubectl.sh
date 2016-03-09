@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-curl https://sdk.cloud.google.com | bash
+curl https://sdk.cloud.google.com 2> /dev/null | bash
 sudo gcloud components update kubectl -q
 sudo ln -s /usr/local/share/google/google-cloud-sdk/bin/kubectl /bin/
 kubectl config set-cluster hollow-cluster --server=http://localhost:8080 --insecure-skip-tls-verify=true

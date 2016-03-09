@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
 	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/pkg/volume/fc"
@@ -80,6 +81,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(pluginDir)...)
 	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	return allPlugins
 }
 

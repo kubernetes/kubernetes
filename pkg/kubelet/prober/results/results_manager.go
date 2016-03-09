@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Manager provides a probe results cache and channel of updates.
@@ -61,7 +62,7 @@ func (r Result) String() string {
 type Update struct {
 	ContainerID kubecontainer.ContainerID
 	Result      Result
-	Pod         *api.Pod
+	PodUID      types.UID
 }
 
 // Manager implementation.
@@ -93,7 +94,7 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 
 func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *api.Pod) {
 	if m.setInternal(id, result) {
-		m.updates <- Update{id, result, pod}
+		m.updates <- Update{id, result, pod.UID}
 	}
 }
 

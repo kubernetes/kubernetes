@@ -126,9 +126,8 @@ func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder
 func (b *Builder) URL(urls ...*url.URL) *Builder {
 	for _, u := range urls {
 		b.paths = append(b.paths, &URLVisitor{
-			Mapper: b.mapper,
-			URL:    u,
-			Schema: b.schema,
+			URL:           u,
+			StreamVisitor: NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
 		})
 	}
 	return b
@@ -440,7 +439,7 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r})
+		gvk, err := b.mapper.KindFor(unversioned.ParseGroupResource(r).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}
@@ -460,7 +459,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if _, ok := mappings[r.Resource]; ok {
 			continue
 		}
-		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r.Resource})
+		gvk, err := b.mapper.KindFor(unversioned.ParseGroupResource(r.Resource).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}

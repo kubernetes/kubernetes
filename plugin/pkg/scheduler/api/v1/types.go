@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type Policy struct {
@@ -124,7 +124,7 @@ type ExtenderConfig struct {
 	// EnableHttps specifies whether https should be used to communicate with the extender
 	EnableHttps bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
-	TLSConfig *client.TLSClientConfig `json:"tlsConfig,omitempty"`
+	TLSConfig *restclient.TLSClientConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout time.Duration `json:"httpTimeout,omitempty"`

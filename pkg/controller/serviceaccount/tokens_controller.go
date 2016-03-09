@@ -88,7 +88,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
 	)
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	e.secrets, e.secretController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -325,13 +325,18 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 		return err
 	}
 	secret.Data[api.ServiceAccountTokenKey] = []byte(token)
+	secret.Data[api.ServiceAccountNamespaceKey] = []byte(serviceAccount.Namespace)
 	if e.rootCA != nil && len(e.rootCA) > 0 {
 		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
 	}
 
 	// Save the secret
-	if _, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
+	if createdToken, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret); err != nil {
 		return err
+	} else {
+		// Manually add the new token to the cache store.
+		// This prevents the service account update (below) triggering another token creation, if the referenced token couldn't be found in the store
+		e.secrets.Add(createdToken)
 	}
 
 	liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, api.ObjectReference{Name: secret.Name})
@@ -364,16 +369,22 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 	caData := secret.Data[api.ServiceAccountRootCAKey]
 	needsCA := len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
 
+	needsNamespace := len(secret.Data[api.ServiceAccountNamespaceKey]) == 0
+
 	tokenData := secret.Data[api.ServiceAccountTokenKey]
 	needsToken := len(tokenData) == 0
 
-	if !needsCA && !needsToken {
+	if !needsCA && !needsToken && !needsNamespace {
 		return nil
 	}
 
 	// Set the CA
 	if needsCA {
 		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
+	}
+	// Set the namespace
+	if needsNamespace {
+		secret.Data[api.ServiceAccountNamespaceKey] = []byte(secret.Namespace)
 	}
 
 	// Generate the token
@@ -404,11 +415,6 @@ func (e *TokensController) deleteSecret(secret *api.Secret) error {
 // removeSecretReferenceIfNeeded updates the given ServiceAccount to remove a reference to the given secretName if needed.
 // Returns whether an update was performed, and any error that occurred
 func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.ServiceAccount, secretName string) error {
-	// See if the account even referenced the secret
-	if !getSecretReferences(serviceAccount).Has(secretName) {
-		return nil
-	}
-
 	// We don't want to update the cache's copy of the service account
 	// so remove the secret from a freshly retrieved copy of the service account
 	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)

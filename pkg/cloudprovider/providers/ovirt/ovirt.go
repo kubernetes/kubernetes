@@ -193,6 +193,11 @@ func (v *OVirtCloud) InstanceID(name string) (string, error) {
 	return "/" + instance.UUID, err
 }
 
+// InstanceType returns the type of the specified instance.
+func (v *OVirtCloud) InstanceType(name string) (string, error) {
+	return "", nil
+}
+
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
 	if body == nil {
 		return nil, fmt.Errorf("ovirt rest-api response body is missing")

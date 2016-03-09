@@ -47,7 +47,7 @@ federated servers.
   developers to expose their APIs as a separate server and enabling the cluster
   admin to use it without any change to the core kubernetes reporsitory, we
   unblock these APIs.
-* Place for staging experimental APIs: New APIs can remain in seperate
+* Place for staging experimental APIs: New APIs can remain in separate
   federated servers until they become stable, at which point, they can be moved
   to the core kubernetes master, if appropriate.
 * Ensure that new APIs follow kubernetes conventions: Without the mechanism

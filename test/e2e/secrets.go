@@ -26,7 +26,7 @@ import (
 )
 
 var _ = Describe("Secrets", func() {
-	f := NewFramework("secrets")
+	f := NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
 		name := "secret-test-" + string(util.NewUUID())

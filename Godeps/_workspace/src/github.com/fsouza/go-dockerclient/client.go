@@ -60,7 +60,8 @@ func NewAPIVersion(input string) (APIVersion, error) {
 	if !strings.Contains(input, ".") {
 		return nil, fmt.Errorf("Unable to parse version %q", input)
 	}
-	arr := strings.Split(input, ".")
+	raw := strings.Split(input, "-")
+	arr := strings.Split(raw[0], ".")
 	ret := make(APIVersion, len(arr))
 	var err error
 	for i, val := range arr {
@@ -586,7 +587,7 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) (Close
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "plain/text")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "tcp")
 	protocol := c.endpointURL.Scheme

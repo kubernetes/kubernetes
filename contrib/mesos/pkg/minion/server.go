@@ -28,18 +28,17 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/golang/glog"
+	"github.com/kardianos/osext"
+	"github.com/spf13/pflag"
+	"gopkg.in/natefinch/lumberjack.v2"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-
-	log "github.com/golang/glog"
-	"github.com/kardianos/osext"
-	"github.com/spf13/pflag"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 const (
@@ -54,7 +53,7 @@ type MinionServer struct {
 
 	privateMountNS bool
 	hks            hyperkube.Interface
-	clientConfig   *client.Config
+	clientConfig   *restclient.Config
 	kmBinary       string
 	tasks          []*tasks.Task
 
@@ -121,20 +120,22 @@ func filterArgsByFlagSet(args []string, flags *pflag.FlagSet) ([]string, []strin
 	return matched, notMatched
 }
 
-func findMesosCgroup(prefix string) string {
+func findMesosCgroup(prefix string) (cgroupPath string, containerID string) {
 	// derive our cgroup from MESOS_DIRECTORY environment
 	mesosDir := os.Getenv("MESOS_DIRECTORY")
 	if mesosDir == "" {
 		log.V(2).Infof("cannot derive executor's cgroup because MESOS_DIRECTORY is empty")
-		return ""
+		return
 	}
 
-	containerId := path.Base(mesosDir)
-	if containerId == "" {
+	containerID = path.Base(mesosDir)
+	if containerID == "" {
 		log.V(2).Infof("cannot derive executor's cgroup from MESOS_DIRECTORY=%q", mesosDir)
-		return ""
+		return
 	}
-	return path.Join("/", prefix, containerId)
+
+	cgroupPath = path.Join("/", prefix, containerID)
+	return
 }
 
 func (ms *MinionServer) launchProxyServer() {
@@ -146,7 +147,9 @@ func (ms *MinionServer) launchProxyServer() {
 		fmt.Sprintf("--bind-address=%s", bindAddress),
 		fmt.Sprintf("--v=%d", ms.proxyLogV),
 		"--logtostderr=true",
-		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
+		// TODO(jdef) resource-container is going away completely at some point, but
+		// we need to override it here to disable the current default behavior
+		"--resource-container=", // disable this; mesos slave doesn't like sub-containers yet
 		"--proxy-mode=" + ms.proxyMode,
 		"--conntrack-max=" + strconv.Itoa(ms.conntrackMax),
 		"--conntrack-tcp-timeout-established=" + strconv.Itoa(ms.conntrackTCPTimeoutEstablished),
@@ -159,14 +162,14 @@ func (ms *MinionServer) launchProxyServer() {
 		args = append(args, fmt.Sprintf("--hostname-override=%s", ms.KubeletExecutorServer.HostnameOverride))
 	}
 
-	ms.launchHyperkubeServer(hyperkube.CommandProxy, args, proxyLogFilename, nil)
+	ms.launchHyperkubeServer(hyperkube.CommandProxy, args, proxyLogFilename)
 }
 
 // launchExecutorServer returns a chan that closes upon kubelet-executor death. since the kubelet-
 // executor doesn't support failover right now, the right thing to do is to fail completely since all
 // pods will be lost upon restart and we want mesos to recover the resources from them.
-func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
-	allArgs := os.Args[1:]
+func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{} {
+	allArgs := os.Args[2:]
 
 	// filter out minion flags, leaving those for the executor
 	executorFlags := pflag.NewFlagSet("executor", pflag.ContinueOnError)
@@ -174,7 +177,8 @@ func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 	ms.AddExecutorFlags(executorFlags)
 	executorArgs, _ := filterArgsByFlagSet(allArgs, executorFlags)
 
-	executorArgs = append(executorArgs, "--resource-container="+path.Join("/", ms.mesosCgroup, "kubelet"))
+	// disable resource-container; mesos slave doesn't like sub-containers yet
+	executorArgs = append(executorArgs, "--kubelet-cgroups=")
 	if ms.cgroupRoot != "" {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
@@ -191,16 +195,25 @@ func (ms *MinionServer) launchExecutorServer() <-chan struct{} {
 			// close execDied to signal interested listeners.
 			close(execDied)
 			return false
+	
+        // forward containerID so that the executor may pass it along to containers that it launches
+	var ctidOpt tasks.Option
+	ctidOpt = func(t *tasks.Task) tasks.Option {
+		oldenv := t.Env[:]
+		t.Env = append(t.Env, "MESOS_EXECUTOR_CONTAINER_UUID="+containerID)
+		return func(t2 *tasks.Task) tasks.Option {
+			t2.Env = oldenv
+			return ctidOpt
 		}
-		// since we only expect to die once, and there is no restart; don't delay any longer than needed
-		t.RestartDelay = 0
-		return t
 	}
-	ms.launchHyperkubeServer(hyperkube.CommandExecutor, executorArgs, executorLogFilename, decorator)
+
+	// run executor and quit minion server when this exits cleanly
+	execDied := make(chan struct{})
+	ms.launchHyperkubeServer(hyperkube.CommandExecutor, executorArgs, executorLogFilename, tasks.NoRespawn(execDied), ctidOpt)
 	return execDied
 }
 
-func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logFileName string, decorator func(*tasks.Task) *tasks.Task) {
+func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logFileName string, options ...tasks.Option) {
 	log.V(2).Infof("Spawning hyperkube %v with args '%+v'", server, args)
 
 	kmArgs := append([]string{server}, args...)
@@ -223,31 +236,37 @@ func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logF
 		}
 	}
 
-	// use given environment, but add /usr/sbin and $SANDBOX/bin to the path for the iptables binary used in kube-proxy
-	var kmEnv []string
-	env := os.Environ()
-	kmEnv = make([]string, 0, len(env))
-	for _, e := range env {
-		if !strings.HasPrefix(e, "PATH=") {
-			kmEnv = append(kmEnv, e)
-		} else {
-			if ms.pathOverride != "" {
-				e = "PATH=" + ms.pathOverride
-			}
-			pwd, err := os.Getwd()
-			if err != nil {
-				panic(fmt.Errorf("Cannot get current directory: %v", err))
-			}
-			kmEnv = append(kmEnv, fmt.Sprintf("%s:%s", e, path.Join(pwd, "bin")))
-		}
-	}
+	// prepend env, allow later options to customize further
+	options = append([]tasks.Option{tasks.Environment(os.Environ()), ms.applyPathOverride()}, options...)
 
-	t := tasks.New(server, ms.kmBinary, kmArgs, kmEnv, writerFunc)
-	if decorator != nil {
-		t = decorator(t)
-	}
+	t := tasks.New(server, ms.kmBinary, kmArgs, writerFunc, options...)
 	go t.Start()
 	ms.tasks = append(ms.tasks, t)
+}
+
+// applyPathOverride overrides PATH and also adds $SANDBOX/bin (needed for locating bundled binary deps
+// as well as external deps like iptables)
+func (ms *MinionServer) applyPathOverride() tasks.Option {
+	return func(t *tasks.Task) tasks.Option {
+		kmEnv := make([]string, 0, len(t.Env))
+		for _, e := range t.Env {
+			if !strings.HasPrefix(e, "PATH=") {
+				kmEnv = append(kmEnv, e)
+			} else {
+				if ms.pathOverride != "" {
+					e = "PATH=" + ms.pathOverride
+				}
+				pwd, err := os.Getwd()
+				if err != nil {
+					panic(fmt.Errorf("Cannot get current directory: %v", err))
+				}
+				kmEnv = append(kmEnv, fmt.Sprintf("%s:%s", e, path.Join(pwd, "bin")))
+			}
+		}
+		oldenv := t.Env
+		t.Env = kmEnv
+		return tasks.Environment(oldenv)
+	}
 }
 
 // runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
@@ -271,7 +290,8 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	// - pod container cgroup root (e.g. docker cgroup-parent, optionally; see comments below)
 	// - parent of kubelet container
 	// - parent of kube-proxy container
-	ms.mesosCgroup = findMesosCgroup(ms.cgroupPrefix)
+	containerID := ""
+	ms.mesosCgroup, containerID = findMesosCgroup(ms.cgroupPrefix)
 	log.Infof("discovered mesos cgroup at %q", ms.mesosCgroup)
 
 	// hack alert, this helps to work around systemd+docker+mesos integration problems
@@ -293,7 +313,7 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	// abort closes when the kubelet-executor dies
-	abort := ms.launchExecutorServer()
+	abort := ms.launchExecutorServer(containerID)
 	shouldQuit := termSignalListener(abort)
 	te := tasks.MergeOutput(ms.tasks, shouldQuit)
 

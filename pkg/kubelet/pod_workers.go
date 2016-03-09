@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // PodWorkers is an abstract interface for testability.
@@ -38,6 +39,14 @@ type PodWorkers interface {
 }
 
 type syncPodFnType func(*api.Pod, *api.Pod, *kubecontainer.PodStatus, kubetypes.SyncPodType) error
+
+const (
+	// jitter factor for resyncInterval
+	workerResyncIntervalJitterFactor = 0.5
+
+	// jitter factor for backOffPeriod
+	workerBackOffPeriodJitterFactor = 0.5
+)
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -209,10 +218,10 @@ func (p *podWorkers) wrapUp(uid types.UID, syncErr error) {
 	switch {
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.
-		p.workQueue.Enqueue(uid, p.resyncInterval)
+		p.workQueue.Enqueue(uid, wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor))
 	default:
 		// Error occurred during the sync; back off and then retry.
-		p.workQueue.Enqueue(uid, p.backOffPeriod)
+		p.workQueue.Enqueue(uid, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))
 	}
 	p.checkForUpdates(uid)
 }

@@ -284,7 +284,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
 			_, err := cmd.CombinedOutput()
 			if err == nil {
-				// the disk has been formatted sucessfully try to mount it again.
+				// the disk has been formatted successfully try to mount it again.
 				return mounter.Interface.Mount(source, target, fstype, options)
 			}
 			return err

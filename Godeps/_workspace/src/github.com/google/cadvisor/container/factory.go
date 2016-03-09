@@ -35,6 +35,35 @@ type ContainerHandlerFactory interface {
 	DebugInfo() map[string][]string
 }
 
+// MetricKind represents the kind of metrics that cAdvisor exposes.
+type MetricKind string
+
+const (
+	CpuUsageMetrics        MetricKind = "cpu"
+	MemoryUsageMetrics     MetricKind = "memory"
+	CpuLoadMetrics         MetricKind = "cpuLoad"
+	DiskIOMetrics          MetricKind = "diskIO"
+	DiskUsageMetrics       MetricKind = "disk"
+	NetworkUsageMetrics    MetricKind = "network"
+	NetworkTcpUsageMetrics MetricKind = "tcp"
+	AppMetrics             MetricKind = "app"
+)
+
+func (mk MetricKind) String() string {
+	return string(mk)
+}
+
+type MetricSet map[MetricKind]struct{}
+
+func (ms MetricSet) Has(mk MetricKind) bool {
+	_, exists := ms[mk]
+	return exists
+}
+
+func (ms MetricSet) Add(mk MetricKind) {
+	ms[mk] = struct{}{}
+}
+
 // TODO(vmarmol): Consider not making this global.
 // Global list of factories.
 var (

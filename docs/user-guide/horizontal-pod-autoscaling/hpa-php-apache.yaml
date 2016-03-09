@@ -7,7 +7,6 @@ spec:
   scaleRef:
     kind: ReplicationController
     name: php-apache
-    namespace: default
     subresource: scale
   minReplicas: 1
   maxReplicas: 10

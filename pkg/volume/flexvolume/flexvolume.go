@@ -58,7 +58,7 @@ type flexVolumePlugin struct {
 	host       volume.VolumeHost
 }
 
-// Init intializes the plugin.
+// Init initializes the plugin.
 func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	// call the init script

@@ -48,10 +48,11 @@ func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta)
 
 func Run() error {
 	config := genericapiserver.Config{
-		EnableIndex:    true,
-		APIPrefix:      "/api",
-		APIGroupPrefix: "/apis",
-		Serializer:     api.Codecs,
+		EnableIndex:          true,
+		EnableSwaggerSupport: true,
+		APIPrefix:            "/api",
+		APIGroupPrefix:       "/apis",
+		Serializer:           api.Codecs,
 	}
 	s, err := genericapiserver.New(&config)
 	if err != nil {

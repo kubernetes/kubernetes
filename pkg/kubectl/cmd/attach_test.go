@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
@@ -40,7 +40,7 @@ type fakeRemoteAttach struct {
 	attachErr error
 }
 
-func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	f.method = method
 	f.url = url
 	return f.attachErr
@@ -87,7 +87,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{}
+		tf.ClientConfig = &restclient.Config{}
 
 		cmd := &cobra.Command{}
 		options := test.p
@@ -150,7 +150,7 @@ func TestAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -227,7 +227,7 @@ func TestAttachWarnings(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{ContentConfig: client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})

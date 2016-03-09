@@ -1,9 +1,11 @@
 # Kubernetes
 
-[![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis] [![Coverage Status Widget]][Coverage Status]
+[![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis] [![Coverage Status Widget]][Coverage Status]
 
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.png
+[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
+[GoReportCard]: https://goreportcard.com/report/k8s.io/kubernetes
+[GoReportCard Widget]: https://goreportcard.com/badge/k8s.io/kubernetes
 [Travis]: https://travis-ci.org/kubernetes/kubernetes
 [Travis Widget]: https://travis-ci.org/kubernetes/kubernetes.svg?branch=master
 [Coverage Status]: https://coveralls.io/r/kubernetes/kubernetes
@@ -71,7 +73,7 @@ Kubernetes documentation is organized into several categories.
       - in [Getting Started from Scratch](docs/getting-started-guides/scratch.md)
   - **User documentation**
     - for people who want to run programs on an existing Kubernetes cluster
-    - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)  
+    - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)
 	*Tip: You can also view help documentation out on [http://kubernetes.io/docs/](http://kubernetes.io/docs/).*
     - the [Kubectl Command Line Interface](docs/user-guide/kubectl/kubectl.md) is a detailed reference on
       the `kubectl` CLI
@@ -85,7 +87,7 @@ Kubernetes documentation is organized into several categories.
     - in the [Kubernetes Developer Guide](docs/devel/README.md)
     - see also [notes on the API](docs/api.md)
     - see also the [API object documentation](http://kubernetes.io/third_party/swagger-ui/), a
-      detailed description of all fields found in the core API objects 
+      detailed description of all fields found in the core API objects
   - **Walkthroughs and examples**
     - hands-on introduction and example config files
     - in the [user guide](docs/user-guide/README.md#quick-walkthrough)
@@ -119,7 +121,7 @@ We have presence on:
  * [Twitter](https://twitter.com/kubernetesio)
  * [Google+](https://plus.google.com/u/0/b/116512812300813784482/116512812300813784482)
  * [Blogger](http://blog.kubernetes.io/)
- 
+
 You can also view recordings of past events and presentations on our [Media page](http://kubernetes.io/media/).
 
 For Q&A, our threads are at:
@@ -132,7 +134,7 @@ For Q&A, our threads are at:
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
 #### Support
- 
+
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
 
 If you need support, start with the [troubleshooting guide](docs/troubleshooting.md#getting-help) and work your way through the process that we've outlined.

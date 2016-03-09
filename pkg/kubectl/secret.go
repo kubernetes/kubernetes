@@ -17,7 +17,6 @@ limitations under the License.
 package kubectl
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -205,34 +204,4 @@ func addKeyFromLiteralToSecret(secret *api.Secret, keyName string, data []byte) 
 	}
 	secret.Data[keyName] = data
 	return nil
-}
-
-// parseFileSource parses the source given. Acceptable formats include:
-// source-name=source-path, where source-name will become the key name and source-path is the path to the key file
-// source-path, where source-path is a path to a file or directory, and key names will default to file names
-// Key names cannot include '='.
-func parseFileSource(source string) (keyName, filePath string, err error) {
-	numSeparators := strings.Count(source, "=")
-	switch {
-	case numSeparators == 0:
-		return path.Base(source), source, nil
-	case numSeparators == 1 && strings.HasPrefix(source, "="):
-		return "", "", fmt.Errorf("key name for file path %v missing.", strings.TrimPrefix(source, "="))
-	case numSeparators == 1 && strings.HasSuffix(source, "="):
-		return "", "", fmt.Errorf("file path for key name %v missing.", strings.TrimSuffix(source, "="))
-	case numSeparators > 1:
-		return "", "", errors.New("Key names or file paths cannot contain '='.")
-	default:
-		components := strings.Split(source, "=")
-		return components[0], components[1], nil
-	}
-}
-
-// parseLiteralSource parses the source key=val pair
-func parseLiteralSource(source string) (keyName, value string, err error) {
-	items := strings.Split(source, "=")
-	if len(items) != 2 {
-		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
-	}
-	return items[0], items[1], nil
 }

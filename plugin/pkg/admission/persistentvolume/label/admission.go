@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	vol "k8s.io/kubernetes/pkg/volume"
 )
 
 func init() {
@@ -102,6 +103,10 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 }
 
 func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if volume.Spec.AWSElasticBlockStore.VolumeID == vol.ProvisionedVolumeName {
+		return nil, nil
+	}
 	ebsVolumes, err := l.getEBSVolumes()
 	if err != nil {
 		return nil, err
@@ -141,6 +146,11 @@ func (l *persistentVolumeLabel) getEBSVolumes() (aws.Volumes, error) {
 }
 
 func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if volume.Spec.GCEPersistentDisk.PDName == vol.ProvisionedVolumeName {
+		return nil, nil
+	}
+
 	provider, err := l.getGCECloudProvider()
 	if err != nil {
 		return nil, err

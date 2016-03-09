@@ -21,18 +21,21 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
@@ -41,7 +44,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volume.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -122,12 +125,16 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 	doTestSecretDataInVolume(volumePath, secret, t)
+	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 
+	// Metrics only supported on linux
 	metrics, err := builder.GetMetrics()
-	assert.NotEmpty(t, metrics)
-	assert.NoError(t, err)
-
-	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+	if runtime.GOOS == "linux" {
+		assert.NotEmpty(t, metrics)
+		assert.NoError(t, err)
+	} else {
+		t.Skipf("Volume metrics not supported on %s", runtime.GOOS)
+	}
 }
 
 // Test the case where the 'ready' file has been created and the pod volume dir

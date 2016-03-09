@@ -27,8 +27,8 @@ kube::util::realpath() {
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
-  local wait=${3:-0.5}
-  local times=${4:-25}
+  local wait=${3:-1}
+  local times=${4:-30}
 
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
@@ -293,6 +293,21 @@ kube::util::group-version-to-pkg-path() {
       ;;
     *)
       echo "apis/${group_version%__internal}"
+      ;;
+  esac
+}
+
+# Takes a group/version and returns the swagger-spec file name.
+# default behavior: extensions/v1beta1 -> extensions_v1beta1
+# special case for v1: v1 -> v1
+kube::util::gv-to-swagger-name() {
+  local group_version="$1"
+  case "${group_version}" in
+    v1)
+      echo "v1"
+      ;;
+    *)
+      echo "${group_version%/*}_${group_version#*/}"
       ;;
   esac
 }

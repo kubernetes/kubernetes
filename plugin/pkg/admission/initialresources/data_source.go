@@ -28,8 +28,9 @@ var (
 	influxdbHost = flag.String("ir-influxdb-host", "localhost:8080/api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api", "Address of InfluxDB which contains metrics requred by InitialResources")
 	user         = flag.String("ir-user", "root", "User used for connecting to InfluxDB")
 	// TODO: figure out how to better pass password here
-	password = flag.String("ir-password", "root", "Password used for connecting to InfluxDB")
-	db       = flag.String("ir-dbname", "k8s", "InfluxDB database name which contains metrics requred by InitialResources")
+	password       = flag.String("ir-password", "root", "Password used for connecting to InfluxDB")
+	db             = flag.String("ir-dbname", "k8s", "InfluxDB database name which contains metrics requred by InitialResources")
+	hawkularConfig = flag.String("ir-hawkular", "", "Hawkular configuration URL")
 )
 
 // WARNING: If you are planning to add another implementation of dataSource interface please bear in mind,
@@ -50,7 +51,7 @@ func newDataSource(kind string) (dataSource, error) {
 		return newGcmSource()
 	}
 	if kind == "hawkular" {
-		return newHawkularSource()
+		return newHawkularSource(*hawkularConfig)
 	}
 	return nil, fmt.Errorf("Unknown data source %v", kind)
 }

@@ -37,7 +37,7 @@ type HistoryOptions struct {
 const (
 	history_long    = `view previous rollout revisions and configurations.`
 	history_example = `# View the rollout history of a deployment
-$ kubectl rollout history deployment/abc`
+kubectl rollout history deployment/abc`
 )
 
 func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -21,6 +21,9 @@
   {% set certgen="make-ca-cert.sh" %}
 {% endif %}
 
+openssl:
+  pkg.installed: []
+
 kube-cert:
   group.present:
     - system: True
@@ -38,3 +41,5 @@ kubernetes-cert:
     - user: root
     - group: root
     - shell: /bin/bash
+    - require:
+      - pkg: openssl

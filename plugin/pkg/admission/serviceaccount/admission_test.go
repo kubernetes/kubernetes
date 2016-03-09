@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 )

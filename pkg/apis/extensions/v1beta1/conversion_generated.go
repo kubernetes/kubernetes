@@ -146,6 +146,30 @@ func Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigM
 	return autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in, out, s)
 }
 
+func autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.ConfigMapVolumeSource, out *v1.ConfigMapVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ConfigMapVolumeSource))(in)
+	}
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]v1.KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_api_KeyToPath_To_v1_KeyToPath(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.ConfigMapVolumeSource, out *v1.ConfigMapVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in, out, s)
+}
+
 func autoConvert_api_Container_To_v1_Container(in *api.Container, out *v1.Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Container))(in)
@@ -613,6 +637,19 @@ func Convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolumeSo
 	return autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in, out, s)
 }
 
+func autoConvert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *v1.KeyToPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.KeyToPath))(in)
+	}
+	out.Key = in.Key
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *v1.KeyToPath, s conversion.Scope) error {
+	return autoConvert_api_KeyToPath_To_v1_KeyToPath(in, out, s)
+}
+
 func autoConvert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *v1.Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Lifecycle))(in)
@@ -1064,6 +1101,12 @@ func autoConvert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityConte
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		out.ReadOnlyRootFilesystem = new(bool)
+		*out.ReadOnlyRootFilesystem = *in.ReadOnlyRootFilesystem
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
@@ -1280,6 +1323,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	} else {
 		out.AzureFile = nil
 	}
+	// unable to generate simple pointer conversion for api.ConfigMapVolumeSource -> v1.ConfigMapVolumeSource
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(v1.ConfigMapVolumeSource)
+		if err := Convert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in.ConfigMap, out.ConfigMap, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
+	}
 	return nil
 }
 
@@ -1452,6 +1504,30 @@ func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *v1.Conf
 
 func Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *v1.ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
 	return autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in, out, s)
+}
+
+func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *v1.ConfigMapVolumeSource, out *api.ConfigMapVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.ConfigMapVolumeSource))(in)
+	}
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.KeyToPath, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_v1_KeyToPath_To_api_KeyToPath(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *v1.ConfigMapVolumeSource, out *api.ConfigMapVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_Container_To_api_Container(in *v1.Container, out *api.Container, s conversion.Scope) error {
@@ -1921,6 +1997,19 @@ func Convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *v1.ISCSIVolumeSou
 	return autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in, out, s)
 }
 
+func autoConvert_v1_KeyToPath_To_api_KeyToPath(in *v1.KeyToPath, out *api.KeyToPath, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.KeyToPath))(in)
+	}
+	out.Key = in.Key
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_KeyToPath_To_api_KeyToPath(in *v1.KeyToPath, out *api.KeyToPath, s conversion.Scope) error {
+	return autoConvert_v1_KeyToPath_To_api_KeyToPath(in, out, s)
+}
+
 func autoConvert_v1_Lifecycle_To_api_Lifecycle(in *v1.Lifecycle, out *api.Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.Lifecycle))(in)
@@ -2348,6 +2437,12 @@ func autoConvert_v1_SecurityContext_To_api_SecurityContext(in *v1.SecurityContex
 	} else {
 		out.RunAsNonRoot = nil
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		out.ReadOnlyRootFilesystem = new(bool)
+		*out.ReadOnlyRootFilesystem = *in.ReadOnlyRootFilesystem
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
 	return nil
 }
 
@@ -2564,6 +2659,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *a
 	} else {
 		out.AzureFile = nil
 	}
+	// unable to generate simple pointer conversion for v1.ConfigMapVolumeSource -> api.ConfigMapVolumeSource
+	if in.ConfigMap != nil {
+		out.ConfigMap = new(api.ConfigMapVolumeSource)
+		if err := Convert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in.ConfigMap, out.ConfigMap, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMap = nil
+	}
 	return nil
 }
 
@@ -2594,76 +2698,6 @@ func autoConvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization
 
 func Convert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in *extensions.CPUTargetUtilization, out *CPUTargetUtilization, s conversion.Scope) error {
 	return autoConvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in, out, s)
-}
-
-func autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ClusterAutoscaler))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
-	return autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in, out, s)
-}
-
-func autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *extensions.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ClusterAutoscalerList))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ClusterAutoscaler, len(in.Items))
-		for i := range in.Items {
-			if err := Convert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *extensions.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
-	return autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in, out, s)
-}
-
-func autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *extensions.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ClusterAutoscalerSpec))(in)
-	}
-	out.MinNodes = int32(in.MinNodes)
-	out.MaxNodes = int32(in.MaxNodes)
-	if in.TargetUtilization != nil {
-		out.TargetUtilization = make([]NodeUtilization, len(in.TargetUtilization))
-		for i := range in.TargetUtilization {
-			if err := Convert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.TargetUtilization = nil
-	}
-	return nil
-}
-
-func Convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *extensions.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
-	return autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in, out, s)
 }
 
 func autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet, out *DaemonSet, s conversion.Scope) error {
@@ -2732,13 +2766,11 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	if err := api.Convert_string_To_string_ref(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
-		return err
-	}
 	return nil
+}
+
+func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
+	return autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in, out, s)
 }
 
 func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
@@ -2753,23 +2785,6 @@ func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exten
 
 func Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in, out, s)
-}
-
-func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.DaemonSetUpdateStrategy))(in)
-	}
-	out.Type = DaemonSetUpdateStrategyType(in.Type)
-	// unable to generate simple pointer conversion for extensions.RollingUpdateDaemonSet -> v1beta1.RollingUpdateDaemonSet
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(RollingUpdateDaemonSet)
-		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
-	return nil
 }
 
 func autoConvert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployment, out *Deployment, s conversion.Scope) error {
@@ -2855,10 +2870,11 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := s.Convert(&in.Replicas, &out.Replicas, 0); err != nil {
 		return err
 	}
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil
@@ -2893,6 +2909,7 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DeploymentStatus))(in)
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = int32(in.Replicas)
 	out.UpdatedReplicas = int32(in.UpdatedReplicas)
 	out.AvailableReplicas = int32(in.AvailableReplicas)
@@ -3373,14 +3390,11 @@ func autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, o
 	} else {
 		out.Selector = nil
 	}
+	// in.ManualSelector has no peer in out
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-func Convert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *JobSpec, s conversion.Scope) error {
-	return autoConvert_extensions_JobSpec_To_v1beta1_JobSpec(in, out, s)
 }
 
 func autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
@@ -3423,19 +3437,6 @@ func autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobSta
 
 func Convert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in, out, s)
-}
-
-func autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.NodeUtilization))(in)
-	}
-	out.Resource = NodeResource(in.Resource)
-	out.Value = in.Value
-	return nil
-}
-
-func Convert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
-	return autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in, out, s)
 }
 
 func autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *extensions.PodSecurityPolicy, out *PodSecurityPolicy, s conversion.Scope) error {
@@ -3519,7 +3520,7 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	}
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
-	if err := Convert_extensions_SELinuxContextStrategyOptions_To_v1beta1_SELinuxContextStrategyOptions(&in.SELinuxContext, &out.SELinuxContext, s); err != nil {
+	if err := Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
@@ -3649,17 +3650,6 @@ func Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensions.
 	return autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in, out, s)
 }
 
-func autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.RollingUpdateDaemonSet))(in)
-	}
-	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
-		return err
-	}
-	out.MinReadySeconds = int32(in.MinReadySeconds)
-	return nil
-}
-
 func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.RollingUpdateDeployment))(in)
@@ -3677,7 +3667,7 @@ func autoConvert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrateg
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.RunAsUserStrategyOptions))(in)
 	}
-	out.Type = RunAsUserStrategy(in.Type)
+	out.Rule = RunAsUserStrategy(in.Rule)
 	if in.Ranges != nil {
 		out.Ranges = make([]IDRange, len(in.Ranges))
 		for i := range in.Ranges {
@@ -3695,11 +3685,11 @@ func Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOpt
 	return autoConvert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in, out, s)
 }
 
-func autoConvert_extensions_SELinuxContextStrategyOptions_To_v1beta1_SELinuxContextStrategyOptions(in *extensions.SELinuxContextStrategyOptions, out *SELinuxContextStrategyOptions, s conversion.Scope) error {
+func autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *SELinuxStrategyOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.SELinuxContextStrategyOptions))(in)
+		defaulting.(func(*extensions.SELinuxStrategyOptions))(in)
 	}
-	out.Type = SELinuxContextStrategy(in.Type)
+	out.Rule = SELinuxStrategy(in.Rule)
 	// unable to generate simple pointer conversion for api.SELinuxOptions -> v1.SELinuxOptions
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(v1.SELinuxOptions)
@@ -3712,8 +3702,8 @@ func autoConvert_extensions_SELinuxContextStrategyOptions_To_v1beta1_SELinuxCont
 	return nil
 }
 
-func Convert_extensions_SELinuxContextStrategyOptions_To_v1beta1_SELinuxContextStrategyOptions(in *extensions.SELinuxContextStrategyOptions, out *SELinuxContextStrategyOptions, s conversion.Scope) error {
-	return autoConvert_extensions_SELinuxContextStrategyOptions_To_v1beta1_SELinuxContextStrategyOptions(in, out, s)
+func Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *SELinuxStrategyOptions, s conversion.Scope) error {
+	return autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in, out, s)
 }
 
 func autoConvert_extensions_Scale_To_v1beta1_Scale(in *extensions.Scale, out *Scale, s conversion.Scope) error {
@@ -3913,76 +3903,6 @@ func Convert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in 
 	return autoConvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in, out, s)
 }
 
-func autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ClusterAutoscaler))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
-	return autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in, out, s)
-}
-
-func autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *extensions.ClusterAutoscalerList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ClusterAutoscalerList))(in)
-	}
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]extensions.ClusterAutoscaler, len(in.Items))
-		for i := range in.Items {
-			if err := Convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *extensions.ClusterAutoscalerList, s conversion.Scope) error {
-	return autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in, out, s)
-}
-
-func autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *extensions.ClusterAutoscalerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ClusterAutoscalerSpec))(in)
-	}
-	out.MinNodes = int(in.MinNodes)
-	out.MaxNodes = int(in.MaxNodes)
-	if in.TargetUtilization != nil {
-		out.TargetUtilization = make([]extensions.NodeUtilization, len(in.TargetUtilization))
-		for i := range in.TargetUtilization {
-			if err := Convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.TargetUtilization = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *extensions.ClusterAutoscalerSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in, out, s)
-}
-
 func autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSet))(in)
@@ -4049,13 +3969,11 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	if err := api.Convert_string_ref_To_string(&in.UniqueLabelKey, &out.UniqueLabelKey, s); err != nil {
-		return err
-	}
 	return nil
+}
+
+func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
@@ -4070,23 +3988,6 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 
 func Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in, out, s)
-}
-
-func autoConvert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*DaemonSetUpdateStrategy))(in)
-	}
-	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
-	// unable to generate simple pointer conversion for v1beta1.RollingUpdateDaemonSet -> extensions.RollingUpdateDaemonSet
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(extensions.RollingUpdateDaemonSet)
-		if err := Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
-	return nil
 }
 
 func autoConvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
@@ -4170,10 +4071,11 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 		defaulting.(func(*DeploymentSpec))(in)
 	}
 	// in.Replicas has no peer in out
+	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil
@@ -4208,6 +4110,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStatus))(in)
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = int(in.Replicas)
 	out.UpdatedReplicas = int(in.UpdatedReplicas)
 	out.AvailableReplicas = int(in.AvailableReplicas)
@@ -4671,14 +4574,11 @@ func autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensi
 	} else {
 		out.Selector = nil
 	}
+	// in.AutoSelector has no peer in out
 	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-func Convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.JobSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_JobSpec_To_extensions_JobSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *extensions.JobStatus, s conversion.Scope) error {
@@ -4801,19 +4701,6 @@ func Convert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.Li
 	return autoConvert_v1beta1_ListOptions_To_api_ListOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*NodeUtilization))(in)
-	}
-	out.Resource = extensions.NodeResource(in.Resource)
-	out.Value = in.Value
-	return nil
-}
-
-func Convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in, out, s)
-}
-
 func autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodSecurityPolicy))(in)
@@ -4895,7 +4782,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 	}
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
-	if err := Convert_v1beta1_SELinuxContextStrategyOptions_To_extensions_SELinuxContextStrategyOptions(&in.SELinuxContext, &out.SELinuxContext, s); err != nil {
+	if err := Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
@@ -5023,15 +4910,6 @@ func Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(in *RollbackCon
 	return autoConvert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(in, out, s)
 }
 
-func autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RollingUpdateDaemonSet))(in)
-	}
-	// in.MaxUnavailable has no peer in out
-	out.MinReadySeconds = int(in.MinReadySeconds)
-	return nil
-}
-
 func autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RollingUpdateDeployment))(in)
@@ -5045,7 +4923,7 @@ func autoConvert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrateg
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RunAsUserStrategyOptions))(in)
 	}
-	out.Type = extensions.RunAsUserStrategy(in.Type)
+	out.Rule = extensions.RunAsUserStrategy(in.Rule)
 	if in.Ranges != nil {
 		out.Ranges = make([]extensions.IDRange, len(in.Ranges))
 		for i := range in.Ranges {
@@ -5063,11 +4941,11 @@ func Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOpt
 	return autoConvert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_SELinuxContextStrategyOptions_To_extensions_SELinuxContextStrategyOptions(in *SELinuxContextStrategyOptions, out *extensions.SELinuxContextStrategyOptions, s conversion.Scope) error {
+func autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in *SELinuxStrategyOptions, out *extensions.SELinuxStrategyOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*SELinuxContextStrategyOptions))(in)
+		defaulting.(func(*SELinuxStrategyOptions))(in)
 	}
-	out.Type = extensions.SELinuxContextStrategy(in.Type)
+	out.Rule = extensions.SELinuxStrategy(in.Rule)
 	// unable to generate simple pointer conversion for v1.SELinuxOptions -> api.SELinuxOptions
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(api.SELinuxOptions)
@@ -5080,8 +4958,8 @@ func autoConvert_v1beta1_SELinuxContextStrategyOptions_To_extensions_SELinuxCont
 	return nil
 }
 
-func Convert_v1beta1_SELinuxContextStrategyOptions_To_extensions_SELinuxContextStrategyOptions(in *SELinuxContextStrategyOptions, out *extensions.SELinuxContextStrategyOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_SELinuxContextStrategyOptions_To_extensions_SELinuxContextStrategyOptions(in, out, s)
+func Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in *SELinuxStrategyOptions, out *extensions.SELinuxStrategyOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *extensions.Scale, s conversion.Scope) error {
@@ -5264,6 +5142,7 @@ func init() {
 		autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
 		autoConvert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
 		autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector,
+		autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource,
 		autoConvert_api_ContainerPort_To_v1_ContainerPort,
 		autoConvert_api_Container_To_v1_Container,
 		autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
@@ -5283,6 +5162,7 @@ func init() {
 		autoConvert_api_Handler_To_v1_Handler,
 		autoConvert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
+		autoConvert_api_KeyToPath_To_v1_KeyToPath,
 		autoConvert_api_Lifecycle_To_v1_Lifecycle,
 		autoConvert_api_ListOptions_To_v1beta1_ListOptions,
 		autoConvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
@@ -5307,13 +5187,9 @@ func init() {
 		autoConvert_api_Volume_To_v1_Volume,
 		autoConvert_extensions_APIVersion_To_v1beta1_APIVersion,
 		autoConvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization,
-		autoConvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList,
-		autoConvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec,
-		autoConvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler,
 		autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList,
 		autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
 		autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
-		autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy,
 		autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet,
 		autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList,
 		autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback,
@@ -5342,7 +5218,6 @@ func init() {
 		autoConvert_extensions_JobSpec_To_v1beta1_JobSpec,
 		autoConvert_extensions_JobStatus_To_v1beta1_JobStatus,
 		autoConvert_extensions_Job_To_v1beta1_Job,
-		autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization,
 		autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList,
 		autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
 		autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
@@ -5352,10 +5227,9 @@ func init() {
 		autoConvert_extensions_ReplicaSet_To_v1beta1_ReplicaSet,
 		autoConvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy,
 		autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig,
-		autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
 		autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		autoConvert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions,
-		autoConvert_extensions_SELinuxContextStrategyOptions_To_v1beta1_SELinuxContextStrategyOptions,
+		autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions,
 		autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
 		autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
 		autoConvert_extensions_Scale_To_v1beta1_Scale,
@@ -5372,6 +5246,7 @@ func init() {
 		autoConvert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
 		autoConvert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector,
+		autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource,
 		autoConvert_v1_ContainerPort_To_api_ContainerPort,
 		autoConvert_v1_Container_To_api_Container,
 		autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
@@ -5391,6 +5266,7 @@ func init() {
 		autoConvert_v1_Handler_To_api_Handler,
 		autoConvert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,
+		autoConvert_v1_KeyToPath_To_api_KeyToPath,
 		autoConvert_v1_Lifecycle_To_api_Lifecycle,
 		autoConvert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
 		autoConvert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
@@ -5414,13 +5290,9 @@ func init() {
 		autoConvert_v1_Volume_To_api_Volume,
 		autoConvert_v1beta1_APIVersion_To_extensions_APIVersion,
 		autoConvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization,
-		autoConvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList,
-		autoConvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec,
-		autoConvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler,
 		autoConvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList,
 		autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,
-		autoConvert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
 		autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet,
 		autoConvert_v1beta1_DeploymentList_To_extensions_DeploymentList,
 		autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback,
@@ -5451,7 +5323,6 @@ func init() {
 		autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector,
 		autoConvert_v1beta1_ListOptions_To_api_ListOptions,
-		autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization,
 		autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList,
 		autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec,
 		autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy,
@@ -5461,10 +5332,9 @@ func init() {
 		autoConvert_v1beta1_ReplicaSet_To_extensions_ReplicaSet,
 		autoConvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy,
 		autoConvert_v1beta1_RollbackConfig_To_extensions_RollbackConfig,
-		autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		autoConvert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions,
-		autoConvert_v1beta1_SELinuxContextStrategyOptions_To_extensions_SELinuxContextStrategyOptions,
+		autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions,
 		autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec,
 		autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
 		autoConvert_v1beta1_Scale_To_extensions_Scale,

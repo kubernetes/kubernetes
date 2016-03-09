@@ -28,7 +28,7 @@ type SecurityContextProvider interface {
 	// the container is created.
 	ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config)
 
-	// ModifyHostConfig is called before the Docker runContainer call.
+	// ModifyHostConfig is called before the Docker createContainer call.
 	// The security context provider can make changes to the HostConfig, affecting
 	// security options, whether the container is privileged, volume binds, etc.
 	// An error is returned if it's not possible to secure the container as requested

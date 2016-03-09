@@ -31,7 +31,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Amazon reccomends having no more that 40 volumes attached to an instance,
+// Amazon recommends having no more that 40 volumes attached to an instance,
 // and at least one of those is for the system root volume.
 const DefaultMaxEBSVolumes = 39
 
@@ -68,7 +68,7 @@ func init() {
 		"ServiceSpreadingPriority",
 		factory.PriorityConfigFactory{
 			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{})
+				return priorities.NewSelectorSpreadPriority(args.PodLister, args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{})
 			},
 			Weight: 1,
 		},
@@ -76,6 +76,10 @@ func init() {
 	// PodFitsPorts has been replaced by PodFitsHostPorts for better user understanding.
 	// For backwards compatibility with 1.0, PodFitsPorts is regitered as well.
 	factory.RegisterFitPredicate("PodFitsPorts", predicates.PodFitsHostPorts)
+	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
+	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
+	// packages required by the pod or a small total size of already-installed packages required by the pod.
+	factory.RegisterPriorityFunction("ImageLocalityPriority", priorities.ImageLocalityPriority, 1)
 }
 
 func defaultPredicates() sets.String {
@@ -141,7 +145,7 @@ func defaultPriorities() sets.String {
 			"SelectorSpreadPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister)
+					return priorities.NewSelectorSpreadPriority(args.PodLister, args.ServiceLister, args.ControllerLister, args.ReplicaSetLister)
 				},
 				Weight: 1,
 			},

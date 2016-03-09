@@ -153,7 +153,7 @@ func TestRoundTripTypes(t *testing.T) {
 	// defer api.Scheme.Log(nil)
 
 	for groupKey, group := range testapi.Groups {
-		for kind := range api.Scheme.KnownTypes(group.InternalGroupVersion()) {
+		for kind := range group.InternalTypes() {
 			t.Logf("working on %v in %v", kind, groupKey)
 			if nonRoundTrippableTypes.Has(kind) {
 				continue
@@ -180,7 +180,7 @@ func doRoundTripTest(group testapi.TestGroup, kind string, t *testing.T) {
 	if api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
 		roundTripSame(t, group, item, nonRoundTrippableTypesByVersion[kind]...)
 	}
-	if !nonInternalRoundTrippableTypes.Has(kind) {
+	if !nonInternalRoundTrippableTypes.Has(kind) && api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
 		roundTrip(t, group.Codec(), fuzzInternalObject(t, group.InternalGroupVersion(), item, rand.Int63()))
 	}
 }

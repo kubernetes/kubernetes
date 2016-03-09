@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -31,7 +30,7 @@ import (
 )
 
 var _ = Describe("ReplicationController", func() {
-	framework := NewFramework("replication-controller")
+	framework := NewDefaultFramework("replication-controller")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
 		ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
@@ -116,13 +115,4 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 	if err != nil {
 		Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
-}
-
-func isElementOf(podUID types.UID, pods *api.PodList) bool {
-	for _, pod := range pods.Items {
-		if pod.UID == podUID {
-			return true
-		}
-	}
-	return false
 }

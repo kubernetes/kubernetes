@@ -134,7 +134,7 @@ func parseMetrics(data string, knownMetrics map[string][]string, output *Metrics
 			if isKnownMetric || isCommonMetric {
 				(*output)[name] = append((*output)[name], metric)
 			} else {
-				glog.Warning("Unknown metric %v", metric)
+				glog.Warningf("Unknown metric %v", metric)
 				if unknownMetrics != nil {
 					unknownMetrics.Insert(name)
 				}

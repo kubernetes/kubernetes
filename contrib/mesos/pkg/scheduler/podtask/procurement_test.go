@@ -23,6 +23,8 @@ import (
 	"github.com/mesos/mesos-go/mesosutil"
 
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"reflect"
@@ -51,7 +53,12 @@ func TestNewPodResourcesProcurement(t *testing.T) {
 
 	task, _ := New(
 		api.NewDefaultContext(),
-		"",
+		Config{
+			Prototype:        executor,
+			FrameworkRoles:   []string{"*"},
+			DefaultPodRoles:  []string{"*"},
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "test",
@@ -76,9 +83,6 @@ func TestNewPodResourcesProcurement(t *testing.T) {
 				},
 			},
 		},
-		executor,
-		[]string{"*"},
-		[]string{"*"},
 	)
 
 	procurement := NewPodResourcesProcurement()
@@ -214,6 +218,6 @@ func TestProcureRoleResources(t *testing.T) {
 
 func scalar(name string, value float64, role string) *mesos.Resource {
 	res := mesosutil.NewScalarResource(name, value)
-	res.Role = stringPtrTo(role)
+	res.Role = resources.StringPtrTo(role)
 	return res
 }

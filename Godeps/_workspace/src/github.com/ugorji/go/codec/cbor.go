@@ -508,7 +508,7 @@ func (d *cborDecDriver) DecodeNaked() {
 			n.v = valueTypeExt
 			n.u = d.decUint()
 			n.l = nil
-			d.bdRead = false
+			// d.bdRead = false
 			// d.d.decode(&re.Value) // handled by decode itself.
 			// decodeFurther = true
 		default:

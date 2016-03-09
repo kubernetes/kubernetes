@@ -19,7 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
-	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type TestgroupInterface interface {
@@ -28,7 +28,7 @@ type TestgroupInterface interface {
 
 // TestgroupClient is used to interact with features provided by the Testgroup group.
 type TestgroupClient struct {
-	*unversioned.RESTClient
+	*restclient.RESTClient
 }
 
 func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
@@ -36,12 +36,12 @@ func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
 }
 
 // NewForConfig creates a new TestgroupClient for the given config.
-func NewForConfig(c *unversioned.Config) (*TestgroupClient, error) {
+func NewForConfig(c *restclient.Config) (*TestgroupClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := unversioned.RESTClientFor(&config)
+	client, err := restclient.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func NewForConfig(c *unversioned.Config) (*TestgroupClient, error) {
 
 // NewForConfigOrDie creates a new TestgroupClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversioned.Config) *TestgroupClient {
+func NewForConfigOrDie(c *restclient.Config) *TestgroupClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,11 +59,11 @@ func NewForConfigOrDie(c *unversioned.Config) *TestgroupClient {
 }
 
 // New creates a new TestgroupClient for the given RESTClient.
-func New(c *unversioned.RESTClient) *TestgroupClient {
+func New(c *restclient.RESTClient) *TestgroupClient {
 	return &TestgroupClient{c}
 }
 
-func setConfigDefaults(config *unversioned.Config) error {
+func setConfigDefaults(config *restclient.Config) error {
 	// if testgroup group is not registered, return an error
 	g, err := registered.Group("testgroup")
 	if err != nil {
@@ -71,7 +71,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
+		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {

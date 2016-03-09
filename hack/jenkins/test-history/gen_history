@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Copyright 2016 The Kubernetes Authors All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Compiles a static HTML site containing the last day's worth of test results.
+# Pass the URL of Jenkins into $1
+
+set -o errexit
+set -o nounset
+
+readonly jenkins="$1"
+readonly datestr=$(date +"%Y-%m-%d")
+
+# Create JSON report
+time python gen_json.py "${jenkins}" kubernetes
+
+# Create static HTML report out of the JSON
+python gen_html.py > static/tests.html
+python gen_html.py kubernetes-e2e > static/tests-e2e.html
+python gen_html.py kubernetes-soak > static/tests-soak.html
+python gen_html.py kubernetes-e2e-gce > static/tests-e2e-gce.html
+python gen_html.py kubernetes-e2e-gke > static/tests-e2e-gke.html
+python gen_html.py kubernetes-upgrade > static/tests-upgrade.html
+
+# Fill in the last updated time into the template.
+cat index_template.html | sed -e "s/TIME/Last updated: ${datestr}/" > static/index.html
+
+# Upload to GCS
+readonly bucket="kubernetes-test-history"
+readonly gcs_acl="public-read"
+gsutil -q cp -a "${gcs_acl}" -z json "tests.json" "gs://${bucket}/logs/${datestr}.json"
+gsutil -q cp -ra "${gcs_acl}" "static" "gs://${bucket}/"

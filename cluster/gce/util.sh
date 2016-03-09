@@ -115,33 +115,55 @@ function detect-project () {
   fi
 }
 
-function already-staged() {
-  local -r file=$1
-  local -r newsum=$2
-
-  [[ -e "${file}.uploaded.sha1" ]] || return 1
-
-  local oldsum
-  oldsum=$(cat "${file}.uploaded.sha1")
-
-  [[ "${oldsum}" == "${newsum}" ]]
-}
-
-# Copy a release tar, if we don't already think it's staged in GCS
-function copy-if-not-staged() {
+# Copy a release tar and its accompanying hash.
+function copy-to-staging() {
   local -r staging_path=$1
   local -r gs_url=$2
   local -r tar=$3
   local -r hash=$4
 
-  if already-staged "${tar}" "${hash}"; then
-    echo "+++ $(basename ${tar}) already staged ('rm ${tar}.uploaded.sha1' to force)"
+  echo "${hash}" > "${tar}.sha1"
+  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
+  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
+  echo "+++ $(basename ${tar}) uploaded (sha1 = ${hash})"
+}
+
+# Given the cluster zone, return the list of regional GCS release
+# bucket suffixes for the release in preference order. GCS doesn't
+# give us an API for this, so we hardcode it.
+#
+# Assumed vars:
+#   RELEASE_REGION_FALLBACK
+#   REGIONAL_KUBE_ADDONS
+#   ZONE
+# Vars set:
+#   PREFERRED_REGION
+#   KUBE_ADDON_REGISTRY
+function set-preferred-region() {
+  case ${ZONE} in
+    asia-*)
+      PREFERRED_REGION=("asia" "us" "eu")
+      ;;
+    europe-*)
+      PREFERRED_REGION=("eu" "us" "asia")
+      ;;
+    *)
+      PREFERRED_REGION=("us" "eu" "asia")
+      ;;
+  esac
+  local -r preferred="${PREFERRED_REGION[0]}"
+
+  if [[ "${RELEASE_REGION_FALLBACK}" != "true" ]]; then
+    PREFERRED_REGION=( "${preferred}" )
+  fi
+
+  # If we're using regional GCR, and we're outside the US, go to the
+  # regional registry. The gcr.io/google_containers registry is
+  # appropriate for US (for now).
+  if [[ "${REGIONAL_KUBE_ADDONS}" == "true" ]] && [[ "${preferred}" != "us" ]]; then
+    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
   else
-    echo "${hash}" > "${tar}.sha1"
-    gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
-    gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
-    echo "${hash}" > "${tar}.uploaded.sha1"
-    echo "+++ $(basename ${tar}) uploaded (sha1 = ${hash})"
+    KUBE_ADDON_REGISTRY="gcr.io/google_containers"
   fi
 }
 
@@ -155,6 +177,7 @@ function copy-if-not-staged() {
 #   SERVER_BINARY_TAR
 #   SALT_TAR
 #   KUBE_MANIFESTS_TAR
+#   ZONE
 # Vars set:
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
@@ -181,35 +204,59 @@ function upload-server-tars() {
   # that's probably good enough for now :P
   project_hash=${project_hash:0:10}
 
-  local -r staging_bucket="gs://kubernetes-staging-${project_hash}"
-
-  # Ensure the bucket is created
-  if ! gsutil ls "$staging_bucket" > /dev/null 2>&1 ; then
-    echo "Creating $staging_bucket"
-    gsutil mb "${staging_bucket}"
-  fi
-
-  local -r staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
+  set-preferred-region
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
+  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
+  fi
 
-  echo "+++ Staging server tars to Google Storage: ${staging_path}"
-  local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
-  local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
-  copy-if-not-staged "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_HASH}"
-  copy-if-not-staged "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${SALT_TAR_HASH}"
+  local server_binary_tar_urls=()
+  local salt_tar_urls=()
+  local kube_manifest_tar_urls=()
 
-  # Convert from gs:// URL to an https:// URL
-  SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
-  SALT_TAR_URL="${salt_gs_url/gs:\/\//https://storage.googleapis.com/}"
+  for region in "${PREFERRED_REGION[@]}"; do
+    suffix="-${region}"
+    if [[ "${suffix}" == "-us" ]]; then
+      suffix=""
+    fi
+    local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
+
+    # Ensure the buckets are created
+    if ! gsutil ls "${staging_bucket}" > /dev/null 2>&1 ; then
+      echo "Creating ${staging_bucket}"
+      gsutil mb -l "${region}" "${staging_bucket}"
+    fi
+
+    local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
+
+    echo "+++ Staging server tars to Google Storage: ${staging_path}"
+    local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
+    local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
+    copy-to-staging "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_HASH}"
+    copy-to-staging "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${SALT_TAR_HASH}"
+
+    # Convert from gs:// URL to an https:// URL
+    server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
+    salt_tar_urls+=("${salt_gs_url/gs:\/\//https://storage.googleapis.com/}")
+
+    if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+      local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
+      copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
+      # Convert from gs:// URL to an https:// URL
+      kube_manifests_tar_urls+=("${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}")
+    fi
+  done
 
   if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
-    local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
-    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
-    copy-if-not-staged "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
-    # Convert from gs:// URL to an https:// URL
-    KUBE_MANIFESTS_TAR_URL="${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}"
+    # TODO: Support fallback .tar.gz settings on CoreOS/Trusty
+    SERVER_BINARY_TAR_URL="${server_binary_tar_urls[0]}"
+    SALT_TAR_URL="${salt_tar_urls[0]}"
+    KUBE_MANIFESTS_TAR_URL="${kube_manifests_tar_urls[0]}"
+  else
+    SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
+    SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
   fi
 }
 
@@ -233,7 +280,7 @@ function detect-node-names {
     done
     echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]}" >&2
     echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
-  else 
+  else
     echo "INSTANCE_GROUPS=" >&2
     echo "NODE_NAMES=" >&2
   fi
@@ -257,8 +304,8 @@ function detect-nodes () {
     if [[ -z "${node_ip-}" ]] ; then
       echo "Did not find ${NODE_NAMES[$i]}" >&2
     else
-      echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
-      KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
+      echo "Found ${NODE_NAMES[$i]} at ${node_ip}"
+      KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
     fi
   done
   if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
@@ -298,19 +345,27 @@ function create-static-ip {
   local attempt=0
   local REGION="$2"
   while true; do
-    if ! gcloud compute addresses create "$1" \
+    if gcloud compute addresses create "$1" \
       --project "${PROJECT}" \
       --region "${REGION}" -q > /dev/null; then
-      if (( attempt > 4 )); then
-        echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
-        exit 2
-      fi
-      attempt=$(($attempt+1)) 
-      echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
-      sleep $(($attempt * 5))
-    else
+      # successful operation
       break
     fi
+
+    if cloud compute addresses describe "$1" \
+      --project "${PROJECT}" \
+      --region "${REGION}" >/dev/null 2>&1; then
+      # it exists - postcondition satisfied
+      break
+    fi
+
+    if (( attempt > 4 )); then
+      echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
+      exit 2
+    fi
+    attempt=$(($attempt+1))
+    echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
+    sleep $(($attempt * 5))
   done
 }
 
@@ -350,9 +405,7 @@ function get-template-name-from-version {
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
-# $3: The minion start script metadata from file.
-# $4: The kube-env metadata.
-# $5 and others: Additional user defined metadata.
+# $3 and others: Metadata entries (must all be from a file).
 function create-node-template {
   detect-project
   local template_name="$1"
@@ -396,6 +449,11 @@ function create-node-template {
         echo -e "${color_yellow}Attempt ${attempt} failed to create instance template $template_name. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
         sleep $(($attempt * 5))
+
+        # In case the previous attempt failed with something like a
+        # Backend Error and left the entry laying around, delete it
+        # before we try again.
+        gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" &>/dev/null || true
     else
         break
     fi
@@ -482,6 +540,7 @@ function kube-up {
   else
     check-existing
     create-network
+    write-cluster-name
     create-master
     create-nodes-firewall
     create-nodes-template
@@ -622,7 +681,7 @@ function create-nodes-template() {
 # Assumes:
 # - MAX_INSTANCES_PER_MIG
 # - NUM_NODES
-# exports: 
+# exports:
 # - NUM_MIGS
 function set_num_migs() {
   local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
@@ -647,7 +706,7 @@ function create-nodes() {
   local last_mig_size=$((${NUM_NODES} - (${NUM_MIGS} - 1) * ${instances_per_mig}))
 
   #TODO: parallelize this loop to speed up the process
-  for i in $(seq $((${NUM_MIGS} - 1))); do
+  for ((i=1; i<${NUM_MIGS}; i++)); do
     gcloud compute instance-groups managed \
         create "${NODE_INSTANCE_PREFIX}-group-$i" \
         --project "${PROJECT}" \
@@ -708,7 +767,7 @@ function create-autoscaler() {
     local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
     local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${NUM_MIGS} - 1) * ${min_instances_per_mig}))
 
-    for i in $(seq $((${NUM_MIGS} - 1))); do
+    for ((i=1; i<${NUM_MIGS}; i++)); do
       gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
           --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${metrics} || true
     done
@@ -803,7 +862,7 @@ function kube-down {
   # Get the name of the managed instance group template before we delete the
   # managed instance group. (The name of the managed instance group template may
   # change during a cluster upgrade.)
-  local template=$(get-template "${PROJECT}" "${ZONE}" "${NODE_INSTANCE_PREFIX}-group")
+  local template=$(get-template "${PROJECT}")
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
@@ -935,18 +994,18 @@ function kube-down {
   set -e
 }
 
-# Gets the instance template for the managed instance group with the provided
-# project, zone, and group name. It echos the template name so that the function
+# Gets the instance template for given NODE_INSTANCE_PREFIX. It echos the template name so that the function
 # output can be used.
+# Assumed vars:
+#   NODE_INSTANCE_PREFIX
 #
 # $1: project
 # $2: zone
-# $3: managed instance group name
 function get-template {
-  # url is set to https://www.googleapis.com/compute/v1/projects/$1/global/instanceTemplates/<template>
-  local url=$(gcloud compute instance-groups managed describe --project="${1}" --zone="${2}" "${3}" | grep instanceTemplate)
-  # template is set to <template> (the pattern strips off all but last slash)
-  local template="${url##*/}"
+  local template=""
+  if [[ -n $(gcloud compute instance-templates list "${NODE_INSTANCE_PREFIX}"-template --project="${1}" | grep template) ]]; then
+    template="${NODE_INSTANCE_PREFIX}"-template
+  fi
   echo "${template}"
 }
 
@@ -1159,7 +1218,7 @@ function kube-push {
 }
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e-test.sh
+# Cluster specific test helpers used from hack/e2e.go
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -1171,13 +1230,23 @@ function test-build-release {
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up (it is run after kube-up).
+# called from hack/e2e.go only when running -up.
 #
 # Assumed vars:
 #   Variables from config.sh
 function test-setup {
   # Detect the project into $PROJECT if it isn't set
   detect-project
+
+  if [[ ${MULTIZONE:-} == "true" ]]; then
+    for KUBE_GCE_ZONE in ${E2E_ZONES}
+    do
+      KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_USE_EXISTING_MASTER="${KUBE_USE_EXISTING_MASTER:-}" "${KUBE_ROOT}/cluster/kube-up.sh"
+      KUBE_USE_EXISTING_MASTER="true" # For subsequent zones we use the existing master
+    done
+  else
+    "${KUBE_ROOT}/cluster/kube-up.sh"
+  fi
 
   # Open up port 80 & 8080 so common containers on minions can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
@@ -1231,7 +1300,17 @@ function test-teardown {
     --project "${PROJECT}" \
     --quiet \
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" || true
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  if [[ ${MULTIZONE:-} == "true" ]]; then
+      local zones=( ${E2E_ZONES} )
+      # tear them down in reverse order, finally tearing down the master too.
+      for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--))
+      do
+	  KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
+      done
+      KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/cluster/kube-down.sh"
+  else
+      "${KUBE_ROOT}/cluster/kube-down.sh"
+  fi
 }
 
 # SSH to a node by name ($1) and run a command ($2).

@@ -51,7 +51,7 @@ on a node but do not prevent it, taints that prevent a pod from starting on Kube
 if the pod's `NodeName` was written directly (i.e. pod did not go through the scheduler),
 and taints that evict already-running pods.
 [This comment](https://github.com/kubernetes/kubernetes/issues/3885#issuecomment-146002375)
-has more background on these diffrent scenarios. We will focus on the first
+has more background on these different scenarios. We will focus on the first
 kind of taint in this doc, since it is the kind required for the "dedicated nodes" use case.
 
 Implementing dedicated nodes using taints and tolerations is straightforward: in essence, a node that
@@ -264,7 +264,7 @@ their taint. Thus we need to ensure that a new node does not become "Ready" unti
 configured with its taints. One way to do this is to have an admission controller that adds the taint whenever
 a Node object is created.
 
-A quota policy may want to treat nodes diffrently based on what taints, if any,
+A quota policy may want to treat nodes differently based on what taints, if any,
 they have. For example, if a particular namespace is only allowed to access dedicated nodes,
 then it may be convenient to give the namespace unlimited quota. (To use finite quota,
 you'd have to size the namespace's quota to the sum of the sizes of the machines in the

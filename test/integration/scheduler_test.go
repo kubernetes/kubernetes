@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -66,7 +67,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -313,7 +314,7 @@ func TestMultiScheduler(t *testing.T) {
 			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
 	*/
 	// 1. create and start default-scheduler
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -384,7 +385,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	restClient2 := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	restClient2 := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	schedulerConfigFactory2 := factory.NewConfigFactory(restClient2, "foo-scheduler")
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
@@ -473,7 +474,7 @@ func TestAllocatable(t *testing.T) {
 	}
 
 	// 1. create and start default-scheduler
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.Create()

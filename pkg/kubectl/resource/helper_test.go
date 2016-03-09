@@ -357,40 +357,42 @@ func TestHelperList(t *testing.T) {
 }
 
 func TestHelperReplace(t *testing.T) {
-	expectPut := func(req *http.Request) bool {
+	expectPut := func(path string, req *http.Request) bool {
 		if req.Method != "PUT" {
 			t.Errorf("unexpected method: %#v", req)
 			return false
 		}
-		parts := splitPath(req.URL.Path)
-		if parts[1] != "bar" {
-			t.Errorf("url doesn't contain namespace: %#v", req.URL)
-			return false
-		}
-		if parts[2] != "foo" {
-			t.Errorf("url doesn't contain name: %#v", req)
+		if req.URL.Path != path {
+			t.Errorf("unexpected url: %v", req.URL)
 			return false
 		}
 		return true
 	}
 
 	tests := []struct {
-		Resp       *http.Response
-		HTTPClient *http.Client
-		HttpErr    error
-		Overwrite  bool
-		Object     runtime.Object
+		Resp            *http.Response
+		HTTPClient      *http.Client
+		HttpErr         error
+		Overwrite       bool
+		Object          runtime.Object
+		Namespace       string
+		NamespaceScoped bool
 
+		ExpectPath   string
 		ExpectObject runtime.Object
 		Err          bool
-		Req          func(*http.Request) bool
+		Req          func(string, *http.Request) bool
 	}{
 		{
-			HttpErr: errors.New("failure"),
-			Err:     true,
+			Namespace:       "bar",
+			NamespaceScoped: true,
+			HttpErr:         errors.New("failure"),
+			Err:             true,
 		},
 		{
-			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Namespace:       "bar",
+			NamespaceScoped: true,
+			Object:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
 				Body:       objBody(&unversioned.Status{Status: unversioned.StatusFailure}),
@@ -398,19 +400,26 @@ func TestHelperReplace(t *testing.T) {
 			Err: true,
 		},
 		{
-			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Namespace:       "bar",
+			NamespaceScoped: true,
+			Object:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			ExpectPath:      "/namespaces/bar/foo",
+			ExpectObject:    &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			Resp: &http.Response{
 				StatusCode: http.StatusOK,
 				Body:       objBody(&unversioned.Status{Status: unversioned.StatusSuccess}),
 			},
 			Req: expectPut,
 		},
+		// namespace scoped resource
 		{
+			Namespace:       "bar",
+			NamespaceScoped: true,
 			Object: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
+			ExpectPath: "/namespaces/bar/foo",
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
@@ -424,11 +433,32 @@ func TestHelperReplace(t *testing.T) {
 			}),
 			Req: expectPut,
 		},
+		// cluster scoped resource
 		{
-			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})},
-			Req:          expectPut,
+			Object: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+			},
+			ExpectObject: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+			},
+			Overwrite:  true,
+			ExpectPath: "/foo",
+			HTTPClient: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method == "PUT" {
+					return &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})}, nil
+				}
+				return &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Node{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
+			}),
+			Req: expectPut,
+		},
+		{
+			Namespace:       "bar",
+			NamespaceScoped: true,
+			Object:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			ExpectPath:      "/namespaces/bar/foo",
+			ExpectObject:    &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			Resp:            &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})},
+			Req:             expectPut,
 		},
 	}
 	for i, test := range tests {
@@ -441,23 +471,22 @@ func TestHelperReplace(t *testing.T) {
 		modifier := &Helper{
 			RESTClient:      client,
 			Versioner:       testapi.Default.MetadataAccessor(),
-			NamespaceScoped: true,
+			NamespaceScoped: test.NamespaceScoped,
 		}
-		_, err := modifier.Replace("bar", "foo", test.Overwrite, test.Object)
+		_, err := modifier.Replace(test.Namespace, "foo", test.Overwrite, test.Object)
 		if (err != nil) != test.Err {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}
 		if err != nil {
 			continue
 		}
-		if test.Req != nil && !test.Req(client.Req) {
+		if test.Req != nil && !test.Req(test.ExpectPath, client.Req) {
 			t.Errorf("%d: unexpected request: %#v", i, client.Req)
 		}
 		body, err := ioutil.ReadAll(client.Req.Body)
 		if err != nil {
 			t.Fatalf("%d: unexpected error: %#v", i, err)
 		}
-		t.Logf("got body: %s", string(body))
 		expect := []byte{}
 		if test.ExpectObject != nil {
 			expect = []byte(runtime.EncodeOrDie(testapi.Default.Codec(), test.ExpectObject))

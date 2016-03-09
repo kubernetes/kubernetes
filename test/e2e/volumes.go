@@ -238,7 +238,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	expectNoError(waitForPodRunningInNamespace(client, clientPod.Name, config.namespace))
 
 	By("reading a web page from the client")
-	subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, client)
+	subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, client)
 	if err != nil {
 		Failf("Failed to get server version: %v", err)
 	}
@@ -353,7 +353,7 @@ func deleteCinderVolume(name string) error {
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
 var _ = Describe("Volumes [Feature:Volumes]", func() {
-	framework := NewFramework("volume")
+	framework := NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag
@@ -376,7 +376,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs",
+				serverImage: "gcr.io/google_containers/volume-nfs:0.4",
 				serverPorts: []int{2049},
 			}
 
@@ -410,7 +410,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster",
+				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
 				serverPorts: []int{24007, 24008, 49152},
 			}
 
@@ -489,7 +489,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
-				serverImage: "gcr.io/google_containers/volume-iscsi",
+				serverImage: "gcr.io/google_containers/volume-iscsi:0.1",
 				serverPorts: []int{3260},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -531,7 +531,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
-				serverImage: "gcr.io/google_containers/volume-rbd",
+				serverImage: "gcr.io/google_containers/volume-rbd:0.1",
 				serverPorts: []int{6789},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -604,7 +604,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
-				serverImage: "gcr.io/google_containers/volume-ceph",
+				serverImage: "gcr.io/google_containers/volume-ceph:0.1",
 				serverPorts: []int{6789},
 			}
 

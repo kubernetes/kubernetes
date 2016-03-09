@@ -78,3 +78,27 @@ func SetAsLabelSelector(ls labels.Set) *LabelSelector {
 
 	return selector
 }
+
+// FormatLabelSelector convert labelSelector into plain string
+func FormatLabelSelector(labelSelector *LabelSelector) string {
+	selector, err := LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return "<error>"
+	}
+
+	l := selector.String()
+	if len(l) == 0 {
+		l = "<none>"
+	}
+	return l
+}
+
+func ExtractGroupVersions(l *APIGroupList) []string {
+	var groupVersions []string
+	for _, g := range l.Groups {
+		for _, gv := range g.Versions {
+			groupVersions = append(groupVersions, gv.GroupVersion)
+		}
+	}
+	return groupVersions
+}

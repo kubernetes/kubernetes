@@ -28,11 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -43,15 +44,18 @@ func init() {
 
 func TestPersistentVolumeRecycler(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	deleteAllEtcdKeys()
-	binderClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	recyclerClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	testClient := clientset.NewForConfigOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	host := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	// Use higher QPS and Burst, there is a test for race condition below, which
+	// creates many claims and default values were too low.
+	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	recyclerClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
-	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}}}
+	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0}}
 	cloud := &fake_cloud.FakeCloud{}
 
 	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 10*time.Second)

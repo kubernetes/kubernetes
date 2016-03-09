@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/test/e2e"
 )
 
 var (
@@ -252,12 +253,16 @@ func main() {
 		}
 	}
 
+	proxyRequest, errProxy := e2e.GetServicesProxyRequest(c, c.Get())
+	if errProxy != nil {
+		glog.Warningf("Get services proxy request failed: %v", errProxy)
+		return
+	}
+
 	// Wait for the endpoints to propagate.
 	for start := time.Now(); time.Since(start) < endpointTimeout; time.Sleep(10 * time.Second) {
-		hostname, err := c.Get().
+		hostname, err := proxyRequest.
 			Namespace(ns).
-			Prefix("proxy").
-			Resource("services").
 			Name("serve-hostnames").
 			DoRaw()
 		if err != nil {
@@ -286,10 +291,8 @@ func main() {
 			go func(i int, query int) {
 				inFlight <- struct{}{}
 				t := time.Now()
-				hostname, err := c.Get().
+				hostname, err := proxyRequest.
 					Namespace(ns).
-					Prefix("proxy").
-					Resource("services").
 					Name("serve-hostnames").
 					DoRaw()
 				glog.V(4).Infof("Proxy call in namespace %s took %v", ns, time.Since(t))

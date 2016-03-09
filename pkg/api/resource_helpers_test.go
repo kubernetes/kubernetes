@@ -51,3 +51,13 @@ func TestResourceHelpers(t *testing.T) {
 		t.Errorf("expected memorylimit %v, got %v", memoryLimit, res)
 	}
 }
+
+func TestDefaultResourceHelpers(t *testing.T) {
+	resourceList := ResourceList{}
+	if resourceList.Cpu().Format != resource.DecimalSI {
+		t.Errorf("expected %v, actual %v", resource.DecimalSI, resourceList.Cpu().Format)
+	}
+	if resourceList.Memory().Format != resource.BinarySI {
+		t.Errorf("expected %v, actual %v", resource.BinarySI, resourceList.Memory().Format)
+	}
+}

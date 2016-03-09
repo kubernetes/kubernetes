@@ -18,54 +18,55 @@ package internalclientset
 
 import (
 	"github.com/golang/glog"
-	core_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	extensions_unversioned "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 )
 
 type Interface interface {
-	Discovery() unversioned.DiscoveryInterface
-	Core() core_unversioned.CoreInterface
-	Extensions() extensions_unversioned.ExtensionsInterface
+	Discovery() discovery.DiscoveryInterface
+	Core() unversionedcore.CoreInterface
+	Extensions() unversionedextensions.ExtensionsInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
-	*unversioned.DiscoveryClient
-	*core_unversioned.CoreClient
-	*extensions_unversioned.ExtensionsClient
+	*discovery.DiscoveryClient
+	*unversionedcore.CoreClient
+	*unversionedextensions.ExtensionsClient
 }
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() core_unversioned.CoreInterface {
+func (c *Clientset) Core() unversionedcore.CoreInterface {
 	return c.CoreClient
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
+func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 	return c.ExtensionsClient
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() unversioned.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
 }
 
 // NewForConfig creates a new Clientset for the given config.
-func NewForConfig(c *unversioned.Config) (*Clientset, error) {
+func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	var clientset Clientset
 	var err error
-	clientset.CoreClient, err = core_unversioned.NewForConfig(c)
+	clientset.CoreClient, err = unversionedcore.NewForConfig(c)
 	if err != nil {
 		return &clientset, err
 	}
-	clientset.ExtensionsClient, err = extensions_unversioned.NewForConfig(c)
+	clientset.ExtensionsClient, err = unversionedextensions.NewForConfig(c)
 	if err != nil {
 		return &clientset, err
 	}
 
-	clientset.DiscoveryClient, err = unversioned.NewDiscoveryClientForConfig(c)
+	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(c)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
@@ -74,21 +75,21 @@ func NewForConfig(c *unversioned.Config) (*Clientset, error) {
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversioned.Config) *Clientset {
+func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = core_unversioned.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = extensions_unversioned.NewForConfigOrDie(c)
+	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = unversioned.NewDiscoveryClientForConfigOrDie(c)
+	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *unversioned.RESTClient) *Clientset {
+func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = core_unversioned.New(c)
-	clientset.ExtensionsClient = extensions_unversioned.New(c)
+	clientset.CoreClient = unversionedcore.New(c)
+	clientset.ExtensionsClient = unversionedextensions.New(c)
 
-	clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c)
+	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset
 }

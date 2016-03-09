@@ -36,6 +36,7 @@ type PluginFactoryArgs struct {
 	PodLister        algorithm.PodLister
 	ServiceLister    algorithm.ServiceLister
 	ControllerLister algorithm.ControllerLister
+	ReplicaSetLister algorithm.ReplicaSetLister
 	NodeLister       algorithm.NodeLister
 	NodeInfo         predicates.NodeInfo
 	PVInfo           predicates.PersistentVolumeInfo
@@ -168,6 +169,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			pcf = &PriorityConfigFactory{
 				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
 					return priorities.NewServiceAntiAffinityPriority(
+						args.PodLister,
 						args.ServiceLister,
 						policy.Argument.ServiceAntiAffinity.Label,
 					)

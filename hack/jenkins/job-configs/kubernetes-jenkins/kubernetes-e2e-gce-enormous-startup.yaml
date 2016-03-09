@@ -1,0 +1,57 @@
+# FIXME: desnowflake this
+- job-template:
+    name: 'kubernetes-e2e-gce-enormous-startup'
+    description: 'Starts and deletes empty 1000 node cluster. Does not allow Node failures. Test owner: gmarek'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            {gce-provider-env}
+            # XXX Not a unique project
+            # TODO: increase a quota for networks in kubernetes-scale and move this test to its own network
+            export E2E_NAME="e2e-enormous-startup"
+            export E2E_TEST="false"
+            export PROJECT="kubernetes-scale"
+            export FAIL_ON_GCP_RESOURCE_LEAK="false"
+            # Override GCE defaults.
+            export NETWORK_PROVIDER="flannel"
+            # Temporarily switch of Heapster, as this will not schedule anywhere.
+            # TODO: Think of a solution to enable it.
+            export KUBE_ENABLE_CLUSTER_MONITORING="none"
+            export KUBE_GCE_ZONE="us-central1-c"
+            export MASTER_SIZE="n1-standard-32"
+            export NODE_SIZE="n1-standard-1"
+            export NODE_DISK_SIZE="50GB"
+            export NUM_NODES="1000"
+            # Reduce logs verbosity
+            export TEST_CLUSTER_LOG_LEVEL="--v=1"
+            export MAX_INSTANCES_PER_MIG="1000"
+            # Increase resync period to simulate production
+            export TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+            {post-env}
+            export KUBE_GCE_NETWORK="e2e-enormous-cluster"
+            timeout -k {kill-timeout}m 480m {runner} && rc=$? || rc=$?
+            {report-rc}
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: "gmarek@google.com"
+    triggers:
+        - timed: 'H 20 * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{jenkins-timeout}'
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- project:
+    name: 'kubernetes-e2e-gce-enormous-startup'
+    jobs:
+        - 'kubernetes-e2e-gce-enormous-startup'

@@ -40,12 +40,12 @@ OUTPUT_TMP="${KUBE_ROOT}/${TMP_SUBPATH}"
 
 echo "Generating api reference docs at ${OUTPUT_TMP}"
 
-V1_TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/v1/"
-V1_TMP="${OUTPUT_TMP}/v1/"
-mkdir -p ${V1_TMP}
-V1BETA1_TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/extensions/v1beta1/"
-V1BETA1_TMP="${OUTPUT_TMP}/extensions/v1beta1/"
-mkdir -p ${V1BETA1_TMP}
+DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1"
+VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
+for ver in $VERSIONS; do
+  mkdir -p "${OUTPUT_TMP}/${ver}"
+done
+
 SWAGGER_PATH="${REPO_DIR}/api/swagger-spec/"
 
 echo "Reading swagger spec from: ${SWAGGER_PATH}"
@@ -56,13 +56,23 @@ if [[ $(uname) == "Darwin" ]]; then
   user_flags=""
 fi 
 
-docker run ${user_flags} --rm -v $V1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.2 \
-    v1 \
-    https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
+for ver in $VERSIONS; do
+  TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/${ver}"
+  REGISTER_FILE_URL="https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg"
+  if [[ ${ver} == "v1" ]]; then
+    REGISTER_FILE_URL="${REGISTER_FILE_URL}/api/${ver}/register.go"
+  else
+    REGISTER_FILE_URL="${REGISTER_FILE_URL}/apis/${ver}/register.go"
+  fi
+  SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name "${ver}")"
 
-docker run ${user_flags} --rm -v $V1BETA1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.2 \
-    v1beta1 \
-    https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
+  docker run ${user_flags} \
+    --rm -v "${TMP_IN_HOST}":/output:z \
+    -v "${SWAGGER_PATH}":/swagger-source:z \
+    gcr.io/google_containers/gen-swagger-docs:v5 \
+    "${SWAGGER_JSON_NAME}" \
+    "${REGISTER_FILE_URL}"
+done
 
 # Check if we actually changed anything
 pushd "${OUTPUT_TMP}" > /dev/null
@@ -93,6 +103,6 @@ done <"${OUTPUT_TMP}/.generated_html"
 echo "Moving api reference docs from ${OUTPUT_TMP} to ${OUTPUT}"
 
 cp -af "${OUTPUT_TMP}"/* "${OUTPUT}"
-rm -r ${OUTPUT_TMP}
+rm -r "${OUTPUT_TMP}"
 
 # ex: ts=2 sw=2 et filetype=sh

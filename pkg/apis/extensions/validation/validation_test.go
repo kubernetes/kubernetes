@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -387,13 +388,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validSelector2 := map[string]string{"c": "d"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 
-	validUpdateStrategy := extensions.DaemonSetUpdateStrategy{
-		Type: extensions.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &extensions.RollingUpdateDaemonSet{
-			MaxUnavailable: intstr.FromInt(1),
-		},
-	}
-
 	validPodSpecAbc := api.PodSpec{
 		RestartPolicy: api.RestartPolicyAlways,
 		DNSPolicy:     api.DNSClusterFirst,
@@ -479,17 +473,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 		},
@@ -497,17 +489,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector2},
-					Template:       validPodTemplateAbc2.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector2},
+					Template: validPodTemplateAbc2.Template,
 				},
 			},
 		},
@@ -515,17 +505,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateNodeSelector.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateNodeSelector.Template,
 				},
 			},
 		},
@@ -542,17 +530,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 		},
@@ -560,81 +546,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: invalidSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"invalid pod": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       invalidPodTemplate.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"change container image": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateDef.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"read-write volume": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       readWriteVolumePodTemplate.Template,
-					UpdateStrategy: validUpdateStrategy,
-				},
-			},
-		},
-		"invalid update strategy": {
-			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-					Template:       validPodTemplateAbc.Template,
-					UpdateStrategy: validUpdateStrategy,
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -642,10 +555,70 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &unversioned.LabelSelector{MatchLabels: invalidSelector},
 					Template: validPodTemplateAbc.Template,
-					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-						Type:          extensions.RollingUpdateDaemonSetStrategyType,
-						RollingUpdate: nil,
-					},
+				},
+			},
+		},
+		"invalid pod": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: invalidPodTemplate.Template,
+				},
+			},
+		},
+		"change container image": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateDef.Template,
+				},
+			},
+		},
+		"read-write volume": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: readWriteVolumePodTemplate.Template,
+				},
+			},
+		},
+		"invalid update strategy": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+					Template: validPodTemplateAbc.Template,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: invalidSelector},
+					Template: validPodTemplateAbc.Template,
 				},
 			},
 		},
@@ -659,12 +632,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 
 func TestValidateDaemonSet(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
-	validUpdateStrategy := extensions.DaemonSetUpdateStrategy{
-		Type: extensions.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &extensions.RollingUpdateDaemonSet{
-			MaxUnavailable: intstr.FromInt(1),
-		},
-	}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
@@ -693,17 +660,15 @@ func TestValidateDaemonSet(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template:       validPodTemplate.Template,
-				UpdateStrategy: validUpdateStrategy,
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+				Template: validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
-				Selector:       &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template:       validPodTemplate.Template,
-				UpdateStrategy: validUpdateStrategy,
+				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+				Template: validPodTemplate.Template,
 			},
 		},
 	}
@@ -823,104 +788,6 @@ func TestValidateDaemonSet(t *testing.T) {
 				},
 			},
 		},
-		"invalid update strategy - Type is not RollingUpdate": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: "",
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable: intstr.FromInt(1),
-					},
-				},
-			},
-		},
-		"invalid update strategy - RollingUpdate field is nil": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type:          extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: nil,
-				},
-			},
-		},
-		"invalid update strategy - MaxUnavailable is 0": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromInt(0),
-						MinReadySeconds: 1,
-					},
-				},
-			},
-		},
-		"invalid update strategy - MaxUnavailable is greater than 100%": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromString("150%"),
-						MinReadySeconds: 1,
-					},
-				},
-			},
-		},
-		"invalid update strategy - MaxUnavailable is negative": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromInt(-1),
-						MinReadySeconds: 0,
-					},
-				},
-			},
-		},
-		"invalid update strategy - MinReadySeconds is negative": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{
-						MaxUnavailable:  intstr.FromInt(-1),
-						MinReadySeconds: -1,
-					},
-				},
-			},
-		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateDaemonSet(&v)
@@ -952,8 +819,10 @@ func validDeployment() *extensions.Deployment {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.DeploymentSpec{
-			Selector: map[string]string{
-				"name": "abc",
+			Selector: &unversioned.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "abc",
+				},
 			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -1000,8 +869,10 @@ func TestValidateDeployment(t *testing.T) {
 	}
 	// selector should match the labels in pod template.
 	invalidSelectorDeployment := validDeployment()
-	invalidSelectorDeployment.Spec.Selector = map[string]string{
-		"name": "def",
+	invalidSelectorDeployment.Spec.Selector = &unversioned.LabelSelector{
+		MatchLabels: map[string]string{
+			"name": "def",
+		},
 	}
 	errorCases["`selector` does not match template `labels`"] = invalidSelectorDeployment
 
@@ -1105,12 +976,15 @@ func TestValidateDeploymentRollback(t *testing.T) {
 }
 
 func TestValidateJob(t *testing.T) {
-	validSelector := &unversioned.LabelSelector{
+	validManualSelector := &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
-	validPodTemplateSpec := api.PodTemplateSpec{
+	validGeneratedSelector := &unversioned.LabelSelector{
+		MatchLabels: map[string]string{"collection-uid": "1a2b3c"},
+	}
+	validPodTemplateSpecForManual := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector.MatchLabels,
+			Labels: validManualSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -1118,21 +992,45 @@ func TestValidateJob(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	successCases := []extensions.Job{
-		{
+	validPodTemplateSpecForGenerated := api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Labels: validGeneratedSelector.MatchLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		},
+	}
+	successCases := map[string]extensions.Job{
+		"manual selector": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Selector: validSelector,
-				Template: validPodTemplateSpec,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForManual,
+			},
+		},
+		"generated selector": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: extensions.JobSpec{
+				Selector:       validGeneratedSelector,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
 	}
-	for _, successCase := range successCases {
-		if errs := ValidateJob(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+	for k, v := range successCases {
+		if errs := ValidateJob(&v); len(errs) != 0 {
+			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
 	negative := -1
@@ -1142,54 +1040,83 @@ func TestValidateJob(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Parallelism: &negative,
-				Selector:    validSelector,
-				Template:    validPodTemplateSpec,
+				Parallelism:    &negative,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.completions:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Completions: &negative,
-				Selector:    validSelector,
-				Template:    validPodTemplateSpec,
+				Completions:    &negative,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.activeDeadlineSeconds:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
 				ActiveDeadlineSeconds: &negative64,
-				Selector:              validSelector,
-				Template:              validPodTemplateSpec,
+				Selector:              validManualSelector,
+				ManualSelector:        newBool(true),
+				Template:              validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.selector:Required value": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Template: validPodTemplateSpec,
+				Template: validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Selector: validSelector,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyOnFailure,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+					},
+				},
+			},
+		},
+		"spec.template.metadata.labels: Invalid value: {\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: extensions.JobSpec{
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template: api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{"controller-uid": "4d5e6f"},
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -1203,12 +1130,14 @@ func TestValidateJob(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
 			},
 			Spec: extensions.JobSpec{
-				Selector: validSelector,
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector.MatchLabels,
+						Labels: validManualSelector.MatchLabels,
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyAlways,
@@ -1425,120 +1354,6 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
-		}
-	}
-}
-
-func TestValidateClusterAutoscaler(t *testing.T) {
-	successCases := []extensions.ClusterAutoscaler{
-		{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "ClusterAutoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.ClusterAutoscalerSpec{
-				MinNodes: 1,
-				MaxNodes: 5,
-				TargetUtilization: []extensions.NodeUtilization{
-					{
-						Resource: extensions.CpuRequest,
-						Value:    0.7,
-					},
-				},
-			},
-		},
-	}
-	for _, successCase := range successCases {
-		if errs := ValidateClusterAutoscaler(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := map[string]extensions.ClusterAutoscaler{
-		"must be 'ClusterAutoscaler'": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "TestClusterAutoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.ClusterAutoscalerSpec{
-				MinNodes: 1,
-				MaxNodes: 5,
-				TargetUtilization: []extensions.NodeUtilization{
-					{
-						Resource: extensions.CpuRequest,
-						Value:    0.7,
-					},
-				},
-			},
-		},
-		"must be 'default'": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "ClusterAutoscaler",
-				Namespace: "test",
-			},
-			Spec: extensions.ClusterAutoscalerSpec{
-				MinNodes: 1,
-				MaxNodes: 5,
-				TargetUtilization: []extensions.NodeUtilization{
-					{
-						Resource: extensions.CpuRequest,
-						Value:    0.7,
-					},
-				},
-			},
-		},
-
-		`must be greater than or equal to 0`: {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "ClusterAutoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.ClusterAutoscalerSpec{
-				MinNodes: -1,
-				MaxNodes: 5,
-				TargetUtilization: []extensions.NodeUtilization{
-					{
-						Resource: extensions.CpuRequest,
-						Value:    0.7,
-					},
-				},
-			},
-		},
-		"must be greater than or equal to `minNodes`": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "ClusterAutoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.ClusterAutoscalerSpec{
-				MinNodes: 10,
-				MaxNodes: 5,
-				TargetUtilization: []extensions.NodeUtilization{
-					{
-						Resource: extensions.CpuRequest,
-						Value:    0.7,
-					},
-				},
-			},
-		},
-		"Required value": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "ClusterAutoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.ClusterAutoscalerSpec{
-				MinNodes:          1,
-				MaxNodes:          5,
-				TargetUtilization: []extensions.NodeUtilization{},
-			},
-		},
-	}
-
-	for k, v := range errorCases {
-		errs := ValidateClusterAutoscaler(&v)
-		if len(errs) == 0 {
-			t.Errorf("[%s] expected failure", k)
-		} else if !strings.Contains(errs[0].Error(), k) {
-			t.Errorf("unexpected error: %v, expected: %q", errs[0], k)
 		}
 	}
 }
@@ -2083,27 +1898,27 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		return &extensions.PodSecurityPolicy{
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: extensions.PodSecurityPolicySpec{
-				SELinuxContext: extensions.SELinuxContextStrategyOptions{
-					Type: extensions.SELinuxStrategyRunAsAny,
+				SELinux: extensions.SELinuxStrategyOptions{
+					Rule: extensions.SELinuxStrategyRunAsAny,
 				},
 				RunAsUser: extensions.RunAsUserStrategyOptions{
-					Type: extensions.RunAsUserStrategyRunAsAny,
+					Rule: extensions.RunAsUserStrategyRunAsAny,
 				},
 			},
 		}
 	}
 
 	noUserOptions := validSCC()
-	noUserOptions.Spec.RunAsUser.Type = ""
+	noUserOptions.Spec.RunAsUser.Rule = ""
 
 	noSELinuxOptions := validSCC()
-	noSELinuxOptions.Spec.SELinuxContext.Type = ""
+	noSELinuxOptions.Spec.SELinux.Rule = ""
 
-	invalidUserStratType := validSCC()
-	invalidUserStratType.Spec.RunAsUser.Type = "invalid"
+	invalidUserStratRule := validSCC()
+	invalidUserStratRule.Spec.RunAsUser.Rule = "invalid"
 
-	invalidSELinuxStratType := validSCC()
-	invalidSELinuxStratType.Spec.SELinuxContext.Type = "invalid"
+	invalidSELinuxStratRule := validSCC()
+	invalidSELinuxStratRule.Spec.SELinux.Rule = "invalid"
 
 	missingObjectMetaName := validSCC()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -2135,12 +1950,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			scc:         noSELinuxOptions,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
 		},
-		"invalid user strategy type": {
-			scc:         invalidUserStratType,
+		"invalid user strategy rule": {
+			scc:         invalidUserStratRule,
 			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
 		},
-		"invalid selinux strategy type": {
-			scc:         invalidSELinuxStratType,
+		"invalid selinux strategy rule": {
+			scc:         invalidSELinuxStratRule,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
 		},
 		"missing object meta name": {
@@ -2168,17 +1983,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	mustRunAs := validSCC()
-	mustRunAs.Spec.RunAsUser.Type = extensions.RunAsUserStrategyMustRunAs
+	mustRunAs.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Ranges = []extensions.IDRange{
 		{
 			Min: 1,
 			Max: 1,
 		},
 	}
-	mustRunAs.Spec.SELinuxContext.Type = extensions.SELinuxStrategyMustRunAs
+	mustRunAs.Spec.SELinux.Rule = extensions.SELinuxStrategyMustRunAs
 
 	runAsNonRoot := validSCC()
-	runAsNonRoot.Spec.RunAsUser.Type = extensions.RunAsUserStrategyMustRunAsNonRoot
+	runAsNonRoot.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAsNonRoot
 
 	successCases := map[string]struct {
 		scc *extensions.PodSecurityPolicy
@@ -2199,4 +2014,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			t.Errorf("Expected success for %s, got %v", k, errs)
 		}
 	}
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }

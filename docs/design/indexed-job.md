@@ -33,18 +33,18 @@ Documentation for other releases can be found at
 ## Summary
 
 This design extends kubernetes with user-friendly support for
-running embarassingly parallel jobs.
+running embarrassingly parallel jobs.
 
 Here, *parallel* means on multiple nodes, which means multiple pods.
-By *embarassingly parallel*,  it is meant that the pods
+By *embarrassingly parallel*,  it is meant that the pods
 have no dependencies between each other.  In particular, neither
 ordering between pods nor gang scheduling are supported.
 
-Users already have two other options for running embarassingly parallel
+Users already have two other options for running embarrassingly parallel
 Jobs (described in the next section), but both have ease-of-use issues.
 
 Therefore, this document proposes extending the Job resource type to support
-a third way to run embarassingly parallel programs, with a focus on
+a third way to run embarrassingly parallel programs, with a focus on
 ease of use.
 
 This new style of Job is called an *indexed job*, because each Pod of the Job
@@ -53,7 +53,7 @@ is specialized to work on a particular *index* from a fixed length array of work
 ## Background
 
 The Kubernetes [Job](../../docs/user-guide/jobs.md) already supports
-the embarassingly parallel use case through *workqueue jobs*.
+the embarrassingly parallel use case through *workqueue jobs*.
 While [workqueue jobs](../../docs/user-guide/jobs.md#job-patterns)
  are very flexible, they can be difficult to use.
 They: (1) typically require running a message queue
@@ -242,7 +242,7 @@ In the above example:
 - `--restart=OnFailure` implies creating a job instead of replicationController.
 - Each pods command line is `/usr/local/bin/process_file $F`.
 - `--per-completion-env=` implies the jobs `.spec.completions` is set to the length of the argument array (3 in the example).
-- `--per-completion-env=F=<values>` causes env var with `F` to be available in the enviroment when the command line is evaluated.
+- `--per-completion-env=F=<values>` causes env var with `F` to be available in the environment when the command line is evaluated.
 
 How exactly this happens is discussed later in the doc: this is a sketch of the user experience.
 
@@ -269,7 +269,7 @@ Another case we do not try to handle is where the input file does not exist yet 
 
 #### Multiple parameters
 
-The user may also have multiple paramters, like in [work list 2](#work-list-2).
+The user may also have multiple parameters, like in [work list 2](#work-list-2).
 One way is to just list all the command lines already expanded, one per line, in a file, like this:
 
 ```
@@ -491,7 +491,7 @@ The index-only approach:
 - requires that the user keep the *per completion parameters* in a separate storage, such as a configData or networked storage.
 - makes no changes to the JobSpec.
 - Drawback: while in separate storage, they could be mutatated, which would have unexpected effects
-- Drawback: Logic for using index to lookup paramters needs to be in the Pod.
+- Drawback: Logic for using index to lookup parameters needs to be in the Pod.
 - Drawback: CLIs and UIs are limited to using the "index" as the identity of a pod
   from a job.  They cannot easily say, for example `repeated failures on the pod processing banana.txt`.
 

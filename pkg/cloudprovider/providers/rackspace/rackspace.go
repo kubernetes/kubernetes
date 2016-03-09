@@ -344,6 +344,11 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	return "", nil
 }
 
+// InstanceType returns the type of the specified instance.
+func (i *Instances) InstanceType(name string) (string, error) {
+	return "", nil
+}
+
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }

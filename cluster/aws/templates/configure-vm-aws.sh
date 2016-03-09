@@ -29,12 +29,12 @@ ensure-packages() {
   # TODO: Where to get safe_format_and_mount?
   mkdir -p /usr/share/google
   cd /usr/share/google
-  download-or-bust https://raw.githubusercontent.com/GoogleCloudPlatform/compute-image-packages/82b75f314528b90485d5239ab5d5495cc22d775f/google-startup-scripts/usr/share/google/safe_format_and_mount
+  download-or-bust "dc96f40fdc9a0815f099a51738587ef5a976f1da" https://raw.githubusercontent.com/GoogleCloudPlatform/compute-image-packages/82b75f314528b90485d5239ab5d5495cc22d775f/google-startup-scripts/usr/share/google/safe_format_and_mount
   chmod +x safe_format_and_mount
 }
 
 set-kube-env() {
-  local kube_env_yaml="${INSTALL_DIR}/kube_env.yaml"
+  local kube_env_yaml="/etc/kubernetes/kube_env.yaml"
 
   # kube-env has all the environment variables we care about, in a flat yaml format
   eval "$(python -c '
@@ -52,6 +52,11 @@ remove-docker-artifacts() {
 
 # Finds the master PD device
 find-master-pd() {
+  if ( grep "/mnt/master-pd" /proc/mounts ); then
+    echo "Master PD already mounted; won't remount"
+    MASTER_PD_DEVICE=""
+    return
+  fi
   echo "Waiting for master pd to be attached"
   attempt=0
   while true; do
@@ -64,6 +69,9 @@ find-master-pd() {
     attempt=$(($attempt+1))
     sleep 1
   done
+
+  # Mount the master PD as early as possible
+  echo "/dev/xvdb /mnt/master-pd ext4 noatime 0 0" >> /etc/fstab
 }
 
 fix-apt-sources() {

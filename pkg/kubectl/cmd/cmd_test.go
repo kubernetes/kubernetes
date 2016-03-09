@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -167,7 +168,7 @@ type testFactory struct {
 	Printer      kubectl.ResourcePrinter
 	Validator    validation.Schema
 	Namespace    string
-	ClientConfig *client.Config
+	ClientConfig *restclient.Config
 	Err          error
 }
 
@@ -180,7 +181,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			return t.Mapper, t.Typer
+			priorityRESTMapper := meta.PriorityRESTMapper{
+				Delegate: t.Mapper,
+				ResourcePriority: []unversioned.GroupVersionResource{
+					{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+				},
+				KindPriority: []unversioned.GroupVersionKind{
+					{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+				},
+			}
+			return priorityRESTMapper, t.Typer
 		},
 		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
@@ -203,7 +213,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		DefaultNamespace: func() (string, bool, error) {
 			return t.Namespace, false, t.Err
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func() (*restclient.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 	}, t, codec
@@ -212,7 +222,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	f, t, c := NewTestFactory()
 	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
-		return meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+		priorityRESTMapper := meta.PriorityRESTMapper{
+			Delegate: meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()},
+			ResourcePriority: []unversioned.GroupVersionResource{
+				{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+			},
+			KindPriority: []unversioned.GroupVersionKind{
+				{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+			},
+		}
+		return priorityRESTMapper, runtime.MultiObjectTyper{t.Typer, api.Scheme}
 	}
 	f.ClientForMapping = func(m *meta.RESTMapping) (resource.RESTClient, error) {
 		if m.ObjectConvertor == api.Scheme {
@@ -261,13 +280,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		DefaultNamespace: func() (string, bool, error) {
 			return t.Namespace, false, t.Err
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func() (*restclient.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 		Generators: func(cmdName string) map[string]kubectl.Generator {
 			return cmdutil.DefaultGenerators(cmdName)
 		},
-		LogsForObject: func(object, options runtime.Object) (*client.Request, error) {
+		LogsForObject: func(object, options runtime.Object) (*restclient.Request, error) {
 			fakeClient := t.Client.(*fake.RESTClient)
 			c := client.NewOrDie(t.ClientConfig)
 			c.Client = fakeClient.Client
@@ -290,6 +309,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}
 	rf := cmdutil.NewFactory(nil)
 	f.PodSelectorForObject = rf.PodSelectorForObject
+	f.MapBasedSelectorForObject = rf.MapBasedSelectorForObject
 	f.PortsForObject = rf.PortsForObject
 	f.LabelsForObject = rf.LabelsForObject
 	f.CanBeExposed = rf.CanBeExposed
@@ -356,14 +376,61 @@ func ExamplePrintReplicationControllerWithNamespace() {
 				},
 			},
 		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS   AGE
-	// beep        foo          foo            someimage   foo=bar    1          10y
+	// NAMESPACE   NAME      DESIRED   CURRENT   AGE
+	// beep        foo       1         1         10y
+}
+
+func ExamplePrintReplicationControllerWithWide() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
+	tf.Client = &fake.RESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
+	// foo       1         1         10y       foo            someimage   foo=bar
 }
 
 func ExamplePrintPodWithWideFormat() {
@@ -634,9 +701,9 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           SELECTOR   AGE       L1|
-	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     s=magic    10y       value|
-	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   s=kazam    10y       dolla-bill-yall|
+	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE       L1|
+	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     10y       value|
+	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   10y       dolla-bill-yall|
 	// ||
 }
 

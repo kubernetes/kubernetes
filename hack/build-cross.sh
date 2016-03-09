@@ -28,6 +28,9 @@ KUBE_BUILD_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 kube::golang::build_binaries "${KUBE_SERVER_TARGETS[@]}"
 
 KUBE_BUILD_PLATFORMS=("${KUBE_CLIENT_PLATFORMS[@]}")
-kube::golang::build_binaries "${KUBE_CLIENT_TARGETS[@]}" "${KUBE_TEST_TARGETS[@]}"
+kube::golang::build_binaries "${KUBE_CLIENT_TARGETS[@]}"
+
+KUBE_BUILD_PLATFORMS=("${KUBE_TEST_PLATFORMS[@]}")
+kube::golang::build_binaries "${KUBE_TEST_TARGETS[@]}"
 
 kube::golang::place_bins

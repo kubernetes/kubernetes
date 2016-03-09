@@ -589,6 +589,7 @@ func patchResource(ctx api.Context, admit updateAdmissionFunc, timeout time.Dura
 				return nil, err
 			}
 			if hasConflicts {
+				glog.V(4).Infof("patchResource failed for resource %s, becauase there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
 				return updateObject, updateErr
 			}
 

@@ -45,7 +45,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "openstack"
@@ -479,6 +481,11 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	return "/" + srv.ID, nil
 }
 
+// InstanceType returns the type of the specified instance.
+func (i *Instances) InstanceType(name string) (string, error) {
+	return "", nil
+}
+
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -654,8 +661,8 @@ func (lb *LoadBalancer) GetLoadBalancer(name, region string) (*api.LoadBalancerS
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, affinity)
+func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinity api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, serviceName, annotations)
 
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
@@ -679,7 +686,16 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
-	glog.V(2).Info("Checking if openstack load balancer already exists: %s", name)
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
+	if err != nil {
+		return nil, err
+	}
+
+	if !service.IsAllowAll(sourceRanges) {
+		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
+	}
+
+	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", name)
 	_, exists, err := lb.GetLoadBalancer(name, region)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
@@ -1037,7 +1053,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(size int, tags *map[string]string) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error) {
 
 	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -1048,7 +1064,10 @@ func (os *OpenStack) CreateVolume(size int, tags *map[string]string) (volumeName
 		return "", err
 	}
 
-	opts := volumes.CreateOpts{Size: size}
+	opts := volumes.CreateOpts{
+		Name: name,
+		Size: size,
+	}
 	if tags != nil {
 		opts.Metadata = *tags
 	}

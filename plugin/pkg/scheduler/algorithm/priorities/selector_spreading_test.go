@@ -22,10 +22,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	wellknownlabels "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func TestSelectorSpreadPriority(t *testing.T) {
@@ -48,6 +50,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		pods         []*api.Pod
 		nodes        []string
 		rcs          []api.ReplicationController
+		rss          []extensions.ReplicaSet
 		services     []api.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
@@ -178,6 +181,20 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "service with partial pod label matches with service and replication controller",
 		},
 		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    []string{"machine1", "machine2"},
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rss:      []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "service with partial pod label matches with service and replication controller",
+		},
+		{
 			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}}},
 			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
@@ -188,6 +205,20 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Taken together Service and Replication Controller should match all Pods, hence result should be equal to one above.
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "disjoined service and replication controller should be treated equally",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    []string{"machine1", "machine2"},
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			rss:      []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
 			test:         "disjoined service and replication controller should be treated equally",
 		},
@@ -211,20 +242,43 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
+			nodes: []string{"machine1", "machine2"},
+			rss:   []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:         "Replication controller with partial pod label matches",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
 			nodes:        []string{"machine1", "machine2"},
 			rcs:          []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "Replication controller with partial pod label matches",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes: []string{"machine1", "machine2"},
+			rss:   []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
 			test:         "Replication controller with partial pod label matches",
 		},
 	}
 
 	for _, test := range tests {
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		selectorSpread := SelectorSpread{serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs)}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		selectorSpread := SelectorSpread{podLister: algorithm.FakePodLister(test.pods), serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs), replicaSetLister: algorithm.FakeReplicaSetLister(test.rss)}
+		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -276,6 +330,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		pods         []*api.Pod
 		nodes        []string
 		rcs          []api.ReplicationController
+		rss          []extensions.ReplicaSet
 		services     []api.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
@@ -422,12 +477,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		selectorSpread := SelectorSpread{serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs)}
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeLabeledNodeList(labeledNodes)))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		selectorSpread := SelectorSpread{podLister: algorithm.FakePodLister(test.pods), serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs), replicaSetLister: algorithm.FakeReplicaSetLister(test.rss)}
+		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(makeLabeledNodeList(labeledNodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -597,12 +649,9 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		zoneSpread := ServiceAntiAffinity{serviceLister: algorithm.FakeServiceLister(test.services), label: "zone"}
-		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeLabeledNodeList(test.nodes)))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		zoneSpread := ServiceAntiAffinity{podLister: algorithm.FakePodLister(test.pods), serviceLister: algorithm.FakeServiceLister(test.services), label: "zone"}
+		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(makeLabeledNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

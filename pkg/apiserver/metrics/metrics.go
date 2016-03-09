@@ -66,10 +66,11 @@ func Register() {
 	prometheus.MustRegister(requestLatenciesSummary)
 }
 
-func Monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
-	requestCounter.WithLabelValues(*verb, *resource, client, codeToString(*httpCode)).Inc()
-	requestLatencies.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
-	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+func Monitor(verb, resource *string, client string, httpCode int, reqStart time.Time) {
+	elapsed := float64((time.Since(reqStart)) / time.Microsecond)
+	requestCounter.WithLabelValues(*verb, *resource, client, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(*verb, *resource).Observe(elapsed)
+	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(elapsed)
 }
 
 func Reset() {
@@ -98,11 +99,7 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 		response.ResponseWriter = rw
 
 		routeFunc(request, response)
-
-		elapsed := float64(time.Since(now)) / float64(time.Microsecond)
-		requestCounter.WithLabelValues(verb, resource, utilnet.GetHTTPClient(request.Request), codeToString(delegate.status)).Inc()
-		requestLatencies.WithLabelValues(verb, resource).Observe(elapsed)
-		requestLatenciesSummary.WithLabelValues(verb, resource).Observe(elapsed)
+		Monitor(&verb, &resource, utilnet.GetHTTPClient(request.Request), delegate.status, now)
 	})
 }
 

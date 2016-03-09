@@ -36,11 +36,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	// version applies to upgrades; kube-push always pushes local binaries.
-	versionURLFmt = "https://storage.googleapis.com/kubernetes-release/%s/%s.txt"
-)
-
 // realVersion turns a version constant s into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
 func realVersion(s string) (string, error) {
@@ -84,12 +79,6 @@ func masterUpgradeGKE(v string) error {
 	return err
 }
 
-var masterPush = func(_ string) error {
-	// TODO(mikedanese): Make master push use the provided version.
-	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-push.sh"), "-m")
-	return err
-}
-
 var nodeUpgrade = func(f *Framework, replicas int, v string) error {
 	// Perform the upgrade.
 	var err error
@@ -106,6 +95,9 @@ var nodeUpgrade = func(f *Framework, replicas int, v string) error {
 	}
 
 	// Wait for it to complete and validate nodes and pods are healthy.
+	//
+	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
+	// GKE; the operation shouldn't return until they all are.
 	Logf("Waiting up to %v for all nodes to be ready after the upgrade", restartNodeReadyAgainTimeout)
 	if _, err := checkNodesReady(f.Client, restartNodeReadyAgainTimeout, testContext.CloudConfig.NumNodes); err != nil {
 		return err
@@ -115,8 +107,10 @@ var nodeUpgrade = func(f *Framework, replicas int, v string) error {
 }
 
 func nodeUpgradeGCE(rawV string) error {
+	// TODO(ihmccreery) This code path should be identical to how a user
+	// would trigger a node update; right now it's very different.
 	v := "v" + rawV
-	Logf("Preparing node upgarde by creating new instance template for %q", v)
+	Logf("Preparing node upgrade by creating new instance template for %q", v)
 	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-P", v)
 	if err != nil {
 		return err
@@ -160,7 +154,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		Logf("Version for %q is %q", testContext.UpgradeTarget, v)
 	})
 
-	f := NewFramework("cluster-upgrade")
+	f := NewDefaultFramework("cluster-upgrade")
 	var w *ServiceTestFixture
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")
@@ -191,35 +185,17 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		//  - volumes
 		//  - persistent volumes
 	})
+
 	AfterEach(func() {
 		w.Cleanup()
 	})
 
-	Describe("kube-push", func() {
-		BeforeEach(func() {
-			SkipUnlessProviderIs("gce")
-		})
-
-		It("of master should maintain responsive services", func() {
+	Describe("master upgrade", func() {
+		It("should maintain responsive services [Feature:MasterUpgrade]", func() {
 			By("Validating cluster before master upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a master upgrade")
-			testMasterUpgrade(ip, v, masterPush)
-			By("Validating cluster after master upgrade")
-			expectNoError(validate(f, svcName, rcName, ingress, replicas))
-		})
-	})
-
-	Describe("upgrade-master", func() {
-		BeforeEach(func() {
-			SkipUnlessProviderIs("gce", "gke")
-		})
-
-		It("should maintain responsive services", func() {
-			By("Validating cluster before master upgrade")
-			expectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a master upgrade")
-			testMasterUpgrade(ip, v, masterUpgrade)
+			testUpgrade(ip, v, masterUpgrade)
 			By("Checking master version")
 			expectNoError(checkMasterVersion(f.Client, v))
 			By("Validating cluster after master upgrade")
@@ -227,7 +203,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		})
 	})
 
-	Describe("upgrade-cluster", func() {
+	Describe("node upgrade", func() {
 		var tmplBefore, tmplAfter string
 		BeforeEach(func() {
 			if providerIs("gce") {
@@ -264,26 +240,36 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 			}
 		})
 
-		It("should maintain a functioning cluster", func() {
-			SkipUnlessProviderIs("gce", "gke")
-
-			By("Validating cluster before master upgrade")
-			expectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a master upgrade")
-			testMasterUpgrade(ip, v, masterUpgrade)
-			By("Checking master version")
-			expectNoError(checkMasterVersion(f.Client, v))
-			By("Validating cluster after master upgrade")
+		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
+			By("Validating cluster before node upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a node upgrade")
-			testNodeUpgrade(f, nodeUpgrade, replicas, v)
+			// Circumnavigate testUpgrade, since services don't necessarily stay up.
+			Logf("Starting upgrade")
+			expectNoError(nodeUpgrade(f, replicas, v))
+			Logf("Upgrade complete")
+			By("Checking node versions")
+			expectNoError(checkNodesVersions(f.Client, v))
+			By("Validating cluster after node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+		})
+
+		It("should maintain responsive services [Feature:ExperimentalNodeUpgrade]", func() {
+			By("Validating cluster before node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a node upgrade")
+			testUpgrade(ip, v, func(v string) error {
+				return nodeUpgrade(f, replicas, v)
+			})
+			By("Checking node versions")
+			expectNoError(checkNodesVersions(f.Client, v))
 			By("Validating cluster after node upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 		})
 	})
 })
 
-func testMasterUpgrade(ip, v string, mUp func(v string) error) {
+func testUpgrade(ip, v string, upF func(v string) error) {
 	Logf("Starting async validation")
 	httpClient := http.Client{Timeout: 2 * time.Second}
 	done := make(chan struct{}, 1)
@@ -310,18 +296,18 @@ func testMasterUpgrade(ip, v string, mUp func(v string) error) {
 			// because this validation runs in another goroutine. Without this,
 			// a failure is very confusing to track down because from the logs
 			// everything looks fine.
-			msg := fmt.Sprintf("Failed to contact service during master upgrade: %v", err)
+			msg := fmt.Sprintf("Failed to contact service during upgrade: %v", err)
 			Logf(msg)
 			Failf(msg)
 		}
 	}, 200*time.Millisecond, done)
 
-	Logf("Starting master upgrade")
-	expectNoError(mUp(v))
+	Logf("Starting upgrade")
+	expectNoError(upF(v))
 	done <- struct{}{}
 	Logf("Stopping async validation")
 	wg.Wait()
-	Logf("Master upgrade complete")
+	Logf("Upgrade complete")
 }
 
 func checkMasterVersion(c *client.Client, want string) error {
@@ -339,15 +325,6 @@ func checkMasterVersion(c *client.Client, want string) error {
 	}
 	Logf("Master is at version %s", want)
 	return nil
-}
-
-func testNodeUpgrade(f *Framework, nUp func(f *Framework, n int, v string) error, replicas int, v string) {
-	Logf("Starting node upgrade")
-	expectNoError(nUp(f, replicas, v))
-	Logf("Node upgrade complete")
-	By("Checking node versions")
-	expectNoError(checkNodesVersions(f.Client, v))
-	Logf("All nodes are at version %s", v)
 }
 
 func checkNodesVersions(c *client.Client, want string) error {
@@ -510,7 +487,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 		// NOTE(mikedanese): If you are changing this gcloud command, update
 		//                 cluster/gce/upgrade.sh to match this EXACTLY.
 		// A `rolling-updates start` call outputs what we want to stderr.
-		_, output, err := retryCmd("gcloud", append(migUpdateCmdBase(),
+		_, output, err := retryCmd("gcloud", "alpha", "compute",
 			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
@@ -524,7 +501,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 			//       --max-num-concurrent-instances.
 			fmt.Sprintf("--max-num-concurrent-instances=%d", 1),
 			fmt.Sprintf("--max-num-failed-instances=%d", 0),
-			fmt.Sprintf("--min-instance-update-time=%ds", 0))...)
+			fmt.Sprintf("--min-instance-update-time=%ds", 0))
 		if err != nil {
 			errLast = fmt.Errorf("rolling-updates call failed with err: %v", err)
 			return false, nil
@@ -552,25 +529,6 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	return id, nil
 }
 
-// migUpdateCmdBase gets the base of the MIG rolling update command--i.e., all
-// pieces of the gcloud command that come after "gcloud" but before
-// "rolling-updates". Examples of returned values are:
-//
-//   {preview"}
-//
-//   {"alpha", "compute"}
-//
-// TODO(mikedanese): Remove this hack on July 29, 2015 when the migration to
-//                 `gcloud alpha compute rolling-updates` is complete.
-func migUpdateCmdBase() []string {
-	b := []string{"preview"}
-	a := []string{"rolling-updates", "-h"}
-	if err := exec.Command("gcloud", append(b, a...)...).Run(); err != nil {
-		b = []string{"alpha", "compute"}
-	}
-	return b
-}
-
 // migRollingUpdatePoll (CKE/GKE-only) polls the progress of the MIG rolling
 // update with ID id until it is complete. It returns an error if this takes
 // longer than nt times the number of nodes.
@@ -582,12 +540,12 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
 	if wait.Poll(restartPoll, timeout, func() (bool, error) {
 		// A `rolling-updates describe` call outputs what we want to stdout.
-		output, _, err := retryCmd("gcloud", append(migUpdateCmdBase(),
+		output, _, err := retryCmd("gcloud", "alpha", "compute",
 			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"describe",
-			id)...)
+			id)
 		if err != nil {
 			errLast = fmt.Errorf("Error calling rolling-updates describe %s: %v", id, err)
 			Logf("%v", errLast)
@@ -611,6 +569,10 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 }
 
 func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
+	loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
+	if providerIs("aws") {
+		loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
+	}
 	return testLoadBalancerReachableInTime(ingress, port, loadBalancerLagTimeout)
 }
 

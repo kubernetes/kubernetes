@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -68,6 +68,7 @@ type testCase struct {
 	targetTimestamp       int
 	reportedMetricsPoints [][]metricPoint
 	namespace             string
+	podListOverride       *api.PodList
 	selector              map[string]string
 }
 
@@ -81,36 +82,19 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if tc.podListOverride != nil {
+			return true, tc.podListOverride, nil
+		}
 		obj := &api.PodList{}
 		for i := 0; i < tc.replicas; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-			pod := api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      podName,
-					Namespace: namespace,
-					Labels:    selector,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									api.ResourceCPU: resource.MustParse("10"),
-								},
-							},
-						},
-					},
-				},
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
-				},
-			}
+			pod := buildPod(namespace, podName, selector, api.PodRunning)
 			obj.Items = append(obj.Items, pod)
 		}
 		return true, obj, nil
 	})
 
-	fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret client.ResponseWrapper, err error) {
+	fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret restclient.ResponseWrapper, err error) {
 		metrics := heapster.MetricResultList{}
 		var latestTimestamp time.Time
 		for _, reportedMetricPoints := range tc.reportedMetricsPoints {
@@ -134,6 +118,30 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	})
 
 	return fakeClient
+}
+
+func buildPod(namespace, podName string, selector map[string]string, phase api.PodPhase) api.Pod {
+	return api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			Labels:    selector,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU: resource.MustParse("10"),
+						},
+					},
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Phase: phase,
+		},
+	}
 }
 
 func (tc *testCase) verifyResults(t *testing.T, val *float64, timestamp time.Time, err error) {
@@ -173,6 +181,50 @@ func TestCPU(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestCPUPending(t *testing.T) {
+	tc := testCase{
+		replicas:              4,
+		desiredValue:          5000,
+		targetResource:        "cpu-usage",
+		targetTimestamp:       1,
+		reportedMetricsPoints: [][]metricPoint{{{5000, 1}}, {{5000, 1}}, {{5000, 1}}},
+		podListOverride:       &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	selector := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, selector, api.PodRunning)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[0].Status.Phase = api.PodPending
+
+	tc.runTest(t)
+}
+
+func TestCPUAllPending(t *testing.T) {
+	tc := testCase{
+		replicas:              4,
+		targetResource:        "cpu-usage",
+		targetTimestamp:       1,
+		reportedMetricsPoints: [][]metricPoint{},
+		podListOverride:       &api.PodList{},
+		desiredError:          fmt.Errorf("no running pods"),
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	selector := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, selector, api.PodPending)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.runTest(t)
+}
+
 func TestQPS(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
@@ -181,6 +233,50 @@ func TestQPS(t *testing.T) {
 		targetTimestamp:       1,
 		reportedMetricsPoints: [][]metricPoint{{{10, 1}}, {{20, 1}}, {{10, 1}}},
 	}
+	tc.runTest(t)
+}
+
+func TestQPSPending(t *testing.T) {
+	tc := testCase{
+		replicas:              4,
+		desiredValue:          13.33333,
+		targetResource:        "qps",
+		targetTimestamp:       1,
+		reportedMetricsPoints: [][]metricPoint{{{10, 1}}, {{20, 1}}, {{10, 1}}},
+		podListOverride:       &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	selector := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, selector, api.PodRunning)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[0].Status.Phase = api.PodPending
+	tc.runTest(t)
+}
+
+func TestQPSAllPending(t *testing.T) {
+	tc := testCase{
+		replicas:              4,
+		desiredError:          fmt.Errorf("no running pods"),
+		targetResource:        "qps",
+		targetTimestamp:       1,
+		reportedMetricsPoints: [][]metricPoint{},
+		podListOverride:       &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	selector := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, selector, api.PodPending)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[0].Status.Phase = api.PodPending
 	tc.runTest(t)
 }
 
@@ -315,6 +411,44 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 		reportedMetricsPoints: [][]metricPoint{{}, {{100, 1}}, {{400, 2}, {300, 3}}},
 	}
 	tc.runTest(t)
+}
+
+func TestAggregateSum(t *testing.T) {
+	//calculateSumFromTimeSample(metrics heapster.MetricResultList, duration time.Duration) (sum intAndFloat, count int, timestamp time.Time) {
+	now := time.Now()
+	result := heapster.MetricResultList{
+		Items: []heapster.MetricResult{
+			{
+				Metrics: []heapster.MetricPoint{
+					{now, 50, nil},
+					{now.Add(-15 * time.Second), 100, nil},
+					{now.Add(-60 * time.Second), 100000, nil}},
+				LatestTimestamp: now,
+			},
+		},
+	}
+	sum, cnt, _ := calculateSumFromTimeSample(result, time.Minute)
+	assert.Equal(t, int64(75), sum.intValue)
+	assert.InEpsilon(t, 75.0, sum.floatValue, 0.1)
+	assert.Equal(t, 1, cnt)
+}
+
+func TestAggregateSumSingle(t *testing.T) {
+	now := time.Now()
+	result := heapster.MetricResultList{
+		Items: []heapster.MetricResult{
+			{
+				Metrics: []heapster.MetricPoint{
+					{now, 50, nil},
+					{now.Add(-65 * time.Second), 100000, nil}},
+				LatestTimestamp: now,
+			},
+		},
+	}
+	sum, cnt, _ := calculateSumFromTimeSample(result, time.Minute)
+	assert.Equal(t, int64(50), sum.intValue)
+	assert.InEpsilon(t, 50.0, sum.floatValue, 0.1)
+	assert.Equal(t, 1, cnt)
 }
 
 // TODO: add proper tests for request

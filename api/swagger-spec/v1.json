@@ -1,7 +1,7 @@
 {
   "swaggerVersion": "1.2",
   "apiVersion": "v1",
-  "basePath": "https://10.10.10.10:6443",
+  "basePath": "https://10.10.10.10:443",
   "resourcePath": "/api/v1",
   "apis": [
    {
@@ -4749,6 +4749,426 @@
     ]
    },
    {
+    "path": "/api/v1/nodes/{name}/proxy",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to proxy of Node",
+      "nickname": "connectGetNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to proxy of Node",
+      "nickname": "connectPostNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to proxy of Node",
+      "nickname": "connectPutNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to proxy of Node",
+      "nickname": "connectDeleteNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to proxy of Node",
+      "nickname": "connectHeadNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to proxy of Node",
+      "nickname": "connectOptionsNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/nodes/{name}/proxy/{path}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to proxy of Node",
+      "nickname": "connectGetNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to proxy of Node",
+      "nickname": "connectPostNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to proxy of Node",
+      "nickname": "connectPutNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to proxy of Node",
+      "nickname": "connectDeleteNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to proxy of Node",
+      "nickname": "connectHeadNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to proxy of Node",
+      "nickname": "connectOptionsNamespacedNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/nodes/{name}/status",
     "description": "API at /api/v1",
     "operations": [
@@ -7826,7 +8246,7 @@
         "type": "string",
         "paramType": "query",
         "name": "sinceTime",
-        "description": "An RFC3339 timestamp from which to show logs. If this value preceeds the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+        "description": "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
         "required": false,
         "allowMultiple": false
        },
@@ -10056,6 +10476,168 @@
       ],
       "consumes": [
        "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespace}/replicationcontrollers/{name}/scale",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.Scale",
+      "method": "GET",
+      "summary": "read scale of the specified Scale",
+      "nickname": "readNamespacedScaleScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Scale",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Scale"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Scale",
+      "method": "PUT",
+      "summary": "replace scale of the specified Scale",
+      "nickname": "replaceNamespacedScaleScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Scale",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Scale",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Scale"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Scale",
+      "method": "PATCH",
+      "summary": "partially update scale of the specified Scale",
+      "nickname": "patchNamespacedScaleScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Scale",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Scale"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      }
     ]
@@ -12707,6 +13289,22 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -13559,6 +14157,522 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{namespace}/services/{name}/proxy",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to proxy of Service",
+      "nickname": "connectGetNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to proxy of Service",
+      "nickname": "connectPostNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to proxy of Service",
+      "nickname": "connectPutNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to proxy of Service",
+      "nickname": "connectDeleteNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to proxy of Service",
+      "nickname": "connectHeadNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to proxy of Service",
+      "nickname": "connectOptionsNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespace}/services/{name}/proxy/{path}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to proxy of Service",
+      "nickname": "connectGetNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to proxy of Service",
+      "nickname": "connectPostNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to proxy of Service",
+      "nickname": "connectPutNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to proxy of Service",
+      "nickname": "connectDeleteNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to proxy of Service",
+      "nickname": "connectHeadNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to proxy of Service",
+      "nickname": "connectOptionsNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/services/{name}/status",
     "description": "API at /api/v1",
     "operations": [
@@ -13697,7 +14811,7 @@
      "generation": {
       "type": "integer",
       "format": "int64",
-      "description": "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only."
+      "description": "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only."
      },
      "creationTimestamp": {
       "type": "string",
@@ -14673,17 +15787,17 @@
     "id": "v1.ContainerImage",
     "description": "Describe a container image",
     "required": [
-     "repoTags"
+     "names"
     ],
     "properties": {
-     "repoTags": {
+     "names": {
       "type": "array",
       "items": {
        "type": "string"
       },
       "description": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]"
      },
-     "size": {
+     "sizeBytes": {
       "type": "integer",
       "format": "int64",
       "description": "The size of the image in bytes."
@@ -14937,10 +16051,9 @@
    },
    "v1.GCEPersistentDiskVolumeSource": {
     "id": "v1.GCEPersistentDiskVolumeSource",
-    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once. GCE PDs support ownership management and SELinux relabeling.",
+    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
     "required": [
-     "pdName",
-     "fsType"
+     "pdName"
     ],
     "properties": {
      "pdName": {
@@ -14949,7 +16062,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "partition": {
       "type": "integer",
@@ -14964,10 +16077,9 @@
    },
    "v1.AWSElasticBlockStoreVolumeSource": {
     "id": "v1.AWSElasticBlockStoreVolumeSource",
-    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist and be formatted before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
+    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
     "required": [
-     "volumeID",
-     "fsType"
+     "volumeID"
     ],
     "properties": {
      "volumeID": {
@@ -14976,7 +16088,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "partition": {
       "type": "integer",
@@ -15071,7 +16183,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd"
      },
      "pool": {
       "type": "string",
@@ -15111,8 +16223,7 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun",
-     "fsType"
+     "lun"
     ],
     "properties": {
      "targetPortal": {
@@ -15134,7 +16245,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi"
      },
      "readOnly": {
       "type": "boolean",
@@ -15155,7 +16266,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Only ext3 and ext4 are allowed More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
      "readOnly": {
       "type": "boolean",
@@ -15204,8 +16315,7 @@
     "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
     "required": [
      "targetWWNs",
-     "lun",
-     "fsType"
+     "lun"
     ],
     "properties": {
      "targetWWNs": {
@@ -15222,7 +16332,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\""
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
      },
      "readOnly": {
       "type": "boolean",
@@ -15256,7 +16366,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\""
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script."
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
@@ -15528,6 +16638,10 @@
      "azureFile": {
       "$ref": "v1.AzureFileVolumeSource",
       "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod."
+     },
+     "configMap": {
+      "$ref": "v1.ConfigMapVolumeSource",
+      "description": "ConfigMap represents a configMap that should populate this volume"
      }
     }
    },
@@ -15637,6 +16751,41 @@
      }
     }
    },
+   "v1.ConfigMapVolumeSource": {
+    "id": "v1.ConfigMapVolumeSource",
+    "description": "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'."
+     }
+    }
+   },
+   "v1.KeyToPath": {
+    "id": "v1.KeyToPath",
+    "description": "Maps a string key to a path within a volume.",
+    "required": [
+     "key",
+     "path"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The key to project."
+     },
+     "path": {
+      "type": "string",
+      "description": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'."
+     }
+    }
+   },
    "v1.Container": {
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
@@ -15657,25 +16806,25 @@
       "items": {
        "type": "string"
       },
-      "description": "Entrypoint array. Not executed within a shell. The docker image's entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
+      "description": "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
      },
      "args": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Arguments to the entrypoint. The docker image's cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
+      "description": "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
      },
      "workingDir": {
       "type": "string",
-      "description": "Container's working directory. Defaults to Docker's default. D efaults to image's default. Cannot be updated."
+      "description": "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated."
      },
      "ports": {
       "type": "array",
       "items": {
        "$ref": "v1.ContainerPort"
       },
-      "description": "List of ports to expose from the container. Cannot be updated."
+      "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated."
      },
      "env": {
       "type": "array",
@@ -15855,7 +17004,7 @@
      },
      "mountPath": {
       "type": "string",
-      "description": "Path within the container at which the volume should be mounted."
+      "description": "Path within the container at which the volume should be mounted.  Must not contain ':'."
      }
     }
    },
@@ -16034,6 +17183,10 @@
      "runAsNonRoot": {
       "type": "boolean",
       "description": "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence."
+     },
+     "readOnlyRootFilesystem": {
+      "type": "boolean",
+      "description": "Whether this container has a read-only root filesystem. Default is false."
      }
     }
    },
@@ -16479,6 +17632,61 @@
      }
     }
    },
+   "v1.Scale": {
+    "id": "v1.Scale",
+    "description": "Scale represents a scaling request for a resource.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
+     },
+     "spec": {
+      "$ref": "v1.ScaleSpec",
+      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "v1.ScaleStatus",
+      "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
+     }
+    }
+   },
+   "v1.ScaleSpec": {
+    "id": "v1.ScaleSpec",
+    "description": "ScaleSpec describes the attributes of a scale subresource.",
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "desired number of instances for the scaled object."
+     }
+    }
+   },
+   "v1.ScaleStatus": {
+    "id": "v1.ScaleStatus",
+    "description": "ScaleStatus represents the current status of a scale subresource.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "actual number of observed instances of the scaled object."
+     },
+     "selector": {
+      "type": "string",
+      "description": "label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+     }
+    }
+   },
    "v1.ResourceQuotaList": {
     "id": "v1.ResourceQuotaList",
     "description": "ResourceQuotaList is a list of ResourceQuota items.",
@@ -16540,8 +17748,19 @@
      "hard": {
       "type": "any",
       "description": "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"
+     },
+     "scopes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ResourceQuotaScope"
+      },
+      "description": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects."
      }
     }
+   },
+   "v1.ResourceQuotaScope": {
+    "id": "v1.ResourceQuotaScope",
+    "properties": {}
    },
    "v1.ResourceQuotaStatus": {
     "id": "v1.ResourceQuotaStatus",
@@ -16777,7 +17996,7 @@
    },
    "v1.ServicePort": {
     "id": "v1.ServicePort",
-    "description": "ServicePort conatins information on service's port.",
+    "description": "ServicePort contains information on service's port.",
     "required": [
      "port"
     ],
@@ -16797,7 +18016,7 @@
      },
      "targetPort": {
       "type": "string",
-      "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of Port is used (an identity map). Defaults to the service port. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service"
+      "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service"
      },
      "nodePort": {
       "type": "integer",
