@@ -30,6 +30,13 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 readonly report_dir="${1:-_artifacts}"
 echo "Dumping master and node logs to ${report_dir}"
 
+# Attempts to SSH to a node ($1) and run a simple command. Returns 0 on
+# success and 1 on error.
+function test-ssh() {
+    local -r node_name="${1}"
+    return $(ssh-to-node "${node_name}" "echo test > /dev/null" &> /dev/null)
+}
+
 # Saves a single output of running a given command ($2) on a given node ($1)
 # into a given local file ($3). Does not fail if the ssh command fails for any
 # reason, just prints an error to stderr.
@@ -70,6 +77,8 @@ if [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
 elif ! $(detect-master &> /dev/null); then
     echo "Master not detected. Is the cluster up?"
+elif ! test-ssh "${MASTER_NAME}"; then
+    echo "Could not SSH to ${MASTER_NAME}" >&2
 else
     echo "Master Name: ${MASTER_NAME}"
     readonly master_prefix="${report_dir}/${MASTER_NAME}"
@@ -88,6 +97,10 @@ elif [[ "${#NODE_NAMES[@]}" -eq 0 ]]; then
 else
     echo "Node Names: ${NODE_NAMES[*]}"
     for node_name in "${NODE_NAMES[@]}"; do
+        if ! test-ssh "${node_name}"; then
+            echo "Could not SSH to ${node_name}" >&2
+            continue
+        fi
         node_prefix="${report_dir}/${node_name}"
         save-log "${node_name}" "cat /var/log/kube-proxy.log" "${node_prefix}-kube-proxy.log"
         save-common-logs "${node_name}" "${node_prefix}"
