@@ -39,6 +39,7 @@ func NewKubeProxy() *Server {
 		services and forwarding it to the appropriate pods. It generally runs on
 		nodes next to the Kubelet and proxies traffic from local pods to remote pods.
 		It is also used when handling incoming external traffic.`,
+		ParseArgs: true,
 	}
 
 	config.AddFlags(hks.Flags())

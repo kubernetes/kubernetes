@@ -34,6 +34,7 @@ func NewKubeControllerManager() *Server {
 		Run: func(_ *Server, args []string) error {
 			return app.Run(s)
 		},
+		ParseArgs: true,
 	}
 	s.AddFlags(hks.Flags())
 	return &hks

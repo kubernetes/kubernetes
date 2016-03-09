@@ -154,14 +154,16 @@ func (hk *HyperKube) Run(args []string) error {
 		return err
 	}
 
-	s.Flags().AddFlagSet(hk.Flags())
-	err = s.Flags().Parse(args)
-	if err != nil || hk.helpFlagVal {
-		if err != nil {
-			hk.Printf("Error: %v\n\n", err)
+	if s.ParseArgs {
+		s.Flags().AddFlagSet(hk.Flags())
+		err = s.Flags().Parse(args)
+		if err != nil || hk.helpFlagVal {
+			if err != nil {
+				hk.Printf("Error: %v\n\n", err)
+			}
+			s.Usage()
+			return err
 		}
-		s.Usage()
-		return err
 	}
 
 	verflag.PrintAndExitIfRequested()

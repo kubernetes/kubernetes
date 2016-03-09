@@ -36,6 +36,7 @@ func NewKubelet() *Server {
 		Run: func(_ *Server, _ []string) error {
 			return app.Run(s, nil)
 		},
+		ParseArgs: true,
 	}
 	s.AddFlags(hks.Flags())
 	return &hks

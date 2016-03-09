@@ -35,5 +35,6 @@ func NewKubectlServer() *Server {
 			os.Exit(0)
 			return nil
 		},
+		ParseArgs: false,
 	}
 }

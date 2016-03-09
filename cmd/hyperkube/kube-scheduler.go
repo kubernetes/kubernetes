@@ -34,6 +34,7 @@ func NewScheduler() *Server {
 		Run: func(_ *Server, _ []string) error {
 			return app.Run(s)
 		},
+		ParseArgs: true,
 	}
 	s.AddFlags(hks.Flags())
 	return &hks
