@@ -34,6 +34,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 ALLOCATE_NODE_CIDRS=true
 

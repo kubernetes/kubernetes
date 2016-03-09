@@ -16,7 +16,7 @@
 
 source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
-source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 detect-project &> /dev/null
 export PROJECT
