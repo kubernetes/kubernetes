@@ -49,7 +49,7 @@ func TestListReplicaSets(t *testing.T) {
 						},
 						Spec: extensions.ReplicaSetSpec{
 							Replicas: 2,
-							Template: &api.PodTemplateSpec{},
+							Template: api.PodTemplateSpec{},
 						},
 					},
 				},
@@ -76,7 +76,7 @@ func TestGetReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -115,7 +115,7 @@ func TestUpdateReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -143,7 +143,7 @@ func TestUpdateStatusReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 				Status: extensions.ReplicaSetStatus{
 					Replicas: 2,
@@ -183,7 +183,7 @@ func TestCreateReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},

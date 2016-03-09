@@ -426,7 +426,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		{
 			rs: &ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -446,7 +446,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 					},
 				},
 				Spec: ReplicaSetSpec{
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -471,7 +471,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 							"some": "other",
 						},
 					},
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -491,7 +491,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 							"some": "other",
 						},
 					},
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -538,7 +538,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -553,7 +553,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(0),
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -568,7 +568,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(3),
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -611,7 +611,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	rs := &ReplicaSet{
 		Spec: ReplicaSetSpec{
 			Replicas: newInt32(3),
-			Template: &v1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
