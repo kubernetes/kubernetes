@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -73,7 +74,9 @@ var validScale = extensions.Scale{
 	},
 	Status: extensions.ScaleStatus{
 		Replicas: 0,
-		Selector: validPodTemplate.Template.Labels,
+		Selector: &unversioned.LabelSelector{
+			MatchLabels: validPodTemplate.Template.Labels,
+		},
 	},
 }
 

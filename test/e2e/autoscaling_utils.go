@@ -42,6 +42,7 @@ const (
 	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta2"
 	rcIsNil                         = "ERROR: replicationController = nil"
 	deploymentIsNil                 = "ERROR: deployment = nil"
+	rsIsNil                         = "ERROR: replicaset = nil"
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
 	customMetricName                = "QPS"
 )
@@ -298,6 +299,13 @@ func (rc *ResourceConsumer) GetReplicas() int {
 			Failf(deploymentIsNil)
 		}
 		return deployment.Status.Replicas
+	case kindReplicaSet:
+		rs, err := rc.framework.Client.ReplicaSets(rc.framework.Namespace.Name).Get(rc.name)
+		expectNoError(err)
+		if rs == nil {
+			Failf(rsIsNil)
+		}
+		return rs.Status.Replicas
 	default:
 		Failf(invalidKind)
 	}
@@ -380,6 +388,12 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 			rcConfig,
 		}
 		expectNoError(RunDeployment(dpConfig))
+		break
+	case kindReplicaSet:
+		rsConfig := ReplicaSetConfig{
+			rcConfig,
+		}
+		expectNoError(RunReplicaSet(rsConfig))
 		break
 	default:
 		Failf(invalidKind)
