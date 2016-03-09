@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	apiclusters "k8s.io/kubernetes/pkg/apis/clusters"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -30,27 +30,27 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, apiclusters.GroupName)
-	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage}
+	etcdStorage, server := registrytest.NewEtcdStorage(t, controlplane.GroupName)
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
 	storage, _ := NewREST(restOptions)
 	return storage, server
 }
 
-func validNewCluster() *apiclusters.Cluster {
-	return &apiclusters.Cluster{
+func validNewCluster() *controlplane.Cluster {
+	return &controlplane.Cluster{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
 				"name": "foo",
 			},
 		},
-		Spec: apiclusters.ClusterSpec{
-			Address: apiclusters.ClusterAddress{
+		Spec: controlplane.ClusterSpec{
+			Address: controlplane.ClusterAddress{
 				Url: "http://localhost:8888",
 			},
 		},
-		Status: apiclusters.ClusterStatus{
-			Phase: apiclusters.ClusterPending,
+		Status: controlplane.ClusterStatus{
+			Phase: controlplane.ClusterPending,
 		},
 	}
 }
@@ -63,7 +63,7 @@ func TestCreate(t *testing.T) {
 	cluster.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		cluster,
-		&apiclusters.Cluster{
+		&controlplane.Cluster{
 			ObjectMeta: api.ObjectMeta{Name: "-a123-a_"},
 		},
 	)
@@ -78,7 +78,7 @@ func TestUpdate(t *testing.T) {
 		validNewCluster(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*apiclusters.Cluster)
+			object := obj.(*controlplane.Cluster)
 			object.Spec.Credential = "bar"
 			return object
 		},

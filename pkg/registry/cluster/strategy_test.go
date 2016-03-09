@@ -22,14 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	apiclusters "k8s.io/kubernetes/pkg/apis/clusters"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"reflect"
 )
 
-func validNewCluster() *apiclusters.Cluster {
-	return &apiclusters.Cluster{
+func validNewCluster() *controlplane.Cluster {
+	return &controlplane.Cluster{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "4",
@@ -37,28 +37,28 @@ func validNewCluster() *apiclusters.Cluster {
 				"name": "foo",
 			},
 		},
-		Spec: apiclusters.ClusterSpec{
-			Address: apiclusters.ClusterAddress{
+		Spec: controlplane.ClusterSpec{
+			Address: controlplane.ClusterAddress{
 				Url: "http://localhost:8888",
 			},
 		},
-		Status: apiclusters.ClusterStatus{
-			Phase: apiclusters.ClusterTerminated,
+		Status: controlplane.ClusterStatus{
+			Phase: controlplane.ClusterTerminated,
 		},
 	}
 }
 
-func invalidNewCluster() *apiclusters.Cluster {
-	return &apiclusters.Cluster{
+func invalidNewCluster() *controlplane.Cluster {
+	return &controlplane.Cluster{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "5",
 		},
-		Spec: apiclusters.ClusterSpec{
+		Spec: controlplane.ClusterSpec{
 			Credential: "bar",
 		},
-		Status: apiclusters.ClusterStatus{
-			Phase: apiclusters.ClusterOffline,
+		Status: controlplane.ClusterStatus{
+			Phase: controlplane.ClusterOffline,
 		},
 	}
 }
@@ -74,7 +74,7 @@ func TestClusterStrategy(t *testing.T) {
 
 	cluster := validNewCluster()
 	Strategy.PrepareForCreate(cluster)
-	if cluster.Status.Phase != apiclusters.ClusterPending {
+	if cluster.Status.Phase != controlplane.ClusterPending {
 		t.Errorf("Cluster should not allow setting phase on create")
 	}
 	errs := Strategy.Validate(ctx, cluster)
@@ -145,9 +145,9 @@ func TestMatchCluster(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Default.GroupVersion().String(),
+		testapi.Clusters.GroupVersion().String(),
 		"Cluster",
-		labels.Set(ClusterToSelectableFields(&apiclusters.Cluster{})),
+		labels.Set(ClusterToSelectableFields(&controlplane.Cluster{})),
 		nil,
 	)
 }

@@ -18,7 +18,7 @@ package validation
 
 import (
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/clusters"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -26,7 +26,7 @@ func ValidateClusterName(name string, prefix bool) (bool, string) {
 	return validation.NameIsDNSSubdomain(name, prefix)
 }
 
-func ValidateCluster(cluster *clusters.Cluster) field.ErrorList {
+func ValidateCluster(cluster *controlplane.Cluster) field.ErrorList {
 	allErrs := validation.ValidateObjectMeta(&cluster.ObjectMeta, false, ValidateClusterName, field.NewPath("metadata"))
 
 	// Only validate spec. All status fields are optional and can be updated later.
@@ -38,7 +38,7 @@ func ValidateCluster(cluster *clusters.Cluster) field.ErrorList {
 	return allErrs
 }
 
-func ValidateClusterUpdate(cluster, oldCluster *clusters.Cluster) field.ErrorList {
+func ValidateClusterUpdate(cluster, oldCluster *controlplane.Cluster) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaUpdate(&cluster.ObjectMeta, &oldCluster.ObjectMeta, field.NewPath("metadata"))
 
 	return allErrs

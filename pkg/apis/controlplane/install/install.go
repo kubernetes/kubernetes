@@ -26,13 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/clusters"
-	"k8s.io/kubernetes/pkg/apis/clusters/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
+	"k8s.io/kubernetes/pkg/apis/controlplane/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/clusters"
+const importPrefix = "k8s.io/kubernetes/pkg/apis/controlplane"
 
 var accessor = meta.NewAccessor()
 
@@ -48,7 +48,7 @@ func init() {
 		}
 	}
 	if len(externalVersions) == 0 {
-		glog.V(4).Infof("No version is registered for group %v", clusters.GroupName)
+		glog.V(4).Infof("No version is registered for group %v", controlplane.GroupName)
 		return
 	}
 
@@ -107,16 +107,15 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := registered.Group(clusters.GroupName)
+		g, _ := registered.Group(controlplane.GroupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	clusters.AddToScheme(api.Scheme)
+	controlplane.AddToScheme(api.Scheme)
 	// add the enabled external versions to Scheme
-	glog.Infof("== clusters.install.addVersionsToScheme: externalVersions: %v\n", externalVersions)
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
 			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)
