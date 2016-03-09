@@ -3746,19 +3746,8 @@ func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.Sc
 		defaulting.(func(*extensions.ScaleStatus))(in)
 	}
 	out.Replicas = int32(in.Replicas)
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
+	// in.Selector has no peer in out
 	return nil
-}
-
-func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
-	return autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in, out, s)
 }
 
 func autoConvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *extensions.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
@@ -5002,19 +4991,9 @@ func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, 
 		defaulting.(func(*ScaleStatus))(in)
 	}
 	out.Replicas = int(in.Replicas)
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
+	// in.Selector has no peer in out
+	// in.TargetSelector has no peer in out
 	return nil
-}
-
-func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
-	return autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in, out, s)
 }
 
 func autoConvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in *SubresourceReference, out *extensions.SubresourceReference, s conversion.Scope) error {

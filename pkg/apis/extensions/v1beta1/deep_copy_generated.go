@@ -1846,6 +1846,7 @@ func deepCopy_v1beta1_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversio
 	} else {
 		out.Selector = nil
 	}
+	out.TargetSelector = in.TargetSelector
 	return nil
 }
 
