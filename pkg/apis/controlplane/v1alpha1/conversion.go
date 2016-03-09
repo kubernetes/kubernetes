@@ -24,7 +24,7 @@ import (
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) {
-	err := api.Scheme.AddFieldLabelConversionFunc("clusters/v1alpha1", "Cluster",
+	err := api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "Cluster",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",

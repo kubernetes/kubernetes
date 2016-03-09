@@ -20,15 +20,15 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/clusters"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 )
 
 func TestValidateCluster(t *testing.T) {
-	successCases := []clusters.Cluster{
+	successCases := []controlplane.Cluster{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "cluster-s"},
-			Spec: clusters.ClusterSpec{
-				Address: clusters.ClusterAddress{
+			Spec: controlplane.ClusterSpec{
+				Address: controlplane.ClusterAddress{
 					Url: "http://localhost:8888",
 				},
 			},
@@ -41,7 +41,7 @@ func TestValidateCluster(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]clusters.Cluster{
+	errorCases := map[string]controlplane.Cluster{
 		"missing cluster address": {
 			ObjectMeta: api.ObjectMeta{Name: "cluster-f"},
 		},
@@ -64,23 +64,23 @@ func TestValidateCluster(t *testing.T) {
 
 func TestValidateClusterUpdate(t *testing.T) {
 	type clusterUpdateTest struct {
-		old    clusters.Cluster
-		update clusters.Cluster
+		old    controlplane.Cluster
+		update controlplane.Cluster
 	}
 	successCases := []clusterUpdateTest{
 		{
-			old: clusters.Cluster{
+			old: controlplane.Cluster{
 				ObjectMeta: api.ObjectMeta{Name: "cluster-s"},
-				Spec: clusters.ClusterSpec{
-					Address: clusters.ClusterAddress{
+				Spec: controlplane.ClusterSpec{
+					Address: controlplane.ClusterAddress{
 						Url: "http://localhost:8888",
 					},
 				},
 			},
-			update: clusters.Cluster{
+			update: controlplane.Cluster{
 				ObjectMeta: api.ObjectMeta{Name: "cluster-s"},
-				Spec: clusters.ClusterSpec{
-					Address: clusters.ClusterAddress{
+				Spec: controlplane.ClusterSpec{
+					Address: controlplane.ClusterAddress{
 						Url: "http://127.0.0.1:8888",
 					},
 				},

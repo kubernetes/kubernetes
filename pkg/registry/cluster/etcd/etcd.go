@@ -18,7 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	apiclusters "k8s.io/kubernetes/pkg/apis/clusters"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 	"k8s.io/kubernetes/pkg/registry/cluster"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
@@ -34,7 +34,7 @@ type StatusREST struct {
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &apiclusters.Cluster{}
+	return &controlplane.Cluster{}
 }
 
 // Update alters the status subset of an object.
@@ -46,12 +46,12 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/clusters"
 
-	newListFunc := func() runtime.Object { return &apiclusters.ClusterList{} }
+	newListFunc := func() runtime.Object { return &controlplane.ClusterList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage, 100, &apiclusters.Cluster{}, prefix, cluster.Strategy, newListFunc)
+		opts.Storage, 100, &controlplane.Cluster{}, prefix, cluster.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
-		NewFunc:     func() runtime.Object { return &apiclusters.Cluster{} },
+		NewFunc:     func() runtime.Object { return &controlplane.Cluster{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
@@ -60,10 +60,10 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*apiclusters.Cluster).Name, nil
+			return obj.(*controlplane.Cluster).Name, nil
 		},
 		PredicateFunc:           cluster.MatchCluster,
-		QualifiedResource:       apiclusters.Resource("clusters"),
+		QualifiedResource:       controlplane.Resource("clusters"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: cluster.Strategy,

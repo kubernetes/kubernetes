@@ -14,41 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clusters
+package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GroupName is the group name use in this package
-const GroupName = "clusters"
+const GroupName = "controlplane"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
-
-// Kind takes an unqualified kind and returns back a Group qualified GroupKind
-func Kind(kind string) unversioned.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
-
-// Resource takes an unqualified resource and returns back a Group qualified GroupResource
-func Resource(resource string) unversioned.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 // Adds the list of known types to api.Scheme.
 func AddToScheme(scheme *runtime.Scheme) {
 	addKnownTypes(scheme)
+	addDefaultingFuncs(scheme)
+	addConversionFuncs(scheme)
 }
 
 func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Cluster{},
 		&ClusterList{},
-		&api.ListOptions{},
-		&api.DeleteOptions{},
+		&unversioned.Status{},
+		&v1.ListOptions{},
+		&v1.DeleteOptions{},
+		&v1.ExportOptions{},
 	)
 }
 

@@ -23,19 +23,19 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/clusters"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/generic"
 
-	_ "k8s.io/kubernetes/pkg/apis/clusters/install"
+	_ "k8s.io/kubernetes/pkg/apis/controlplane/install"
 	clusteretcd "k8s.io/kubernetes/pkg/registry/cluster/etcd"
 )
 
 func addClusterAPIGroup(d genericapiserver.StorageDestinations, s *options.APIServer) {
 	glog.Infof("Configuring cluster/v1alpha1 storage destination")
 	storageVersions := s.StorageGroupsToGroupVersions()
-	clusterGroup, err := registered.Group(clusters.GroupName)
+	clusterGroup, err := registered.Group(controlplane.GroupName)
 	if err != nil {
 		glog.Fatalf("Clusters API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 	}
@@ -45,27 +45,27 @@ func addClusterAPIGroup(d genericapiserver.StorageDestinations, s *options.APISe
 		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", clusterGroup.GroupVersion.Group, storageVersions)
 	}
 
-	if storageGroupVersion != "clusters/v1alpha1" {
-		glog.Fatalf("The storage version for clusters must be 'clusters/v1alpha1'")
+	if storageGroupVersion != "controlplane/v1alpha1" {
+		glog.Fatalf("The storage version for clusters must be 'controlplane/v1alpha1'")
 	}
 	glog.Infof("Using %v for clusters group storage version", storageGroupVersion)
-	clustersEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "clusters/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
+	clustersEtcdStorage, err := newEtcd(s.EtcdServerList, api.Codecs, storageGroupVersion, "controlplane/__internal", s.EtcdPathPrefix, s.EtcdQuorumRead)
 	if err != nil {
 		glog.Fatalf("Invalid clusters storage version or misconfigured etcd: %v", err)
 	}
-	d.AddAPIGroup(clusters.GroupName, clustersEtcdStorage)
+	d.AddAPIGroup(controlplane.GroupName, clustersEtcdStorage)
 }
 
 func installClusterAPI(m *master.Master, d genericapiserver.StorageDestinations) {
 	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(generic.RESTOptions{
-		Storage:   d.Get(clusters.GroupName, "clusters"),
+		Storage:   d.Get(controlplane.GroupName, "clusters"),
 		Decorator: m.StorageDecorator(),
 	})
 	clusterResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,
 	}
-	clusterGroupMeta := registered.GroupOrDie(clusters.GroupName)
+	clusterGroupMeta := registered.GroupOrDie(controlplane.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *clusterGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{

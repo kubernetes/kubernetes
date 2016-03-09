@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	apiclusters "k8s.io/kubernetes/pkg/apis/clusters"
-	"k8s.io/kubernetes/pkg/apis/clusters/validation"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
+	"k8s.io/kubernetes/pkg/apis/controlplane/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -40,7 +40,7 @@ func (clusterStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func ClusterToSelectableFields(cluster *apiclusters.Cluster) fields.Set {
+func ClusterToSelectableFields(cluster *controlplane.Cluster) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(cluster.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		"status.phase": string(cluster.Status.Phase),
@@ -53,7 +53,7 @@ func MatchCluster(label labels.Selector, field fields.Selector) generic.Matcher 
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			cluster, ok := obj.(*apiclusters.Cluster)
+			cluster, ok := obj.(*controlplane.Cluster)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not a cluster.")
 			}
@@ -64,15 +64,15 @@ func MatchCluster(label labels.Selector, field fields.Selector) generic.Matcher 
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (clusterStrategy) PrepareForCreate(obj runtime.Object) {
-	cluster := obj.(*apiclusters.Cluster)
-	cluster.Status = apiclusters.ClusterStatus{
-		Phase: apiclusters.ClusterPending,
+	cluster := obj.(*controlplane.Cluster)
+	cluster.Status = controlplane.ClusterStatus{
+		Phase: controlplane.ClusterPending,
 	}
 }
 
 // Validate validates a new cluster.
 func (clusterStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	cluster := obj.(*apiclusters.Cluster)
+	cluster := obj.(*controlplane.Cluster)
 	return validation.ValidateCluster(cluster)
 }
 
@@ -87,15 +87,15 @@ func (clusterStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (clusterStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	cluster := obj.(*apiclusters.Cluster)
-	oldCluster := old.(*apiclusters.Cluster)
+	cluster := obj.(*controlplane.Cluster)
+	oldCluster := old.(*controlplane.Cluster)
 	cluster.Status = oldCluster.Status
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (clusterStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	allErrs := validation.ValidateCluster(obj.(*apiclusters.Cluster))
-	return append(allErrs, validation.ValidateClusterUpdate(obj.(*apiclusters.Cluster), old.(*apiclusters.Cluster))...)
+	allErrs := validation.ValidateCluster(obj.(*controlplane.Cluster))
+	return append(allErrs, validation.ValidateClusterUpdate(obj.(*controlplane.Cluster), old.(*controlplane.Cluster))...)
 }
 func (clusterStrategy) AllowUnconditionalUpdate() bool {
 	return true
@@ -108,15 +108,15 @@ type clusterStatusStrategy struct {
 var StatusStrategy = clusterStatusStrategy{Strategy}
 
 func (clusterStatusStrategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*apiclusters.Cluster)
+	_ = obj.(*controlplane.Cluster)
 }
 func (clusterStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	cluster := obj.(*apiclusters.Cluster)
-	oldCluster := old.(*apiclusters.Cluster)
+	cluster := obj.(*controlplane.Cluster)
+	oldCluster := old.(*controlplane.Cluster)
 	cluster.Spec = oldCluster.Spec
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (clusterStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateClusterUpdate(obj.(*apiclusters.Cluster), old.(*apiclusters.Cluster))
+	return validation.ValidateClusterUpdate(obj.(*controlplane.Cluster), old.(*controlplane.Cluster))
 }
