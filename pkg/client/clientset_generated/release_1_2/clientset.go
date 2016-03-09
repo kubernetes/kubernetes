@@ -20,6 +20,7 @@ import (
 	"github.com/golang/glog"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
+	v1alpha1controlplane "k8s.io/kubernetes/pkg/client/typed/generated/controlplane/v1alpha1"
 	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
 )
@@ -28,6 +29,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() v1core.CoreInterface
 	Extensions() v1beta1extensions.ExtensionsInterface
+	Controlplane() v1alpha1controlplane.ControlplaneInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -36,6 +38,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreClient
 	*v1beta1extensions.ExtensionsClient
+	*v1alpha1controlplane.ControlplaneClient
 }
 
 // Core retrieves the CoreClient
@@ -46,6 +49,11 @@ func (c *Clientset) Core() v1core.CoreInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return c.ExtensionsClient
+}
+
+// Controlplane retrieves the ControlplaneClient
+func (c *Clientset) Controlplane() v1alpha1controlplane.ControlplaneInterface {
+	return c.ControlplaneClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -65,6 +73,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return &clientset, err
 	}
+	clientset.ControlplaneClient, err = v1alpha1controlplane.NewForConfig(c)
+	if err != nil {
+		return &clientset, err
+	}
 
 	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(c)
 	if err != nil {
@@ -79,6 +91,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
+	clientset.ControlplaneClient = v1alpha1controlplane.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -89,6 +102,7 @@ func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.New(c)
 	clientset.ExtensionsClient = v1beta1extensions.New(c)
+	clientset.ControlplaneClient = v1alpha1controlplane.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset
