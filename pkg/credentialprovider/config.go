@@ -26,10 +26,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // DockerConfigJson represents ~/.docker/config.json file info
@@ -49,10 +47,6 @@ type DockerConfigEntry struct {
 	Password string
 	Email    string
 }
-
-const (
-	readURLTimeout = time.Second * 20
-)
 
 var (
 	preferredPathLock sync.Mutex
@@ -144,19 +138,6 @@ func (he *HttpError) Error() string {
 }
 
 func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte, err error) {
-	retryInterval := time.Second
-	wait.PollImmediate(retryInterval, readURLTimeout, func() (bool, error) {
-		body, err = readUrl(url, client, header)
-		if err != nil {
-			glog.V(4).Infof("Error reading %q: %v", url, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	return body, err
-}
-
-func readUrl(url string, client *http.Client, header *http.Header) (body []byte, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

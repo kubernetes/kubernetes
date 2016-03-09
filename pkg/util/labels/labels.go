@@ -57,7 +57,7 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 // AddLabel returns a map with the given key and value added to the given map.
 func AddLabel(labels map[string]string, labelKey string, labelValue string) map[string]string {
 	if labelKey == "" {
-		// Dont need to add a label.
+		// Don't need to add a label.
 		return labels
 	}
 	if labels == nil {
@@ -110,7 +110,7 @@ func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey stri
 // AddLabelToSelector returns a selector with the given key and value added to the given selector's MatchLabels.
 func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, labelValue string) *unversioned.LabelSelector {
 	if labelKey == "" {
-		// Dont need to add a label.
+		// Don't need to add a label.
 		return selector
 	}
 	if selector.MatchLabels == nil {

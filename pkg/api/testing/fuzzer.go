@@ -408,10 +408,10 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 		func(psp *extensions.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again
-			userTypes := []extensions.RunAsUserStrategy{extensions.RunAsUserStrategyMustRunAsNonRoot, extensions.RunAsUserStrategyMustRunAs, extensions.RunAsUserStrategyRunAsAny}
-			psp.RunAsUser.Type = userTypes[c.Rand.Intn(len(userTypes))]
-			seLinuxTypes := []extensions.SELinuxContextStrategy{extensions.SELinuxStrategyRunAsAny, extensions.SELinuxStrategyMustRunAs}
-			psp.SELinuxContext.Type = seLinuxTypes[c.Rand.Intn(len(seLinuxTypes))]
+			runAsUserRules := []extensions.RunAsUserStrategy{extensions.RunAsUserStrategyMustRunAsNonRoot, extensions.RunAsUserStrategyMustRunAs, extensions.RunAsUserStrategyRunAsAny}
+			psp.RunAsUser.Rule = runAsUserRules[c.Rand.Intn(len(runAsUserRules))]
+			seLinuxRules := []extensions.SELinuxStrategy{extensions.SELinuxStrategyRunAsAny, extensions.SELinuxStrategyMustRunAs}
+			psp.SELinux.Rule = seLinuxRules[c.Rand.Intn(len(seLinuxRules))]
 		},
 	)
 	return f

@@ -19,6 +19,7 @@ package stats
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -184,7 +185,13 @@ func (sb *summaryBuilder) latestContainerStats(info *cadvisorapiv2.ContainerInfo
 func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 	// Map each container to a pod and update the PodStats with container data
 	podToStats := map[stats.PodReference]*stats.PodStats{}
-	for _, cinfo := range sb.infos {
+	for key, cinfo := range sb.infos {
+		// on systemd using devicemapper each mount into the container has an associated cgroup.
+		// we ignore them to ensure we do not get duplicate entries in our summary.
+		// for details on .mount units: http://man7.org/linux/man-pages/man5/systemd.mount.5.html
+		if strings.HasSuffix(key, ".mount") {
+			continue
+		}
 		// Build the Pod key if this container is managed by a Pod
 		if !sb.isPodManagedContainer(&cinfo) {
 			continue

@@ -76,3 +76,14 @@ func HandleError(err error) {
 func logError(err error) {
 	glog.ErrorDepth(2, err)
 }
+
+// GetCaller returns the caller of the function that calls it.
+func GetCaller() string {
+	var pc [1]uintptr
+	runtime.Callers(3, pc[:])
+	f := runtime.FuncForPC(pc[0])
+	if f == nil {
+		return fmt.Sprintf("Unable to find caller")
+	}
+	return f.Name()
+}

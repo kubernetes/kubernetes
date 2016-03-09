@@ -17,6 +17,7 @@ limitations under the License.
 package internalclientset
 
 import (
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned"
@@ -39,9 +40,9 @@ func FromUnversionedClient(c *unversioned.Client) *Clientset {
 	}
 
 	if c != nil && c.DiscoveryClient != nil {
-		clientset.DiscoveryClient = unversioned.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
+		clientset.DiscoveryClient = discovery.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
 	} else {
-		clientset.DiscoveryClient = unversioned.NewDiscoveryClient(nil)
+		clientset.DiscoveryClient = discovery.NewDiscoveryClient(nil)
 	}
 
 	return &clientset

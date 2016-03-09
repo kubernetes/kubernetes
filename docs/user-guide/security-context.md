@@ -9,6 +9,10 @@ A security context defines the operating system security settings (uid, gid, cap
 
 
 
+This file has moved to: http://kubernetes.github.io/docs/user-guide/security-context/
+
+
+
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->

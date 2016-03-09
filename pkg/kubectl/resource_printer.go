@@ -1669,8 +1669,8 @@ func printConfigMapList(list *api.ConfigMapList, w io.Writer, options PrintOptio
 
 func printPodSecurityPolicy(item *extensions.PodSecurityPolicy, w io.Writer, options PrintOptions) error {
 	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%t\t%s\t%s\n", item.Name, item.Spec.Privileged,
-		item.Spec.Capabilities, item.Spec.Volumes, item.Spec.SELinuxContext.Type,
-		item.Spec.RunAsUser.Type)
+		item.Spec.Capabilities, item.Spec.Volumes, item.Spec.SELinux.Rule,
+		item.Spec.RunAsUser.Rule)
 	return err
 }
 

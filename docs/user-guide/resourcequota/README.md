@@ -3,9 +3,8 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Resource Quota
-========================================
-This page has been moved to [here](../../admin/resourcequota/README.md)
+This file has moved to: http://kubernetes.github.io/docs/user-guide/resourcequota/
+
 
 
 

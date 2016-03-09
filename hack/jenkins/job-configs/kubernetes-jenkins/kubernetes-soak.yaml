@@ -80,6 +80,8 @@
         export E2E_DOWN="false"
         # Clear out any orphaned namespaces in case previous run was interrupted.
         export E2E_CLEAN_START="true"
+        # TODO: Remove when we figure out #22166 and other docker potential slowness.
+        export DOCKER_TEST_LOG_LEVEL="--log-level=warn"
         # We should be testing the reliability of a long-running cluster. The
         # [Disruptive] tests kill/restart components or nodes in the cluster,
         # defeating the purpose of a soak cluster. (#15722)

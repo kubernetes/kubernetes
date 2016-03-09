@@ -90,6 +90,7 @@ Updated: 8/27/2015
   * json, yaml, Go template, and jsonpath template formats should be supported and encouraged for subsequent processing
     * Users should use --api-version or --output-version to ensure the output uses the version they expect
 * `describe` commands may output on multiple lines and may include information from related resources, such as events. Describe should add additional information from related resources that a normal user may need to know - if a user would always run "describe resource1" and the immediately want to run a "get type2" or "describe resource2", consider including that info. Examples, persistent volume claims for pods that reference claims, events for most resources, nodes and the pods scheduled on them. When fetching related resources, a targeted field selector should be used in favor of client side filtering of related resources.
+* For fields that can be explicitly unset (booleans, integers, structs), the output should say `<unset>`.  Likewise, for arrays `<none>` should be used.  Lastly `<unknown>` should be used where unrecognized field type was specified.
 * Mutations should output TYPE/name verbed by default, where TYPE is singular; `-o name` may be used to just display TYPE/name, which may be used to specify resources in other commands
 
 ## Documentation conventions
@@ -156,7 +157,7 @@ func NewCmdMine(parent, name string, f *cmdutil.Factory, out io.Writer) *cobra.C
       }
     },
   }
-  
+
   cmd.Flags().BoolVar(&options.mineLatest, "latest", false, "Use latest stuff")
   return cmd
 }

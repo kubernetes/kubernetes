@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -453,7 +453,7 @@ func estimateGracefulTerminationForPods(kubeClient clientset.Interface, ns strin
 }
 
 // ServerPreferredNamespacedGroupVersionResources uses the specified client to discover the set of preferred groupVersionResources that are namespaced
-func ServerPreferredNamespacedGroupVersionResources(discoveryClient client.DiscoveryInterface) ([]unversioned.GroupVersionResource, error) {
+func ServerPreferredNamespacedGroupVersionResources(discoveryClient discovery.DiscoveryInterface) ([]unversioned.GroupVersionResource, error) {
 	results := []unversioned.GroupVersionResource{}
 	serverGroupList, err := discoveryClient.ServerGroups()
 	if err != nil {

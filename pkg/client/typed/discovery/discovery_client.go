@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package discovery
 
 import (
 	"encoding/json"
@@ -148,7 +148,7 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := ExtractGroupVersions(apiGroups)
+	groupVersions := unversioned.ExtractGroupVersions(apiGroups)
 	result := map[string]*unversioned.APIResourceList{}
 	for _, groupVersion := range groupVersions {
 		resources, err := d.ServerResourcesForGroupVersion(groupVersion)
@@ -184,7 +184,7 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := ExtractGroupVersions(groupList)
+	groupVersions := unversioned.ExtractGroupVersions(groupList)
 	// This check also takes care the case that kubectl is newer than the running endpoint
 	if stringDoesntExistIn(version.String(), groupVersions) {
 		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
@@ -240,4 +240,13 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 // New creates a new DiscoveryClient for the given RESTClient.
 func NewDiscoveryClient(c *restclient.RESTClient) *DiscoveryClient {
 	return &DiscoveryClient{c}
+}
+
+func stringDoesntExistIn(str string, slice []string) bool {
+	for _, s := range slice {
+		if s == str {
+			return false
+		}
+	}
+	return true
 }

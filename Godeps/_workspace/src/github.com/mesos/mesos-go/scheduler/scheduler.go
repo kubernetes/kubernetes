@@ -809,7 +809,7 @@ func (driver *MesosSchedulerDriver) frameworkMessageRcvd(_ context.Context, from
 func (driver *MesosSchedulerDriver) frameworkErrorRcvd(ctx context.Context, from *upid.UPID, pbMsg proto.Message) {
 	log.V(1).Infoln("Handling framework error event.")
 	msg := pbMsg.(*mesos.FrameworkErrorMessage)
-	driver.error(ctx, msg.GetMessage())
+	driver.fatal(ctx, msg.GetMessage())
 }
 
 // ---------------------- Interface Methods ---------------------- //
@@ -1530,7 +1530,7 @@ func (driver *MesosSchedulerDriver) ReconcileTasks(statuses []*mesos.TaskStatus)
 }
 
 // error expects to be guarded by eventLock
-func (driver *MesosSchedulerDriver) error(ctx context.Context, err string) {
+func (driver *MesosSchedulerDriver) fatal(ctx context.Context, err string) {
 	if driver.status == mesos.Status_DRIVER_ABORTED {
 		log.V(3).Infoln("Ignoring error message, the driver is aborted!")
 		return

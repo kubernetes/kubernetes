@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -32,7 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util"
 )
+
+const defaultReplicas = 100
 
 func newStorage(t *testing.T) (*DeploymentStorage, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
@@ -180,73 +184,84 @@ func TestWatch(t *testing.T) {
 	)
 }
 
-// TODO(madhusudancs): Fix this when Scale group issues are resolved  (see issue #18528).
+func TestScaleGet(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
 
-// func validNewScale() *extensions.Scale {
-// 	return &extensions.Scale{
-// 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
-// 		Spec: extensions.ScaleSpec{
-// 			Replicas: validDeployment.Spec.Replicas,
-// 		},
-// 		Status: extensions.ScaleStatus{
-// 			Replicas: validDeployment.Status.Replicas,
-// 			Selector: validDeployment.Spec.Template.Labels,
-// 		},
-// 	}
-// }
+	var deployment extensions.Deployment
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
+	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, &deployment, 0); err != nil {
+		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
+	}
 
-// var validScale = *validNewScale()
+	selector, err := unversioned.LabelSelectorAsSelector(validDeployment.Spec.Selector)
+	if err != nil {
+		t.Errorf("invalid deployment selector %+v: %v", validDeployment.Spec.Selector, err)
+	}
+	want := &autoscaling.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              name,
+			Namespace:         namespace,
+			UID:               deployment.UID,
+			ResourceVersion:   deployment.ResourceVersion,
+			CreationTimestamp: deployment.CreationTimestamp,
+		},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: validDeployment.Spec.Replicas,
+		},
+		Status: autoscaling.ScaleStatus{
+			Replicas: validDeployment.Status.Replicas,
+			Selector: selector.String(),
+		},
+	}
+	obj, err := storage.Scale.Get(ctx, name)
+	if err != nil {
+		t.Fatalf("error fetching scale for %s: %v", name, err)
+	}
+	got := obj.(*autoscaling.Scale)
+	if !api.Semantic.DeepEqual(want, got) {
+		t.Errorf("unexpected scale: %s", util.ObjectDiff(want, got))
+	}
+}
 
-// func TestScaleGet(t *testing.T) {
-// 	storage, server := newStorage(t)
-// 	defer server.Terminate(t)
+func TestScaleUpdate(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
 
-// 	ctx := api.WithNamespace(api.NewContext(), namespace)
-// 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-// 	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+	var deployment extensions.Deployment
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
+	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, &deployment, 0); err != nil {
+		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
+	}
+	replicas := 12
+	update := autoscaling.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: replicas,
+		},
+	}
 
-// 	expect := &validScale
-// 	obj, err := storage.Scale.Get(ctx, name)
-// 	if err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
-// 	scale := obj.(*extensions.Scale)
-// 	if e, a := expect, scale; !api.Semantic.DeepDerivative(e, a) {
-// 		t.Errorf("unexpected scale: %s", util.ObjectDiff(e, a))
-// 	}
-// }
+	if _, _, err := storage.Scale.Update(ctx, &update); err != nil {
+		t.Fatalf("error updating scale %v: %v", update, err)
+	}
+	obj, err := storage.Scale.Get(ctx, name)
+	if err != nil {
+		t.Fatalf("error fetching scale for %s: %v", name, err)
+	}
+	scale := obj.(*autoscaling.Scale)
+	if scale.Spec.Replicas != replicas {
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
+	}
 
-// func TestScaleUpdate(t *testing.T) {
-// 	storage, server := newStorage(t)
-// 	defer server.Terminate(t)
+	update.ResourceVersion = deployment.ResourceVersion
+	update.Spec.Replicas = 15
 
-// 	ctx := api.WithNamespace(api.NewContext(), namespace)
-// 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-// 	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
-// 	replicas := 12
-// 	update := extensions.Scale{
-// 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
-// 		Spec: extensions.ScaleSpec{
-// 			Replicas: replicas,
-// 		},
-// 	}
-
-// 	if _, _, err := storage.Scale.Update(ctx, &update); err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
-// 	obj, err := storage.Deployment.Get(ctx, name)
-// 	if err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
-// 	deployment := obj.(*extensions.Deployment)
-// 	if deployment.Spec.Replicas != replicas {
-// 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
-// 	}
-// }
+	if _, _, err = storage.Scale.Update(ctx, &update); err != nil && !errors.IsConflict(err) {
+		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
+	}
+}
 
 func TestStatusUpdate(t *testing.T) {
 	storage, server := newStorage(t)
@@ -260,10 +275,10 @@ func TestStatusUpdate(t *testing.T) {
 	update := extensions.Deployment{
 		ObjectMeta: validDeployment.ObjectMeta,
 		Spec: extensions.DeploymentSpec{
-			Replicas: 100,
+			Replicas: defaultReplicas,
 		},
 		Status: extensions.DeploymentStatus{
-			Replicas: 100,
+			Replicas: defaultReplicas,
 		},
 	}
 
@@ -279,8 +294,8 @@ func TestStatusUpdate(t *testing.T) {
 	if deployment.Spec.Replicas != 7 {
 		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", deployment.Spec.Replicas)
 	}
-	if deployment.Status.Replicas != 100 {
-		t.Errorf("we expected .status.replicas to be updated to 100 but it was %v", deployment.Status.Replicas)
+	if deployment.Status.Replicas != defaultReplicas {
+		t.Errorf("we expected .status.replicas to be updated to %d but it was %v", defaultReplicas, deployment.Status.Replicas)
 	}
 }
 

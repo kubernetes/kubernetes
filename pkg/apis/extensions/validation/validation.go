@@ -759,21 +759,21 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
-	allErrs = append(allErrs, validatePSPSELinuxContext(fldPath.Child("seLinuxContext"), &spec.SELinuxContext)...)
+	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
 
 	return allErrs
 }
 
-// validatePSPSELinuxContext validates the SELinuxContext fields of PodSecurityPolicy.
-func validatePSPSELinuxContext(fldPath *field.Path, seLinuxContext *extensions.SELinuxContextStrategyOptions) field.ErrorList {
+// validatePSPSELinux validates the SELinux fields of PodSecurityPolicy.
+func validatePSPSELinux(fldPath *field.Path, seLinux *extensions.SELinuxStrategyOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// ensure the selinux strategy has a valid type
-	supportedSELinuxContextTypes := sets.NewString(string(extensions.SELinuxStrategyMustRunAs),
+	// ensure the selinux strategy has a valid rule
+	supportedSELinuxRules := sets.NewString(string(extensions.SELinuxStrategyMustRunAs),
 		string(extensions.SELinuxStrategyRunAsAny))
-	if !supportedSELinuxContextTypes.Has(string(seLinuxContext.Type)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), seLinuxContext.Type, supportedSELinuxContextTypes.List()))
+	if !supportedSELinuxRules.Has(string(seLinux.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), seLinux.Rule, supportedSELinuxRules.List()))
 	}
 
 	return allErrs
@@ -783,12 +783,12 @@ func validatePSPSELinuxContext(fldPath *field.Path, seLinuxContext *extensions.S
 func validatePSPRunAsUser(fldPath *field.Path, runAsUser *extensions.RunAsUserStrategyOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// ensure the user strategy has a valid type
-	supportedRunAsUserTypes := sets.NewString(string(extensions.RunAsUserStrategyMustRunAs),
+	// ensure the user strategy has a valid rule
+	supportedRunAsUserRules := sets.NewString(string(extensions.RunAsUserStrategyMustRunAs),
 		string(extensions.RunAsUserStrategyMustRunAsNonRoot),
 		string(extensions.RunAsUserStrategyRunAsAny))
-	if !supportedRunAsUserTypes.Has(string(runAsUser.Type)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), runAsUser.Type, supportedRunAsUserTypes.List()))
+	if !supportedRunAsUserRules.Has(string(runAsUser.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), runAsUser.Rule, supportedRunAsUserRules.List()))
 	}
 
 	// validate range settings

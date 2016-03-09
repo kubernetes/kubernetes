@@ -189,6 +189,11 @@ func (m *Master) InstallAPIs(c *Config) {
 			ParameterCodec:       api.ParameterCodec,
 			NegotiatedSerializer: api.Codecs,
 		}
+		if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
+			apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
+				"replicationcontrollers/scale": autoscalingGroupVersion.WithKind("Scale"),
+			}
+		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
@@ -242,6 +247,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			Scheme:                 api.Scheme,
 			ParameterCodec:         api.ParameterCodec,
 			NegotiatedSerializer:   api.Codecs,
+		}
+		if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
+			apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
+				"deployments/scale": autoscalingGroupVersion.WithKind("Scale"),
+				"replicasets/scale": autoscalingGroupVersion.WithKind("Scale"),
+			}
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
@@ -389,7 +400,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(restOptions("replicationControllers"))
+	controllerStorage := controlleretcd.NewStorage(restOptions("replicationControllers"))
 
 	serviceRest := service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport)
 
@@ -407,8 +418,8 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 		"podTemplates": podTemplateStorage,
 
-		"replicationControllers":        controllerStorage,
-		"replicationControllers/status": controllerStatusStorage,
+		"replicationControllers":        controllerStorage.Controller,
+		"replicationControllers/status": controllerStorage.Status,
 
 		"services":        serviceRest.Service,
 		"services/proxy":  serviceRest.Proxy,
@@ -437,6 +448,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"configMaps":                    configMapStorage,
 
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
+	}
+	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+		m.v1ResourcesStorage["replicationControllers/scale"] = controllerStorage.Scale
 	}
 }
 
@@ -644,7 +658,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		OptionsExternalVersion: &optionsExternalVersion,
 
 		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
-		ParameterCodec: api.ParameterCodec,
+		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
 		Context: m.RequestContextMapper,
 
@@ -674,6 +688,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	}
 
 	storage := map[string]rest.Storage{}
+
 	if isEnabled("horizontalpodautoscalers") {
 		m.constructHPAResources(c, storage)
 		controllerStorage := expcontrolleretcd.NewStorage(
@@ -707,9 +722,11 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
-		// TODO(madhusudancs): Install scale when Scale group issues are fixed (see issue #18528).
-		// storage["deployments/scale"] = deploymentStorage.Scale
 		storage["deployments/rollback"] = deploymentStorage.Rollback
+
+		if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+			storage["deployments/scale"] = deploymentStorage.Scale
+		}
 	}
 	if isEnabled("jobs") {
 		m.constructJobResources(c, storage)
@@ -727,6 +744,9 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
+		if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+			storage["replicasets/scale"] = replicaSetStorage.Scale
+		}
 	}
 
 	return storage

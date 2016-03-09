@@ -18,8 +18,10 @@ package e2e
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"net"
@@ -27,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -43,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -59,6 +63,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -270,6 +275,11 @@ type RCConfig struct {
 
 	// Ports to declare in the container (map of name to containerPort).
 	Ports map[string]int
+	// Ports to declare in the container as host and container ports.
+	HostPorts map[string]int
+
+	Volumes      []api.Volume
+	VolumeMounts []api.VolumeMount
 
 	// Pointer to a list of pods; if non-nil, will be set to a list of pods
 	// created by this RC by RunRC.
@@ -341,7 +351,7 @@ func providerIs(providers ...string) bool {
 	return false
 }
 
-func SkipUnlessServerVersionGTE(v semver.Version, c client.ServerVersionInterface) {
+func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) {
 	gte, err := serverVersionGTE(v, c)
 	if err != nil {
 		Failf("Failed to get server version: %v", err)
@@ -510,6 +520,60 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	return nil
 }
 
+func podFromManifest(filename string) (*api.Pod, error) {
+	var pod api.Pod
+	Logf("Parsing pod from %v", filename)
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &pod); err != nil {
+		return nil, err
+	}
+	return &pod, nil
+}
+
+// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
+// to flip to Ready, log its output and delete it.
+func runKubernetesServiceTestContainer(repoRoot string, ns string) {
+	c, err := loadClient()
+	if err != nil {
+		Logf("Failed to load client")
+		return
+	}
+	path := filepath.Join(repoRoot, "test", "images", "clusterapi-tester", "pod.yaml")
+	p, err := podFromManifest(path)
+	if err != nil {
+		Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
+		return
+	}
+	p.Namespace = ns
+	if _, err := c.Pods(ns).Create(p); err != nil {
+		Logf("Failed to create %v: %v", p.Name, err)
+		return
+	}
+	defer func() {
+		if err := c.Pods(ns).Delete(p.Name, nil); err != nil {
+			Logf("Failed to delete pod %v: %v", p.Name, err)
+		}
+	}()
+	timeout := 5 * time.Minute
+	if err := waitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, podRunningReady); err != nil {
+		Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
+		return
+	}
+	logs, err := getPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
+	if err != nil {
+		Logf("Failed to retrieve logs from %v: %v", p.Name, err)
+	} else {
+		Logf("Output of clusterapi-tester:\n%v", logs)
+	}
+}
+
 func logFailedContainers(ns string) {
 	c, err := loadClient()
 	if err != nil {
@@ -521,16 +585,18 @@ func logFailedContainers(ns string) {
 		Logf("Error getting pods in namespace '%s': %v", ns, err)
 		return
 	}
+	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
-		if res, err := podRunningReady(&pod); res && err == nil {
-			Logf("Ignoring Ready pod %v/%v", pod.Namespace, pod.Name)
-		} else {
+		if res, err := podRunningReady(&pod); !res || err != nil {
 			for _, container := range pod.Spec.Containers {
-				logs, err := getPreviousPodLogs(c, ns, pod.Name, container.Name)
+				logs, err := getPodLogs(c, ns, pod.Name, container.Name)
 				if err != nil {
-					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+					logs, err = getPreviousPodLogs(c, ns, pod.Name, container.Name)
+					if err != nil {
+						Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+					}
 				}
-				By(fmt.Sprintf("Previous logs of %v/%v:%v on node %v", ns, pod.Name, container.Name, pod.Spec.NodeName))
+				By(fmt.Sprintf("Logs of %v/%v:%v on node %v", ns, pod.Name, container.Name, pod.Spec.NodeName))
 				Logf(logs)
 			}
 		}
@@ -865,6 +931,19 @@ func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName strin
 	})
 }
 
+func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
+	return waitForPodCondition(c, namespace, podName, "running", timeout, func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase == api.PodRunning {
+			Logf("Found pod '%s' on node '%s'", podName, pod.Spec.NodeName)
+			return true, nil
+		}
+		if pod.Status.Phase == api.PodFailed {
+			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
+		}
+		return podReady(pod), nil
+	})
+}
+
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	return waitForPodCondition(c, ns, podName, "!pending", podStartTimeout, func(pod *api.Pod) (bool, error) {
@@ -1141,7 +1220,7 @@ func (r podProxyResponseChecker) checkAllResponses() (done bool, err error) {
 // version.
 //
 // TODO(18726): This should be incorporated into client.VersionInterface.
-func serverVersionGTE(v semver.Version, c client.ServerVersionInterface) (bool, error) {
+func serverVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
 		return false, fmt.Errorf("Unable to get server version: %v", err)
@@ -1780,6 +1859,12 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
 		}
 	}
+	if config.HostPorts != nil {
+		for k, v := range config.HostPorts {
+			c := &template.Spec.Containers[0]
+			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v, HostPort: v})
+		}
+	}
 	if config.CpuLimit > 0 || config.MemLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits = api.ResourceList{}
 	}
@@ -1797,6 +1882,12 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 	}
 	if config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
+	}
+	if len(config.Volumes) > 0 {
+		template.Spec.Volumes = config.Volumes
+	}
+	if len(config.VolumeMounts) > 0 {
+		template.Spec.Containers[0].VolumeMounts = config.VolumeMounts
 	}
 }
 
@@ -1950,6 +2041,7 @@ func startPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		_, err := c.Pods(namespace).Create(&pod)
 		expectNoError(err)
 	}
+	Logf("Waiting for running...")
 	if waitForRunning {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
 		err := waitForPodsWithLabelRunning(c, namespace, label)
@@ -2242,10 +2334,12 @@ func DeleteRC(c *client.Client, ns, name string) error {
 // waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
 // have completed termination).
 func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
+	labels := labels.SelectorFromSet(rc.Spec.Selector)
+	podStore := newPodStore(c, rc.Namespace, labels, fields.Everything())
+	defer podStore.Stop()
+
 	return wait.PollImmediate(poll, 2*time.Minute, func() (bool, error) {
-		selector := labels.SelectorFromSet(rc.Spec.Selector)
-		options := api.ListOptions{LabelSelector: selector}
-		if pods, err := c.Pods(rc.Namespace).List(options); err == nil && len(pods.Items) == 0 {
+		if pods := podStore.List(); len(pods) == 0 {
 			return true, nil
 		}
 		return false, nil
@@ -2410,7 +2504,7 @@ func waitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		logReplicaSetsOfDeployment(deployment, nil, newRS)
 	}
 	if err != nil {
-		return fmt.Errorf("error waiting for deployment %s revision and image to match expectation: %v", deploymentName, err)
+		return fmt.Errorf("error waiting for deployment %s (got %s / %s) and new RS %s (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
 	}
 	return nil
 }
@@ -2602,7 +2696,7 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 	return hosts
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this exludes master node.
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this excludes master node.
 // It returns an error if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
 func NodeSSHHosts(c *client.Client) ([]string, error) {
@@ -2726,6 +2820,7 @@ func RunHostCmd(ns, name, cmd string) (string, error) {
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
 func RunHostCmdOrDie(ns, name, cmd string) string {
 	stdout, err := RunHostCmd(ns, name, cmd)
+	Logf("stdout: %v", stdout)
 	expectNoError(err)
 	return stdout
 }
@@ -3352,4 +3447,127 @@ func isElementOf(podUID types.UID, pods *api.PodList) bool {
 		}
 	}
 	return false
+}
+
+func checkRSHashLabel(rs *extensions.ReplicaSet) error {
+	if len(rs.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 ||
+		len(rs.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 ||
+		len(rs.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+		return fmt.Errorf("unexpected RS missing required pod-hash-template: %+v, selector = %+v, template = %+v", rs, rs.Spec.Selector, rs.Spec.Template)
+	}
+	return nil
+}
+
+func checkPodHashLabel(pods *api.PodList) error {
+	invalidPod := ""
+	for _, pod := range pods.Items {
+		if len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+			if len(invalidPod) == 0 {
+				invalidPod = "unexpected pods missing required pod-hash-template:"
+			}
+			invalidPod = fmt.Sprintf("%s %+v;", invalidPod, pod)
+		}
+	}
+	if len(invalidPod) > 0 {
+		return fmt.Errorf("%s", invalidPod)
+	}
+	return nil
+}
+
+// GetReadyNodes retrieves a list of schedulable nodes whose condition
+// is Ready.  An error will be returned if no such nodes are found.
+func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
+	nodes = ListSchedulableNodesOrDie(f.Client)
+	// previous tests may have cause failures of some nodes. Let's skip
+	// 'Not Ready' nodes, just in case (there is no need to fail the test).
+	filterNodes(nodes, func(node api.Node) bool {
+		return !node.Spec.Unschedulable && isNodeConditionSetAsExpected(&node, api.NodeReady, true)
+	})
+
+	if len(nodes.Items) == 0 {
+		return nil, errors.New("No Ready nodes found.")
+	}
+	return nodes, nil
+}
+
+// LaunchWebserverPod launches a pod serving http on port 8080 to act
+// as the target for networking connectivity checks.  The ip address
+// of the created pod will be returned if the pod is launched
+// successfully.
+func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
+	containerName := fmt.Sprintf("%s-container", podName)
+	port := 8080
+	pod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: podName,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  containerName,
+					Image: "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+					Env:   []api.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
+					Ports: []api.ContainerPort{{ContainerPort: port}},
+				},
+			},
+			NodeName:      nodeName,
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	podClient := f.Client.Pods(f.Namespace.Name)
+	_, err := podClient.Create(pod)
+	expectNoError(err)
+	expectNoError(f.WaitForPodRunning(podName))
+	createdPod, err := podClient.Get(podName)
+	expectNoError(err)
+	ip = fmt.Sprintf("%s:%d", createdPod.Status.PodIP, port)
+	Logf("Target pod IP:port is %s", ip)
+	return
+}
+
+// CheckConnectivityToHost launches a pod running wget on the
+// specified node to test connectivity to the specified host.  An
+// error will be returned if the host is not reachable from the pod.
+func CheckConnectivityToHost(f *Framework, nodeName, podName, host string) error {
+	contName := fmt.Sprintf("%s-container", podName)
+	pod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: podName,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    contName,
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"wget", "-s", host},
+				},
+			},
+			NodeName:      nodeName,
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	podClient := f.Client.Pods(f.Namespace.Name)
+	_, err := podClient.Create(pod)
+	if err != nil {
+		return err
+	}
+	defer podClient.Delete(podName, nil)
+	return waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+}
+
+// CoreDump SSHs to the master and all nodes and dumps their logs into dir.
+// It shells out to cluster/log-dump.sh to accomplish this.
+func CoreDump(dir string) {
+	cmd := exec.Command(path.Join(testContext.RepoRoot, "cluster", "log-dump.sh"), dir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		Logf("Error running cluster/log-dump.sh: %v", err)
+	}
 }

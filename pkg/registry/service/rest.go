@@ -198,6 +198,12 @@ func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 	return rs.registry.WatchServices(ctx, options)
 }
 
+// Export returns Service stripped of cluster-specific information.
+// It implements rest.Exporter.
+func (rs *REST) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+	return rs.registry.ExportService(ctx, name, opts)
+}
+
 func (*REST) New() runtime.Object {
 	return &api.Service{}
 }

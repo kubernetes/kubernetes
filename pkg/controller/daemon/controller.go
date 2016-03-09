@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -91,11 +92,13 @@ type DaemonSetsController struct {
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
 
+	lookupCache *controller.MatchingCache
+
 	// Daemon sets that need to be synced.
 	queue *workqueue.Type
 }
 
-func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *DaemonSetsController {
+func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -132,6 +135,22 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldDS := old.(*extensions.DaemonSet)
+				curDS := cur.(*extensions.DaemonSet)
+				// We should invalidate the whole lookup cache if a DS's selector has been updated.
+				//
+				// Imagine that you have two RSs:
+				// * old DS1
+				// * new DS2
+				// You also have a pod that is attached to DS2 (because it doesn't match DS1 selector).
+				// Now imagine that you are changing DS1 selector so that it is now matching that pod,
+				// in such case we must invalidate the whole cache so that pod could be adopted by DS1
+				//
+				// This makes the lookup cache less helpful, but selector update does not happen often,
+				// so it's not a big problem
+				if !reflect.DeepEqual(oldDS.Spec.Selector, curDS.Spec.Selector) {
+					dsc.lookupCache.InvalidateAll()
+				}
+
 				glog.V(4).Infof("Updating daemon set %s", oldDS.Name)
 				dsc.enqueueDaemonSet(cur)
 			},
@@ -180,6 +199,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	)
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.podStoreSynced = dsc.podController.HasSynced
+	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return dsc
 }
 
@@ -238,6 +258,18 @@ func (dsc *DaemonSetsController) enqueueDaemonSet(obj interface{}) {
 }
 
 func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.DaemonSet {
+	// look up in the cache, if cached and the cache is valid, just return cached value
+	if obj, cached := dsc.lookupCache.GetMatchingObject(pod); cached {
+		ds, ok := obj.(*extensions.DaemonSet)
+		if !ok {
+			// This should not happen
+			glog.Errorf("lookup cache does not retuen a ReplicationController object")
+			return nil
+		}
+		if cached && dsc.isCacheValid(pod, ds) {
+			return ds
+		}
+	}
 	sets, err := dsc.dsStore.GetPodDaemonSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No daemon sets found for pod %v, daemon set controller will avoid syncing", pod.Name)
@@ -250,7 +282,40 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.Daemo
 		glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(byCreationTimestamp(sets))
 	}
+
+	// update lookup cache
+	dsc.lookupCache.Update(pod, &sets[0])
+
 	return &sets[0]
+}
+
+// isCacheValid check if the cache is valid
+func (dsc *DaemonSetsController) isCacheValid(pod *api.Pod, cachedDS *extensions.DaemonSet) bool {
+	_, exists, err := dsc.dsStore.Get(cachedDS)
+	// ds has been deleted or updated, cache is invalid
+	if err != nil || !exists || !isDaemonSetMatch(pod, cachedDS) {
+		return false
+	}
+	return true
+}
+
+// isDaemonSetMatch take a Pod and DaemonSet, return whether the Pod and DaemonSet are matching
+// TODO(mqliang): This logic is a copy from GetPodDaemonSets(), remove the duplication
+func isDaemonSetMatch(pod *api.Pod, ds *extensions.DaemonSet) bool {
+	if ds.Namespace != pod.Namespace {
+		return false
+	}
+	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		err = fmt.Errorf("invalid selector: %v", err)
+		return false
+	}
+
+	// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		return false
+	}
+	return true
 }
 
 func (dsc *DaemonSetsController) addPod(obj interface{}) {

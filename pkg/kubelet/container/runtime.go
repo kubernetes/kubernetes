@@ -57,7 +57,10 @@ type Runtime interface {
 	Version() (Version, error)
 	// APIVersion returns the API version information of the container
 	// runtime. This may be different from the runtime engine's version.
+	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
+	// Status returns error if the runtime is unhealthy; nil otherwise.
+	Status() error
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
@@ -356,6 +359,8 @@ type RunContainerOptions struct {
 	CgroupParent string
 	// The type of container rootfs
 	ReadOnly bool
+	// hostname for pod containers
+	Hostname string
 }
 
 // VolumeInfo contains information about the volume.
@@ -470,3 +475,12 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 // Option is a functional option type for Runtime, useful for
 // completely optional settings.
 type Option func(Runtime)
+
+// Sort the container statuses by creation time.
+type SortContainerStatusesByCreationTime []*ContainerStatus
+
+func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }
+func (s SortContainerStatusesByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortContainerStatusesByCreationTime) Less(i, j int) bool {
+	return s[i].CreatedAt.Before(s[j].CreatedAt)
+}

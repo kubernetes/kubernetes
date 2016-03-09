@@ -464,7 +464,7 @@ var _ = Describe("Kubectl client", func() {
 				withStdinData("abcd1234\n").
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
-			runTestPod, err := util.GetFirstPod(c, ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}))
+			runTestPod, _, err := util.GetFirstPod(c, ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}))
 			if err != nil {
 				os.Exit(1)
 			}
@@ -897,6 +897,20 @@ var _ = Describe("Kubectl client", func() {
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != nginxImage {
 				runKubectlOrDie("get", "pods", "-L", "run", nsFlag)
 				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", nginxImage, len(pods))
+			}
+
+			By("confirm that you can get logs from an rc")
+			podNames := []string{}
+			for _, pod := range pods {
+				podNames = append(podNames, pod.Name)
+			}
+			if !checkPodsRunningReady(c, ns, podNames, podStartTimeout) {
+				Failf("Pods for rc %s were not ready", rcName)
+			}
+			_, err = runKubectl("logs", "rc/"+rcName, nsFlag)
+			// a non-nil error is fine as long as we actually found a pod.
+			if err != nil && !strings.Contains(err.Error(), " in pod ") {
+				Failf("Failed getting logs by rc %s: %v", rcName, err)
 			}
 		})
 

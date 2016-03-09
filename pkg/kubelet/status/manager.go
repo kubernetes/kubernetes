@@ -148,7 +148,10 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	if err != nil {
 		return
 	}
-	m.updateStatusInternal(pod, status, false)
+	// Force a status update if deletion timestamp is set. This is necessary
+	// because if the pod is in the non-running state, the pod worker still
+	// needs to be able to trigger an update and/or deletion.
+	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
 }
 
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {

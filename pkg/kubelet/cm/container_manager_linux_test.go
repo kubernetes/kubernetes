@@ -20,9 +20,13 @@ package cm
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -75,7 +79,9 @@ func fakeContainerMgrMountInt() mount.Interface {
 }
 
 func TestCgroupMountValidationSuccess(t *testing.T) {
-	assert.Nil(t, validateSystemRequirements(fakeContainerMgrMountInt()))
+	f, err := validateSystemRequirements(fakeContainerMgrMountInt())
+	assert.Nil(t, err)
+	assert.False(t, f.cpuHardcapping, "cpu hardcapping is expected to be disabled")
 }
 
 func TestCgroupMountValidationMemoryMissing(t *testing.T) {
@@ -98,7 +104,8 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 			},
 		},
 	}
-	assert.Error(t, validateSystemRequirements(mountInt))
+	_, err := validateSystemRequirements(mountInt)
+	assert.Error(t, err)
 }
 
 func TestCgroupMountValidationMultipleSubsytem(t *testing.T) {
@@ -121,5 +128,37 @@ func TestCgroupMountValidationMultipleSubsytem(t *testing.T) {
 			},
 		},
 	}
-	assert.Nil(t, validateSystemRequirements(mountInt))
+	_, err := validateSystemRequirements(mountInt)
+	assert.Nil(t, err)
+}
+
+func TestSoftRequirementsValidationSuccess(t *testing.T) {
+	req := require.New(t)
+	tempDir, err := ioutil.TempDir("", "")
+	req.NoError(err)
+	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
+	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
+	mountInt := &fakeMountInterface{
+		[]mount.MountPoint{
+			{
+				Device: "cgroup",
+				Type:   "cgroup",
+				Opts:   []string{"rw", "relatime", "cpuset"},
+			},
+			{
+				Device: "cgroup",
+				Type:   "cgroup",
+				Opts:   []string{"rw", "relatime", "cpu"},
+				Path:   tempDir,
+			},
+			{
+				Device: "cgroup",
+				Type:   "cgroup",
+				Opts:   []string{"rw", "relatime", "cpuacct", "memory"},
+			},
+		},
+	}
+	f, err := validateSystemRequirements(mountInt)
+	assert.NoError(t, err)
+	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 }

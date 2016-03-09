@@ -493,7 +493,7 @@ func runAPIVersionsTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to get api versions: %v", err)
 	}
-	versions := client.ExtractGroupVersions(g)
+	versions := unversioned.ExtractGroupVersions(g)
 
 	// Verify that the server supports the API version used by the client.
 	for _, version := range versions {
@@ -994,10 +994,22 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&restclient.Config{Host: apiServerURL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	kubeClient := client.NewOrDie(
+		&restclient.Config{
+			Host:          apiServerURL,
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+			QPS:           20,
+			Burst:         50,
+		})
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{Host: apiServerURL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
+	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(
+		&restclient.Config{
+			Host:          apiServerURL,
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
+			QPS:           20,
+			Burst:         50,
+		})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

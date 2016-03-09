@@ -53,7 +53,7 @@ grep -q "^${ETCD_VERSION}\$" binaries/.etcd 2>/dev/null || {
 }
 
 # k8s
-KUBE_VERSION=${KUBE_VERSION:-"1.1.7"}
+KUBE_VERSION=${KUBE_VERSION:-"1.1.8"}
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."
 grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
   curl -L https://github.com/kubernetes/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz

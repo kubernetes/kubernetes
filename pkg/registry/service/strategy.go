@@ -90,7 +90,7 @@ func (svcStrategy) Export(obj runtime.Object, exact bool) error {
 		return nil
 	}
 	if t.Spec.ClusterIP != api.ClusterIPNone {
-		t.Spec.ClusterIP = ""
+		t.Spec.ClusterIP = "<unknown>"
 	}
 	if t.Spec.Type == api.ServiceTypeNodePort {
 		for i := range t.Spec.Ports {

@@ -240,11 +240,12 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		api.Kind("ConfigMap"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:            resourceQuotaControllerClient,
-		ResyncPeriod:          controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
-		Registry:              resourceQuotaRegistry,
-		GroupKindsToReplenish: groupKindsToReplenish,
-		ControllerFactory:     resourcequotacontroller.NewReplenishmentControllerFactory(resourceQuotaControllerClient),
+		KubeClient:                resourceQuotaControllerClient,
+		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
+		Registry:                  resourceQuotaRegistry,
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(resourceQuotaControllerClient),
+		ReplenishmentResyncPeriod: ResyncPeriod(s),
+		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
 
@@ -299,7 +300,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), ResyncPeriod(s)).
+			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), ResyncPeriod(s), s.LookupCacheSizeForDaemonSet).
 				Run(s.ConcurrentDaemonSetSyncs, wait.NeverStop)
 		}
 

@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		CreateStrategy: service.Strategy,
 		UpdateStrategy: service.Strategy,
+		ExportStrategy: service.Strategy,
 
 		Storage: storageInterface,
 	}

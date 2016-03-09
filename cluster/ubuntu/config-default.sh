@@ -21,7 +21,7 @@
 export nodes=${nodes:-"vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"}
 
 # Define all your nodes role: a(master) or i(minion) or ai(both master and minion), must be the order same 
-role=${role:-"ai i i"}
+role=${roles:-"ai i i"}
 # If it practically impossible to set an array as an environment variable
 # from a script, so assume variable is a string then convert it to an array
 export roles=($role)
