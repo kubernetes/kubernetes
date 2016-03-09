@@ -439,7 +439,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *ext
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := rsc.podControl.CreatePods(rs.Namespace, rs.Spec.Template, rs); err != nil {
+				if err := rsc.podControl.CreatePods(rs.Namespace, &rs.Spec.Template, rs); err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for replica set %q/%q", rs.Namespace, rs.Name)
 					rsc.expectations.CreationObserved(rsKey)
