@@ -25,8 +25,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 export KUBECTL KUBE_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 

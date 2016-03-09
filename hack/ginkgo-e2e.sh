@@ -38,7 +38,7 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 
 export KUBECTL KUBE_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
@@ -52,8 +52,6 @@ if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     )
 else
     echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
-
-    source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
     prepare-e2e
 
