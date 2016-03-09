@@ -27,6 +27,8 @@ import (
 //
 // TODO: pay attention to the package name (instead of renaming every package).
 // TODO: Figure out the best way to make names for packages that collide.
+//
+// TODO: Try to merge this into generator.ImportTracker (or refactor common parts).
 type ImportTracker struct {
 	pathToName map[string]string
 	// forbidden names are in here. (e.g. "go" is a directory in which
