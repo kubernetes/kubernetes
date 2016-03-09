@@ -32,8 +32,8 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -107,7 +107,7 @@ type dockerPuller struct {
 
 type throttledDockerPuller struct {
 	puller  dockerPuller
-	limiter util.RateLimiter
+	limiter flowcontrol.RateLimiter
 }
 
 // newDockerPuller creates a new instance of the default implementation of DockerPuller.
@@ -122,7 +122,7 @@ func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	}
 	return &throttledDockerPuller{
 		puller:  dp,
-		limiter: util.NewTokenBucketRateLimiter(qps, burst),
+		limiter: flowcontrol.NewTokenBucketRateLimiter(qps, burst),
 	}
 }
 
