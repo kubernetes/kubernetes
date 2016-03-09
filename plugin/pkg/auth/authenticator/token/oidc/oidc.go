@@ -30,7 +30,7 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/crypto"
 	"k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -65,7 +65,7 @@ func New(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (*OIDCA
 	}
 
 	if caFile != "" {
-		roots, err = util.CertPoolFromFile(caFile)
+		roots, err = crypto.CertPoolFromFile(caFile)
 		if err != nil {
 			glog.Errorf("Failed to read the CA file: %v", err)
 		}
