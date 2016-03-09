@@ -58,5 +58,5 @@ start "$@"
 
 # Ugly hack to do nothing and wait for SIGTERM
 while true; do
-    read
+    sleep 5
 done
