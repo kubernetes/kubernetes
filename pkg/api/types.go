@@ -2187,6 +2187,14 @@ const (
 	ResourceQuotas ResourceName = "resourcequotas"
 	// ResourceSecrets, number
 	ResourceSecrets ResourceName = "secrets"
+	// ReplicaSets, number
+	ResourceReplicaSets ResourceName = "replicasets"
+	// Job, number
+	ResourceJobs ResourceName = "jobs"
+	// DaemonSet, number
+	ResourceDaemonSets ResourceName = "daemonsets"
+	// Deployment, number
+	ResourceDeployments ResourceName = "deployments"
 	// ResourceConfigMaps, number
 	ResourceConfigMaps ResourceName = "configmaps"
 	// ResourcePersistentVolumeClaims, number
