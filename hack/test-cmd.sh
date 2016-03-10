@@ -1674,9 +1674,9 @@ __EOF__
   #####################
 
   kube::log::status "Testing resource aliasing"
-  kubectl create -f examples/cassandra/cassandra.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert "all -l'app=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:'
+  kube::test::get_object_assert "all -l'app=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:cassandra:cassandra:'
   kubectl delete all -l app=cassandra "${kube_flags[@]}"
 
 
