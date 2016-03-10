@@ -347,8 +347,6 @@ type protoField struct {
 	Extras   map[string]string
 
 	CommentLines string
-
-	OptionalSet bool
 }
 
 var (
@@ -473,6 +471,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 	}
 	field.Tag = protoTag
 	// TODO: we are converting a Protobuf type back into an internal type, which is questionable
+	// TODO; Allow a way to unambiguously represent a type into two systems at the same time, like Go and Protobuf.
 	if last := strings.LastIndex(parts[0], "."); last != -1 {
 		prefix := parts[0][:last]
 		field.Type = &types.Type{
@@ -498,7 +497,6 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			}
 		}
 	}
-	field.OptionalSet = true
 
 	protoExtra := make(map[string]string)
 	for i, extra := range parts[3:] {
@@ -511,6 +509,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
 			protoExtra[parts[0]] = parts[1]
 		}
+		// TODO: Should we parse castkey and castvalue too?
 	}
 
 	field.Extras = protoExtra
@@ -708,18 +707,6 @@ func (ft protoIDLFileType) assemble(w io.Writer, f *generator.File) {
 	}
 
 	w.Write(f.Body.Bytes())
-}
-
-func isPackable(t *types.Type) bool {
-	if t.Kind != typesKindProtobuf {
-		return false
-	}
-	switch t.Name.Name {
-	case "int32", "int64", "varint":
-		return true
-	default:
-		return false
-	}
 }
 
 func isPrivateGoName(name string) bool {

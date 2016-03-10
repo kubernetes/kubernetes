@@ -90,24 +90,6 @@ func (n *protobufNamer) GoNameToProtoName(name types.Name) types.Name {
 	return types.Name{Name: name.Name}
 }
 
-func (n *protobufNamer) protoNameForTypeName(name types.Name) string {
-	packageName := name.Package
-	if len(name.Package) != 0 {
-		if p, ok := n.packagesByPath[packageName]; ok {
-			packageName = p.Name()
-		} else {
-			packageName = protoSafePackage(packageName)
-		}
-	}
-	if len(name.Name) == 0 {
-		return packageName
-	}
-	if len(packageName) > 0 {
-		return packageName + "." + name.Name
-	}
-	return name.Name
-}
-
 func protoSafePackage(name string) string {
 	return strings.Replace(name, "/", ".", -1)
 }
