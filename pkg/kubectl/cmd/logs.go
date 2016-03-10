@@ -101,6 +101,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
@@ -155,7 +156,7 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	decoder := f.Decoder(true)
 	if o.Object == nil {
 		infos, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).

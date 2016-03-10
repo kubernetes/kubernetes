@@ -115,7 +115,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(false)
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
@@ -229,7 +229,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	info.Refresh(object, true)
 	// TODO: extract this flag to a central location, when such a location exists.
 	if cmdutil.GetFlagBool(cmd, "dry-run") {
-		return f.PrintObject(cmd, object, out)
+		return f.PrintObject(cmd, mapper, object, out)
 	}
 	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
 		return err
@@ -242,7 +242,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-		return f.PrintObject(cmd, object, out)
+		return f.PrintObject(cmd, mapper, object, out)
 	}
 	cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "exposed")
 	return nil
