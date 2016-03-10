@@ -46,7 +46,7 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 		{in: &LabelSelector{}, out: labels.Everything()},
 		{
 			in:  &LabelSelector{MatchLabels: matchLabels},
-			out: mustParse("foo in (bar)"),
+			out: mustParse("foo=bar"),
 		},
 		{
 			in:  &LabelSelector{MatchExpressions: matchExpressions},
@@ -54,7 +54,7 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 		},
 		{
 			in:  &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
-			out: mustParse("foo in (bar),baz in (norf,qux)"),
+			out: mustParse("baz in (norf,qux),foo=bar"),
 		},
 		{
 			in: &LabelSelector{
