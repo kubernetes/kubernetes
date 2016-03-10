@@ -78,11 +78,15 @@ const createStreamResponseTimeout = 30 * time.Second
 func (c *connection) Close() error {
 	c.streamLock.Lock()
 	for _, s := range c.streams {
-		s.Close()
+		// calling Reset instead of Close ensures that all streams are fully torn down
+		s.Reset()
 	}
 	c.streams = make([]httpstream.Stream, 0)
 	c.streamLock.Unlock()
 
+	// now that all streams are fully torn down, it's safe to call close on the underlying connection,
+	// which should be able to terminate immediately at this point, instead of waiting for any
+	// remaining graceful stream termination.
 	return c.conn.Close()
 }
 
