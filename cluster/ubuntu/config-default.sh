@@ -21,7 +21,11 @@
 export nodes=${nodes:-"vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"}
 
 # Define all your nodes role: a(master) or i(minion) or ai(both master and minion), must be the order same 
-role=${roles:-"ai i i"}
+# Note that default env value comes from $role not $roles
+# This is because it is converted to an array type below in other scripts
+# and if it was called $roles this would result in a double array conversion
+# if this script is sourced twice, causing the array to be truncated.
+role=${role:-"ai i i"}
 # If it practically impossible to set an array as an environment variable
 # from a script, so assume variable is a string then convert it to an array
 export roles=($role)
