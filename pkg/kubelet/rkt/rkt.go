@@ -997,16 +997,31 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		return nil, fmt.Errorf("couldn't list pods: %v", err)
 	}
 
-	var pods []*kubecontainer.Pod
+	pods := make(map[types.UID]*kubecontainer.Pod)
 	for _, pod := range listResp.Pods {
 		pod, err := r.convertRktPod(pod)
 		if err != nil {
 			glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
 			continue
 		}
-		pods = append(pods, pod)
+
+		// Group pods together.
+		oldPod, found := pods[pod.ID]
+		if !found {
+			pods[pod.ID] = pod
+			continue
+		}
+
+		oldPod.Containers = append(oldPod.Containers, pod.Containers...)
 	}
-	return pods, nil
+
+	// Convert map to list.
+	var result []*kubecontainer.Pod
+	for _, p := range pods {
+		result = append(result, p)
+	}
+
+	return result, nil
 }
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
