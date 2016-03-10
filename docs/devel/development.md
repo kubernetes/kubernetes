@@ -196,17 +196,6 @@ export GOPATH=$HOME/go-tools
 export PATH=$PATH:$GOPATH/bin
 ```
 
-Note:
-At this time, godep update in the Kubernetes project only works properly if your
-version of godep is < 54.
-
-To check your version of godep:
-
-```sh
-$ godep version
-godep v53 (linux/amd64/go1.5.3)
-```
-
 ### Using godep
 
 Here's a quick walkthrough of one way to use godeps to add or update a
