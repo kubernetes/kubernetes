@@ -6,6 +6,8 @@ file_owner
 file_perm
 fs_type
 gke_context
+global_housekeeping_interval
+housekeeping_interval
 max_in_flight
 max_par
 new_file_0644

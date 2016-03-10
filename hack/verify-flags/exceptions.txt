@@ -80,6 +80,12 @@ cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" |
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--global_housekeeping_interval="+ms.globalHousekeepingInterval.String())
 contrib/mesos/pkg/minion/server.go:	executorArgs = append(executorArgs, "--housekeeping_interval="+ms.housekeepingInterval.String())
+contrib/mesos/pkg/minion/server.go:	fs.DurationVar(&ms.globalHousekeepingInterval, "global_housekeeping_interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
+contrib/mesos/pkg/minion/server.go:	fs.DurationVar(&ms.housekeepingInterval, "housekeeping_interval", ms.housekeepingInterval, "Interval between container housekeepings")
+contrib/mesos/pkg/scheduler/service/service.go:		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--global_housekeeping_interval=%v", s.globalHousekeepingInterval))
+contrib/mesos/pkg/scheduler/service/service.go:		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--housekeeping_interval=%v", s.housekeepingInterval))
+contrib/mesos/pkg/scheduler/service/service.go:	fs.DurationVar(&s.globalHousekeepingInterval, "global_housekeeping_interval", s.globalHousekeepingInterval, "Interval between container global housekeepings")
+contrib/mesos/pkg/scheduler/service/service.go:	fs.DurationVar(&s.housekeepingInterval, "housekeeping_interval", s.housekeepingInterval, "Interval between container housekeepings")
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
@@ -98,11 +104,10 @@ hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credent
 hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
-hack/test-cmd.sh:  --runtime_config="extensions/v1beta1/deployments=true" \
-pkg/kubelet/cadvisor/cadvisor_linux.go:	if f := flag.Lookup("housekeeping_interval"); f != nil {
 hack/test-update-storage-objects.sh:  local storage_versions=${1:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
+pkg/kubelet/cadvisor/cadvisor_linux.go:	if f := flag.Lookup("housekeeping_interval"); f != nil {
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
 pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.

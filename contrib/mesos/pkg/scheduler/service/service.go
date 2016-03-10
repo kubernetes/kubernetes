@@ -153,7 +153,7 @@ type SchedulerServer struct {
 	defaultContainerMemLimit       resources.MegaBytes
 	schedulerConfigFileName        string
 	globalHousekeepingInterval     time.Duration
-	graceful                       bool	
+	graceful                       bool
 	frameworkName                  string
 	frameworkWebURI                string
 	ha                             bool
@@ -244,10 +244,10 @@ func NewSchedulerServer() *SchedulerServer {
 		// when kube-proxy is running in a non-root netns (init_net); setting this to a non-zero value will
 		// impact connection tracking for the entire host on which kube-proxy is running. xref (k8s#19182)
 		conntrackMax: 0,
-		
+
 		// cadvisor housekeeping related config
-		housekeepingInterval: 			1 * time.Second,
-		globalHousekeepingInterval:		1 * time.Minute,
+		housekeepingInterval:       1 * time.Second,
+		globalHousekeepingInterval: 1 * time.Minute,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -424,10 +424,10 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-age=%d", s.minionLogMaxAgeInDays))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
-		
- 		// adding cadvisor housekeeping config
- 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--housekeeping_interval=%v", s.housekeepingInterval))
- 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--global_housekeeping_interval=%v", s.globalHousekeepingInterval))
+
+		// adding cadvisor housekeeping config
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--housekeeping_interval=%v", s.housekeepingInterval))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--global_housekeeping_interval=%v", s.globalHousekeepingInterval))
 	}
 
 	if s.sandboxOverlay != "" {
