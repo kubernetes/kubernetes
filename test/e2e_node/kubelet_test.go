@@ -182,8 +182,8 @@ var _ = Describe("Kubelet", func() {
 
 				By("Having resources for node")
 				Expect(summary.Node.NodeName).To(Equal(*nodeName))
-				Expect(summary.Node.CPU.UsageCoreNanoSeconds).NotTo(BeNil())
-				Expect(*summary.Node.CPU.UsageCoreNanoSeconds).NotTo(BeZero())
+				Expect(summary.Node.CPU.CumulativeCoreNanoseconds).NotTo(BeNil())
+				Expect(*summary.Node.CPU.CumulativeCoreNanoseconds).NotTo(BeZero())
 
 				Expect(summary.Node.Memory.UsageBytes).NotTo(BeNil())
 				Expect(*summary.Node.Memory.UsageBytes).NotTo(BeZero())
@@ -270,8 +270,8 @@ func ExpectContainerStatsNotEmpty(container *stats.ContainerStats) {
 	// TODO: Test Network
 
 	Expect(container.CPU).NotTo(BeNil(), spew.Sdump(container))
-	Expect(container.CPU.UsageCoreNanoSeconds).NotTo(BeNil(), spew.Sdump(container))
-	Expect(*container.CPU.UsageCoreNanoSeconds).NotTo(BeZero(), spew.Sdump(container))
+	Expect(container.CPU.CumulativeCoreNanoseconds).NotTo(BeNil(), spew.Sdump(container))
+	Expect(*container.CPU.CumulativeCoreNanoseconds).NotTo(BeZero(), spew.Sdump(container))
 
 	Expect(container.Memory).NotTo(BeNil(), spew.Sdump(container))
 	Expect(container.Memory.UsageBytes).NotTo(BeNil(), spew.Sdump(container))

@@ -119,9 +119,9 @@ type CPUStats struct {
 	Time unversioned.Time `json:"time"`
 	// Total CPU usage (sum of all cores) averaged over the sample window.
 	// The "core" unit can be interpreted as CPU core-nanoseconds per second.
-	UsageNanoCores *uint64 `json:"usageNanoCores,omitempty"`
+	CoreUsageRate *uint64 `json:"coreUsageRate,omitempty"`
 	// Cumulative CPU usage (sum of all cores) since object creation.
-	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`
+	CumulativeCoreNanoseconds *uint64 `json:"cumulativeCoreNanoseconds,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.

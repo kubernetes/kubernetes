@@ -266,10 +266,10 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 			Time: unversioned.NewTime(cstat.Timestamp),
 		}
 		if cstat.CpuInst != nil {
-			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
+			cpuStats.CoreUsageRate = &cstat.CpuInst.Usage.Total
 		}
 		if cstat.Cpu != nil {
-			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
+			cpuStats.CumulativeCoreNanoseconds = &cstat.Cpu.Usage.Total
 		}
 		cStats.CPU = &cpuStats
 	}
