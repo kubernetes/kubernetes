@@ -236,7 +236,7 @@ function kube-check {
   let effective_timeout=($timeout/$sleepstep)
   attempt=0
   echo
-  printf "This may take several minutes. Bound to $effective_timeout attemmps"
+  printf "This may take several minutes. Bound to $effective_timeout attempts"
   while true; do
     local rc=0
     output=$(kube-ssh ${nodeip} "${cmd}") || rc=1
@@ -274,7 +274,7 @@ function remote-pgrep {
 
   max_attempt=60
 
-  printf "This may take several minutes. Bound to $max_attempt attemmps"
+  printf "This may take several minutes. Bound to $max_attempt attempts"
 
   attempt=0
   while true; do
