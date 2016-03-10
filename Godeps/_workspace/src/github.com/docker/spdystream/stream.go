@@ -170,6 +170,11 @@ func (s *Stream) Reset() error {
 }
 
 func (s *Stream) resetStream() error {
+	// Always call closeRemoteChannels, even if s.finished is already true.
+	// This makes it so that stream.Close() followed by stream.Reset() allows
+	// stream.Read() to unblock.
+	s.closeRemoteChannels()
+
 	s.finishLock.Lock()
 	if s.finished {
 		s.finishLock.Unlock()
@@ -177,8 +182,6 @@ func (s *Stream) resetStream() error {
 	}
 	s.finished = true
 	s.finishLock.Unlock()
-
-	s.closeRemoteChannels()
 
 	resetFrame := &spdy.RstStreamFrame{
 		StreamId: s.streamId,
@@ -320,7 +323,5 @@ func (s *Stream) closeRemoteChannels() {
 	case <-s.closeChan:
 	default:
 		close(s.closeChan)
-		s.dataLock.Lock()
-		defer s.dataLock.Unlock()
 	}
 }
