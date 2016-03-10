@@ -1295,7 +1295,7 @@ __EOF__
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   kubectl delete rs frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend replica set
   kube::test::get_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1304,7 +1304,7 @@ __EOF__
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   # Post-condition: frontend replica set is created
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
 
@@ -1320,10 +1320,8 @@ __EOF__
   # Clean-up
   kubectl delete rs frontend "${kube_flags[@]}"
 
-  # TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
-
   ### Expose replica set as service
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rs frontend' "{{$rs_replicas_field}}" '3'
   # Command
@@ -1349,8 +1347,8 @@ __EOF__
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
-  kubectl create -f docs/user-guide/replicaset/redis-slave.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/redis-slave-replicaset.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
