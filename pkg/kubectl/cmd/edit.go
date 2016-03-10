@@ -107,6 +107,7 @@ func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
@@ -129,7 +130,7 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		return err
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	resourceMapper := &resource.Mapper{
 		ObjectTyper:  typer,
 		RESTMapper:   mapper,

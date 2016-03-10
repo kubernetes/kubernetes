@@ -102,6 +102,8 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
+
 	return cmd
 }
 
@@ -190,7 +192,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	var keepOldName bool
 	var replicasDefaulted bool
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 
 	if len(filename) != 0 {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
@@ -311,10 +313,10 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			oldRcData.WriteString(oldRc.Name)
 			newRcData.WriteString(newRc.Name)
 		} else {
-			if err := f.PrintObject(cmd, oldRc, oldRcData); err != nil {
+			if err := f.PrintObject(cmd, mapper, oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := f.PrintObject(cmd, newRc, newRcData); err != nil {
+			if err := f.PrintObject(cmd, mapper, newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -359,7 +361,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 	if outputFormat != "" {
-		return f.PrintObject(cmd, newRc, out)
+		return f.PrintObject(cmd, mapper, newRc, out)
 	}
 	kind, err := api.Scheme.ObjectKind(newRc)
 	if err != nil {

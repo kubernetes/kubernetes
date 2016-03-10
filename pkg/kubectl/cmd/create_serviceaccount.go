@@ -50,6 +50,7 @@ func NewCmdCreateServiceAccount(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Com
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceAccountV1GeneratorName)
 	return cmd
 }

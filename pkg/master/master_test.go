@@ -370,7 +370,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	// TODO(caesarxuchao): make this pass  now that batch is added,
+	// TODO(caesarxuchao): make this pass now that batch is added,
 	// and rewrite it so that the indexes do not need to change each time a new api group is added.
 	/*
 		master, etcdserver, config, assert := newMaster(t)
