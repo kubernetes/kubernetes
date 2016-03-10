@@ -26,10 +26,10 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
-	runOnceManifestDelay     = 1 * time.Second
 	runOnceMaxRetries        = 10
 	runOnceRetryDelay        = 1 * time.Second
 	runOnceRetryDelayBackoff = 2
@@ -41,7 +41,15 @@ type RunPodResult struct {
 }
 
 // RunOnce polls from one configuration update and run the associated pods.
-func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, error) {
+func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate, runOnceTimeout time.Duration) ([]RunPodResult, error) {
+	if !kl.standaloneMode {
+		done := make(chan struct{})
+		defer close(done)
+		// Sync node status to master (needed to register node with master
+		// to get pods).
+		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, done)
+	}
+
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return nil, err
@@ -54,14 +62,20 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 		}
 	}
 
-	select {
-	case u := <-updates:
-		glog.Infof("processing manifest with %d pods", len(u.Pods))
-		result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
-		glog.Infof("finished processing %d pods", len(u.Pods))
-		return result, err
-	case <-time.After(runOnceManifestDelay):
-		return nil, fmt.Errorf("no pod manifest update after %v", runOnceManifestDelay)
+	for {
+		glog.Info("begin wait for update")
+		select {
+		case u := <-updates:
+			if !kl.standaloneMode && u.Op == kubetypes.SOURCE_READY {
+				continue
+			}
+			glog.Infof("processing manifest with %d pods", len(u.Pods))
+			result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
+			glog.Infof("finished processing %d pods", len(u.Pods))
+			return result, err
+		case <-time.After(runOnceTimeout):
+			return nil, fmt.Errorf("no pod manifest update after %v", runOnceTimeout)
+		}
 	}
 }
 
@@ -110,6 +124,16 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
 			return fmt.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
+		}
+
+		if !kl.standaloneMode {
+			// Update pod status.
+			pod.Status = kl.generatePodStatus(pod, status)
+			kl.statusManager.SetPodStatus(pod, pod.Status)
+			pod, err = kl.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
+			if err != nil {
+				glog.Infof("error updating pod status with apiserver: %v", err)
+			}
 		}
 
 		if kl.isPodRunning(pod, status) {
