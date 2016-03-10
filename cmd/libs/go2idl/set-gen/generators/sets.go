@@ -120,7 +120,7 @@ type genSet struct {
 	generator.DefaultGen
 	outputPackage string
 	typeToMatch   *types.Type
-	imports       *generator.ImportTracker
+	imports       namer.ImportTracker
 }
 
 // Filter ignores all but one type because we're making a single file per type.

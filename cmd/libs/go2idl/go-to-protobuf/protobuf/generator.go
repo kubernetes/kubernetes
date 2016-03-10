@@ -35,7 +35,7 @@ type genProtoIDL struct {
 	generator.DefaultGen
 	localPackage   types.Name
 	localGoPackage types.Name
-	imports        *ImportTracker
+	imports        namer.ImportTracker
 
 	generateAll    bool
 	omitGogo       bool
@@ -187,7 +187,7 @@ func (p protobufLocator) CastTypeName(name types.Name) string {
 func (p protobufLocator) ProtoTypeFor(t *types.Type) (*types.Type, error) {
 	switch {
 	// we've already converted the type, or it's a map
-	case t.Kind == typesKindProtobuf || t.Kind == types.Map:
+	case t.Kind == types.Protobuf || t.Kind == types.Map:
 		p.tracker.AddType(t)
 		return t, nil
 	}
@@ -200,7 +200,7 @@ func (p protobufLocator) ProtoTypeFor(t *types.Type) (*types.Type, error) {
 	if t.Kind == types.Struct {
 		t := &types.Type{
 			Name: p.namer.GoNameToProtoName(t.Name),
-			Kind: typesKindProtobuf,
+			Kind: types.Protobuf,
 
 			CommentLines: t.CommentLines,
 		}
@@ -354,29 +354,29 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 	// switch {
 	// case t.Kind == types.Struct && t.Name == types.Name{Package: "time", Name: "Time"}:
 	// 	return &types.Type{
-	// 		Kind: typesKindProtobuf,
+	// 		Kind: types.Protobuf,
 	// 		Name: types.Name{Path: "google/protobuf/timestamp.proto", Package: "google.protobuf", Name: "Timestamp"},
 	// 	}, true
 	// }
 	switch t.Kind {
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
-			return &types.Type{Name: types.Name{Name: "bytes"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "bytes"}, Kind: types.Protobuf}, true
 		}
 	case types.Builtin:
 		switch t.Name.Name {
 		case "string", "uint32", "int32", "uint64", "int64", "bool":
-			return &types.Type{Name: types.Name{Name: t.Name.Name}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: t.Name.Name}, Kind: types.Protobuf}, true
 		case "int":
-			return &types.Type{Name: types.Name{Name: "int64"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "int64"}, Kind: types.Protobuf}, true
 		case "uint":
-			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: types.Protobuf}, true
 		case "float64", "float":
-			return &types.Type{Name: types.Name{Name: "double"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "double"}, Kind: types.Protobuf}, true
 		case "float32":
-			return &types.Type{Name: types.Name{Name: "float"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "float"}, Kind: types.Protobuf}, true
 		case "uintptr":
-			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: types.Protobuf}, true
 		}
 		// TODO: complex?
 	}
@@ -386,7 +386,7 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *types.Type) error {
 	var err error
 	switch t.Kind {
-	case typesKindProtobuf:
+	case types.Protobuf:
 		field.Type, err = locator.ProtoTypeFor(t)
 	case types.Builtin:
 		field.Type, err = locator.ProtoTypeFor(t)
@@ -430,7 +430,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
-			field.Type = &types.Type{Name: types.Name{Name: "bytes"}, Kind: typesKindProtobuf}
+			field.Type = &types.Type{Name: types.Name{Name: "bytes"}, Kind: types.Protobuf}
 			return nil
 		}
 		if err := memberTypeToProtobufField(locator, field, t.Elem); err != nil {
@@ -477,7 +477,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 				// TODO: this probably needs to be a lookup into a namer
 				Path: strings.Replace(prefix, ".", "/", -1),
 			},
-			Kind: typesKindProtobuf,
+			Kind: types.Protobuf,
 		}
 	} else {
 		switch parts[0] {
@@ -489,7 +489,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 					Package: localPackage.Package,
 					Path:    localPackage.Path,
 				},
-				Kind: typesKindProtobuf,
+				Kind: types.Protobuf,
 			}
 		}
 	}

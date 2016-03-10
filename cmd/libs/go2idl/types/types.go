@@ -72,6 +72,9 @@ const (
 	DeclarationOf Kind = "DeclarationOf"
 	Unknown       Kind = ""
 	Unsupported   Kind = "Unsupported"
+
+	// Protobuf is protobuf type.
+	Protobuf Kind = "Protobuf"
 )
 
 // Package holds package-level information.
