@@ -23,6 +23,14 @@ existing replication controller and overwrite at least one (common) label in its
 
 .SH OPTIONS
 .PP
+\fB\-\-creation\-timeout\fP=15m0s
+    Max time to wait for new pods creation on a node before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-deletion\-timeout\fP=10m0s
+    Max time to wait for old pods deletion on a node before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
 \fB\-\-dry\-run\fP=false
     If true, print out the changes that would be made, but don't actually make them.
 
@@ -46,7 +54,7 @@ existing replication controller and overwrite at least one (common) label in its
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
 
 .PP
 \fB\-\-poll\-interval\fP=3s
@@ -97,7 +105,7 @@ existing replication controller and overwrite at least one (common) label in its
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""

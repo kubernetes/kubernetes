@@ -1181,6 +1181,8 @@ _kubectl_rolling-update-by-node()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--creation-timeout=")
+    flags+=("--deletion-timeout=")
     flags+=("--dry-run")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
