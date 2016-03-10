@@ -477,7 +477,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/namespaces/test/pods/cassandra":
+				case "/namespaces/test/replicationcontrollers/cassandra":
 					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -485,7 +485,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 				}
 			case "PATCH":
 				switch req.URL.Path {
-				case "/namespaces/test/pods/cassandra":
+				case "/namespaces/test/replicationcontrollers/cassandra":
 					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -504,7 +504,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	cmd := NewCmdAnnotate(f, buf)
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
-	options.filenames = []string{"../../../examples/cassandra/cassandra.yaml"}
+	options.filenames = []string{"../../../examples/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b", "c-"}
 	if err := options.Complete(f, buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)

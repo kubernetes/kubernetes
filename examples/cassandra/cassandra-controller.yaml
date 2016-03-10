@@ -1,13 +1,17 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  labels:
-    app: cassandra
   name: cassandra
+  # The labels will be applied automatically
+  # from the labels in the pod template, if not set
+  # labels:
+    # app: cassandra
 spec:
   replicas: 2
-  selector:
-      app: cassandra
+  # The selector will be applied automatically
+  # from the labels in the pod template, if not set.
+  # selector:
+      # app: cassandra
   template:
     metadata:
       labels:
