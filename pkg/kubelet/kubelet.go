@@ -186,6 +186,7 @@ func NewMainKubelet(
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
 	nodeLabels map[string]string,
+	bootstrapPodLabel map[string]string,
 	nodeStatusUpdateFrequency time.Duration,
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
@@ -315,6 +316,7 @@ func NewMainKubelet(
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
+		bootstrapPodLabel:              bootstrapPodLabel,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		os:                         osInterface,
 		oomWatcher:                 oomWatcher,
@@ -581,6 +583,9 @@ type Kubelet struct {
 
 	// a list of node labels to register
 	nodeLabels map[string]string
+
+	// label used to denote bootstrap pod
+	bootstrapPodLabel map[string]string
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
