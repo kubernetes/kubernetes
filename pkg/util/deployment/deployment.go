@@ -86,7 +86,7 @@ func GetOldReplicaSetsFromLists(deployment *extensions.Deployment, c clientset.I
 				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
 			// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
-			if api.Semantic.DeepEqual(rs.Spec.Template, &newRSTemplate) {
+			if api.Semantic.DeepEqual(rs.Spec.Template, newRSTemplate) {
 				continue
 			}
 			allOldRSs[rs.ObjectMeta.Name] = rs
@@ -131,7 +131,7 @@ func GetNewReplicaSetFromList(deployment *extensions.Deployment, c clientset.Int
 	newRSTemplate := GetNewReplicaSetTemplate(deployment)
 
 	for i := range rsList {
-		if api.Semantic.DeepEqual(rsList[i].Spec.Template, &newRSTemplate) {
+		if api.Semantic.DeepEqual(rsList[i].Spec.Template, newRSTemplate) {
 			// This is the new ReplicaSet.
 			return &rsList[i], nil
 		}

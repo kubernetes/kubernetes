@@ -61,7 +61,7 @@ func validNewReplicaSet() *extensions.ReplicaSet {
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},

@@ -552,7 +552,7 @@ func TestDeploymentStop(t *testing.T) {
 								Namespace: ns,
 							},
 							Spec: extensions.ReplicaSetSpec{
-								Template: &template,
+								Template: template,
 							},
 						},
 					},

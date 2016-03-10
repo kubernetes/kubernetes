@@ -87,7 +87,7 @@ func newRS(rsName string, replicas int, rsPodLabels map[string]string, imageName
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: replicas,
 			Selector: &unversioned.LabelSelector{MatchLabels: rsPodLabels},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: rsPodLabels,
 				},
