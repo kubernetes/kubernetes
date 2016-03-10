@@ -59,7 +59,7 @@ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print
       --dry-run[=false]: If true, only print the object that would be sent, without sending it.
       --env=[]: Environment variables to set in the container
       --expose[=false]: If true, a public, external service is created for the container(s) which are run
-      --generator="": The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1beta1'.
+      --generator="": The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.
       --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s).
