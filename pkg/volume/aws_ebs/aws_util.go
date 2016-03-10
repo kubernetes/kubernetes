@@ -146,7 +146,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volum
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 	volumeOptions := &aws.VolumeOptions{
 		CapacityGB: requestGB,
-		Tags:       &tags,
+		Tags:       tags,
 	}
 
 	name, err := cloud.CreateDisk(volumeOptions)
