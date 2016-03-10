@@ -3864,6 +3864,14 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
+func getStorageResourceList(storage string) api.ResourceList {
+	res := api.ResourceList{}
+	if storage != "" {
+		res[api.ResourceStorage] = resource.MustParse(storage)
+	}
+	return res
+}
+
 func TestValidateLimitRange(t *testing.T) {
 	successCases := []struct {
 		name string
@@ -3901,6 +3909,36 @@ func TestValidateLimitRange(t *testing.T) {
 						Default:              getResourceList("50m", "500Mi"),
 						DefaultRequest:       getResourceList("10m", "200Mi"),
 						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+				},
+			},
+		},
+		{
+			name: "thirdparty-fields-all-valid-standard-container-resources",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 "thirdparty.com/foo",
+						Max:                  getResourceList("100m", "10000T"),
+						Min:                  getResourceList("5m", "100Mi"),
+						Default:              getResourceList("50m", "500Mi"),
+						DefaultRequest:       getResourceList("10m", "200Mi"),
+						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+				},
+			},
+		},
+		{
+			name: "thirdparty-fields-all-valid-storage-resources",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 "thirdparty.com/foo",
+						Max:                  getStorageResourceList("10000T"),
+						Min:                  getStorageResourceList("100Mi"),
+						Default:              getStorageResourceList("500Mi"),
+						DefaultRequest:       getStorageResourceList("200Mi"),
+						MaxLimitRequestRatio: getStorageResourceList(""),
 					},
 				},
 			},
@@ -4051,6 +4089,21 @@ func TestValidateLimitRange(t *testing.T) {
 				},
 			}},
 			"ratio 10 is greater than max/min = 4.000000",
+		},
+		"invalid non standard limit type": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 "foo",
+						Max:                  getStorageResourceList("10000T"),
+						Min:                  getStorageResourceList("100Mi"),
+						Default:              getStorageResourceList("500Mi"),
+						DefaultRequest:       getStorageResourceList("200Mi"),
+						MaxLimitRequestRatio: getStorageResourceList(""),
+					},
+				},
+			}},
+			"must be a standard limit type or fully qualified",
 		},
 	}
 
