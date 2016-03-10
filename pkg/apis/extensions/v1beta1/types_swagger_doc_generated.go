@@ -28,9 +28,8 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_APIVersion = map[string]string{
-	"":         "An APIVersion represents a single concrete version of an object model.",
-	"name":     "Name of this version (e.g. 'v1').",
-	"apiGroup": "The API group to add this object into, default 'experimental'.",
+	"":     "An APIVersion represents a single concrete version of an object model.",
+	"name": "Name of this version (e.g. 'v1').",
 }
 
 func (APIVersion) SwaggerDoc() map[string]string {
