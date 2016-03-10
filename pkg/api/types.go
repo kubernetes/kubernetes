@@ -1519,6 +1519,8 @@ type ServiceSpec struct {
 	// the loadBalancerIP when a load balancer is created.
 	// This field will be ignored if the cloud-provider does not support the feature.
 	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
+	// Prefix for LoadBalancer UID for easier sorting and management, particularly in AWS
+	LoadBalancerNamePrefix string `json:"loadBalancerNamePrefix,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`

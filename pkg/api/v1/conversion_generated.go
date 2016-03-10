@@ -6960,6 +6960,7 @@ func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Ser
 		out.ExternalIPs = nil
 	}
 	out.LoadBalancerIP = in.LoadBalancerIP
+	// in.LoadBalancerNamePrefix has no peer in out
 	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
 	return nil
 }
