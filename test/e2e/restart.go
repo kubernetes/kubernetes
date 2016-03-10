@@ -50,6 +50,9 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 
 	It("should restart all nodes and ensure all nodes and pods recover", func() {
 		nn := framework.TestContext.CloudConfig.NumNodes
+		// Sadly, this count must be kept up to date.  This total is 13 system pods
+		// plus 2 for each node.  See #22489 for further discussion.
+		expectedPodCount := 2*nn + 13
 
 		By("ensuring all nodes are ready")
 		nodeNamesBefore, err := framework.CheckNodesReady(f.Client, framework.NodeReadyInitialTimeout, nn)
@@ -57,11 +60,9 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		framework.Logf("Got the following nodes before restart: %v", nodeNamesBefore)
 
 		By("ensuring all pods are running and ready")
-		pods := ps.List()
-		podNamesBefore := make([]string, len(pods))
-		for i, p := range pods {
-			podNamesBefore[i] = p.ObjectMeta.Name
-		}
+		podNamesBefore, err := waitForNPods(ps, expectedPodCount, restartPodReadyAgainTimeout)
+		Expect(err).NotTo(HaveOccurred())
+
 		ns := api.NamespaceSystem
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
