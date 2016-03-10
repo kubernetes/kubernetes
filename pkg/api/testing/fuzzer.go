@@ -413,6 +413,25 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			seLinuxRules := []extensions.SELinuxStrategy{extensions.SELinuxStrategyRunAsAny, extensions.SELinuxStrategyMustRunAs}
 			psp.SELinux.Rule = seLinuxRules[c.Rand.Intn(len(seLinuxRules))]
 		},
+		func(s *extensions.Scale, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			// TODO: Implement a fuzzer to generate valid keys, values and operators for
+			// selector requirements.
+			if s.Status.Selector != nil {
+				s.Status.Selector = &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"testlabelkey": "testlabelval",
+					},
+					MatchExpressions: []unversioned.LabelSelectorRequirement{
+						{
+							Key:      "testkey",
+							Operator: unversioned.LabelSelectorOpIn,
+							Values:   []string{"val1", "val2", "val3"},
+						},
+					},
+				}
+			}
+		},
 	)
 	return f
 }

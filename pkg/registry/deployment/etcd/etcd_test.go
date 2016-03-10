@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -195,11 +194,7 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(validDeployment.Spec.Selector)
-	if err != nil {
-		t.Errorf("invalid deployment selector %+v: %v", validDeployment.Spec.Selector, err)
-	}
-	want := &autoscaling.Scale{
+	want := &extensions.Scale{
 		ObjectMeta: api.ObjectMeta{
 			Name:              name,
 			Namespace:         namespace,
@@ -207,19 +202,19 @@ func TestScaleGet(t *testing.T) {
 			ResourceVersion:   deployment.ResourceVersion,
 			CreationTimestamp: deployment.CreationTimestamp,
 		},
-		Spec: autoscaling.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: validDeployment.Spec.Replicas,
 		},
-		Status: autoscaling.ScaleStatus{
+		Status: extensions.ScaleStatus{
 			Replicas: validDeployment.Status.Replicas,
-			Selector: selector.String(),
+			Selector: validDeployment.Spec.Selector,
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	got := obj.(*autoscaling.Scale)
+	got := obj.(*extensions.Scale)
 	if !api.Semantic.DeepEqual(want, got) {
 		t.Errorf("unexpected scale: %s", util.ObjectDiff(want, got))
 	}
@@ -236,9 +231,9 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
 	replicas := 12
-	update := autoscaling.Scale{
+	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: autoscaling.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},
 	}
@@ -250,7 +245,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	scale := obj.(*autoscaling.Scale)
+	scale := obj.(*extensions.Scale)
 	if scale.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
 	}

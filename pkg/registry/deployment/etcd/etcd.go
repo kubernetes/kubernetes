@@ -23,9 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	asvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -192,13 +189,13 @@ var _ = rest.Patcher(&ScaleREST{})
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &autoscaling.Scale{}
+	return &extensions.Scale{}
 }
 
 func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	deployment, err := r.registry.GetDeployment(ctx, name)
 	if err != nil {
-		return nil, errors.NewNotFound(autoscaling.Resource("deployments/scale"), name)
+		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
 	}
 	scale, err := scaleFromDeployment(deployment)
 	if err != nil {
@@ -211,18 +208,18 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*autoscaling.Scale)
+	scale, ok := obj.(*extensions.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", obj))
 	}
 
-	if errs := asvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
+	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
 	}
 
 	deployment, err := r.registry.GetDeployment(ctx, scale.Name)
 	if err != nil {
-		return nil, false, errors.NewNotFound(autoscaling.Resource("deployments/scale"), scale.Name)
+		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), scale.Name)
 	}
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
@@ -238,12 +235,8 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 }
 
 // scaleFromDeployment returns a scale subresource for a deployment.
-func scaleFromDeployment(deployment *extensions.Deployment) (*autoscaling.Scale, error) {
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return nil, fmt.Errorf("stored deployment object can't be represented in the form of a scale subresource because the label selector ('%v') can't be parsed: %v", deployment.Spec.Selector, err)
-	}
-	return &autoscaling.Scale{
+func scaleFromDeployment(deployment *extensions.Deployment) (*extensions.Scale, error) {
+	return &extensions.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: api.ObjectMeta{
 			Name:              deployment.Name,
@@ -252,12 +245,12 @@ func scaleFromDeployment(deployment *extensions.Deployment) (*autoscaling.Scale,
 			ResourceVersion:   deployment.ResourceVersion,
 			CreationTimestamp: deployment.CreationTimestamp,
 		},
-		Spec: autoscaling.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: deployment.Spec.Replicas,
 		},
-		Status: autoscaling.ScaleStatus{
+		Status: extensions.ScaleStatus{
 			Replicas: deployment.Status.Replicas,
-			Selector: selector.String(),
+			Selector: deployment.Spec.Selector,
 		},
 	}, nil
 }
