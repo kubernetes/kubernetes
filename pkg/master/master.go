@@ -663,7 +663,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // getExperimentalResources returns the resources for extensions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("daemonsets", "deployments", "horizontalpodautoscalers", "ingresses", "jobs", "replicasets")
+	enabledResources := sets.NewString("daemonsets", "deployments", "horizontalpodautoscalers", "ingresses", "jobs", "replicasets", "thirdpartyresources")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
