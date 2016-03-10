@@ -101,6 +101,7 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), scale.Name)
 	}
 	rc.Spec.Replicas = scale.Spec.Replicas
+	rc.ResourceVersion = scale.ResourceVersion
 	rc, err = (*r.registry).UpdateController(ctx, rc)
 	if err != nil {
 		return nil, false, errors.NewConflict(extensions.Resource("replicationcontrollers/scale"), scale.Name, err)
