@@ -38,10 +38,12 @@ import (
 type testPatchType struct {
 	unversioned.TypeMeta `json:",inline"`
 
-	testPatchSubType `json:",inline"`
+	TestPatchSubType `json:",inline"`
 }
 
-type testPatchSubType struct {
+// We explicitly make it public as private types doesn't
+// work correctly with json inlined types.
+type TestPatchSubType struct {
 	StringField string `json:"theField"`
 }
 
