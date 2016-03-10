@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -69,15 +70,15 @@ type testCase struct {
 	reportedMetricsPoints [][]metricPoint
 	namespace             string
 	podListOverride       *api.PodList
-	selector              map[string]string
+	selector              labels.Selector
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	namespace := "test-namespace"
 	tc.namespace = namespace
 	podNamePrefix := "test-pod"
-	selector := map[string]string{"name": podNamePrefix}
-	tc.selector = selector
+	podLabels := map[string]string{"name": podNamePrefix}
+	tc.selector = labels.SelectorFromSet(podLabels)
 
 	fakeClient := &fake.Clientset{}
 
@@ -88,7 +89,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := &api.PodList{}
 		for i := 0; i < tc.replicas; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-			pod := buildPod(namespace, podName, selector, api.PodRunning)
+			pod := buildPod(namespace, podName, podLabels, api.PodRunning)
 			obj.Items = append(obj.Items, pod)
 		}
 		return true, obj, nil
@@ -120,12 +121,12 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	return fakeClient
 }
 
-func buildPod(namespace, podName string, selector map[string]string, phase api.PodPhase) api.Pod {
+func buildPod(namespace, podName string, podLabels map[string]string, phase api.PodPhase) api.Pod {
 	return api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
 			Namespace: namespace,
-			Labels:    selector,
+			Labels:    podLabels,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -193,10 +194,10 @@ func TestCPUPending(t *testing.T) {
 
 	namespace := "test-namespace"
 	podNamePrefix := "test-pod"
-	selector := map[string]string{"name": podNamePrefix}
+	podLabels := map[string]string{"name": podNamePrefix}
 	for i := 0; i < tc.replicas; i++ {
 		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-		pod := buildPod(namespace, podName, selector, api.PodRunning)
+		pod := buildPod(namespace, podName, podLabels, api.PodRunning)
 		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
 	}
 	tc.podListOverride.Items[0].Status.Phase = api.PodPending
@@ -216,10 +217,10 @@ func TestCPUAllPending(t *testing.T) {
 
 	namespace := "test-namespace"
 	podNamePrefix := "test-pod"
-	selector := map[string]string{"name": podNamePrefix}
+	podLabels := map[string]string{"name": podNamePrefix}
 	for i := 0; i < tc.replicas; i++ {
 		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-		pod := buildPod(namespace, podName, selector, api.PodPending)
+		pod := buildPod(namespace, podName, podLabels, api.PodPending)
 		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
 	}
 	tc.runTest(t)
@@ -248,10 +249,10 @@ func TestQPSPending(t *testing.T) {
 
 	namespace := "test-namespace"
 	podNamePrefix := "test-pod"
-	selector := map[string]string{"name": podNamePrefix}
+	podLabels := map[string]string{"name": podNamePrefix}
 	for i := 0; i < tc.replicas; i++ {
 		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-		pod := buildPod(namespace, podName, selector, api.PodRunning)
+		pod := buildPod(namespace, podName, podLabels, api.PodRunning)
 		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
 	}
 	tc.podListOverride.Items[0].Status.Phase = api.PodPending
@@ -270,10 +271,10 @@ func TestQPSAllPending(t *testing.T) {
 
 	namespace := "test-namespace"
 	podNamePrefix := "test-pod"
-	selector := map[string]string{"name": podNamePrefix}
+	podLabels := map[string]string{"name": podNamePrefix}
 	for i := 0; i < tc.replicas; i++ {
 		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-		pod := buildPod(namespace, podName, selector, api.PodPending)
+		pod := buildPod(namespace, podName, podLabels, api.PodPending)
 		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
 	}
 	tc.podListOverride.Items[0].Status.Phase = api.PodPending

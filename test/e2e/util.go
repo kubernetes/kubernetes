@@ -294,6 +294,10 @@ type DeploymentConfig struct {
 	RCConfig
 }
 
+type ReplicaSetConfig struct {
+	RCConfig
+}
+
 func nowStamp() string {
 	return time.Now().Format(time.StampMilli)
 }
@@ -1785,6 +1789,59 @@ func (config *DeploymentConfig) create() error {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
 	Logf("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
+	return nil
+}
+
+// RunReplicaSet launches (and verifies correctness) of a ReplicaSet
+// and waits until all the pods it launches to reach the "Running" state.
+// It's the caller's responsibility to clean up externally (i.e. use the
+// namespace lifecycle for handling cleanup).
+func RunReplicaSet(config ReplicaSetConfig) error {
+	err := config.create()
+	if err != nil {
+		return err
+	}
+	return config.start()
+}
+
+func (config *ReplicaSetConfig) create() error {
+	By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
+	rs := &extensions.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Replicas: config.Replicas,
+			Selector: &unversioned.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": config.Name,
+				},
+			},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": config.Name},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+							Ports:   []api.ContainerPort{{ContainerPort: 80}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	config.applyTo(rs.Spec.Template)
+
+	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
+	if err != nil {
+		return fmt.Errorf("Error creating replica set: %v", err)
+	}
+	Logf("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
 	return nil
 }
 
