@@ -4587,14 +4587,13 @@ func (x *APIVersion) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2 := !z.EncBinary()
 			yy2arr2 := z.EncBasicHandle().StructToArray
-			var yyq2 [2]bool
+			var yyq2 [1]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[0] = x.Name != ""
-			yyq2[1] = x.APIGroup != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
-				r.EncodeArrayStart(2)
+				r.EncodeArrayStart(1)
 			} else {
 				yynn2 = 0
 				for _, b := range yyq2 {
@@ -4627,31 +4626,6 @@ func (x *APIVersion) CodecEncodeSelf(e *codec1978.Encoder) {
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Name))
-					}
-				}
-			}
-			if yyr2 || yy2arr2 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[1] {
-					yym7 := z.EncBinary()
-					_ = yym7
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIGroup))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("apiGroup"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym8 := z.EncBinary()
-					_ = yym8
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIGroup))
 					}
 				}
 			}
@@ -4722,12 +4696,6 @@ func (x *APIVersion) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			} else {
 				x.Name = string(r.DecodeString())
 			}
-		case "apiGroup":
-			if r.TryDecodeAsNil() {
-				x.APIGroup = ""
-			} else {
-				x.APIGroup = string(r.DecodeString())
-			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
 		} // end switch yys3
@@ -4739,16 +4707,16 @@ func (x *APIVersion) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj6 int
-	var yyb6 bool
-	var yyhl6 bool = l >= 0
-	yyj6++
-	if yyhl6 {
-		yyb6 = yyj6 > l
+	var yyj5 int
+	var yyb5 bool
+	var yyhl5 bool = l >= 0
+	yyj5++
+	if yyhl5 {
+		yyb5 = yyj5 > l
 	} else {
-		yyb6 = r.CheckBreak()
+		yyb5 = r.CheckBreak()
 	}
-	if yyb6 {
+	if yyb5 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -4758,34 +4726,18 @@ func (x *APIVersion) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Name = string(r.DecodeString())
 	}
-	yyj6++
-	if yyhl6 {
-		yyb6 = yyj6 > l
-	} else {
-		yyb6 = r.CheckBreak()
-	}
-	if yyb6 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.APIGroup = ""
-	} else {
-		x.APIGroup = string(r.DecodeString())
-	}
 	for {
-		yyj6++
-		if yyhl6 {
-			yyb6 = yyj6 > l
+		yyj5++
+		if yyhl5 {
+			yyb5 = yyj5 > l
 		} else {
-			yyb6 = r.CheckBreak()
+			yyb5 = r.CheckBreak()
 		}
-		if yyb6 {
+		if yyb5 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj6-1, "")
+		z.DecStructFieldNotFound(yyj5-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -19052,7 +19004,7 @@ func (x codecSelfer1234) decSliceAPIVersion(v *[]APIVersion, d *codec1978.Decode
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 32)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 16)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

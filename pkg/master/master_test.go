@@ -97,6 +97,10 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 
+	// TODO: this is kind of hacky, make testing flakes go away even with
+	//   the sync loop running.
+	config.disableThirdPartyControllerForTesting = true
+
 	master, err := New(&config)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -476,12 +480,11 @@ func initThirdParty(t *testing.T, version string) (*Master, *etcdtesting.EtcdTes
 		},
 		Versions: []extensions.APIVersion{
 			{
-				APIGroup: "group",
-				Name:     version,
+				Name: version,
 			},
 		},
 	}
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
+	// master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
 	_, master.ServiceClusterIPRange, _ = net.ParseCIDR("10.0.0.0/24")
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
@@ -541,7 +544,10 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			defer etcdserver.Terminate(t)
 
 			if test.items != nil {
-				storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				err := storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				if !assert.NoError(err) {
+					return
+				}
 			}
 
 			resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos")

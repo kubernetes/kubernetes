@@ -95,7 +95,6 @@ func init() {
 
 func DeepCopy_extensions_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
 	out.Name = in.Name
-	out.APIGroup = in.APIGroup
 	return nil
 }
 

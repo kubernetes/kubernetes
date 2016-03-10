@@ -97,6 +97,8 @@ type Config struct {
 	KubeletClient           kubeletclient.KubeletClient
 	// Used to start and monitor tunneling
 	Tunneler Tunneler
+
+	disableThirdPartyControllerForTesting bool
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -124,6 +126,8 @@ type Master struct {
 	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
+	// Useful for reliable testing.  Shouldn't be used otherwise.
+	disableThirdPartyControllerForTesting bool
 
 	// Used to start and monitor tunneling
 	tunneler Tunneler
@@ -155,6 +159,8 @@ func New(c *Config) (*Master, error) {
 		enableCoreControllers:   c.EnableCoreControllers,
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
 		tunneler:                c.Tunneler,
+
+		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
 	}
 	m.InstallAPIs(c)
 
@@ -698,12 +704,14 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		}
 		go func() {
 			wait.Forever(func() {
+				if m.disableThirdPartyControllerForTesting {
+					return
+				}
 				if err := thirdPartyControl.SyncResources(); err != nil {
 					glog.Warningf("third party resource sync failed: %v", err)
 				}
 			}, 10*time.Second)
 		}()
-
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 

@@ -2680,7 +2680,6 @@ func autoConvert_extensions_APIVersion_To_v1beta1_APIVersion(in *extensions.APIV
 		defaulting.(func(*extensions.APIVersion))(in)
 	}
 	out.Name = in.Name
-	out.APIGroup = in.APIGroup
 	return nil
 }
 
@@ -3867,7 +3866,6 @@ func autoConvert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out
 		defaulting.(func(*APIVersion))(in)
 	}
 	out.Name = in.Name
-	out.APIGroup = in.APIGroup
 	return nil
 }
 
