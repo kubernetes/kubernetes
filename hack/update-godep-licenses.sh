@@ -184,7 +184,7 @@ cat ${KUBE_ROOT}/LICENSE
 
 # Loop through every package in Godeps.json
 for PACKAGE in $(cat Godeps/Godeps.json |\
-                 jq -r ".Deps[].ImportPath" |sort -f); do
+                 jq -r ".Deps[].ImportPath" | LC_ALL=C sort -f); do
 
   process_content ${PACKAGE} LICENSE
   process_content ${PACKAGE} COPYRIGHT
