@@ -186,6 +186,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	})
 
 	fakeClient.AddReactor("get", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
+=======
 		obj := &extensions.Scale{
 			ObjectMeta: api.ObjectMeta{
 				Name:      tc.resource.name,
@@ -203,6 +205,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	})
 
 	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 		obj := &extensions.Scale{
 			ObjectMeta: api.ObjectMeta{
 				Name:      tc.resource.name,
@@ -214,6 +217,26 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			Status: extensions.ScaleStatus{
 				Replicas: tc.initialReplicas,
 				Selector: selector,
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
+			},
+		}
+		return true, obj, nil
+	})
+
+	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &extensions.Scale{
+			ObjectMeta: api.ObjectMeta{
+				Name:      tc.resource.name,
+				Namespace: namespace,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: tc.initialReplicas,
+			},
+			Status: extensions.ScaleStatus{
+				Replicas: tc.initialReplicas,
+				Selector: selector,
+=======
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 			},
 		}
 		return true, obj, nil

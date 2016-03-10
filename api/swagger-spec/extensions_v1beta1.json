@@ -8031,6 +8031,7 @@
       "description": "Standard object metadata; More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#metadata."
      },
      "spec": {
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 <<<<<<< cfb3c50d507ac2f35f425523e233f87a908b8d59
       "$ref": "v1beta1.ScaleSpec",
       "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
@@ -8040,10 +8041,13 @@
       "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
 =======
       "$ref": "v1.ScaleSpec",
+=======
+      "$ref": "v1beta1.ScaleSpec",
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
       "description": "defines the behavior of the scale. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status."
      },
      "status": {
-      "$ref": "v1.ScaleStatus",
+      "$ref": "v1beta1.ScaleStatus",
       "description": "current status of the scale. More info: http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md#spec-and-status. Read-only."
 >>>>>>> Re-versionize docs since I merged from head
      }
@@ -8074,6 +8078,7 @@
      },
      "selector": {
       "type": "any",
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
       "description": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
      },
      "targetSelector": {
@@ -8083,6 +8088,13 @@
 =======
       "description": "label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors"
 >>>>>>> Re-versionize docs since I merged from head
+=======
+      "description": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors"
+     },
+     "targetSelector": {
+      "type": "string",
+      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
      }
     }
    },
@@ -8689,6 +8701,7 @@
       "description": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet."
      }
     }
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
    },
    "v1beta1.ThirdPartyResourceList": {
     "id": "v1beta1.ThirdPartyResourceList",
@@ -8826,6 +8839,8 @@
 >>>>>>> Versioning docs and examples for release-1.2.
      }
     }
+=======
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
    }
   }
  }

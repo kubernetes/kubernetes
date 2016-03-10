@@ -42,7 +42,11 @@ var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() 
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability"
 
 	// These tests take ~20 minutes each.
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 	KubeDescribe("[Serial] [Slow] Deployment", func() {
+=======
+	Describe("[Serial] [Slow] Deployment", func() {
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("test-deployment", kindDeployment, rc, f)
@@ -51,6 +55,20 @@ var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() 
 			scaleDown("test-deployment", kindDeployment, rc, f)
 		})
 	})
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
+=======
+
+	// These tests take ~20 minutes each.
+	Describe("[Serial] [Slow] ReplicaSet", func() {
+		// CPU tests via deployments
+		It(titleUp, func() {
+			scaleUp("rs", kindReplicaSet, rc, f)
+		})
+		It(titleDown, func() {
+			scaleDown("rs", kindReplicaSet, rc, f)
+		})
+	})
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 
 	// These tests take ~20 minutes each.
 	KubeDescribe("[Serial] [Slow] ReplicaSet", func() {

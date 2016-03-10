@@ -46,6 +46,7 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int `json:"replicas"`
 
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 <<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 	// label query over pods that should match the replicas count.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
@@ -54,6 +55,11 @@ type ScaleStatus struct {
 	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 >>>>>>> Versioning docs and examples for release-1.2.
+=======
+	// label query over pods that should match the replicas count.
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
+	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 }
 
 // +genclient=true,noMethods=true

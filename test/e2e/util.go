@@ -1872,7 +1872,11 @@ func (config *ReplicaSetConfig) create() error {
 					"name": config.Name,
 				},
 			},
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 			Template: api.PodTemplateSpec{
+=======
+			Template: &api.PodTemplateSpec{
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
@@ -1890,7 +1894,11 @@ func (config *ReplicaSetConfig) create() error {
 		},
 	}
 
+<<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 	config.applyTo(&rs.Spec.Template)
+=======
+	config.applyTo(rs.Spec.Template)
+>>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
 
 	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {
