@@ -730,7 +730,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 0,
 			Selector: newRSSelector,
-			Template: &newRSTemplate,
+			Template: newRSTemplate,
 		},
 	}
 	// Set new replica set's annotation
@@ -1100,9 +1100,9 @@ func (dc *DeploymentController) updateDeployment(deployment *extensions.Deployme
 }
 
 func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deployment, rs *extensions.ReplicaSet) (d *extensions.Deployment, performedRollback bool, err error) {
-	if !reflect.DeepEqual(deploymentutil.GetNewReplicaSetTemplate(deployment), *rs.Spec.Template) {
+	if !reflect.DeepEqual(deploymentutil.GetNewReplicaSetTemplate(deployment), rs.Spec.Template) {
 		glog.Infof("Rolling back deployment %s to template spec %+v", deployment.Name, rs.Spec.Template.Spec)
-		deploymentutil.SetFromReplicaSetTemplate(deployment, *rs.Spec.Template)
+		deploymentutil.SetFromReplicaSetTemplate(deployment, rs.Spec.Template)
 		performedRollback = true
 	} else {
 		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %s, skipping rollback...", deployment.Name)

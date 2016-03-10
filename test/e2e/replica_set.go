@@ -65,7 +65,7 @@ func ReplicaSetServeImageOrFail(f *Framework, test string, image string) {
 			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{
 				"name": name,
 			}},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": name},
 				},
