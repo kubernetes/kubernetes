@@ -38,5 +38,5 @@ spec:
               memory: {{ heapster_memory }}
           command:
             - /heapster
-            - --source=kubernetes.summary_api:''
+            - --source=kubernetes:''
             - --metric_resolution=60s
