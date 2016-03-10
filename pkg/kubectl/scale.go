@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -47,8 +46,6 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 		return &ReplicationControllerScaler{c}, nil
 	case extensions.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
-	case extensions.Kind("Job"), batch.Kind("Job"):
-		return &JobScaler{c.Extensions()}, nil // Either kind of job can be scaled with Extensions interface.
 	case extensions.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
@@ -247,72 +244,6 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		}
 		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
 			client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
-	}
-	return nil
-}
-
-// ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
-func (precondition *ScalePrecondition) ValidateJob(job *extensions.Job) error {
-	if precondition.Size != -1 && job.Spec.Parallelism == nil {
-		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
-	}
-	if precondition.Size != -1 && *job.Spec.Parallelism != precondition.Size {
-		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), strconv.Itoa(*job.Spec.Parallelism)}
-	}
-	if len(precondition.ResourceVersion) != 0 && job.ResourceVersion != precondition.ResourceVersion {
-		return PreconditionError{"resource version", precondition.ResourceVersion, job.ResourceVersion}
-	}
-	return nil
-}
-
-type JobScaler struct {
-	c client.ExtensionsInterface
-}
-
-// ScaleSimple is responsible for updating job's parallelism.
-func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
-	job, err := scaler.c.Jobs(namespace).Get(name)
-	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
-	}
-	if preconditions != nil {
-		if err := preconditions.ValidateJob(job); err != nil {
-			return err
-		}
-	}
-	parallelism := int(newSize)
-	job.Spec.Parallelism = &parallelism
-	if _, err := scaler.c.Jobs(namespace).Update(job); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, job.ResourceVersion, err}
-		}
-		return ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
-	}
-	return nil
-}
-
-// Scale updates a Job to a new size, with optional precondition check (if preconditions is not nil),
-// optional retries (if retry is not nil), and then optionally waits for parallelism to reach desired
-// number, which can be less than requested based on job's current progress.
-func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
-	if preconditions == nil {
-		preconditions = &ScalePrecondition{-1, ""}
-	}
-	if retry == nil {
-		// Make it try only once, immediately
-		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
-	}
-	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
-		return err
-	}
-	if waitForReplicas != nil {
-		job, err := scaler.c.Jobs(namespace).Get(name)
-		if err != nil {
-			return err
-		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.JobHasDesiredParallelism(scaler.c, job))
 	}
 	return nil
 }
