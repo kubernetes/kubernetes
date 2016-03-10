@@ -88,8 +88,7 @@ rm -rf ./Godeps ./vendor
 git init > /dev/null 2>&1
 
 # Recreate the Godeps using the nice clean set we just downloaded
-# TODO(thockin, eparis): Move this in to a common script with hack/godep-save.sh
-"${GODEP}" save github.com/ugorji/go/codec/codecgen github.com/onsi/ginkgo/ginkgo ./...
+hack/godep-save.sh
 
 # Test for diffs
 if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
