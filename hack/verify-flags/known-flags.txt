@@ -162,6 +162,7 @@ ignore-daemonsets
 ignore-not-found
 image-gc-high-threshold
 image-gc-low-threshold
+include-extended-apis
 input-dirs
 insecure-bind-address
 insecure-port

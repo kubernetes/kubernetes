@@ -35,6 +35,10 @@ var (
 	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
 	registeredVersions = map[unversioned.GroupVersion]struct{}{}
 
+	// thirdPartyGroupVersions are API versions which are dynamically
+	// registered (and unregistered) via API calls to the apiserver
+	thirdPartyGroupVersions []unversioned.GroupVersion
+
 	// enabledVersions represents all enabled API versions. It should be a
 	// subset of registeredVersions. Please call EnableVersions() to add
 	// enabled versions.
@@ -156,6 +160,51 @@ func Group(group string) (*apimachinery.GroupMeta, error) {
 func IsRegistered(group string) bool {
 	_, found := groupMetaMap[group]
 	return found
+}
+
+// IsRegisteredVersion returns if a version is registered.
+func IsRegisteredVersion(v unversioned.GroupVersion) bool {
+	_, found := registeredVersions[v]
+	return found
+}
+
+// IsThirdPartyAPIGroupVersion returns true if the api version is a user-registered group/version.
+func IsThirdPartyAPIGroupVersion(gv unversioned.GroupVersion) bool {
+	for ix := range thirdPartyGroupVersions {
+		if thirdPartyGroupVersions[ix] == gv {
+			return true
+		}
+	}
+	return false
+}
+
+// AddThirdPartyAPIGroupVersions sets the list of third party versions,
+// registers them in the API machinery and enables them.
+// Skips GroupVersions that are already registered.
+// Returns the list of GroupVersions that were skipped.
+func AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversioned.GroupVersion {
+	filteredGVs := []unversioned.GroupVersion{}
+	skippedGVs := []unversioned.GroupVersion{}
+	for ix := range gvs {
+		if !IsRegisteredVersion(gvs[ix]) {
+			filteredGVs = append(filteredGVs, gvs[ix])
+		} else {
+			glog.V(3).Infof("Skipping %s, because its already registered", gvs[ix].String())
+			skippedGVs = append(skippedGVs, gvs[ix])
+		}
+	}
+	if len(filteredGVs) == 0 {
+		return skippedGVs
+	}
+	RegisterVersions(filteredGVs)
+	EnableVersions(filteredGVs...)
+	next := make([]unversioned.GroupVersion, len(gvs))
+	for ix := range filteredGVs {
+		next[ix] = filteredGVs[ix]
+	}
+	thirdPartyGroupVersions = next
+
+	return skippedGVs
 }
 
 // TODO: This is an expedient function, because we don't check if a Group is

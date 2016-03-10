@@ -100,6 +100,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }
@@ -204,8 +205,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return cmdutil.UsageError(cmd, err.Error())
 	}
-	mapper, typer := f.Object()
-
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -296,7 +296,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 		outputFormat := cmdutil.GetFlagString(cmd, "output")
 		if outputFormat != "" {
-			return f.PrintObject(cmd, outputObj, out)
+			return f.PrintObject(cmd, mapper, outputObj, out)
 		}
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, dataChangeMsg)
 		return nil

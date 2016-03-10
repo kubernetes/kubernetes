@@ -38,6 +38,7 @@ func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateSecretGeneric(f, cmdOut))
+
 	return cmd
 }
 
@@ -155,6 +156,7 @@ func NewCmdCreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer) *cob
 	cmd.Flags().String("docker-email", "", "Email for Docker registry")
 	cmd.MarkFlagRequired("docker-email")
 	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", "Server location for Docker registry")
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 

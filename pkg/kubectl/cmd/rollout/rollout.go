@@ -43,7 +43,6 @@ func NewCmdRollout(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmd.Help()
 		},
 	}
-
 	// subcommands
 	cmd.AddCommand(NewCmdRolloutHistory(f, out))
 	cmd.AddCommand(NewCmdRolloutPause(f, out))

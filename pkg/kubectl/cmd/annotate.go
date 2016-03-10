@@ -110,6 +110,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
@@ -161,7 +162,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
 	o.changeCause = f.Command()
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
@@ -246,11 +247,13 @@ func (o AnnotateOptions) RunAnnotate() error {
 		if err != nil {
 			return err
 		}
+
+		mapper, _ := o.f.Object(cmdutil.GetIncludeThirdPartyAPIs(o.cmd))
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
-			return o.f.PrintObject(o.cmd, outputObj, o.out)
+			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)
 		}
-		mapper, _ := o.f.Object()
+
 		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, "annotated")
 		return nil
 	})
