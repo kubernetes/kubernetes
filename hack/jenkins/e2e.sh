@@ -903,6 +903,54 @@ case ${JOB_NAME} in
     : ${AWS_SHARED_CREDENTIALS_FILE:='/var/lib/jenkins/.aws/credentials'}
     ;;
 
+  # kubernetes-upgrade-gke-1.1-1.2
+  #
+  # Test upgrades from the latest release-1.1 build to the latest release-1.2 build.
+  #
+  # Configurations for step2, step3, step5, and step7 live in release-1.2.
+
+  kubernetes-upgrade-gke-1.1-1.2-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-release-1.2' 'upgrade-gke-1-1-1-2' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
+    ;;
+
+  kubernetes-upgrade-gke-1.1-1.2-step4-e2e-old)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-release-1.2' 'upgrade-gke-1-1-1-2' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
+    ;;
+
+  kubernetes-upgrade-gke-1.1-1.2-step6-e2e-old)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-release-1.2' 'upgrade-gke-1-1-1-2' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
+    ;;
+
+  # kubernetes-upgrade-gce-1.1-1.2
+  #
+  # Test upgrades from the latest release-1.1 build to the latest release-1.2 build.
+  #
+  # Configurations for step2, step3, step5, and step7 live in release-1.2.
+
+  kubernetes-upgrade-gce-1.1-1.2-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-release-1.2' 'upgrade-gce-1-1-1-2' 'k8s-jkns-gce-upgrade'
+    ;;
+
+  kubernetes-upgrade-gce-1.1-1.2-step4-e2e-old)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-release-1.2' 'upgrade-gce-1-1-1-2' 'k8s-jkns-gce-upgrade'
+    ;;
+
+  kubernetes-upgrade-gce-1.1-1.2-step6-e2e-old)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-release-1.2' 'upgrade-gce-1-1-1-2' 'k8s-jkns-gce-upgrade'
+    ;;
+
   # kubernetes-upgrade-gke-1.1-master
   #
   # Test upgrades from the latest release-1.1 build to the latest master build.
@@ -951,91 +999,52 @@ case ${JOB_NAME} in
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gce-1-1-master' 'k8s-jkns-gce-upgrade'
     ;;
 
-  # kubernetes-upgrade-gke-1.0-current-release
-  #
-  # Test upgrades from the latest release-1.0 build to the latest current
-  # release build.
-  #
-  # Configurations for step1, step4, and step6 live in the release-1.0 branch.
-
-  kubernetes-upgrade-gke-1.0-current-release-step2-kubectl-e2e-new)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-1.0-current-release-step3-upgrade-master)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-1.0-current-release-step5-upgrade-cluster)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-1.0-current-release-step7-e2e-new)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  # kubernetes-upgrade-gce-stable-current-release
+  # kubernetes-upgrade-gke-stable-1.2
   #
   # Test upgrades from the stable build to the latest current release build.
+  #
+  # TODO(ihmccreery) When we release v1.2.0, these jobs will need to migrate to the release-1.2 branch.
 
-  kubernetes-upgrade-gce-stable-current-release-step1-deploy)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
+  kubernetes-upgrade-gke-stable-1.2-step1-deploy)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1.2' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
     ;;
 
-  kubernetes-upgrade-gce-stable-current-release-step2-kubectl-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
+  kubernetes-upgrade-gke-stable-1.2-step4-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1.2' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
     ;;
 
-  kubernetes-upgrade-gce-stable-current-release-step3-upgrade-master)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
+  kubernetes-upgrade-gke-stable-1.2-step6-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1.2' 'kubernetes-jenkins-gke-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
     ;;
 
-  kubernetes-upgrade-gce-stable-current-release-step4-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
-    ;;
-
-  kubernetes-upgrade-gce-stable-current-release-step5-upgrade-cluster)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
-    ;;
-
-  kubernetes-upgrade-gce-stable-current-release-step6-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
-    ;;
-
-  kubernetes-upgrade-gce-stable-current-release-step7-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
-    ;;
-
-  # kubernetes-upgrade-gke-stable-current-release
+  # kubernetes-upgrade-gce-stable-1.2
   #
   # Test upgrades from the stable build to the latest current release build.
+  #
+  # TODO(ihmccreery) When we release v1.2.0, these jobs will need to migrate to the release-1.2 branch.
 
-  kubernetes-upgrade-gke-stable-current-release-step1-deploy)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gce-stable-1.2-step1-deploy)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step2-kubectl-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gce-stable-1.2-step4-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step3-upgrade-master)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-stable-current-release-step4-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-stable-current-release-step5-upgrade-cluster)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-stable-current-release-step6-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-stable-current-release-step7-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gce-stable-1.2-step6-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 esac
 
