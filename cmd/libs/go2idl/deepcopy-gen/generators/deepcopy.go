@@ -91,7 +91,7 @@ func Packages(_ *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 						return false
 					}
 					// Also, filter out private types.
-					if strings.ToLower(t.Name.Name[:1]) == t.Name.Name[:1] {
+					if namer.IsPrivateGoName(t.Name.Name) {
 						return false
 					}
 					return true
@@ -164,7 +164,7 @@ func (g *genDeepCopy) copyableWithinPackage(t *types.Type) bool {
 		// We won't be able to access private fields.
 		// Thus, this type cannot have private fields.
 		for _, member := range t.Members {
-			if strings.ToLower(member.Name[:1]) == member.Name[:1] {
+			if namer.IsPrivateGoName(member.Name) {
 				return false
 			}
 			// TODO: This is a temporary hack, to make avoid generating function
