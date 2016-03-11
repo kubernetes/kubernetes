@@ -66,6 +66,17 @@ runTests() {
   cleanup
 }
 
+checkEtcdOnPath() {
+  kube::log::status "Checking etcd is on PATH"
+  which etcd && return
+  kube::log::status "Cannot find etcd, cannot run integration tests."
+  kube::log::status "Please see docs/devel/testing.md for instructions."
+  return 1
+}
+
+checkEtcdOnPath
+
+
 KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.

@@ -178,7 +178,7 @@ godep v53 (linux/amd64/go1.5.3)
 
 ### Using godep
 
-Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
+Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/\_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
 1) Devote a directory to this endeavor:
 
@@ -240,83 +240,18 @@ Please send dependency updates in separate commits within your PR, for easier re
 
 6) If you updated the Godeps, please also update `Godeps/LICENSES` by running `hack/update-godep-licenses.sh`.
 
+## Testing
 
-## Unit tests
-
-```sh
-cd kubernetes
-hack/test-go.sh
-```
-
-Alternatively, you could also run:
+Three basic commands let you run unit, integration and/or e2e tests:
 
 ```sh
 cd kubernetes
-godep go test ./...
+hack/test-go.sh  # Run unit tests
+hack/test-integration.sh  # Run integration tests, requires etcd
+go run hack/e2e.go -v --build --up --test --down  # Run e2e tests
 ```
 
-If you only want to run unit tests in one package, you could run ``godep go test`` under the package directory. For example, the following commands will run all unit tests in package kubelet:
-
-```console
-$ cd kubernetes # step into the kubernetes directory.
-$ cd pkg/kubelet
-$ godep go test
-# some output from unit tests
-PASS
-ok      k8s.io/kubernetes/pkg/kubelet   0.317s
-```
-
-## Coverage
-
-Currently, collecting coverage is only supported for the Go unit tests.
-
-To run all unit tests and generate an HTML coverage report, run the following:
-
-```sh
-cd kubernetes
-KUBE_COVER=y hack/test-go.sh
-```
-
-At the end of the run, an the HTML report will be generated with the path printed to stdout.
-
-To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
-
-```sh
-cd kubernetes
-KUBE_COVER=y hack/test-go.sh pkg/kubectl
-```
-
-Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
-
-Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/kubernetes/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls. Coverage reports from before the Kubernetes Github organization was created can be found [here](https://coveralls.io/r/GoogleCloudPlatform/kubernetes).
-
-## Integration tests
-
-You need an [etcd](https://github.com/coreos/etcd/releases) in your path. To download a copy of the latest version used by Kubernetes, either
- * run `hack/install-etcd.sh`, which will download etcd to `third_party/etcd`, and then set your `PATH` to include `third_party/etcd`.
- * inspect `cluster/saltbase/salt/etcd/etcd.manifest` for the correct version, and then manually download and install it to some place in your `PATH`.
-
-```sh
-cd kubernetes
-hack/test-integration.sh
-```
-
-## End-to-End tests
-
-See [End-to-End Testing in Kubernetes](e2e-tests.md).
-
-## Testing out flaky tests
-
-[Instructions here](flaky-tests.md)
-
-## Benchmarking
-
-To run benchmark tests, you'll typically use something like:
-
-    $ godep go test ./pkg/apiserver -benchmem -run=XXX -bench=BenchmarkWatch
-
-The `-run=XXX` prevents normal unit tests for running, while `-bench` is a regexp for selecting which benchmarks to run.
-See `go test -h` for more instructions on generating profiles from benchmarks.
+See the [testing guide](testing.md) for additional information and scenarios.
 
 ## Regenerating the CLI documentation
 
