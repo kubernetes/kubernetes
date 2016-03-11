@@ -30,6 +30,7 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
+bootstrap-pod-label
 build-only
 build-services
 cadvisor-port
