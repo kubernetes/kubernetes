@@ -88,8 +88,8 @@
 {% endif -%}
 
 {% set non_masquerade_cidr = "" -%}
-{% if grains.non_masquerade_cidr is defined -%}
-  {% set non_masquerade_cidr = "--non-masquerade-cidr=" + grains.non_masquerade_cidr -%}
+{% if pillar.get('non_masquerade_cidr','') is defined -%}
+  {% set non_masquerade_cidr = "--non-masquerade-cidr=" + pillar.non_masquerade_cidr -%}
 {% endif -%}
 
 # The master kubelet cannot wait for the flannel daemon because it is responsible
