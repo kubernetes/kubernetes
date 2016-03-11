@@ -182,6 +182,16 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
+	// Usage of some resources cannot be counted in isolation. For example when
+	// the resource represents a number of unique references to external
+	// resource. In such a case an evaluator needs to process other objects in
+	// the same namespace which needs to be known.
+	if om, err := api.ObjectMetaFor(inputObject); namespace != "" && err == nil {
+		if om.Namespace == "" {
+			om.Namespace = namespace
+		}
+	}
+
 	// there is at least one quota that definitely matches our object
 	// as a result, we need to measure the usage of this object for quota
 	// on updates, we need to subtract the previous measured usage
