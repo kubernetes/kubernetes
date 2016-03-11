@@ -19,10 +19,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd -P)"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-branch="${1:-master}"
-# notice this uses ... to find the first shared ancestor
-if ! git diff origin/"${branch}"...HEAD | grep 'Godeps/' > /dev/null; then
+readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
+if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
+  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/'; then
   exit 0
 fi
 
