@@ -324,6 +324,16 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 		}
 	}
 
+	for _, container := range pod.Spec.Containers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
+					return fmt.Errorf("Container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+				}
+			}
+		}
+	}
+
 	// limit pull secret references as well
 	pullSecrets := sets.NewString()
 	for _, s := range serviceAccount.ImagePullSecrets {
