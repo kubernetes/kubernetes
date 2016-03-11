@@ -31,7 +31,7 @@ import (
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/release-1.2/docs/user-guide/jsonpath.md].")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
 	cmd.Flags().Bool("show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
 	// template shorthand -t is deprecated to support -t for --tty

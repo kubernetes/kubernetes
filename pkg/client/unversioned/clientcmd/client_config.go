@@ -28,7 +28,6 @@ import (
 	"github.com/imdario/mergo"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -99,13 +98,6 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		u.RawQuery = ""
 		u.Fragment = ""
 		clientConfig.Host = u.String()
-	}
-	if len(configClusterInfo.APIVersion) != 0 {
-		gv, err := unversioned.ParseGroupVersion(configClusterInfo.APIVersion)
-		if err != nil {
-			return nil, err
-		}
-		clientConfig.GroupVersion = &gv
 	}
 
 	// only try to read the auth information if we are secure

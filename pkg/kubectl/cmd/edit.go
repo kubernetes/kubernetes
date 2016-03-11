@@ -94,7 +94,7 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to file to use to edit the resource"
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
