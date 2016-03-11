@@ -502,9 +502,11 @@ func (c *cacheWatcher) stop() {
 }
 
 func (c *cacheWatcher) add(event watchCacheEvent) {
+	t := time.NewTimer(5 * time.Second)
+	defer t.Stop()
 	select {
 	case c.input <- event:
-	case <-time.After(5 * time.Second):
+	case <-t.C:
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to blockin on it infinitely,
 		// we simply terminate it.
