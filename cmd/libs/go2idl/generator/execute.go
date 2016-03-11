@@ -57,9 +57,12 @@ func (c *Context) ExecutePackages(outDir string, packages Packages) error {
 	return nil
 }
 
-type golangFileType struct{}
+type DefaultFileType struct {
+	Format   func([]byte) ([]byte, error)
+	Assemble func(io.Writer, *File)
+}
 
-func (ft golangFileType) AssembleFile(f *File, pathname string) error {
+func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
 	log.Printf("Assembling file %q", pathname)
 	destFile, err := os.Create(pathname)
 	if err != nil {
@@ -69,12 +72,12 @@ func (ft golangFileType) AssembleFile(f *File, pathname string) error {
 
 	b := &bytes.Buffer{}
 	et := NewErrorTracker(b)
-	ft.assemble(et, f)
+	ft.Assemble(et, f)
 	if et.Error() != nil {
 		return et.Error()
 	}
-	if formatted, err := format.Source(b.Bytes()); err != nil {
-		err = fmt.Errorf("unable to run gofmt on %q (%v).", pathname, err)
+	if formatted, err := ft.Format(b.Bytes()); err != nil {
+		err = fmt.Errorf("unable to format file %q (%v).", pathname, err)
 		// Write the file anyway, so they can see what's going wrong and fix the generator.
 		if _, err2 := destFile.Write(b.Bytes()); err2 != nil {
 			return err2
@@ -86,18 +89,18 @@ func (ft golangFileType) AssembleFile(f *File, pathname string) error {
 	}
 }
 
-func (ft golangFileType) VerifyFile(f *File, pathname string) error {
+func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
 	log.Printf("Verifying file %q", pathname)
 	friendlyName := filepath.Join(f.PackageName, f.Name)
 	b := &bytes.Buffer{}
 	et := NewErrorTracker(b)
-	ft.assemble(et, f)
+	ft.Assemble(et, f)
 	if et.Error() != nil {
 		return et.Error()
 	}
-	formatted, err := format.Source(b.Bytes())
+	formatted, err := ft.Format(b.Bytes())
 	if err != nil {
-		return fmt.Errorf("unable to gofmt the output for %q: %v", friendlyName, err)
+		return fmt.Errorf("unable to format the output for %q: %v", friendlyName, err)
 	}
 	existing, err := ioutil.ReadFile(pathname)
 	if err != nil {
@@ -121,7 +124,7 @@ func (ft golangFileType) VerifyFile(f *File, pathname string) error {
 	return fmt.Errorf("output for %q differs; first existing/expected diff: \n  %q\n  %q", friendlyName, string(eDiff), string(fDiff))
 }
 
-func (ft golangFileType) assemble(w io.Writer, f *File) {
+func assembleGolangFile(w io.Writer, f *File) {
 	w.Write(f.Header)
 	fmt.Fprintf(w, "package %v\n\n", f.PackageName)
 
@@ -153,6 +156,13 @@ func (ft golangFileType) assemble(w io.Writer, f *File) {
 	}
 
 	w.Write(f.Body.Bytes())
+}
+
+func NewGolangFile() *DefaultFileType {
+	return &DefaultFileType{
+		Format:   format.Source,
+		Assemble: assembleGolangFile,
+	}
 }
 
 // format should be one line only, and not end with \n.

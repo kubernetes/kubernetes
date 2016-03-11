@@ -177,7 +177,7 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 		Namers:   namer.NameSystems{},
 		Universe: u,
 		FileTypes: map[string]FileType{
-			GolangFileType: golangFileType{},
+			GolangFileType: NewGolangFile(),
 		},
 	}
 

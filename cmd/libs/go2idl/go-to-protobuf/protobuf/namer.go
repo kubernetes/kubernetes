@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
+	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 )
 
@@ -124,7 +125,7 @@ func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global
 
 	local[t.Name] = p
 	for _, m := range t.Members {
-		if isPrivateGoName(m.Name) {
+		if namer.IsPrivateGoName(m.Name) {
 			continue
 		}
 		field := &protoField{}
