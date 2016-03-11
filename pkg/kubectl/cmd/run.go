@@ -441,7 +441,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 			Decoder:      f.Decoder(true),
 		}
-		info, err := resourceMapper.InfoForObject(obj)
+		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}

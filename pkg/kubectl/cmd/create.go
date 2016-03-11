@@ -236,7 +236,7 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 		RESTMapper:   mapper,
 		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 	}
-	info, err := resourceMapper.InfoForObject(obj)
+	info, err := resourceMapper.InfoForObject(obj, nil)
 	if err != nil {
 		return err
 	}
