@@ -35,8 +35,12 @@ func AddPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 =======
 	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/release-1.2/docs/user-guide/jsonpath.md].")
+<<<<<<< 3bc17a26d597dbbcd6e6437e1f45f9f65f8240cf
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
 >>>>>>> Versioning docs and examples for release-1.2.
+=======
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+>>>>>>> Merge pull request #22410 from nikhiljindal/apiReferenceFlag
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
 	cmd.Flags().Bool("show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
 	// template shorthand -t is deprecated to support -t for --tty
