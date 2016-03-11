@@ -46,7 +46,7 @@ import (
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
 	kselector "k8s.io/kubernetes/pkg/fields"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -634,7 +634,7 @@ func setupHealthzHandlers(ks *kube2sky) {
 }
 
 func main() {
-	flag.CommandLine.SetNormalizeFunc(util.WarnWordSepNormalizeFunc)
+	flag.CommandLine.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc)
 	flag.Parse()
 	var err error
 	setupSignalHandlers()

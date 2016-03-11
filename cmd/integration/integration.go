@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -972,7 +973,7 @@ func main() {
 	gruntime.GOMAXPROCS(gruntime.NumCPU())
 	addFlags(pflag.CommandLine)
 
-	util.InitFlags()
+	flag.InitFlags()
 	utilruntime.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
