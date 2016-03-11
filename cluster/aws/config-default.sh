@@ -31,12 +31,22 @@ if [[ -z ${NODE_SIZE} ]]; then
 fi
 
 # Dynamically set the master size by the number of nodes, these are guesses
-# TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_NODES} < 150 )); then
-    MASTER_SIZE="m3.medium"
-  else
-    MASTER_SIZE="m3.large"
+  MASTER_SIZE="m3.medium"
+  if [[ "${NUM_NODES}" -gt "5" ]]; then
+    suggested_master_size="m3.large"
+  fi
+  if [[ "${NUM_NODES}" -gt "10" ]]; then
+    suggested_master_size="m3.xlarge"
+  fi
+  if [[ "${NUM_NODES}" -gt "100" ]]; then
+    suggested_master_size="m3.2xlarge"
+  fi
+  if [[ "${NUM_NODES}" -gt "250" ]]; then
+    suggested_master_size="c4.4xlarge"
+  fi
+  if [[ "${NUM_NODES}" -gt "500" ]]; then
+    suggested_master_size="c4.8xlarge"
   fi
 fi
 
