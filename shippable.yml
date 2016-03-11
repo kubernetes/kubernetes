@@ -44,18 +44,7 @@ install:
   - ./hack/build-go.sh
   - godep go install ./...
   - ./hack/install-etcd.sh
-  - ./hack/verify-gofmt.sh
-  - ./hack/verify-boilerplate.sh
-  - ./hack/verify-description.sh
-  - ./hack/verify-flags-underscore.py
-  - ./hack/verify-godeps.sh ${BASE_BRANCH}
-  - ./hack/verify-godep-licenses.sh ${BASE_BRANCH}
-  - ./hack/travis/install-std-race.sh
-  - ./hack/verify-generated-conversions.sh
-  - ./hack/verify-generated-deep-copies.sh
-  - ./hack/verify-generated-docs.sh
-  - ./hack/verify-generated-swagger-docs.sh
-  - ./hack/verify-swagger-spec.sh
+  - make verify BRANCH=${BASE_BRANCH}
 
 script:
   # Disable coverage collection on pull requests
