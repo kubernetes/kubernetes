@@ -22,6 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -95,6 +97,7 @@ func CreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comman
 		return err
 	}
 	var generator kubectl.StructuredGenerator
+	var resource unversioned.GroupVersionResource
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretV1GeneratorName:
 		generator = &kubectl.SecretGeneratorV1{
@@ -103,11 +106,13 @@ func CreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comman
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
 		}
+		resource = v1.SchemeGroupVersion.WithResource("secret")
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
+		Resource:            resource,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
@@ -173,6 +178,7 @@ func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra
 		}
 	}
 	var generator kubectl.StructuredGenerator
+	var resource unversioned.GroupVersionResource
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretForDockerRegistryV1GeneratorName:
 		generator = &kubectl.SecretForDockerRegistryGeneratorV1{
@@ -182,11 +188,13 @@ func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra
 			Password: cmdutil.GetFlagString(cmd, "docker-password"),
 			Server:   cmdutil.GetFlagString(cmd, "docker-server"),
 		}
+		resource = v1.SchemeGroupVersion.WithResource("secret")
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
+		Resource:            resource,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),

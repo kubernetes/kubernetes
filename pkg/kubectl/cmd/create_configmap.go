@@ -22,6 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -77,6 +79,7 @@ func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 		return err
 	}
 	var generator kubectl.StructuredGenerator
+	var resource unversioned.GroupVersionResource
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ConfigMapV1GeneratorName:
 		generator = &kubectl.ConfigMapGeneratorV1{
@@ -84,11 +87,13 @@ func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
 		}
+		resource = v1.SchemeGroupVersion.WithResource("configmap")
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
+		Resource:            resource,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),

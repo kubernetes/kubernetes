@@ -204,8 +204,10 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 
 // CreateSubcommandOptions is an options struct to support create subcommands
 type CreateSubcommandOptions struct {
-	// Name of resource being created
+	// Name of resource instance being created (ex: my-pod, my-namespace)
 	Name string
+	// Resource being created (ex: v1.pod, v1.namespace)
+	Resource unversioned.GroupVersionResource
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator kubectl.StructuredGenerator
 	// DryRun is true if the command should be simulated but not run against the server
@@ -225,8 +227,11 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 		return err
 	}
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	gvk, err := typer.ObjectKind(obj)
-	mapping, err := mapper.RESTMapping(unversioned.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+	gvk, err := mapper.KindFor(options.Resource)
+	if err != nil {
+		return err
+	}
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return err
 	}
