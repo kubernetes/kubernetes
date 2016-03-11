@@ -135,7 +135,7 @@ func (s *PrivateKeySet) Active() *PrivateKey {
 type GeneratePrivateKeyFunc func() (*PrivateKey, error)
 
 func GeneratePrivateKey() (*PrivateKey, error) {
-	pk, err := rsa.GenerateKey(rand.Reader, 1024)
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
