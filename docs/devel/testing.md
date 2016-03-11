@@ -30,10 +30,10 @@ Documentation for other releases can be found at
 # Testing guide
 
 This assumes you already read the [development guide](development.md) to
-install go, godeps and configure your git client.
+install go, godeps, and configure your git client.
 
 In order to send pull requests you need to make sure you changes pass
-unit, integration tests.
+unit and integration tests.
 
 Kubernetes only merges pull requests when e2e tests are passing, so it is often
 a good idea to make sure these work as well.
@@ -188,15 +188,17 @@ hack/test-integration.sh  # Run all integration tests.
 ### e2e test philosophy
 
 In general passing unit and integration tests should provide sufficient
-confidence
-to allow code to merge. If that is not the case, please *invest more time adding
-unit and integration test coverage*. These tests run faster and a smaller failure domain.
+confidence to allow code to merge.  If that is not the case,
+please *invest more time adding unit and integration test coverage*.
+These tests run faster and have a smaller failure domain.
 
 However, end-to-end (e2e) tests provide maximum confidence that
 the system is working in exchange for reduced performance and a
 higher debugging cost.
 
-e2e tests deploy a real kubernetes cluster of real nodes on a concrete provider such as GCE. The tests then manipulate the cluster in certain ways and assert the expected results.
+e2e tests deploy a real kubernetes cluster of real nodes on a concrete provider
+such as GCE. The tests then manipulate the cluster in certain ways and
+assert the expected results.
 
 For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
 
