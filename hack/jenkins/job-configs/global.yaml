@@ -125,6 +125,7 @@
 # Default email recipients are set in Jenkins global config
 - defaults:
     name: global
+    disable_job: false
     emails: '$DEFAULT_RECIPIENTS'
     cron-string: 'H/30 * * * *'
     # How long to wait after sending TERM to send KILL (minutes)
