@@ -547,8 +547,21 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		rsc.manageReplicas(filteredPods, &rs)
 	}
 
+	// Count the number of pods that have labels matching the labels of the pod
+	// template of the replicaSet, the matching pods may have more labels than
+	// are in the template. Because the label of podTemplateSpec is a superset
+	// of the selector of the replicaset, so the possible matching pods must be
+	// part of the filteredPods.
+	fullyLabeledReplicasCount := 0
+	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelector()
+	for _, pod := range filteredPods {
+		if templateLabel.Matches(labels.Set(pod.Labels)) {
+			fullyLabeledReplicasCount++
+		}
+	}
+
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, len(filteredPods)); err != nil {
+	if err := updateReplicaCount(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, len(filteredPods), fullyLabeledReplicasCount); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// we retry with some fairness.
 		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rs.Namespace, rs.Name, err)
