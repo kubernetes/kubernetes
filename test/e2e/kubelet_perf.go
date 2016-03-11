@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -186,9 +185,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 	var rm *resourceMonitor
 
 	BeforeEach(func() {
-		// It should be OK to list unschedulable Nodes here.
-		nodes, err := framework.Client.Nodes().List(api.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)

@@ -1116,6 +1116,48 @@ func TestCheckPod(t *testing.T) {
 	}
 }
 
+func TestCleanupOrphanedPods(t *testing.T) {
+	newPod := func(name, node string) api.Pod {
+		return api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+			},
+			Spec: api.PodSpec{
+				NodeName: node,
+			},
+		}
+	}
+	pods := []api.Pod{
+		newPod("a", "foo"),
+		newPod("b", "bar"),
+		newPod("c", "gone"),
+	}
+	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, false)
+
+	nc.nodeStore.Store.Add(newNode("foo"))
+	nc.nodeStore.Store.Add(newNode("bar"))
+	for _, pod := range pods {
+		p := pod
+		nc.podStore.Store.Add(&p)
+	}
+
+	var deleteCalls int
+	var deletedPodName string
+	nc.forcefullyDeletePod = func(p *api.Pod) error {
+		deleteCalls++
+		deletedPodName = p.ObjectMeta.Name
+		return nil
+	}
+	nc.cleanupOrphanedPods()
+
+	if deleteCalls != 1 {
+		t.Fatalf("expected one delete, got: %v", deleteCalls)
+	}
+	if deletedPodName != "c" {
+		t.Fatalf("expected deleted pod name to be 'c', but got: %q", deletedPodName)
+	}
+}
+
 func newNode(name string) *api.Node {
 	return &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: name},

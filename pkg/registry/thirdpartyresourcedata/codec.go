@@ -326,7 +326,7 @@ func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream 
 		}
 		fmt.Fprintf(stream, template, t.kind+"List", strings.Join(dataStrings, ","))
 		return nil
-	case *unversioned.Status:
+	case *unversioned.Status, *unversioned.APIResourceList:
 		return t.delegate.EncodeToStream(obj, stream, overrides...)
 	default:
 		return fmt.Errorf("unexpected object to encode: %#v", obj)

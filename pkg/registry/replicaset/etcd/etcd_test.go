@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -62,7 +61,7 @@ func validNewReplicaSet() *extensions.ReplicaSet {
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
@@ -256,11 +255,7 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(validReplicaSet.Spec.Selector)
-	if err != nil {
-		t.Errorf("invalid replicaset selector %+v: %v", validReplicaSet.Spec.Selector, err)
-	}
-	want := &autoscaling.Scale{
+	want := &extensions.Scale{
 		ObjectMeta: api.ObjectMeta{
 			Name:              name,
 			Namespace:         api.NamespaceDefault,
@@ -268,16 +263,16 @@ func TestScaleGet(t *testing.T) {
 			ResourceVersion:   rs.ResourceVersion,
 			CreationTimestamp: rs.CreationTimestamp,
 		},
-		Spec: autoscaling.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: validReplicaSet.Spec.Replicas,
 		},
-		Status: autoscaling.ScaleStatus{
+		Status: extensions.ScaleStatus{
 			Replicas: validReplicaSet.Status.Replicas,
-			Selector: selector.String(),
+			Selector: validReplicaSet.Spec.Selector,
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name)
-	got := obj.(*autoscaling.Scale)
+	got := obj.(*extensions.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -299,12 +294,12 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
 	replicas := 12
-	update := autoscaling.Scale{
+	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: autoscaling.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},
 	}
@@ -317,7 +312,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	scale := obj.(*autoscaling.Scale)
+	scale := obj.(*extensions.Scale)
 	if scale.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}

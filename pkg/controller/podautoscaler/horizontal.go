@@ -129,7 +129,20 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.
 		targetUtilization = hpa.Spec.CPUUtilization.TargetPercentage
 	}
 	currentReplicas := scale.Status.Replicas
-	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
+
+	if scale.Status.Selector == nil {
+		errMsg := "selector is required"
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "SelectorRequired", errMsg)
+		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
+	}
+
+	selector, err := unversioned.LabelSelectorAsSelector(scale.Status.Selector)
+	if err != nil {
+		errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
+		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
+	}
+	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -177,7 +190,19 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 	}
 
 	for _, customMetricTarget := range targetList.Items {
-		value, currentTimestamp, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, scale.Status.Selector)
+		if scale.Status.Selector == nil {
+			errMsg := "selector is required"
+			a.eventRecorder.Event(hpa, api.EventTypeWarning, "SelectorRequired", errMsg)
+			return 0, "", "", time.Time{}, fmt.Errorf("selector is required")
+		}
+
+		selector, err := unversioned.LabelSelectorAsSelector(scale.Status.Selector)
+		if err != nil {
+			errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
+			a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
+			return 0, "", "", time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
+		}
+		value, currentTimestamp, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
 		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
 			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetCustomMetrics", err.Error())

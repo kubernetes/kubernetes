@@ -44,11 +44,11 @@ type MetricsClient interface {
 	// GetCPUUtilization returns the average utilization over all pods represented as a percent of requested CPU
 	// (e.g. 70 means that an average pod uses 70% of the requested CPU)
 	// and the time of generation of the oldest of utilization reports for pods.
-	GetCPUUtilization(namespace string, selector map[string]string) (*int, time.Time, error)
+	GetCPUUtilization(namespace string, selector labels.Selector) (*int, time.Time, error)
 
 	// GetCustomMetric returns the average value of the given custom metrics from the
 	// pods picked using the namespace and selector passed as arguments.
-	GetCustomMetric(customMetricName string, namespace string, selector map[string]string) (*float64, time.Time, error)
+	GetCustomMetric(customMetricName string, namespace string, selector labels.Selector) (*float64, time.Time, error)
 }
 
 type intAndFloat struct {
@@ -100,7 +100,7 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map[string]string) (*int, time.Time, error) {
+func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector labels.Selector) (*int, time.Time, error) {
 	avgConsumption, avgRequest, timestamp, err := h.GetCpuConsumptionAndRequestInMillis(namespace, selector)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get CPU consumption and request: %v", err)
@@ -109,12 +109,11 @@ func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map
 	return &utilization, timestamp, nil
 }
 
-func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace string, selector map[string]string) (avgConsumption int64,
+func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace string, selector labels.Selector) (avgConsumption int64,
 	avgRequest int64, timestamp time.Time, err error) {
 
-	labelSelector := labels.SelectorFromSet(labels.Set(selector))
 	podList, err := h.client.Core().Pods(namespace).
-		List(api.ListOptions{LabelSelector: labelSelector})
+		List(api.ListOptions{LabelSelector: selector})
 
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
@@ -144,7 +143,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	if missing || requestSum == 0 {
 		return 0, 0, time.Time{}, fmt.Errorf("some pods do not have request for cpu")
 	}
-	glog.V(4).Infof("%s %v - sum of CPU requested: %d", namespace, selector, requestSum)
+	glog.V(4).Infof("%s %s - sum of CPU requested: %d", namespace, selector, requestSum)
 	requestAvg := requestSum / int64(len(podList.Items))
 	// Consumption is already averaged and in millis.
 	consumption, timestamp, err := h.getForPods(heapsterCpuUsageMetricDefinition, namespace, podNames)
@@ -156,11 +155,10 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 
 // GetCustomMetric returns the average value of the given custom metric from the
 // pods picked using the namespace and selector passed as arguments.
-func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespace string, selector map[string]string) (*float64, time.Time, error) {
+func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespace string, selector labels.Selector) (*float64, time.Time, error) {
 	metricSpec := getHeapsterCustomMetricDefinition(customMetricName)
 
-	labelSelector := labels.SelectorFromSet(labels.Set(selector))
-	podList, err := h.client.Core().Pods(namespace).List(api.ListOptions{LabelSelector: labelSelector})
+	podList, err := h.client.Core().Pods(namespace).List(api.ListOptions{LabelSelector: selector})
 
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)

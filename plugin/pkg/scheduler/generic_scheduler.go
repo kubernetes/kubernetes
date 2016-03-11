@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 
@@ -55,12 +56,13 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	predicates   map[string]algorithm.FitPredicate
-	prioritizers []algorithm.PriorityConfig
-	extenders    []algorithm.SchedulerExtender
-	pods         algorithm.PodLister
-	random       *rand.Rand
-	randomLock   sync.Mutex
+	predicates    map[string]algorithm.FitPredicate
+	prioritizers  []algorithm.PriorityConfig
+	extenders     []algorithm.SchedulerExtender
+	pods          algorithm.PodLister
+	random        *rand.Rand
+	randomLock    sync.Mutex
+	lastNodeIndex uint64
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -109,24 +111,16 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 		return "", fmt.Errorf("empty priorityList")
 	}
 
+	sort.Sort(sort.Reverse(priorityList))
 	maxScore := priorityList[0].Score
-	// idx contains indices of elements with score == maxScore.
-	idx := []int{}
-
-	for i, entry := range priorityList {
-		if entry.Score > maxScore {
-			maxScore = entry.Score
-			idx = []int{i}
-		} else if entry.Score == maxScore {
-			idx = append(idx, i)
-		}
-	}
+	firstAfterMaxScore := sort.Search(len(priorityList), func(i int) bool { return priorityList[i].Score < maxScore })
 
 	g.randomLock.Lock()
-	ix := g.random.Int() % len(idx)
+	ix := int(g.lastNodeIndex % uint64(firstAfterMaxScore))
+	g.lastNodeIndex++
 	g.randomLock.Unlock()
 
-	return priorityList[idx[ix]].Host, nil
+	return priorityList[ix].Host, nil
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
@@ -188,7 +182,14 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 // Each priority function can also have its own weight
 // The node scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all nodes
-func PrioritizeNodes(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, nodeLister algorithm.NodeLister, extenders []algorithm.SchedulerExtender) (schedulerapi.HostPriorityList, error) {
+func PrioritizeNodes(
+	pod *api.Pod,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	podLister algorithm.PodLister,
+	priorityConfigs []algorithm.PriorityConfig,
+	nodeLister algorithm.NodeLister,
+	extenders []algorithm.SchedulerExtender,
+) (schedulerapi.HostPriorityList, error) {
 	result := schedulerapi.HostPriorityList{}
 
 	// If no priority configs are provided, then the EqualPriority function is applied

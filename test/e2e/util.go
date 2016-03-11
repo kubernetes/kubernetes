@@ -294,6 +294,10 @@ type DeploymentConfig struct {
 	RCConfig
 }
 
+type ReplicaSetConfig struct {
+	RCConfig
+}
+
 func nowStamp() string {
 	return time.Now().Format(time.StampMilli)
 }
@@ -1788,6 +1792,59 @@ func (config *DeploymentConfig) create() error {
 	return nil
 }
 
+// RunReplicaSet launches (and verifies correctness) of a ReplicaSet
+// and waits until all the pods it launches to reach the "Running" state.
+// It's the caller's responsibility to clean up externally (i.e. use the
+// namespace lifecycle for handling cleanup).
+func RunReplicaSet(config ReplicaSetConfig) error {
+	err := config.create()
+	if err != nil {
+		return err
+	}
+	return config.start()
+}
+
+func (config *ReplicaSetConfig) create() error {
+	By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
+	rs := &extensions.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Replicas: config.Replicas,
+			Selector: &unversioned.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": config.Name,
+				},
+			},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": config.Name},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+							Ports:   []api.ContainerPort{{ContainerPort: 80}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	config.applyTo(&rs.Spec.Template)
+
+	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
+	if err != nil {
+		return fmt.Errorf("Error creating replica set: %v", err)
+	}
+	Logf("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
+	return nil
+}
+
 // RunRC Launches (and verifies correctness) of a Replication Controller
 // and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
@@ -3267,9 +3324,16 @@ func getNodePortURL(client *client.Client, ns, name string, svcPort int) (string
 	if err != nil {
 		return "", err
 	}
-	// It should be OK to list unschedulable Node here.
-	nodes, err := client.Nodes().List(api.ListOptions{})
-	if err != nil {
+	// This list of nodes must not include the master, which is marked
+	// unschedulable, since the master doesn't run kube-proxy. Without
+	// kube-proxy NodePorts won't work.
+	var nodes *api.NodeList
+	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
+		nodes, err = client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector()})
+		return err == nil, nil
+	}) != nil {
 		return "", err
 	}
 	if len(nodes.Items) == 0 {

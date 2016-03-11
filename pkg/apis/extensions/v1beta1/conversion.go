@@ -34,6 +34,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 	err := scheme.AddConversionFuncs(
 		Convert_api_PodSpec_To_v1_PodSpec,
 		Convert_v1_PodSpec_To_api_PodSpec,
+		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
+		Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
 		Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
 		Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
 		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
@@ -91,6 +93,58 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 
 func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conversion.Scope) error {
 	return v1.Convert_v1_PodSpec_To_api_PodSpec(in, out, s)
+}
+
+func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.ScaleStatus))(in)
+	}
+	out.Replicas = int32(in.Replicas)
+
+	out.Selector = nil
+	out.TargetSelector = ""
+	if in.Selector != nil {
+		if in.Selector.MatchExpressions == nil || len(in.Selector.MatchExpressions) == 0 {
+			out.Selector = in.Selector.MatchLabels
+		}
+
+		selector, err := unversioned.LabelSelectorAsSelector(in.Selector)
+		if err != nil {
+			return fmt.Errorf("invalid label selector: %v", err)
+		}
+		out.TargetSelector = selector.String()
+	}
+	return nil
+}
+
+func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ScaleStatus))(in)
+	}
+	out.Replicas = int(in.Replicas)
+
+	// Normally when 2 fields map to the same internal value we favor the old field, since
+	// old clients can't be expected to know about new fields but clients that know about the
+	// new field can be expected to know about the old field (though that's not quite true, due
+	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
+	if in.TargetSelector != "" {
+		labelSelector, err := unversioned.ParseToLabelSelector(in.TargetSelector)
+		if err != nil {
+			out.Selector = nil
+			return fmt.Errorf("failed to parse target selector: %v", err)
+		}
+		out.Selector = labelSelector
+	} else if in.Selector != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		selector := make(map[string]string)
+		for key, val := range in.Selector {
+			selector[key] = val
+		}
+		out.Selector.MatchLabels = selector
+	} else {
+		out.Selector = nil
+	}
+	return nil
 }
 
 func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
@@ -243,13 +297,9 @@ func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(v1.PodTemplateSpec)
-		if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -269,13 +319,8 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	return nil
 }

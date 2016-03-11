@@ -143,6 +143,7 @@ const (
 	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
+	JobV1GeneratorName                          = "job/v1"
 	NamespaceV1GeneratorName                    = "namespace/v1"
 	SecretV1GeneratorName                       = "secret/v1"
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
@@ -161,6 +162,7 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		RunPodV1GeneratorName:          kubectl.BasicPod{},
 		DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
 		JobV1Beta1GeneratorName:        kubectl.JobV1Beta1{},
+		JobV1GeneratorName:             kubectl.JobV1{},
 	}
 	generators["autoscale"] = map[string]kubectl.Generator{
 		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
@@ -548,7 +550,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		CanBeAutoscaled: func(kind unversioned.GroupKind) error {
 			switch kind {
-			case api.Kind("ReplicationController"), extensions.Kind("Deployment"):
+			case api.Kind("ReplicationController"), extensions.Kind("Deployment"), extensions.Kind("ReplicaSet"):
 				// nothing to do here
 			default:
 				return fmt.Errorf("cannot autoscale a %v", kind)

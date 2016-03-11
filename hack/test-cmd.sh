@@ -485,11 +485,11 @@ runTests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   # Post-condition: valid-pod has the record annotation
   kube::test::get_object_assert pods "{{range.items}}{{$annotations_field}}:{{end}}" "${change_cause_annotation}"
-  # prove that patch can use different types 
+  # prove that patch can use different types
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx2"}]'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx2:'
-  # prove that patch can use different types 
+  # prove that patch can use different types
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx"}]'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
@@ -545,7 +545,7 @@ runTests() {
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
   #cleaning
   rm /tmp/tmp-valid-pod.json
-  
+
   ## replace of a cluster scoped resource can succeed
   # Pre-condition: a node exists
   kubectl create -f - "${kube_flags[@]}" << __EOF__
@@ -729,6 +729,13 @@ __EOF__
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
   [[ "$(kubectl get hpa.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs  
+  output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
+  output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
+  output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the rc reaper.
   kubectl delete hpa frontend "${kube_flags[@]}"
@@ -751,6 +758,12 @@ __EOF__
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl run pi --generator=job/v1beta1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: Job "pi" is created
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete jobs pi "${kube_flags[@]}"
+  # Command
+  kubectl run pi --generator=job/v1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
@@ -853,7 +866,7 @@ __EOF__
   # Command
   [[ "$(kubectl create secret generic test-secret --namespace=test-secrets --from-literal=key1=value1 --output=go-template --template=\"{{.metadata.name}}:\" | grep 'test-secret:')" ]]
   ## Clean-up
-  kubectl delete secret test-secret --namespace=test-secrets  
+  kubectl delete secret test-secret --namespace=test-secrets
   # Clean up
   kubectl delete namespace test-secrets
 
@@ -884,7 +897,7 @@ __EOF__
   # Clean-up
   kubectl delete configmap test-configmap --namespace=test-configmaps
   kubectl delete namespace test-configmaps
-  
+
   ####################
   # Service Accounts #
   ####################
@@ -1289,7 +1302,7 @@ __EOF__
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   kubectl delete rs frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend replica set
   kube::test::get_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1298,11 +1311,13 @@ __EOF__
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   # Post-condition: frontend replica set is created
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
-
-  # TODO(madhusudancs): Add describe tests once PR #20886 that implements describe for ReplicaSet is merged.
+  # Describe command should print detailed information
+  kube::test::describe_object_assert rs 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert rs "Name:" "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
@@ -1314,10 +1329,8 @@ __EOF__
   # Clean-up
   kubectl delete rs frontend "${kube_flags[@]}"
 
-  # TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
-
   ### Expose replica set as service
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rs frontend' "{{$rs_replicas_field}}" '3'
   # Command
@@ -1343,8 +1356,8 @@ __EOF__
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f docs/user-guide/replicaset/frontend.yaml "${kube_flags[@]}"
-  kubectl create -f docs/user-guide/replicaset/redis-slave.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/redis-slave-replicaset.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
@@ -1355,6 +1368,26 @@ __EOF__
   kubectl delete rs frontend redis-slave "${kube_flags[@]}" # delete multiple replica sets at once
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Auto scale replica set
+  # Pre-condition: no replica set exists
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
+  # autoscale 1~2 pods, CPU utilization 70%, replica set specified by file
+  kubectl autoscale -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  # autoscale 2~3 pods, default CPU utilization (80%), replica set specified by name
+  kubectl autoscale rs frontend "${kube_flags[@]}" --min=2 --max=3
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  # autoscale without specifying --max should fail
+  ! kubectl autoscale rs frontend "${kube_flags[@]}"
+  # Clean up
+  kubectl delete rs frontend "${kube_flags[@]}"
+
 
   ######################
   # Multiple Resources #

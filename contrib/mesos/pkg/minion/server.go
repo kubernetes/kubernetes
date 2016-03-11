@@ -68,6 +68,7 @@ type MinionServer struct {
 	logVerbosity    int32 // see glog.Level
 
 	runProxy                       bool
+	proxyKubeconfig                string
 	proxyLogV                      int
 	proxyBindall                   bool
 	proxyMode                      string
@@ -149,7 +150,9 @@ func (ms *MinionServer) launchProxyServer() {
 		"--conntrack-max=" + strconv.Itoa(ms.conntrackMax),
 		"--conntrack-tcp-timeout-established=" + strconv.Itoa(ms.conntrackTCPTimeoutEstablished),
 	}
-
+	if ms.proxyKubeconfig != "" {
+		args = append(args, fmt.Sprintf("--kubeconfig=%s", ms.proxyKubeconfig))
+	}
 	if ms.clientConfig.Host != "" {
 		args = append(args, fmt.Sprintf("--master=%s", ms.clientConfig.Host))
 	}
@@ -359,6 +362,7 @@ func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 
 	// proxy flags
 	fs.BoolVar(&ms.runProxy, "run-proxy", ms.runProxy, "Maintain a running kube-proxy instance as a child proc of this kubelet-executor.")
+	fs.StringVar(&ms.proxyKubeconfig, "proxy-kubeconfig", ms.proxyKubeconfig, "Path to kubeconfig file used by the child kube-proxy.")
 	fs.IntVar(&ms.proxyLogV, "proxy-logv", ms.proxyLogV, "Log verbosity of the child kube-proxy.")
 	fs.BoolVar(&ms.proxyBindall, "proxy-bindall", ms.proxyBindall, "When true will cause kube-proxy to bind to 0.0.0.0.")
 	fs.StringVar(&ms.proxyMode, "proxy-mode", ms.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")

@@ -1738,13 +1738,8 @@ func deepCopy_v1beta1_ReplicaSetSpec(in ReplicaSetSpec, out *ReplicaSetSpec, c *
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(v1.PodTemplateSpec)
-		if err := deepCopy_v1_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := deepCopy_v1_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1846,6 +1841,7 @@ func deepCopy_v1beta1_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversio
 	} else {
 		out.Selector = nil
 	}
+	out.TargetSelector = in.TargetSelector
 	return nil
 }
 
