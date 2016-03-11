@@ -998,6 +998,7 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	}
 
 	pods := make(map[types.UID]*kubecontainer.Pod)
+	var podIDs []types.UID
 	for _, pod := range listResp.Pods {
 		pod, err := r.convertRktPod(pod)
 		if err != nil {
@@ -1009,16 +1010,17 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		oldPod, found := pods[pod.ID]
 		if !found {
 			pods[pod.ID] = pod
+			podIDs = append(podIDs, pod.ID)
 			continue
 		}
 
 		oldPod.Containers = append(oldPod.Containers, pod.Containers...)
 	}
 
-	// Convert map to list.
+	// Convert map to list, using the consistent order from the podIDs array.
 	var result []*kubecontainer.Pod
-	for _, p := range pods {
-		result = append(result, p)
+	for _, id := range podIDs {
+		result = append(result, pods[id])
 	}
 
 	return result, nil
