@@ -188,7 +188,7 @@ type stringPair struct {
 	data, fileName string
 }
 
-var _ = Describe("Addon update", func() {
+var _ = KubeDescribe("Addon update", func() {
 
 	var dir string
 	var sshClient *ssh.Client

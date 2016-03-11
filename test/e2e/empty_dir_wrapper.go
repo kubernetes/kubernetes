@@ -28,7 +28,7 @@ import (
 
 // This test will create a pod with a secret volume and gitRepo volume
 // Thus requests a secret, a git server pod, and a git server service
-var _ = Describe("EmptyDir wrapper volumes", func() {
+var _ = KubeDescribe("EmptyDir wrapper volumes", func() {
 	f := NewDefaultFramework("emptydir-wrapper")
 
 	It("should becomes running", func() {

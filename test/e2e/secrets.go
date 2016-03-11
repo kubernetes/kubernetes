@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Secrets", func() {
+var _ = KubeDescribe("Secrets", func() {
 	f := NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {

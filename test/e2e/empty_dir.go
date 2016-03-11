@@ -33,7 +33,7 @@ const (
 	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.3"
 )
 
-var _ = Describe("EmptyDir volumes", func() {
+var _ = KubeDescribe("EmptyDir volumes", func() {
 
 	f := NewDefaultFramework("emptydir")
 

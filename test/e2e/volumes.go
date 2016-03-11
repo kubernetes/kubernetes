@@ -331,7 +331,7 @@ func deleteCinderVolume(name string) error {
 
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
-var _ = Describe("Volumes [Feature:Volumes]", func() {
+var _ = KubeDescribe("Volumes [Feature:Volumes]", func() {
 	framework := NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -350,7 +350,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	Describe("NFS", func() {
+	KubeDescribe("NFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -384,7 +384,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	Describe("GlusterFS", func() {
+	KubeDescribe("GlusterFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -463,7 +463,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	Describe("iSCSI", func() {
+	KubeDescribe("iSCSI", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -505,7 +505,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	Describe("Ceph RBD", func() {
+	KubeDescribe("Ceph RBD", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -578,7 +578,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
 
-	Describe("CephFS", func() {
+	KubeDescribe("CephFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -649,7 +649,7 @@ var _ = Describe("Volumes [Feature:Volumes]", func() {
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 
-	Describe("Cinder", func() {
+	KubeDescribe("Cinder", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace: namespace.Name,

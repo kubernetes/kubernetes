@@ -207,7 +207,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 // that each have a variable amount of content in the associated Namespace.
 // When run in [Serial] this test appears to delete Namespace objects at a
 // rate of approximately 1 per second.
-var _ = Describe("Namespaces [Serial]", func() {
+var _ = KubeDescribe("Namespaces [Serial]", func() {
 
 	f := NewDefaultFramework("namespaces")
 

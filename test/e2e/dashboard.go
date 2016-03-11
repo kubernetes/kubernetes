@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Kubernetes Dashboard", func() {
+var _ = KubeDescribe("Kubernetes Dashboard", func() {
 	const (
 		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName

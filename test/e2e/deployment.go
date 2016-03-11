@@ -46,7 +46,7 @@ const (
 	redisImageName = "redis"
 )
 
-var _ = Describe("Deployment", func() {
+var _ = KubeDescribe("Deployment", func() {
 	f := NewDefaultFramework("deployment")
 
 	It("deployment should create new pods", func() {

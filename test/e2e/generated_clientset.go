@@ -32,7 +32,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Generated release_1_2 clientset", func() {
+var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 	framework := NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
 		podClient := framework.Clientset_1_2.Core().Pods(framework.Namespace.Name)
