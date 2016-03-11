@@ -32,7 +32,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -40,11 +39,6 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
-)
-
-const (
-	// timeout for proxy requests.
-	proxyTimeout = 2 * time.Minute
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -342,46 +336,9 @@ type usageDataPerContainer struct {
 	memWorkSetData []uint64
 }
 
-// Performs a get on a node proxy endpoint given the nodename and rest client.
-func nodeProxyRequest(c *client.Client, node, endpoint string) (restclient.Result, error) {
-	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
-	// This will leak a goroutine if proxy hangs. #22165
-	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
-	if err != nil {
-		return restclient.Result{}, err
-	}
-	var result restclient.Result
-	finished := make(chan struct{})
-	go func() {
-		if subResourceProxyAvailable {
-			result = c.Get().
-				Resource("nodes").
-				SubResource("proxy").
-				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-				Suffix(endpoint).
-				Do()
-
-		} else {
-			result = c.Get().
-				Prefix("proxy").
-				Resource("nodes").
-				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-				Suffix(endpoint).
-				Do()
-		}
-		finished <- struct{}{}
-	}()
-	select {
-	case <-finished:
-		return result, nil
-	case <-time.After(proxyTimeout):
-		return restclient.Result{}, nil
-	}
-}
-
 // Retrieve metrics from the kubelet server of the given node.
 func getKubeletMetricsThroughProxy(c *client.Client, node string) (string, error) {
-	client, err := nodeProxyRequest(c, node, "metrics")
+	client, err := NodeProxyRequest(c, node, "metrics")
 	if err != nil {
 		return "", err
 	}
@@ -408,7 +365,7 @@ func getKubeletMetricsThroughNode(nodeName string) (string, error) {
 }
 
 func getKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
-	client, err := nodeProxyRequest(c, nodeName, "debug/pprof/heap")
+	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap")
 	if err != nil {
 		return "", err
 	}
@@ -423,31 +380,10 @@ func getKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
 	return strings.Join(lines[len(lines)-numLines:], "\n"), nil
 }
 
-// GetKubeletPods retrieves the list of running pods on the kubelet. The pods
-// includes necessary information (e.g., UID, name, namespace for
-// pods/containers), but do not contain the full spec.
-func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
-	result := &api.PodList{}
-	client, err := nodeProxyRequest(c, node, "runningpods")
-	if err != nil {
-		return &api.PodList{}, err
-	}
-	if err = client.Into(result); err != nil {
-		return &api.PodList{}, err
-	}
-	return result, nil
-}
-
 func PrintAllKubeletPods(c *client.Client, nodeName string) {
-	result, err := nodeProxyRequest(c, nodeName, "pods")
+	podList, err := GetKubeletPods(c, nodeName)
 	if err != nil {
-		Logf("Unable to retrieve kubelet pods for node %v", nodeName)
-		return
-	}
-	podList := &api.PodList{}
-	err = result.Into(podList)
-	if err != nil {
-		Logf("Unable to cast result to pods for node %v", nodeName)
+		Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
 		return
 	}
 	for _, p := range podList.Items {
