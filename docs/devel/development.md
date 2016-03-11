@@ -232,7 +232,7 @@ Please send dependency updates in separate commits within your PR, for easier re
 
 ## Testing
 
-Three basic commands let you run unit, integration and/or unit tests:
+Three basic commands let you run unit, integration and/or e2e tests:
 
 ```sh
 cd kubernetes
