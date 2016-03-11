@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"net/http"
 	"net/url"
 	"time"
@@ -82,7 +82,7 @@ func TestList_NoError(t *testing.T) {
 		Items: []api.ComponentStatus{*(createTestStatus("test1", api.ConditionTrue, "ok", ""))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", util.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
 	}
 }
 
@@ -97,7 +97,7 @@ func TestList_FailedCheck(t *testing.T) {
 			*(createTestStatus("test1", api.ConditionFalse, "", ""))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", util.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
 	}
 }
 
@@ -112,7 +112,7 @@ func TestList_UnknownError(t *testing.T) {
 			*(createTestStatus("test1", api.ConditionUnknown, "", "fizzbuzz error"))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", util.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
 	}
 }
 
@@ -124,7 +124,7 @@ func TestGet_NoError(t *testing.T) {
 	}
 	expect := createTestStatus("test1", api.ConditionTrue, "ok", "")
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", util.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
 	}
 }
 

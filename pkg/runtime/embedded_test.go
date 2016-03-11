@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type EmbeddedTest struct {
@@ -169,7 +169,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	// we want DecodeList to set type meta if possible, even on runtime.Unknown objects
 	internal.Items[2].(*runtime.Unknown).TypeMeta = runtime.TypeMeta{Kind: "OtherTest", APIVersion: "unknown.group/unknown"}
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
-		t.Errorf("mismatched decoded: %s", util.ObjectGoPrintSideBySide(e, a))
+		t.Errorf("mismatched decoded: %s", diff.ObjectGoPrintSideBySide(e, a))
 	}
 }
 

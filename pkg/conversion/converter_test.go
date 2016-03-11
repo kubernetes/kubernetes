@@ -27,7 +27,7 @@ import (
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
@@ -835,12 +835,12 @@ func objDiff(a, b interface{}) string {
 	if err != nil {
 		panic("b")
 	}
-	return util.StringDiff(string(ab), string(bb))
+	return diff.StringDiff(string(ab), string(bb))
 
 	// An alternate diff attempt, in case json isn't showing you
 	// the difference. (reflect.DeepEqual makes a distinction between
 	// nil and empty slices, for example.)
-	//return util.StringDiff(
+	//return diff.StringDiff(
 	//	fmt.Sprintf("%#v", a),
 	//	fmt.Sprintf("%#v", b),
 	//)

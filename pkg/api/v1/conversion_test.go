@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -99,7 +99,7 @@ func TestPodLogOptions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(convertedLogOptions, versionedLogOptions) {
-			t.Fatalf("Unexpected deserialization:\n%s", util.ObjectGoPrintSideBySide(versionedLogOptions, convertedLogOptions))
+			t.Fatalf("Unexpected deserialization:\n%s", diff.ObjectGoPrintSideBySide(versionedLogOptions, convertedLogOptions))
 		}
 	}
 
@@ -111,7 +111,7 @@ func TestPodLogOptions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(convertedLogOptions, unversionedLogOptions) {
-			t.Fatalf("Unexpected deserialization:\n%s", util.ObjectGoPrintSideBySide(unversionedLogOptions, convertedLogOptions))
+			t.Fatalf("Unexpected deserialization:\n%s", diff.ObjectGoPrintSideBySide(unversionedLogOptions, convertedLogOptions))
 		}
 	}
 }
