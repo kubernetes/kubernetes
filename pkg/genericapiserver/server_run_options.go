@@ -30,7 +30,6 @@ type ServerRunOptions struct {
 	BindAddress          net.IP
 	CertDirectory        string
 	ClientCAFile         string
-	EtcdQuorumRead       bool
 	InsecureBindAddress  net.IP
 	InsecurePort         int
 	LongRunningRequestRE string

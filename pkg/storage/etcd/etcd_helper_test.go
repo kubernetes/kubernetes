@@ -125,6 +125,7 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
+
 	if e, a := list.Items, got.Items; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
