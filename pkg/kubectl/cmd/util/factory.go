@@ -550,7 +550,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		CanBeAutoscaled: func(kind unversioned.GroupKind) error {
 			switch kind {
-			case api.Kind("ReplicationController"), extensions.Kind("Deployment"):
+			case api.Kind("ReplicationController"), extensions.Kind("Deployment"), extensions.Kind("ReplicaSet"):
 				// nothing to do here
 			default:
 				return fmt.Errorf("cannot autoscale a %v", kind)
