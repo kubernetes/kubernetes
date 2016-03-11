@@ -111,6 +111,22 @@
             job-env: |
                 export HAIRPIN_MODE="hairpin-veth"
                 export PROJECT="k8s-jkns-gce-soak-2"
+        - 'gce-1.2':
+            deploy-description: |
+                Deploy Kubernetes to soak cluster using the latest successful
+                release-1.2 Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gce-1.2 build is running,
+                this deployment build will be blocked and remain in the queue
+                until the test run is complete.<br>
+            e2e-description: |
+                Assumes Kubernetes soak cluster is already deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gce-1.2 build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            provider-env: '{gce-provider-env}'
+            job-env: |
+                export PROJECT="k8s-jkns-gce-soak-1-2"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
         - 'gce-1.1':
             deploy-description: |
                 Deploy Kubernetes to soak cluster using the latest successful
