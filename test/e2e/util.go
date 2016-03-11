@@ -1872,11 +1872,15 @@ func (config *ReplicaSetConfig) create() error {
 					"name": config.Name,
 				},
 			},
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 <<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 			Template: api.PodTemplateSpec{
 =======
 			Template: &api.PodTemplateSpec{
 >>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
+=======
+			Template: api.PodTemplateSpec{
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
@@ -1894,11 +1898,15 @@ func (config *ReplicaSetConfig) create() error {
 		},
 	}
 
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 <<<<<<< d4870f632bd0c817ad2ea4e58265547e0af0de75
 	config.applyTo(&rs.Spec.Template)
 =======
 	config.applyTo(rs.Spec.Template)
 >>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
+=======
+	config.applyTo(&rs.Spec.Template)
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 
 	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {

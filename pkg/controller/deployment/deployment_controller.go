@@ -1269,6 +1269,7 @@ func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deploy
 	if !reflect.DeepEqual(deploymentutil.GetNewReplicaSetTemplate(deployment), rs.Spec.Template) {
 		glog.Infof("Rolling back deployment %s to template spec %+v", deployment.Name, rs.Spec.Template.Spec)
 		deploymentutil.SetFromReplicaSetTemplate(deployment, rs.Spec.Template)
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 		// set RS (the old RS we'll rolling back to) annotations back to the deployment;
 		// otherwise, the deployment's current annotations (should be the same as current new RS) will be copied to the RS after the rollback.
 		//
@@ -1281,6 +1282,8 @@ func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deploy
 		// If we don't copy the annotations back from RS to deployment on rollback, the Deployment will stay as {change-cause:edit},
 		// and new RS1 becomes {change-cause:edit} (copied from deployment after rollback), old RS2 {change-cause:edit}, which is not correct.
 		setDeploymentAnnotationsTo(deployment, rs)
+=======
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 		performedRollback = true
 	} else {
 		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %s, skipping rollback...", deployment.Name)

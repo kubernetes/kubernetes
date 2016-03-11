@@ -162,9 +162,62 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []extensions.R
 	return requiredRSs, allRSs, nil
 }
 
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
 	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
+=======
+// GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
+// Returns nil if the new replica set doesn't exist yet.
+func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
+	return GetNewReplicaSetFromList(deployment, c,
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
+			return c.Core().Pods(namespace).List(options)
+		},
+		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
+			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+			return rsList.Items, err
+		})
+}
+
+// GetNewReplicaSetFromList returns a replica set that matches the intent of the given deployment; get ReplicaSetList with the input function.
+// Returns nil if the new replica set doesn't exist yet.
+func GetNewReplicaSetFromList(deployment *extensions.Deployment, c clientset.Interface, getPodList podListFunc, getRSList rsListFunc) (*extensions.ReplicaSet, error) {
+	rsList, _, err := rsAndPodsWithHashKeySynced(deployment, c, getRSList, getPodList)
+	if err != nil {
+		return nil, fmt.Errorf("error listing ReplicaSets: %v", err)
+	}
+	newRSTemplate := GetNewReplicaSetTemplate(deployment)
+
+	for i := range rsList {
+		if api.Semantic.DeepEqual(rsList[i].Spec.Template, newRSTemplate) {
+			// This is the new ReplicaSet.
+			return &rsList[i], nil
+		}
+	}
+	// new ReplicaSet does not exist.
+	return nil, nil
+}
+
+// rsAndPodsWithHashKeySynced returns the RSs and pods the given deployment targets, with pod-template-hash information synced.
+func rsAndPodsWithHashKeySynced(deployment *extensions.Deployment, c clientset.Interface, getRSList rsListFunc, getPodList podListFunc) ([]extensions.ReplicaSet, *api.PodList, error) {
+	namespace := deployment.Namespace
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, nil, err
+	}
+	options := api.ListOptions{LabelSelector: selector}
+	rsList, err := getRSList(namespace, options)
+	if err != nil {
+		return nil, nil, err
+	}
+	syncedRSList := []extensions.ReplicaSet{}
+	for _, rs := range rsList {
+		// Add pod-template-hash information if it's not in the RS.
+		// Otherwise, new RS produced by Deployment will overlap with pre-existing ones
+		// that aren't constrained by the pod-template-hash.
+		syncedRS, err := addHashKeyToRSAndPods(deployment, c, rs, getPodList)
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 		if err != nil {
 			return false, err
 		}

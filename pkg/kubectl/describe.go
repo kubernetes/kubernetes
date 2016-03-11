@@ -1057,7 +1057,11 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(rs.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 		describeVolumes(rs.Spec.Template.Spec.Volumes, out, "")
+=======
+		describeVolumes(rs.Spec.Template.Spec.Volumes, out)
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 		if events != nil {
 			DescribeEvents(events, out)
 		}

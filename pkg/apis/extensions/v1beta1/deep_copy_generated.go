@@ -909,7 +909,11 @@ func DeepCopy_v1beta1_ReplicaSetSpec(in ReplicaSetSpec, out *ReplicaSetSpec, c *
 	} else {
 		out.Selector = nil
 	}
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 	if err := v1.DeepCopy_v1_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
+=======
+	if err := deepCopy_v1_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 		return err
 	}
 	return nil

@@ -900,8 +900,12 @@ type ReplicaSetSpec struct {
 	Template v1.PodTemplateSpec `json:"template,omitempty"`
 =======
 	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#pod-template
+<<<<<<< cb836a1a58855a9b6ba54edb1892d4909487532f
 	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 >>>>>>> Versioning docs and examples for release-1.2.
+=======
+	Template v1.PodTemplateSpec `json:"template,omitempty"`
+>>>>>>> Merge pull request #22758 from madhusudancs/replicaset-nonpointer-template
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
