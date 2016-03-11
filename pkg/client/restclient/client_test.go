@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -114,7 +114,7 @@ func TestDoRequestFailed(t *testing.T) {
 	expected.APIVersion = "v1"
 	expected.Kind = "Status"
 	if !reflect.DeepEqual(&expected, &actual) {
-		t.Errorf("Unexpected mis-match: %s", util.ObjectDiff(status, &actual))
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectDiff(status, &actual))
 	}
 }
 

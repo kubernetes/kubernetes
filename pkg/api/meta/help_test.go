@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 
 	"github.com/google/gofuzz"
 )
@@ -224,7 +224,7 @@ func TestSetListToRuntimeObjectArray(t *testing.T) {
 	}
 	for i := range list {
 		if e, a := list[i], pl.Items[i]; e != a {
-			t.Fatalf("%d: unmatched: %s", i, util.ObjectDiff(e, a))
+			t.Fatalf("%d: unmatched: %s", i, diff.ObjectDiff(e, a))
 		}
 	}
 }

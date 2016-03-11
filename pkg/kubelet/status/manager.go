@@ -32,7 +32,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -453,7 +453,7 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 		return false
 	}
 	glog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
-		util.ObjectDiff(podStatus, status))
+		diff.ObjectDiff(podStatus, status))
 
 	return true
 }
