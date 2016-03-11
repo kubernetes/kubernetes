@@ -28,7 +28,7 @@ spec:
               memory: 300Mi
           command:
             - /heapster
-            - --source=kubernetes.summary_api:''
+            - --source=kubernetes:''
             - --sink=gcl
             - --sink=gcmautoscaling
             - --sink=influxdb:http://monitoring-influxdb:8086

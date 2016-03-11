@@ -28,7 +28,7 @@ spec:
               memory: 300Mi
           command:
             - /heapster
-            - --source=kubernetes.summary_api:''
+            - --source=kubernetes:''
             - --sink=gcm
             - --sink=gcmautoscaling
             - --sink=gcl

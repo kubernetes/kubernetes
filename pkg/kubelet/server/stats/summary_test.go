@@ -34,8 +34,8 @@ import (
 
 const (
 	// Offsets from seed value in generated container stats.
-	offsetCPUUsageCores = iota
-	offsetCPUUsageCoreSeconds
+	offsetCPUCoreUsageRate = iota
+	offsetCPUCumulativeCoreNanoseconds
 	offsetMemPageFaults
 	offsetMemMajorPageFaults
 	offsetMemUsageBytes
@@ -280,8 +280,8 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 		},
 		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
 	}
-	stats.Cpu.Usage.Total = uint64(seed + offsetCPUUsageCoreSeconds)
-	stats.CpuInst.Usage.Total = uint64(seed + offsetCPUUsageCores)
+	stats.Cpu.Usage.Total = uint64(seed + offsetCPUCumulativeCoreNanoseconds)
+	stats.CpuInst.Usage.Total = uint64(seed + offsetCPUCoreUsageRate)
 	return v2.ContainerInfo{
 		Spec:  spec,
 		Stats: []*v2.ContainerStats{&stats},
@@ -302,8 +302,8 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *kubestats.Ne
 
 func checkCPUStats(t *testing.T, label string, seed int, stats *kubestats.CPUStats) {
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
-	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
-	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
+	assert.EqualValues(t, seed+offsetCPUCoreUsageRate, *stats.CoreUsageRate, label+".CPU.CoreUsageRate")
+	assert.EqualValues(t, seed+offsetCPUCumulativeCoreNanoseconds, *stats.CumulativeCoreNanoseconds, label+".CPU.CumulativeCoreNanoseconds")
 }
 
 func checkMemoryStats(t *testing.T, label string, seed int, stats *kubestats.MemoryStats) {
