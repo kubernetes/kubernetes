@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util"
@@ -128,6 +131,70 @@ func TestDelete(t *testing.T) {
 	scheduledPod := validNewPod()
 	scheduledPod.Spec.NodeName = "some-node"
 	test.TestDeleteGraceful(scheduledPod, 30)
+}
+
+type FailDeletionStorage struct {
+	storage.Interface
+	Called *bool
+}
+
+func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object) error {
+	*f.Called = true
+	return etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+}
+
+func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	failDeleteStorage := FailDeletionStorage{etcdStorage, called}
+	restOptions := generic.RESTOptions{failDeleteStorage, generic.UndecoratedStorage, 3}
+	storage := NewStorage(restOptions, nil, nil)
+	return storage.Pod, server
+}
+
+func TestIgnoreDeleteNotFound(t *testing.T) {
+	pod := validNewPod()
+	testContext := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	called := false
+	registry, server := newFailDeleteStorage(t, &called)
+	defer server.Terminate(t)
+
+	// should fail if pod A is not created yet.
+	_, err := registry.Delete(testContext, pod.Name, nil)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// create pod
+	_, err = registry.Create(testContext, pod)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// delete object with grace period 0, storage will return NotFound, but the
+	// registry shouldn't get any error since we ignore the NotFound error.
+	zero := int64(0)
+	opt := &api.DeleteOptions{GracePeriodSeconds: &zero}
+	obj, err := registry.Delete(testContext, pod.Name, opt)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !called {
+		t.Fatalf("expect the overriding Delete method to be called")
+	}
+	deletedPod, ok := obj.(*api.Pod)
+	if !ok {
+		t.Fatalf("expect a pod is returned")
+	}
+	if deletedPod.DeletionTimestamp == nil {
+		t.Errorf("expect the DeletionTimestamp to be set")
+	}
+	if deletedPod.DeletionGracePeriodSeconds == nil {
+		t.Fatalf("expect the DeletionGracePeriodSeconds to be set")
+	}
+	if *deletedPod.DeletionGracePeriodSeconds != 0 {
+		t.Errorf("expect the DeletionGracePeriodSeconds to be 0, got %d", *deletedPod.DeletionTimestamp)
+	}
 }
 
 func TestCreateSetsFields(t *testing.T) {
