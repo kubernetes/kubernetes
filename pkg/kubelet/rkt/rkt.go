@@ -579,7 +579,8 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 		return err
 	}
 
-	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c)
+	// TODO: determine how this should be handled for rkt
+	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
 	if err != nil {
 		return err
 	}

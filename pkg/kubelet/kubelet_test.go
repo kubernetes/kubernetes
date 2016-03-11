@@ -728,7 +728,7 @@ func TestMakeVolumeMounts(t *testing.T) {
 		},
 	}
 
-	mounts, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", podVolumes)
+	mounts, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes)
 
 	expectedMounts := []kubecontainer.Mount{
 		{
@@ -1189,7 +1189,7 @@ func TestDNSConfigurationParams(t *testing.T) {
 	for i, pod := range pods {
 		var err error
 		kubelet.volumeManager.SetVolumes(pod.UID, make(kubecontainer.VolumeMap, 0))
-		options[i], err = kubelet.GenerateRunContainerOptions(pod, &api.Container{})
+		options[i], err = kubelet.GenerateRunContainerOptions(pod, &api.Container{}, "")
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -1210,7 +1210,7 @@ func TestDNSConfigurationParams(t *testing.T) {
 	kubelet.resolverConfig = "/etc/resolv.conf"
 	for i, pod := range pods {
 		var err error
-		options[i], err = kubelet.GenerateRunContainerOptions(pod, &api.Container{})
+		options[i], err = kubelet.GenerateRunContainerOptions(pod, &api.Container{}, "")
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -1715,9 +1715,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				Name:      "dapi-test-pod-name",
 			},
 		}
-		testPod.Status.PodIP = "1.2.3.4"
+		podIP := "1.2.3.4"
 
-		result, err := kl.makeEnvironmentVariables(testPod, tc.container)
+		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
 		if err != nil {
 			t.Errorf("[%v] Unexpected error: %v", tc.name, err)
 		}
