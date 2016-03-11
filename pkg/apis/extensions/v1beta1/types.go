@@ -42,7 +42,7 @@ type ScaleStatus struct {
 	// avoid introspection in the clients. The string will be in the same format as the
 	// query-param syntax. If the target type only supports map-based selectors, both this
 	// field and map-based selector field are populated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	TargetSelector string `json:"targetSelector,omitempty"`
 }
 

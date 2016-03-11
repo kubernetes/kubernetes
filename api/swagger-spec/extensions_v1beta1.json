@@ -8093,8 +8093,12 @@
      },
      "targetSelector": {
       "type": "string",
+<<<<<<< a8c63917768036197c277a5ec16b56894976b6ee
       "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
 >>>>>>> Merge pull request #22724 from madhusudancs/scale-hpa-stopgap-1.2
+=======
+      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors"
+>>>>>>> Versionize docs after cherry-pick updates
      }
     }
    },
