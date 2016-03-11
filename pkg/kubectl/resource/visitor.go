@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -337,8 +338,15 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		}{v.Mapper, v.Mapper.Decoder}); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
+
+		// If we have a GroupVersionKind on the list, prioritize that when asking for info on the objects contained in the list
+		var preferredGVKs []unversioned.GroupVersionKind
+		if info.Mapping != nil && !info.Mapping.GroupVersionKind.IsEmpty() {
+			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
+		}
+
 		for i := range items {
-			item, err := v.InfoForObject(items[i])
+			item, err := v.InfoForObject(items[i], preferredGVKs)
 			if err != nil {
 				return err
 			}

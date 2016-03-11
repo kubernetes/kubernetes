@@ -136,7 +136,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 		Decoder:      f.Decoder(true),
 	}
-	hpa, err := resourceMapper.InfoForObject(object)
+	hpa, err := resourceMapper.InfoForObject(object, nil)
 	if err != nil {
 		return err
 	}

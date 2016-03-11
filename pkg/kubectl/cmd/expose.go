@@ -212,7 +212,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 		Decoder:      f.Decoder(true),
 	}
-	info, err = resourceMapper.InfoForObject(object)
+	info, err = resourceMapper.InfoForObject(object, nil)
 	if err != nil {
 		return err
 	}
