@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -85,11 +86,17 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
-func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {
-	groupVersionKind, err := m.ObjectKind(obj)
+func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []unversioned.GroupVersionKind) (*Info, error) {
+	groupVersionKinds, err := m.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
+
+	groupVersionKind := groupVersionKinds[0]
+	if len(groupVersionKinds) > 1 && len(preferredGVKs) > 0 {
+		groupVersionKind = preferredObjectKind(groupVersionKinds, preferredGVKs)
+	}
+
 	mapping, err := m.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %v: %v", groupVersionKind, err)
@@ -110,4 +117,40 @@ func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {
 		Object:          obj,
 		ResourceVersion: resourceVersion,
 	}, nil
+}
+
+// preferredObjectKind picks the possibility that most closely matches the priority list in this order:
+// GroupVersionKind matches (exact match)
+// GroupKind matches
+// Group matches
+func preferredObjectKind(possibilities []unversioned.GroupVersionKind, preferences []unversioned.GroupVersionKind) unversioned.GroupVersionKind {
+	// Exact match
+	for _, priority := range preferences {
+		for _, possibility := range possibilities {
+			if possibility == priority {
+				return possibility
+			}
+		}
+	}
+
+	// GroupKind match
+	for _, priority := range preferences {
+		for _, possibility := range possibilities {
+			if possibility.GroupKind() == priority.GroupKind() {
+				return possibility
+			}
+		}
+	}
+
+	// Group match
+	for _, priority := range preferences {
+		for _, possibility := range possibilities {
+			if possibility.Group == priority.Group {
+				return possibility
+			}
+		}
+	}
+
+	// Just pick the first
+	return possibilities[0]
 }
