@@ -254,7 +254,7 @@
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
                                          --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
-                export PROJECT="kubernetes-jkns-e2e-gce-serial-1-2"
+                export PROJECT="k8s-jkns-e2e-gce-serial-1-2"
     jobs:
         - 'kubernetes-e2e-{suffix}'
  
