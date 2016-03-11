@@ -41,7 +41,7 @@ try:
 except:
 	print 'err'`
 
-var _ = Describe("ClusterDns [Feature:Example]", func() {
+var _ = KubeDescribe("ClusterDns [Feature:Example]", func() {
 	framework := NewDefaultFramework("cluster-dns")
 
 	var c *client.Client

@@ -45,7 +45,7 @@ const (
 	gcePDDetachPollTime = 10 * time.Second
 )
 
-var _ = Describe("Pod Disks", func() {
+var _ = KubeDescribe("Pod Disks", func() {
 	var (
 		podClient client.PodInterface
 		host0Name string

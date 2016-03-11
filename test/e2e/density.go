@@ -116,7 +116,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 // IMPORTANT: This test is designed to work on large (>= 100 Nodes) clusters. For smaller ones
 // results will not be representative for control-plane performance as we'll start hitting
 // limits on Docker's concurrent container startup.
-var _ = Describe("Density", func() {
+var _ = KubeDescribe("Density", func() {
 	var c *client.Client
 	var nodeCount int
 	var RCName string

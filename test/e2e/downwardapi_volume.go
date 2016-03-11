@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Downward API volume", func() {
+var _ = KubeDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 45 * time.Second
 

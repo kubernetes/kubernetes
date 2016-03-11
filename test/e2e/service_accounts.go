@@ -33,7 +33,7 @@ import (
 
 var serviceAccountTokenNamespaceVersion = version.MustParse("v1.2.0")
 
-var _ = Describe("ServiceAccounts", func() {
+var _ = KubeDescribe("ServiceAccounts", func() {
 	f := NewDefaultFramework("svcaccounts")
 
 	It("should ensure a single API token exists", func() {

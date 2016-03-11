@@ -47,7 +47,7 @@ type PrivilegedPodTestConfig struct {
 	hostExecPod   *api.Pod
 }
 
-var _ = Describe("PrivilegedPod", func() {
+var _ = KubeDescribe("PrivilegedPod", func() {
 	f := NewDefaultFramework("e2e-privilegedpod")
 	config := &PrivilegedPodTestConfig{
 		f: f,

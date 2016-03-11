@@ -57,7 +57,7 @@ func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
 	return pod
 }
 
-var _ = Describe("Security Context [Feature:SecurityContext]", func() {
+var _ = KubeDescribe("Security Context [Feature:SecurityContext]", func() {
 	framework := NewDefaultFramework("security-context")
 
 	It("should support pod.Spec.SecurityContext.SupplementalGroups", func() {

@@ -109,7 +109,7 @@ var (
 	podProbeParametersVersion = version.MustParse("v1.2.0-alpha.4")
 )
 
-var _ = Describe("Kubectl client", func() {
+var _ = KubeDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
 	framework := NewDefaultFramework("kubectl")
 	var c *client.Client
@@ -119,7 +119,7 @@ var _ = Describe("Kubectl client", func() {
 		ns = framework.Namespace.Name
 	})
 
-	Describe("Update Demo", func() {
+	KubeDescribe("Update Demo", func() {
 		var updateDemoRoot, nautilusPath, kittenPath string
 		BeforeEach(func() {
 			updateDemoRoot = filepath.Join(testContext.RepoRoot, "docs/user-guide/update-demo")
@@ -159,7 +159,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Guestbook application", func() {
+	KubeDescribe("Guestbook application", func() {
 		var guestbookPath string
 
 		BeforeEach(func() {
@@ -179,7 +179,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Simple pod", func() {
+	KubeDescribe("Simple pod", func() {
 		var podPath string
 
 		BeforeEach(func() {
@@ -525,7 +525,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl api-versions", func() {
+	KubeDescribe("Kubectl api-versions", func() {
 		It("should check if v1 is in available api versions [Conformance]", func() {
 			By("validating api verions")
 			output := runKubectlOrDie("api-versions")
@@ -535,7 +535,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl apply", func() {
+	KubeDescribe("Kubectl apply", func() {
 		It("should apply a new configuration to an existing RC", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
@@ -554,7 +554,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl cluster-info", func() {
+	KubeDescribe("Kubectl cluster-info", func() {
 		It("should check if Kubernetes master services is included in cluster-info [Conformance]", func() {
 			By("validating cluster-info")
 			output := runKubectlOrDie("cluster-info")
@@ -571,7 +571,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl describe", func() {
+	KubeDescribe("Kubectl describe", func() {
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
 
@@ -670,7 +670,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl expose", func() {
+	KubeDescribe("Kubectl expose", func() {
 		It("should create services for rc [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
@@ -740,7 +740,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl label", func() {
+	KubeDescribe("Kubectl label", func() {
 		var podPath string
 		var nsFlag string
 		BeforeEach(func() {
@@ -776,7 +776,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl logs", func() {
+	KubeDescribe("Kubectl logs", func() {
 		var rcPath string
 		var nsFlag string
 		containerName := "redis-master"
@@ -837,7 +837,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl patch", func() {
+	KubeDescribe("Kubectl patch", func() {
 		It("should add annotations for pods in rc [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
@@ -866,7 +866,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl version", func() {
+	KubeDescribe("Kubectl version", func() {
 		It("should check is all data is printed [Conformance]", func() {
 			version := runKubectlOrDie("version")
 			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
@@ -878,7 +878,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl run default", func() {
+	KubeDescribe("Kubectl run default", func() {
 		var nsFlag string
 		var name string
 
@@ -920,7 +920,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl run rc", func() {
+	KubeDescribe("Kubectl run rc", func() {
 		var nsFlag string
 		var rcName string
 
@@ -974,7 +974,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl run deployment", func() {
+	KubeDescribe("Kubectl run deployment", func() {
 		var nsFlag string
 		var dName string
 
@@ -1016,7 +1016,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl run job", func() {
+	KubeDescribe("Kubectl run job", func() {
 		var nsFlag string
 		var jobName string
 
@@ -1068,7 +1068,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl run --rm job", func() {
+	KubeDescribe("Kubectl run --rm job", func() {
 		nsFlag := fmt.Sprintf("--namespace=%v", ns)
 		jobName := "e2e-test-rm-busybox-job"
 
@@ -1092,7 +1092,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Proxy server", func() {
+	KubeDescribe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
 		It("should support proxy with --port 0 [Conformance]", func() {
 			By("starting the proxy server")

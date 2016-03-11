@@ -205,7 +205,7 @@ func getRestartDelay(c *client.Client, pod *api.Pod, ns string, name string, con
 	return 0, fmt.Errorf("timeout getting pod restart delay")
 }
 
-var _ = Describe("Pods", func() {
+var _ = KubeDescribe("Pods", func() {
 	framework := NewDefaultFramework("pods")
 
 	It("should get a host IP [Conformance]", func() {

@@ -29,7 +29,7 @@ import (
 // these tests are not run by default.
 //
 // Flaky issue #20272
-var _ = Describe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
+var _ = KubeDescribe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
 	f := NewDefaultFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {

@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Kibana Logging Instances Is Alive", func() {
+var _ = KubeDescribe("Kibana Logging Instances Is Alive", func() {
 	f := NewDefaultFramework("kibana-logging")
 
 	BeforeEach(func() {

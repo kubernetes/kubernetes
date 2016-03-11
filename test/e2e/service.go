@@ -61,7 +61,7 @@ const loadBalancerCreateTimeout = 20 * time.Minute
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
-var _ = Describe("Services", func() {
+var _ = KubeDescribe("Services", func() {
 	f := NewDefaultFramework("services")
 
 	var c *client.Client

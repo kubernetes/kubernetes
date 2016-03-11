@@ -69,7 +69,7 @@ type KubeProxyTestConfig struct {
 	nodes                []api.Node
 }
 
-var _ = Describe("KubeProxy", func() {
+var _ = KubeDescribe("KubeProxy", func() {
 	f := NewDefaultFramework("e2e-kubeproxy")
 	config := &KubeProxyTestConfig{
 		f: f,

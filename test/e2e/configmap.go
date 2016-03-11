@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ConfigMap", func() {
+var _ = KubeDescribe("ConfigMap", func() {
 
 	f := NewDefaultFramework("configmap")
 

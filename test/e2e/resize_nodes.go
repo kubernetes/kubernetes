@@ -340,7 +340,7 @@ func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
 	}
 }
 
-var _ = Describe("Nodes [Disruptive]", func() {
+var _ = KubeDescribe("Nodes [Disruptive]", func() {
 	framework := NewDefaultFramework("resize-nodes")
 	var systemPodsNo int
 	var c *client.Client
@@ -354,7 +354,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	Describe("Resize [Slow]", func() {
+	KubeDescribe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {
@@ -448,7 +448,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 		})
 	})
 
-	Describe("Network", func() {
+	KubeDescribe("Network", func() {
 		Context("when a node becomes unreachable", func() {
 			BeforeEach(func() {
 				SkipUnlessProviderIs("gce", "gke", "aws")

@@ -35,7 +35,7 @@ const (
 	resourceQuotaTimeout = 30 * time.Second
 )
 
-var _ = Describe("ResourceQuota", func() {
+var _ = KubeDescribe("ResourceQuota", func() {
 	f := NewDefaultFramework("resourcequota")
 
 	It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {

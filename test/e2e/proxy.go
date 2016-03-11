@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Proxy", func() {
+var _ = KubeDescribe("Proxy", func() {
 	version := testapi.Default.GroupVersion().Version
 	Context("version "+version, func() { proxyContext(version) })
 })

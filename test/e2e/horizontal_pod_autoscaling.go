@@ -34,8 +34,7 @@ const (
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-
-var _ = Describe("Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() {
 	var rc *ResourceConsumer
 	f := NewDefaultFramework("horizontal-pod-autoscaling")
 
@@ -43,7 +42,7 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU)", func() {
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability"
 
 	// These tests take ~20 minutes each.
-	Describe("[Serial] [Slow] Deployment", func() {
+	KubeDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("test-deployment", kindDeployment, rc, f)
@@ -54,7 +53,7 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU)", func() {
 	})
 
 	// These tests take ~20 minutes each.
-	Describe("[Serial] [Slow] ReplicaSet", func() {
+	KubeDescribe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("rs", kindReplicaSet, rc, f)
@@ -63,9 +62,8 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU)", func() {
 			scaleDown("rs", kindReplicaSet, rc, f)
 		})
 	})
-
 	// These tests take ~20 minutes each.
-	Describe("[Serial] [Slow] ReplicationController", func() {
+	KubeDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
 		It(titleUp, func() {
 			scaleUp("rc", kindRC, rc, f)
@@ -75,7 +73,7 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU)", func() {
 		})
 	})
 
-	Describe("ReplicationController light", func() {
+	KubeDescribe("ReplicationController light", func() {
 		It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
