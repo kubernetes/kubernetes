@@ -881,6 +881,10 @@
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
 		{
+			"ImportPath": "github.com/pkg/browser",
+			"Rev": "9302be274faad99162b9d48ec97b24306872ebb0"
+		},
+		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
