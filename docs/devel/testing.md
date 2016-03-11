@@ -1,0 +1,229 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
+# Testing guide
+
+This assumes you already read the [development guide](development.md) to
+install go, godeps, and configure your git client.
+
+In order to send pull requests you need to make sure you changes pass
+unit and integration tests.
+
+Kubernetes only merges pull requests when e2e tests are passing, so it is often
+a good idea to make sure these work as well.
+
+## Unit tests
+
+* Unit tests should be fully hermetic
+  - Only access resources in the test binary.
+* All packages and any significant files require unit tests.
+* The preferred method of testing multiple scenarios or inputs
+is [table driven testing](https://github.com/golang/go/wiki/TableDrivenTests)
+  - Example: [TestNamespaceAuthorization](../../test/integration/auth_test.go)
+* Unit tests must pass on OS X and Windows platforms.
+  - Tests using linux-specific features must be skipped or compiled out.
+  - Skipped is better, compiled out is required when it won't compile.
+* Concurrent unit test runs must pass.
+* See [coding conventions](coding-conventions.md).
+
+### Run all unit tests
+
+```sh
+cd kubernetes
+hack/test-go.sh  # Run all unit tests.
+```
+
+### Run some unit tests
+
+```sh
+cd kubernetes
+
+# Run all tests under pkg (requires client to be in $GOPATH/src/k8s.io)
+godep go test ./pkg/...
+
+# Run all tests in the pkg/api (but not subpackages)
+godep go test ./pkg/api
+```
+
+### Stress running unit tests
+
+Running the same tests repeatedly is one way to root out flakes.
+You can do this efficiently.
+
+
+```sh
+cd kubernetes
+
+# Have 2 workers run all tests 5 times each (10 total iterations).
+hack/test-go.sh -p 2 -i 5
+```
+
+For more advanced ideas please see [flaky-tests.md](flaky-tests.md).
+
+### Unit test coverage
+
+Currently, collecting coverage is only supported for the Go unit tests.
+
+To run all unit tests and generate an HTML coverage report, run the following:
+
+```sh
+cd kubernetes
+KUBE_COVER=y hack/test-go.sh
+```
+
+At the end of the run, an the HTML report will be generated with the path printed to stdout.
+
+To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
+
+```sh
+cd kubernetes
+KUBE_COVER=y hack/test-go.sh pkg/kubectl
+```
+
+Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
+
+Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/kubernetes/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls. Coverage reports from before the Kubernetes Github organization was created can be found [here](https://coveralls.io/r/GoogleCloudPlatform/kubernetes).
+
+### Benchmark unit tests
+
+To run benchmark tests, you'll typically use something like:
+
+```sh
+cd kubernetes
+godep go test ./pkg/apiserver -benchmem -run=XXX -bench=BenchmarkWatch
+```
+
+This will do the following:
+
+1. `-run=XXX` will turn off regular unit tests
+  * Technically it will run test methods with XXX in the name.
+2. `-bench=BenchmarkWatch` will run test methods with BenchmarkWatch in the name
+  * See `grep -nr BenchmarkWatch .` for examples
+3. `-benchmem` enables memory allocation stats
+
+See `go help test` and `go help testflag` for additional info.
+
+
+## Integration tests
+
+* Integration tests should only access other resources on the local machine
+  - Most commonly etcd or a service listening on localhost.
+* All significant features require integration tests.
+  - This includes kubectl commands
+* The preferred method of testing multiple scenarios or inputs
+is [table driven testing](https://github.com/golang/go/wiki/TableDrivenTests)
+  - Example: [TestNamespaceAuthorization](../../test/integration/auth_test.go)
+* Integration tests must run in parallel
+  - Each test should create its own master, httpserver and config.
+  - Example: [TestPodUpdateActiveDeadlineSeconds](../../test/integration/pods.go)
+* See [coding conventions](coding-conventions.md).
+
+### Install etcd dependency
+
+Kubernetes integration tests require your PATH to include an [etcd](https://github.com/coreos/etcd/releases) installation.
+Kubernetes includes a script to help install etcd on your machine.
+
+```sh
+# Install etcd and add to PATH
+
+# Option a) install inside kubernetes root
+cd kubernetes
+hack/install-etcd.sh  # Installs in ./third_party/etcd
+echo export PATH="$PATH:$(pwd)/third_party/etcd" >> .profile  # Add to PATH
+
+# Option b) install manually
+cd kubernetes
+grep -E "image.*etcd" cluster/saltbase/etcd/etcd.manifest  # Find version
+# Install that version using yum/apt-get/etc
+echo export PATH="$PATH:<LOCATION>" >> .profile  # Add to PATH
+```
+
+### Run integration tests
+
+```sh
+cd kubernetes
+hack/test-integration.sh  # Run all integration tests.
+```
+
+
+## End-to-End tests
+
+* e2e tests build kubernetes and deploy a cluster of nodes.
+  - Generally on a specific cloud provider.
+* Access gcr.io images
+* Access a specific, non-latest image tag (unless testing pulling).
+* Tests may not flake due to intermittent issues.
+* Use ginko to desribe steps.
+  - See [should run a job to completion when tasks succeed](../../test/e2e/job.go)
+* Use [NewDefaultFramework](../../test/e2e/framework.go)
+  - Contains clients, namespace and auto resource cleanup
+* See [coding conventions](coding-conventions.md).
+
+### e2e test philosophy
+
+In general passing unit and integration tests should provide sufficient
+confidence to allow code to merge.  If that is not the case,
+please *invest more time adding unit and integration test coverage*.
+These tests run faster and have a smaller failure domain.
+
+However, end-to-end (e2e) tests provide maximum confidence that
+the system is working in exchange for reduced performance and a
+higher debugging cost.
+
+e2e tests deploy a real kubernetes cluster of real nodes on a concrete provider
+such as GCE. The tests then manipulate the cluster in certain ways and
+assert the expected results.
+
+For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
+
+### Running e2e tests
+
+```sh
+cd kubernetes
+go run hack/e2e.go -v --build --up --test --down
+
+# Change code, run unit and integration tests
+# Push to an existing cluster, or bring up a cluster if it's down.
+go run hack/e2e.go -v --pushup
+
+# Run all tests on an already up cluster
+go run hack/e2e.go -v --test
+
+# Run only conformance tests
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Conformance\]"
+
+# Run tests on a specific provider
+KUBERNETES_PROVIDER=aws go run hack/e2e.go --build --pushup --test --down
+```
+
+For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/testing.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
