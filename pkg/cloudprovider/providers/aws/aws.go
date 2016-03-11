@@ -2301,8 +2301,7 @@ func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups m
 // Return all the security groups that are tagged as being part of our cluster
 func (s *AWSCloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error) {
 	request := &ec2.DescribeSecurityGroupsInput{}
-	filters := []*ec2.Filter{}
-	request.Filters = s.addFilters(filters)
+	request.Filters = s.addFilters(nil)
 	groups, err := s.ec2.DescribeSecurityGroups(request)
 	if err != nil {
 		return nil, fmt.Errorf("error querying security groups: %v", err)
@@ -2350,7 +2349,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 	describeRequest.Filters = s.addFilters(filters)
 	actualGroups, err := s.ec2.DescribeSecurityGroups(describeRequest)
 	if err != nil {
-		return fmt.Errorf("error querying security groups: %v", err)
+		return fmt.Errorf("error querying security groups for ELB: %v", err)
 	}
 
 	taggedSecurityGroups, err := s.getTaggedSecurityGroups()
@@ -2689,6 +2688,12 @@ func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 	for k, v := range s.filterTags {
 		filters = append(filters, newEc2Filter("tag:"+k, v))
 	}
+	if len(filters) == 0 {
+		// We can't pass a zero-length Filters to AWS (it's an error)
+		// So if we end up with no filters; just return nil
+		return nil
+	}
+
 	return filters
 }
 
