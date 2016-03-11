@@ -91,7 +91,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 }
 
 func addRunFlags(cmd *cobra.Command) {
-	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for --restart=Alwyas, 'run-pod/v1' for others.")
+	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for --restart=Always, 'run-pod/v1' for others.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
