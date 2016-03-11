@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -312,24 +313,42 @@ var _ = Describe("[Feature:Example]", func() {
 
 			runKubectlOrDie("create", "-f", execYaml, nsFlag)
 			runKubectlOrDie("create", "-f", httpYaml, nsFlag)
+
+			// Since both containers start rapidly, we can easily run this test in parallel.
+			var wg sync.WaitGroup
+			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
 				err := waitForPodRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
-
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
 					pod, err := c.Pods(ns).Get(podName)
 					expectNoError(err, fmt.Sprintf("getting pod %s", podName))
-					restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-					Logf("Pod: %s   restart count:%d", podName, restartCount)
-					if restartCount > 0 {
+					stat := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
+					Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
+					if stat.RestartCount > 0 {
+						Logf("Saw %v restart, succeeded...", podName)
+						wg.Done()
 						return
 					}
 				}
-				Failf("Pod %s was not restarted", podName)
+				Logf("Failed waiting for %v restart! ", podName)
+				passed = false
+				wg.Done()
 			}
+
 			By("Check restarts")
-			checkRestart("liveness-exec", time.Minute)
-			checkRestart("liveness-http", time.Minute)
+
+			// Start the "actual test", and wait for both pods to complete.
+			// If 2 fail: Something is broken with the test (or maybe even with liveness).
+			// If 1 fails: Its probably just an error in the examples/ files themselves.
+			wg.Add(2)
+			for _, c := range []string{"liveness-http", "liveness-exec"} {
+				go checkRestart(c, 2*time.Minute)
+			}
+			wg.Wait()
+			if !passed {
+				Failf("At least one liveness example failed.  See the logs above.")
+			}
 		})
 	})
 
