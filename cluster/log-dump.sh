@@ -25,67 +25,72 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+detect-project &> /dev/null
 
 readonly report_dir="${1:-_artifacts}"
 echo "Dumping master and node logs to ${report_dir}"
 
-# Attempts to SSH to a node ($1) and run a simple command. Returns 0 on
-# success and 1 on error.
-function test-ssh() {
-    local -r node_name="${1}"
-    return $(ssh-to-node "${node_name}" "echo test > /dev/null" &> /dev/null)
-}
+# Copy all files /var/log/{$3}.log on node $1 into local dir $2.
+# $3 should be a space-separated string of files.
+# This function shouldn't ever trigger errexit, but doesn't block stderr.
+function copy-logs-from-node() {
+    local -r node="${1}"
+    local -r dir="${2}"
+    local files=(${3})
+    # Append ".log"
+    files=("${files[@]/%/.log}")
+    # Prepend "/var/log/"
+    files=("${files[@]/#/\/var\/log\/}")
+    # Replace spaces with commas, surround with braces
+    local -r scp_files="{$(echo ${files[*]} | tr ' ' ',')}"
 
-# Saves a single output of running a given command ($2) on a given node ($1)
-# into a given local file ($3). Does not fail if the ssh command fails for any
-# reason, just prints an error to stderr.
-function save-log() {
-    local -r node_name="${1}"
-    local -r cmd="${2}"
-    local -r output_file="${3}"
-    if ! ssh-to-node "${node_name}" "${cmd}" > "${output_file}"; then
-        echo "${cmd} failed for ${node_name}" >&2
+    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+        local ip=$(get_instance_public_ip "${node}")
+        scp -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
+    else
+        gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
     fi
 }
 
-# Saves logs common to master and nodes. The node name is in $1 and the
-# directory/name prefix is in $2. Assumes KUBERNETES_PROVIDER is set.
-function save-common-logs() {
+# Save logs for node $1 into directory $2. Pass in any non-common files in $3.
+# $3 should be a space-separated list of files.
+# This function shouldn't ever trigger errexit
+function save-logs() {
     local -r node_name="${1}"
-    local -r prefix="${2}"
-    echo "Dumping logs for ${node_name}"
-    save-log "${node_name}" "cat /var/log/kern.log" "${prefix}-kern.log"
-    save-log "${node_name}" "cat /var/log/docker.log" "${prefix}-docker.log"
+    local -r dir="${2}"
+    local files="${3} ${common_logfiles}"
     if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-        save-log "${node_name}" "cat /var/log/startupscript.log" "${prefix}-startupscript.log"
+        files="${files} ${gce_logfiles}"
     fi
     if ssh-to-node "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
-        save-log "${node_name}" "sudo journalctl --output=cat -u kubelet.service" "${prefix}-kubelet.log"
+        ssh-to-node "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
     else
-        save-log "${node_name}" "cat /var/log/kubelet.log" "${prefix}-kubelet.log"
-        save-log "${node_name}" "cat /var/log/supervisor/supervisord.log" "${prefix}-supervisord.log"
-        save-log "${node_name}" "cat /var/log/supervisor/kubelet-stdout.log" "${prefix}-supervisord-kubelet-stdout.log"
-        save-log "${node_name}" "cat /var/log/supervisor/kubelet-stderr.log" "${prefix}-supervisord-kubelet-stderr.log"
+        files="${files} ${supervisord_logfiles}"
     fi
+    copy-logs-from-node "${node_name}" "${dir}" "${files}"
 }
 
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
+readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd"
+readonly node_logfiles="kube-proxy"
+readonly gce_logfiles="startupscript"
+readonly common_logfiles="kern docker"
+readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr"
+
+# Limit the number of concurrent node connections so that we don't run out of
+# file descriptors for large clusters.
+readonly max_scp_processes=25
+
 if [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
 elif ! $(detect-master &> /dev/null); then
     echo "Master not detected. Is the cluster up?"
-elif ! test-ssh "${MASTER_NAME}"; then
-    echo "Could not SSH to ${MASTER_NAME}" >&2
 else
-    echo "Master Name: ${MASTER_NAME}"
-    readonly master_prefix="${report_dir}/${MASTER_NAME}"
-    save-log "${MASTER_NAME}" "cat /var/log/kube-apiserver.log" "${master_prefix}-kube-apiserver.log"
-    save-log "${MASTER_NAME}" "cat /var/log/kube-scheduler.log" "${master_prefix}-kube-scheduler.log"
-    save-log "${MASTER_NAME}" "cat /var/log/kube-controller-manager.log" "${master_prefix}-kube-controller-manager.log"
-    save-log "${MASTER_NAME}" "cat /var/log/etcd.log" "${master_prefix}-kube-etcd.log"
-    save-common-logs "${MASTER_NAME}" "${master_prefix}"
+    readonly master_dir="${report_dir}/${MASTER_NAME}"
+    mkdir -p "${master_dir}"
+    save-logs "${MASTER_NAME}" "${master_dir}" "${master_logfiles}"
 fi
 
 detect-node-names &> /dev/null
@@ -94,14 +99,24 @@ if [[ ! "${node_ssh_supported_providers}"  =~ "${KUBERNETES_PROVIDER}" ]]; then
 elif [[ "${#NODE_NAMES[@]}" -eq 0 ]]; then
     echo "Nodes not detected. Is the cluster up?"
 else
-    echo "Node Names: ${NODE_NAMES[*]}"
+    proc=${max_scp_processes}
     for node_name in "${NODE_NAMES[@]}"; do
-        if ! test-ssh "${node_name}"; then
-            echo "Could not SSH to ${node_name}" >&2
-            continue
+        node_dir="${report_dir}/${node_name}"
+        mkdir -p "${node_dir}"
+        # Save logs in the background. This speeds up things when there are
+        # many nodes.
+        save-logs "${node_name}" "${node_dir}" "${node_logfiles}" &
+        # We don't want to run more than ${max_scp_processes} at a time, so
+        # wait once we hit that many nodes. This isn't ideal, since one might
+        # take much longer than the others, but it should help.
+        proc=$((proc - 1))
+        if [[ proc -eq 0 ]]; then
+            proc=${max_scp_processes}
+            wait
         fi
-        node_prefix="${report_dir}/${node_name}"
-        save-log "${node_name}" "cat /var/log/kube-proxy.log" "${node_prefix}-kube-proxy.log"
-        save-common-logs "${node_name}" "${node_prefix}"
     done
+    # Wait for any remaining processes.
+    if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+        wait
+    fi
 fi
