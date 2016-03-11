@@ -447,26 +447,27 @@
     emails: 'bburns@google.com'
     cron-string: '@daily'
     trigger-job: ''
+    timeout: 240
+    provider-env: |
+        {aws-provider-env}
+        export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+        export GINKGO_PARALLEL="y"
+        export PROJECT="k8s-jkns-e2e-aws"
+        export AWS_CONFIG_FILE='/var/lib/jenkins/.aws/credentials'
+        export AWS_SSH_KEY='/var/lib/jenkins/.ssh/kube_aws_rsa'
+        export KUBE_SSH_USER='admin'
+        # This is needed to be able to create PD from the e2e test
+        export AWS_SHARED_CREDENTIALS_FILE='/var/lib/jenkins/.aws/credentials'
     suffix:
         - 'aws':
             description: 'Run e2e tests on AWS using the latest successful Kubernetes build.'
-            timeout: 240
-            provider-env: '{aws-provider-env}'
             job-env: |
-                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
-                export GINKGO_PARALLEL="y"
-                export PROJECT="k8s-jkns-e2e-aws"
-                export AWS_CONFIG_FILE='/var/lib/jenkins/.aws/credentials'
-                export AWS_SSH_KEY='/var/lib/jenkins/.ssh/kube_aws_rsa'
-                export KUBE_SSH_USER='ubuntu'
-                # This is needed to be able to create PD from the e2e test
-                export AWS_SHARED_CREDENTIALS_FILE='/var/lib/jenkins/.aws/credentials'
-        - 'aws-release-1.1':
-            description: 'Run e2e tests on AWS using the latest successful 1.1 Kubernetes build.'
-            timeout: 240
-            branch: 'release-1.1'
-            runner: '{old-runner-1-1}'
-            post-env: ''
+                export E2E_NAME="e2e-aws-master"
+        - 'aws-release-1.2':
+            description: 'Run e2e tests on AWS using the latest successful 1.2 Kubernetes build.'
+            job-env: |
+                export E2E_NAME="e2e-aws-1-2"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
