@@ -182,7 +182,7 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	_, err = c.Extensions().Deployments(ns).Get(deployment.Name)
 	Expect(err).To(HaveOccurred())
 	Expect(errors.IsNotFound(err)).To(BeTrue())
-	Logf("ensuring deployment %s rcs were deleted", deploymentName)
+	Logf("ensuring deployment %s RSes were deleted", deploymentName)
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := api.ListOptions{LabelSelector: selector}

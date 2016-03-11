@@ -471,7 +471,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, &deployment, test.maxCleanupCount)
+		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, &deployment, test.maxCleanupCount)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -520,6 +520,13 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			maxUnavailable:     intstr.FromInt(2),
 			readyPods:          10,
 			oldReplicas:        0,
+			scaleExpected:      false,
+		},
+		{
+			deploymentReplicas: 10,
+			maxUnavailable:     intstr.FromInt(2),
+			readyPods:          1,
+			oldReplicas:        10,
 			scaleExpected:      false,
 		},
 	}
