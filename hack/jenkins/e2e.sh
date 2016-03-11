@@ -415,48 +415,64 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
 
-  # kubernetes-upgrade-gke-1.0-current-release
+  # kubernetes-upgrade-gke-1.0-1.2
   #
-  # Test upgrades from the latest release-1.0 build to the latest current
-  # release build.
+  # Test upgrades from the latest release-1.0 build to the latest release-1.2 build.
   #
-  # Configurations for step2, step3, step5, and step7 live in the current release
-  # branch.
+  # Configurations for step2, step3, step5, and step7 live in release-1.2 branch.
 
-  kubernetes-upgrade-gke-1.0-current-release-step1-deploy)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-1.0-current-release-step4-e2e-old)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  kubernetes-upgrade-gke-1.0-current-release-step6-e2e-old)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
-    ;;
-
-  # kubernetes-upgrade-gke-1.0-master
-  #
-  # Test upgrades from the latest release-1.0 build to the latest master build.
-  #
-  # Configurations for step2, step3, step5, and step7 live in master.
-
-  kubernetes-upgrade-gke-1.0-master-step1-deploy)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-1.2-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-release-1.2' 'upgrade-gke-1-0-1-2' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
+    # Starting in v1.2, defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
     ;;
 
-  kubernetes-upgrade-gke-1.0-master-step4-e2e-old)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-1.2-step4-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-release-1.2' 'upgrade-gke-1-0-1-2' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
+    # Starting in v1.2, defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
     ;;
 
-  kubernetes-upgrade-gke-1.0-master-step6-e2e-old)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-1.2-step6-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-release-1.2' 'upgrade-gke-1-0-1-2' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
+    # Starting in v1.2, defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
+    ;;
+
+  # kubernetes-upgrade-gce-1.0-1.2
+  #
+  # Test upgrades from the latest release-1.0 build to the latest release-1.2 build.
+  #
+  # Configurations for step2, step3, step5, and step7 live in release-1.2 branch.
+
+  kubernetes-upgrade-gce-1.0-1.2-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-release-1.2' 'upgrade-gce-1-0-1-2' 'kubernetes-jenkins-gce-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
+    ;;
+
+  kubernetes-upgrade-gce-1.0-1.2-step4-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-release-1.2' 'upgrade-gce-1-0-1-2' 'kubernetes-jenkins-gce-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
+    ;;
+
+  kubernetes-upgrade-gce-1.0-1.2-step6-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-release-1.2' 'upgrade-gce-1-0-1-2' 'kubernetes-jenkins-gce-upgrade'
+    # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
+    NUM_MINIONS=3
+    # Starting in v1.2, defaults to deploying to n1-standard-2, and some tests require that.
+    MINION_SIZE='n1-standard-2'
     ;;
 esac
 
