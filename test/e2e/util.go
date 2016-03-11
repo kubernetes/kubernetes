@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/types"
@@ -3552,6 +3553,70 @@ func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
 		return nil, errors.New("No Ready nodes found.")
 	}
 	return nodes, nil
+}
+
+// timeout for proxy requests.
+const proxyTimeout = 2 * time.Minute
+
+// NodeProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
+func NodeProxyRequest(c *client.Client, node, endpoint string) (restclient.Result, error) {
+	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
+	// This will leak a goroutine if proxy hangs. #22165
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	if err != nil {
+		return restclient.Result{}, err
+	}
+	var result restclient.Result
+	finished := make(chan struct{})
+	go func() {
+		if subResourceProxyAvailable {
+			result = c.Get().
+				Resource("nodes").
+				SubResource("proxy").
+				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+				Suffix(endpoint).
+				Do()
+
+		} else {
+			result = c.Get().
+				Prefix("proxy").
+				Resource("nodes").
+				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+				Suffix(endpoint).
+				Do()
+		}
+		finished <- struct{}{}
+	}()
+	select {
+	case <-finished:
+		return result, nil
+	case <-time.After(proxyTimeout):
+		return restclient.Result{}, nil
+	}
+}
+
+// GetKubeletPods retrieves the list of pods on the kubelet
+func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
+	return getKubeletPods(c, node, "pods")
+}
+
+// GetKubeletRunningPods retrieves the list of running pods on the kubelet. The pods
+// includes necessary information (e.g., UID, name, namespace for
+// pods/containers), but do not contain the full spec.
+func GetKubeletRunningPods(c *client.Client, node string) (*api.PodList, error) {
+	return getKubeletPods(c, node, "runningpods")
+}
+
+func getKubeletPods(c *client.Client, node, resource string) (*api.PodList, error) {
+	result := &api.PodList{}
+	client, err := NodeProxyRequest(c, node, resource)
+	if err != nil {
+		return &api.PodList{}, err
+	}
+	if err = client.Into(result); err != nil {
+		return &api.PodList{}, err
+	}
+	return result, nil
 }
 
 // LaunchWebserverPod launches a pod serving http on port 8080 to act
