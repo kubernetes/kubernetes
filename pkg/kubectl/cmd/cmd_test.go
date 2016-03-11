@@ -389,7 +389,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 	// beep        foo       1         1         10y
 }
 
-func ExamplePrintReplicationControllerWithWide() {
+func ExamplePrintMultiContainersReplicationControllerWithWide() {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
@@ -416,6 +416,10 @@ func ExamplePrintReplicationControllerWithWide() {
 							Name:  "foo",
 							Image: "someimage",
 						},
+						{
+							Name:  "foo2",
+							Image: "someimage2",
+						},
 					},
 				},
 			},
@@ -429,8 +433,56 @@ func ExamplePrintReplicationControllerWithWide() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
-	// foo       1         1         10y       foo            someimage   foo=bar
+	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
+	// foo       1         1         10y       foo,foo2       someimage,someimage2   foo=bar
+}
+
+func ExamplePrintReplicationController() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	tf.Client = &fake.RESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+						{
+							Name:  "foo2",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      DESIRED   CURRENT   AGE
+	// foo       1         1         10y
 }
 
 func ExamplePrintPodWithWideFormat() {
