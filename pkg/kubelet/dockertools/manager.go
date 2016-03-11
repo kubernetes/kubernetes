@@ -566,12 +566,11 @@ func (dm *DockerManager) runContainer(
 	}
 
 	hc := &docker.HostConfig{
-		Binds:          binds,
-		NetworkMode:    netMode,
-		IpcMode:        ipcMode,
-		UTSMode:        utsMode,
-		PidMode:        pidMode,
-		ReadonlyRootfs: readOnlyRootFilesystem(container),
+		Binds:       binds,
+		NetworkMode: netMode,
+		IpcMode:     ipcMode,
+		UTSMode:     utsMode,
+		PidMode:     pidMode,
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
 		Memory:      memoryLimit,
 		MemorySwap:  -1,
@@ -827,11 +826,6 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 // pod must not be nil
 func usesHostNetwork(pod *api.Pod) bool {
 	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
-}
-
-// determine if the container root should be a read only filesystem.
-func readOnlyRootFilesystem(container *api.Container) bool {
-	return container.SecurityContext != nil && container.SecurityContext.ReadOnlyRootFilesystem != nil && *container.SecurityContext.ReadOnlyRootFilesystem
 }
 
 // container must not be nil
