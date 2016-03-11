@@ -168,7 +168,7 @@ type pdManager interface {
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(c *gcePersistentDiskCleaner) error
 	// Creates a volume
-	CreateVolume(provisioner *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, err error)
+	CreateVolume(provisioner *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *gcePersistentDiskDeleter) error
 }
@@ -371,7 +371,7 @@ type gcePersistentDiskProvisioner struct {
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
 func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error {
-	volumeID, sizeGB, err := c.manager.CreateVolume(c)
+	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return err
 	}
@@ -379,6 +379,16 @@ func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
+
+	if len(labels) != 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			pv.Labels[k] = v
+		}
+	}
+
 	return nil
 }
 
