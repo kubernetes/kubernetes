@@ -240,6 +240,21 @@
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="k8s-jkns-e2e-gce-1-2"
+        - 'gce-slow-release-1.2':
+            description: 'Runs slow tests on GCE, sequentially on the release-1.2 branch.'
+            timeout: 60
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
+                                         --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export PROJECT="k8s-jkns-e2e-gce-slow-1-2"
+        - 'gce-serial-release-1.2':
+            description: 'Run [Serial], [Disruptive], tests on GCE on the release-1.2 branch.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="kubernetes-jkns-e2e-gce-serial-1-2"
     jobs:
         - 'kubernetes-e2e-{suffix}'
  
