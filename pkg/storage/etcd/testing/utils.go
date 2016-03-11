@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -42,6 +43,11 @@ type EtcdTestServer struct {
 	PeerListeners, ClientListeners []net.Listener
 	Client                         etcd.Client
 
+	CertificatesDir string
+	CertFile        string
+	KeyFile         string
+	CAFile          string
+
 	raftHandler http.Handler
 	s           *etcdserver.EtcdServer
 	hss         []*httptest.Server
@@ -56,6 +62,39 @@ func newLocalListener(t *testing.T) net.Listener {
 	return l
 }
 
+// newSecuredLocalListener opens a port localhost using any port
+// with SSL enable
+func newSecuredLocalListener(t *testing.T, certFile, keyFile, caFile string) net.Listener {
+	var l net.Listener
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tlsInfo := transport.TLSInfo{
+		CertFile: certFile,
+		KeyFile:  keyFile,
+		CAFile:   caFile,
+	}
+	l, err = transport.NewKeepAliveListener(l, "https", tlsInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return l
+}
+
+func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.CancelableTransport {
+	tlsInfo := transport.TLSInfo{
+		CertFile: certFile,
+		KeyFile:  keyFile,
+		CAFile:   caFile,
+	}
+	tr, err := transport.NewTransport(tlsInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tr
+}
+
 // configureTestCluster will set the params to start an etcd server
 func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 	var err error
@@ -68,9 +107,26 @@ func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 		t.Fatal(err)
 	}
 
-	cln := newLocalListener(t)
+	m.CertificatesDir, err = ioutil.TempDir(os.TempDir(), "etcd_certificates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.CertFile = path.Join(m.CertificatesDir, "etcdcert.pem")
+	if err = ioutil.WriteFile(m.CertFile, []byte(CertFileContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	m.KeyFile = path.Join(m.CertificatesDir, "etcdkey.pem")
+	if err = ioutil.WriteFile(m.KeyFile, []byte(KeyFileContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	m.CAFile = path.Join(m.CertificatesDir, "ca.pem")
+	if err = ioutil.WriteFile(m.CAFile, []byte(CAFileContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cln := newSecuredLocalListener(t, m.CertFile, m.KeyFile, m.CAFile)
 	m.ClientListeners = []net.Listener{cln}
-	m.ClientURLs, err = types.NewURLs([]string{"http://" + cln.Addr().String()})
+	m.ClientURLs, err = types.NewURLs([]string{"https://" + cln.Addr().String()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,6 +217,9 @@ func (m *EtcdTestServer) Terminate(t *testing.T) {
 	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.RemoveAll(m.CertificatesDir); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // NewEtcdTestClientServer creates a new client and server for testing
@@ -173,6 +232,7 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	}
 	cfg := etcd.Config{
 		Endpoints: server.ClientURLs.StringSlice(),
+		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
