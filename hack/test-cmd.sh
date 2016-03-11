@@ -1307,8 +1307,10 @@ __EOF__
   kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   # Post-condition: frontend replica set is created
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
-
-  # TODO(madhusudancs): Add describe tests once PR #20886 that implements describe for ReplicaSet is merged.
+  # Describe command should print detailed information
+  kube::test::describe_object_assert rs 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert rs "Name:" "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
