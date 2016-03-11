@@ -88,7 +88,11 @@ func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.Cance
 		KeyFile:  keyFile,
 		CAFile:   caFile,
 	}
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	tr, err := transport.NewTransport(tlsInfo, time.Second)
+=======
+	tr, err := transport.NewTransport(tlsInfo)
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 	if err != nil {
 		t.Fatal(err)
 	}

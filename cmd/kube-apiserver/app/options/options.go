@@ -32,7 +32,11 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	"k8s.io/kubernetes/pkg/util/config"
+=======
+	"k8s.io/kubernetes/pkg/util"
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
@@ -58,7 +62,10 @@ type APIServer struct {
 	EnableLogsSupport          bool
 	EnableProfiling            bool
 	EnableWatchCache           bool
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	EnableSwaggerUI            bool
+=======
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 	EtcdServersOverrides       []string
 	EtcdConfig                 etcdstorage.EtcdConfig
 	EventTTL                   time.Duration
@@ -107,7 +114,11 @@ func NewAPIServer() *APIServer {
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
 		MasterServiceNamespace: api.NamespaceDefault,
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 		RuntimeConfig:          make(config.ConfigurationMap),
+=======
+		RuntimeConfig:          make(util.ConfigurationMap),
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 		StorageVersions:        registered.AllPreferredGroupVersions(),
 		DefaultStorageVersions: registered.AllPreferredGroupVersions(),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
@@ -223,7 +234,11 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, "File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. The API server will query the remote service to determine access on the API server's secure port.")
 	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
 	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile, "File with admission control configuration.")
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	fs.StringSliceVar(&s.EtcdConfig.ServerList, "etcd-servers", s.EtcdConfig.ServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
+=======
+	fs.StringSliceVar(&s.EtcdConfig.ServerList, "etcd-servers", s.EtcdConfig.ServerList, "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, "Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 	fs.StringVar(&s.EtcdConfig.Prefix, "etcd-prefix", s.EtcdConfig.Prefix, "The prefix for all resource paths in etcd.")
 	fs.StringVar(&s.EtcdConfig.KeyFile, "etcd-keyfile", s.EtcdConfig.KeyFile, "SSL key file used to secure etcd communication")

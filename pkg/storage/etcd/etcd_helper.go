@@ -84,10 +84,28 @@ func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
 		Endpoints: c.ServerList,
 		Transport: t,
 	})
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
+=======
 	if err != nil {
 		return nil, err
 	}
 
+	return cli, nil
+}
+
+func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
+	info := transport.TLSInfo{
+		CertFile: c.CertFile,
+		KeyFile:  c.KeyFile,
+		CAFile:   c.CAFile,
+	}
+	cfg, err := info.ClientConfig()
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
+	if err != nil {
+		return nil, err
+	}
+
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	return cli, nil
 }
 
@@ -105,6 +123,11 @@ func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
 	// Copied from etcd.DefaultTransport declaration.
 	// TODO: Determine if transport needs optimization
 	tr := utilnet.SetTransportDefaults(&http.Transport{
+=======
+	// Copied from etcd.DefaultTransport declaration.
+	// TODO: Determine if transport needs optimization
+	tr := &http.Transport{
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 		Proxy: http.ProxyFromEnvironment,
 		Dial: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -113,7 +136,11 @@ func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
 		TLSHandshakeTimeout: 10 * time.Second,
 		MaxIdleConnsPerHost: 500,
 		TLSClientConfig:     cfg,
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	})
+=======
+	}
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 
 	return tr, nil
 }
@@ -129,7 +156,11 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 		copier:         api.Scheme,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 		cache:          utilcache.NewCache(maxEtcdCacheEntries),
+=======
+		cache:          util.NewCache(maxEtcdCacheEntries),
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 	}
 }
 
@@ -316,6 +347,7 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 		panic("unable to convert output object to pointer")
 	}
 
+<<<<<<< bf9b7bfaf7b623e3afffacc33b9610c2f707df7d
 	if preconditions == nil {
 		startTime := time.Now()
 		response, err := h.etcdKeysAPI.Delete(ctx, key, nil)
@@ -359,6 +391,15 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 				}
 			}
 			return toStorageErr(err, key, 0)
+=======
+	startTime := time.Now()
+	response, err := h.etcdKeysAPI.Delete(ctx, key, nil)
+	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
+	if !etcdutil.IsEtcdNotFound(err) {
+		// if the object that existed prior to the delete is returned by etcd, update out.
+		if err != nil || response.PrevNode != nil {
+			_, _, err = h.extractObj(response, err, out, false, true)
+>>>>>>> Merge pull request #21535 from AdoHe/restore_secure_etcd
 		}
 	}
 }
