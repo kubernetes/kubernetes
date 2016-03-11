@@ -710,7 +710,7 @@ func ValidateReplicaSetSpec(spec *extensions.ReplicaSetSpec, fldPath *field.Path
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
 	}
 	return allErrs
 }

@@ -1817,7 +1817,7 @@ func (config *ReplicaSetConfig) create() error {
 					"name": config.Name,
 				},
 			},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
@@ -1835,7 +1835,7 @@ func (config *ReplicaSetConfig) create() error {
 		},
 	}
 
-	config.applyTo(rs.Spec.Template)
+	config.applyTo(&rs.Spec.Template)
 
 	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {

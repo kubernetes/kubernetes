@@ -14609,7 +14609,7 @@ func (x *ReplicaSetSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[1] = x.Selector != nil
-			yyq2[2] = x.Template != nil
+			yyq2[2] = true
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(3)
@@ -14680,11 +14680,8 @@ func (x *ReplicaSetSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					if x.Template == nil {
-						r.EncodeNil()
-					} else {
-						x.Template.CodecEncodeSelf(e)
-					}
+					yy10 := &x.Template
+					yy10.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
@@ -14693,11 +14690,8 @@ func (x *ReplicaSetSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("template"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Template == nil {
-						r.EncodeNil()
-					} else {
-						x.Template.CodecEncodeSelf(e)
-					}
+					yy12 := &x.Template
+					yy12.CodecEncodeSelf(e)
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -14786,14 +14780,10 @@ func (x *ReplicaSetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "template":
 			if r.TryDecodeAsNil() {
-				if x.Template != nil {
-					x.Template = nil
-				}
+				x.Template = pkg2_api.PodTemplateSpec{}
 			} else {
-				if x.Template == nil {
-					x.Template = new(pkg2_api.PodTemplateSpec)
-				}
-				x.Template.CodecDecodeSelf(d)
+				yyv7 := &x.Template
+				yyv7.CodecDecodeSelf(d)
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -14864,14 +14854,10 @@ func (x *ReplicaSetSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		if x.Template != nil {
-			x.Template = nil
-		}
+		x.Template = pkg2_api.PodTemplateSpec{}
 	} else {
-		if x.Template == nil {
-			x.Template = new(pkg2_api.PodTemplateSpec)
-		}
-		x.Template.CodecDecodeSelf(d)
+		yyv12 := &x.Template
+		yyv12.CodecDecodeSelf(d)
 	}
 	for {
 		yyj8++
@@ -18962,7 +18948,7 @@ func (x codecSelfer1234) decSliceReplicaSet(v *[]ReplicaSet, d *codec1978.Decode
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 232)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 552)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

@@ -81,7 +81,7 @@ func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, 
 		if err != nil {
 			continue
 		}
-		historyInfo.RevisionToTemplate[v] = rs.Spec.Template
+		historyInfo.RevisionToTemplate[v] = &rs.Spec.Template
 		changeCause := getChangeCause(rs)
 		if historyInfo.RevisionToTemplate[v].Annotations == nil {
 			historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)

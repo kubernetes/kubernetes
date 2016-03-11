@@ -898,7 +898,7 @@ type ReplicaSetSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
 	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#pod-template
-	Template *v1.PodTemplateSpec `json:"template,omitempty"`
+	Template v1.PodTemplateSpec `json:"template,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.

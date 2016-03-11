@@ -42,7 +42,7 @@ func rs(name string, replicas int, selector map[string]string) *exp.ReplicaSet {
 		Spec: exp.ReplicaSetSpec{
 			Replicas: replicas,
 			Selector: &unversioned.LabelSelector{MatchLabels: selector},
-			Template: &api.PodTemplateSpec{},
+			Template: api.PodTemplateSpec{},
 		},
 	}
 }
@@ -120,7 +120,7 @@ func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet
 		},
 		Spec: exp.ReplicaSetSpec{
 			Replicas: replicas,
-			Template: &d.Spec.Template,
+			Template: d.Spec.Template,
 		},
 	}
 
