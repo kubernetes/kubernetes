@@ -22,6 +22,21 @@ import (
 	"strings"
 )
 
+// ParseResourceArg takes the common style of string which may be either `resource.group.com` or `resource.version.group.com`
+// and parses it out into both possibilities.  This code takes no responsibility for knowing which representation was intended
+// but with a knowledge of all GroupVersions, calling code can take a very good guess.  If there are only two segments, then
+// `*GroupVersionResource` is nil.
+// `resource.group.com` -> `group=com, version=group, resource=resource` and `group=group.com, resource=resource`
+func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
+	var gvr *GroupVersionResource
+	s := strings.SplitN(arg, ".", 3)
+	if len(s) == 3 {
+		gvr = &GroupVersionResource{Group: s[2], Version: s[1], Resource: s[0]}
+	}
+
+	return gvr, ParseGroupResource(arg)
+}
+
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
 //

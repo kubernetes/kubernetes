@@ -433,20 +433,36 @@ func (b *Builder) SingleResourceType() *Builder {
 	return b
 }
 
+// mappingFor returns the RESTMapping for the Kind referenced by the resource.
+// prefers a fully specified GroupVersionResource match.  If we don't have one match on GroupResource
+func (b *Builder) mappingFor(resourceArg string) (*meta.RESTMapping, error) {
+	fullySpecifiedGVR, groupResource := unversioned.ParseResourceArg(resourceArg)
+	gvk := unversioned.GroupVersionKind{}
+	if fullySpecifiedGVR != nil {
+		gvk, _ = b.mapper.KindFor(*fullySpecifiedGVR)
+	}
+	if gvk.IsEmpty() {
+		var err error
+		gvk, err = b.mapper.KindFor(groupResource.WithVersion(""))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+}
+
 func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	if len(b.resources) > 1 && b.singleResourceType {
 		return nil, fmt.Errorf("you may only specify a single resource type")
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		gvk, err := b.mapper.KindFor(unversioned.ParseGroupResource(r).WithVersion(""))
+		mapping, err := b.mappingFor(r)
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return nil, err
-		}
+
 		mappings = append(mappings, mapping)
 	}
 	return mappings, nil
@@ -459,14 +475,11 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if _, ok := mappings[r.Resource]; ok {
 			continue
 		}
-		gvk, err := b.mapper.KindFor(unversioned.ParseGroupResource(r.Resource).WithVersion(""))
+		mapping, err := b.mappingFor(r.Resource)
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return nil, err
-		}
+
 		mappings[mapping.Resource] = mapping
 		mappings[r.Resource] = mapping
 		canonical[mapping.Resource] = struct{}{}
