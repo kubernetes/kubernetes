@@ -22,7 +22,8 @@
 
 config_hostname() {
   # Set the hostname to the short version.
-  short_hostname=$(hostname -s)
+  host_name=$(curl --silent "http://metadata.google.internal/computeMetadata/v1/instance/hostname" -H "Metadata-Flavor: Google")
+  short_hostname=$(echo "${host_name}" | cut -d. -f1)
   hostname "${short_hostname}"
 }
 
@@ -121,8 +122,7 @@ install_critical_packages() {
   # Install docker and brctl if they are not in the image.
   if ! which docker > /dev/null; then
     echo "Do not find docker. Install it."
-    # We should install the latest qualified docker, which is version 1.8.3 at present.
-    curl -sSL https://get.docker.com/ | DOCKER_VERSION=1.8.3 sh
+    curl -fsSL https://get.docker.com/ | sh
   fi
   if ! which brctl > /dev/null; then
     echo "Do not find brctl. Install it."
@@ -132,18 +132,22 @@ install_critical_packages() {
 
 # Install the packages that are useful but not required by spinning up a cluster.
 install_additional_packages() {
-  # Socat and nsenter are not required for spinning up a cluster. We move the
-  # installation here to be in parallel with the cluster creation.
   if ! which socat > /dev/null; then
     echo "Do not find socat. Install it."
     apt-get install --yes socat
   fi
   if ! which nsenter > /dev/null; then
     echo "Do not find nsenter. Install it."
-    # Note: this is an easy way to install nsenter, but may not be the fastest
-    # way. In addition, this may not be a trusted source. So, replace it if
-    # we have a better solution.
-    docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+    mkdir -p /tmp/nsenter-install
+    cd /tmp/nsenter-install
+    curl https://www.kernel.org/pub/linux/utils/util-linux/v2.24/util-linux-2.24.tar.gz | tar -zxf-
+    apt-get --yes install make
+    apt-get --yes install gcc
+    cd util-linux-2.24
+    ./configure --without-ncurses
+    make nsenter
+    cp nsenter /usr/local/bin
+    rm -rf /tmp/nsenter-install
   fi
 }
 
@@ -287,10 +291,15 @@ restart_docker_daemon() {
     echo "Sleep 1 second to wait for cbr0"
     sleep 1
   done
-  initctl restart docker
   # Remove docker0
   ifconfig docker0 down
   brctl delbr docker0
+  # Ensure docker daemon is really functional before exiting. Operations afterwards may
+  # assume it is running.
+  while ! docker version > /dev/null; do
+    echo "Sleep 1 second to wait for docker daemon"
+    sleep 1
+  done
 }
 
 # Create the log file and set its properties.
@@ -312,10 +321,14 @@ health_monitoring() {
     if ! timeout 10 docker version > /dev/null; then
       echo "Docker daemon failed!"
       pkill docker
+      # Wait for a while, as we don't want to kill it again before it is really up.
+      sleep 30
     fi
     if ! curl --insecure -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
       echo "Kubelet is unhealthy!"
       pkill kubelet
+      # Wait for a while, as we don't want to kill it again before it is really up.
+      sleep 60
     fi
     sleep "${sleep_seconds}"
   done
